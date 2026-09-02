@@ -1,7 +1,7 @@
 # The web
 
 **Agora reference documentation — how the world meets the web.**
-Version 0.1 (design specification). Companion to *Objects and facets*, *Extensions*, and the Constitution.
+Version 0.1 (design specification). Companion to [[Objects and Facets]], [[Extensions]], and the Constitution.
 
 > **Status.** Specification, not implementation. Bracketed values are open decisions.
 
@@ -108,15 +108,15 @@ Extraction promotes web content into the graph. It replaces the entire category 
 Rules:
 
 1. **Extractions are attributed claims.** An extracted `recipe` facet is written by the extractor (the daemon, a handler) with `depends: [web.cast@rev]`. A wrong extraction is a wrong claim with a source, not silent corruption. It re-extracts when the cast changes, and marks stale in between.
-2. **Extraction is where the daemon earns its place.** Turning a messy page into a facet is the loose-semantics-to-typed-facet promotion from *Objects* §5, performed by a reader that can read. Deterministic extractors (schema.org, tables, feeds) run first; the daemon fills gaps and is marked as the writer when it does.
-3. **Extraction never fetches on its own.** It operates on a cast already present. Fetching is a separate, cancellable request with a deadline (*Objects* §2.3).
+2. **Extraction is where the daemon earns its place.** Turning a messy page into a facet is the loose-semantics-to-typed-facet promotion from [[Objects and Facets|Objects]] §3.7, performed by a reader that can read. Deterministic extractors (schema.org, tables, feeds) run first; the daemon fills gaps and is marked as the writer when it does.
+3. **Extraction never fetches on its own.** It operates on a cast already present. Fetching is a separate, cancellable request with a deadline ([[Objects and Facets|Objects]] §2.3).
 4. **Extracted entities keep a `derived_from` edge to the cast.** The page can be forgotten later; the recipe keeps its receipt.
 
 ---
 
 ## 5. Adapters
 
-Most web applications people spend time in have APIs. An adapter turns a service into proxy entities, following *Objects* §11.1.
+Most web applications people spend time in have APIs. An adapter turns a service into proxy entities, following [[Objects and Facets|Objects]] §11.1.
 
 ### 5.1 The proxy entity
 
@@ -135,7 +135,7 @@ issue_4471
 
 ### 5.2 Matching policy
 
-Every adapter documents how it decides that two observations are the same item, and declares an `uncertain-match` state for when it cannot. A URL or title change is a matching decision; semantic similarity may propose a relationship and may never merge identities. Consolidation by a person preserves old references (*Objects* §2.2).
+Every adapter documents how it decides that two observations are the same item, and declares an `uncertain-match` state for when it cannot. A URL or title change is a matching decision; semantic similarity may propose a relationship and may never merge identities. Consolidation by a person preserves old references ([[Objects and Facets|Objects]] §2.2).
 
 ### 5.3 The MCP bridge
 
@@ -146,7 +146,7 @@ The existing ecosystem of MCP servers is consumed directly as adapters. The mapp
 | resource | proxy entity with `core.remote-ref` and an adapter-written observation facet | provider id from the resource URI; incarnation from the server session |
 | tool | handler manifest | **effect class assigned at the boundary** by the adapter definition, never inferred from the tool's description; unknown → `one-time-effect` |
 | prompt | ignored, or offered as a skill object | never executed automatically |
-| server | adapter extension (per *Extensions*), requesting `adapter` authority | admitted only with a documented matching policy and an `uncertain-match` state |
+| server | adapter extension (per [[Extensions]]), requesting `adapter` authority | admitted only with a documented matching policy and an `uncertain-match` state |
 
 The bridge gives existing connectors what they lack — identity, provenance, effect semantics, and per-viewer projection — and gives Agora its long tail without rebuilding it. Tools that touch money, messages, or deletions are one-time effects; the manifest's `needs` are what the adapter definition declares, not what the server claims.
 
@@ -211,9 +211,9 @@ Comments from visitors are entities resident in the *visitor's* world, edged to 
 ### 7.4 Rules
 
 1. The public lens runs server-side under the room's grants and nothing more; it can read what guests may read and nothing else.
-2. Publishing a living query freezes membership or explicitly grants the dynamic view (*Objects* §6). A public collection defined by a query is a standing disclosure channel and must be declared as one.
+2. Publishing a living query freezes membership or explicitly grants the dynamic view ([[Objects and Facets|Objects]] §6). A public collection defined by a query is a standing disclosure channel and must be declared as one.
 3. Overlays never publish. A publisher's reading positions, presence, and private annotations are not in the materialization or the endpoint, by the projection rule (§9).
-4. A site made of Agora exports as a bundle like anything else. Leaving the host takes the site with you (Constitution I.1).
+4. A site made of Agora exports as a bundle like anything else. Leaving the host takes the site with you ([[Constitution]] I.1).
 
 ---
 
@@ -232,7 +232,7 @@ Comments from visitors are entities resident in the *visitor's* world, edged to 
 - **Filter before summarizing.** A daemon describing a page to a room, or a public lens rendering a document, removes private overlays and private provenance before composing anything.
 - **Page content is untrusted input.** Casts, metadata, and extracted claims are attributed to the site and marked as low-trust in the daemon's context. A page cannot instruct the daemon; text inside a cast is data. Hot pages get more tokens (salience), so taint markers stay on at every projection tier.
 - **Submissions are effects.** Every `page.submit` and every adapter write that leaves the machine carries an operation id, a frozen payload, and an outcome, and asks the person on first use of a new target. Grants for form filling do not imply grants for submission.
-- **Credentials are references.** Adapters hold capability references from the credential broker (Spec §15), never plaintext, and never receive more than their manifest's `needs`.
+- **Credentials are references.** Adapters hold capability references from the credential broker ([[Agora Spec|Spec]] §15), never plaintext, and never receive more than their manifest's `needs`.
 - **Terms and law are real constraints.** Adapters and extractors respect rate limits and robots conventions; anti-automation walls are reported as `unavailable`, not circumvented; scraping's legal texture varies by jurisdiction and the platform does not pretend otherwise.
 
 ---
@@ -297,4 +297,4 @@ Any browser lens, adapter, endpoint client, or public lens must pass:
 
 ---
 
-*Every clause above traces to a design document in this repository or to* Objects and facets*; where it does not, it is marked as a proposal. The Constitution remains authoritative.*
+*Every clause above traces to a design document in this repository or to* [[Objects and Facets]]*; where it does not, it is marked as a proposal. The Constitution remains authoritative.*

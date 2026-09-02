@@ -2,7 +2,7 @@
 
 Research proposal · 31 August 2026
 
-**Scope correction:** this first-pass proposal focuses too narrowly on project decisions and experiments to define all of Agora memory. Read the [OS-wide reframing](<C:/Projects/Agora/research/graph-memory/operating-system-memory.md>) first. It supersedes the framing and first-prototype recommendation here; the evidence, authority, temporal and storage considerations below remain supporting design work.
+**Scope correction:** this first-pass proposal focuses too narrowly on project decisions and experiments to define all of Agora memory. Read the [[operating-system-memory|OS-wide reframing]] first. It supersedes the framing and first-prototype recommendation here; the evidence, authority, temporal and storage considerations below remain supporting design work.
 
 **Recommendation:** build an object-centered, evidence-preserving memory service. Keep Agora entities as the identity system; add qualified relationship records and composable memory facets; record native work connections directly; use models to propose additional connections; retrieve small, authorized subgraphs together with their source evidence. Start with an embedded relational store and rebuildable indexes. Do not choose a graph database as a substitute for these contracts.
 
@@ -12,14 +12,14 @@ Everything described as a recommendation below is a proposed design, not existin
 
 | Existing commitment | Consequence for memory | Source |
 | --- | --- | --- |
-| Stable identity plus independently versioned facets; kind tags are advisory | Refer to the same prototype from a conversation, experiment, and decision; express memory features as facets | [Objects, §§3–5](<C:/Projects/Agora/Agora Objects.md>) |
-| Relationships are first-class records with asserter and event | Extend the edge contract rather than invent a separate identity graph | [Objects, §6](<C:/Projects/Agora/Agora Objects.md>) |
-| Facets project into a token budget | Retrieval must select both objects and detail levels, including provenance overhead | [Objects, §7](<C:/Projects/Agora/Agora Objects.md>) |
-| Event log is authoritative; indexes are disposable | Record accepted extraction outputs; replay must not call a model to recreate the past | [Objects, §11](<C:/Projects/Agora/Agora Objects.md>) |
-| World rollback does not erase JEFF's memory | Current-state retrieval and historical recollection need different branch semantics | [Core, §§11–13](<C:/Projects/Agora/Agora Spec.md>) |
-| Spatial and semantic graphs are different | Visual proximity can suggest a connection but cannot define semantic truth | [Core, §5](<C:/Projects/Agora/Agora Spec.md>) |
-| Rooms share selected objects; personal memory is confidential | One logical graph does not mean one undifferentiated memory pool | [Rooms, §§2, 5–6](<C:/Projects/Agora/Untitled.md>) |
-| Protected services mediate memory, disclosure, and effects | A relationship or remembered approval cannot confer authority | [Security, §§3–4](<C:/Projects/Agora/Security Model.md>) |
+| Stable identity plus independently versioned facets; kind tags are advisory | Refer to the same prototype from a conversation, experiment, and decision; express memory features as facets | [[Agora Objects (superseded)|Objects, §§3–5]] |
+| Relationships are first-class records with asserter and event | Extend the edge contract rather than invent a separate identity graph | [[Agora Objects (superseded)|Objects, §6]] |
+| Facets project into a token budget | Retrieval must select both objects and detail levels, including provenance overhead | [[Agora Objects (superseded)|Objects, §7]] |
+| Event log is authoritative; indexes are disposable | Record accepted extraction outputs; replay must not call a model to recreate the past | [[Agora Objects (superseded)|Objects, §11]] |
+| World rollback does not erase JEFF's memory | Current-state retrieval and historical recollection need different branch semantics | [[Agora Spec|Core, §§11–13]] |
+| Spatial and semantic graphs are different | Visual proximity can suggest a connection but cannot define semantic truth | [[Agora Spec|Core, §5]] |
+| Rooms share selected objects; personal memory is confidential | One logical graph does not mean one undifferentiated memory pool | [[Rooms|Rooms, §§2, 5–6]] |
+| Protected services mediate memory, disclosure, and effects | A relationship or remembered approval cannot confer authority | [[Security|Security, §§3–4]] |
 
 Three claims in the existing documents need narrowing. An event can faithfully record a false observation. A model reading loose semantics cannot make that semantics safe for authorization. A history of file-change events cannot reconstruct file contents unless the corresponding versions are retained. These are contract requirements, not graph algorithm choices.
 
@@ -250,13 +250,13 @@ Private JEFF and room-facing inference require separate contexts and cache scope
 
 Keep untrusted extracted content available for low-trust search where appropriate, but do not let it overwrite accepted decisions, personal instructions, or capability state. If a source is poisoned, mark its assertions and all dependent summaries, embeddings, proposed procedures, and queued plans quarantined. Recompute from clean sources. A summary of a summary retains the original dependency chain; repetition is not independent corroboration.
 
-These controls apply Agora's existing [security proposal, particularly A2, A3, A7, A9 and A12](<C:/Projects/Agora/Security Model.md>). Provenance supports diagnosis and containment; it does not prove a model will ignore malicious text.
+These controls apply Agora's existing [[Security|security proposal, particularly A2, A3, A7, A9 and A12]]. Provenance supports diagnosis and containment; it does not prove a model will ignore malicious text.
 
 ## 10. Forgetting is three operations
 
 **Salience decay** reduces default prominence. **Archival** removes items from routine retrieval while preserving entitled recovery. **Erasure** removes content and disallowed derivatives from managed stores. A dormant object can still be a critical dependency, so attention decay alone cannot destroy it.
 
-There is an explicit specification conflict to resolve: the object document suggests permanent events and tombstones; Constitution Article I.8 permits erasing content and traces, while Article V protects the record. Article 0 gives Article I precedence. This proposal does not silently redefine that right away. [Constitution, Articles 0, I and V](<C:/Projects/Agora/CONSTITUTION.md>).
+There is an explicit specification conflict to resolve: the object document suggests permanent events and tombstones; Constitution Article I.8 permits erasing content and traces, while Article V protects the record. Article 0 gives Article I precedence. This proposal does not silently redefine that right away. [[Constitution|Constitution, Articles 0, I and V]].
 
 A candidate mechanism separates minimal event structure from erasable payloads and tracks deletion through sources, indexes, summaries, caches, retained versions, backups, and replicas. Encryption with separately destroyable keys may help, but it is not sufficient by itself: metadata, digests of guessable content, copied plaintext, shared keys, and identifiers can still reveal personal traces. The precise permissible residual record needs an explicit specification decision.
 
@@ -272,6 +272,6 @@ Source-based memory of project history should make JEFF a better collaborator wi
 
 ## 12. Decisions this research recommends next
 
-Adopt the evidence and identity contracts before committing to an engine. Prototype one-project resumption, decision tracing, and worker handoff. Compare a strong hybrid-search baseline with native graph links, then add extracted links, then test more elaborate traversal and summaries separately. Use the [evaluation plan](<C:/Projects/Agora/research/graph-memory/evaluation.md>) to decide which complexity earns its cost.
+Adopt the evidence and identity contracts before committing to an engine. Prototype one-project resumption, decision tracing, and worker handoff. Compare a strong hybrid-search baseline with native graph links, then add extracted links, then test more elaborate traversal and summaries separately. Use the [[evaluation|evaluation plan]] to decide which complexity earns its cost.
 
 Leave universal ontology design, automatic global entity merging, graph neural networks, automatic policy learning, federation-wide memory, personal fine-tuning, and a world-scale graph canvas outside the first slice. These may become research directions; none is required to establish whether connected object memory helps Agora.

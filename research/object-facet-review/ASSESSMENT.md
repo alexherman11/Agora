@@ -2,9 +2,9 @@
 
 Initial research and experiments completed August 31, 2026; subsequently revised at the user's request to evaluate a whole OS rather than center idea-to-prototype work. The core specification, object design, and facet explanation have now been revised. This object review did not edit the Constitution or the separate security assessment; security work proceeded separately. Historical comparisons below retain the initial research; no new web research was used for the whole-OS revision.
 
-**Scope correction:** a development workflow is one useful stress test, not the product backbone or sufficient evidence for a general object model. The current proposal is constrained by reading, listening, communication, scheduling, files, devices, private state, transient data, and large application models. See [Object Use Cases](<C:/Projects/Agora/Object Use Cases.md>) for the expanded reasoning. The [initial assessment](C:/Projects/Agora/research/whole-os-object-review/before-revision/initial-assessment.md) and [earlier core documents](<C:/Projects/Agora/research/whole-os-object-review/before-revision/Agora Objects.md>) are preserved for comparison.
+**Scope correction:** a development workflow is one useful stress test, not the product backbone or sufficient evidence for a general object model. The current proposal is constrained by reading, listening, communication, scheduling, files, devices, private state, transient data, and large application models. See [[Object Use Cases]] for the expanded reasoning. The [[initial-assessment|initial assessment]] and [[Agora Objects (pre-revision)|earlier core documents]] are preserved for comparison.
 
-The working materials are the [concrete example world](C:/Projects/Agora/research/object-facet-review/example_world.json), [executable counterexamples](C:/Projects/Agora/research/object-facet-review/toy_models.py), and [recorded results](C:/Projects/Agora/research/object-facet-review/results.json). The principal local sources were [Agora Objects](<C:/Projects/Agora/Agora Objects.md>), [Facets](C:/Projects/Agora/Facets.md), the [core spec](<C:/Projects/Agora/Agora Spec.md>), the [Constitution](C:/Projects/Agora/CONSTITUTION.md), and the [rooms proposal](C:/Projects/Agora/Untitled.md). Historical descriptions below are source-backed; architectural recommendations and example policies are my assessment, not reported facts about an implemented Agora system.
+The working materials are the [[example_world.json|concrete example world]], [[toy_models.py|executable counterexamples]], and [[results.json|recorded results]]. The principal local sources were [[Agora Objects (superseded)|Agora Objects]], [[Facets in Everyday Use|Facets]], the [[Agora Spec|core spec]], the [[Constitution]], and the [[Rooms|rooms proposal]]. Historical descriptions below are source-backed; architectural recommendations and example policies are my assessment, not reported facts about an implemented Agora system.
 
 **My judgment**
 
@@ -309,7 +309,7 @@ Finally, low attention is not permission to delete. An old family photo, cryptog
 
 **10. What prior systems actually tell us**
 
-The failure table in the [earlier object document](<C:/Projects/Agora/research/whole-os-object-review/before-revision/Agora Objects.md:22>) was too confident about historical causes. The revised core removes that causal framing. The assertion that predecessors died because machines could not read is not supported. Nor does the survival of one mechanism establish that all competing designs failed. Several lines of work survived in narrower forms.
+The failure table in the [[Agora Objects (pre-revision)|earlier object document]] was too confident about historical causes. The revised core removes that causal framing. The assertion that predecessors died because machines could not read is not supported. Nor does the survival of one mechanism establish that all competing designs failed. Several lines of work survived in narrower forms.
 
 | Comparison | What the evidence supports | Implication for Agora |
 |---|---|---|
@@ -332,7 +332,7 @@ The word “facet” also has different established meanings: a data component h
 
 **11. What the executable experiments found**
 
-The [toy models](C:/Projects/Agora/research/object-facet-review/toy_models.py) use only Python's standard library. They ran under Python 3.14.0: **14/14 experiments passed**. “Passed” means the intended counterexample occurred and the constrained model met the specified check. It does not mean the Agora architecture passed 14 production tests.
+The [[toy_models.py|toy models]] use only Python's standard library. They ran under Python 3.14.0: **14/14 experiments passed**. “Passed” means the intended counterexample occurred and the constrained model met the specified check. It does not mean the Agora architecture passed 14 production tests.
 
 | Experiment | Failure demonstrated | Constraint exercised |
 |---|---|---|

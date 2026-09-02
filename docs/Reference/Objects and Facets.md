@@ -1,7 +1,7 @@
 # Objects and facets
 
 **Agora reference documentation — object layer.**
-Version 0.3 (design specification). Supersedes *Agora Objects*, *Agora Objects II*, and the *Agora objects* revision; incorporates *Facets*.
+Version 0.3 (design specification). Supersedes [[Agora Objects (superseded)|Agora Objects]] — the original draft and its whole-OS revision, both archived under `research/` — and incorporates [[Facets in Everyday Use|Facets]]. The superseded document's worked examples are carried here as Appendix A.
 
 > **Status.** This document specifies behavior. It does not claim that any of it is implemented. Code examples use an illustrative SDK; the object layer is a protocol, and any language that speaks it is a first-class client. Bracketed values are open decisions.
 
@@ -27,6 +27,7 @@ Version 0.3 (design specification). Supersedes *Agora Objects*, *Agora Objects I
 12. [Invariants](#12-invariants)
 13. [Open decisions](#13-open-decisions)
 14. [Glossary](#14-glossary)
+15. [Appendix A — Everyday subjects (worked examples)](#appendix-a-everyday-subjects-worked-examples)
 
 ---
 
@@ -280,6 +281,8 @@ facet-def sam.trip-meta v1
 ```
 
 From that moment any entity may carry `sam.trip-meta`. No migration, no global schema version, no permission from the platform. To evolve it, mint v2 with a `migrations` lens; instances on v1 remain readable and are translated on demand.
+
+Soft semantics is the nursery for schema. Free tags, annotations, and ad-hoc key-values need no definition and cost nothing to write; when the same shape recurs across many objects, that recurrence is the signal to mint a vernacular facet-def for it rather than keep hand-writing its projection. The recurrence thresholds, and the search-before-mint rule that decides whether to reuse, extend, or mint, are in [[Extensions]] §4.1–4.2.
 
 > **Warning.** Requesting `authority: reconciler` in a vernacular facet-def is refused unless the requesting component is installed as a reconciler with grants (§3.2).
 
@@ -606,7 +609,7 @@ runtime adapters and controllers
   expiring observations, transient activity streams
 ```
 
-These need not be separate databases. Protection and restore domains must be real, however: the daemon's persistent memory lives outside the world snapshot domain, and excluding a directory from snapshots does not protect it from root inside the VM (see *Security Model*).
+These need not be separate databases. Protection and restore domains must be real, however: the daemon's persistent memory lives outside the world snapshot domain, and excluding a directory from snapshots does not protect it from root inside the VM (see [[Security]]).
 
 ### 10.2 Events are intents
 
@@ -736,6 +739,137 @@ Left open until exercised by conformance cases:
 **Tombstone** — the frozen core of a departed entity, resolving references honestly.
 **World-line** — a branch of history with its own log.
 
+---
+
+## Appendix A. Everyday subjects (worked examples)
+
+*Carried over from [[Agora Objects (superseded)]] §2 and §4 so that the worked cases live with the contract they exercise. The sketches omit wire-format details and illustrate equally important cases, not a sequence every object passes through. Where their vocabulary differs from §2–§8 above, the sections above win. [[Object Use Cases]] pressures each of these cases further.*
+
+### A.1 What an object identifies
+
+An entity has a stable identity and a set of typed facets. It identifies a subject at a useful boundary, not every piece of implementation state associated with that subject.
+
+| Distinction | Example |
+|---|---|
+| Subject and revision | A document remains the same document after an edit; a citation may pin its earlier revision. |
+| Subject and representation | A photo appears in an album, a search result, and an editor without becoming three photos. |
+| Subject and activity | A recording exists when nothing is playing it; a playback session can move between recordings. |
+| Subject and location | A file move changes a binding; a new file at the old path is not automatically the old document. |
+| Subject and occurrence | A playlist can contain the same recording twice; each entry has a distinct position and identity. |
+| Subject and access | A remote document can remain known while its contents are offline or permission has expired. |
+| Subject and role | A particular printer is different from the preference “default printer.” |
+
+Identity stability does not mean every property stays fixed. It means references continue to designate the subject they were issued for, and changes of subject are explicit.
+
+### A.2 A document being read
+
+```text
+document_17:
+  name: Travel itinerary
+  content: retained PDF revision 3
+  source: attachment source with its own provenance
+  annotations: highlights anchored to content revisions
+
+reading state, scoped to Alex:
+  subject: document_17
+  anchor: page 4 in revision 3
+
+reader_session_2:
+  subject: document_17, live revision policy
+  view: Alex's desktop
+  current selection: a versioned region
+```
+
+The document can remain unchanged for years. Reading enriches personal position and optional annotations without changing shared content. If the source is revised, an old anchor remains tied to its old revision until safely mapped or explicitly reattached. Closing the reader does not archive the document. Removing a download does not erase the subject if another source remains.
+
+### A.3 Music and playback
+
+```text
+recording_8:
+  media: duration, content/source identities, supported representations
+  description: title and artist assertions
+
+playlist_4:
+  entries:
+    entry_11 -> recording_8
+    entry_12 -> recording_9
+    entry_13 -> recording_8
+
+playback_session_2:
+  selected entry: playlist_4 / entry_13
+  intent: playing, requested output headphones_2
+  observation: buffering; output not yet connected
+  resume policy: remember position, do not auto-play after reboot
+```
+
+Moving `entry_13` does not move `entry_11`. Pausing playback does not mutate the recording. Requested output and effective output are separate; headphones disappearing must follow an explicit fallback policy, particularly during private listening or calls. Playback time is sampled activity state, not a permanent content edit for every audio frame.
+
+### A.4 Messages and conversations
+
+```text
+conversation_5:
+  participant references and message relationships
+
+draft_12:
+  editable body and attachment selections
+  intended conversation: conversation_5
+
+send_operation_7:
+  frozen body and attachment revision references
+  account and destination
+  operation identity
+  outcome: pending | accepted | rejected | unknown
+
+message_19:
+  source binding and sent-content provenance
+  delivery observations
+```
+
+The domain protocol must specify whether submission preserves a draft's identity or creates a message linked to it; it must not silently retarget old draft references. Editing a draft after submission must not alter the frozen payload already sent. One person's unread state is a private overlay, not a claim that everyone has read the message. A conversation and its active call have independent lifetimes. Deleting a local message view does not retract a remotely delivered message.
+
+### A.5 Appointments and reminders
+
+```text
+appointment_series_6:
+  schedule: local civil time, time zone, recurrence definition
+  participants and exceptions
+
+occurrence_21:
+  belongs to appointment_series_6
+  stable occurrence key
+  scheduled time and any explicit exception
+
+reminder_12:
+  target: occurrence_21
+  timing and delivery policy
+  delivery-operation references
+```
+
+A series is not one occurrence. Moving a single occurrence must not detach old references or move the whole series. A recurrence edit needs explicit scope: this occurrence, future occurrences, or the series. Reopening a calendar does not create new reminder deliveries. An overdue reminder after restart needs a catch-up policy rather than automatic repeated notification.
+
+### A.6 Devices and jobs
+
+```text
+printer_3:
+  device binding and identity evidence
+  supported operations
+  connection/capability observations with freshness
+
+preference, scoped to Alex:
+  default printing target: printer_3
+
+print_job_9:
+  target: printer_3
+  input: document_17 revision 3
+  requested copies: 1
+  submission identity and observed outcome
+```
+
+Changing the default printer does not retarget an already submitted job. A new device at the same address is not automatically the same trusted printer. If the printer accepted the job but the acknowledgment was lost, a restart must not silently produce another physical copy. Unknown outcome is meaningful state.
+
+### A.7 Creation remains supported
+
+A code project may have file bindings and optional service intent; a worker job may produce a changeset; a prototype may be derived from a note. These use the same reference, operation, and authority rules. They are one family among the preceding uses, not the reference example for every mechanism.
 ---
 
 *Every clause above traces to a design document in this repository; where it does not, it is marked as a proposal. The Constitution remains authoritative.*

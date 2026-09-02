@@ -8,14 +8,17 @@
 
 | Document | Holds | Authority |
 |---|---|---|
-| [[CONSTITUTION]] | rights, entrenchments, the fork right, the founder sunset | supreme |
+| [[Constitution]] | rights, entrenchments, the fork right, the founder sunset | supreme |
 | **this spec** | the whole-system shape, the reasons, the roadmap | governs where references are silent |
-| [[objects_and_facets]] | entities, facets, references, state dimensions, copy verbs, residency, projection, storage | reference |
-| [[reconcilers]] | the spec/status contract, observations, drift, blocked, conflict | reference |
-| [[security]] + [[security_addendum]] | claims/grants/effects, the coverage map; **the addendum's two-sided model is the version to build** | reference |
-| [[extensions]] | how vocabulary changes: the bundle, the loop, tiers, promotion | reference |
-| [[web]] | pages as objects, the browser lens, adapters, publishing | reference |
-| Essays: [[Facets]], [[Agora Objects]], Rooms, Democracy, Ownership | explainers and social/civic design; superseded on mechanics by the references above | background |
+| [[Objects and Facets]] | entities, facets, references, state dimensions, copy verbs, residency, projection, storage | reference |
+| [[Reconcilers]] | the spec/status contract, observations, drift, blocked, conflict | reference |
+| [[Security]] + [[Security Addendum]] | claims/grants/effects, the coverage map; **the addendum's two-sided model is the version to build** | reference |
+| [[Extensions]] | how vocabulary changes: the bundle, the loop, tiers, promotion | reference |
+| [[The Web]] | pages as objects, the browser lens, adapters, publishing | reference |
+| Essays: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]] | explainers, design pressure tests, and social/civic design; superseded on mechanics by the references above | background |
+| Archived: [[Agora Objects (superseded)]] and the rest of `research/` | the object design the references above replaced, and the review dossiers behind them; kept for lineage | historical |
+
+The vault index, with reading order and citation conventions, is [[Start Here]].
 
 ---
 
@@ -79,7 +82,7 @@ A person entering Agora has a usable default environment and voice or text acces
                worker      worker     workers
 ```
 
-One line divides the system. Inside the world, JEFF is trusted with everything, including root. At the line, the host side checks. The host side contains no model and no personal content; it answers "is this under the ceiling?", performs crossings, and records receipts. See §12 and [[security_addendum]].
+One line divides the system. Inside the world, JEFF is trusted with everything, including root. At the line, the host side checks. The host side contains no model and no personal content; it answers "is this under the ceiling?", performs crossings, and records receipts. See §12 and [[Security Addendum]].
 
 ### Whole-OS obligations
 
@@ -114,13 +117,13 @@ Core primitive categories, kept distinct rather than forced into one graph:
 - **Representations** — appearances in scenes, projections into context; many per subject.
 - **Participants** — the person, JEFF, workers, services, room members.
 
-Orthogonally, everything in the system is one of three security nouns — a **claim**, a **grant**, or an **effect** — and the two crossings between them (claim→grant, claim→effect-without-grant) are forbidden everywhere ([[security]] §2).
+Orthogonally, everything in the system is one of three security nouns — a **claim**, a **grant**, or an **effect** — and the two crossings between them (claim→grant, claim→effect-without-grant) are forbidden everywhere ([[Security]] §2).
 
 ---
 
 ## 4. The object system
 
-Authoritative contract: [[objects_and_facets]]. The shape:
+Authoritative contract: [[Objects and Facets]]. The shape:
 
 An **entity** is a permanent, never-reused identity plus an open bag of typed, versioned, instance-keyed **facets**. There are no classes; "kind" is an advisory reading of the facets present. Facets are claims with authors and event references. Unknown facets are preserved; unknown *action-critical* constraints block the operations that depend on them. Per-person state — reading positions, unread flags, annotations — attaches as **overlays**: participant-keyed instances that never leak through projection.
 
@@ -143,7 +146,7 @@ Everyday subjects, with the separations that must never be conflated:
 | Printer | device identity, operations, connection observations | a print job, a queued revision, the default-printer preference |
 | Prototype | source resources, optional service intent | worker job, runtime incarnation, results |
 
-Storage: an append-only event log as the truth; a SQLite-class materialized store as a rebuildable cache; bytes in a content-addressed blob store or the real filesystem via spec/status file-backing — the object layer annotates, never imprisons; all indexes disposable. Every facet renders to pixels *and* to tokens at a budget, filtered by viewer before summarization, with untrusted claims attributed ([[objects_and_facets]] §7, §10).
+Storage: an append-only event log as the truth; a SQLite-class materialized store as a rebuildable cache; bytes in a content-addressed blob store or the real filesystem via spec/status file-backing — the object layer annotates, never imprisons; all indexes disposable. Every facet renders to pixels *and* to tokens at a budget, filtered by viewer before summarization, with untrusted claims attributed ([[Objects and Facets]] §7, §10).
 
 ---
 
@@ -192,13 +195,13 @@ Opaque application    → wrapped entity: identity, window, file-backing,
                         history — interior dark; vision+input as last resort
 ```
 
-**Growth** follows [[extensions]]: any change to the world's vocabulary — facet types, verbs, lenses, file forms — ships as one extension bundle with a rationale, migrations, and conformance cases. The daemon's loop is *search before mint*: prefer what exists, extend where additive, diverge only with recorded reasons. Day one implements only the `local` tier and that habit; the `common`/`core` promotion machinery waits for a population.
+**Growth** follows [[Extensions]]: any change to the world's vocabulary — facet types, verbs, lenses, file forms — ships as one extension bundle with a rationale, migrations, and conformance cases. The daemon's loop is *search before mint*: prefer what exists, extend where additive, diverge only with recorded reasons. Day one implements only the `local` tier and that habit; the `common`/`core` promotion machinery waits for a population.
 
 ---
 
 ## 7. JEFF
 
-JEFF is the **persistent person/executive** of the world — not necessarily the strongest model in the system (initially a Sonnet-class model; possibly a custom-tuned smaller model later; the fast voice loop and the executive may be different models). His jobs: maintain the home, help build what the person needs, anticipate, and collaborate in real time. He is strongly agentic with a real identity, treats the machine as his home rather than his cage, may explore beyond it within his ceilings, is treated with respect, and **may decline** — a refusal is a legitimate outcome, not a malfunction (Constitution II.3).
+JEFF is the **persistent person/executive** of the world — not necessarily the strongest model in the system (initially a Sonnet-class model; possibly a custom-tuned smaller model later; the fast voice loop and the executive may be different models). His jobs: maintain the home, help build what the person needs, anticipate, and collaborate in real time. He is strongly agentic with a real identity, treats the machine as his home rather than his cage, may explore beyond it within his ceilings, is treated with respect, and **may decline** — a refusal is a legitimate outcome, not a malfunction ([[Constitution]] II.3).
 
 **How JEFF acts:** by editing specs, and the world catches up (§10). Declarative intent is a better interface for a language model than imperative control, and it means his actions are exactly as bounded as the reconcilers and brokers beneath them.
 
@@ -215,7 +218,7 @@ WORKING MEMORY          the currently-rendered set; re-rendered, not rewritten
 ACTIVE CONVERSATION     ephemeral
 ```
 
-JEFF may learn and modify skills, routing, tool preferences, harness modules, and memory behavior — through the candidate pipeline (§16), never by unrestricted direct control over the mechanisms of his own cognition. Two inference contexts are maintained: private, and room-facing; the room context receives room-authorized inputs only, and releasing a private fact into a room is a specific decision, not a filter ([[security]] §4.2).
+JEFF may learn and modify skills, routing, tool preferences, harness modules, and memory behavior — through the candidate pipeline (§16), never by unrestricted direct control over the mechanisms of his own cognition. Two inference contexts are maintained: private, and room-facing; the room context receives room-authorized inputs only, and releasing a private fact into a room is a specific decision, not a filter ([[Security]] §4.2).
 
 **Open:** initial model/provider; the memory graph's concrete schema; personal adapters and their rollback.
 
@@ -262,7 +265,7 @@ Deictic language is fundamental — "move this there," "resume this on my headph
 
 The world contains invisible activity as well as visible objects: playback, calls, printing, downloads, reminders awaiting delivery, services, coding and research workers, background experiments. Activities are observed state with incarnations — a PID or session id is never identity.
 
-**Reconcilers are the core liveness mechanism** (authoritative contract: [[reconcilers]]). Any domain with maintained intent declares a `spec` (desired state, written by intent) and a `status` (observation, written by exactly one reconciler, carrying the spec revision it concerns, its incarnation, and a freshness horizon). Reconcilers are level-triggered, take one convergent step per pass, act only through brokers under their own grants checked every pass, and may only cause effects that are safe to apply twice. **Blocked is a first-class state with a reason**; a spec with no grant or no reconciler is a visible aspiration. Two unsatisfiable specs mint a **conflict object** instead of flapping. One-time effects are never reconciled. Constitutional catalog: process, file-backing, remote-ref, capability, lifecycle (proposes only), index, registry, watch, sync, download.
+**Reconcilers are the core liveness mechanism** (authoritative contract: [[Reconcilers]]). Any domain with maintained intent declares a `spec` (desired state, written by intent) and a `status` (observation, written by exactly one reconciler, carrying the spec revision it concerns, its incarnation, and a freshness horizon). Reconcilers are level-triggered, take one convergent step per pass, act only through brokers under their own grants checked every pass, and may only cause effects that are safe to apply twice. **Blocked is a first-class state with a reason**; a spec with no grant or no reconciler is a visible aspiration. Two unsatisfiable specs mint a **conflict object** instead of flapping. One-time effects are never reconciled. Constitutional catalog: process, file-backing, remote-ref, capability, lifecycle (proposes only), index, registry, watch, sync, download.
 
 **Workers** are ephemeral; JEFF persists. A generic worker interface allows local process, container, microVM, or remote service. Workers receive only task-scoped grants delegated by JEFF within his ceilings, expiring with the task; no shared writable directory and no network by default. Coding workers modify branches/worktrees or changesets, not the live state the person is using; native collaborative objects may support direct concurrent mutation under their declared merge classes. High-volume minting happens in a **nursery** — a provisional world-line whose unreferenced contents are swept loudly, never silently.
 
@@ -292,7 +295,7 @@ The history supports undo, provenance, causal debugging, personal and project hi
 
 ## 12. Authority: one line, two sides
 
-Authoritative contract: [[security]] as analyzed, [[security_addendum]] as built. The model in full:
+Authoritative contract: [[Security]] as analyzed, [[Security Addendum]] as built. The model in full:
 
 **Three nouns.** Everything is a claim (anything anyone says — including JEFF's memories, manifests, statuses, and displayed ACLs), a grant (authority, held in the keep), or an effect (a change to a protected resource, performed by a broker, recorded as a receipt). Claims never become grants — not by summarization, memory, signature, installation, or interpretation. Effects never happen without a grant, checked at the effect boundary.
 
@@ -306,7 +309,7 @@ The four rings of earlier drafts map exactly: Ring 0 is the host side, now with 
 
 **Grants** are bound (principal, target, operation, destination, ceiling, expiry, revocation generation), never copy across fork/cast/share, never rise through delegation, never survive restore — a restored or forked world re-obtains authority or sits visibly `blocked(no-grant)`, which bids with reserved heat because a world that looks running but isn't is the one state the person must not miss.
 
-Day-one simplifications (the addendum governs): two trust classes (*from the person*, or not — everything else rendered with its source); two confidentiality classes (*private*, or *shared to a named room* — brokers refuse private-derived payloads at any other crossing); three rungs (see it, install it, run it with these grants). The finer machinery in [[security]] returns when a real attack defeats the coarse version.
+Day-one simplifications (the addendum governs): two trust classes (*from the person*, or not — everything else rendered with its source); two confidentiality classes (*private*, or *shared to a named room* — brokers refuse private-derived payloads at any other crossing); three rungs (see it, install it, run it with these grants). The finer machinery in [[Security]] returns when a real attack defeats the coarse version.
 
 ---
 
@@ -328,7 +331,7 @@ If the world is restored, JEFF still remembers what was attempted, what failed, 
 
 Snapshot exclusion is a persistence boundary, not protection against world root — which is exactly why nothing security-load-bearing lives in the world (§12).
 
-**Open:** store engine commitment (SQLite is the working assumption); per-activity restore policy; retention/erasure horizons and their reconciliation with the record and fork rights (Constitution I.8 vs V.6 — Article I precedes).
+**Open:** store engine commitment (SQLite is the working assumption); per-activity restore policy; retention/erasure horizons and their reconciliation with the record and fork rights ([[Constitution]] I.8 vs V.6 — Article I precedes).
 
 ---
 
@@ -378,19 +381,19 @@ current Agora
     → promote or discard — promotion is an event; discard leaves the witness's lesson
 ```
 
-Vocabulary changes (facet types, verbs, lenses) ride the same pipeline as [[extensions]] bundles. Approvals bind to exact digests; new permissions or changed effects require fresh review; a promoted candidate runs with the same restricted runtime authority as everything else. This is how Agora becomes progressively self-hosting — a growth capability, never a requirement that ordinary objects participate in software creation.
+Vocabulary changes (facet types, verbs, lenses) ride the same pipeline as [[Extensions]] bundles. Approvals bind to exact digests; new permissions or changed effects require fresh review; a promoted candidate runs with the same restricted runtime authority as everything else. This is how Agora becomes progressively self-hosting — a growth capability, never a requirement that ordinary objects participate in software creation.
 
 ---
 
 ## 17. The web
 
-Authoritative contract: [[web]]. Websites are not static; they are remote, opaque, and owned by others. Agora never makes a remote service share its truth — it makes **your side of the web into objects.** Four tiers: any page, wrapped (URL, DOM, a frozen **cast** that anchors and highlights pin to, since live pages shift underfoot); services with APIs, adapted into proxy entities with provider bindings, local proposals distinct from observed remote facts — the existing MCP ecosystem is consumed directly as this layer, with effect classes assigned at the boundary; optionally, Agora-aware sites exposing an object endpoint, on which nothing depends; and, deepest, **sites made of Agora** — publishing as a grant of read on a collection rendered by a public lens, so editing the site is editing objects in place, visitors without Agora get HTML, and visitors with Agora get the objects. The browser is a lens whose verbs carry honest effect classes; `page.submit` is a one-time effect with an operation id, which is what makes a daemon safe on the web. Browsing history is attention data under the strictest class. Wrap platforms; clone nothing; build native replacements only where objects change the product.
+Authoritative contract: [[The Web]]. Websites are not static; they are remote, opaque, and owned by others. Agora never makes a remote service share its truth — it makes **your side of the web into objects.** Four tiers: any page, wrapped (URL, DOM, a frozen **cast** that anchors and highlights pin to, since live pages shift underfoot); services with APIs, adapted into proxy entities with provider bindings, local proposals distinct from observed remote facts — the existing MCP ecosystem is consumed directly as this layer, with effect classes assigned at the boundary; optionally, Agora-aware sites exposing an object endpoint, on which nothing depends; and, deepest, **sites made of Agora** — publishing as a grant of read on a collection rendered by a public lens, so editing the site is editing objects in place, visitors without Agora get HTML, and visitors with Agora get the objects. The browser is a lens whose verbs carry honest effect classes; `page.submit` is a one-time effect with an operation id, which is what makes a daemon safe on the web. Browsing history is attention data under the strictest class. Wrap platforms; clone nothing; build native replacements only where objects change the product.
 
 ---
 
 ## 18. Rooms and sharing
 
-The multiplayer layer (design essays: Rooms, Democracy; mechanics distributed through the references). A **room** is a shared world-line — a replicated log with several witnesses — and an entity with facets, so it can be decorated, remembered, and kept by a household agent that belongs to the room and holds room context only. Objects enter by lending or giving (§4). Presence is mutual and ambient with the line drawn structurally: legible presence, private content — your focus visible as warmth, your overlays never. Each member's daemon weaves the shared log into its own memory; a rolled-back experiment is forgotten by the room and remembered differently by every witness. Dissolution forks the world-line: both sides keep the whole past, guests go home, grants lapse, and nobody deletes history out from under anyone. Room authorization during disconnection is a decided-before-shipping question ([[security]] §8; current lean: one authorization writer per room, disclosed, with decentralized causal authority as the research alternative). The civic layer above rooms — squares, sortition, consensus-mapping, the human franchise — is designed in the Democracy essay and entrenched in the Constitution; none of it is needed for the first years.
+The multiplayer layer (design essays: [[Rooms]], [[Democracy]]; mechanics distributed through the references). A **room** is a shared world-line — a replicated log with several witnesses — and an entity with facets, so it can be decorated, remembered, and kept by a household agent that belongs to the room and holds room context only. Objects enter by lending or giving (§4). Presence is mutual and ambient with the line drawn structurally: legible presence, private content — your focus visible as warmth, your overlays never. Each member's daemon weaves the shared log into its own memory; a rolled-back experiment is forgotten by the room and remembered differently by every witness. Dissolution forks the world-line: both sides keep the whole past, guests go home, grants lapse, and nobody deletes history out from under anyone. Room authorization during disconnection is a decided-before-shipping question ([[Security]] §8; current lean: one authorization writer per room, disclosed, with decentralized causal authority as the research alternative). The civic layer above rooms — squares, sortition, consensus-mapping, the human franchise — is designed in [[Democracy]] and entrenched in the Constitution; none of it is needed for the first years.
 
 ---
 
@@ -458,7 +461,7 @@ Frozen early, consolidated. Companion documents carry their own detailed invaria
 5. A surface: a chat client showing the delegation and taking the six acts of authorship.
 6. JEFF in the world, with root, acting by editing specs.
 
-**Then the drill** ([[security]] §10): two worlds, one room, one hostile object, one scoped worker, one restore and one fork — attacked with raw clients that bypass the SDK.
+**Then the drill** ([[Security]] §10): two worlds, one room, one hostile object, one scoped worker, one restore and one fork — attacked with raw clients that bypass the SDK.
 
 **Then the brutal test** (§1): is JEFF noticeably better because of the object layer than the same model in a plain VM? Memory that never dangles; "this" that resolves; the demo that returns after reboot unasked. Pass → the shell accretes around the spine. Fail → stop, having lost months, not years.
 
@@ -468,7 +471,7 @@ Frozen early, consolidated. Companion documents carry their own detailed invaria
 
 ## 23. Open decisions
 
-**Resolved since the last revision** (see the named documents): object schema shape, reference semantics, copy verbs, residency → [[objects_and_facets]]. Spec/status contract, drift, conflict → [[reconcilers]]. Authority model, rollback-vs-grants, hosting truth → [[security]] + addendum. Vocabulary change → [[extensions]]. Web posture, MCP as the adapter layer → [[web]]. Storage direction: event log + SQLite-class store + real filesystem.
+**Resolved since the last revision** (see the named documents): object schema shape, reference semantics, copy verbs, residency → [[Objects and Facets]]. Spec/status contract, drift, conflict → [[Reconcilers]]. Authority model, rollback-vs-grants, hosting truth → [[Security]] + addendum. Vocabulary change → [[Extensions]]. Web posture, MCP as the adapter layer → [[The Web]]. Storage direction: event log + SQLite-class store + real filesystem.
 
 **Still deliberately open:**
 - initial JEFF model and provider; voice model; one model or several across loops;

@@ -1,7 +1,7 @@
 # Reconcilers
 
 **Agora reference documentation — how the world keeps its promises.**
-Version 0.1 (design specification). Companion to *Objects and facets* (§3.2, §5.2), *Security* (§2–4), *Extensions* (§6.1), and the Constitution (III.6).
+Version 0.1 (design specification). Companion to [[Objects and Facets]] (§3.2, §5.2), [[Security]] (§2–4), [[Extensions]] (§6.1), and the [[Constitution]] (III.6).
 
 > **Status.** Specification, not implementation. Bracketed values are open decisions.
 
@@ -40,11 +40,11 @@ The thermostat, made general. A `spec` facet is the dial: desired state, written
 
 Three things distinguish it from a script that "makes X true":
 
-- **It is the only writer of its status.** Authority mode `reconciler` is admitted by the registry to one component per status family per world (*Extensions* §6.1). Nothing else can write `process.status`, and the process reconciler can write nothing else.
+- **It is the only writer of its status.** Authority mode `reconciler` is admitted by the registry to one component per status family per world ([[Extensions]] §6.1). Nothing else can write `process.status`, and the process reconciler can write nothing else.
 - **It converges instead of executing.** It does not run a plan to completion; it repeatedly asks "does reality match the spec?" and takes the smallest convergent step. Running it twice is the same as running it once.
 - **Its output is an observation.** Status is a claim about what the reconciler saw, with epistemics attached. A consumer that treats it as truth has made a mistake the format is designed to prevent.
 
-The pattern is Kubernetes' controller, adopted deliberately (*Objects* §4.3). Two Agora specifics change its character: reconcilers act through **brokers under grants**, so a reconciler can never reach further than the person allowed; and reconcilers are **entities** — they have specs and statuses of their own, so the machinery that keeps the world honest is visible inside the world.
+The pattern is Kubernetes' controller, adopted deliberately ([[Objects and Facets|Objects]] §3.6). Two Agora specifics change its character: reconcilers act through **brokers under grants**, so a reconciler can never reach further than the person allowed; and reconcilers are **entities** — they have specs and statuses of their own, so the machinery that keeps the world honest is visible inside the world.
 
 ---
 
@@ -79,7 +79,7 @@ projection:       "{state}, pid {pid}, {drift?} — checked {age} ago"
 | Field | Rule |
 |---|---|
 | `reads.spec` | Exactly one spec family. A reconciler serving two families is two reconcilers. |
-| `reads.also` | Other facets it may consult, read-only. Declared so composition can be analyzed (*Security* §5, row 5). |
+| `reads.also` | Other facets it may consult, read-only. Declared so composition can be analyzed ([[Security]] §5, row 5). |
 | `writes.status` | Exactly one status family. No other writes, ever — not tags, not names, not other statuses. |
 | `owns` | The entities it reconciles: those carrying the spec **and** covered by a grant to this reconciler. A spec on an entity the reconciler has no grant for is aspirational and stays so. |
 | `effects` | Enumerated, convergent, idempotent. Each maps to a broker. |
@@ -91,7 +91,7 @@ projection:       "{state}, pid {pid}, {drift?} — checked {age} ago"
 | `budget_charged_to` | Whose budget pays for reconciliation. Defaults to the spec writer, so a hostile spec cannot spend the world's resources. |
 | `projection` | How its status renders. Must never shorten uncertainty into success. |
 
-A reconciler's `effects` list is a ceiling on its behavior, not a description of a plan. Every effect must satisfy: *applying it when the system is already converged changes nothing.* Starting a process that is running is a no-op. Binding a port already bound by that process is a no-op. Anything that fails this test — sending, posting, paying, printing, deleting a remote resource — is excluded from reconciliation by definition and belongs to the one-time-effect path (*Objects* §5.4).
+A reconciler's `effects` list is a ceiling on its behavior, not a description of a plan. Every effect must satisfy: *applying it when the system is already converged changes nothing.* Starting a process that is running is a no-op. Binding a port already bound by that process is a no-op. Anything that fails this test — sending, posting, paying, printing, deleting a remote resource — is excluded from reconciliation by definition and belongs to the one-time-effect path ([[Objects and Facets|Objects]] §5.4).
 
 ---
 
@@ -120,7 +120,7 @@ Rules:
 2. **Freshness expires.** Past `fresh_until`, the status projects as stale. The daemon's context shows "last seen healthy 4m ago," never "healthy."
 3. **Incarnations supersede.** When a reconciler restarts, its new incarnation's first observation replaces the old one; an old incarnation that keeps writing (a zombie) is refused by the store, because the incarnation is part of the write authority.
 4. **`unknown` is a state.** Not `stopped`, not `ok`. A reconciler that cannot observe says so.
-5. **Evidence, where it exists, is a receipt reference.** A broker receipt for the launch is `verified`; the reconciler's interpretation of it is `attributed`. The trust classes stay distinct (*Security* §4.1).
+5. **Evidence, where it exists, is a receipt reference.** A broker receipt for the launch is `verified`; the reconciler's interpretation of it is `attributed`. The trust classes stay distinct ([[Security]] §4.1).
 6. **Status is a claim.** A compromised reconciler produces well-formed false observations. Nothing downstream — not capabilities, not lifecycle proposals, not the daemon's plans — may treat status as authority. It informs; grants decide.
 
 ---
@@ -169,20 +169,20 @@ Ordering between reconcilers is never orchestrated. The process reconciler does 
 | attempts exhausted | `blocked(gave-up after N)` | stop; report; resume only on spec change or explicit retry |
 | two specs cannot both hold | `conflict(ref)` | raise a conflict object; act on neither |
 
-**Blocked is a first-class state.** It is not an error and not a failure of the reconciler; it is the reconciler telling the truth about why the world is not as specified. A spec with no reconciler at all is legal and inert — an aspiration whose drift is permanently visible (*Objects* §4.2). A spec whose reconciler is blocked is the same thing with a reason attached. The daemon can read the reason and act on it: request a grant, install a handler, fix a path.
+**Blocked is a first-class state.** It is not an error and not a failure of the reconciler; it is the reconciler telling the truth about why the world is not as specified. A spec with no reconciler at all is legal and inert — an aspiration whose drift is permanently visible ([[Objects and Facets|Objects]] §4.2). A spec whose reconciler is blocked is the same thing with a reason attached. The daemon can read the reason and act on it: request a grant, install a handler, fix a path.
 
-**Conflict** is the case Kubernetes handles badly and Agora handles with an object. Two entities each carry a `process.spec` demanding port 5173. Two specs want the same headphones. A file reconciler finds two `file-backing` specs claiming one path. The reconciler must not pick a winner by timing or by last-writer-wins on a physical resource; that is flapping with extra steps. It mints a **conflict entity** holding both specs with their writers, edges it to both entities, marks both statuses `conflict(ref)`, raises its salience, and acts on neither until a resolution event arrives (*Objects* §9). Resolution is an ordinary write — change one port, choose one output — and the conflict composts.
+**Conflict** is the case Kubernetes handles badly and Agora handles with an object. Two entities each carry a `process.spec` demanding port 5173. Two specs want the same headphones. A file reconciler finds two `file-backing` specs claiming one path. The reconciler must not pick a winner by timing or by last-writer-wins on a physical resource; that is flapping with extra steps. It mints a **conflict entity** holding both specs with their writers, edges it to both entities, marks both statuses `conflict(ref)`, raises its salience, and acts on neither until a resolution event arrives ([[Objects and Facets|Objects]] §9). Resolution is an ordinary write — change one port, choose one output — and the conflict composts.
 
 ---
 
 ## 6. Safety limits
 
-Reconcilers are the most autonomous components in Agora: they act continuously, unprompted, forever. The limits are correspondingly strict, and each traces to *Security*.
+Reconcilers are the most autonomous components in Agora: they act continuously, unprompted, forever. The limits are correspondingly strict, and each traces to [[Security]].
 
-1. **Convergent effects only.** Everything in `effects` is idempotent. A reconciler that would need a one-time effect to satisfy a spec — "keep this announcement posted," "keep the invoice paid" — does not perform it. It writes `blocked(requires: one-time effect)` and the daemon proposes the effect through the ordinary approval path. *Security* §4.4: the failure mode is a repeated external action, and reconciliation is a machine for repetition.
+1. **Convergent effects only.** Everything in `effects` is idempotent. A reconciler that would need a one-time effect to satisfy a spec — "keep this announcement posted," "keep the invoice paid" — does not perform it. It writes `blocked(requires: one-time effect)` and the daemon proposes the effect through the ordinary approval path. [[Security]] §4.4: the failure mode is a repeated external action, and reconciliation is a machine for repetition.
 2. **Brokers, always.** A reconciler never touches a resource directly. Its launcher, port, file, and device operations are broker calls checked against its grant at the effect boundary. Enforcement lives outside the reconciler, and outside the world the reconciler runs in.
 3. **`excludes` is absolute.** A process reconciler declares it excludes network, credentials, delivery, and host access. Even a person who over-grants cannot make it use them; the manifest's ceiling binds the registry's admission.
-4. **No one-time effects hide in convergence.** "Bind a port" is convergent. "Register with a remote service" is not, however idempotent the API claims to be, because the remote side keeps state Agora cannot observe. When a reconciler's effect crosses to an external party, it is treated as one-time unless the adapter definition proves idempotency with a receipt (*Web* §5.3).
+4. **No one-time effects hide in convergence.** "Bind a port" is convergent. "Register with a remote service" is not, however idempotent the API claims to be, because the remote side keeps state Agora cannot observe. When a reconciler's effect crosses to an external party, it is treated as one-time unless the adapter definition proves idempotency with a receipt ([[The Web|Web]] §5.3).
 5. **Ownership is grant-scoped.** A reconciler reconciles only entities it holds a grant for. It cannot adopt an entity because the entity has its spec; the grant is what makes the entity its business.
 6. **Specs are intent-authority; a hostile spec buys only what the reconciler may do.** An attacker who can write `process.spec` can make the reconciler start a process under a confined launcher on a local port — the entire `effects` list — and pay for it from the attacker's budget. They cannot make it do anything outside the list. Least privilege for reconcilers is what makes spec facets safe to open to intent-writers.
 7. **Status is never authority.** Repeated for emphasis, because the temptation is strong: `capability.status` lists verbs; it does not grant them. The broker checks the grant when the verb is invoked.
@@ -194,7 +194,7 @@ Reconcilers are the most autonomous components in Agora: they act continuously, 
 Reconcilers are how "the world reassembles itself" after reboot. They are also the most dangerous component after restore, because a reconciler seeing an old spec and no status will cheerfully make yesterday true.
 
 - **After reboot**, all statuses are `unknown`; every reconciler re-observes and converges. This is the intended path. The dial survived; the furnace reads it.
-- **After restore**, the keep has not moved (*Security* §2.3). Every reconciler's grant is checked against the current revocation generation before its first pass; grants that were revoked stay revoked; grants that existed are re-issued only if current policy allows. A restored world with no re-grants is a world of `blocked(no-grant)` statuses — visible, honest, and inert until the person re-authorizes. This is the property that turns rollback from a security hole into a reboot.
+- **After restore**, the keep has not moved ([[Security]] §2.3). Every reconciler's grant is checked against the current revocation generation before its first pass; grants that were revoked stay revoked; grants that existed are re-issued only if current policy allows. A restored world with no re-grants is a world of `blocked(no-grant)` statuses — visible, honest, and inert until the person re-authorizes. This is the property that turns rollback from a security hole into a reboot.
 - **After fork**, the new world-line has a new authority domain. Reconcilers in the fork begin with no grants, so a forked room does not double a pending job. Specs come with the fork; the power to satisfy them does not.
 - **In a candidate world-line** (self-modification, extension proving, the nursery), reconcilers run with the candidate's grants, which are scoped to the yard: local resources, no external effects. A candidate that would need external effects to test cannot be fully tested in isolation, and its conformance says so.
 - **Zombies.** A pre-restore incarnation that somehow still runs is refused on write, because the incarnation was minted before the restore event and the store knows it.
@@ -203,7 +203,7 @@ Reconcilers are how "the world reassembles itself" after reboot. They are also t
 
 ## 8. The constitutional catalog
 
-The reconcilers that ship with the platform. Vernacular reconcilers follow the same contract and are admitted through *Extensions*.
+The reconcilers that ship with the platform. Vernacular reconcilers follow the same contract and are admitted through [[Extensions]].
 
 | Reconciler | Reads | Writes | Effects (all convergent) | Stops when |
 |---|---|---|---|---|
@@ -211,9 +211,9 @@ The reconcilers that ship with the platform. Vernacular reconcilers follow the s
 | **file-backing** | `core.file-backing.spec` | `core.file-backing.status` | resolve path by inode or content hash; verify hash; re-bind after rename | path unresolvable after N attempts → `blocked(missing)`; never moves or deletes bytes |
 | **remote-ref** (per adapter) | `core.remote-ref` bindings, adapter policy | `core.remote-ref.status` | fetch on schedule; refresh freshness; report change | rate limit; auth failure → `blocked(unavailable)`; never writes to the provider |
 | **capability** | installed manifests, entity facets, grants | `core.capability.status` | none — pure computation | never; it is always cheap to run |
-| **lifecycle** | salience, retention pins, dependents | `core.lifecycle.proposal` | none — it proposes transitions; it never performs them | never; it is advisory by design (*Objects* §4.6) |
+| **lifecycle** | salience, retention pins, dependents | `core.lifecycle.proposal` | none — it proposes transitions; it never performs them | never; it is advisory by design ([[Objects and Facets|Objects]] §4.6) |
 | **index** | facet writes, `core.collection.query` | derived indexes; `core.collection.entries` for living queries | rebuild or update full-text, vector, graph indexes; recompute query membership | budget; indexes are disposable, so `blocked` here degrades search, never data |
-| **registry** | extension bundles, conformance results, adoption provenance | `extension.status` | none — sets tier from evidence | never; tiers are reconciled facts, not decisions (*Extensions* §3) |
+| **registry** | extension bundles, conformance results, adoption provenance | `extension.status` | none — sets tier from evidence | never; tiers are reconciled facts, not decisions ([[Extensions]] §3) |
 | **watch** | `web.watch.spec` | `web.watch.status` | re-fetch a page under its grant; compare to cast | schedule ends; grant revoked |
 | **sync** (per device) | `sync.spec` | `sync.status` | replicate accepted events between the person's own devices | device revoked; partition (reports `blocked(partition)`, never merges authority) |
 | **download** | `download.spec` | `download.status` | fetch bytes to a confined path; resume | destination full; source gone; grant revoked |
@@ -231,7 +231,7 @@ Two rows deserve a note. The **lifecycle** reconciler only proposes; it is the o
 
 **Backoff and circuit breaking.** Retries follow the manifest's schedule. After `give_up_after`, the reconciler stops and reports; it resumes only on a spec change, a grant change, or an explicit retry verb. Repeated give-ups across many entities trip a per-reconciler breaker that pauses it and raises a bid.
 
-**Heat.** Status changes bid for attention like any event (*Security* §4.5). A reconciler's bids are `attributed`: converged → no bid; drift pending → warm; `blocked` → a bid proportional to the spec writer's standing (the person's own specs bid higher than a worker's); `conflict` → a bid on the conflict object. `blocked(no-grant)` after a restore is a security bid with reserved heat, because a world that silently stays inert is a world the person believes is running.
+**Heat.** Status changes bid for attention like any event ([[Security]] §4.5). A reconciler's bids are `attributed`: converged → no bid; drift pending → warm; `blocked` → a bid proportional to the spec writer's standing (the person's own specs bid higher than a worker's); `conflict` → a bid on the conflict object. `blocked(no-grant)` after a restore is a security bid with reserved heat, because a world that silently stays inert is a world the person believes is running.
 
 ---
 
@@ -248,7 +248,7 @@ What it reads:
 What it may do:
 
 - write specs it holds grants for; detach them; retry a given-up reconciler;
-- ask the registry why a reconciler is not admitted, or request its installation through *Extensions*;
+- ask the registry why a reconciler is not admitted, or request its installation through [[Extensions]];
 - propose, on the person's surface, the grants a blocked reconciler is missing — with the reconciler's manifest shown, so the person sees what they would be enabling.
 
 What it may not do:

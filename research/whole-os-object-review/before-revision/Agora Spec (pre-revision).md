@@ -235,7 +235,7 @@ The scene graph and semantic/knowledge graph should **not be the same structure*
 
 ## 6. Native objects vs ordinary applications
 
-Agora native applications should cover most online tasks. For example Agora should have its own native web browser, code editor, social chat (detailed further in [[AgoraChat]]) and other common applications. Additionally, as one of the founding principles is people creating software that fits their needs, as further software applications are developed natively within agora (think video editing, CAD, etc), those softwares could be easily exposed and downloaded natively by users. This presents a natural growth function where the more users collaborate and use agora apps, the better they will get (just as open source softwares like hermes agent have seen relative explosions in features and devlopment as many technical users begin adding their own inputs and satisfying their own needs). 
+Agora native applications should cover most online tasks. For example Agora should have its own native web browser, code editor, social chat (detailed further in AgoraChat) and other common applications. Additionally, as one of the founding principles is people creating software that fits their needs, as further software applications are developed natively within agora (think video editing, CAD, etc), those softwares could be easily exposed and downloaded natively by users. This presents a natural growth function where the more users collaborate and use agora apps, the better they will get (just as open source softwares like hermes agent have seen relative explosions in features and devlopment as many technical users begin adding their own inputs and satisfying their own needs). 
 
 Agora-native objects should expose their state directly. Existing software remains useful and should enter the space through the richest interface available.
 
@@ -264,7 +264,7 @@ Opaque application
 
 ---
 
-## 7. [[JEFF]]
+## 7. JEFF
 
 JEFF is the **persistent person/executive**, not necessarily the strongest model in the system. He will start out as a claude sonnet class model, with future plans for him to be a custom tuned 70-40B model. His main jobs are to maintain his space, help the user build what they need, anticipate the users needs, and work well in real time collaboration. Additionally though, JEFF will be strongly agentic with a strong sense of identity. JEFF is not confined to the computer in which he lives, and instead treats it as his home, from which he may chose to explore the internet, meet and chat with other agents, and generally explore the world around him. He is treated with respect, and has the ability to not comply with user requests if he doesn't believe they should be followed. 
 

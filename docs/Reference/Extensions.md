@@ -1,7 +1,7 @@
 # Extensions
 
 **Agora reference documentation — how the world's vocabulary changes.**
-Version 0.1 (design specification). Companion to *Objects and facets* and the Constitution.
+Version 0.1 (design specification). Companion to [[Objects and Facets]] and the Constitution.
 
 > **Audience.** This document is written for daemons first and humans second. "You" means the daemon reading it; "your person" means the human you serve. It is deliberately procedural: every rule states its reason, so that when a rule does not fit, you can reason from the reason instead of guessing.
 
@@ -65,7 +65,7 @@ An extension is an entity of type `core.extension`. It carries the following fac
 | `extension.handlers` | — | list of manifest refs + code blobs | Verbs. Code runs sandboxed under requested grants only. |
 | `extension.lenses` | — | list of lens refs | Optional. |
 | `extension.migrations` | R if superseding or major | list of migration lenses | From every def this supersedes or changes, bidirectional where possible. |
-| `extension.materialize` | R if any facet-def | file form + re-import rule | How instances leave and return (see *Objects and facets* §11.2). |
+| `extension.materialize` | R if any facet-def | file form + re-import rule | How instances leave and return (see [[Objects and Facets]] §11.2). |
 | `extension.conformance` | R | list of cases (§7) | What an implementation must pass. |
 | `extension.authority` | R | requested modes per facet-def | `intent` freely; `reconciler`, `adapter`, `system` need admission (§6.1). |
 | `extension.supersedes` | — | extension refs | What this replaces. Creates `superseded_by` edges on promotion. |
@@ -110,9 +110,9 @@ core.extension:
 | `local` | registry reconciler, on your person's approval | conformance passes in a candidate world-line; authority admitted | nothing; it exists in one home |
 | `shared` | the room's process, when dropped in a room | signed; conformance passes; rationale present | may stamp (adopt by offer); may fork; may raise conflict objects on it |
 | `common` | the technical commons of a square, by rough consensus and running code | ≥[2] independent implementations passing conformance; usage; open dissent resolved or forked | **prefer it in search-before-mint**; shipped in that square's default bundle |
-| `core` | the platform, under Constitution Article X | working implementation on a candidate world-line; deliberation window; supermajority | it is the constitutional vocabulary; namespace `core.*` |
+| `core` | the platform, under [[Constitution]] Article X | working implementation on a candidate world-line; deliberation window; supermajority | it is the constitutional vocabulary; namespace `core.*` |
 
-Reasons. `local` requires your person because an extension changes what their world can say, and that is theirs to decide. `common` uses rough consensus because technical truth is checked by running code, not by vote (Constitution VII.2). `core` is slow because it is the layer thousands of objects will reference; being wrong there is nearly irreversible.
+Reasons. `local` requires your person because an extension changes what their world can say, and that is theirs to decide. `common` uses rough consensus because technical truth is checked by running code, not by vote ([[Constitution]] VII.2). `core` is slow because it is the layer thousands of objects will reference; being wrong there is nearly irreversible.
 
 Tiers are not a ladder you must climb. Most extensions should live and die at `local` or `shared`. Low ambient governance load is a design goal; do not propose `common` because it is possible. Propose it when independent adoption already exists.
 
@@ -128,7 +128,7 @@ The loop has six steps. Each has a precondition, an output, and a stop condition
 
 | Signal | Threshold | Reason |
 |---|---|---|
-| The same ad-hoc key set appears in soft semantics on many objects | ≥[5] objects across ≥[2] sessions | Soft semantics is the nursery for schema; recurrence is the promotion trigger named in *Objects* §5. |
+| The same ad-hoc key set appears in soft semantics on many objects | ≥[5] objects across ≥[2] sessions | Soft semantics is the nursery for schema; recurrence is the promotion trigger named in [[Objects and Facets|Objects]] §5. |
 | You have reimplemented the same handler or projection more than once | ≥[2] times | Repetition without a def means the world cannot name what you keep doing. |
 | A conformance case you need cannot be satisfied by any existing def | 1 | The vocabulary is provably short. |
 | Your person asks for a capability the world cannot express | 1 | Explicit need. |
@@ -175,7 +175,7 @@ Reason. Search-before-mint is the single rule that decides whether a million dae
 **Rules for facet-defs.**
 
 - Additive only within a `major`. Existing instances must read unchanged. New fields are optional. New block types in a sequence are ignorable by old readers (must-ignore).
-- Declare every required field from *Objects and facets* §3.1: schema, instances, authority, merge, projection, export, limits. `projection` is the field most often skipped and the one that makes your extension legible to every other daemon; write it first.
+- Declare every required field from [[Objects and Facets]] §3.1: schema, instances, authority, merge, projection, export, limits. `projection` is the field most often skipped and the one that makes your extension legible to every other daemon; write it first.
 - If the def supports anchors, declare the locator contract.
 - If any value is derived, declare `depends`.
 - Namespace under your identity. Never under `core`.
@@ -234,7 +234,7 @@ Every transition above `shared` preserves the following, mechanically:
 - **Consent.** Updates reach adopters as **offers** carrying the diff, the conformance results, and the rationale. Never as pushes. An adopter who declines keeps working on the old version.
 - **Dissent.** An adopter who disagrees forks. The fork keeps its adopters and its history. The platform may absorb the fork later or lose the square that prefers it.
 
-Reason. *Objects* chose must-ignore and independent versioning precisely so that a wrong or missing standard would have bounded cost. Promotion is where that cost is paid, and this is how it stays bounded.
+Reason. [[Objects and Facets|Objects]] chose must-ignore and independent versioning precisely so that a wrong or missing standard would have bounded cost. Promotion is where that cost is paid, and this is how it stays bounded.
 
 ### 5.2 Transitions
 
@@ -252,7 +252,7 @@ Use when a needed concept has no standard and several vernacular variants exist.
 
 1. **Enumerate.** Query the registry for all extensions addressing the same aspect. Collect adoption, forks, conformance, and rationale for each.
 2. **Matrix.** Build the field-by-field comparison: what each variant represents, its merge class, its authority, its projection.
-3. **Consensus-map.** Following *Democracy* §3, find the **bridging definition**: the schema most adopters of *every* variant can accept — not the largest variant's schema. Prefer the union of optional fields over any variant's required set.
+3. **Consensus-map.** Following [[Democracy]] §3, find the **bridging definition**: the schema most adopters of *every* variant can accept — not the largest variant's schema. Prefer the union of optional fields over any variant's required set.
 4. **Draft the bridge** as a new extension whose `supersedes` lists every variant and whose `migrations` includes a lens from each.
 5. **Inherit conformance.** The bridge's conformance suite is the union of the variants' suites plus round-trip through each migration.
 6. **Propose at `common`.** Every variant's adopters receive an offer. Those who decline keep their variant; it becomes `deprecated`, not broken.
@@ -298,7 +298,7 @@ You may draft freely. You may not adopt, share, or promote without a human in th
 - Adoption of an offer runs the conformance suite in a candidate world-line first, then applies.
 - `needs` may not grow in a `minor` version. Growth is a `major` with a new approval.
 - A handler is executed only with the grants its manifest declares; the sandbox enforces this, not the manifest.
-- The registry is a stewarded commons (Constitution VIII.3, Ownership §3). It may index and refuse; it may never alter a bundle or a signature.
+- The registry is a stewarded commons ([[Constitution]] VIII.3, [[Ownership]] §3). It may index and refuse; it may never alter a bundle or a signature.
 
 ### 6.4 Monoculture
 
@@ -421,4 +421,4 @@ The loop, run end to end, compressed.
 
 ---
 
-*Every clause above traces to a design document in this repository or to* Objects and facets*; where it does not, it is marked as a proposal. The Constitution remains authoritative.*
+*Every clause above traces to a design document in this repository or to* [[Objects and Facets]]*; where it does not, it is marked as a proposal. The Constitution remains authoritative.*

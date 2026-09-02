@@ -1,10 +1,12 @@
+> **Background essay.** The contract is [[Objects and Facets]]; where this essay and the reference differ, the reference wins. See [[Start Here]].
+
 # Facets in everyday use
 
 An Agora object is a stable subject: a document, a recording, a conversation, an appointment, a photo, or a device. A **facet** describes one aspect of that subject. Different tools can work with compatible aspects while the subject keeps its identity.
 
 The point is continuity throughout ordinary computer use. Most objects do not begin as ideas or become programs. Listening to an album, receiving a message, reading a manual, and choosing a printer are central cases. Building software is another supported case.
 
-[[Agora Objects]] defines the contracts. [[Object Use Cases]] explores the difficult boundaries. This document explains what those contracts should feel like in practice; it does not claim that a bag of metadata supplies the implementation automatically.
+[[Objects and Facets]] defines the contracts. [[Object Use Cases]] explores the difficult boundaries. This document explains what those contracts should feel like in practice; it does not claim that a bag of metadata supplies the implementation automatically.
 
 ## 1. Start with a photo
 

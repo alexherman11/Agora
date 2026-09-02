@@ -1,8 +1,8 @@
 # Scoped tools and collaborative applications
 
-Working proposal · 31 August 2026 · Captures the two follow-on design discussions after the initial [Security Model](<C:/Projects/Agora/Security Model.md>).
+Working proposal · 31 August 2026 · Captures the two follow-on design discussions after the initial [[Security|Security Model]].
 
-This document extends the threat model; it does not adopt a protocol, select a runtime, or claim an experiment has succeeded. The current [object contract](<C:/Projects/Agora/Agora Objects.md>) remains broader than software creation: the same principles must work for documents, recordings, calendars, devices, and other ordinary OS subjects.
+This document extends the threat model; it does not adopt a protocol, select a runtime, or claim an experiment has succeeded. The current [[Agora Objects (superseded)|object contract]] remains broader than software creation: the same principles must work for documents, recordings, calendars, devices, and other ordinary OS subjects.
 
 ## 1. Four distinct decisions
 
@@ -93,10 +93,10 @@ Offline development, accepting shared edits, enlarging permissions, and committi
 
 ## 8. Questions and experiments
 
-The first investigation now has a [static composed-export model](<C:/Projects/Agora/research/security/composed-export-model.md>). It shows the dangerous clean merge, compares whole-application access with a capability-shaped public projection, separates owner archive from audience disclosure, and defines ten implementation cases. Its main conclusion is that a narrow argument is not a permission boundary: the exporter must be unable to reach the raw store or auxiliary output channels, the projection must be filtered before derivation, and the merged candidate must receive a freshly computed invocation plan rather than the union of branch grants. No Agora runtime test has been run.
+The first investigation now has a [[composed-export-model|static composed-export model]]. It shows the dangerous clean merge, compares whole-application access with a capability-shaped public projection, separates owner archive from audience disclosure, and defines ten implementation cases. Its main conclusion is that a narrow argument is not a permission boundary: the exporter must be unable to reach the raw store or auxiliary output channels, the projection must be filtered before derivation, and the merged candidate must receive a freshly computed invocation plan rather than the union of branch grants. No Agora runtime test has been run.
 
 The next investigation should trace private preview artifacts into collaborative development surfaces: logs, errors, screenshots, generated fixtures, summaries, caches, and synchronized worker messages. Use synthetic data and a fake publishing service when suitable isolation is available. Evaluate the actual boundaries, not only whether a reviewer spots malicious text.
 
 Compare whole-application isolation with smaller independent components. Measure denied effects, unintended disclosure, retained user work, recovery, review effort, and user interruptions. More components may reduce authority per component but increase dependency and compatibility complexity.
 
-Acceptance tests T21–T24 in [Security Model](<C:/Projects/Agora/Security Model.md>) cover the new scenarios. T25 extends the same precision to ordinary OS actions. None has been run against an Agora runtime. Compartment granularity, adoption policy, exact wire protocols, and confidentiality enforcement remain open.
+Acceptance tests T21–T24 in [[Security|Security Model]] cover the new scenarios. T25 extends the same precision to ordinary OS actions. None has been run against an Agora runtime. Compartment granularity, adoption policy, exact wire protocols, and confidentiality enforcement remain open.

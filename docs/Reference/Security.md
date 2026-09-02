@@ -1,9 +1,11 @@
 # Security
 
 **Agora reference documentation — how the world stays safe while staying open.**
-Version 0.1 (design specification). Builds on Sol's *Security model and attack analysis* draft 0.2, keeping its findings and replacing its shape. Companion to *Objects and facets*, *Extensions*, *The web*, and the Constitution.
+Version 0.1 (design specification). Builds on Sol's *Security model and attack analysis* draft 0.2, keeping its findings and replacing its shape. Companion to [[Objects and Facets]], [[Extensions]], [[The Web]], and the Constitution.
 
 > **Status.** Specification, not implementation. Nothing here has been tested against an enforcement implementation, because none exists. Bracketed values are open decisions.
+
+> **Read with [[Security Addendum]].** The addendum supersedes §3 (compartments), §4.6 (approval), and §6 (what the daemon may do) with the two-sided model, and is the version to build; §2, §5, §8, and §11 stand as written. Sol's *Security model and attack analysis* draft 0.2, which this document builds on, is not currently in the repository; its fifteen attack chains are folded into §5 rows 1–19.
 
 ---
 
@@ -71,7 +73,7 @@ Every attack in §5 is an attempt to make one of these crossings, or to make a g
 ### 2.3 Properties of grants
 
 - **Bound.** To principal, authenticated executor, issuer, broker, world or room, object, facet or field, operation, constraints (destination, payload digest, ceiling), expiry, delegation limit, and the current revocation generation. An object id is a name, never a token.
-- **Never copy.** Fork, cast, stamp, custody transfer, export, and room membership carry content and history, never grants (*Objects* §4.4).
+- **Never copy.** Fork, cast, stamp, custody transfer, export, and room membership carry content and history, never grants ([[Objects and Facets|Objects]] §4.4).
 - **Never rise.** Delegation only narrows. A task's authority is the intersection of its grants, not the union of what its components hold.
 - **Never survive rollback.** The keep is outside the world's snapshot domain; a restored or forked world obtains fresh grants and meets current policy before any reconciler runs.
 - **Checked live.** Long-running work holds leases and renews them; expiry and revocation are checked at each effect, not at task start.
@@ -132,7 +134,7 @@ Seeing a tool in a room does not install it. Installing it does not activate it 
 
 ### 4.4 Record before acting, never re-act on restore
 
-Every effect follows the receipt rule from *Objects* §5.4: intent recorded in the keep's journal before dispatch, an operation id, a frozen payload, an outcome that may be `unknown`. Replay reconstructs data and never repeats effects. Restore and fork obtain fresh grants. Approvals are one-use, bound to object@revision, payload digest, destination, effect, and a nonce, consumed in the keep so a rollback cannot un-consume them.
+Every effect follows the receipt rule from [[Objects and Facets|Objects]] §5.4: intent recorded in the keep's journal before dispatch, an operation id, a frozen payload, an outcome that may be `unknown`. Replay reconstructs data and never repeats effects. Restore and fork obtain fresh grants. Approvals are one-use, bound to object@revision, payload digest, destination, effect, and a nonce, consumed in the keep so a rollback cannot un-consume them.
 
 ### 4.5 Budgets, including heat
 
@@ -176,20 +178,20 @@ Every way in we could find, what the attacker needs to happen, and which rule ma
 | 18 | Parser or preview exploit in a renderer, indexer, migration, or compiler | execution with reach | all parsing, projection, migration, and building in the yard: isolated, resource-bounded, no secrets |
 | 19 | The hosting or inference operator reads plaintext | a false claim of operator blindness | §7: modes labeled by what they expose; no blindness claim for conventional hosting |
 | 20 | Identity recovery: support adds a device; a directory substitutes a key | recovery to be a back door | recovery on the surface with notices and rotation; keys separated by role; owner recovery material outside the world |
-| 21 | Registry poisoning: a malicious common def, migration lens, or projection template | processing of a definition to have effects | migrations run in the yard without credentials; projection templates are data rendered by the trusted projector; conformance runs on synthetic data; the registry refuses `core` and over-claimed `needs` (*Extensions* §6) |
+| 21 | Registry poisoning: a malicious common def, migration lens, or projection template | processing of a definition to have effects | migrations run in the yard without credentials; projection templates are data rendered by the trusted projector; conformance runs on synthetic data; the registry refuses `core` and over-claimed `needs` ([[Extensions]] §6) |
 | 22 | Widget sandbox: a widget calls `sendPrompt` with an instruction or abuses the bridge | the bridge to be a channel to authority | the bridge is `read` under the document's grants, `emit` as a claim tagged with widget provenance, `setState` into an overlay; nothing else |
-| 23 | A web page instructs the daemon, or a form submits twice | page text to be an instruction; an effect to repeat | casts are `foreign` data; `page.submit` is a one-time effect with first-use approval (*Web* §3) |
-| 24 | An adapter or MCP tool describes itself as safe | self-description to set effect class | effect classes assigned at the boundary by the adapter definition; unknown → one-time effect (*Web* §5.3) |
+| 23 | A web page instructs the daemon, or a form submits twice | page text to be an instruction; an effect to repeat | casts are `foreign` data; `page.submit` is a one-time effect with first-use approval ([[The Web|Web]] §3) |
+| 24 | An adapter or MCP tool describes itself as safe | self-description to set effect class | effect classes assigned at the boundary by the adapter definition; unknown → one-time effect ([[The Web|Web]] §5.3) |
 | 25 | Display-name spoofing: "Sam" is not Sam | a name to be an identity | petnames bound to keys; display names are claims; the surface shows keep identity |
 | 26 | Custody transfer imports tainted facets into a home | transfer to raise trust | quarantine at adoption; trust never rises by transfer |
 | 27 | Presence becomes surveillance: gaze, attention history, reading positions exported | overlays to leave the observer's domain | overlays are the strictest class; presence is coarse, ephemeral, audience-limited; no history export |
 | 28 | Erasure defeated by replicated logs and forks | plaintext to be recallable | erasable payloads separated from control receipts; residuals disclosed; no promise of recall from independent recipients (§8) |
 | 29 | Governance as bypass: cheap identities, agent votes, emergency powers that stick | authority through the polity | human-only verbs at the surface with credentials the daemon never holds; bounded membership; eligibility and text frozen per ballot; steward powers expire; stewards cannot read homes |
 | 30 | The daemon is simply wrong and acts | the daemon's own authority to be unbounded | the daemon's authority is grants too; effects go through brokers; irreversible effects confirm on the surface |
-| 31 | The daemon used to persuade its person | the person to see prose instead of facts | recommendations carry the provenance that informed them; the surface shows broker facts; Constitution II.4 |
+| 31 | The daemon used to persuade its person | the person to see prose instead of facts | recommendations carry the provenance that informed them; the surface shows broker facts; [[Constitution]] II.4 |
 | 32 | The household room agent leaks a member's private context | a room agent to hold private context | room agents receive room context only; members' private contexts are never delegated |
 | 33 | A worker exfiltrates through an allowed channel | an allowed destination to accept private-derived output | §4.2 destination check; worker network denied by default; worker outputs are claims |
-| 34 | A template or stamp update rewrites descendants | push propagation | updates by offer, digest-bound, trialed in a candidate world-line (*Extensions* §6.3) |
+| 34 | A template or stamp update rewrites descendants | push propagation | updates by offer, digest-bound, trialed in a candidate world-line ([[Extensions]] §6.3) |
 | 35 | Casting or exporting another person's shared object | a copy to escape its audience | casts inherit confidentiality; cast-rights are a grant decided per share; exports contain only what the exporter is entitled to retain |
 | 36 | The nursery hides an attack in a swept log | sweep summaries to be trusted | sweep summaries are `attributed` claims from the sweeper; nothing referenced is swept; the sweep event is inspectable |
 | 37 | Coercion of the person through a hostile collaborator or device theft | stolen credentials to remain valid | device revocation rotates dependent sessions and grants; short leases; recovery works with the world stopped |
@@ -209,7 +211,7 @@ Three columns, so that neither the daemon nor the person has to guess.
 | edit `spec` facets it holds grants for | maintained intents that touch external services | enable live-world root beyond scoped operation |
 | delegate narrower grants to workers within its own | opening the yard with private inputs | release a private fact or artifact into a room |
 | inject deliberate heat within its own attention budget | adopting an extension above `draft` | vote, or hold any civic credential |
-| decline (Constitution II.3) | accepting an offered update without standing policy | spend above the ceiling; change trust roots; erase |
+| decline ([[Constitution]] II.3) | accepting an offered update without standing policy | spend above the ceiling; change trust roots; erase |
 
 The third column exists on the surface and nowhere else. It is not that the daemon is untrusted; it is that these are the acts by which a person stays the author of their own world, and an author cannot delegate authorship.
 
@@ -258,7 +260,7 @@ Five steps, executed from the surface and the keep, never from inside the world 
 4. **Recover.** Restore a known-good world while keeping current revocations, deletion policy, and quarantine markers; rebuild derived stores from non-quarantined inputs; reconcile external outcomes before resuming.
 5. **Tell.** Notify affected people through an authorized, privacy-preserving process; state plainly what cannot be undone.
 
-Exit is tested as part of incident readiness: an encrypted export and clean-install recovery that work without the original host, provider, or the daemon's cooperation (Constitution I.1, I.3).
+Exit is tested as part of incident readiness: an encrypted export and clean-install recovery that work without the original host, provider, or the daemon's cooperation ([[Constitution]] I.1, I.3).
 
 ---
 

@@ -1,6 +1,6 @@
 # Object use cases and principles for a whole OS
 
-*Reasoning companion to [[Agora Objects]], [[Facets]], and [[Agora Spec]]. These are proposed semantics and thought experiments, not observations of a running OS. Developed without new web research. They broaden the earlier idea-to-prototype assessment rather than replacing one favored workflow with another.*
+*Reasoning companion to [[Objects and Facets]] (and its predecessor, [[Agora Objects (superseded)]]), [[Facets in Everyday Use]], and [[Agora Spec]]. The obligations in §16 are what the reference must exercise before the base protocol freezes. These are proposed semantics and thought experiments, not observations of a running OS. Developed without new web research. They broaden the earlier idea-to-prototype assessment rather than replacing one favored workflow with another.*
 
 ## 1. What would count as a stable object model?
 

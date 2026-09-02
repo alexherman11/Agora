@@ -1,6 +1,6 @@
 # Security — addendum: the two-sided model
 
-**Supersedes the compartment architecture in *Security* §3 and the approval framing in §4.6 and §6.** The three nouns (§2), the coverage map (§5), the invariants (§11), and the conflicts list (§8) stand. This addendum is the version to build.
+**Supersedes the compartment architecture in [[Security]] §3 and the approval framing in §4.6 and §6.** The three nouns (§2), the coverage map (§5), the invariants (§11), and the conflicts list (§8) stand. This addendum is the version to build.
 
 ---
 
@@ -25,7 +25,7 @@ The seven compartments of §3 map onto this without loss:
 | Yard | a throwaway VM the host side starts on request, with explicit inputs and no keys |
 | Gate | a validation step the host side runs on anything entering the world from outside |
 
-This is Ring 0 and Ring 2 from the core spec, with Ring 0 named precisely: the supervisor already there, plus the keep, plus the brokers. Ring 1 (the daemon's persistent state) is data, not a compartment. Ring 3 (workers) is inside the world under the daemon's delegation.
+This is Ring 0 and Ring 2 from [[Agora Spec|the core spec]], with Ring 0 named precisely: the supervisor already there, plus the keep, plus the brokers. Ring 1 (the daemon's persistent state) is data, not a compartment. Ring 3 (workers) is inside the world under the daemon's delegation.
 
 ## 2. The membrane rule
 
@@ -105,11 +105,13 @@ The smallest thing that can be attacked and can be lived in:
 5. a surface: a chat client that shows the delegation and takes the six verbs in §4;
 6. the daemon, in the world, with root.
 
-Then the drill from *Security* §10, with raw clients that bypass the SDK — and, alongside it, the test that decides whether any of this was worth it: **after a few weeks, is the daemon noticeably better because of the object layer than the same model in a plain VM?** Memory that never dangles; "this" that resolves; a demo that comes back after a reboot without being asked.
+*This spine is also [[Agora Spec]] §22, which is the maintained copy.*
+
+Then the drill from [[Security]] §10, with raw clients that bypass the SDK — and, alongside it, the test that decides whether any of this was worth it: **after a few weeks, is the daemon noticeably better because of the object layer than the same model in a plain VM?** Memory that never dangles; "this" that resolves; a demo that comes back after a reboot without being asked.
 
 ## 8. What still holds
 
-From the invariants in *Security* §11, unchanged: claims never become grants; effects never happen without one; grants never copy, rise, or survive rollback; enforcement lives outside the root it constrains; record before acting, never re-act on restore; the person can revoke, recover, and export without the world or the daemon cooperating.
+From the invariants in [[Security]] §11, unchanged: claims never become grants; effects never happen without one; grants never copy, rise, or survive rollback; enforcement lives outside the root it constrains; record before acting, never re-act on restore; the person can revoke, recover, and export without the world or the daemon cooperating.
 
 One added: **inside the line, the daemon is trusted; at the line, the host side checks.** Everything above is that sentence, sized to fit a first build.
 

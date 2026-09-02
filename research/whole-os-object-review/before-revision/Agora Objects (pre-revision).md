@@ -78,7 +78,7 @@ This is what makes invariant #14 (*Agora becomes better at building itself*) tru
   
 ---  
   
-## 4. Layer 1 — [[Facets]]  
+## 4. Layer 1 — [[Facets (pre-revision)|Facets]]  
   
 Facets are versioned, typed data components attached to entities.  
   

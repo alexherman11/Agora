@@ -1,6 +1,8 @@
+> **Superseded.** This is the whole-OS revision of *Agora Objects* (31 August 2026; see [[REVISION]]). The object contract is now [[Objects and Facets]] v0.3, which supersedes this document and carries its worked examples (§2, §4) as Appendix A. The earlier draft is [[Agora Objects (pre-revision)]]. Kept for lineage; not a current design recommendation.
+
 # Agora objects
 
-*Core design for persistent objects, facets, references, and their storage. Revised around everyday OS use. This is a design specification, not a claim that these mechanisms are implemented. The Constitution remains authoritative; unresolved enforcement and retention choices are identified below and in [[Security Model]].*
+*Core design for persistent objects, facets, references, and their storage. Revised around everyday OS use. This is a design specification, not a claim that these mechanisms are implemented. The Constitution remains authoritative; unresolved enforcement and retention choices are identified below and in [[Security]].*
 
 ## 1. Purpose and scope
 
@@ -255,7 +257,7 @@ These are semantic dimensions, not prescribed universal fields. A domain supplie
 
 ## 6. Actions, intent, and observations
 
-JEFF and the human use the same semantic action definitions. Neither gets authority merely from a descriptor. Installed handlers, compatible data, current policy, target revisions, and resource budgets determine whether a call can run. [[Security Model]] describes the proposed enforcement boundaries.
+JEFF and the human use the same semantic action definitions. Neither gets authority merely from a descriptor. Installed handlers, compatible data, current policy, target revisions, and resource budgets determine whether a call can run. [[Security]] describes the proposed enforcement boundaries.
 
 The command model must cover different operations:
 
@@ -357,7 +359,7 @@ runtime adapters and controllers
   -> expiring observations and transient activity streams
 ```
 
-These are not necessarily separate databases. Protection and restore domains must be real, however: excluding a directory from snapshots does not protect it from root in that VM. Follow the enforcement design in [[Security Model]] rather than trusting a facet declaration.
+These are not necessarily separate databases. Protection and restore domains must be real, however: excluding a directory from snapshots does not protect it from root in that VM. Follow the enforcement design in [[Security]] rather than trusting a facet declaration.
 
 Restore selects a state in a branch and records that transition. Required genesis evidence must survive so references into the abandoned future resolve historically. Old grants and callbacks do not regain validity; runtime observations are revalidated. A previously sent message, heard reminder, or printed page is not undone by restoring local state.
 
@@ -373,7 +375,7 @@ Operations specify both reads and writes. Validating only the modified facet mis
 
 Preserve unknown data, but do not assert that independently upgraded tools are semantically compatible merely because each can parse the envelope. Declare supported schema versions and migrations. Read-only inspection is preferable to a lossy edit disguised as full support. Removing a tool leaves data and provenance intact and makes unavailable operations explicit.
 
-Compatibility includes effects. Changing an operation from “share this frozen revision” to “share this live subject” changes its contract even if the argument shape stays the same. Such a change needs a new contract version and fresh compatibility/authorization evaluation; old approval must not silently acquire a broader meaning. See [[Security Model]] for update adoption and exact-configuration requirements.
+Compatibility includes effects. Changing an operation from “share this frozen revision” to “share this live subject” changes its contract even if the argument shape stays the same. Such a change needs a new contract version and fresh compatibility/authorization evaluation; old approval must not silently acquire a broader meaning. See [[Security]] for update adoption and exact-configuration requirements.
 
 An extension's critical requirements and dependencies must be represented in a gate the installed operation service understands. For example, preserving an unfamiliar signature payload while editing its signed content is insufficient: the dependency must invalidate the signature or prevent the edit according to the admitted contract. If the platform cannot enforce a required extension rule, it must not activate that behavior. An unrelated private reading-position update can remain available.
 

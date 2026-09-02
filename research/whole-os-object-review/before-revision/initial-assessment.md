@@ -2,7 +2,7 @@
 
 Research and experiments completed August 31, 2026. This is an assessment and a set of proposals, not an amendment to the existing specification or Constitution. The original design documents were left unchanged.
 
-The working materials are the [concrete example world](C:/Projects/Agora/research/object-facet-review/example_world.json), [executable counterexamples](C:/Projects/Agora/research/object-facet-review/toy_models.py), and [recorded results](C:/Projects/Agora/research/object-facet-review/results.json). The principal local sources were [Agora Objects](<C:/Projects/Agora/Agora Objects.md>), [Facets](C:/Projects/Agora/Facets.md), the [core spec](<C:/Projects/Agora/Agora Spec.md>), the [Constitution](C:/Projects/Agora/CONSTITUTION.md), and the [rooms proposal](C:/Projects/Agora/Untitled.md). Historical descriptions below are source-backed; architectural recommendations and example policies are my assessment, not reported facts about an implemented Agora system.
+The working materials are the [[example_world.json|concrete example world]], [[toy_models.py|executable counterexamples]], and [[results.json|recorded results]]. The principal local sources were [[Agora Objects (pre-revision)|Agora Objects]], [[Facets (pre-revision)|Facets]], the [[Agora Spec (pre-revision)|core spec]], the [[Constitution]], and the [[Rooms|rooms proposal]]. Historical descriptions below are source-backed; architectural recommendations and example policies are my assessment, not reported facts about an implemented Agora system.
 
 **My judgment**
 
@@ -30,7 +30,7 @@ There should be three separate operations that the current prose sometimes blend
 | Derive another entity | A provenance relationship | Build two competing prototypes from one idea. |
 | Add a representation | The underlying subject and content | Open a note as an outline and as a text editor. |
 
-**The note that becomes a program.** In the example in [Facets](C:/Projects/Agora/Facets.md:60), a note gains a process spec and becomes a running program. This can be appropriate for a tiny executable notebook cell. It becomes problematic when the note is a hypothesis and the program is an experiment testing it. The hypothesis must survive the failed program; several programs may test it; the program may be public while the thought process is private. Those are independent lifecycles and access policies.
+**The note that becomes a program.** In the example in [[Facets (pre-revision)|Facets]], a note gains a process spec and becomes a running program. This can be appropriate for a tiny executable notebook cell. It becomes problematic when the note is a hypothesis and the program is an experiment testing it. The hypothesis must survive the failed program; several programs may test it; the program may be public while the thought process is private. Those are independent lifecycles and access policies.
 
 My default representation would be:
 
@@ -307,7 +307,7 @@ Finally, low attention is not permission to delete. An old family photo, cryptog
 
 **10. What prior systems actually tell us**
 
-The failure table in [Agora Objects](<C:/Projects/Agora/Agora Objects.md:22>) is too confident about historical causes. The assertion that predecessors died because machines could not read is not supported. Nor does the survival of one mechanism establish that all competing designs failed. Several lines of work survived in narrower forms.
+The failure table in [[Agora Objects (pre-revision)|Agora Objects]] is too confident about historical causes. The assertion that predecessors died because machines could not read is not supported. Nor does the survival of one mechanism establish that all competing designs failed. Several lines of work survived in narrower forms.
 
 | Comparison | What the evidence supports | Implication for Agora |
 |---|---|---|
@@ -330,7 +330,7 @@ The word “facet” also has different established meanings: a data component h
 
 **11. What the executable experiments found**
 
-The [toy models](C:/Projects/Agora/research/object-facet-review/toy_models.py) use only Python's standard library. They ran under Python 3.14.0: **14/14 experiments passed**. “Passed” means the intended counterexample occurred and the constrained model met the specified check. It does not mean the Agora architecture passed 14 production tests.
+The [[toy_models.py|toy models]] use only Python's standard library. They ran under Python 3.14.0: **14/14 experiments passed**. “Passed” means the intended counterexample occurred and the constrained model met the specified check. It does not mean the Agora architecture passed 14 production tests.
 
 | Experiment | Failure demonstrated | Constraint exercised |
 |---|---|---|

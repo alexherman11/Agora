@@ -1,3 +1,5 @@
+> **Background essay.** Written as a design conversation, before the reference documents existed. The mechanics it sketches are now specified in [[Agora Spec]] and the references listed in [[Start Here]]; where they differ, those win. Kept for the reasoning.
+
 This is the question where I have to be the most honest, because you've asked about the one domain where good intentions have the worst track record. Every generation of technologists has announced that _this_ technology finally enables true direct democracy — and the graveyard here is bigger than the object-schema graveyard. So let me do what we did with objects: tour the failures first, find the one thing that's genuinely different this time, and then build the design from primitives you already have. Because here's the spoiler — I think Agora actually _does_ have something no previous attempt had, but it's not what most people would guess.
 
 ---
@@ -20,7 +22,7 @@ Lay these side by side and the diagnosis is clear, and it's _not_ that people ar
 
 So the real question for Agora isn't "how do we let people vote more often?" California answered that. The question is: **what changed about the attention economics?**
 
-And you already know what changed. You built him in section 7.
+And you already know what changed. You built him in [[Agora Spec|Spec]] §7.
 
 ---
 
@@ -56,7 +58,7 @@ The second big lesson from the graveyard: "democracy" isn't one mechanism, and s
 
 **Rough consensus of those who do the work — for technical decisions.** The IETF has governed the internet's actual protocols for forty years on the principle of "rough consensus and running code" — not votes, but demonstrated agreement among the people building the thing, checked by the requirement that it _works_. Agora's technical commons (protocol changes, facet standards) should work this way, because voting on technical truth is how you get committees designing camels.
 
-**Supermajority + time delay — for the constitution itself.** Changing the rules of rule-changing should be slow and hard everywhere, always. High thresholds, mandatory deliberation windows, and — Agora's specialty — the change deployed as a _candidate world-line first_, tested nested before promotion, exactly like the shell's self-modification pipeline in §16 of the spec. **Constitutional amendment as staged deployment.** The governance layer and the software layer get the same safety architecture, which feels like more than a coincidence.
+**Supermajority + time delay — for the constitution itself.** Changing the rules of rule-changing should be slow and hard everywhere, always. High thresholds, mandatory deliberation windows, and — Agora's specialty — the change deployed as a _candidate world-line first_, tested nested before promotion, exactly like the shell's self-modification pipeline in [[Agora Spec|Spec]] §16. **Constitutional amendment as staged deployment.** The governance layer and the software layer get the same safety architecture, which feels like more than a coincidence.
 
 **And underneath it all, subsidiarity:** every decision lives at the smallest membrane that contains its effects. Rooms are anarchies of two — no governance needed where trust is total. Clubs govern club life. Squares govern squares. The platform level governs _only_ what must be common: the protocol, the constitution, the treasury. The concentric geometry from last time turns out to be a political architecture too: **most of life should be lived below the level where voting is ever necessary.** A healthy democracy is measured partly by how little of your day it demands.
 
@@ -114,4 +116,4 @@ You said it directly: Agora as a company _run by the people for the people_. The
 
 Direct democracy never failed because people were unfit to govern themselves — it failed because informed self-rule cost more attention than any citizen could spare; Agora's wager is that a citizenry where every member has a loyal agent for a civic nervous system, a ledger for a public record, capabilities for explicit power, juries for judgment, consensus maps for deliberation, and the fork for a fire exit can finally afford the thing Athens could only buy with leisure and luck: **government that is a texture of daily life rather than an interruption of it.**
 
-And the closing symmetry, because there's always one. The original spec's most radical line was never about technology — it was _"the human and JEFF share one canonical world."_ Scale that sentence up through every membrane we've walked — rooms, clubs, squares — and at the top it becomes the oldest political idea there is: people who share one canonical world, with common knowledge of what's true in it and common power over what happens to it, governing themselves. The Greeks had a word for the software you're describing. It was never "agora," actually — the agora was just the venue. The word was _politeia_: the constitution of a people. You started out designing a desktop. Somewhere around section 12, it quietly became a polity — and I think it's better that you know it.
+And the closing symmetry, because there's always one. The original spec's most radical line was never about technology — it was _"the human and JEFF share one canonical world."_ Scale that sentence up through every membrane we've walked — rooms, clubs, squares — and at the top it becomes the oldest political idea there is: people who share one canonical world, with common knowledge of what's true in it and common power over what happens to it, governing themselves. The Greeks had a word for the software you're describing. It was never "agora," actually — the agora was just the venue. The word was _politeia_: the constitution of a people. You started out designing a desktop. Somewhere around [[Agora Spec|Spec]] §12, it quietly became a polity — and I think it's better that you know it.

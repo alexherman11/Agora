@@ -4,12 +4,14 @@ August 31, 2026. The user requested changes to the core documents and further re
 
 ## Current documents
 
-- [Agora Spec](<C:/Projects/Agora/Agora Spec.md>): general-purpose scope, ordinary-use coverage, and explicit OS responsibilities that object records do not implement.
-- [Agora Objects](<C:/Projects/Agora/Agora Objects.md>): subject and reference semantics, scoped facets, domain operations, independent state dimensions, compatibility, recovery, and bounded failure.
-- [Facets](C:/Projects/Agora/Facets.md): everyday explanation centered on photos, reading, media, communication, schedules, and devices.
-- [Object Use Cases](<C:/Projects/Agora/Object Use Cases.md>): twelve everyday areas, cross-domain upgrade/outage cases, revised principles, and acceptance obligations.
-- [Revised assessment](C:/Projects/Agora/research/object-facet-review/ASSESSMENT.md): preserves earlier research and counterexamples while correcting the development-workflow emphasis and overly broad identity-splitting advice.
-- [Example world](C:/Projects/Agora/research/object-facet-review/example_world.json): fifteen fictional entities illustrating repeated memberships, private state, frozen submissions, recurring occurrences, disconnected resources, and uncertain effects.
+*Since this revision the object contract was consolidated into [[Objects and Facets]] v0.3, which supersedes the revised [[Agora Objects (superseded)]] and incorporates [[Facets in Everyday Use]]; the design documents now live under `docs/` (see [[Start Here]]). Links below point at the archived copies where the current documents have moved on.*
+
+- [[Agora Spec]]: general-purpose scope, ordinary-use coverage, and explicit OS responsibilities that object records do not implement.
+- [[Agora Objects (superseded)|Agora Objects]]: subject and reference semantics, scoped facets, domain operations, independent state dimensions, compatibility, recovery, and bounded failure.
+- [[Facets in Everyday Use|Facets]]: everyday explanation centered on photos, reading, media, communication, schedules, and devices.
+- [[Object Use Cases]]: twelve everyday areas, cross-domain upgrade/outage cases, revised principles, and acceptance obligations.
+- [[ASSESSMENT|Revised assessment]]: preserves earlier research and counterexamples while correcting the development-workflow emphasis and overly broad identity-splitting advice.
+- [[example_world.json|Example world]]: fifteen fictional entities illustrating repeated memberships, private state, frozen submissions, recurring occurrences, disconnected resources, and uncertain effects.
 
 ## Important changes of position
 

@@ -6,7 +6,7 @@ The earlier proposal treated experimentation as the central shape of memory. Tha
 
 **The broader proposal: Agora's graph should preserve continuity between the things a person encounters, the parts they mean, the ways they use them, the forms they take, and the situations in which they matter. Memory is the ability to reconstruct a useful part of that world when needed.**
 
-This document reasons from hypothetical situations. It does not claim these capabilities exist or that the scenarios actually happened. No further web research was used for this revision. It proposes extensions through facets, references, relationships, adapters, and projections without changing the entity core in [Agora Objects](<C:/Projects/Agora/Agora Objects.md>).
+This document reasons from hypothetical situations. It does not claim these capabilities exist or that the scenarios actually happened. No further web research was used for this revision. It proposes extensions through facets, references, relationships, adapters, and projections without changing the entity core in [[Agora Objects (superseded)|Agora Objects]].
 
 ## 1. Start with an ordinary day, not a research project
 

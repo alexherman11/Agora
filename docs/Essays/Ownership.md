@@ -1,3 +1,5 @@
+> **Background essay.** Written as a design conversation, before the reference documents existed. The mechanics it sketches are now specified in [[Agora Spec]] and the references listed in [[Start Here]]; where they differ, those win. Kept for the reasoning.
+
 Good — this is exactly the right moment to think about it, because two of these decisions (the license, and who holds the name) get made implicitly the day you push code, whether you think about them or not. Let me do this the way we've done everything: first the fundamentals in plain language, then the graveyard-and-garden tour of how others structured it, then honest recommendations. And since you said you don't know much about how companies work, I'll build that part from the ground floor — it's less complicated than the mystique suggests.
 
 ---

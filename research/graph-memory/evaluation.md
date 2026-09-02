@@ -2,7 +2,7 @@
 
 Research design · 31 August 2026 · No experiments in this file have been run
 
-**Scope correction:** this is a project-history evaluation, not sufficient validation of memory for an entire operating system. The [OS-wide reframing, §20](<C:/Projects/Agora/research/graph-memory/operating-system-memory.md>) proposes a broader first prototype spanning parts, uses, representation mappings, browsing, code, media, interruption and live resources. Retain the tests here as a supporting suite rather than the primary definition of success.
+**Scope correction:** this is a project-history evaluation, not sufficient validation of memory for an entire operating system. The [[operating-system-memory|OS-wide reframing, §20]] proposes a broader first prototype spanning parts, uses, representation mappings, browsing, code, media, interruption and live resources. Retain the tests here as a supporting suite rather than the primary definition of success.
 
 **First objective:** determine whether connected object memory helps a person and JEFF resume one project, explain its decisions, and prepare the next worker. Establish correction, source identity, and branch correctness before expanding to autonomous memory organization.
 
@@ -85,7 +85,7 @@ These are test specifications with expected behavior, not passing test results. 
 | 29 | Extractor runs again on unchanged source | Distinguish alternative generated versions from independent corroboration |
 | 30 | Erasure removes the only support | Do not continue presenting the unsupported derivative as verified memory |
 
-The separate [object/facet toy study](<C:/Projects/Agora/research/object-facet-review/results.json>) records bounded examples touching rollback, stale revisions, projection budgets, dependency visibility, and replay. Its results are useful related design evidence, not execution of this suite. No results from that study should be relabeled as this proposal's tests.
+The separate [[results.json|object/facet toy study]] records bounded examples touching rollback, stale revisions, projection budgets, dependency visibility, and replay. Its results are useful related design evidence, not execution of this suite. No results from that study should be relabeled as this proposal's tests.
 
 ## 4. Dataset and measurement protocol
 

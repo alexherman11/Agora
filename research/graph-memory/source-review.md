@@ -86,4 +86,4 @@ SQLite supports FTS5 and recursive common table expressions, sufficient mechanis
 4. Branch-aware temporal retrieval will reduce repetition of rolled-back failures without contaminating current state.
 5. A small number of explained, task-relevant associations will be more useful than unrestricted background linking.
 
-These are Agora hypotheses. None is established by the surveyed papers alone. Their experimental treatment is specified in the [evaluation plan](<C:/Projects/Agora/research/graph-memory/evaluation.md>).
+These are Agora hypotheses. None is established by the surveyed papers alone. Their experimental treatment is specified in the [[evaluation|evaluation plan]].
