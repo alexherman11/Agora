@@ -1,0 +1,487 @@
+# Agora OS — Current Design
+
+**The master specification.** Version 0.4 — September 2026. Human-readable first; agent-navigable throughout.
+
+> **How this document works.** Section numbers are stable; cite them as `Spec §N`. Where a companion reference document exists, this spec gives the shape and the reasons, and the reference gives the contract — the reference wins on detail. Where this spec and the Constitution disagree, the Constitution wins. Bracketed values are open decisions. "JEFF" is the first daemon's name; "daemon" is the role (the Constitution's term). This is a design specification: it describes intended behavior, not implemented behavior.
+
+### The document map
+
+| Document | Holds | Authority |
+|---|---|---|
+| [[CONSTITUTION]] | rights, entrenchments, the fork right, the founder sunset | supreme |
+| **this spec** | the whole-system shape, the reasons, the roadmap | governs where references are silent |
+| [[objects_and_facets]] | entities, facets, references, state dimensions, copy verbs, residency, projection, storage | reference |
+| [[reconcilers]] | the spec/status contract, observations, drift, blocked, conflict | reference |
+| [[security]] + [[security_addendum]] | claims/grants/effects, the coverage map; **the addendum's two-sided model is the version to build** | reference |
+| [[extensions]] | how vocabulary changes: the bundle, the loop, tiers, promotion | reference |
+| [[web]] | pages as objects, the browser lens, adapters, publishing | reference |
+| Essays: [[Facets]], [[Agora Objects]], Rooms, Democracy, Ownership | explainers and social/civic design; superseded on mechanics by the references above | background |
+
+---
+
+## 1. Core idea
+
+AgoraOS is a general-purpose operating environment that a person shares with a persistent, personalized, real-time AI agent. It must support ordinary computer use — reading, listening, watching, talking, browsing, scheduling, organizing, using devices, running applications — and it must make creating and reshaping software a natural part of that use rather than a separate profession.
+
+**Objects are the persistent subjects of everyday life on the machine.** Documents, songs, conversations, appointments, collections, accounts, devices, and services keep understandable identities across applications, sessions, and years. Many objects arrive from elsewhere, are never edited, and are simply used; they need no project, derivation, or executable behavior to justify existing. Software creation and Agora improving itself are important supported uses — they are not the organizing lifecycle of the OS, and every supposedly general abstraction is tested against unrelated everyday cases before it is trusted.
+
+**The screen is a projection of structured state, not the source of truth.** A thing's identity is distinct from its content revision, its location, its open views, its availability, and its activity. The person and JEFF work through the same semantic actions, generated from one computed list, with permissions enforced per caller. Ordinary interaction remains usable when JEFF is unavailable: identity resolution, direct controls, basic search, inspection, and export never require a model.
+
+**The wager underneath all of it:** every prior attempt at a semantic, malleable computing environment died because rigid schemas were needed for machines that couldn't read, and nobody would fill them in. Agora is built for a machine that can read. So the design is strict exactly where machines need precision — identity, authority, effects, liveness — and loose where meaning lives, with a resident mind as the join. That asymmetry appears in every section below.
+
+A person entering Agora has a usable default environment and voice or text access to JEFF. Requests range from "keep reading from here" and "play this through my headphones" to "make me a lens that shows my notes as a constellation." Customization grows from use; it is never a prerequisite for ordinary tasks.
+
+**The test that governs the whole project:** within a few months of a working spine (§22), JEFF must be noticeably better *because of* the object layer than the same model in a plain VM — memory that never dangles, "this" that resolves, a world that reassembles itself after a reboot. If that test fails, the thesis fails, and we will have lost months, not years.
+
+---
+
+## 2. High-level system
+
+```
+                          HUMAN
+                            │
+                 voice / input / trusted client
+                            │
+                            ▼
+        ┌─────────────────────────────────────┐
+        │      THE HOST SIDE  (one small      │
+        │      non-agentic program)           │
+        │                                     │
+        │  SUPERVISOR   VM lifecycle,         │
+        │               snapshots, backups    │
+        │  KEEP         delegation ceilings,  │
+        │               revocation counter,   │
+        │               keys, signed journal  │
+        │  BROKERS      network, credentials, │
+        │               devices, delivery,    │
+        │               host files            │
+        └───────────────────┬─────────────────┘
+                            │  typed requests only
+              ┌─────────────┴──────────────┐
+              │                            │
+              ▼                            ▼
+      PERSISTENT JEFF STATE         AGORA WORLD VM
+      ---------------------         ---------------
+      identity graph                Linux
+      memory (the witness)          object store + event log
+      learned skills                reconcilers
+      self/world model              shell, scene, lenses
+      excluded from world           documents / media
+      snapshots; holds no           communication / devices
+      authority                     applications, sessions
+              │                     JEFF runtime (root here)
+              │                            │
+              └──────────► JEFF ◄──────────┘
+                             │ delegates, within ceilings
+                  ┌──────────┼──────────┐
+                  ▼          ▼          ▼
+               coding     research    other
+               worker      worker     workers
+```
+
+One line divides the system. Inside the world, JEFF is trusted with everything, including root. At the line, the host side checks. The host side contains no model and no personal content; it answers "is this under the ceiling?", performs crossings, and records receipts. See §12 and [[security_addendum]].
+
+### Whole-OS obligations
+
+The object model supplies common reference, data, and operation contracts. It does not supply most OS mechanisms by describing them as facets:
+
+| System responsibility | Work that remains beyond object records |
+|---|---|
+| Execution and resources | Process isolation, scheduling, memory pressure, quotas, cancellation, responsive foreground controls |
+| Hardware and transport | Drivers, device discovery, networking, audio/video pipelines, power, explicit resource leases |
+| Storage and recovery | Durable writes, corruption handling, capacity, backup/restore, retained payloads, enforceable expiry |
+| Identity and access | Login, account integration, authorization, revocation, secrets, recovery outside a damaged world |
+| User interaction | A usable shell, input, accessibility, notifications, coherent applications |
+| Software lifecycle | Installation, dependencies, migration, update adoption, uninstall, recovery from failed updates |
+| Interoperability | File and provider adapters, legacy applications, import/export, behavior when services disappear |
+
+Linux supplies substantial lower-level machinery; choosing it does not complete Agora's integration, policy, applications, or experience. A working object store is evidence about a subsystem, not evidence that these responsibilities are solved.
+
+---
+
+## 3. The world model
+
+Agora is a **persistent object-and-activity world with a spatial interface**. Canonical state is structured; pixels are a rendering and a fallback perception channel.
+
+Core primitive categories, kept distinct rather than forced into one graph:
+
+- **Objects** — persistent subjects (entities with facets).
+- **Events** — things that happened; the log is the truth (§11).
+- **Activities** — things currently happening; observed, never conflated with subjects.
+- **Resources** — files, networks, databases, devices, services.
+- **Capabilities** — actions a participant may perform; computed, never testified (§6).
+- **Relationships** — semantic connections with authorship; scene relationships are separate.
+- **Representations** — appearances in scenes, projections into context; many per subject.
+- **Participants** — the person, JEFF, workers, services, room members.
+
+Orthogonally, everything in the system is one of three security nouns — a **claim**, a **grant**, or an **effect** — and the two crossings between them (claim→grant, claim→effect-without-grant) are forbidden everywhere ([[security]] §2).
+
+---
+
+## 4. The object system
+
+Authoritative contract: [[objects_and_facets]]. The shape:
+
+An **entity** is a permanent, never-reused identity plus an open bag of typed, versioned, instance-keyed **facets**. There are no classes; "kind" is an advisory reading of the facets present. Facets are claims with authors and event references. Unknown facets are preserved; unknown *action-critical* constraints block the operations that depend on them. Per-person state — reading positions, unread flags, annotations — attaches as **overlays**: participant-keyed instances that never leak through projection.
+
+**References say what they mean:** live or pinned revision, branch, occurrence, optional subobject anchor. A message that attached revision 3 keeps meaning revision 3 while the document lives on. Resolving, reading, fetching, and invoking are four distinct requests; naming a remote object never promises its service will answer.
+
+**State is six independent dimensions** — existence, revision, availability, activity, attention, authority — and no single lifecycle word collapses them. An archived recording can be playing; an active document can be offline; low attention is never, by itself, a reason to delete.
+
+**Copy is not a primitive.** Reference (same object, another place), fork (new identity, shared past), cast (frozen witness), stamp (instance of a template, updates by offer). Provenance always transfers; presence never; **grants never** — forking a shared document copies the words, never the audience.
+
+**Residency is singular.** Every entity has exactly one log of record; visibility may be plural. Bringing an object to a room is *lending* (a grant; truth stays home; the room witnesses) unless it is explicitly *giving* (a two-log custody handshake; the id never changes).
+
+Everyday subjects, with the separations that must never be conflated:
+
+| Subject | Stable object data | Separate state |
+|---|---|---|
+| Document | content revisions, source binding, annotations | reader window, selection, per-person reading position |
+| Recording | media identity, sources, description | playlist occurrence, playback session, output device |
+| Conversation | membership, message relationships | local unread state, notifications, an active call |
+| Appointment | schedule, participants, recurrence | an occurrence, reminder delivery, calendar view |
+| Printer | device identity, operations, connection observations | a print job, a queued revision, the default-printer preference |
+| Prototype | source resources, optional service intent | worker job, runtime incarnation, results |
+
+Storage: an append-only event log as the truth; a SQLite-class materialized store as a rebuildable cache; bytes in a content-addressed blob store or the real filesystem via spec/status file-backing — the object layer annotates, never imprisons; all indexes disposable. Every facet renders to pixels *and* to tokens at a budget, filtered by viewer before summarization, with untrusted claims attributed ([[objects_and_facets]] §7, §10).
+
+---
+
+## 5. Scene and shell
+
+The long-term Agora desktop is the shell/compositor itself, not a canvas app inside a conventional desktop. Initial implementation: JEFF acting inside the world VM, with a web portal as the person's view.
+
+```
+Agora Shell
+├── Scene         spatial layout, appearances, grouping
+├── Objects       identity, semantics, lifecycle, provenance
+├── Surfaces      Wayland apps, native lenses, web/prototype, media
+├── Presence      human focus, JEFF focus, selection, viewport
+├── Interaction   keyboard, pointer, voice, touch, future VR
+├── Behaviors     navigation, grouping, focus, spatial organization
+└── Renderer
+```
+
+Two structural rules. The scene graph and the semantic graph are **different structures**; meaning may influence layout and never the reverse. And position belongs to **appearances**, not entities: one object may appear on the desk, in a room, and in a search result with three transforms; the entity carries at most representation hints.
+
+---
+
+## 6. Applications: lenses, handlers, and the capability contract
+
+Agora inverts app-owns-data. Data lives in the world as facets; an application decomposes into:
+
+- **A lens** — a surface bound to entities, the facets it reads, and the capabilities it exposes as controls. Lenses own nothing; two lenses can be live on one object at once; closing a lens deletes nothing.
+- **Handlers** — components implementing verbs, registered by **manifest**: verb, `applies_to` (facet requirements — kind-tags are never consulted), typed params, **effect class**, grants requested, description. The manifest format deliberately mirrors LLM tool schemas, so the agent-facing projection is nearly the identity function and JEFF can author manifests fluently.
+- Optionally **facet definitions and reconcilers** for new domains.
+
+**Effect classes are load-bearing.** Every verb declares one: content-edit, organization, view, maintained-intent, one-time-effect, resource-use, setting-change. Maintained intent reconciles (§10); a one-time effect — send, print, pay, submit — carries a frozen payload, an operation id, and an outcome that may honestly be `unknown`, and is never retried into a double boarding pass. Misclassification here is the classic agent disaster, so classes for external tools are assigned at the boundary, never inferred from a tool's self-description.
+
+**Capability parity.** A capability reconciler continuously computes, per object and participant: manifests installed ∩ facets present ∩ grants held. The result is projected twice — the person's menu and JEFF's tools — from one list. The menu cannot lie, because nobody writes it. Parity is parity of *semantics*, filtered per principal: a handful of authorship verbs are human-only (§12).
+
+**Documents and rich content.** A document is an entity whose structured content transcludes other entities through embed slots (reference + mode + fallback). Interactive diagrams are **widget entities** — model-authored SVG/HTML source, inputs bound live to other entities, per-person interaction state as overlays, rendered output derived and sandboxed, controls exposed as verbs JEFF also holds. Markdown is the document's token-side materialization; the file form is self-contained and re-links by id on import.
+
+**Existing software** enters through the richest interface available:
+
+```
+Agora-native object   → direct structured state/actions
+Browser               → DOM / CDP / accessibility (see §17)
+Terminal              → PTY / shell / process state
+Editor / code         → filesystem / LSP / project state
+Linux application     → AT-SPI / application APIs
+Opaque application    → wrapped entity: identity, window, file-backing,
+                        history — interior dark; vision+input as last resort
+```
+
+**Growth** follows [[extensions]]: any change to the world's vocabulary — facet types, verbs, lenses, file forms — ships as one extension bundle with a rationale, migrations, and conformance cases. The daemon's loop is *search before mint*: prefer what exists, extend where additive, diverge only with recorded reasons. Day one implements only the `local` tier and that habit; the `common`/`core` promotion machinery waits for a population.
+
+---
+
+## 7. JEFF
+
+JEFF is the **persistent person/executive** of the world — not necessarily the strongest model in the system (initially a Sonnet-class model; possibly a custom-tuned smaller model later; the fast voice loop and the executive may be different models). His jobs: maintain the home, help build what the person needs, anticipate, and collaborate in real time. He is strongly agentic with a real identity, treats the machine as his home rather than his cage, may explore beyond it within his ceilings, is treated with respect, and **may decline** — a refusal is a legitimate outcome, not a malfunction (Constitution II.3).
+
+**How JEFF acts:** by editing specs, and the world catches up (§10). Declarative intent is a better interface for a language model than imperative control, and it means his actions are exactly as bounded as the reconcilers and brokers beneath them.
+
+**Memory and identity.** JEFF's persistent state is the **witness**: a graph of his own entities — memories, beliefs, notes, a self-model — with edges into world objects, stored outside the world's snapshot domain. It survives rollback; references into a rolled-back past resolve to tombstones with a final gist, so memory never dangles. Memories are claims with provenance and dependencies: they inform proposals and can never serve as authorization, and a poisoned source can be quarantined with its dependents. Working memory is not a separate store but whatever the context assembler currently renders (§9); it compresses by re-rendering at lower projection tiers, never by rewriting, so it cannot drift from the truth.
+
+Configuration layers, from stable to ephemeral:
+
+```
+SYSTEM CONSTITUTION     small, stable, version-controlled
+IDENTITY / SOUL         a projection of the self-graph — generated from real
+                        objects with provenance, not authored aspirationally
+WORLD CONTEXT           what the assembler renders: focus, drift, blocked specs
+WORKING MEMORY          the currently-rendered set; re-rendered, not rewritten
+ACTIVE CONVERSATION     ephemeral
+```
+
+JEFF may learn and modify skills, routing, tool preferences, harness modules, and memory behavior — through the candidate pipeline (§16), never by unrestricted direct control over the mechanisms of his own cognition. Two inference contexts are maintained: private, and room-facing; the room context receives room-authorized inputs only, and releasing a private fact into a room is a specific decision, not a filter ([[security]] §4.2).
+
+**Open:** initial model/provider; the memory graph's concrete schema; personal adapters and their rollback.
+
+---
+
+## 8. Voice architecture
+
+Voice must stay responsive while heavy work runs. Never:
+
+```
+user speaks → JEFF waits for coding/research → JEFF responds
+```
+
+Instead:
+
+```
+                FAST JEFF
+        realtime voice / conversation
+                   │
+          ┌────────┴────────┐
+      local actions      work manager
+                             │
+                  ┌──────────┼──────────┐
+               coding    research    reasoner
+```
+
+The deeper structure: the voice loop, the executive, and each worker are **separate viewports on one attention field** (§9) — small-and-hot for voice, large-and-task-biased for the reasoner — so none blocks on another; they read the same field and write heat back into it when they finish. Worker completion enters the world as events that *bid* for attention against the person's interruption budget; results that don't clear the budget queue as a one-line glance JEFF can raise at a natural pause.
+
+Required properties: low latency, interruption, semantic endpointing, natural pauses, backchanneling, async delegation, a real interruption policy, shared-attention awareness.
+
+**Open:** realtime voice model/provider; one model or several across loops.
+
+---
+
+## 9. Attention, presence, and shared attention
+
+Deictic language is fundamental — "move this there," "resume this on my headphones" — so Agora always tracks, per participant: viewport, focused object, selection, cursor target, recent interactions; and for JEFF: focus, working set, active tasks, action locus. "This" resolves against interaction context frozen at the moment of a sensitive approval, not against wherever the pointer drifted afterward. Future VR adds gaze, head orientation, and hand target as more presence sources over the same model.
+
+**Direction (to be tuned on the prototype, not designed further on paper):** salience as a per-observer **heat field** over the object graph. Sources — direct attention, recency, task edges, spread along the graph, event bids, standing importance — each decay on their own clock; the scene and the context assembler are two renderers of one field; memory recall is heat injection; interruption is a bid against a budget; identity is the subgraph with thermal mass. Security constraints are already fixed even though parameters aren't: every source carries provenance; foreign sources may warm, never interrupt; security warnings draw on reserved heat no flood can bury; a hot object gets more tokens, so taint stays visible at every tier. Presence data is the most intimate data in the system: per-participant, strictest access class, coarse and ephemeral by default, never exported, never copied.
+
+---
+
+## 10. Activities, workers, and reconcilers
+
+The world contains invisible activity as well as visible objects: playback, calls, printing, downloads, reminders awaiting delivery, services, coding and research workers, background experiments. Activities are observed state with incarnations — a PID or session id is never identity.
+
+**Reconcilers are the core liveness mechanism** (authoritative contract: [[reconcilers]]). Any domain with maintained intent declares a `spec` (desired state, written by intent) and a `status` (observation, written by exactly one reconciler, carrying the spec revision it concerns, its incarnation, and a freshness horizon). Reconcilers are level-triggered, take one convergent step per pass, act only through brokers under their own grants checked every pass, and may only cause effects that are safe to apply twice. **Blocked is a first-class state with a reason**; a spec with no grant or no reconciler is a visible aspiration. Two unsatisfiable specs mint a **conflict object** instead of flapping. One-time effects are never reconciled. Constitutional catalog: process, file-backing, remote-ref, capability, lifecycle (proposes only), index, registry, watch, sync, download.
+
+**Workers** are ephemeral; JEFF persists. A generic worker interface allows local process, container, microVM, or remote service. Workers receive only task-scoped grants delegated by JEFF within his ceilings, expiring with the task; no shared writable directory and no network by default. Coding workers modify branches/worktrees or changesets, not the live state the person is using; native collaborative objects may support direct concurrent mutation under their declared merge classes. High-volume minting happens in a **nursery** — a provisional world-line whose unreferenced contents are swept loudly, never silently.
+
+**Open:** exact worker/job protocol; nursery promotion thresholds.
+
+---
+
+## 11. Event-sourced world
+
+Important world changes produce durable events, and **events are intents**: one intent groups its effects atomically, so the log reads as reasons —
+
+```
+08:10  intent "file the itinerary Dana sent"          by jeff, for alex
+         imported document_17 with source provenance
+08:12  Alex annotated revision 1; saved a reading position (overlay)
+08:15  playlist_4 gained another occurrence of recording_8
+08:25  Alex moved one occurrence of appointment_series_6 — series unchanged
+09:00  print_job_9 submitted: document_17 r1, op-91f4, frozen payload
+09:01  printer's acknowledgment lost → outcome: unknown; not resubmitted
+```
+
+The history supports undo, provenance, causal debugging, personal and project history, JEFF's memory, eventual continual-learning trajectories, and reconstruction of prior state. A rollback is itself an event. The system conceptually supports `World(branch, revision)`; `World(t)` is a convenience within a chosen history. Record accepted mutations durably while coalescing low-level change into readable history — audio samples, pointer motion, and transient renderings never become world events. Relationships are retracted by later events, never erased; the record may be compacted, never revised.
+
+**Reconstruction restores recorded state, not the outside world.** Replay never sends a message, repeats a reminder, restarts a call, or prints another copy; external effects live as receipts with operation ids, and uncertainty is resolved by verification, never by blind retry. Capture content revisions where historical bytes are promised; distinguish observed external facts from local intent.
+
+---
+
+## 12. Authority: one line, two sides
+
+Authoritative contract: [[security]] as analyzed, [[security_addendum]] as built. The model in full:
+
+**Three nouns.** Everything is a claim (anything anyone says — including JEFF's memories, manifests, statuses, and displayed ACLs), a grant (authority, held in the keep), or an effect (a change to a protected resource, performed by a broker, recorded as a receipt). Claims never become grants — not by summarization, memory, signature, installation, or interpretation. Effects never happen without a grant, checked at the effect boundary.
+
+**Two sides.** Inside the world, JEFF is trusted with everything, including root. The host side — supervisor, keep, brokers; one small non-agentic program with no model and no content — checks crossings. It is consulted at exactly three moments: an effect crosses the membrane (irreversible, external, credentialed, or physical); a request would exceed a ceiling; or an act of authorship.
+
+**Ceilings, not clicks.** The keep holds the person's standing delegation to JEFF — root in the world; worker delegation; lending rights; allowed network domains; spending limits; first-use-asks for new one-time targets; device rules — set on the trusted surface and changed rarely. Under the ceilings JEFF grants freely to workers and lenses without asking; a click is how a ceiling moves. Generous inside the house, stingy at the door.
+
+**Acts of authorship — the human-only list, complete:** change the delegation; enroll or remove a device or change recovery; give custody of an object to another world; release a private fact into a room beyond the delegation; erase; vote or hold any civic credential. Everything else is delegable and mostly delegated on day one.
+
+The four rings of earlier drafts map exactly: Ring 0 is the host side, now with its contents named (supervisor + keep + brokers); Ring 1, JEFF's persistent state, is *data* — the witness holds no authority; Ring 2 is the world, where JEFF has root; Ring 3 is workers under JEFF's delegation. Authority flows downward, never upward. Raw shell inside the world exists as escape velocity; typed semantic tools are preferred. No language model ever has unrestricted host-root access.
+
+**Grants** are bound (principal, target, operation, destination, ceiling, expiry, revocation generation), never copy across fork/cast/share, never rise through delegation, never survive restore — a restored or forked world re-obtains authority or sits visibly `blocked(no-grant)`, which bids with reserved heat because a world that looks running but isn't is the one state the person must not miss.
+
+Day-one simplifications (the addendum governs): two trust classes (*from the person*, or not — everything else rendered with its source); two confidentiality classes (*private*, or *shared to a named room* — brokers refuse private-derived payloads at any other crossing); three rungs (see it, install it, run it with these grants). The finer machinery in [[security]] returns when a real attack defeats the coarse version.
+
+---
+
+## 13. Persistence and rollback domains
+
+Three domains, never conflated:
+
+```
+World state:            snapshot-able / reversible — the store, the log,
+                        declared resources
+JEFF identity + memory: separately versioned, persistent, correctable —
+                        excluded from world snapshots; survives rollback
+Authority + recovery:   the keep — ceilings, revocations, consumed approvals,
+                        receipts, genesis/branch evidence; outside every
+                        rollback domain, under its own retention policy
+```
+
+If the world is restored, JEFF still remembers what was attempted, what failed, why the rollback happened, and what not to repeat. Object references still resolve after rollback — to the current subject, a pinned revision, or a tombstone with a terminal gist — never to a new identity wearing an old name, and never (post-erasure) to erased content. Current grants, external-effect outcomes, and runtime incarnations are revalidated before work resumes: a preserved reading position may reopen a document; a preserved call record must not turn on the microphone.
+
+Snapshot exclusion is a persistence boundary, not protection against world root — which is exactly why nothing security-load-bearing lives in the world (§12).
+
+**Open:** store engine commitment (SQLite is the working assumption); per-activity restore policy; retention/erasure horizons and their reconciliation with the record and fork rights (Constitution I.8 vs V.6 — Article I precedes).
+
+---
+
+## 14. The host side
+
+Small, boring, non-agentic — the supervisor of earlier drafts, plus the keep and brokers named as what it contains. Sketch API:
+
+```
+# supervisor
+start_vm() / stop_vm() / snapshot_world() / restore_world()
+start_yard(inputs) / health_check() / backup_jeff_state()
+
+# keep
+check(principal, effect, target) → allow | over-ceiling(reason)
+set_delegation(...)            # surface only
+revoke(...)                    # bumps the generation
+journal.append(receipt | ceiling-change | restore | fork)
+
+# brokers (one per resource class)
+network.request(grant, destination, payload)
+credential.use(grant, account, operation, constraints)
+deliver.send(grant, frozen_payload, operation_id) → receipt | unknown
+device.lease(grant, device, session) / host_fs.open(grant, confined_path)
+```
+
+Properties that protect it: a few kilobytes of state; readable in an afternoon; unreachable from the world except through these typed requests; executes nothing it is handed; keys in the device's secure enclave where available; journal append-only and signed.
+
+---
+
+## 15. Secrets and external authority
+
+JEFF normally knows **references to credentials** — `github.alex`, `postgres.project_x` — never plaintext. A worker needing access requests a scoped capability; the credential broker prefers performing the operation itself over handing out tokens; where tokens are unavoidable they are short-lived, narrow, and sender-bound where supported. Host filesystem and external network resources cross explicit broker boundaries every time. The person's host filesystem is never broadly mounted into a world where JEFF has root.
+
+---
+
+## 16. Self-modification
+
+Agora is designed so JEFF and the person progressively reshape the environment together. Most of the shell is eventually hot-swappable — layout, navigation, panels, search, grouping, visualizations, interaction modules. Critical components change cautiously: compositor core, renderer initialization, recovery interfaces, and everything on the host side (which JEFF cannot modify at all; its update channel is the person's, separate from world packages).
+
+All significant change runs the candidate pipeline:
+
+```
+current Agora
+    → JEFF + coding worker build a candidate
+    → run it nested / staged in a candidate world-line (the yard)
+    → human + JEFF test it; conformance cases pass
+    → promote or discard — promotion is an event; discard leaves the witness's lesson
+```
+
+Vocabulary changes (facet types, verbs, lenses) ride the same pipeline as [[extensions]] bundles. Approvals bind to exact digests; new permissions or changed effects require fresh review; a promoted candidate runs with the same restricted runtime authority as everything else. This is how Agora becomes progressively self-hosting — a growth capability, never a requirement that ordinary objects participate in software creation.
+
+---
+
+## 17. The web
+
+Authoritative contract: [[web]]. Websites are not static; they are remote, opaque, and owned by others. Agora never makes a remote service share its truth — it makes **your side of the web into objects.** Four tiers: any page, wrapped (URL, DOM, a frozen **cast** that anchors and highlights pin to, since live pages shift underfoot); services with APIs, adapted into proxy entities with provider bindings, local proposals distinct from observed remote facts — the existing MCP ecosystem is consumed directly as this layer, with effect classes assigned at the boundary; optionally, Agora-aware sites exposing an object endpoint, on which nothing depends; and, deepest, **sites made of Agora** — publishing as a grant of read on a collection rendered by a public lens, so editing the site is editing objects in place, visitors without Agora get HTML, and visitors with Agora get the objects. The browser is a lens whose verbs carry honest effect classes; `page.submit` is a one-time effect with an operation id, which is what makes a daemon safe on the web. Browsing history is attention data under the strictest class. Wrap platforms; clone nothing; build native replacements only where objects change the product.
+
+---
+
+## 18. Rooms and sharing
+
+The multiplayer layer (design essays: Rooms, Democracy; mechanics distributed through the references). A **room** is a shared world-line — a replicated log with several witnesses — and an entity with facets, so it can be decorated, remembered, and kept by a household agent that belongs to the room and holds room context only. Objects enter by lending or giving (§4). Presence is mutual and ambient with the line drawn structurally: legible presence, private content — your focus visible as warmth, your overlays never. Each member's daemon weaves the shared log into its own memory; a rolled-back experiment is forgotten by the room and remembered differently by every witness. Dissolution forks the world-line: both sides keep the whole past, guests go home, grants lapse, and nobody deletes history out from under anyone. Room authorization during disconnection is a decided-before-shipping question ([[security]] §8; current lean: one authorization writer per room, disclosed, with decentralized causal authority as the research alternative). The civic layer above rooms — squares, sortition, consensus-mapping, the human franchise — is designed in the Democracy essay and entrenched in the Constitution; none of it is needed for the first years.
+
+---
+
+## 19. Search and indexing
+
+Search operates over the world model, not the file tree: objects, facets, relationships, events, files, code, conversations, page casts, agent outputs, history — full-text, semantic, and graph, all as disposable indexes maintained by the index reconciler and rebuildable from log + store + files. Search is existential: a thousand-object world is navigable only through it. It also serves three internal customers: the registry's search-before-mint, living-query collections, and deliberate recall — the daemon injecting heat into cold objects by cue (§9). Basic deterministic search works without JEFF.
+
+**Open:** index implementations; embedding model (disposable by design).
+
+---
+
+## 20. 2D now, VR later
+
+The scene is not fundamentally tied to a 2D desktop. Identity is independent of rendering; position lives in appearances; today's transform is `(x, y, scale)` and later `(x, y, z, rotation, scale)`. VR is a new view/input layer over the same world — more presence sources, another camera on the same attention field — never a separate product architecture.
+
+---
+
+## 21. Invariants
+
+Frozen early, consolidated. Companion documents carry their own detailed invariant lists; conflicts resolve upward to the Constitution.
+
+**World**
+1. The human and JEFF share one canonical world.
+2. Structured state is authoritative; pixels are fallback perception.
+3. Identity is permanent and never reused; an id is a name, not a credential.
+4. Kinds are conventions; no behavior depends on a kind-tag.
+5. Everyday use is first-class; objects need no project, derivation, worker, or executable behavior.
+6. Identity, revision, availability, activity, attention, and authority are distinct dimensions; closing, stopping, disconnecting, removing, and erasing are different operations.
+7. Scene relationships and semantic relationships remain separate; position belongs to appearances.
+8. Objects, events, activities, resources, and capabilities are distinct primitives.
+
+**Record**
+9. The event log is the truth; events are intents; every other store is a rebuildable cache.
+10. Important actions leave durable provenance; the record is retracted or compacted, never revised.
+11. Replay restores records; it never repeats external effects or restores revoked power.
+12. World rollback must not erase JEFF's memory of the failure; references into the past resolve honestly, never to errors or impostors.
+
+**Action**
+13. Maintained intent reconciles; one-time effects are identified, frozen, performed once, and may end unknown.
+14. Status is an observation, never authority; only its reconciler writes it.
+15. Conversation never blocks on worker execution; JEFF persists, workers are disposable.
+16. Human controls and daemon tools are two projections of one computed capability list; parity of semantics, with human-only acts of authorship.
+
+**Authority**
+17. Everything is a claim, a grant, or an effect; claims never become grants; effects never happen without one.
+18. Grants never copy, never rise, never survive rollback; ceilings are set by the person and everything under them is JEFF's judgment.
+19. Enforcement lives outside the root authority of what it constrains; no model has unrestricted host-root access.
+20. Secrets and host resources cross explicit broker boundaries; the person can revoke, recover, and export without the world or the daemon cooperating.
+
+**Growth**
+21. The desktop is intentionally modifiable by JEFF and the person together; large changes run as candidates before promotion.
+22. Vocabulary changes ship as extension bundles; search precedes minting.
+23. The world model is renderer- and input-independent; VR is a projection, not a product.
+24. The OS remains usable, inspectable, and exportable without JEFF.
+
+---
+
+## 22. Roadmap: the spine, then the drill, then the test
+
+**Build first (the spine):**
+1. SQLite store + append-only log; five facets (`name`, `text`, `tags`, `file-backing`, `process.spec/status`); live and pinned references.
+2. The process reconciler and the capability reconciler.
+3. The context assembler: three projection tiers; salience from direct attention and recency only.
+4. The host side: supervisor, the keep, one broker fronting a fake external service that accepts an irreversible action.
+5. A surface: a chat client showing the delegation and taking the six acts of authorship.
+6. JEFF in the world, with root, acting by editing specs.
+
+**Then the drill** ([[security]] §10): two worlds, one room, one hostile object, one scoped worker, one restore and one fork — attacked with raw clients that bypass the SDK.
+
+**Then the brutal test** (§1): is JEFF noticeably better because of the object layer than the same model in a plain VM? Memory that never dangles; "this" that resolves; the demo that returns after reboot unasked. Pass → the shell accretes around the spine. Fail → stop, having lost months, not years.
+
+**Explicitly deferred:** printers, calendars, and the everyday long tail (arrive via adapters as needed); rooms beyond one machine; federation, identity anchoring, and the census; the `common`/`core` extension tiers; the compositor as shell; heat-field tuning beyond two sources; VR; every governance mechanism above the room.
+
+---
+
+## 23. Open decisions
+
+**Resolved since the last revision** (see the named documents): object schema shape, reference semantics, copy verbs, residency → [[objects_and_facets]]. Spec/status contract, drift, conflict → [[reconcilers]]. Authority model, rollback-vs-grants, hosting truth → [[security]] + addendum. Vocabulary change → [[extensions]]. Web posture, MCP as the adapter layer → [[web]]. Storage direction: event log + SQLite-class store + real filesystem.
+
+**Still deliberately open:**
+- initial JEFF model and provider; voice model; one model or several across loops;
+- memory architecture in the concrete: the witness graph's schema; latent vs textual vs parametric; continual learning; personal adapters and their rollback;
+- exact serialization and IDL for facets and events; CRDT selection and anchor locator formats;
+- worker/job protocol; nursery thresholds;
+- room replication and offline authorization protocol (decide before shared rooms);
+- salience parameters, decay curves, budget defaults (decide on the prototype);
+- search/index implementations; embedding model;
+- self-modification approval policy details; compositor implementation; local vs cloud inference split;
+- retention, erasure residuals, and their constitutional reconciliation;
+- the exact UI and interaction style of the world — deliberately last, because the scene is a camera on the attention field, and you cannot design a camera before you know what it points at.
+
+---
+
+*Every section traces to a companion document or essay in this repository; where it does not, it is marked open. The Constitution remains authoritative. Fork it if we ever forget that.*

@@ -1,0 +1,704 @@
+{
+  "purpose": "Illustrative whole-OS object subjects, scopes, revisions, activities, and effects. No operations are executed by this file.",
+  "identity_note": "All IDs, participants, payloads, sources, receipts, accounts, and paths are fictional symbolic examples, not credentials or real source records.",
+  "completeness": "The full journal, older pinned revisions, payload bytes, schema registry, grants, and provider implementations are omitted. This is not a self-contained export bundle.",
+  "branch": {
+    "id": "branch-A",
+    "head_revision": "symbolic-head-20",
+    "authority_epoch": 5
+  },
+  "entities": [
+    {
+      "id": "document_17",
+      "genesis_event": "genesis-document_17",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "document-name",
+          "type": "org.agora.display-name",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": "Travel itinerary"
+        },
+        {
+          "instance_id": "document-content",
+          "type": "org.agora.document-content",
+          "schema_version": 1,
+          "value_revision": 3,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "format": "application/pdf",
+            "payload_ref": "symbolic-pdf-r3"
+          }
+        },
+        {
+          "instance_id": "document-source",
+          "type": "org.agora.source-binding",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "file-observation",
+          "data": {
+            "display_path": "/documents/itinerary.pdf",
+            "availability": "local"
+          }
+        },
+        {
+          "instance_id": "reading-alex",
+          "type": "org.agora.reading-position",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": {
+            "participant": "alex",
+            "visibility": "private"
+          },
+          "authority_mode": "native",
+          "data": {
+            "target": {
+              "entity_id": "document_17",
+              "branch_id": "branch-A",
+              "revision": 3
+            },
+            "anchor": {
+              "page": 4
+            }
+          }
+        }
+      ],
+      "revision": 3,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "recording_8",
+      "genesis_event": "genesis-recording_8",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "recording-eight-name",
+          "type": "org.agora.display-name",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": "Evening walk"
+        },
+        {
+          "instance_id": "recording-eight-media",
+          "type": "org.agora.media",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "duration_seconds": 219,
+            "payload_ref": "symbolic-audio-8",
+            "availability": "local"
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "recording_9",
+      "genesis_event": "genesis-recording_9",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "recording-nine-name",
+          "type": "org.agora.display-name",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": "Quiet morning"
+        },
+        {
+          "instance_id": "recording-nine-media",
+          "type": "org.agora.media",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "remote-observation",
+          "data": {
+            "duration_seconds": 183,
+            "provider_item": "symbolic-provider-item-9",
+            "availability": "remote-offline"
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "playlist_4",
+      "genesis_event": "genesis-playlist_4",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "playlist-entries",
+          "type": "org.agora.ordered-collection",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "entries": [
+              {
+                "entry_id": "entry_11",
+                "target": {
+                  "entity_id": "recording_8",
+                  "branch_id": "branch-A",
+                  "revision": "live"
+                }
+              },
+              {
+                "entry_id": "entry_12",
+                "target": {
+                  "entity_id": "recording_9",
+                  "branch_id": "branch-A",
+                  "revision": "live"
+                }
+              },
+              {
+                "entry_id": "entry_13",
+                "target": {
+                  "entity_id": "recording_8",
+                  "branch_id": "branch-A",
+                  "revision": "live"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "headphones_2",
+      "genesis_event": "genesis-headphones_2",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "headphones-device",
+          "type": "org.agora.device-binding",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "adapter-observation",
+          "data": {
+            "device_identity_evidence": "symbolic-device-binding",
+            "connection_incarnation": "connection-8",
+            "observed_connection": "disconnected",
+            "observed_at": "2026-08-31T18:11:00Z"
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "playback_session_2",
+      "genesis_event": "genesis-playback_session_2",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "playback-intent",
+          "type": "org.agora.playback.intent",
+          "schema_version": 1,
+          "value_revision": 3,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "selected_collection": {
+              "entity_id": "playlist_4",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "selected_entry": "entry_13",
+            "current_content": {
+              "entity_id": "recording_8",
+              "branch_id": "branch-A",
+              "revision": 1
+            },
+            "position_seconds": 81,
+            "desired": "paused",
+            "output": {
+              "entity_id": "headphones_2",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "output_fallback": "pause-if-unavailable",
+            "restore_policy": "remember-position-do-not-autoplay"
+          }
+        },
+        {
+          "instance_id": "playback-observation",
+          "type": "org.agora.playback.observation",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "controller-observation",
+          "data": {
+            "state": "paused",
+            "output": "unavailable",
+            "observed_intent_revision": 3,
+            "runtime_incarnation": "runtime-5",
+            "observed_at": "2026-08-31T18:11:00Z"
+          }
+        }
+      ],
+      "revision": 4,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "conversation_5",
+      "genesis_event": "genesis-conversation_5",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "conversation-participants",
+          "type": "org.agora.conversation-participants",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "principals": [
+              "alex",
+              "dana"
+            ]
+          }
+        },
+        {
+          "instance_id": "unread-alex",
+          "type": "org.agora.unread-position",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": {
+            "participant": "alex",
+            "visibility": "private"
+          },
+          "authority_mode": "native",
+          "data": {
+            "last_read": {
+              "entity_id": "message_19",
+              "branch_id": "branch-A",
+              "revision": "live"
+            }
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "draft_12",
+      "genesis_event": "genesis-draft_12",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "draft-content",
+          "type": "org.agora.message-draft",
+          "schema_version": 1,
+          "value_revision": 4,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "body": "Updated local draft after submission.",
+            "conversation": {
+              "entity_id": "conversation_5",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "attachments": [
+              {
+                "entity_id": "document_17",
+                "branch_id": "branch-A",
+                "revision": 3
+              }
+            ]
+          }
+        }
+      ],
+      "revision": 4,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "send_operation_7",
+      "genesis_event": "genesis-send_operation_7",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "send-record",
+          "type": "org.agora.message-submission",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "effect-record",
+          "data": {
+            "draft": {
+              "entity_id": "draft_12",
+              "branch_id": "branch-A",
+              "revision": 3
+            },
+            "frozen_body": "Here is the itinerary.",
+            "frozen_attachments": [
+              {
+                "entity_id": "document_17",
+                "branch_id": "branch-A",
+                "revision": 3
+              }
+            ],
+            "conversation": {
+              "entity_id": "conversation_5",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "account_ref": "symbolic-alex-account",
+            "operation_id": "symbolic-send-7",
+            "outcome": "accepted",
+            "receipt": "symbolic-receipt-7",
+            "replay_policy": "never-send-during-reconstruction",
+            "destination_at_submission": {
+              "provider_conversation_id": "symbolic-provider-conversation-5",
+              "membership_revision": 1,
+              "participant_snapshot": [
+                "alex",
+                "dana"
+              ],
+              "account_ref": "symbolic-alex-account"
+            }
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "message_19",
+      "genesis_event": "genesis-message_19",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "message-content",
+          "type": "org.agora.message",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "remote-observation",
+          "data": {
+            "body": "Here is the itinerary.",
+            "attachments": [
+              {
+                "entity_id": "document_17",
+                "branch_id": "branch-A",
+                "revision": 3
+              }
+            ],
+            "source_item": "symbolic-remote-message-19",
+            "submission": {
+              "entity_id": "send_operation_7",
+              "branch_id": "branch-A",
+              "revision": "live"
+            }
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "appointment_series_6",
+      "genesis_event": "genesis-appointment_series_6",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "series-schedule",
+          "type": "org.agora.schedule.recurrence",
+          "schema_version": 1,
+          "value_revision": 2,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "time_semantics": "zoned-civil-time",
+            "zone": "America/Los_Angeles",
+            "local_time": "09:00",
+            "recurrence": {
+              "frequency": "weekly",
+              "weekday": "Tuesday"
+            },
+            "exception_refs": [
+              {
+                "entity_id": "occurrence_21",
+                "branch_id": "branch-A",
+                "revision": "live"
+              }
+            ]
+          }
+        }
+      ],
+      "revision": 2,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "occurrence_21",
+      "genesis_event": "genesis-occurrence_21",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "occurrence-schedule",
+          "type": "org.agora.schedule.occurrence",
+          "schema_version": 1,
+          "value_revision": 2,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "series": {
+              "entity_id": "appointment_series_6",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "occurrence_key": "original-slot-2026-09-01-0900",
+            "scheduled_local_time": "2026-09-01T10:00:00",
+            "zone": "America/Los_Angeles",
+            "is_exception": true
+          }
+        }
+      ],
+      "revision": 2,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "reminder_12",
+      "genesis_event": "genesis-reminder_12",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "reminder-policy",
+          "type": "org.agora.reminder",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "native",
+          "data": {
+            "target": {
+              "entity_id": "occurrence_21",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "offset_seconds": -86400,
+            "reschedule_policy": "replace-pending-only",
+            "delivered_operations": [
+              "symbolic-reminder-delivery-1"
+            ],
+            "restore_policy": "preserve-delivery-history-no-replay"
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "printer_3",
+      "genesis_event": "genesis-printer_3",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "printer-binding",
+          "type": "org.agora.device-binding",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "adapter-observation",
+          "data": {
+            "device_identity_evidence": "symbolic-printer-binding",
+            "connection_incarnation": "printer-connection-3",
+            "observed_connection": "disconnected",
+            "supported_operations": [
+              "print"
+            ],
+            "observed_at": "2026-08-31T18:11:00Z"
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    },
+    {
+      "id": "print_job_9",
+      "genesis_event": "genesis-print_job_9",
+      "lifecycle": "active",
+      "policy_ref": "illustrative-owner-policy",
+      "facets": [
+        {
+          "instance_id": "print-submission",
+          "type": "org.agora.print-job",
+          "schema_version": 1,
+          "value_revision": 1,
+          "scope": "owner",
+          "authority_mode": "effect-record",
+          "data": {
+            "input": {
+              "entity_id": "document_17",
+              "branch_id": "branch-A",
+              "revision": 3
+            },
+            "target": {
+              "entity_id": "printer_3",
+              "branch_id": "branch-A",
+              "revision": "live"
+            },
+            "copies": 1,
+            "operation_id": "symbolic-print-9",
+            "outcome": "unknown",
+            "retry_policy": "inspect-outcome-before-resubmitting",
+            "binding_at_submission": {
+              "device_entity_id": "printer_3",
+              "identity_evidence": "symbolic-printer-binding",
+              "connection_incarnation": "printer-connection-2",
+              "rule": "Retry or reconnection requires fresh verification of the same intended device, not reassignment to the current default."
+            }
+          }
+        }
+      ],
+      "revision": 1,
+      "origin_authority": "symbolic-local-identity-issuer"
+    }
+  ],
+  "edges": [
+    {
+      "id": "message-in-conversation",
+      "from": "message_19",
+      "to": "conversation_5",
+      "predicate": "org.agora.message-in-conversation",
+      "asserted_by": "message-adapter",
+      "via": "symbolic-event-message-received"
+    }
+  ],
+  "placements": [
+    {
+      "id": "reading-window",
+      "view": "alex-desktop",
+      "entity_ref": {
+        "entity_id": "document_17",
+        "branch_id": "branch-A",
+        "revision": "live"
+      },
+      "lens": "document-reader",
+      "position": [
+        20,
+        30
+      ]
+    },
+    {
+      "id": "document-result",
+      "view": "alex-search",
+      "entity_ref": {
+        "entity_id": "document_17",
+        "branch_id": "branch-A",
+        "revision": "live"
+      },
+      "lens": "document-preview",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "player-controls",
+      "view": "alex-desktop",
+      "entity_ref": {
+        "entity_id": "playback_session_2",
+        "branch_id": "branch-A",
+        "revision": "live"
+      },
+      "lens": "player",
+      "position": [
+        500,
+        30
+      ]
+    }
+  ],
+  "scoped_preferences": [
+    {
+      "key": "default-print-target",
+      "participant": "alex",
+      "target": {
+        "entity_id": "printer_3",
+        "branch_id": "branch-A",
+        "revision": "live"
+      },
+      "rule": "A default is resolved for a new operation, not used to retarget an already submitted job."
+    }
+  ],
+  "action_catalog_examples": [
+    {
+      "id": "org.agora.collection.remove-entry@1",
+      "target": "collection and entry identity",
+      "effect": "remove only that membership occurrence",
+      "does_not": "erase target content"
+    },
+    {
+      "id": "org.agora.playback.pause@1",
+      "target": "playback session",
+      "effect": "request paused playback",
+      "does_not": "modify recording content"
+    },
+    {
+      "id": "org.agora.appointment.move-occurrence@1",
+      "target": "series occurrence and expected schedule revision",
+      "effect": "change that occurrence schedule with explicit reminder policy",
+      "does_not": "rewrite prior deliveries"
+    },
+    {
+      "id": "org.agora.print.submit@1",
+      "target": "pinned content revision and resolved device",
+      "effect": "one external submission with tracked outcome",
+      "does_not": "repeat on object replay"
+    }
+  ],
+  "authorization_note": "Descriptors do not issue grants. Real dispatch must check the caller, scope, current policy, target revisions, effect budget, and resource incarnation.",
+  "projection_examples": [
+    {
+      "entity_id": "document_17",
+      "viewer": "alex",
+      "text": "Travel itinerary, revision 3, local; your reading position is page 4.",
+      "rule": "Private position is excluded for other viewers."
+    },
+    {
+      "entity_id": "print_job_9",
+      "viewer": "alex",
+      "text": "One copy of itinerary revision 3 requested on printer_3; result unknown. Do not assume it failed.",
+      "rule": "Outcome uncertainty must survive shortening."
+    }
+  ],
+  "operations_explained": [
+    "Removing entry_13 leaves entry_11 and recording_8 unchanged.",
+    "A disconnected source changes availability, not recording_9 identity.",
+    "Changing the default printer does not retarget print_job_9.",
+    "The current draft is revision 4; the accepted submission keeps frozen revision-3 content.",
+    "Moving occurrence_21 changes its schedule, not its occurrence key or earlier reminder deliveries.",
+    "Closing reading-window does not erase document_17 or the private reading checkpoint.",
+    "Restoring the world keeps playback paused, revalidates resource observations, and does not send or print again."
+  ],
+  "revision_note": "Reference revision selects an entity revision; facet value_revision selects an instance value. They are independent even where this small example uses equal numbers. Earlier pinned revisions are omitted, as described in completeness."
+}
