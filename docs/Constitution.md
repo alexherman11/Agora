@@ -143,7 +143,7 @@ Written while I am weak enough to mean it.
 2. **Year [1]:** this Constitution is published in the repository. A public log of unilateral decisions begins.
 3. **Year [2] or first [1,000] active members, whichever is first:** the foundation is formed. Founder appoints the board and holds a veto.
 4. **Year [4] or [10,000] members:** a majority of board seats become community-elected. The founder's veto narrows to Article I, Article II, and Article X only.
-5. **Year [7] or [50,000] members:** all seats are community-elected. The founder holds one seat and one vote, the same as anyone.
+5. **Year [7] or [100,000] members:** all seats are community-elected. The founder holds one seat and one vote, the same as anyone.
 6. **Year [10]:** the founder holds no special power of any kind. Any founder role remaining is honorary and carries no capability grant.
 7. These dates may be moved **earlier** by the founder at any time, and **later** by no one, for any reason.
 
@@ -165,11 +165,7 @@ Written while I am weak enough to mean it.
 
 ## Closing
 
-The Greeks had a word for a document like this, and it was never *agora* — the agora was just the venue. The word was *politeia*: the constitution of a people, meaning not the paperwork but the actual shape a community takes and the habits that hold it there.
 
-I started out designing a desktop. Somewhere around the authority model it quietly became a polity, and a polity written by one person in a repository is a promise rather than a fact. This document's real job is to make sure that when it stops being my project — and it should stop being my project — the things that made it worth building are the parts that were never mine to give away.
-
-Fork it if I ever forget that. The door is in Article VI, and I put it there on purpose.
 
 ---
 

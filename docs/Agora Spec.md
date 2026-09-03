@@ -1,22 +1,22 @@
 # Agora OS — Current Design
 
-**The master specification.** Version 0.4 — September 2026. Human-readable first; agent-navigable throughout.
+**The master specification.** Version 0.4 — September 2026. 
 
 > **How this document works.** Section numbers are stable; cite them as `Spec §N`. Where a companion reference document exists, this spec gives the shape and the reasons, and the reference gives the contract — the reference wins on detail. Where this spec and the Constitution disagree, the Constitution wins. Bracketed values are open decisions. "JEFF" is the first daemon's name; "daemon" is the role (the Constitution's term). This is a design specification: it describes intended behavior, not implemented behavior.
 
 ### The document map
 
-| Document | Holds | Authority |
-|---|---|---|
-| [[Constitution]] | rights, entrenchments, the fork right, the founder sunset | supreme |
-| **this spec** | the whole-system shape, the reasons, the roadmap | governs where references are silent |
-| [[Objects and Facets]] | entities, facets, references, state dimensions, copy verbs, residency, projection, storage | reference |
-| [[Reconcilers]] | the spec/status contract, observations, drift, blocked, conflict | reference |
-| [[Security]] + [[Security Addendum]] | claims/grants/effects, the coverage map; **the addendum's two-sided model is the version to build** | reference |
-| [[Extensions]] | how vocabulary changes: the bundle, the loop, tiers, promotion | reference |
-| [[The Web]] | pages as objects, the browser lens, adapters, publishing | reference |
-| Essays: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]] | explainers, design pressure tests, and social/civic design; superseded on mechanics by the references above | background |
-| Archived: [[Agora Objects (superseded)]] and the rest of `research/` | the object design the references above replaced, and the review dossiers behind them; kept for lineage | historical |
+| Document                                                                                          | Holds                                                                                                       | Authority                           |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [[Constitution]]                                                                                  | rights, entrenchments, the fork right, the founder sunset                                                   | supreme                             |
+| **this spec**                                                                                     | the whole-system shape, the reasons, the roadmap                                                            | governs where references are silent |
+| [[Objects and Facets]]                                                                            | entities, facets, references, state dimensions, copy verbs, residency, projection, storage                  | reference                           |
+| [[Reconcilers]]                                                                                   | the spec/status contract, observations, drift, blocked, conflict                                            | reference                           |
+| [[Security]] + [[Security Addendum]]                                                              | claims/grants/effects, the coverage map; **the addendum's two-sided model is the version to build**         | reference                           |
+| [[Extensions]]                                                                                    | how vocabulary changes: the bundle, the loop, tiers, promotion                                              | reference                           |
+| [[The Web]]                                                                                       | pages as objects, the browser lens, adapters, publishing                                                    | reference                           |
+| Essays: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]] | explainers, design pressure tests, and social/civic design; superseded on mechanics by the references above | background                          |
+| Archived: [[Agora Objects (superseded)]] and the rest of `research/`                              | the object design the references above replaced, and the review dossiers behind them; kept for lineage      | historical                          |
 
 The vault index, with reading order and citation conventions, is [[Start Here]].
 
@@ -26,15 +26,13 @@ The vault index, with reading order and citation conventions, is [[Start Here]].
 
 AgoraOS is a general-purpose operating environment that a person shares with a persistent, personalized, real-time AI agent. It must support ordinary computer use — reading, listening, watching, talking, browsing, scheduling, organizing, using devices, running applications — and it must make creating and reshaping software a natural part of that use rather than a separate profession.
 
-**Objects are the persistent subjects of everyday life on the machine.** Documents, songs, conversations, appointments, collections, accounts, devices, and services keep understandable identities across applications, sessions, and years. Many objects arrive from elsewhere, are never edited, and are simply used; they need no project, derivation, or executable behavior to justify existing. Software creation and Agora improving itself are important supported uses — they are not the organizing lifecycle of the OS, and every supposedly general abstraction is tested against unrelated everyday cases before it is trusted.
+**Objects are the persistent subjects of everyday life on the machine.** Documents, songs, conversations, appointments, collections, accounts, devices, and services keep understandable identities across applications, sessions, and years. Many objects arrive from elsewhere, are never edited, and are simply used; they need no project, derivation, or executable behavior to justify existing. 
 
 **The screen is a projection of structured state, not the source of truth.** A thing's identity is distinct from its content revision, its location, its open views, its availability, and its activity. The person and JEFF work through the same semantic actions, generated from one computed list, with permissions enforced per caller. Ordinary interaction remains usable when JEFF is unavailable: identity resolution, direct controls, basic search, inspection, and export never require a model.
 
 **The wager underneath all of it:** every prior attempt at a semantic, malleable computing environment died because rigid schemas were needed for machines that couldn't read, and nobody would fill them in. Agora is built for a machine that can read. So the design is strict exactly where machines need precision — identity, authority, effects, liveness — and loose where meaning lives, with a resident mind as the join. That asymmetry appears in every section below.
 
 A person entering Agora has a usable default environment and voice or text access to JEFF. Requests range from "keep reading from here" and "play this through my headphones" to "make me a lens that shows my notes as a constellation." Customization grows from use; it is never a prerequisite for ordinary tasks.
-
-**The test that governs the whole project:** within a few months of a working spine (§22), JEFF must be noticeably better *because of* the object layer than the same model in a plain VM — memory that never dangles, "this" that resolves, a world that reassembles itself after a reboot. If that test fails, the thesis fails, and we will have lost months, not years.
 
 ---
 
