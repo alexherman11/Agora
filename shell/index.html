@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agora desk</title>
+<style>
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; display: grid; grid-template-columns: 1fr 360px; height: 100vh; }
+  #desk { position: relative; background: #f4f1ea; overflow: hidden; }
+  .item { position: absolute; max-width: 240px; padding: 6px 8px; background: #fff; border: 1px solid #c9c2b4; border-radius: 4px; }
+  .item .label { font-weight: 600; }
+  .item .summary { color: #555; margin-top: 2px; white-space: pre-wrap; }
+  .item .id { color: #999; font-size: 11px; }
+  #empty { position: absolute; left: 12px; top: 12px; color: #888; }
+  #chat { display: flex; flex-direction: column; border-left: 1px solid #ddd; }
+  #log { flex: 1; overflow: auto; padding: 8px; }
+  #log p { margin: 0 0 8px; white-space: pre-wrap; }
+  #log .jeff { color: #1a4d8f; }
+  #log .call { color: #777; font-size: 12px; font-family: monospace; }
+  #log .error { color: #a00; }
+  form { display: flex; border-top: 1px solid #ddd; }
+  input { flex: 1; padding: 8px; border: 0; font: inherit; }
+  button { padding: 8px 12px; border: 0; background: #1a4d8f; color: #fff; font: inherit; }
+  #status { padding: 4px 8px; font-size: 12px; color: #777; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<div id="desk"><div id="empty">an empty desk</div></div>
+<div id="chat">
+  <div id="status">connecting…</div>
+  <div id="log"></div>
+  <form id="form"><input id="msg" placeholder="tell JEFF…" autocomplete="off"><button>send</button></form>
+</div>
+<script>
+const desk = document.getElementById("desk"), empty = document.getElementById("empty");
+const log = document.getElementById("log"), status = document.getElementById("status");
+
+async function loadTree() {
+  const tree = await (await fetch("/tree")).json();
+  desk.querySelectorAll(".item").forEach(n => n.remove());
+  empty.hidden = tree.nodes.length > 0;
+  for (const node of tree.nodes) {
+    const el = document.createElement("div");
+    el.className = "item";
+    el.style.left = (node.transform.x || 0) + "px";
+    el.style.top = (node.transform.y || 0) + "px";
+    el.style.transform = "scale(" + (node.transform.scale || 1) + ")";
+    const label = document.createElement("div"); label.className = "label"; label.textContent = node.label;
+    const id = document.createElement("div"); id.className = "id"; id.textContent = node.entity;
+    el.append(label, id);
+    if (node.mode !== "icon") {
+      const summary = document.createElement("div"); summary.className = "summary"; summary.textContent = node.summary;
+      el.append(summary);
+    }
+    desk.append(el);
+  }
+  status.textContent = "revision " + tree.revision;
+}
+
+function say(text, cls) { const p = document.createElement("p"); p.className = cls; p.textContent = text; log.append(p); log.scrollTop = log.scrollHeight; }
+
+document.getElementById("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("msg"), message = input.value.trim();
+  if (!message) return;
+  input.value = ""; say("you: " + message, "you");
+  const r = await fetch("/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message }) });
+  const data = await r.json();
+  if (data.error) { say(data.error, "error"); return; }
+  for (const c of data.calls) say(c.verb + " " + JSON.stringify(c.args) + (c.error ? "  ✗ " + c.error : "  ✓"), "call");
+  say("JEFF: " + data.reply, "jeff");
+});
+
+const source = new EventSource("/events");
+source.addEventListener("changed", loadTree);
+source.onerror = () => { status.textContent = "disconnected"; };
+loadTree();
+</script>
+</body>
+</html>

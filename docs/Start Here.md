@@ -13,6 +13,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | Reference | `Reference/` | The contracts. A reference wins over the Spec on detail. |
 | Essays | `Essays/` | Explainers, pressure tests, and social/civic design. Superseded on mechanics by the references. |
 | Research | `research/` | Review dossiers, toy models, and archived drafts. Historical record, not current design. |
+| Build | repository root | `BUILD_PROMPT.md` (what milestone one is), `AGENTS.md` (how to work on the code), `DECISIONS.md` (settled questions and friction). Governed by the Spec; the code never outranks the documents. |
 
 ## Reading order
 
@@ -23,6 +24,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 5. [[Security]], then [[Security Addendum]] — the addendum's two-sided model is the version to build.
 6. [[Extensions]] and [[The Web]] — how vocabulary changes, and how the world meets the web.
 7. Essays as interest takes you: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]].
+8. Before writing code: [[Agora Spec]] §22 for the roadmap, then `BUILD_PROMPT.md` and `AGENTS.md` at the repository root.
 
 ## Reference
 
@@ -58,6 +60,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 
 - **Citing.** `Spec §N`, `Objects §N`, `Security §N`, `Constitution III.6`. Inside the references, cited titles are links: `[[Objects and Facets|Objects]] §5.4`.
 - **Status lines.** Every reference opens with a version, a "companion to" line, and a status block. Every essay opens with a banner naming what supersedes it.
-- **Nothing is implemented.** All of this is design specification. Bracketed values are open decisions.
+- **The documents are specification, not description.** They state intended behavior. What is actually built is whatever passes the tests under `tests/`; milestone one ([[Agora Spec]] §22) is the first code, and it lives in `kernel/`, `cli.py`, `shell/`, and `jeff/`. Bracketed values are open decisions; values committed for M1 are listed in `DECISIONS.md`.
+- **The code never outranks the documents.** Where an implementation and a reference disagree, the reference is right and the code carries a `DECISIONS.md` line explaining the deviation, or the code changes.
 - **Names.** "JEFF" is the first daemon's name; "daemon" is the role and the Constitution's term. The essays say JEFF; the references say daemon.
 - **Not in the repository.** Sol's *Security model and attack analysis* draft 0.2, which [[Security]] builds on, is not currently here. If it turns up, it belongs under `research/security/`.

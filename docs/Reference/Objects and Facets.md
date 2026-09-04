@@ -693,8 +693,8 @@ The manifest distinguishes fully included content from references. Export is ava
 Left open until exercised by conformance cases:
 
 - exact id encoding and issuance protocol across hosts;
-- facet definition language and canonical serialization ([JSON / CBOR]);
-- sequence CRDT selection and anchor locator formats per facet family;
+- facet definition language and canonical serialization ([JSON / CBOR]; milestone one uses JSON lines, see [[Agora Spec]] §22);
+- sequence CRDT selection and anchor locator formats per facet family (milestone one commits `core.text` to Loro, with a locator of position-id range + creation revision + quoted text; other families remain open);
 - conflict-object UX and the daemon's adjudication limits;
 - projection tier sizes and budget negotiation between assembler and salience;
 - custody handshake protocol across federated hosts and its failure modes;
@@ -704,7 +704,7 @@ Left open until exercised by conformance cases:
 - per-span provenance storage cost and compaction;
 - stamp-update consent defaults;
 - whether casting another participant's shared object is a right or a grant;
-- entity store engine (SQLite is the working assumption, not a commitment).
+- entity store engine (SQLite is the working assumption, not a commitment; milestone one derives a SQLite cache from a JSONL log and proves it rebuildable).
 
 ---
 

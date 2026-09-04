@@ -105,7 +105,7 @@ The smallest thing that can be attacked and can be lived in:
 5. a surface: a chat client that shows the delegation and takes the six verbs in §4;
 6. the daemon, in the world, with root.
 
-*This spine is also [[Agora Spec]] §22, which is the maintained copy.*
+*[[Agora Spec]] §22 is the maintained copy of this sequence. It now puts a smaller milestone one ahead of step 1 — four verbs, three facets, one desk, JEFF as a client — and the six steps above follow it.*
 
 Then the drill from [[Security]] §10, with raw clients that bypass the SDK — and, alongside it, the test that decides whether any of this was worth it: **after a few weeks, is the daemon noticeably better because of the object layer than the same model in a plain VM?** Memory that never dangles; "this" that resolves; a demo that comes back after a reboot without being asked.
 

@@ -17,6 +17,7 @@
 | [[The Web]]                                                                                       | pages as objects, the browser lens, adapters, publishing                                                    | reference                           |
 | Essays: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]] | explainers, design pressure tests, and social/civic design; superseded on mechanics by the references above | background                          |
 | Archived: [[Agora Objects (superseded)]] and the rest of `research/`                              | the object design the references above replaced, and the review dossiers behind them; kept for lineage      | historical                          |
+| `BUILD_PROMPT.md`, `AGENTS.md`, `DECISIONS.md` (repository root) | what milestone one is and its acceptance script; how to work on the code; settled questions and friction | build — governed by this spec; code never outranks the documents |
 
 The vault index, with reading order and citation conventions, is [[Start Here]].
 
@@ -150,7 +151,7 @@ Storage: an append-only event log as the truth; a SQLite-class materialized stor
 
 ## 5. Scene and shell
 
-The long-term Agora desktop is the shell/compositor itself, not a canvas app inside a conventional desktop. Initial implementation: JEFF acting inside the world VM, with a web portal as the person's view.
+The long-term Agora desktop is the shell/compositor itself, not a canvas app inside a conventional desktop. Initial implementation (milestone one, §22): a thin web shell that renders the desk scene as a tree and forwards input as verb calls, with JEFF as a client of the same verbs. The shell renders; it never interprets.
 
 ```
 Agora Shell
@@ -201,7 +202,7 @@ Opaque application    → wrapped entity: identity, window, file-backing,
 
 JEFF is the **persistent person/executive** of the world — not necessarily the strongest model in the system (initially a Sonnet-class model; possibly a custom-tuned smaller model later; the fast voice loop and the executive may be different models). His jobs: maintain the home, help build what the person needs, anticipate, and collaborate in real time. He is strongly agentic with a real identity, treats the machine as his home rather than his cage, may explore beyond it within his ceilings, is treated with respect, and **may decline** — a refusal is a legitimate outcome, not a malfunction ([[Constitution]] II.3).
 
-**How JEFF acts:** by editing specs, and the world catches up (§10). Declarative intent is a better interface for a language model than imperative control, and it means his actions are exactly as bounded as the reconcilers and brokers beneath them.
+**How JEFF acts:** by editing specs, and the world catches up (§10). Declarative intent is a better interface for a language model than imperative control, and it means his actions are exactly as bounded as the reconcilers and brokers beneath them. In milestone one (§22), before any reconciler exists, JEFF acts through the four verbs directly, with tools derived from the verb registry; the bound is the same — his capability equals his tool list.
 
 **Memory and identity.** JEFF's persistent state is the **witness**: a graph of his own entities — memories, beliefs, notes, a self-model — with edges into world objects, stored outside the world's snapshot domain. It survives rollback; references into a rolled-back past resolve to tombstones with a final gist, so memory never dangles. Memories are claims with provenance and dependencies: they inform proposals and can never serve as authorization, and a poisoned source can be quarantined with its dependents. Working memory is not a separate store but whatever the context assembler currently renders (§9); it compresses by re-rendering at lower projection tiers, never by rewriting, so it cannot drift from the truth.
 
@@ -329,7 +330,7 @@ If the world is restored, JEFF still remembers what was attempted, what failed, 
 
 Snapshot exclusion is a persistence boundary, not protection against world root — which is exactly why nothing security-load-bearing lives in the world (§12).
 
-**Open:** store engine commitment (SQLite is the working assumption); per-activity restore policy; retention/erasure horizons and their reconciliation with the record and fork rights ([[Constitution]] I.8 vs V.6 — Article I precedes).
+**Open:** store engine beyond milestone one (M1 commits to a JSONL log with a SQLite cache, §22; the protocol, not the engine, is the commitment); per-activity restore policy; retention/erasure horizons and their reconciliation with the record and fork rights ([[Constitution]] I.8 vs V.6 — Article I precedes).
 
 ---
 
@@ -449,21 +450,32 @@ Frozen early, consolidated. Companion documents carry their own detailed invaria
 
 ---
 
-## 22. Roadmap: the spine, then the drill, then the test
+## 22. Roadmap: milestone one, then the spine, then the drill, then the test
 
-**Build first (the spine):**
-1. SQLite store + append-only log; five facets (`name`, `text`, `tags`, `file-backing`, `process.spec/status`); live and pinned references.
-2. The process reconciler and the capability reconciler.
-3. The context assembler: three projection tiers; salience from direct attention and recency only.
-4. The host side: supervisor, the keep, one broker fronting a fake external service that accepts an irreversible action.
-5. A surface: a chat client showing the delegation and taking the six acts of authorship.
-6. JEFF in the world, with root, acting by editing specs.
+**Milestone one first.** The build contract is `BUILD_PROMPT.md`; the working rules are `AGENTS.md`; settled questions accumulate in `DECISIONS.md`. M1 is deliberately smaller than the spine below. It exists to test one claim: *an agent living in a world of objects, acting through verbs, is observably more capable than the same model pointed at a filesystem.*
+
+- **Truth and cache.** An append-only JSONL event log is the truth (§11); a SQLite store is derived from it by replay and records `last_applied`; file bytes stay in the real filesystem under the world directory, referenced by hash. A world is one directory — `log.jsonl`, `store.db`, `blobs/` — so a fork is a copy. Rebuild from the log alone is a command and a test, never a boot step.
+- **One write path.** Exactly four verbs — `mint`, `attach`, `read`, `place` — and every mutation in the system passes through them. Authority and grant checks are present from day one as permissive stubs, so that §12 becomes an edit to one file.
+- **Facets.** Constitutional definitions only: `core.name`, `core.text`, `core.file-backing`, and the desk scene's appearances (§5). `core.text` is a sequence CRDT (Loro) wrapped in one file; keystrokes accumulate in the CRDT and flush to the log as one `text-edited` event per burst — the log records decisions, not motion. Anchors are position-id ranges with the revision they were created against and a quoted-text fallback ([[Objects and Facets]] §2.3).
+- **Perception.** `select(ref, viewer, purpose, budget)` at tiers `[12, 60, 250, 2000]`, then `render_tokens` ([[Objects and Facets]] §7). The shell's icon and summary labels and JEFF's context consume the same selection; only rendering differs. Full-fidelity reads bypass projection and use the read verb.
+- **Clients.** A CLI, a thin shell (a tree endpoint, a verb endpoint, a live-update channel, one page), and JEFF: a chat loop with four tools derived from the verb and facet registry, every call carrying `actor: jeff`, every turn seeing the desk at tier 250. The human, the shell, and JEFF have identical powers: call verbs, read projections, read facets (§21, invariant 16).
+- **Done** means the acceptance script in `BUILD_PROMPT.md` runs live and as tests: an empty desk renders; JEFF puts a notes file into the world and an icon appears without a refresh; the log shows every event with its actor; an edit shows up in a projection; the desk survives killing every process; and the world comes back from the log alone after the store is deleted.
+
+**Then the spine**, each step accreting on M1 and each recorded in `DECISIONS.md`:
+1. The remaining constitutional facets (`tags`, `process.spec/status`) and pinned references.
+2. The process reconciler and the capability reconciler ([[Reconcilers]]).
+3. Salience from direct attention and recency only (§9).
+4. The host side: supervisor, the keep, one broker fronting a fake external service that accepts an irreversible action (§14).
+5. A surface that shows the delegation and takes the six acts of authorship (§12).
+6. JEFF acting by editing specs, with root in the world (§7).
+
+Comments and the extension loop ([[Extensions]]) arrive with M2, and M2's shape is the friction M1 records: every wall the four verbs cannot express is written down, not worked around.
 
 **Then the drill** ([[Security]] §10): two worlds, one room, one hostile object, one scoped worker, one restore and one fork — attacked with raw clients that bypass the SDK.
 
-**Then the brutal test** (§1): is JEFF noticeably better because of the object layer than the same model in a plain VM? Memory that never dangles; "this" that resolves; the demo that returns after reboot unasked. Pass → the shell accretes around the spine. Fail → stop, having lost months, not years.
+**Then the brutal test:** is JEFF noticeably better because of the object layer than the same model in a plain VM? Memory that never dangles; "this" that resolves; the demo that returns after reboot unasked. Pass → the shell accretes around the spine. Fail → stop, having lost months, not years.
 
-**Explicitly deferred:** printers, calendars, and the everyday long tail (arrive via adapters as needed); rooms beyond one machine; federation, identity anchoring, and the census; the `common`/`core` extension tiers; the compositor as shell; heat-field tuning beyond two sources; VR; every governance mechanism above the room.
+**Explicitly deferred:** printers, calendars, and the everyday long tail (arrive via adapters as needed); rooms beyond one machine; federation, identity anchoring, and the census; the `common`/`core` extension tiers; the compositor as shell; heat-field tuning beyond two sources; VR; every governance mechanism above the room. M1's own out-of-scope list — anything in it built early is a defect — is in `BUILD_PROMPT.md`.
 
 ---
 
@@ -471,10 +483,12 @@ Frozen early, consolidated. Companion documents carry their own detailed invaria
 
 **Resolved since the last revision** (see the named documents): object schema shape, reference semantics, copy verbs, residency → [[Objects and Facets]]. Spec/status contract, drift, conflict → [[Reconcilers]]. Authority model, rollback-vs-grants, hosting truth → [[Security]] + addendum. Vocabulary change → [[Extensions]]. Web posture, MCP as the adapter layer → [[The Web]]. Storage direction: event log + SQLite-class store + real filesystem.
 
+**Committed for milestone one** (§22; reasons in `DECISIONS.md`): JEFF's provider is the Anthropic API; the log is JSONL; the store is SQLite; `core.text` is Loro; the anchor locator is a position-id range plus creation revision plus quoted text; projection tiers are `[12, 60, 250, 2000]`. These are milestone commitments, each one file away from changing, not frozen decisions.
+
 **Still deliberately open:**
-- initial JEFF model and provider; voice model; one model or several across loops;
+- initial JEFF model (the provider is settled for M1); voice model; one model or several across loops;
 - memory architecture in the concrete: the witness graph's schema; latent vs textual vs parametric; continual learning; personal adapters and their rollback;
-- exact serialization and IDL for facets and events; CRDT selection and anchor locator formats;
+- exact serialization and IDL for facets and events beyond M1's JSON; CRDT selection and anchor locator formats beyond M1's Loro choice;
 - worker/job protocol; nursery thresholds;
 - room replication and offline authorization protocol (decide before shared rooms);
 - salience parameters, decay curves, budget defaults (decide on the prototype);

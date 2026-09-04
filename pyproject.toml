@@ -1,0 +1,30 @@
+[project]
+name = "agora"
+version = "0.1.0"
+description = "Agora OS - Milestone One: an object layer, four verbs, a desk, and JEFF as a client"
+requires-python = ">=3.12"
+dependencies = [
+    "loro>=1.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "sse-starlette>=2.0",
+    "anthropic>=0.40",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["research", "attempt1"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
