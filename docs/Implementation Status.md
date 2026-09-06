@@ -46,7 +46,12 @@ Verified on 2026-09-06 with Python 3.12.10 on Windows:
 
 - Dependency installation and editable package build succeeded.
 - CLI help, default invocation and version output succeeded.
-- All 27 local link targets in 12 Markdown documents resolve.
+- All 278 local links and heading targets in 18 Markdown documents resolve,
+  including Obsidian wiki-links. Code fences are closed and JSON examples parse.
+- The documentation checker passed eight positive/negative fixtures covering
+  missing links, missing headings, ambiguous names, malformed JSON and fences.
+- The illustrative JavaScript handler passes syntax checking; its proposed
+  runtime APIs are not implemented or exercised.
 - Ruff lint and formatting checks passed.
 
 These checks validate the scaffold and local documentation targets. They do not
@@ -54,4 +59,4 @@ exercise a world, agent, VM or authored application.
 
 Domain tests will accompany actual domain implementation. Replay, atomicity,
 boundary enforcement, recovery and real interface input are required evidence
-for the corresponding slices in [Transition Plan](Transition%20Plan.md).
+for the corresponding proofs in [[Native Development]] §9 and [[Agora Spec]] §22.

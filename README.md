@@ -1,13 +1,18 @@
 # Agora3
 
-Agora is a computing environment that you and JEFF can reshape while using it.
-Applications, interfaces, tools, skills and data definitions are native world
-objects. A Linux workspace supplies general execution; a small protected host
-preserves world history, authority and recovery.
+Agora is a general-purpose operating environment shared by a person and JEFF:
+ordinary things keep their identity while the ways of viewing and using them can
+change. A Linux workspace supplies general execution; native objects, applications
+and history make that work understandable and portable.
 
-This is a new codebase. The architecture and transition plan are documented;
-the runtime is not implemented. Start with [the design index](docs/Start%20Here.md)
-and [implementation status](docs/Implementation%20Status.md).
+Start with [the documentation index](docs/Start%20Here.md),
+[the Constitution](docs/Constitution.md), and
+[the master specification](docs/Agora%20Spec.md).
+[Native Development](docs/Reference/Native%20Development.md) connects the Linux VM,
+native packages and the experience of asking JEFF to create new capabilities.
+
+The current code is a new scaffold, not a running OS. See
+[Implementation Status](docs/Implementation%20Status.md).
 
 ## Development
 
@@ -20,9 +25,8 @@ Python 3.12 or later and uv are the initial host development tools.
     uv run ruff check .
     uv run ruff format --check .
 
-The CLI currently identifies this development skeleton only. It does not create
-a world, launch a VM, connect a model or change the machine.
+The CLI identifies the scaffold only. It does not create a world, launch a VM or
+connect a model.
 
-[AGENTS.md](AGENTS.md) describes contribution boundaries.
-[The transition plan](docs/Transition%20Plan.md) defines the first runnable slices.
-[Decisions](DECISIONS.md) records choices and unresolved questions.
+[AGENTS.md](AGENTS.md) covers contribution practice.
+[Decisions](DECISIONS.md) records architectural choices and their reasons.

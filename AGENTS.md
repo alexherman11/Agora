@@ -1,8 +1,8 @@
 # Agora3 development guide
 
 Agora3 is a fresh implementation of a programmable computing environment.
-Read [Start Here](docs/Start%20Here.md), [Foundations](docs/Foundations.md),
-[Architecture](docs/Architecture.md), and
+Read [Start Here](docs/Start%20Here.md), [Constitution](docs/Constitution.md),
+[Agora Spec](docs/Agora%20Spec.md), the relevant reference contract, and
 [Implementation Status](docs/Implementation%20Status.md) before domain work.
 
 ## Working agreement
@@ -11,6 +11,10 @@ The person directs the project. Design documents are revisable plans; tests and
 working behavior support implementation claims. Explain conflicts and revise
 the relevant contract when evidence changes the design. Do not invent approval
 requirements for routine work already authorized by the person.
+
+Preserve the Constitution → master Spec → References → Essays structure. Keep
+worked examples and schemas beside their contracts. Prefer targeted corrections
+to a wholesale rewrite; consolidate new directions where they have one owner.
 
 Keep current design self-contained. Historical rationale belongs in Git history
 or dated decisions; current documents must not require obsolete specifications
