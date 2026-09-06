@@ -123,6 +123,26 @@ Choices made while writing the code, where `BUILD_PROMPT.md` left room.
   (verified: it accepts `x-api-key`). Day-one model for the demo:
   `anthropic/claude-haiku-4.5`, cheap and good with tools.
 
+## Tentative
+
+Direction agreed in conversation but not yet binding; promote to Settled (or
+strike) when the work that tests it begins.
+
+- **2026-09-04 — Delegation ("call a friend").** When JEFF needs a specialized
+  coding agent, delegation is a world object, not agent scaffolding: JEFF mints
+  a task entity (`task.spec`: what is wanted, a ref to the subject, acceptance
+  criteria) placed on a well-known job-board scene; a worker runtime — a client
+  outside `jeff/`, under its own actor (`worker:<name>`) — picks it up, works
+  through the same verbs, and writes `task.status`. The friend is a client or
+  it does not exist: no host filesystem, no log access, no repo. Deferred until
+  after JEFF authors the first lens directly — the milestone exists to surface
+  authoring friction first-person, and the worker inherits whatever client
+  capabilities that work produces. Reason: keeps capability equal to tool list
+  (axiom 3), makes delegated work provable in the log, gives parallelism via
+  multiple task entities instead of an orchestration framework, and lands on
+  the spine's own `process.spec/status` shape rather than inventing a second
+  one.
+
 ## Friction
 
 When JEFF or a developer hits a wall the verbs cannot express, record it here
@@ -147,3 +167,33 @@ what the verbs could not say. This list is the M2 roadmap.
   authoring lenses with the four verbs it has; facet definitions as entities;
   then handlers under grants (the spine); then the repository itself as
   objects (Spec §16). Alex has corrections to this plan still to come.
+
+
+## September 5, 2026 — approved evolution
+
+These entries supersede incompatible M1 limitations above; historical reasoning remains intact.
+
+- **2026-09-05 — Feature horizon.** Alex approved replacing the post-M1 spine/build sequence with unordered desired capabilities. Choose further work through lived use and evidence; the immediate extension is the compact notes list with selection preview.
+- **2026-09-05 — Display authorship.** Broader display control, including the future chat panel, is the destination. The first lens changes the workspace only; stop, default restoration, and authority information remain protected. View customization does not grant access to or ownership of conversation history.
+- **2026-09-05 — World serialization.** Reentrant world locks coordinate threads and cooperating processes. Store cursor lookup/application and revision preconditions share that boundary. SQLite call serialization alone was insufficient.
+- **2026-09-05 — Framed recovery.** Replay reads complete UTF-8 byte frames using a stored byte offset. A new append that seals a torn suffix records its hash in optional `sealed_tail`; unexplained malformed complete records fail loudly. Legacy sealed gaps without evidence require explicit recovery investigation; do not guess away acknowledged history.
+- **2026-09-05 — Safe rebuild.** Construct a sibling cache before replacement, preserving the previous destination if reconstruction fails. Events and captured payloads remain the authority.
+- **2026-09-05 — Conditional text.** A stale text session refuses its flush and retains pending edits for recovery. Full multi-writer CRDT merging remains a desired feature. Exporting an anchor persists its CRDT identity first, creating a recorded revision when necessary. Content reads omit the storage snapshot codec; the debugger and retained log still preserve it.
+- **2026-09-05 — Selected imports.** File reads require explicit import sources, are bounded to 8 MiB, and revalidate resulting facet limits. The local shell defaults to the world's imports directory; AGORA_IMPORT_ROOTS may explicitly expand it. A trusted CLI path authorizes that exact file. Preparation writes no blobs. Imported file-backing is a captured snapshot, not live writeback.
+- **2026-09-05 — Bounded projections.** The budget includes attribution and omission markers; scene references use nonrecursive labels. Valid cyclic reference data must not crash perception.
+- **2026-09-05 — First lens vocabulary.** core.lens describes a bounded list/text-detail view over explicit references or a scene. core.display pins an activated definition revision. Preview and activation are registered operations; drafts remain separate from the active version. No JavaScript, registry marketplace, or general handler runtime is needed for this experiment.
+- **2026-09-05 — Local sessions and stopping.** The local server establishes actor identity and checks host, origin, session, and mutation tokens. JEFF turns are serialized; stop prevents subsequent tool dispatch, while already completed changes and an in-flight provider request may remain. This is not a multi-user authentication system or an OS sandbox.
+- **2026-09-05 — Context discipline.** World data is supplied separately from system instructions. Attribution identifies evidence, not instruction authority or proof of correctness. This separation is not a prompt-injection security proof.
+
+- **2026-09-05 — Live lens vocabulary feedback.** A synthetic provider trial confused compact and comfortable spacing; descriptions now define their direction explicitly. The fresh retry preserved lens identity, compact spacing, authorship display, and note contents. Retain both transcripts; this is integration evidence, not a model-advantage result.
+
+- **2026-09-05 — Executable authorship is essential.** Alex clarified that JEFF must invent abilities not anticipated by repository code. This supersedes the earlier narrowing to declarative views as the complete extension scope. Dragging is the first authored behavior to test; a different interaction and discoverable action test generality.
+- **2026-09-05 — Bounded executable slice.** Store versioned component source, bindings, permissions, owned-state schema, and named actions as objects. Validate entire effect batches behind the single verb gateway; record facts and source provenance, never rerun code during replay. Only the active component exposes actions in this slice.
+- **2026-09-05 — Interpreter placement.** quickjs-ng 0.16.2.1 supplies fresh synchronous contexts in a separate process with no host callbacks and a minimal environment. Resource limits bound invocation failures; this is not an OS sandbox against engine vulnerabilities. Trusted browser code renders data only. Local server event round-trips are an explicit performance limitation.
+- **2026-09-05 — Candidate admission.** Disposable world copies isolate interactive and scripted tests. Activation pins the complete definition, requires current-input test evidence and a display revision precondition, and rejects incompatible persistent state. Already admitted versions may be restored; restoration does not undo data. Migration and full grants remain future work.
+- **2026-09-05 — Authoring feedback.** Early Haiku trials failed on malformed manifests, unsupported styles, JavaScript syntax, and empty local-state initialization. Derived nested JSON schemas, specific style refusals, and a clearer protocol improve the contract. Retain failed provider transcripts and distinguish authored live examples from fixture-based runtime tests.
+
+- **2026-09-05 — Measured authoring budget.** A Sonnet trial reached a passing drag candidate but exhausted the twelve-step turn before activation. Increase the existing finite loop to 24 model steps and output budget to 8192 tokens; do not introduce a planning or retry framework. A fresh Sonnet 4.5 trial completed dragging, revised the same component with sorting/state/action, and invoked the action. This does not establish Haiku reliability or a model-advantage result; the configured personal model is unchanged.
+
+- **2026-09-05 — Astra inside JEFF.** Alex selected the OpenAI Agents SDK route, preserving Agora's tools and outer loop. The adapter uses gpt-6-astra through Responses, refreshed derived tools each step, SDK-preserved reasoning/call history, no hosted tools, no tracing, and the existing actor/stop boundary. Default Astra reasoning is medium, output ceiling 32768 tokens, timeout 120 seconds, retries disabled. Existing Anthropic configurations remain supported. Live Astra validation awaits a locally configured OpenAI API key; scripted inference is not a capability result.
+- **2026-09-05 — OpenAI-account OAuth.** Alex required his OpenAI account instead of an API key. Use the official Codex Python SDK with Codex-managed ChatGPT OAuth, no credential extraction. Verified Astra with runtime 0.153.4; the SDK-bundled 0.147.0 is rejected by Astra. Agora controls the derived verbs, 24-call budget, cancellation and ten-minute deadline; Codex owns the inner inference loop. Disable environments, plugins, skills and MCP. The actual runtime inventory test allows only Agora verbs plus Astra's UTC clock; isolated code-mode execution/wait compose them. New component actions remain discoverable and invocable mid-turn through existing verbs. Keep the API-key Agents SDK adapter as an alternative.

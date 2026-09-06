@@ -3,10 +3,12 @@ Never: no I/O, no events, no Loro; a definition is never added or changed at run
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from kernel import component_metadata, component_schema
 from kernel.schema import MODES
 
 
@@ -55,6 +57,35 @@ def _def(type_: str, doc: str, fields: dict[str, Field], **kw: Any) -> FacetDef:
 
 REGISTRY: MappingProxyType[str, FacetDef] = MappingProxyType(
     {
+        **component_schema.definitions(_def, Field),
+        "core.lens": _def(
+            "core.lens",
+            "A declarative list and text-detail lens, authored as world data.",
+            {
+                "version": Field("int", True, "1"),
+                "title": Field("str", True, "visible title"),
+                "source": Field("dict", True, "{scene: ref, facet?: type} or {entities: [ref]}"),
+                "list": Field(
+                    "dict",
+                    True,
+                    "{component: list, field: core.name.name, secondary?: [written_by, revision]}",
+                ),
+                "detail": Field("dict", True, "{component: text, field: core.text.text}"),
+                "density": Field(
+                    "str", False, "compact (tight rows) or comfortable (roomier rows)"
+                ),
+            },
+            limits={"title": 200},
+        ),
+        "core.display": _def(
+            "core.display",
+            "The desk's active lens pinned to a definition revision; empty lens resets.",
+            {
+                "kind": Field("str", False, "lens (default) or component"),
+                "lens": Field("str", True, "lens entity, or empty string for the default desk"),
+                "revision": Field("int", True, "retained lens revision, or 0 for the default desk"),
+            },
+        ),
         "core.name": _def(
             "core.name",
             "What the entity is called, plus aliases.",
@@ -75,7 +106,7 @@ REGISTRY: MappingProxyType[str, FacetDef] = MappingProxyType(
             },
             merge="sequence",
             projection="text",
-            limits={"text": 1_000_000},
+            limits={"text": 1_000_000, "snapshot": 8_000_000},
         ),
         "core.file-backing": _def(
             "core.file-backing",
@@ -103,7 +134,7 @@ REGISTRY: MappingProxyType[str, FacetDef] = MappingProxyType(
 
 def validate(facet_type: str, body: Any) -> dict[str, Any]:
     """Return the body if it fits the definition; otherwise refuse with the expected shape."""
-    if facet_type not in REGISTRY:
+    if not isinstance(facet_type, str) or facet_type not in REGISTRY:
         raise FacetError(f"unknown facet type {facet_type!r}; M1 knows {sorted(REGISTRY)}")
     fdef = REGISTRY[facet_type]
     if not isinstance(body, dict):
@@ -125,8 +156,19 @@ def validate(facet_type: str, body: Any) -> dict[str, Any]:
     if facet_type == "core.text" and "text" not in body and "path" not in body:
         raise FacetError("core.text needs either `text` or `path`")
     if facet_type == "core.scene":
+        if len(body["appearances"]) > 1000:
+            raise FacetError("a scene is limited to 1000 appearances")
         for entry in body["appearances"]:
             validate_appearance(entry)
+    if facet_type == "core.component":
+        component_schema.validate(body)
+    if facet_type == "core.lens":
+        from kernel import lens_schema
+
+        try:
+            lens_schema.validate(body)
+        except ValueError as exc:
+            raise FacetError(str(exc)) from exc
     return body
 
 
@@ -138,9 +180,9 @@ def validate_appearance(entry: Any) -> None:
         raise FacetError(f"appearance mode must be one of {list(MODES)}; got {entry.get('mode')!r}")
     transform = entry.get("transform", {})
     if not isinstance(transform, dict) or not all(
-        isinstance(v, int | float) for v in transform.values()
+        type(v) in (int, float) and math.isfinite(v) for v in transform.values()
     ):
-        raise FacetError(f"a transform is {{x, y, scale}} with numbers; got {transform!r}")
+        raise FacetError(f"a transform is {{x, y, scale}} with finite numbers; got {transform!r}")
 
 
 def describe() -> list[dict[str, Any]]:
@@ -151,6 +193,7 @@ def describe() -> list[dict[str, Any]]:
             "doc": fdef.doc,
             "shape": fdef.shape(),
             "fields": {n: f.doc for n, f in fdef.fields.items()},
+            "json_schema": component_metadata.json_schema(fdef),
             "merge": fdef.merge,
         }
         for fdef in REGISTRY.values()

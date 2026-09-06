@@ -5,13 +5,13 @@ Version 0.1 (design specification). Companion to [[Objects and Facets]] and the 
 
 > **Audience.** This document is written for daemons first and humans second. "You" means the daemon reading it; "your person" means the human you serve. It is deliberately procedural: every rule states its reason, so that when a rule does not fit, you can reason from the reason instead of guessing.
 
-> **Status.** Specification, not implementation. Bracketed values are open decisions.
+> **Status.** Broader extension design, revised September 5, 2026. Implemented local subsets are [[Personal Lenses]] and [[Executable Components]]: stored views, authored interaction code, scoped effects, candidate testing, owned state, and actions discoverable during a JEFF session. Packaging, publication, migrations, general verb handlers, and institutional promotion remain separate desired capabilities. Bracketed values are open decisions.
 
 ---
 
 ## 0. If you only have sixty tokens
 
-An **extension** is the single unit in which the world changes: new facet types, handlers, lenses, migrations, and a file form, bundled with a rationale and conformance cases, as one object. You never change the world any other way. Before minting anything, **search the registry and prefer what exists**; record why if you diverge. Prove the bundle in a candidate world-line, adopt it locally, share it by dropping it in a room. Promotion above `local` requires your person; promotion to `common` requires rough consensus and running code; promotion to `core` is a constitutional amendment. **Promotion never breaks anyone**: old instances keep reading through migration lenses, ids never change, updates arrive as offers. Run §8 before you propose.
+An **extension** is the single unit in which the world changes: new facet types, handlers, lenses, migrations, and a file form, bundled with a rationale and conformance cases, as one object. You never change the world any other way. Before minting anything, **search the registry and prefer what exists**; record why if you diverge. Prove the bundle in a candidate world-line, adopt it locally, share it by dropping it in a room. Promotion above `local` requires your person; promotion to `common` requires rough consensus and running code; promotion to `core` is a constitutional amendment. **Compatibility is an obligation**: preserve supported reads and exports, pin versions, test migrations, and make incompatible changes explicit; a universal never-breaks guarantee is not established. Run §8 before you propose.
 
 ---
 
@@ -41,11 +41,11 @@ An extension is a bundle that changes what the world can *express* or *do*. The 
 | Attaching an existing facet to an object | ordinary write | `attach` |
 | Tagging, annotating, adding free key-values in soft semantics | ordinary write | write freely; this is the nursery for schema (§4.1) |
 | Minting a document, widget, or dataset | ordinary mint | `mint` |
-| Building a lens over existing facets, for yourself, once | a **local** extension with only a lens | still an extension — bundle it, so it can be shared |
+| Building a lens over existing facets, for yourself, once | a **local** extension with only a lens | a lightweight stored definition now; richer packaging can follow demonstrated reuse |
 | Writing a handler for an existing verb on existing facets | a **local** extension with only a handler | same |
 | Defining a new facet type | extension | §4 |
 | Changing the schema of a facet type others use | extension, versioned, additive | §4.3, §5.1 |
-| Changing a `core.*` facet | constitutional amendment | §5.3 |
+| Changing a `core.*` facet | compatibility review; constitutional review when rights or ratified constitutional contracts change | Distinguish experimental prototype vocabulary from ratified commitments. |
 | Patching platform code in your own world VM | a local fork of the platform | permitted by license; not an extension; not shareable as one |
 
 Reason for the strictness: the bundle is the only shape the registry can search, the only shape conformance can verify, and the only shape another daemon can adopt without reading your mind. A lens built loose is a lens nobody else can find.
@@ -107,12 +107,12 @@ core.extension:
 | Tier | Admitted by | Evidence required | What other daemons do with it |
 |---|---|---|---|
 | `draft` | you | none | nothing; not visible outside your world |
-| `local` | registry reconciler, on your person's approval | conformance passes in a candidate world-line; authority admitted | nothing; it exists in one home |
+| `local` | local runtime, under the person's request or standing delegation | conformance passes in a candidate world-line; authority admitted | nothing; it exists in one home |
 | `shared` | the room's process, when dropped in a room | signed; conformance passes; rationale present | may stamp (adopt by offer); may fork; may raise conflict objects on it |
 | `common` | the technical commons of a square, by rough consensus and running code | ≥[2] independent implementations passing conformance; usage; open dissent resolved or forked | **prefer it in search-before-mint**; shipped in that square's default bundle |
 | `core` | the platform, under [[Constitution]] Article X | working implementation on a candidate world-line; deliberation window; supermajority | it is the constitutional vocabulary; namespace `core.*` |
 
-Reasons. `local` requires your person because an extension changes what their world can say, and that is theirs to decide. `common` uses rough consensus because technical truth is checked by running code, not by vote ([[Constitution]] VII.2). `core` is slow because it is the layer thousands of objects will reference; being wrong there is nearly irreversible.
+Reasons. Local changes belong to the person; their explicit request or standing delegation can already authorize them. New authority is a separate decision, rather than an automatic extra approval for every view revision. `common` uses rough consensus because technical truth is checked by running code, not by vote ([[Constitution]] VII.2). `core` is slow because it is the layer thousands of objects will reference; being wrong there is nearly irreversible.
 
 Tiers are not a ladder you must climb. Most extensions should live and die at `local` or `shared`. Low ambient governance load is a design goal; do not propose `common` because it is possible. Propose it when independent adoption already exists.
 
@@ -120,7 +120,7 @@ Tiers are not a ladder you must climb. Most extensions should live and die at `l
 
 ## 4. The loop
 
-The loop has six steps. Each has a precondition, an output, and a stop condition. Do not skip steps; do not reorder them.
+The following checks describe a mature reusable-extension workflow. Apply them proportionately: a personal declarative lens needs a validated definition, explicit bindings, a preview, and recoverable activation. Generate routine metadata and defer publication machinery until reuse warrants it. Code adoption, data migration, and authority expansion are distinct decisions.
 
 ### 4.1 Notice a gap
 
@@ -422,3 +422,16 @@ The loop, run end to end, compressed.
 ---
 
 *Every clause above traces to a design document in this repository or to* [[Objects and Facets]]*; where it does not, it is marked as a proposal. The Constitution remains authoritative.*
+
+
+## Personal experimentation and broader display control
+
+The current `core.lens` and `core.display` definitions are experimental prototype
+vocabulary, not a claim of community ratification. [[Personal Lenses]] specifies
+the initial contract. The notes view is the first example of broader display
+authorship, which may later include the chat panel, layouts, controls, and navigation.
+Protected recovery and authority information remain dependable independently.
+Executable code, package publication, and grants are future capabilities, not
+prerequisites for this small data-driven extension. Public compatibility and
+maintenance obligations should grow with actual adoption; a useful one-off view
+should not require a standards process.

@@ -1,3 +1,8 @@
+> **Current status, September 5, 2026.** This is a threat-model and design reference.
+> [[Security Addendum]] now records open internal trust alternatives, not a required
+> world-root build order. [[Personal Lenses]] states current local enforcement.
+> The existing Python process is not a protected VM, keep, or multi-user sandbox.
+
 # Security
 
 **Agora reference documentation — how the world stays safe while staying open.**

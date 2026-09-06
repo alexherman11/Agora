@@ -38,4 +38,41 @@ def derive_tools() -> list[dict[str, Any]]:
                 },
             }
         )
+    writable = {
+        f["type"]: f["json_schema"]
+        for f in verbs.facet_types()
+        if f["type"]
+        not in {"core.component-state", "core.component-test", "core.component-admission"}
+    }
+    for tool in tools:
+        properties = tool["input_schema"]["properties"]
+        if tool["name"] == "mint":
+            properties["facets"] = {
+                "type": "object",
+                "properties": writable,
+                "additionalProperties": False,
+            }
+        elif tool["name"] == "attach":
+            properties["body"] = {"anyOf": list(writable.values())}
     return tools
+
+
+def derive_extension_tools(actions):
+    """Descriptions and argument schemas come from admitted component manifests."""
+    tools, targets = [], {}
+    for action in actions:
+        name = "extension_" + action["name"]
+        targets[name] = action
+        tools.append(
+            {
+                "name": name,
+                "description": action["description"],
+                "input_schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {k: {"type": t} for k, t in action["params"].items()},
+                    "required": list(action["params"]),
+                },
+            }
+        )
+    return tools, targets

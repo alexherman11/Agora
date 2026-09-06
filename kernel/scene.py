@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from kernel import project, schema
+from kernel.locking import synchronized
 from kernel.schema import Appearance
 from kernel.store import Store
 
@@ -17,6 +18,7 @@ def appearances(world: Store, scene: str = DESK) -> list[Appearance]:
     return world.appearances(scene)
 
 
+@synchronized
 def tree(world: Store, viewer: str = "alex", scene: str = DESK) -> dict[str, Any]:
     """The render description: nodes with labels the shell draws and never interprets."""
     revision = world.sync()
@@ -37,6 +39,8 @@ def tree(world: Store, viewer: str = "alex", scene: str = DESK) -> dict[str, Any
                 "transform": dict(entry.transform),
                 "label": label,
                 "summary": summary,
+                "lens": world.facet(entry.entity, "core.lens") is not None,
+                "component": world.facet(entry.entity, "core.component") is not None,
             }
         )
     return {

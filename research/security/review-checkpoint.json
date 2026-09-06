@@ -1,110 +1,203 @@
 {
-  "schema_version": 1,
-  "review_date": "2026-09-01",
-  "captured_at_utc": "2026-09-01T17:07:07.9062482Z",
+  "schema_version": 2,
+  "review_date": "2026-09-04",
+  "captured_at_utc": "2026-09-04T17:12:59.4124296Z",
   "workspace": "C:/Projects/Agora",
-  "review_type": "Changed-source reconciliation and static composed-export investigation",
-  "git_repository_present": false,
-  "automation_created_by_this_review": false,
+  "review_type": "Git-based static M1 security choke-point review",
+  "git_repository_present": true,
+  "head_commit": "80a43dadd7220a61e49d67b999087286b17b9709",
+  "branch": "docs",
   "implementation_tests_run_by_this_review": false,
-  "proposed_acceptance_tests": 25,
   "sources": [
     {
-      "path": "Agora Objects.md",
-      "sha256": "148EB1DB1807723C86D60768F50C0BB4F319D45E0BF713137B3C72FB9AE70AC9",
-      "last_write_utc": "2026-08-31T19:14:24.2187344Z",
-      "coverage": "Current security-targeted review, especially scopes, projections, authority, export, concurrency, and compatibility; not a fresh line-by-line audit of unrelated examples."
+      "path": "AGENTS.md",
+      "sha256": "36A80F7152AB2EB0C91A83BC8656DD98D34E797200E63A8D9304081576DDB980",
+      "last_write_utc": "2026-09-03T23:59:33.8642512Z",
+      "coverage": "Applicable project instructions; supplied in the heartbeat context and fingerprinted against the workspace copy."
     },
     {
-      "path": "Facets.md",
-      "sha256": "56C18F7476CDED72952BD426C9131153AFAA749269D4C8B80C900E3F0E0D9BC7",
-      "last_write_utc": "2026-08-31T19:14:24.21973Z",
-      "coverage": "Current full read; application lenses/operations, private overlays, export, action contracts, and version semantics."
+      "path": "BUILD_PROMPT.md",
+      "sha256": "08686EAC394725272D8E922A8312FF21FBECE79490C4D868D868AC7EBF098A6C",
+      "last_write_utc": "2026-09-03T23:26:17.2851147Z",
+      "coverage": "Full read; M1 scope, acceptance contract, explicit deferrals, file import, shell, and JEFF boundaries."
     },
     {
-      "path": "Agora Spec.md",
-      "sha256": "4545BABCAB7AE06D1A30A82023A9CF3803C4F8DB48E7ACFF63A21BB6502D4D21",
-      "last_write_utc": "2026-08-31T19:14:24.2177698Z",
-      "coverage": "Current full read; whole-OS revision, workers, authority rings, rollback, secrets, and self-modification."
+      "path": "DECISIONS.md",
+      "sha256": "D0F0E3D552E09BA2CBBD514DEF877BC121BFFA788A6EEF46B6888C08601939C6",
+      "last_write_utc": "2026-09-04T05:11:16.7084983Z",
+      "coverage": "Targeted read of the M1 implementation decisions and friction log."
     },
     {
-      "path": "CONSTITUTION.md",
-      "sha256": "3F8A268CDD4D8490F27D8C76EE0A10CFE249538F47097AB4C5697A94637A8B2F",
-      "last_write_utc": "2026-08-31T18:04:09.8567136Z",
-      "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
-      "unchanged_from_initial_review": true
+      "path": "docs/Start Here.md",
+      "sha256": "DF5B6E32DD17E2E3EA1A7D70A72BA42BBC0EC467244858DA9BEF594D9AE8A5A4",
+      "last_write_utc": "2026-09-04T17:10:25.3509372Z",
+      "coverage": "Full read; authority map, reading order, implementation status, and research index."
     },
     {
-      "path": "Agora's Democracy.md",
-      "sha256": "3D5F1EB1156CB1D5C7CB395FD4BAFBCFA81AD3BE1941FE1E982FAC9A44F099E3",
-      "last_write_utc": "2026-08-18T04:10:02Z",
-      "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
-      "unchanged_from_initial_review": true
+      "path": "docs/Agora Spec.md",
+      "sha256": "5860D34FC0BC753778868371F03D95B17EA7ACC1850760A86446A967DEDE7391",
+      "last_write_utc": "2026-09-03T23:28:41.302606Z",
+      "coverage": "Targeted read of invariants and roadmap sections 21-22; headings inspected for overall structure."
     },
     {
-      "path": "Untitled.md",
-      "sha256": "7CCBFC299B2FED51333DD5E08F0F6ECF308D8178EB157E6C4D9E16D761231457",
-      "last_write_utc": "2026-08-18T03:33:04Z",
-      "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
-      "unchanged_from_initial_review": true
+      "path": "docs/Reference/Objects and Facets.md",
+      "sha256": "367C72ED4D46BDD0CAF4EA79EED12D5BD332E18438DA34441F5043281C0E8FCE",
+      "last_write_utc": "2026-09-03T23:28:41.3046028Z",
+      "coverage": "Targeted read of facet authority/composition, write pipeline, projection, storage, export, and compatibility sections."
     },
     {
-      "path": "Who Should Own Agora.md",
-      "sha256": "B3514C609D9256BC0ABD289B26BACADCF2505A3827C4E6B5D3B6616B2D67DD63",
-      "last_write_utc": "2026-08-18T04:37:47Z",
-      "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
-      "unchanged_from_initial_review": true
+      "path": "docs/Reference/Security.md",
+      "sha256": "9F29DC1BD72E74EDDDB1F898973A75844940A36741E3C544576471410E06F395",
+      "last_write_utc": "2026-09-02T17:43:45.7734863Z",
+      "coverage": "Full read; current security specification, coverage map, deployment truth, first drill, and invariants."
     },
     {
-      "path": "research/graph-memory/README.md",
-      "sha256": "935E01F00475DFF52E0545DD2DD55B1594685CF2ED0D4BA668396107C14AA46B",
-      "last_write_utc": "2026-08-31T18:35:05.9031263Z",
-      "coverage": "Current full read for revised dossier scope"
+      "path": "docs/Reference/Security Addendum.md",
+      "sha256": "66B76291F7F93EC67A1A3D697CACDBE1B45B8C267738ADEC1FA53F6CAE598929",
+      "last_write_utc": "2026-09-03T23:28:41.3035716Z",
+      "coverage": "Full read; superseding two-sided model and staged spine."
     },
     {
-      "path": "research/graph-memory/operating-system-memory.md",
-      "sha256": "266228C1AC423DB2258E964F6BA860D3CE3B45C9DE8CD01657E5DD0DC15BE9FF",
-      "last_write_utc": "2026-08-31T18:35:50.7966868Z",
-      "coverage": "Context only: introduction and security-relevant references/sections; not full review"
+      "path": "kernel/schema.py",
+      "sha256": "12B26C90DFFBA903BD78DEC476B5AE1F4F033F70E841016548F8E4A2EF7F71C4",
+      "last_write_utc": "2026-09-03T23:55:32.7249801Z",
+      "coverage": "Full static read."
     },
     {
-      "path": "research/object-facet-review/ASSESSMENT.md",
-      "sha256": "12672928CD6E59E967A09334DE51F4DEE2248AD6BD90BE6B05EF09502E7F5CB2",
-      "last_write_utc": "2026-08-31T19:17:19.208086Z",
-      "coverage": "Targeted review of the revised scope, authority, projection/export, recorded toy result, and updated conclusions; toy experiments were not rerun."
+      "path": "kernel/events.py",
+      "sha256": "F92FCC59CDA0558D82260F05C5BD1EDC478BAF3875B7498483A7991A011CAA02",
+      "last_write_utc": "2026-09-03T23:41:32.5916234Z",
+      "coverage": "Full static read; append, replay, blob storage, and failure handling."
     },
     {
-      "path": "Object Use Cases.md",
-      "sha256": "53B56C0360BFFCDC481D5192182DCC194C19E146C474A5F1FB258EA0AC7C7F97",
-      "last_write_utc": "2026-08-31T19:14:24.21973Z",
-      "coverage": "Current full read; cross-domain reference, authority, disclosure, external-effect, update, and rollback pressures."
+      "path": "kernel/store.py",
+      "sha256": "605B7AC8CF5D81420690B4826704D9EFCA42890BFAB52E5B3A5E32F1015A955C",
+      "last_write_utc": "2026-09-03T23:55:07.4020077Z",
+      "coverage": "Full static read; replay synchronization, table fold, and shared connection behavior."
+    },
+    {
+      "path": "kernel/facets.py",
+      "sha256": "DD3A55ED24D5E01CF0B38A91D7B4263915CF221D2D38C8E7F40FB8C454830354",
+      "last_write_utc": "2026-09-03T23:41:14.7857265Z",
+      "coverage": "Full static read; shapes, limits, scene validation, and tool-visible definitions."
+    },
+    {
+      "path": "kernel/verbs.py",
+      "sha256": "73F247F060C1B080652744D3380F70008B946A89C7C4EBC25395F1B88127AC74",
+      "last_write_utc": "2026-09-03T23:56:37.3291905Z",
+      "coverage": "Full static read; check ordering, import preparation, read/place semantics, and tool registry."
+    },
+    {
+      "path": "kernel/project.py",
+      "sha256": "51B0A7BD16AABCA8FB47E36C1EBCFE9BB1FD1B599AF98CB9C3E8A5676C17DD4E",
+      "last_write_utc": "2026-09-04T00:00:29.4084485Z",
+      "coverage": "Full static read; selection, rendering, attribution, recursion, and budgets."
+    },
+    {
+      "path": "kernel/scene.py",
+      "sha256": "DEA863B0AA0928CA5C626D18AC2E1A530474A8FB54E2AA4854E4D885E2AF5148",
+      "last_write_utc": "2026-09-03T23:58:38.8545919Z",
+      "coverage": "Full static read."
+    },
+    {
+      "path": "kernel/text.py",
+      "sha256": "8E8F71BFA076FA31DA844DB4679F16AF2DAA29CA883085AB51BF60B2F9BF1B1F",
+      "last_write_utc": "2026-09-03T23:44:53.3036707Z",
+      "coverage": "Full static read; snapshot import, burst flush, and anchors."
+    },
+    {
+      "path": "cli.py",
+      "sha256": "5375785D6A236997CD5FB5064762E0908892D2EC05587CC76F894238057D3941",
+      "last_write_utc": "2026-09-03T23:57:29.8066919Z",
+      "coverage": "Full static read; debugger powers, actor/viewer selection, and imports."
+    },
+    {
+      "path": "shell/server.py",
+      "sha256": "9D213F20329CE8E66104546038CBE2035DA51A884C1A149EF9F57562669BEB89",
+      "last_write_utc": "2026-09-04T00:11:08.0889674Z",
+      "coverage": "Full static read; HTTP/SSE surface, actor handling, threading, and environment loading."
+    },
+    {
+      "path": "shell/index.html",
+      "sha256": "74534FCFB0D31DDD5DCD5EAD049C262B5FBEF4DAF2204415421F2940124F42C8",
+      "last_write_utc": "2026-09-03T23:47:12.9423267Z",
+      "coverage": "Full static read; browser client rendering and requests."
+    },
+    {
+      "path": "jeff/agent.py",
+      "sha256": "ED519D7DAEC71EB4459B5F1952CBBC84C3780F450B8FACB7EC614CC6E807BC1E",
+      "last_write_utc": "2026-09-03T23:55:15.5300816Z",
+      "coverage": "Full static read; model loop, history, tool calls, and error handling."
+    },
+    {
+      "path": "jeff/context.py",
+      "sha256": "36DB58321443C0C6FE1DE59D8403B17A4EC3564E736299239F5BA95AE9CC63FA",
+      "last_write_utc": "2026-09-03T23:47:26.4321089Z",
+      "coverage": "Full static read; desk projection and file-import instructions."
+    },
+    {
+      "path": "jeff/tools.py",
+      "sha256": "800183B6AD0F1D7B1D04D61AEC59A42610CA4FC2FBF77AEB5A0FC8B208789332",
+      "last_write_utc": "2026-09-03T23:55:18.8461269Z",
+      "coverage": "Full static read; derived tool schemas."
+    },
+    {
+      "path": "tests/test_replay.py",
+      "sha256": "2526B0BC7704E8A3537C81D1C88968387A0ADBBC52CC43739EDC1BBC273DB950",
+      "last_write_utc": "2026-09-03T23:42:37.0171183Z",
+      "coverage": "Full static read; tests not executed."
+    },
+    {
+      "path": "tests/test_atomic.py",
+      "sha256": "A352F31A1FCC25F767332902445CE275243B8C9FB38EF1A1204BDE711A8CE613",
+      "last_write_utc": "2026-09-03T23:41:17.8364572Z",
+      "coverage": "Full static read; tests not executed."
+    },
+    {
+      "path": "tests/test_verbs.py",
+      "sha256": "C1D8A6E3A8E138C6D26735EBF4C60B48E9940F99926A2AB29EC37E522E8E7709",
+      "last_write_utc": "2026-09-03T23:41:37.0095971Z",
+      "coverage": "Full static read; tests not executed."
+    },
+    {
+      "path": "tests/test_project.py",
+      "sha256": "229818EBE8ADB9058CEC6D239ED7674C82CE91E46DDB06498AC0408424DAF870",
+      "last_write_utc": "2026-09-03T23:43:57.4638229Z",
+      "coverage": "Full static read; tests not executed."
+    },
+    {
+      "path": "tests/test_shell.py",
+      "sha256": "1E68F7BBE2CF9B627873CF369ABE81209B99A3730996681326EC3D42C939A3F8",
+      "last_write_utc": "2026-09-03T23:55:22.8482747Z",
+      "coverage": "Full static read; tests not executed."
     }
   ],
   "artifacts": [
     {
-      "path": "Security Model.md",
-      "sha256": "F52DE8ADBA38017FD1CDB9038A768A27ACFC36257B25A2BF15E1B85858F70BC2"
-    },
-    {
-      "path": "Security Work Plan.md",
-      "sha256": "518620B8754353AF98F4556F5BEC0A286F2BDCFD7589521A0BC68E3EED135ADB"
+      "path": "docs/Start Here.md",
+      "sha256": "DF5B6E32DD17E2E3EA1A7D70A72BA42BBC0EC467244858DA9BEF594D9AE8A5A4"
     },
     {
       "path": "research/security/scoped-collaboration.md",
-      "sha256": "7BD863D0BD520E45759A17CAB542D7461013B89E3524176E6B6D91F1DE849A1C"
+      "sha256": "0C11C8F3AF469CCA5A261BA44610257800B205E9E32EC9928064E4B0AC92A252"
     },
     {
       "path": "research/security/composed-export-model.md",
       "sha256": "9BA1116DE1E6A7A1F2FBE49366FEF68A88E05EA9E1FB4A3AACFA0947D1E2C16A"
+    },
+    {
+      "path": "research/security/m1-choke-point-review.md",
+      "sha256": "22F95D1BA7A8BA357F249F626083B877C80D473D10A2B3528E434149C715EC48"
     }
   ],
   "coverage_limits": [
-    "Not a production code, deployment, or whole-research-tree audit.",
-    "Existing object/facet toy experiments were not executed or validated in this pass.",
-    "Files not listed as reviewed must not be treated as reviewed.",
-    "Fingerprints identify observed input versions; they are not security attestations."
+    "Static review only; committed project tests and runtime behavior were not executed.",
+    "No .env content, provider credential, world data, external service, or production resource was accessed.",
+    "Files not listed in sources must not be treated as reviewed; some listed design files have explicitly targeted coverage.",
+    "The checkout was clean at review start; the security artifacts and research-index edit are uncommitted review output.",
+    "Source fingerprints and a commit identify observed versions; they are not security attestations."
   ],
-  "next_question": "Can private preview results escape through collaborative development artifacts such as logs, errors, screenshots, generated fixtures, summaries, caches, or synchronized worker messages?",
+  "next_question": "Have M1-C1 and M1-C2 been closed with a synthetic ingress root and authenticated shell, without adding another file-read path? If not, continue the private-preview artifact investigation.",
   "automation_setup": {
     "recorded_at_utc": "2026-08-31T19:22:38.8446109Z",
     "automation_id": "agora-security-review",
@@ -112,9 +205,10 @@
     "status": "ACTIVE",
     "schedule": "Tuesdays and Fridays at 10:00",
     "timezone": "America/Los_Angeles",
-    "scope": "Continue security review in the existing task",
-    "evidence": "App automation tool confirmed creation after explicit user authorization",
-    "note": "Administrative setup only; original review metadata and source fingerprints are preserved. Only the work plan artifact fingerprint was refreshed."
+    "scope": "Continue Git-aware security review in the existing task using current docs/ and implementation paths",
+    "evidence": "App automation tool confirmed the Git-aware prompt update and ACTIVE status after the repository was reorganized and M1 was committed",
+    "note": "Administrative setup only; original review metadata and source fingerprints are preserved. Only the work plan artifact fingerprint was refreshed.",
+    "last_updated_utc": "2026-09-04T17:13:54.5685686Z"
   },
   "review_runs": [
     {
@@ -154,6 +248,165 @@
       "evidence_state": "Static counterexample and ten proposed runtime cases; no Agora enforcement implementation was executed.",
       "artifact": "research/security/composed-export-model.md",
       "implementation_tests_run": false
+    },
+    {
+      "review_date": "2026-09-04",
+      "captured_at_utc": "2026-09-04T17:12:59.4124296Z",
+      "trigger": "agora-security-review heartbeat",
+      "git_repository_present": true,
+      "head_commit": "80a43dadd7220a61e49d67b999087286b17b9709",
+      "branch": "docs",
+      "working_tree_at_start": "clean",
+      "investigation": "Whether the M1 single-verb path is shaped to become the security choke point",
+      "result": "It is not yet load-bearing: protected file I/O precedes checks, the checks omit operation constraints, and the unauthenticated browser surface can reach the path. For M1, a synthetic ingress root and launch authentication are recommended; resource-bound import tickets remain with the later host-side spine.",
+      "findings": [
+        {
+          "id": "M1-C1",
+          "gate": "Before real sensitive data or untrusted content",
+          "status": "Static finding",
+          "summary": "JEFF can request arbitrary host paths; mint/attach resolve and persist file bytes before authority/grant checks, then desk projection may send imported text to the remote model provider.",
+          "locations": [
+            "kernel/verbs.py:39",
+            "kernel/verbs.py:52",
+            "kernel/verbs.py:179",
+            "jeff/context.py:18",
+            "shell/server.py:73"
+          ]
+        },
+        {
+          "id": "M1-C2",
+          "gate": "Before ordinary browser use",
+          "status": "Static finding",
+          "summary": "Loopback HTTP and SSE endpoints have no launch authentication or origin/host checks, and /verb accepts a caller-supplied actor.",
+          "locations": [
+            "shell/server.py:47",
+            "shell/server.py:55",
+            "shell/server.py:59",
+            "shell/server.py:73",
+            "shell/server.py:87"
+          ]
+        },
+        {
+          "id": "M1-C3",
+          "gate": "Before M2 grant enforcement",
+          "status": "Structural finding",
+          "summary": "The check stubs receive only actor, verb, and entity, so they cannot bind future policy to facet, source resource, revision, payload, scene, destination, or budget.",
+          "locations": [
+            "kernel/verbs.py:31",
+            "kernel/verbs.py:35"
+          ]
+        },
+        {
+          "id": "M1-I1",
+          "gate": "Before concurrent/adversarial use",
+          "status": "Adjacent static finding",
+          "summary": "Direct core.scene replacement and recursive projection can bypass place semantics and create persistent cycles; shared Store.sync has no lock around last_applied plus tail application.",
+          "locations": [
+            "kernel/facets.py:90",
+            "kernel/project.py:123",
+            "kernel/store.py:41"
+          ]
+        }
+      ],
+      "evidence_state": "Static review of named files and committed tests. No project code, tests, model calls, exploit, or credential content executed or read.",
+      "artifact": "research/security/m1-choke-point-review.md",
+      "implementation_tests_run": false
     }
-  ]
+  ],
+  "legacy_pre_git_checkpoint": {
+    "review_date": "2026-09-01",
+    "captured_at_utc": "2026-09-01T17:07:07.9062482Z",
+    "git_repository_present": false,
+    "sources": [
+      {
+        "path": "Agora Objects.md",
+        "sha256": "148EB1DB1807723C86D60768F50C0BB4F319D45E0BF713137B3C72FB9AE70AC9",
+        "last_write_utc": "2026-08-31T19:14:24.2187344Z",
+        "coverage": "Current security-targeted review, especially scopes, projections, authority, export, concurrency, and compatibility; not a fresh line-by-line audit of unrelated examples."
+      },
+      {
+        "path": "Facets.md",
+        "sha256": "56C18F7476CDED72952BD426C9131153AFAA749269D4C8B80C900E3F0E0D9BC7",
+        "last_write_utc": "2026-08-31T19:14:24.21973Z",
+        "coverage": "Current full read; application lenses/operations, private overlays, export, action contracts, and version semantics."
+      },
+      {
+        "path": "Agora Spec.md",
+        "sha256": "4545BABCAB7AE06D1A30A82023A9CF3803C4F8DB48E7ACFF63A21BB6502D4D21",
+        "last_write_utc": "2026-08-31T19:14:24.2177698Z",
+        "coverage": "Current full read; whole-OS revision, workers, authority rings, rollback, secrets, and self-modification."
+      },
+      {
+        "path": "CONSTITUTION.md",
+        "sha256": "3F8A268CDD4D8490F27D8C76EE0A10CFE249538F47097AB4C5697A94637A8B2F",
+        "last_write_utc": "2026-08-31T18:04:09.8567136Z",
+        "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
+        "unchanged_from_initial_review": true
+      },
+      {
+        "path": "Agora's Democracy.md",
+        "sha256": "3D5F1EB1156CB1D5C7CB395FD4BAFBCFA81AD3BE1941FE1E982FAC9A44F099E3",
+        "last_write_utc": "2026-08-18T04:10:02Z",
+        "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
+        "unchanged_from_initial_review": true
+      },
+      {
+        "path": "Untitled.md",
+        "sha256": "7CCBFC299B2FED51333DD5E08F0F6ECF308D8178EB157E6C4D9E16D761231457",
+        "last_write_utc": "2026-08-18T03:33:04Z",
+        "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
+        "unchanged_from_initial_review": true
+      },
+      {
+        "path": "Who Should Own Agora.md",
+        "sha256": "B3514C609D9256BC0ABD289B26BACADCF2505A3827C4E6B5D3B6616B2D67DD63",
+        "last_write_utc": "2026-08-18T04:37:47Z",
+        "coverage": "Reviewed in initial pass; verify unchanged fingerprint",
+        "unchanged_from_initial_review": true
+      },
+      {
+        "path": "research/graph-memory/README.md",
+        "sha256": "935E01F00475DFF52E0545DD2DD55B1594685CF2ED0D4BA668396107C14AA46B",
+        "last_write_utc": "2026-08-31T18:35:05.9031263Z",
+        "coverage": "Current full read for revised dossier scope"
+      },
+      {
+        "path": "research/graph-memory/operating-system-memory.md",
+        "sha256": "266228C1AC423DB2258E964F6BA860D3CE3B45C9DE8CD01657E5DD0DC15BE9FF",
+        "last_write_utc": "2026-08-31T18:35:50.7966868Z",
+        "coverage": "Context only: introduction and security-relevant references/sections; not full review"
+      },
+      {
+        "path": "research/object-facet-review/ASSESSMENT.md",
+        "sha256": "12672928CD6E59E967A09334DE51F4DEE2248AD6BD90BE6B05EF09502E7F5CB2",
+        "last_write_utc": "2026-08-31T19:17:19.208086Z",
+        "coverage": "Targeted review of the revised scope, authority, projection/export, recorded toy result, and updated conclusions; toy experiments were not rerun."
+      },
+      {
+        "path": "Object Use Cases.md",
+        "sha256": "53B56C0360BFFCDC481D5192182DCC194C19E146C474A5F1FB258EA0AC7C7F97",
+        "last_write_utc": "2026-08-31T19:14:24.21973Z",
+        "coverage": "Current full read; cross-domain reference, authority, disclosure, external-effect, update, and rollback pressures."
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "Security Model.md",
+        "sha256": "F52DE8ADBA38017FD1CDB9038A768A27ACFC36257B25A2BF15E1B85858F70BC2"
+      },
+      {
+        "path": "Security Work Plan.md",
+        "sha256": "518620B8754353AF98F4556F5BEC0A286F2BDCFD7589521A0BC68E3EED135ADB"
+      },
+      {
+        "path": "research/security/scoped-collaboration.md",
+        "sha256": "7BD863D0BD520E45759A17CAB542D7461013B89E3524176E6B6D91F1DE849A1C"
+      },
+      {
+        "path": "research/security/composed-export-model.md",
+        "sha256": "9BA1116DE1E6A7A1F2FBE49366FEF68A88E05EA9E1FB4A3AACFA0947D1E2C16A"
+      }
+    ],
+    "next_question": "Can private preview results escape through collaborative development artifacts such as logs, errors, screenshots, generated fixtures, summaries, caches, or synchronized worker messages?"
+  }
 }

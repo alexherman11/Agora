@@ -13,7 +13,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | Reference | `Reference/` | The contracts. A reference wins over the Spec on detail. |
 | Essays | `Essays/` | Explainers, pressure tests, and social/civic design. Superseded on mechanics by the references. |
 | Research | `research/` | Review dossiers, toy models, and archived drafts. Historical record, not current design. |
-| Build | repository root | `BUILD_PROMPT.md` (what milestone one is), `AGENTS.md` (how to work on the code), `DECISIONS.md` (settled questions and friction). Governed by the Spec; the code never outranks the documents. |
+| Build | repository root | `BUILD_PROMPT.md` (what milestone one is), `AGENTS.md` (how to work on the code), `DECISIONS.md` (settled questions and friction). Records current scope and evidence. Revise the plan when experiments justify it; keep implementation claims tied to working behavior. |
 
 ## Reading order
 
@@ -21,7 +21,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 2. [[Agora Spec]] §1–§4 — the core idea and the object system in outline.
 3. [[Objects and Facets]] — the object layer contract. Appendix A carries the everyday worked examples.
 4. [[Reconcilers]] — how spec/status keeps the world's promises.
-5. [[Security]], then [[Security Addendum]] — the addendum's two-sided model is the version to build.
+5. [[Security]], then [[Security Addendum]] — the protected external boundary is a direction; future internal root authority remains open.
 6. [[Extensions]] and [[The Web]] — how vocabulary changes, and how the world meets the web.
 7. Essays as interest takes you: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]].
 8. Before writing code: [[Agora Spec]] §22 for the roadmap, then `BUILD_PROMPT.md` and `AGENTS.md` at the repository root.
@@ -35,6 +35,9 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | [[Security]] | claims, grants, effects; the coverage map; the first drill |
 | [[Security Addendum]] | the two-sided model; supersedes Security §3, §4.6, and §6 |
 | [[Extensions]] | the bundle, the loop, tiers, promotion, retrofit |
+| [[Personal Lenses]] | declarative views, pinned activation, recovery, and the broader display direction |
+| [[Executable Components]] | authored behavior, scoped effects, candidate worlds, owned state, and dynamic actions |
+| [[Astra Harness]] | Astra with OpenAI account OAuth, Agora tools and runtime controls; API-key alternative and validation |
 | [[The Web]] | pages as objects, the browser lens, adapters, the object endpoint, publishing |
 
 ## Essays
@@ -54,13 +57,14 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | `research/whole-os-object-review/` | [[REVISION]] notes; [[Agora Objects (superseded)]], the object design that [[Objects and Facets]] replaced; pre-revision copies of the Spec, Objects, and Facets |
 | `research/object-facet-review/` | [[ASSESSMENT]], executable toy counterexamples, an illustrative example world |
 | `research/graph-memory/` | memory for a world of objects; start at [[operating-system-memory]] |
-| `research/security/` | [[scoped-collaboration]] and [[composed-export-model]], follow-ons to the security model |
+| `research/holistic-review/` | [[holistic-assessment-2026-09-04]], baseline probes, and implementation validation |
+| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], and [[m1-choke-point-review]], follow-ons and implementation reviews for the security model |
 
 ## Conventions
 
 - **Citing.** `Spec §N`, `Objects §N`, `Security §N`, `Constitution III.6`. Inside the references, cited titles are links: `[[Objects and Facets|Objects]] §5.4`.
 - **Status lines.** Every reference opens with a version, a "companion to" line, and a status block. Every essay opens with a banner naming what supersedes it.
-- **The documents are specification, not description.** They state intended behavior. What is actually built is whatever passes the tests under `tests/`; milestone one ([[Agora Spec]] §22) is the first code, and it lives in `kernel/`, `cli.py`, `shell/`, and `jeff/`. Bracketed values are open decisions; values committed for M1 are listed in `DECISIONS.md`.
-- **The code never outranks the documents.** Where an implementation and a reference disagree, the reference is right and the code carries a `DECISIONS.md` line explaining the deviation, or the code changes.
+- **The documents are specification, not description.** They state intended behavior. Implementation status must cite both working behavior and its tested limits; milestone one ([[Agora Spec]] §22) is the first code, and it lives in `kernel/`, `cli.py`, `shell/`, and `jeff/`. Bracketed values are open decisions; values committed for M1 are listed in `DECISIONS.md`.
+- **The code never outranks the documents.** Disagreements require an explicit decision: repair the implementation or revise the design based on evidence and the person's intent. A proposal is not an implemented guarantee.
 - **Names.** "JEFF" is the first daemon's name; "daemon" is the role and the Constitution's term. The essays say JEFF; the references say daemon.
 - **Not in the repository.** Sol's *Security model and attack analysis* draft 0.2, which [[Security]] builds on, is not currently here. If it turns up, it belongs under `research/security/`.

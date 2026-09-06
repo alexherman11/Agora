@@ -19,8 +19,8 @@ Three axioms shape every decision:
    silently: replay stops reproducing reality and every downstream guarantee
    (time travel, undo, provenance) becomes fiction with no error message.
 2. **One write path.** All mutation flows through `kernel/verbs.py` into
-   `kernel/events.py`. Every future security property (authority modes, grants,
-   rate limits) is an edit to one file only because this holds. A second write
+   `kernel/events.py`. Helpers may implement validation and domain operations behind this one command
+   boundary; all future authority checks must remain mandatory at dispatch. A second write
    path makes every rule need two implementations, and the system is insecure the
    day one copy lags.
 3. **JEFF is a client, not a resident of the codebase.** JEFF acts through verbs
@@ -28,6 +28,17 @@ Three axioms shape every decision:
    tool list exactly. The moment `jeff/` reaches deeper, the experiment this
    milestone exists to run (is the *world* what makes the agent capable?) is
    unfalsifiable.
+
+## Current approved work
+
+The September 5, 2026 scope supersedes M1-only prohibitions: reliability repairs,
+local request/import boundaries, declarative personal lenses, and executable
+components JEFF authors during use. See `docs/Reference/Personal Lenses.md` and
+`docs/Reference/Executable Components.md`. The executable slice includes scoped
+object access, disposable candidates, owned state, and dynamic actions; dragging
+is a test of authorship, not a special-case platform feature. M2 onward is a feature horizon, not a
+build order. Broad display control includes the future conversation panel;
+protected recovery and authority information remain dependable independently.
 
 ## Contribution rubric
 
@@ -46,8 +57,7 @@ Three axioms shape every decision:
 
 - **Convenience write paths.** Any function outside `verbs.py` that mutates the
   store or appends events, however small ("just for renames").
-- **M2+ features arriving early.** Grants logic, extension machinery, a `find`
-  verb, shell polish. Scope discipline is the project's survival strategy.
+- **Unmotivated platform growth.** Build the approved personal-lens and executable component experience; use observed friction to choose further work from the feature horizon.
 - **Agent scaffolding in `jeff/`.** Retry frameworks, planning layers, memory
   systems. `jeff/` staying tiny is the experimental control.
 - **Implementation types leaking across boundaries.** Loro types outside
@@ -64,8 +74,9 @@ Three axioms shape every decision:
   contract); don't improvise one.
 - **"Keystrokes don't appear in `agora log`" is the design.** The log records
   decisions, not motion; fine-grained history lives inside the CRDT body.
-- **"`check_authority` always allows" is a stub, not a hole.** It exists so the
-  call sites are load-bearing from day one. Marked `# M2:`.
+- **"`check_authority` always allows" is a stub, not a hole.** General authority hooks remain
+  stubs marked `# M2:`. Component scope and runtime-owned facet protection are
+  real checks; do not mistake them for a complete multi-user grant system.
 
 ## Capability placement
 
@@ -74,12 +85,12 @@ Choose the highest (least-footprint) rung that solves the problem:
 1. **Compose existing verbs in a client** (`cli.py`, `shell/`, `jeff/context.py`),
    with `project` and `scene` for perception. Zero kernel surface.
 2. **New facet type in `facets.py`** — when the world needs to *say* something new
-   but not *do* anything new. Constitutional defs only in M1; must include
+   but not *do* anything new. Prototype definitions are added deliberately; must include
    projection behavior.
 3. **New verb in `verbs.py`** — when there's a genuinely new operation. Requires:
    validation, an event kind in `schema.py`, an `apply` branch in `store.py`, a
-   test, and a derived JEFF tool. If you're adding a verb, you're probably early —
-   check the M1 scope list in `BUILD_PROMPT.md` first.
+   test, and a derived JEFF tool. Reuse existing events when the operation composes
+   existing mutations. Check the current approved scope and `Personal Lenses.md`.
 4. **Change to `schema.py`** — last resort, additive only. Shipped fields are the
    forever format; logs written in week one must replay in year three.
 
@@ -92,9 +103,9 @@ agora/
 ├── docs/                # the design vault (start at Start Here.md) — design authority
 ├── kernel/
 │   ├── schema.py        # event + facet record shapes, as data (~80 lines)
-│   ├── events.py        # append + replay; the only log writer (~120)
+│   ├── events.py        # append + framed replay; the only log writer
 │   ├── store.py         # SQLite derived from events via apply() (~200)
-│   ├── facets.py        # constitutional facet-defs, frozen (~120)
+│   ├── facets.py        # admitted prototype facet definitions and validation
 │   ├── verbs.py         # mint/attach/read/place; the choke point (~150)
 │   ├── project.py       # select() + render_tokens(); perception (~150)
 │   ├── scene.py         # desk scene + appearances (~100)
@@ -190,7 +201,7 @@ Invariants:
 
 ## Extension points
 
-### Adding a facet type (M1: constitutional only)
+### Adding a facet type (within the approved experiment)
 
 1. Add the def to `facets.py`: type id, schema, authority mode, merge class,
    projection behavior, limits.
@@ -224,7 +235,7 @@ Code answers "what"; the log answers "when"; only that file answers "why".
 
 **Friction is data.** When JEFF (or you) hits a wall the verbs can't express,
 record it in `DECISIONS.md` under "Friction" rather than working around it. The
-friction log is the M2 roadmap.
+friction log informs the feature horizon.
 
 ## Known pitfalls
 
@@ -265,7 +276,7 @@ Order of the four guards, and what each protects:
 2. `test_atomic.py` — failure leaves no trace.
 3. `test_boundary.py` — clients touch only `verbs`, `project`, `scene`; the kernel
    follows its chain; only `text.py` knows Loro, only `store.py` knows SQLite;
-   every kernel file has its two-line header and stays under 230 lines
+   every kernel file has its two-line header and stays within its reviewed size budget
    (axioms 2, 3).
 4. `test_anchors.py` — references survive change.
 
@@ -276,3 +287,67 @@ Good tests state invariants ("rebuild equals store", "a refused attach appends
 nothing") against a throwaway world in `tmp_path`. Bad tests snapshot the
 current projection text, depend on `worlds/`, or assert on log line formatting.
 An invariant that isn't a test is a hope.
+
+## Implemented extension support and dependency additions
+
+`locking.py` contains no domain policy and serializes local world operations across
+threads and cooperating processes. `imports.py` prepares bounded reads from
+explicitly selected sources; it writes nothing. `vocabulary.py` is the command
+registry, re-exported by verbs for client tool derivation. `lens_schema.py` validates
+plain declarative data; `lenses.py` resolves explicit bindings and retained revisions.
+Clients continue to import only verbs, project, and scene from the kernel.
+
+Allowed additions: events → locking; store → locking; facets → lens_schema;
+imports → facets; lenses → lens_schema + locking + schema + store;
+verbs → imports + lenses + locking + vocabulary; project → lenses + locking;
+scene → locking; vocabulary → schema. The boundary test checks every kernel module.
+SQLite types remain confined to store, Loro to text. Size budgets are 230 lines per
+kernel file, with reviewed budgets of store 300, verbs 320, and events 260
+to keep transaction and command boundaries readable; update the map rather than hiding
+code in compressed lines. The protected shell owns session identity, stop, and
+recovery controls. Declarative lens definitions cannot execute JavaScript.
+Executable components use the separate interpreter boundary described below. `client_layout.py` supplies a shared client placement default.
+
+
+### Executable boundary
+
+`component_api.bind()` receives the private verb commit callback and binds every
+public command to authentication and world serialization. Component domain
+helpers validate requests but cannot append events themselves. All live and
+candidate writes still pass through `verbs._append` → `events.append` →
+`store.apply`. `component_effects` validates the complete atomic batch;
+`component_commands` validates admission, fingerprints, and the proposed render.
+`component_testing` and `component_candidates` use owned temporary world copies.
+`component_data`, `component_schema`, `component_metadata`, and `component_tree`
+resolve/describe/validate plain data. The explicit dependency map in
+`tests/test_boundary.py` is authoritative for these helper edges.
+
+`component_runtime/` hosts fresh QuickJS contexts in a subprocess; no host
+callbacks or credentials enter generated code. This is not an OS security
+sandbox. `shell/components.js` renders validated trees and forwards input; it
+never evaluates component source. New behavior belongs in stored source, not
+feature-specific handlers in the shell. Keep motion in local state, persist
+completed decisions, and never execute source during replay. Named JEFF action
+tools are derived from the active manifest each model step, not handwritten.
+
+
+### Astra provider
+
+Alex approved `jeff/openai_agent.py` as an OpenAI Agents SDK adapter using Astra.
+Agora owns the outer finite loop; the SDK runs a single model/tool step before
+capabilities and projections are refreshed. All callbacks call the existing
+Agent verb dispatch, with the same actor and cancellation lock. Do not import
+Codex's ambient tools or promote world content into system instructions. Preserve
+SDK reasoning and call/output history, disable tracing, and distinguish mocked
+transport checks from successful live authoring. See `docs/Reference/Astra Harness.md`.
+
+Alex subsequently required OpenAI-account OAuth. `jeff/codex_agent.py` uses the
+official Codex Python SDK and managed ChatGPT sign-in for that path. Codex owns
+the inner inference loop; Agora owns verb dispatch, cancellation and budgets.
+Use no computer environments, disable host/orchestrator skills, MCP and plugins,
+and run the actual runtime inventory test after runtime/config changes. Astra
+needs its isolated code-mode host and supplies a UTC clock; those helpers do not
+read or mutate the world. Every world action still derives from the registry.
+`component_actions` plus pinned `invoke_component` provide same-turn discovery
+without rebuilding Codex's top-level tools. Never extract OAuth tokens. The
+API-key Agents SDK adapter remains an alternative, with a separate loop contract.

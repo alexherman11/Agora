@@ -17,7 +17,7 @@ def world_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def world(world_path: Path) -> Store:
-    return verbs.open_world(world_path)
+    return verbs.open_world(world_path, import_roots=[world_path.parent])
 
 
 @pytest.fixture

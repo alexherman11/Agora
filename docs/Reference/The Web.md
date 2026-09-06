@@ -87,7 +87,7 @@ The Agora browser is a lens: a surface bound to page entities, reading their fac
 | `page.submit` | **one-time-effect** | frozen payload; operation id; outcome `pending \| accepted \| rejected \| unknown` |
 | `page.navigate` | view | follows a link; provenance edge `opened_from` |
 
-`page.submit` is the important row. Submissions carry an operation id and a frozen payload cast; a lost response yields `unknown`, never a retry; verification is an explicit request. This is the same machinery as print jobs, and it is what makes it safe to let a daemon act on the web: the double-submitted order cannot happen.
+`page.submit` is the important row. Submissions carry an operation id and a frozen payload cast; a lost response yields `unknown`, never a retry; verification is an explicit request. This is the same machinery as print jobs, and it is what makes it safe to let a daemon act on the web: Agora can prevent specified automatic retries, but a local operation id does not make an arbitrary provider deduplicate. Unknown outcomes require verification; two separately requested submissions still need intent-level checks.
 
 The daemon receives exactly these verbs and no others. It does not "browse"; it operates page objects. Under the surface the handlers drive CDP and the accessibility tree; that is an implementation detail of the wrapped tier and never appears in the capability list.
 
@@ -143,7 +143,7 @@ The existing ecosystem of MCP servers is consumed directly as adapters. The mapp
 
 | MCP concept | Agora concept | Boundary rule |
 |---|---|---|
-| resource | proxy entity with `core.remote-ref` and an adapter-written observation facet | provider id from the resource URI; incarnation from the server session |
+| resource | proxy entity with `core.remote-ref` and an adapter-written observation facet | durable provider identity and resource version; adapter session tracked separately |
 | tool | handler manifest | **effect class assigned at the boundary** by the adapter definition, never inferred from the tool's description; unknown → `one-time-effect` |
 | prompt | ignored, or offered as a skill object | never executed automatically |
 | server | adapter extension (per [[Extensions]]), requesting `adapter` authority | admitted only with a documented matching policy and an `uncertain-match` state |
@@ -298,3 +298,15 @@ Any browser lens, adapter, endpoint client, or public lens must pass:
 ---
 
 *Every clause above traces to a design document in this repository or to* [[Objects and Facets]]*; where it does not, it is marked as a proposal. The Constitution remains authoritative.*
+
+
+## Boundary qualifications — September 5, 2026
+
+These are desired capabilities, not the next required build steps. `page.fill` is
+private only while values remain in a separate local draft. Dispatching them into
+a live page through typing or CDP can invoke page code and disclose data before any
+submit action. Navigation can cross a network boundary even when its visible purpose
+is viewing. Effect descriptors must cover every relevant property, rather than using
+one exclusive label as proof of safety. A published edition should be explicitly
+selected or pinned independently of private working edits. Provider guarantees and
+uncertain outcomes must be validated at each real adapter.

@@ -80,7 +80,7 @@ projection:       "{state}, pid {pid}, {drift?} — checked {age} ago"
 |---|---|
 | `reads.spec` | Exactly one spec family. A reconciler serving two families is two reconcilers. |
 | `reads.also` | Other facets it may consult, read-only. Declared so composition can be analyzed ([[Security]] §5, row 5). |
-| `writes.status` | Exactly one status family. No other writes, ever — not tags, not names, not other statuses. |
+| `writes.status` | Exactly one status family for a resource controller. Shared runtime services own conflict records; pure derivations have a separate declared cache contract. |
 | `owns` | The entities it reconciles: those carrying the spec **and** covered by a grant to this reconciler. A spec on an entity the reconciler has no grant for is aspirational and stays so. |
 | `effects` | Enumerated, convergent, idempotent. Each maps to a broker. |
 | `needs` / `excludes` | Grants requested and grants it declares it must never hold. The registry refuses a manifest whose `needs` exceed what its conformance cases exercise, and honors `excludes` as a hard ceiling even if a person later over-grants. |
@@ -171,7 +171,7 @@ Ordering between reconcilers is never orchestrated. The process reconciler does 
 
 **Blocked is a first-class state.** It is not an error and not a failure of the reconciler; it is the reconciler telling the truth about why the world is not as specified. A spec with no reconciler at all is legal and inert — an aspiration whose drift is permanently visible ([[Objects and Facets|Objects]] §4.2). A spec whose reconciler is blocked is the same thing with a reason attached. The daemon can read the reason and act on it: request a grant, install a handler, fix a path.
 
-**Conflict** is the case Kubernetes handles badly and Agora handles with an object. Two entities each carry a `process.spec` demanding port 5173. Two specs want the same headphones. A file reconciler finds two `file-backing` specs claiming one path. The reconciler must not pick a winner by timing or by last-writer-wins on a physical resource; that is flapping with extra steps. It mints a **conflict entity** holding both specs with their writers, edges it to both entities, marks both statuses `conflict(ref)`, raises its salience, and acts on neither until a resolution event arrives ([[Objects and Facets|Objects]] §9). Resolution is an ordinary write — change one port, choose one output — and the conflict composts.
+**Conflict** is the case Kubernetes handles badly and Agora handles with an object. Two entities each carry a `process.spec` demanding port 5173. Two specs want the same headphones. A file reconciler finds two `file-backing` specs claiming one path. The reconciler must not pick a winner by timing or by last-writer-wins on a physical resource; that is flapping with extra steps. It requests that the runtime record a **conflict entity** holding both specs with their writers, edges it to both entities, marks both statuses `conflict(ref)`, raises its salience, and acts on neither until a resolution event arrives ([[Objects and Facets|Objects]] §9). Resolution is an ordinary write — change one port, choose one output — and the conflict composts.
 
 ---
 
@@ -368,3 +368,19 @@ Any reconciler must pass:
 ---
 
 *Every clause above traces to a design document in this repository; where it does not, it is marked as a proposal. The Constitution remains authoritative.*
+
+
+## Design qualifications — September 5, 2026
+
+This catalog is a feature horizon, not an implementation sequence. Resource
+controllers, pure cached computations, and durable commands may share scheduling
+without having identical write contracts. Volatile freshness refreshes must remain
+outside replay-derived durable tables; durable observations still use recorded
+commands. Cache dependencies and execution scheduling are distinct concerns.
+
+A resource normally has an explicit current owner and waiting/refusal policy.
+Conflict objects are for ambiguities needing resolution, not a reason to stop every
+current user whenever another claimant appears. Starting a process idempotently
+does not make its internal effects idempotent. The receiving effect boundary must
+check current authority and fence stale work, even if a controller's next pass is
+blocked. All such machinery remains prospective beyond [[Personal Lenses]].

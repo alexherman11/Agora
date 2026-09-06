@@ -72,8 +72,16 @@ class TextDoc:
         self._idle, self._burst, self._clock = idle, burst, clock
         self._doc = loro.LoroDoc()
         snapshot = record.body.get("snapshot")
+        self._persisted = bool(snapshot)
         if snapshot:
-            self._doc.import_(base64.b64decode(snapshot))
+            try:
+                self._doc.import_(base64.b64decode(snapshot, validate=True))
+            except BaseException as exc:
+                if not isinstance(exc, Exception) and type(exc) is not BaseException:
+                    raise
+                raise verbs.VerbError(
+                    "invalid text snapshot; preserve this revision for recovery"
+                ) from exc
         if self._text().to_string() != record.body.get("text", ""):
             # plain text was attached after (or instead of) a snapshot: the body wins
             self._text().delete(0, self._text().len_unicode)
@@ -108,9 +116,9 @@ class TextDoc:
             return self.flush()
         return None
 
-    def flush(self) -> FacetRecord | None:
+    def flush(self, *, persist_identity: bool = False) -> FacetRecord | None:
         """Record the burst as one text-edited event. The only write this file ever makes."""
-        if not self.dirty:
+        if not self.dirty and (not persist_identity or self._persisted):
             return None
         snapshot = base64.b64encode(self._doc.export(loro.ExportMode.Snapshot())).decode("ascii")
         record = verbs.attach(
@@ -119,8 +127,10 @@ class TextDoc:
             self._entity,
             "core.text",
             {"text": self.plaintext(), "snapshot": snapshot},
+            expected_revision=self.revision,
         )
         self.revision = record.revision
+        self._persisted = True
         self._pending, self._last_edit = 0, None
         return record
 
@@ -134,6 +144,7 @@ class TextDoc:
         text = self.plaintext()
         if not 0 <= start <= end <= len(text):
             raise ValueError(f"range {start}:{end} is outside the text (length {len(text)})")
+        self.flush(persist_identity=True)
         head = self._text().get_cursor(start, loro.Side.Left)
         tail = self._text().get_cursor(end, loro.Side.Left)
         return Locator(
@@ -150,8 +161,17 @@ class TextDoc:
         The head cursor rides the range's first character, the tail cursor the character after
         it: an edit inside stretches the range, and deleting the range unseats the head.
         """
-        head = self._doc.get_cursor_pos(loro.Cursor.decode(base64.b64decode(locator.start)))
-        tail = self._doc.get_cursor_pos(loro.Cursor.decode(base64.b64decode(locator.end)))
+        if locator.entity != self._entity:
+            raise verbs.VerbError("locator belongs to another entity")
+        try:
+            head = self._doc.get_cursor_pos(loro.Cursor.decode(base64.b64decode(locator.start)))
+            tail = self._doc.get_cursor_pos(loro.Cursor.decode(base64.b64decode(locator.end)))
+        except BaseException as exc:
+            if type(exc) is BaseException and "id is not found" in str(exc):
+                return Resolution(None, None, locator.revision, False)
+            if isinstance(exc, (ValueError, TypeError)):
+                raise verbs.VerbError("invalid locator encoding") from exc
+            raise
         if head.update is not None or tail.update is not None:
             return Resolution(None, None, locator.revision, False)
         start, end = head.current.pos, tail.current.pos

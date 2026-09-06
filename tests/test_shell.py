@@ -5,12 +5,11 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from jeff.agent import Agent
 from kernel import verbs
 from shell.server import changes, create_app
 from tests.fakes import FakeClient, text
+from tests.http_client import TestClient
 
 
 def test_empty_desk_renders(world_path: Path) -> None:
@@ -45,7 +44,7 @@ def test_verb_endpoint_forwards_and_refuses(world_path: Path) -> None:
 
 
 def test_chat_goes_through_jeff(world_path: Path) -> None:
-    world = verbs.open_world(world_path)
+    world = verbs.open_world(world_path, import_roots=[world_path.parent])
     jeff = Agent(world, client=FakeClient([[text("Nothing to do.")]]))
     with TestClient(create_app(world_path, jeff=jeff)) as client:
         reply = client.post("/chat", json={"message": "hello"}).json()
@@ -60,7 +59,7 @@ def test_page_is_served(world_path: Path) -> None:
 
 
 def test_change_stream_notices_verbs(world_path: Path) -> None:
-    world = verbs.open_world(world_path)
+    world = verbs.open_world(world_path, import_roots=[world_path.parent])
 
     async def scenario() -> list[str]:
         stream = changes(world, poll=0.01, limit=2)

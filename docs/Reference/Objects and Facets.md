@@ -873,3 +873,21 @@ A code project may have file bindings and optional service intent; a worker job 
 ---
 
 *Every clause above traces to a design document in this repository; where it does not, it is marked as a proposal. The Constitution remains authoritative.*
+
+
+## Current prototype additions — September 5, 2026
+
+[[Personal Lenses]] defines the first admitted view vocabulary: `core.lens` contains
+a declarative definition; the desk's `core.display` pins an activated revision.
+Definition identity, definition revision, bound subject identities, live content,
+and per-session selection are separate. Generic facet attachment cannot bypass
+lens-definition validation. Historical reads preserve the source revision needed
+for recovery; conditional attachment rejects stale writes.
+
+The current text wrapper persists identity before exporting anchors and refuses
+stale editing sessions; it does not yet merge simultaneous writers. File import
+captures immutable bytes and is not live file synchronization. Content reads expose
+content and attribution while omitting the internal CRDT snapshot codec. The retained
+log still contains the codec needed for exact text reconstruction. Recovery depends
+on the retained log, captured payloads, and compatible interpretation, not on a path
+to today's mutable external file. See [[Personal Lenses]] for tested scope and limits.

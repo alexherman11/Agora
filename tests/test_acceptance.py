@@ -5,13 +5,12 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 import cli
 from jeff.agent import Agent
 from kernel import store, verbs
 from shell.server import create_app
 from tests.fakes import FakeClient, import_notes_script
+from tests.http_client import TestClient
 
 
 def agora(world: Path, *args: str) -> str:
@@ -22,7 +21,7 @@ def agora(world: Path, *args: str) -> str:
 
 def test_the_acceptance_script(world_path: Path, notes_file: Path) -> None:
     # 1. Start the shell. An empty desk renders: a scene entity with zero appearances.
-    world = verbs.open_world(world_path)
+    world = verbs.open_world(world_path, import_roots=[world_path.parent])
     jeff = Agent(world, client=FakeClient(import_notes_script(str(notes_file))))
     with TestClient(create_app(world_path, jeff=jeff)) as shell:
         tree = shell.get("/tree").json()
@@ -55,7 +54,7 @@ def test_the_acceptance_script(world_path: Path, notes_file: Path) -> None:
     # 5. Kill every process. Restart. The desk is exactly as it was; rebuild matches the store.
     world.close()
     desk_before = agora(world_path, "tree")
-    again = verbs.open_world(world_path)
+    again = verbs.open_world(world_path, import_roots=[world_path.parent])
     with TestClient(create_app(world_path)) as shell:
         assert shell.get("/tree").json()["nodes"][0]["entity"] == entity
     assert agora(world_path, "tree") == desk_before
