@@ -1,4 +1,0 @@
-#!/bin/sh
-# agora: the CLI. `./agora log`, `./agora project <ref> --budget 60`, ...
-here="$(cd "$(dirname "$0")" && pwd)"
-exec uv run --project "$here" python "$here/cli.py" "$@"
