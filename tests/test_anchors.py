@@ -48,10 +48,10 @@ def test_deleted_range_resolves_to_its_recorded_revision(world: store.Store) -> 
     entity = note_with(world, "hello world")
     doc = TextDoc(world, "alex", entity)
     anchor = doc.anchor(6, 11)
-    assert anchor.revision == 1
+    assert anchor.revision == world.facet(entity, "core.text").revision
     doc.delete(5, 6)
     found = doc.resolve(anchor)
-    assert not found.live and found.revision == 1  # never a wrong place
+    assert not found.live and found.revision == anchor.revision  # never a wrong place
 
 
 def test_anchor_round_trips_through_the_log(world: store.Store) -> None:

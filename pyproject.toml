@@ -1,7 +1,7 @@
 [project]
 name = "agora"
 version = "0.1.0"
-description = "Agora OS - Milestone One: an object layer, four verbs, a desk, and JEFF as a client"
+description = "Agora: an experimental object environment with personal views and JEFF as a client"
 requires-python = ">=3.12"
 dependencies = [
     "loro>=1.0",
@@ -9,6 +9,9 @@ dependencies = [
     "uvicorn>=0.30",
     "sse-starlette>=2.0",
     "anthropic>=0.40",
+    "quickjs-ng==0.16.2.1",
+    "openai-agents>=0.22.0",
+    "openai-codex>=0.147.0",
 ]
 
 [dependency-groups]

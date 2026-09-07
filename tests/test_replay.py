@@ -28,28 +28,28 @@ def test_rebuild_is_empty_for_an_empty_world(world: store.Store) -> None:
 
 
 def test_store_survives_restart(world_path: Path, notes_file: Path) -> None:
-    first = verbs.open_world(world_path)
+    first = verbs.open_world(world_path, import_roots=[world_path.parent])
     populate(first, notes_file)
     before = first.snapshot()
     first.close()
-    again = verbs.open_world(world_path)
+    again = verbs.open_world(world_path, import_roots=[world_path.parent])
     assert again.snapshot() == before
 
 
 def test_world_returns_from_the_log_alone(world_path: Path, notes_file: Path) -> None:
-    first = verbs.open_world(world_path)
+    first = verbs.open_world(world_path, import_roots=[world_path.parent])
     note = populate(first, notes_file)
     before = first.snapshot()
     first.close()
     (world_path / "store.db").unlink()
-    again = verbs.open_world(world_path)
+    again = verbs.open_world(world_path, import_roots=[world_path.parent])
     assert again.snapshot() == before
     assert again.facet(note, "core.text").revision == 2
     assert [a.mode for a in again.appearances("ent_desk")] == ["summary"]
 
 
 def test_boot_replays_only_the_tail(world_path: Path, notes_file: Path) -> None:
-    first = verbs.open_world(world_path)
+    first = verbs.open_world(world_path, import_roots=[world_path.parent])
     populate(first, notes_file)
     assert first.sync() == events.count(first.world)
     verbs.mint(first, "alex")

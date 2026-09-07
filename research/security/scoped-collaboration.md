@@ -97,6 +97,8 @@ The first investigation now has a [[composed-export-model|static composed-export
 
 The next investigation should trace private preview artifacts into collaborative development surfaces: logs, errors, screenshots, generated fixtures, summaries, caches, and synchronized worker messages. Use synthetic data and a fake publishing service when suitable isolation is available. Evaluate the actual boundaries, not only whether a reviewer spots malicious text.
 
+Implementation began before that preview system exists. A [[m1-choke-point-review|static M1 choke-point review]] therefore took precedence on 4 September 2026. It found that file import reads the host before the permissive check stubs and that the stubs do not receive enough of the intended operation to enforce later grants. Combined with the unauthenticated local shell and JEFF's remote model context, this creates a concrete private-host-file disclosure path. No runtime exploit or project test was executed. The preview-artifact investigation remains open after the import boundary is settled.
+
 Compare whole-application isolation with smaller independent components. Measure denied effects, unintended disclosure, retained user work, recovery, review effort, and user interruptions. More components may reduce authority per component but increase dependency and compatibility complexity.
 
 Acceptance tests T21–T24 in [[Security|Security Model]] cover the new scenarios. T25 extends the same precision to ordinary OS actions. None has been run against an Agora runtime. Compartment granularity, adoption policy, exact wire protocols, and confidentiality enforcement remain open.

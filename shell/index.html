@@ -1,79 +1,93 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>agora desk</title>
-<style>
-  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; display: grid; grid-template-columns: 1fr 360px; height: 100vh; }
-  #desk { position: relative; background: #f4f1ea; overflow: hidden; }
-  .item { position: absolute; max-width: 240px; padding: 6px 8px; background: #fff; border: 1px solid #c9c2b4; border-radius: 4px; }
-  .item .label { font-weight: 600; }
-  .item .summary { color: #555; margin-top: 2px; white-space: pre-wrap; }
-  .item .id { color: #999; font-size: 11px; }
-  #empty { position: absolute; left: 12px; top: 12px; color: #888; }
-  #chat { display: flex; flex-direction: column; border-left: 1px solid #ddd; }
-  #log { flex: 1; overflow: auto; padding: 8px; }
-  #log p { margin: 0 0 8px; white-space: pre-wrap; }
-  #log .jeff { color: #1a4d8f; }
-  #log .call { color: #777; font-size: 12px; font-family: monospace; }
-  #log .error { color: #a00; }
-  form { display: flex; border-top: 1px solid #ddd; }
-  input { flex: 1; padding: 8px; border: 0; font: inherit; }
-  button { padding: 8px 12px; border: 0; background: #1a4d8f; color: #fff; font: inherit; }
-  #status { padding: 4px 8px; font-size: 12px; color: #777; border-bottom: 1px solid #ddd; }
-</style>
-</head>
-<body>
-<div id="desk"><div id="empty">an empty desk</div></div>
-<div id="chat">
-  <div id="status">connecting…</div>
-  <div id="log"></div>
-  <form id="form"><input id="msg" placeholder="tell JEFF…" autocomplete="off"><button>send</button></form>
-</div>
-<script>
-const desk = document.getElementById("desk"), empty = document.getElementById("empty");
-const log = document.getElementById("log"), status = document.getElementById("status");
-
-async function loadTree() {
-  const tree = await (await fetch("/tree")).json();
-  desk.querySelectorAll(".item").forEach(n => n.remove());
-  empty.hidden = tree.nodes.length > 0;
-  for (const node of tree.nodes) {
-    const el = document.createElement("div");
-    el.className = "item";
-    el.style.left = (node.transform.x || 0) + "px";
-    el.style.top = (node.transform.y || 0) + "px";
-    el.style.transform = "scale(" + (node.transform.scale || 1) + ")";
-    const label = document.createElement("div"); label.className = "label"; label.textContent = node.label;
-    const id = document.createElement("div"); id.className = "id"; id.textContent = node.entity;
-    el.append(label, id);
-    if (node.mode !== "icon") {
-      const summary = document.createElement("div"); summary.className = "summary"; summary.textContent = node.summary;
-      el.append(summary);
-    }
-    desk.append(el);
-  }
-  status.textContent = "revision " + tree.revision;
-}
-
-function say(text, cls) { const p = document.createElement("p"); p.className = cls; p.textContent = text; log.append(p); log.scrollTop = log.scrollHeight; }
-
-document.getElementById("form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = document.getElementById("msg"), message = input.value.trim();
-  if (!message) return;
-  input.value = ""; say("you: " + message, "you");
-  const r = await fetch("/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message }) });
-  const data = await r.json();
-  if (data.error) { say(data.error, "error"); return; }
-  for (const c of data.calls) say(c.verb + " " + JSON.stringify(c.args) + (c.error ? "  ✗ " + c.error : "  ✓"), "call");
-  say("JEFF: " + data.reply, "jeff");
-});
-
-const source = new EventSource("/events");
-source.addEventListener("changed", loadTree);
-source.onerror = () => { status.textContent = "disconnected"; };
-loadTree();
-</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agora · Your workspace</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main id="workspace">
+      <header class="bar">
+        <div>
+          <span class="brand">agora</span><span id="view-label">Your desk</span>
+        </div>
+        <nav aria-label="Workspace controls">
+          <button id="new-note">New note</button
+          ><button id="default">Default desk</button
+          ><button id="restore">Restore previous display</button>
+        </nav>
+      </header>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <div id="preview-bar" hidden>
+        <span>Preview · Your active display is unchanged</span
+        ><button id="activate">Use this version</button
+        ><button id="close-preview">Close preview</button>
+      </div>
+      <section id="desk" aria-label="Desk"></section>
+      <section id="component-host" aria-label="Executable workspace" hidden></section>
+      <section id="lens" hidden aria-label="Personal lens">
+        <div class="list-pane">
+          <h1 id="lens-title"></h1>
+          <div id="rows" role="listbox" aria-label="Objects"></div>
+          <div class="pages">
+            <button id="previous-page">Previous</button
+            ><span id="page-status"></span><button id="next-page">Next</button>
+          </div>
+        </div>
+        <article class="detail-pane">
+          <div id="selected-label">Select an object</div>
+          <pre id="detail"></pre>
+        </article>
+      </section>
+      <details id="inspector">
+        <summary>Inspect this view</summary>
+        <pre id="definition"></pre>
+        <button id="draft">Preview latest draft</button>
+      </details>
+    </main>
+    <aside id="chat" aria-label="Conversation with JEFF">
+      <header class="bar">
+        <div>
+          <strong>JEFF</strong><span id="agent-connection" class="subtle">Here with you</span>
+        </div>
+        <button id="openai-login" hidden>Sign in with OpenAI</button>
+        <button id="stop">Stop</button>
+      </header>
+      <div id="status" role="status">Connecting…</div>
+      <div id="log" role="log" aria-live="polite">
+        <p class="welcome">A place for your work, shaped together.</p>
+        <button id="suggest">Ask JEFF for a notes list with previews</button>
+      </div>
+      <form id="chat-form">
+        <label class="sr-only" for="message">Message JEFF</label
+        ><textarea
+          id="message"
+          rows="3"
+          placeholder="What would you like to change?"
+        ></textarea>
+        <div class="compose-footer">
+          <span id="selection-status">No object selected</span
+          ><button id="send" type="submit">Send ↗</button>
+        </div>
+      </form>
+    </aside>
+    <dialog id="note-dialog">
+      <form id="note-form">
+        <h2>A new note</h2>
+        <label for="note-title">Name</label
+        ><input id="note-title" required maxlength="200" /><label
+          for="note-text"
+          >Text</label
+        ><textarea id="note-text" rows="8"></textarea>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-note">Cancel</button
+          ><button type="submit">Add to desk</button>
+        </div>
+      </form>
+    </dialog>
+    <!-- EventSource refreshes views; the protected shell owns recovery controls. -->
+    <script src="/components.js" defer></script>
+    <script src="/app.js" defer></script>
+  </body>
 </html>

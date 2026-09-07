@@ -10,6 +10,7 @@ import os
 import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 from typing import IO, Any
 
 from kernel import events, project, scene, store, verbs
@@ -30,7 +31,11 @@ def run(argv: list[str], out: IO[str], err: IO[str]) -> int:
     if args.command is None:
         parser.print_help(out)
         return 0
-    world = verbs.open_world(args.world)
+    try:
+        world = verbs.open_world(args.world)
+    except (events.LogError, OSError) as exc:
+        print(f"cannot open world: {exc}", file=err)
+        return 2
     if getattr(args, "viewer", None) is None:
         args.viewer = args.actor  # you see the world as yourself unless you ask otherwise
     try:
@@ -38,7 +43,7 @@ def run(argv: list[str], out: IO[str], err: IO[str]) -> int:
     except VerbError as exc:
         print(f"refused: {exc}", file=err)
         return 2
-    except ValueError as exc:
+    except (ValueError, TypeError, events.LogError, OSError) as exc:
         print(f"error: {exc}", file=err)
         return 2
     finally:
@@ -56,12 +61,15 @@ def _init(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
 
 def _mint(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
     facets = {facet_type: _json(body) for facet_type, body in args.facet or []}
+    _selected_imports(world, facets.values())
     print(verbs.mint(world, args.actor, facets), file=out)
     return 0
 
 
 def _attach(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
-    record = verbs.attach(world, args.actor, args.entity, args.type, _json(args.body))
+    body = _json(args.body)
+    _selected_imports(world, [body])
+    record = verbs.attach(world, args.actor, args.entity, args.type, body)
     print(f"{record.entity} {record.type} r{record.revision}", file=out)
     return 0
 
@@ -69,6 +77,40 @@ def _attach(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
 def _read(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
     print(json.dumps(verbs.read(world, args.actor, args.entity, args.type), indent=2), file=out)
     return 0
+
+
+def _call(world, args, out):
+    """Access the same registry as JEFF, including lens operations and retained reads."""
+    fn = verbs.VERBS.get(args.verb)
+    if fn is None:
+        raise VerbError(f"unknown verb; choose from {sorted(verbs.VERBS)}")
+    body = _json(args.arguments)
+    if not isinstance(body, dict):
+        raise VerbError("arguments must be a JSON object")
+    if args.verb == "mint" and isinstance(body.get("facets"), dict):
+        _selected_imports(world, body["facets"].values())
+    elif args.verb == "attach":
+        _selected_imports(world, [body.get("body")])
+    result = fn(world, args.actor, **body)
+    import dataclasses
+
+    print(
+        json.dumps(
+            dataclasses.asdict(result) if dataclasses.is_dataclass(result) else result,
+            ensure_ascii=False,
+        ),
+        file=out,
+    )
+    return 0
+
+
+def _selected_imports(world, bodies):
+    """A path explicitly supplied at the trusted terminal authorizes that exact file."""
+    world.import_roots += tuple(
+        Path(b["path"]).expanduser().resolve()
+        for b in bodies
+        if isinstance(b, dict) and isinstance(b.get("path"), str)
+    )
 
 
 def _place(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
@@ -140,6 +182,7 @@ def _edit(world: store.Store, args: argparse.Namespace, out: IO[str]) -> int:
 
 
 _COMMANDS = {
+    "call": _call,
     "init": _init,
     "mint": _mint,
     "attach": _attach,
@@ -165,6 +208,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("init", help="create the world and its desk")
+    call = sub.add_parser(
+        "call", help="call any registered verb, including preview_lens and activate_lens"
+    )
+    call.add_argument("verb")
+    call.add_argument("arguments", help="JSON argument object")
     mint = sub.add_parser("mint", help="bring a new entity into the world")
     mint.add_argument("--facet", nargs=2, action="append", metavar=("TYPE", "JSON"))
     attach = sub.add_parser("attach", help="attach or update a facet")

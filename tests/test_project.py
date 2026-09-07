@@ -38,7 +38,7 @@ def test_budget_is_respected_at_every_tier(world: store.Store, notes_file: Path)
     note = rich_note(world, notes_file)
     for tier in TIERS:
         sel = select(world, note, "alex", "context", tier)
-        spent = sum(tokens(f.text) + (tokens(f" (by {f.written_by})")) for f in sel.facts)
+        spent = tokens(render_tokens(sel))
         assert spent <= tier, (tier, spent)
 
 

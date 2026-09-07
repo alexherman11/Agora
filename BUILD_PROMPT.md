@@ -1,3 +1,5 @@
+> **Historical M1 contract.** On September 5, 2026, Alex approved the reliability repairs and personal-lens extension and subsequent executable authorship in `docs/Reference/Personal Lenses.md` and `docs/Reference/Executable Components.md`. M1-only restrictions below describe the initial build, not the approved current scope. M2 onward is an unordered feature horizon in Agora Spec §22. The current public registry may grow deliberately; JEFF tools remain derived from it.
+
 # Build Agora — Milestone One
 
 You are building the first running version of **Agora**: an object-oriented computing

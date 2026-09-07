@@ -17,7 +17,13 @@ DESK = "ent_desk"
 #   facet-attached     {"entity": id, "type": type, "body": body}
 #   text-edited        {"entity": id, "type": "core.text", "body": {"text": str, "snapshot": b64}}
 #   appearance-placed  {"scene": id, "entity": id, "mode": mode, "transform": {x, y, scale}}
-EVENT_KINDS = ("entity-minted", "facet-attached", "text-edited", "appearance-placed")
+EVENT_KINDS = (
+    "entity-minted",
+    "facet-attached",
+    "text-edited",
+    "appearance-placed",
+    "component-committed",
+)
 
 MODES = ("icon", "summary", "full")
 
@@ -33,10 +39,13 @@ class Event:
     payload: dict[str, Any]
     v: int = SCHEMA_VERSION
     seq: int = field(default=0, compare=False)
+    sealed_tail: str | None = None  # hash of an incomplete predecessor, sealed by this append
+    offset: int = field(default=0, compare=False)  # byte cursor, replay-only
 
     def to_line(self) -> str:
         record = asdict(self)
         del record["seq"]
+        del record["offset"]
         return json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
     @classmethod
@@ -50,6 +59,7 @@ class Event:
             payload=record["payload"],
             v=record.get("v", SCHEMA_VERSION),
             seq=seq,
+            sealed_tail=record.get("sealed_tail"),
         )
 
 

@@ -2,7 +2,7 @@
 
 **The master specification.** Version 0.4 — September 2026. 
 
-> **How this document works.** Section numbers are stable; cite them as `Spec §N`. Where a companion reference document exists, this spec gives the shape and the reasons, and the reference gives the contract — the reference wins on detail. Where this spec and the Constitution disagree, the Constitution wins. Bracketed values are open decisions. "JEFF" is the first daemon's name; "daemon" is the role (the Constitution's term). This is a design specification: it describes intended behavior, not implemented behavior.
+> **How this document works.** Section numbers are stable; cite them as `Spec §N`. Where a companion reference document exists, this spec gives the shape and the reasons, and the reference gives the contract — the reference wins on detail. Where this spec and the Constitution disagree, the Constitution wins. Bracketed values are open decisions. "JEFF" is the first daemon's name; "daemon" is the role (the Constitution's term). This is a revisable design plan: it describes intended behavior, not implemented behavior. Experiments may change architecture and priorities; constitutional rights remain the constraints. [[Personal Lenses]] records the current prototype contract.
 
 ### The document map
 
@@ -12,12 +12,12 @@
 | **this spec**                                                                                     | the whole-system shape, the reasons, the roadmap                                                            | governs where references are silent |
 | [[Objects and Facets]]                                                                            | entities, facets, references, state dimensions, copy verbs, residency, projection, storage                  | reference                           |
 | [[Reconcilers]]                                                                                   | the spec/status contract, observations, drift, blocked, conflict                                            | reference                           |
-| [[Security]] + [[Security Addendum]]                                                              | claims/grants/effects, the coverage map; **the addendum's two-sided model is the version to build**         | reference                           |
+| [[Security]] + [[Security Addendum]]                                                              | claims/grants/effects, the coverage map; protected external boundaries; internal authority remains an experiment         | reference                           |
 | [[Extensions]]                                                                                    | how vocabulary changes: the bundle, the loop, tiers, promotion                                              | reference                           |
 | [[The Web]]                                                                                       | pages as objects, the browser lens, adapters, publishing                                                    | reference                           |
 | Essays: [[Facets in Everyday Use]], [[Object Use Cases]], [[Rooms]], [[Democracy]], [[Ownership]] | explainers, design pressure tests, and social/civic design; superseded on mechanics by the references above | background                          |
 | Archived: [[Agora Objects (superseded)]] and the rest of `research/`                              | the object design the references above replaced, and the review dossiers behind them; kept for lineage      | historical                          |
-| `BUILD_PROMPT.md`, `AGENTS.md`, `DECISIONS.md` (repository root) | what milestone one is and its acceptance script; how to work on the code; settled questions and friction | build — governed by this spec; code never outranks the documents |
+| `BUILD_PROMPT.md`, `AGENTS.md`, `DECISIONS.md` (repository root) | what milestone one is and its acceptance script; how to work on the code; settled questions and friction | build — tested evidence informs revisions to this plan |
 
 The vault index, with reading order and citation conventions, is [[Start Here]].
 
@@ -31,13 +31,15 @@ AgoraOS is a general-purpose operating environment that a person shares with a p
 
 **The screen is a projection of structured state, not the source of truth.** A thing's identity is distinct from its content revision, its location, its open views, its availability, and its activity. The person and JEFF work through the same semantic actions, generated from one computed list, with permissions enforced per caller. Ordinary interaction remains usable when JEFF is unavailable: identity resolution, direct controls, basic search, inspection, and export never require a model.
 
-**The wager underneath all of it:** every prior attempt at a semantic, malleable computing environment died because rigid schemas were needed for machines that couldn't read, and nobody would fill them in. Agora is built for a machine that can read. So the design is strict exactly where machines need precision — identity, authority, effects, liveness — and loose where meaning lives, with a resident mind as the join. That asymmetry appears in every section below.
+**The wager underneath all of it:** an agent that can interpret ordinary content may reduce the work needed to maintain a semantic, malleable environment. That is a hypothesis to test through use, not a settled explanation of why earlier systems struggled. The design therefore aims for precision in identity, authority, effects, and liveness while allowing meaning to remain flexible. The object layer must earn its complexity by making useful changes and continuity easier.
 
 A person entering Agora has a usable default environment and voice or text access to JEFF. Requests range from "keep reading from here" and "play this through my headphones" to "make me a lens that shows my notes as a constellation." Customization grows from use; it is never a prerequisite for ordinary tasks.
 
 ---
 
 ## 2. High-level system
+
+The diagram describes a possible mature deployment, not a prerequisite for personal usefulness. VM packaging, persistent agent memory, and world-root authority are open choices. The current prototype keeps JEFF as a verb/projection client; [[Security Addendum]] sets out the tradeoff.
 
 ```
                           HUMAN
@@ -71,7 +73,7 @@ A person entering Agora has a usable default environment and voice or text acces
       excluded from world           documents / media
       snapshots; holds no           communication / devices
       authority                     applications, sessions
-              │                     JEFF runtime (root here)
+              │                     JEFF runtime (authority TBD)
               │                            │
               └──────────► JEFF ◄──────────┘
                              │ delegates, within ceilings
@@ -81,7 +83,7 @@ A person entering Agora has a usable default environment and voice or text acces
                worker      worker     workers
 ```
 
-One line divides the system. Inside the world, JEFF is trusted with everything, including root. At the line, the host side checks. The host side contains no model and no personal content; it answers "is this under the ceiling?", performs crossings, and records receipts. See §12 and [[Security Addendum]].
+The proposed deployment separates a programmable world from the boundary that checks external effects and protects recovery. Whether JEFF has world-root authority or remains a constrained client is unresolved. In either case, an agent must not be able to rewrite the enforcement of its own external authority. See §12 and [[Security Addendum]].
 
 ### Whole-OS obligations
 
@@ -294,21 +296,21 @@ The history supports undo, provenance, causal debugging, personal and project hi
 
 ## 12. Authority: one line, two sides
 
-Authoritative contract: [[Security]] as analyzed, [[Security Addendum]] as built. The model in full:
+Design references: [[Security]] and [[Security Addendum]]. These describe a future authority model; the current implementation is a local, single-user prototype with authority stubs. The committed experimental boundary is JEFF acting through verbs and projections. Broader authority is a choice to evaluate, not a promised upgrade.
 
 **Three nouns.** Everything is a claim (anything anyone says — including JEFF's memories, manifests, statuses, and displayed ACLs), a grant (authority, held in the keep), or an effect (a change to a protected resource, performed by a broker, recorded as a receipt). Claims never become grants — not by summarization, memory, signature, installation, or interpretation. Effects never happen without a grant, checked at the effect boundary.
 
-**Two sides.** Inside the world, JEFF is trusted with everything, including root. The host side — supervisor, keep, brokers; one small non-agentic program with no model and no content — checks crossings. It is consulted at exactly three moments: an effect crosses the membrane (irreversible, external, credentialed, or physical); a request would exceed a ceiling; or an act of authorship.
+**Two sides.** Protected authority and external effect enforcement must remain outside the component they constrain. One candidate uses a supervisor, keep, and brokers outside a programmable world; another retains stricter client boundaries inside it as well. Broad internal control could make repair easier, but would weaken guarantees about mediation, provenance, and shared-space isolation. Evaluate those consequences explicitly before adopting world root.
 
-**Ceilings, not clicks.** The keep holds the person's standing delegation to JEFF — root in the world; worker delegation; lending rights; allowed network domains; spending limits; first-use-asks for new one-time targets; device rules — set on the trusted surface and changed rarely. Under the ceilings JEFF grants freely to workers and lenses without asking; a click is how a ceiling moves. Generous inside the house, stingy at the door.
+**Ceilings, not clicks.** The keep holds the person's standing delegation to JEFF — allowed world operations; worker delegation; lending rights; allowed network domains; spending limits; first-use-asks for new one-time targets; device rules — set on the trusted surface and changed rarely. Under the ceilings JEFF grants freely to workers and lenses without asking; a click is how a ceiling moves. Generous inside the house, stingy at the door.
 
-**Acts of authorship — the human-only list, complete:** change the delegation; enroll or remove a device or change recovery; give custody of an object to another world; release a private fact into a room beyond the delegation; erase; vote or hold any civic credential. Everything else is delegable and mostly delegated on day one.
+**Acts of authorship — the human-only list, complete:** change the delegation; enroll or remove a device or change recovery; give custody of an object to another world; release a private fact into a room beyond the delegation; erase; vote or hold any civic credential. Ordinary reversible display changes can be delegated directly. Broader defaults should emerge from use and the actual enforcement available, not be granted implicitly on day one.
 
-The four rings of earlier drafts map exactly: Ring 0 is the host side, now with its contents named (supervisor + keep + brokers); Ring 1, JEFF's persistent state, is *data* — the witness holds no authority; Ring 2 is the world, where JEFF has root; Ring 3 is workers under JEFF's delegation. Authority flows downward, never upward. Raw shell inside the world exists as escape velocity; typed semantic tools are preferred. No language model ever has unrestricted host-root access.
+Earlier drafts used four rings: protected host services, JEFF's persistent data, the world, and delegated workers. That remains a useful separation of concerns, not a settled deployment topology. Memory is data, not authority. Raw shell access inside a world would be an explicitly different experiment from the current client model. No language model receives unrestricted host-root access.
 
 **Grants** are bound (principal, target, operation, destination, ceiling, expiry, revocation generation), never copy across fork/cast/share, never rise through delegation, never survive restore — a restored or forked world re-obtains authority or sits visibly `blocked(no-grant)`, which bids with reserved heat because a world that looks running but isn't is the one state the person must not miss.
 
-Day-one simplifications (the addendum governs): two trust classes (*from the person*, or not — everything else rendered with its source); two confidentiality classes (*private*, or *shared to a named room* — brokers refuse private-derived payloads at any other crossing); three rungs (see it, install it, run it with these grants). The finer machinery in [[Security]] returns when a real attack defeats the coarse version.
+Candidate simplifications to test (the addendum governs): two trust classes (*from the person*, or not — everything else rendered with its source); two confidentiality classes (*private*, or *shared to a named room* — brokers refuse private-derived payloads at any other crossing); three rungs (see it, install it, run it with these grants). The finer machinery in [[Security]] returns when a real attack defeats the coarse version.
 
 ---
 
@@ -328,7 +330,7 @@ Authority + recovery:   the keep — ceilings, revocations, consumed approvals,
 
 If the world is restored, JEFF still remembers what was attempted, what failed, why the rollback happened, and what not to repeat. Object references still resolve after rollback — to the current subject, a pinned revision, or a tombstone with a terminal gist — never to a new identity wearing an old name, and never (post-erasure) to erased content. Current grants, external-effect outcomes, and runtime incarnations are revalidated before work resumes: a preserved reading position may reopen a document; a preserved call record must not turn on the microphone.
 
-Snapshot exclusion is a persistence boundary, not protection against world root — which is exactly why nothing security-load-bearing lives in the world (§12).
+Snapshot exclusion is a persistence boundary. It cannot protect against any principal with world-root authority; if that deployment is chosen, its enforcement and authoritative records must live beyond that authority (§12).
 
 **Open:** store engine beyond milestone one (M1 commits to a JSONL log with a SQLite cache, §22; the protocol, not the engine, is the commitment); per-activity restore policy; retention/erasure horizons and their reconciliation with the record and fork rights ([[Constitution]] I.8 vs V.6 — Article I precedes).
 
@@ -450,38 +452,37 @@ Frozen early, consolidated. Companion documents carry their own detailed invaria
 
 ---
 
-## 22. Roadmap: milestone one, then the spine, then the drill, then the test
+## 22. Direction: a working foundation and an open feature horizon
 
-**Milestone one first.** The build contract is `BUILD_PROMPT.md`; the working rules are `AGENTS.md`; settled questions accumulate in `DECISIONS.md`. M1 is deliberately smaller than the spine below. It exists to test one claim: *an agent living in a world of objects, acting through verbs, is observably more capable than the same model pointed at a filesystem.*
+**Status: approved direction, September 5, 2026.** M1 established the initial object layer. Its historical build contract remains in `BUILD_PROMPT.md`; it is not a permanent restriction on future verbs, facets, or interfaces. The initial [[Personal Lenses]] experiment and reliability repairs are implemented. Alex clarified that inventing unanticipated abilities during use is essential; [[Executable Components]] defines the approved executable authorship slice.
 
-- **Truth and cache.** An append-only JSONL event log is the truth (§11); a SQLite store is derived from it by replay and records `last_applied`; file bytes stay in the real filesystem under the world directory, referenced by hash. A world is one directory — `log.jsonl`, `store.db`, `blobs/` — so a fork is a copy. Rebuild from the log alone is a command and a test, never a boot step.
-- **One write path.** Exactly four verbs — `mint`, `attach`, `read`, `place` — and every mutation in the system passes through them. Authority and grant checks are present from day one as permissive stubs, so that §12 becomes an edit to one file.
-- **Facets.** Constitutional definitions only: `core.name`, `core.text`, `core.file-backing`, and the desk scene's appearances (§5). `core.text` is a sequence CRDT (Loro) wrapped in one file; keystrokes accumulate in the CRDT and flush to the log as one `text-edited` event per burst — the log records decisions, not motion. Anchors are position-id ranges with the revision they were created against and a quoted-text fallback ([[Objects and Facets]] §2.3).
-- **Perception.** `select(ref, viewer, purpose, budget)` at tiers `[12, 60, 250, 2000]`, then `render_tokens` ([[Objects and Facets]] §7). The shell's icon and summary labels and JEFF's context consume the same selection; only rendering differs. Full-fidelity reads bypass projection and use the read verb.
-- **Clients.** A CLI, a thin shell (a tree endpoint, a verb endpoint, a live-update channel, one page), and JEFF: a chat loop with four tools derived from the verb and facet registry, every call carrying `actor: jeff`, every turn seeing the desk at tier 250. The human, the shell, and JEFF have identical powers: call verbs, read projections, read facets (§21, invariant 16).
-- **Done** means the acceptance script in `BUILD_PROMPT.md` runs live and as tests: an empty desk renders; JEFF puts a notes file into the world and an icon appears without a refresh; the log shows every event with its actor; an edit shows up in a projection; the desk survives killing every process; and the world comes back from the log alone after the store is deleted.
+**The immediate experience.** Ask JEFF: “Can you make it so I can click and drag the notes around?” JEFF should author the behavior as executable source stored in the world, exercise a candidate, and activate its exact revision. A different follow-up should revise that component and introduce another interaction and a discoverable action. Existing objects retain their identity; changes still flow through recorded verbs. The runtime implements general input, rendering, and scoped effects; the requested behavior must come from authored code. A fixed catalog of templates alone does not fulfill the vision. Live-model success, usability, persistence, and recovery need explicit evidence alongside runtime tests.
 
-**Then the spine**, each step accreting on M1 and each recorded in `DECISIONS.md`:
-1. The remaining constitutional facets (`tags`, `process.spec/status`) and pinned references.
-2. The process reconciler and the capability reconciler ([[Reconcilers]]).
-3. Salience from direct attention and recency only (§9).
-4. The host side: supervisor, the keep, one broker fronting a fake external service that accepts an irreversible action (§14).
-5. A surface that shows the delegation and takes the six acts of authorship (§12).
-6. JEFF acting by editing specs, with root in the world (§7).
+**The display direction.** The person and JEFF should eventually be able to reshape nearly the entire workspace: layouts, lenses, navigation, typography, and the conversation panel itself. The chat panel is not editable by the first lens. Over time it can participate in the same view system. A small dependable recovery surface retains stop, default-display restoration, and authoritative permission information. Editing a view does not itself confer access to conversation contents, authority to rewrite history, or permission to disclose data.
 
-Comments and the extension loop ([[Extensions]]) arrive with M2, and M2's shape is the friction M1 records: every wall the four verbs cannot express is written down, not worked around.
+**M2 onward is a feature horizon, not an implementation sequence.** These are capabilities we would like to explore. Their grouping conveys purpose; it does not prescribe order, dates, or an architecture to build before useful experiments.
 
-**Then the drill** ([[Security]] §10): two worlds, one room, one hostile object, one scoped worker, one restore and one fork — attacked with raw clients that bypass the SDK.
+| Direction | Capabilities we would like | Questions that guide experiments |
+|---|---|---|
+| Personal malleability | Authored capabilities beyond predefined templates, lenses, widgets, reusable tools, broader display composition, safe environment changes | Can a person ask for a useful change, revise it, and recover without developer rescue? |
+| Everyday computing | Documents, media, collections, comments, search, file and web integration | Do unlike everyday subjects remain predictable across independent tools? |
+| JEFF's continuity | Stable referents, resumption, inspectable and correctable memory, useful delegation | Which context mechanisms reduce effort and mistakes at acceptable cost? |
+| Execution and effects | Maintained resources, background work, cancellation, budgets, external operations | What is requested, what was observed, what completed, and what remains unknown? |
+| Shared places | Rooms, selective sharing, independent views, optional presence, shared tools | Do people want to return, and do privacy, leaving, and retention behave as promised? |
+| Devices and ownership | Offline use, selective synchronization, recovery, export, portable environments | What remains available without a device, host, registry, or model provider? |
+| Ecosystem and distribution | Compatibility, hosting, independent operators, federation, stewardship | Can others operate and extend the system sustainably without giving up ownership? |
 
-**Then the brutal test:** is JEFF noticeably better because of the object layer than the same model in a plain VM? Memory that never dangles; "this" that resolves; the demo that returns after reboot unasked. Pass → the shell accretes around the spine. Fail → stop, having lost months, not years.
+Real dependencies still matter. External execution needs enforceable authority; shared rooms need an explicit membership and retention policy; offline collaboration needs defined conflict and authorization behavior. These are obligations at the point of use, not a universal “spine” that every experiment must complete first. A small centrally served room can test company and place before it tests a distributed protocol.
 
-**Explicitly deferred:** printers, calendars, and the everyday long tail (arrive via adapters as needed); rooms beyond one machine; federation, identity anchoring, and the census; the `common`/`core` extension tiers; the compositor as shell; heat-field tuning beyond two sources; VR; every governance mechanism above the room. M1's own out-of-scope list — anything in it built early is a defect — is in `BUILD_PROMPT.md`.
+**Evaluation is ongoing.** Compare useful tasks against the same model with competent conventional tools, comparable information and authority. Count setup, human corrections, failures, latency, and cost. Also test deterministic use without JEFF. Scripted acceptance establishes integration behavior; it does not establish a real model's advantage. Let measurements reshape the feature horizon.
+
+**Evidence and status.** Distinguish implemented and tested contracts, selected directions awaiting implementation, open experiments, and aspirations. Passing tests supports the cases they exercise, not every promise in the design. Maintain focused regression tests for replay, refusal, boundaries, anchors, version conflicts, recovery, and lens activation. The review in [[holistic-assessment-2026-09-04]] records the earlier baseline; it is not the current implementation status.
 
 ---
 
 ## 23. Open decisions
 
-**Resolved since the last revision** (see the named documents): object schema shape, reference semantics, copy verbs, residency → [[Objects and Facets]]. Spec/status contract, drift, conflict → [[Reconcilers]]. Authority model, rollback-vs-grants, hosting truth → [[Security]] + addendum. Vocabulary change → [[Extensions]]. Web posture, MCP as the adapter layer → [[The Web]]. Storage direction: event log + SQLite-class store + real filesystem.
+**Resolved since the last revision** (see the named documents): object schema shape, reference semantics, copy verbs, residency → [[Objects and Facets]]. Spec/status contract, drift, conflict → [[Reconcilers]]. Authority choices, rollback-vs-grants, and hosting constraints → [[Security]] + addendum; the future world-root/client choice remains open. Vocabulary change → [[Extensions]]. Web posture, MCP as the adapter layer → [[The Web]]. Storage direction: event log + SQLite-class store + real filesystem.
 
 **Committed for milestone one** (§22; reasons in `DECISIONS.md`): JEFF's provider is the Anthropic API; the log is JSONL; the store is SQLite; `core.text` is Loro; the anchor locator is a position-id range plus creation revision plus quoted text; projection tiers are `[12, 60, 250, 2000]`. These are milestone commitments, each one file away from changing, not frozen decisions.
 
@@ -495,7 +496,7 @@ Comments and the extension loop ([[Extensions]]) arrive with M2, and M2's shape 
 - search/index implementations; embedding model;
 - self-modification approval policy details; compositor implementation; local vs cloud inference split;
 - retention, erasure residuals, and their constitutional reconciliation;
-- the exact UI and interaction style of the world — deliberately last, because the scene is a camera on the attention field, and you cannot design a camera before you know what it points at.
+- the evolving UI and interaction style: useful direct interaction and accessible controls are part of the experiment from the start, alongside broader display composition.
 
 ---
 

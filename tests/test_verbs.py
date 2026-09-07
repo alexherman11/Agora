@@ -115,12 +115,18 @@ def test_place_on_another_scene(world: store.Store) -> None:
         verbs.place(world, "alex", note, scene=note)
 
 
-def test_registry_describes_exactly_four_verbs(world: store.Store) -> None:
-    assert [v.name for v in verbs.REGISTRY] == ["mint", "attach", "read", "place"]
-    assert set(verbs.VERBS) == {"mint", "attach", "read", "place"}
+def test_registry_describes_the_public_operations(world: store.Store) -> None:
+    assert {v.name for v in verbs.REGISTRY} == set(verbs.VERBS)
+    assert {"mint", "attach", "read", "place", "preview_lens", "activate_lens"} <= set(verbs.VERBS)
     assert {f["type"] for f in verbs.facet_types()} == {
         "core.name",
         "core.text",
         "core.file-backing",
         "core.scene",
+        "core.lens",
+        "core.display",
+        "core.component",
+        "core.component-state",
+        "core.component-test",
+        "core.component-admission",
     }

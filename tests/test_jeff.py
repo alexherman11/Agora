@@ -39,9 +39,10 @@ def test_jeff_sees_the_desk_and_the_vocabulary(world: store.Store) -> None:
     client = FakeClient([[text("I see it.")]])
     Agent(world, client=client).turn("What is on the desk?")
     system = client.requests[0]["system"]
-    assert "grocery list (by alex)" in system
+    assert "grocery list" not in system
+    assert "grocery list (by alex)" in client.requests[0]["messages"][0]["content"]
     assert "core.file-backing" in system and "- place:" in system
-    assert [t["name"] for t in client.requests[0]["tools"]] == ["mint", "attach", "read", "place"]
+    assert [t["name"] for t in client.requests[0]["tools"]] == [v.name for v in verbs.REGISTRY]
 
 
 def test_a_refusal_comes_back_as_an_error_result(world: store.Store) -> None:
@@ -71,5 +72,5 @@ def test_history_is_the_only_memory(world: store.Store) -> None:
     jeff.turn("one")
     jeff.turn("two")
     roles = [m["role"] for m in client.requests[1]["messages"]]
-    assert roles == ["user", "assistant", "user"]
+    assert roles == ["user", "user", "assistant", "user"]
     assert Agent(world, client=FakeClient([])).history == []

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Agora · Your desk</title>
+  <style>
+    :root { color-scheme: light; --paper:#f7f7f2; --panel:#fff; --ink:#23342e; --muted:#707b73; --line:#dfe5dc; --green:#315b46; --green-soft:#e7eee5; --card:#fbf3d7; --card-line:#eadfba; --danger:#a44535; --shadow:0 12px 40px #273e2b0a; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); } button,input,textarea { font:inherit; } button { cursor:pointer; } button:disabled { cursor:default; opacity:.55; } button,input,textarea { color:inherit; } button:focus-visible,a:focus-visible { outline:3px solid #81a889; outline-offset:3px; } textarea:focus-visible,input:focus-visible { outline:2px solid #81a889; outline-offset:1px; } button { border:0; } [hidden] { display:none!important; }
+    .app { display:grid; grid-template-columns:184px minmax(280px,1fr) minmax(310px,370px); grid-template-rows:68px minmax(0,1fr); height:100dvh; overflow:hidden; }
+    .brand { display:flex; align-items:center; gap:10px; padding:0 25px; border-bottom:1px solid var(--line); letter-spacing:-.7px; font-size:24px; font-weight:650; }
+    .brand-mark { width:25px;height:26px;display:inline-flex;align-items:center;justify-content:center;color:var(--green);font:32px/1 Georgia,serif; transform:translateY(-2px); }
+    .topbar { grid-column:2/4; display:flex; gap:16px; justify-content:space-between; align-items:center; padding:0 28px; border-bottom:1px solid var(--line); min-width:0; }
+    .breadcrumb { color:var(--muted); font-size:12px; display:flex; gap:9px; align-items:center; } .breadcrumb strong { color:var(--ink);font-weight:550; } .crumb-divider { color:#acb6ac; } .session-state { display:flex; align-items:center;gap:8px;font-size:12px;color:var(--muted); } .dot { width:7px;height:7px;display:inline-block;flex-shrink:0;border-radius:50%;background:#7d9c78; } .dot.pending { background:#bc9949; } .dot.error { background:var(--danger); }
+    .nav { padding:27px 14px 18px; border-right:1px solid var(--line); display:flex;flex-direction:column;gap:5px; } .nav-caption { font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted); padding:0 13px 12px; } .nav-button { display:flex;align-items:center;gap:11px;background:transparent;padding:11px 13px;border-radius:8px;text-align:left;color:var(--muted); } .nav-button svg { width:17px;height:17px;flex-shrink:0; } .nav-button:hover { background:var(--green-soft);color:var(--ink); } .nav-button.active { background:var(--green-soft);color:var(--green);font-weight:600; } .nav-foot { margin-top:auto;border-top:1px solid var(--line);padding:17px 12px 0; } .nav-foot p { margin:3px 0;font-size:11px;color:var(--muted); } .nav-foot strong { font-size:12px;font-weight:550; }
+    .workspace { min-width:0;display:flex;flex-direction:column;min-height:0; } .desk-heading { padding:37px 35px 21px;display:flex;gap:16px;justify-content:space-between;align-items:flex-start; } h1 { margin:0 0 5px;font-size:28px;letter-spacing:-1px;font-weight:550;line-height:1.3; } .subtitle { color:var(--muted);font-size:12px;margin:0; } .button { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;border-radius:7px;border:1px solid var(--line);background:var(--panel);font-size:12px;white-space:nowrap; } .button:hover { border-color:#a8b8a7; } .button.primary { background:var(--green);border-color:var(--green);color:#fff; } .button svg { width:14px;height:14px; } .desk-toolbar { display:flex;justify-content:space-between;align-items:center;padding:0 35px 13px;color:var(--muted);font-size:11px; } .desk-toolbar .label { text-transform:uppercase;letter-spacing:1.3px;font-size:10px; }
+    .desk-scroll { flex:1;overflow:auto;min-height:0;position:relative;padding:0 20px 24px; } .desk { position:relative;min-width:100%;min-height:100%; background-image:radial-gradient(#a9b9a53d .8px,transparent .8px);background-size:20px 20px; border-radius:12px; } .note { position:absolute;min-width:160px;min-height:140px;background:var(--card);border:1px solid var(--card-line);border-radius:9px;box-shadow:0 3px 5px #253b2710;display:flex;flex-direction:column;overflow:hidden; } .note:focus-within { border-color:#a8ab73;box-shadow:0 0 0 2px #a8ab7320; } .note-header { display:flex;align-items:center;gap:8px; padding:14px 16px 0; } .note-icon { color:#a3905d;font-size:13px; } .note-title { min-width:0;flex:1;width:100%;border:0;background:transparent;font-size:13px;font-weight:600;padding:0; } .note-title:focus-visible { outline-offset:4px; } .note-body { resize:none;flex:1;min-height:60px;width:100%;border:0;background:transparent;padding:11px 16px 8px;line-height:1.7;font-size:13px; } .note-body:focus-visible { outline:none; } .note-footer { display:flex;justify-content:space-between;gap:5px;padding:0 16px 10px;min-height:25px;color:#968b6c;font-size:10px; } .note-status.error { color:var(--danger); } .note-status button { color:var(--danger);font-size:10px;background:transparent;text-decoration:underline;padding:0 3px; } .empty-desk { position:absolute;top:22%;left:50%;transform:translateX(-50%);width:min(320px,90%);text-align:center;color:var(--muted); } .empty-desk svg { width:36px;height:36px;opacity:.65; } .empty-desk h2 { margin:12px 0 4px;color:var(--ink);font-size:17px;font-weight:500; } .empty-desk p { font-size:12px; }
+    .conversation { border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0;min-width:0; } .chat-heading { padding:23px 23px 18px;display:flex;align-items:center;gap:10px; } .avatar { width:32px;height:32px;border:1px solid var(--line);background:var(--green-soft);color:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;font:22px Georgia,serif; } .chat-heading h2 { font-size:13px;margin:0;font-weight:650;letter-spacing:.8px; } .chat-heading p { margin:0;font-size:10px;color:var(--muted); } .chat-heading .icon-button { margin-left:auto; } .icon-button { width:29px;height:29px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:transparent;color:var(--muted); } .icon-button:hover { background:var(--green-soft); } .icon-button svg { width:15px;height:15px; }
+    .messages { padding:8px 23px 16px;overflow:auto;flex:1;min-height:0;scrollbar-width:thin; } .chat-welcome { margin:36px 0 22px; } .eyebrow { margin:0 0 9px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted); } .chat-welcome h3 { font-size:23px;line-height:1.35;letter-spacing:-.7px;font-weight:450;margin:0 0 12px; } .chat-welcome p { font-size:12px;line-height:1.8;color:var(--muted); } .suggestion { display:block;text-align:left;width:100%;background:transparent;border:1px solid var(--line);border-radius:8px;padding:11px 12px;margin:8px 0;font-size:12px;line-height:1.5; } .suggestion:hover { background:var(--paper);border-color:#bccbb7; }
+    .message { margin:18px 0 23px; } .message-meta { display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:10px;color:var(--muted); } .message-meta strong { font-size:10px;color:var(--ink);font-weight:650;letter-spacing:.5px; } .message-content { white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.75; } .message.user { border:1px solid var(--line);border-radius:9px;background:var(--paper);padding:12px 13px; } .message.user .message-meta { margin-bottom:4px; } .activity { padding:0 23px 12px;font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center;min-height:0; } .activity .dot.pending { animation:breathe 2s ease-in-out infinite; } @keyframes breathe { 50% { opacity:.35; } } .activity.error { color:var(--danger); } .composer-wrap { padding:0 17px 15px; } .composer { border:1px solid var(--line);border-radius:11px;background:var(--panel);box-shadow:0 3px 10px #1c392408; } .composer:focus-within { border-color:#8aa78e;box-shadow:0 0 0 2px #8aa78e15; } .composer textarea { resize:none;display:block;width:100%;border:0;background:transparent;min-height:82px;max-height:180px;padding:13px 14px 6px;font-size:13px;line-height:1.6; } .composer textarea:focus-visible { outline:none; } .composer-bottom { display:flex;align-items:center;justify-content:space-between;padding:5px 9px 9px 13px;gap:9px; } .composer-hint { font-size:10px;color:var(--muted); } .send { width:29px;height:29px;background:var(--green);color:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center; } .send svg { width:15px;height:15px; } .composer-footer { display:flex;justify-content:space-between;gap:8px;padding:8px 3px 0;font-size:10px;color:var(--muted); } .mobile-tabs { display:none; }
+    .notice { margin:0 20px 12px;padding:10px 12px;border:1px solid #dec0aa;border-radius:8px;background:#fff4e8;color:#864b35;font-size:12px;overflow-wrap:anywhere; } .notice button { margin-left:8px; background:transparent;color:inherit;text-decoration:underline; } .account-connect { margin:0 17px 13px;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--paper);font-size:11px;color:var(--muted); } .account-connect p { margin:0 0 9px; } .account-connect a { display:block;color:var(--green);margin-top:9px;font-size:12px; } .account-connect code { user-select:all;color:var(--ink); }
+    dialog { padding:0;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);width:min(760px,calc(100vw - 32px));max-height:85dvh;box-shadow:0 25px 100px #1c2e2440; } dialog::backdrop { background:#1c2e2445;backdrop-filter:blur(3px); } .dialog-head { display:flex;align-items:center;justify-content:space-between;padding:21px 25px;border-bottom:1px solid var(--line); } .dialog-head h2 { margin:0;font-size:19px;font-weight:550;letter-spacing:-.4px; } .dialog-body { padding:20px 25px;max-height:calc(85dvh - 76px);overflow:auto; } .dialog-body p { color:var(--muted);font-size:12px;margin-top:0; } .section-title { font-size:11px;letter-spacing:1.2px;text-transform:uppercase;margin:22px 0 9px;color:var(--muted); } .package-row,.tool-row { padding:12px 0;border-bottom:1px solid var(--line); } .package-row { display:flex;align-items:center;justify-content:space-between;gap:12px; } .package-name { font-weight:550;font-size:13px; } .package-detail { color:var(--muted);font-size:11px;margin-top:3px;overflow-wrap:anywhere; } .tool-name { font:12px ui-monospace,Consolas,monospace; } .tool-description { color:var(--muted);font-size:12px;margin-top:4px; } .source { white-space:pre-wrap;overflow-wrap:anywhere;background:var(--paper);border:1px solid var(--line);padding:13px;border-radius:7px;max-height:42vh;overflow:auto;font:11px/1.6 ui-monospace,Consolas,monospace; } .source-picker { font:12px inherit;padding:8px;max-width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px;margin-bottom:8px; } .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+    @media (max-width:1100px) { .app { grid-template-columns:65px minmax(280px,1fr) minmax(290px,340px); } .brand { padding:0;justify-content:center; } .brand-name,.nav-caption,.nav-label,.nav-foot { display:none; } .nav { padding:23px 9px; } .nav-button { justify-content:center;padding:12px; } .topbar { padding:0 22px; } .desk-heading { padding:29px 25px 19px; } .desk-toolbar { padding:0 25px 13px; } .desk-scroll { padding:0 12px 20px; } }
+    @media (max-width:750px) { .app { grid-template-columns:54px minmax(0,1fr);grid-template-rows:58px minmax(0,1fr) 48px; } .topbar { grid-column:2;padding:0 15px; } .session-state { max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; } .breadcrumb { font-size:11px; } .nav { grid-row:2/4;padding:18px 5px; } .nav-button { padding:11px; } .workspace,.conversation { grid-column:2;grid-row:2; } .conversation { display:none;border:0; } .app.chat-visible .conversation { display:flex; } .app.chat-visible .workspace { display:none; } .mobile-tabs { display:flex;grid-column:2;grid-row:3;border-top:1px solid var(--line);background:var(--panel);padding:5px;gap:5px; } .mobile-tabs button { flex:1;background:transparent;border-radius:6px;font-size:12px;color:var(--muted); } .mobile-tabs button[aria-pressed="true"] { background:var(--green-soft);color:var(--green);font-weight:600; } .desk-heading { padding:24px 20px 18px; } h1 { font-size:25px; } .desk-toolbar { padding:0 20px 12px; } .desk { display:flex;flex-direction:column;gap:15px;padding:12px; } .note { position:relative!important;left:auto!important;top:auto!important;width:100%!important;min-height:180px;height:auto!important; } .note-body { min-height:110px; } .chat-heading { padding-top:18px; } .chat-welcome { margin-top:16px; } }
+    @media (prefers-color-scheme:dark) { :root { color-scheme:dark;--paper:#19231e;--panel:#202d25;--ink:#e3e9df;--muted:#99a99a;--line:#34473a;--green:#54765d;--green-soft:#304536;--card:#373927;--card-line:#525338;--danger:#e3a28b; } .brand-mark { color:#afc9a8; } .note-icon,.note-footer { color:#acac82; } .notice { background:#382d21;border-color:#67513a;color:#e3b98e; } .desk { background-image:radial-gradient(#849a7438 .8px,transparent .8px); } }
+    @media (prefers-reduced-motion:reduce) { * { animation:none!important;scroll-behavior:auto!important; } }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="brand" aria-label="Agora"><span class="brand-mark" aria-hidden="true">a</span><span class="brand-name">agora</span></div>
+    <header class="topbar"><div class="breadcrumb"><span>Personal space</span><span class="crumb-divider" aria-hidden="true">/</span><strong>Your desk</strong></div><div class="session-state" id="system-state"><span class="dot pending"></span><span>Connecting</span></div></header>
+    <nav class="nav" aria-label="Workspace">
+      <div class="nav-caption">Your space</div>
+      <button class="nav-button active" id="nav-desk" aria-label="Your desk" title="Your desk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg><span class="nav-label">Your desk</span></button>
+      <button class="nav-button" id="nav-packages" aria-label="Packages and tools" title="Packages and tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9"/></svg><span class="nav-label">Packages</span></button>
+      <div class="nav-foot"><strong>A place to make your own.</strong><p>Agora · Early development</p></div>
+    </nav>
+    <main class="workspace" aria-labelledby="desk-title">
+      <div class="desk-heading"><div><h1 id="desk-title">Your desk</h1><p class="subtitle">A little space for what’s on your mind.</p></div><button class="button" id="add-note"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 4v12M4 10h12"/></svg>New note</button></div>
+      <div class="desk-toolbar"><span class="label">Notes</span><span id="note-count">Loading…</span></div>
+      <div class="notice" id="notice" role="alert" hidden></div>
+      <div class="desk-scroll"><div class="desk" id="desk" aria-label="Notes on your desk"><div class="empty-desk" id="empty-desk" hidden><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M10 5h20a3 3 0 0 1 3 3v21l-7 7H10a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z"/><path d="M25 36v-8h8M14 14h12M14 20h9"/></svg><h2>Room for a new thought</h2><p>Add a note, or ask JEFF to help shape your space.</p><button class="button" id="empty-add">Create a note</button></div></div></div>
+    </main>
+    <aside class="conversation" aria-labelledby="chat-title">
+      <div class="chat-heading"><div class="avatar" aria-hidden="true">j</div><div><h2 id="chat-title">JEFF</h2><p id="jeff-subtitle">Here in your space</p></div><button class="icon-button" id="chat-tools" title="See available tools" aria-label="See available tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m9 4-7 8 7 8m6-16 7 8-7 8"/></svg></button></div>
+      <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"><div class="chat-welcome" id="chat-welcome"><div class="eyebrow">Make this space yours</div><h3>What would you like<br>to make possible?</h3><p>Ask JEFF to help with a task, build a tool, or change how your desk works.</p><button class="suggestion" data-suggestion="Can you make it so I can click and drag the notes around?">Make my notes draggable <span aria-hidden="true">↗</span></button><button class="suggestion" data-suggestion="What can you do in this environment right now, and what is not connected yet?">Show me what’s possible here <span aria-hidden="true">↗</span></button></div></div>
+      <div class="activity" id="chat-activity" role="status" hidden></div>
+      <div class="account-connect" id="account-connect" hidden><p>Connect your OpenAI account to talk with JEFF.</p><button class="button" id="connect-account">Connect OpenAI account</button><div id="account-link" role="status"></div></div>
+      <div class="composer-wrap"><form class="composer" id="chat-form"><label class="sr-only" for="chat-input">Message JEFF</label><textarea id="chat-input" placeholder="Ask JEFF anything…" rows="3"></textarea><div class="composer-bottom"><span class="composer-hint">Enter to send · Shift + Enter for a new line</span><button class="send" id="send-message" aria-label="Send message" title="Send message" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 16V4m-5 5 5-5 5 5"/></svg></button><button class="button" id="stop-message" type="button" hidden>Stop</button></div></form><div class="composer-footer"><span id="draft-state">Your space, always evolving</span><span id="chat-model"></span></div></div>
+    </aside>
+    <div class="mobile-tabs" aria-label="Visible panel"><button id="show-desk" aria-pressed="true">Desk</button><button id="show-chat" aria-pressed="false">JEFF</button></div>
+  </div>
+  <dialog id="packages-dialog" aria-labelledby="packages-title"><div class="dialog-head"><h2 id="packages-title">Packages & tools</h2><button class="button" id="close-packages">Close</button></div><div class="dialog-body"><p>The software that shapes your space. Installed tools remain available when their views are closed.</p><div id="packages-content" role="status">Loading…</div></div></dialog>
+  <dialog id="source-dialog" aria-labelledby="source-title"><div class="dialog-head"><h2 id="source-title">Package source</h2><button class="button" id="close-source">Close</button></div><div class="dialog-body"><p id="source-description"></p><label class="sr-only" for="source-picker">Source file</label><select class="source-picker" id="source-picker"></select><pre class="source" id="source-code" tabindex="0"></pre></div></dialog>
+  <script>
+  'use strict';
+  // This entire desk and chat are installed package content. JEFF can read, edit,
+  // build, and install this file through package operations. No host token enters
+  // this frame. Author inspectors here using data-object-id / data-facet and
+  // getBoundingClientRect(); report the view's coordinate system and freshness.
+  // Author durable behavior through world.transact, not by silently mutating DOM.
+  const $ = (id) => document.getElementById(id);
+  const pending = new Map();
+  const incarnation = crypto.randomUUID();
+  let sequence = 0;
+  function call(method, args = {}) {
+    return new Promise((resolve, reject) => {
+      const id = `shell-${incarnation}-${++sequence}`;
+      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} did not respond. The connection may have stopped.`)); }, 30000);
+      pending.set(id, {resolve, reject, timer});
+      parent.postMessage({agora:true, id, method, args}, '*');
+    });
+  }
+  let refreshTimer;
+  window.addEventListener('message', (event) => {
+    if (event.source !== parent || !event.data || event.data.agora !== true) return;
+    const data = event.data;
+    if (data.event === 'changed') { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 120); return; }
+    if (data.event === 'prepare-reload') { prepareReload(data.id); return; }
+    if (data.event === 'cancel-reload') { cancelReload(data.id); return; }
+    const task = pending.get(data.id);
+    if (!task) return;
+    clearTimeout(task.timer); pending.delete(data.id);
+    if (data.error) task.reject(new Error(typeof data.error === 'string' ? data.error : data.error.message || JSON.stringify(data.error)));
+    else task.resolve(data.result);
+  });
+  const state = { notes:new Map(), chatRunning:false, sending:false, connected:false, refreshBusy:false, chatRefreshPromise:null, draftRevision:0, draftDirty:false, draftLoaded:false, draftPromise:null, pendingReload:null, lastChat:'' };
+  function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
+  function errorText(error) { return error && error.message ? error.message : String(error); }
+  function notice(message) { const target = $('notice'); target.replaceChildren(document.createTextNode(message)); const dismiss = element('button', '', 'Dismiss'); dismiss.onclick = () => { target.hidden = true; }; target.append(dismiss); target.hidden = false; }
+  function setSystem(text, kind='') { $('system-state').replaceChildren(element('span', `dot ${kind}`), element('span', '', text)); }
+  function resultItems(result) { return Array.isArray(result) ? result : result?.items || result?.packages || result?.tools || []; }
+  function facetText(object, type, fallback='') { const f = object.facets?.[type]; return typeof f === 'string' ? f : f?.text ?? fallback; }
+  function createNote(object) {
+    const node = element('article', 'note'); node.dataset.objectId = object.id; node.setAttribute('aria-label', 'Note');
+    const header = element('div', 'note-header'); header.append(element('span', 'note-icon', '▤'));
+    const title = element('input', 'note-title'); title.setAttribute('aria-label', 'Note title'); title.dataset.facet = 'core.title'; title.maxLength = 500; header.append(title);
+    const body = element('textarea', 'note-body'); body.setAttribute('aria-label', 'Note text'); body.dataset.facet = 'core.text'; body.spellcheck = true; body.maxLength = 100000;
+    const footer = element('div', 'note-footer'); const label = element('span', '', 'NOTE'); const status = element('span', 'note-status', 'Saved'); status.setAttribute('aria-live', 'polite'); footer.append(label, status); node.append(header, body, footer);
+    const entry = {object,node,title,body,status,dirty:false,saving:false,savePromise:null,conflict:false,timer:null,editSequence:0};
+    function edited() { entry.dirty = true; entry.editSequence++; entry.status.textContent = 'Unsaved'; clearTimeout(entry.timer); entry.timer = setTimeout(() => saveNote(entry), 600); }
+    title.addEventListener('input', edited); body.addEventListener('input', edited);
+    for (const input of [title,body]) input.addEventListener('blur', () => { if (entry.dirty) saveNote(entry); });
+    $('desk').append(node); state.notes.set(object.id,entry); updateNote(entry,object); return entry;
+  }
+  function updateNote(entry, object) {
+    // A query begun before a successful save can finish afterwards. Never let
+    // that older projection replace either content or geometry we already read.
+    if (object.revision < entry.object.revision) return;
+    if (!entry.dirty && !entry.saving) { entry.object = object; entry.title.value = facetText(object,'core.title','Untitled'); entry.body.value = facetText(object,'core.text'); }
+    const appearance = object.facets?.['core.appearance'] || {};
+    const finite = (value, fallback) => typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    entry.node.style.left = `${finite(appearance.x,20)}px`; entry.node.style.top = `${finite(appearance.y,20)}px`;
+    entry.node.style.width = `${Math.max(160,finite(appearance.width,245))}px`; entry.node.style.height = `${Math.max(140,finite(appearance.height,205))}px`;
+    entry.node.setAttribute('aria-label', `Note: ${facetText(object,'core.title','Untitled')}`);
+  }
+  function saveNote(entry) {
+    clearTimeout(entry.timer); if (entry.savePromise) return entry.savePromise;
+    if (!entry.dirty || entry.conflict) return Promise.resolve();
+    entry.savePromise = persistNote(entry).finally(()=>{ entry.savePromise = null; });
+    return entry.savePromise;
+  }
+  async function persistNote(entry) {
+    const editSequence = entry.editSequence;
+    entry.saving = true; entry.status.textContent = 'Saving…'; entry.status.classList.remove('error');
+    try {
+      const committed = await call('world.transact', {changes:[{id:entry.object.id, expected_revision:entry.object.revision, facets:{'core.title':{text:entry.title.value},'core.text':{text:entry.body.value}}}]});
+      entry.object = committed.items.find((object)=>object.id===entry.object.id);
+      entry.dirty = entry.editSequence !== editSequence;
+      entry.status.textContent = entry.dirty ? 'Unsaved' : 'Saved';
+    } catch (error) {
+      entry.conflict = true; entry.status.classList.add('error'); entry.status.textContent = 'Not saved · ';
+      const retry = element('button','','Review'); retry.onclick = async () => {
+        try { const result = await call('world.get',{id:entry.object.id}); const current = result.item || result;
+          notice(`This note was not saved: ${errorText(error)}. Your text remains here. Copy it before reloading if another edit needs to be preserved.`);
+          const retrySave = element('button','','Save my text over latest'); retrySave.onclick = () => { entry.object = current; entry.conflict = false; saveNote(entry); $('notice').hidden = true; }; $('notice').append(retrySave);
+        } catch (readError) { notice(errorText(readError)); }
+      }; entry.status.append(retry);
+    } finally { entry.saving = false; if (entry.dirty && !entry.conflict) entry.timer = setTimeout(() => saveNote(entry),300); }
+  }
+  function renderNotes(objects, complete) {
+    const ids = new Set();
+    for (const object of objects) {
+      if (!object.facets?.['core.appearance'] || object.facets['core.appearance'].scene !== 'desk' || !object.facets?.['core.text']) continue;
+      ids.add(object.id); const entry = state.notes.get(object.id); if (entry) updateNote(entry,object); else createNote(object);
+    }
+    if (complete !== false) for (const [id,entry] of state.notes) if (!ids.has(id) && !entry.dirty && !entry.saving) { entry.node.remove(); state.notes.delete(id); }
+    $('empty-desk').hidden = state.notes.size !== 0; $('note-count').textContent = `${state.notes.size} ${state.notes.size === 1 ? 'note' : 'notes'}${complete === false ? ' · partial view' : ''}`;
+    let bottom = 300; let right = 0; for (const {node} of state.notes.values()) { bottom = Math.max(bottom,parseFloat(node.style.top)+parseFloat(node.style.height)+35); right = Math.max(right,parseFloat(node.style.left)+parseFloat(node.style.width)+20); }
+    $('desk').style.minHeight = `${bottom}px`; $('desk').style.width = matchMedia('(max-width:750px)').matches ? '100%' : `${Math.max($('desk').parentElement.clientWidth-40,right)}px`;
+  }
+  async function addNote() {
+    $('add-note').disabled = true;
+    try { const count = state.notes.size; const width = 245; const room = Math.max(280,$('desk').parentElement.clientWidth-48); const columns = Math.max(1,Math.floor(room/(width+20))); const id = `note-${crypto.randomUUID()}`;
+      const committed = await call('world.transact',{changes:[{id,expected_revision:0,facets:{'core.title':{text:'Untitled'},'core.text':{text:''},'core.appearance':{scene:'desk',x:16+(count%columns)*(width+20),y:16+Math.floor(count/columns)*225,width,height:205}}}]});
+      const object = committed.items.find((item)=>item.id===id); const entry = state.notes.get(id) || createNote(object); updateNote(entry,object);
+      renderNotes([...state.notes.values()].map((note)=>note.object),true); entry.title.focus(); entry.title.select(); entry.node.scrollIntoView({block:'nearest'});
+    } catch (error) { notice(errorText(error)); } finally { $('add-note').disabled = false; }
+  }
+  let draftTimer;
+  async function loadDraft() {
+    try { const result = await call('world.get',{id:'shell.chat-draft'}); const object = result.item || result; state.draftRevision = object.revision || 0; if (!state.draftDirty) $('chat-input').value = facetText(object,'core.text'); }
+    catch (error) { if (!/not.?found|does not exist|unknown object/i.test(errorText(error))) $('draft-state').textContent = 'Draft storage unavailable'; }
+    state.draftLoaded = true; updateSend(); if (state.draftDirty) saveDraft().catch(()=>{});
+  }
+  function saveDraft() {
+    clearTimeout(draftTimer);
+    if (state.draftPromise) return state.draftPromise.then(() => state.draftDirty ? saveDraft() : undefined);
+    if (!state.draftDirty || !state.draftLoaded) return Promise.resolve();
+    const text = $('chat-input').value; state.draftDirty = false; $('draft-state').textContent = 'Saving draft…';
+    state.draftPromise = call('world.transact',{changes:[{id:'shell.chat-draft',expected_revision:state.draftRevision,facets:{'core.text':{text},'core.draft':{conversation:'main'}}}]})
+      .then((committed) => { state.draftRevision = committed.items.find((object)=>object.id==='shell.chat-draft').revision; $('draft-state').textContent = text ? 'Draft saved' : 'Your space, always evolving'; })
+      .catch((error) => { state.draftDirty = true; $('draft-state').textContent = 'Draft not saved'; throw error; })
+      .finally(() => { state.draftPromise = null; });
+    return state.draftPromise;
+  }
+  function updateSend() { $('send-message').disabled = !state.connected || state.sending || state.chatRunning || !$('chat-input').value.trim(); $('send-message').hidden = state.chatRunning; $('stop-message').hidden = !state.chatRunning; }
+  function cancelReload(id) {
+    const reload = state.pendingReload; if (!reload || reload.id !== id) return;
+    clearTimeout(reload.thawTimer); state.pendingReload = null; $('app').inert = false;
+    if (reload.focused && document.contains(reload.focused)) reload.focused.focus();
+  }
+  async function prepareReload(id) {
+    if (state.pendingReload || state.sending) { parent.postMessage({agora:true,event:'reload-ready',id,error:'The shell is already saving or submitting a message. Retry shortly.'},'*'); return; }
+    const reload = {id,focused:document.activeElement,thawTimer:null}; state.pendingReload = reload; $('app').inert = true;
+    let deadline;
+    const flush = async () => {
+      if (!state.draftLoaded) throw new Error('The existing draft has not finished loading. Retry shortly.');
+      await saveDraft();
+      // The first pass may await a save that began before the last keystroke.
+      // Input is now frozen; the next pass saves exactly that remaining edit.
+      for (let pass=0;pass<3;pass++) {
+        await Promise.all([...state.notes.values()].map(saveNote));
+        if (![...state.notes.values()].some((note)=>note.dirty && !note.conflict)) break;
+      }
+      if (state.draftDirty || [...state.notes.values()].some((note)=>note.dirty || note.saving || note.conflict)) throw new Error('Unsaved edits need review before replacing this view. Your current view has been kept.');
+    };
+    try {
+      await Promise.race([flush(),new Promise((_,reject)=>{ deadline=setTimeout(()=>reject(new Error('Saving is taking longer than expected. The current view has been kept.')),2500); })]);
+      if (state.pendingReload !== reload) return;
+      parent.postMessage({agora:true,event:'reload-ready',id,result:{ready:true}},'*');
+      // A protected host normally replaces us immediately. If it disconnects,
+      // the old view must not remain frozen indefinitely.
+      reload.thawTimer = setTimeout(()=>cancelReload(id),5000);
+    } catch (error) {
+      if (state.pendingReload !== reload) return;
+      cancelReload(id); notice(errorText(error)); parent.postMessage({agora:true,event:'reload-ready',id,error:errorText(error)},'*');
+    } finally { clearTimeout(deadline); }
+  }
+  function showActivity(text,error=false) { const target = $('chat-activity'); target.hidden = !text; target.classList.toggle('error',error); target.replaceChildren(); if (text) target.append(element('span',`dot ${error?'error':'pending'}`),element('span','',text)); }
+  function chatMessage(message,index) { const facet = message.facets?.['core.message'] || message; const role = facet.role || 'assistant'; const text = facet.text ?? facet.content ?? ''; return {id:message.id || facet.id || `message-${index}`,role,text:typeof text === 'string' ? text : JSON.stringify(text),created_at:facet.created_at}; }
+  function renderChat(status) {
+    state.chatRunning = !!status.running; updateSend();
+    const messages = (status.messages || []).map(chatMessage); const signature = JSON.stringify(messages);
+    if (signature !== state.lastChat) {
+      const scroller = $('messages'); const nearEnd = scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<100; const hadNone = !state.lastChat;
+      const wanted = new Set();
+      messages.forEach((message) => { wanted.add(message.id); let node = [...scroller.querySelectorAll('.message')].find((n)=>n.dataset.messageId===message.id);
+        if (!node) { node = element('article',`message ${message.role === 'user' ? 'user' : 'assistant'}`); node.dataset.messageId = message.id; const meta = element('div','message-meta'); meta.append(element('strong','',message.role === 'user' ? 'YOU' : message.role === 'assistant' ? 'JEFF' : message.role.toUpperCase())); node.append(meta,element('div','message-content')); scroller.append(node); }
+        const body = node.querySelector('.message-content'); if (body.textContent !== message.text) body.textContent = message.text;
+      });
+      for (const node of scroller.querySelectorAll('.message')) if (!wanted.has(node.dataset.messageId)) node.remove();
+      $('chat-welcome').hidden = messages.length>0; if (nearEnd || hadNone || state.sending) scroller.scrollTop = scroller.scrollHeight; state.lastChat = signature;
+    }
+    const events = status.events || []; const last = events[events.length-1]; const detail = typeof last === 'string' ? last : last?.message || last?.tool || last?.name;
+    if (status.error) showActivity(errorText(status.error),true); else showActivity(state.chatRunning ? (detail || 'JEFF is working…') : '');
+    $('jeff-subtitle').textContent = state.chatRunning ? 'Working in your space' : status.available === false ? 'Connection needed' : 'Here in your space';
+    if (status.model) $('chat-model').textContent = status.model;
+  }
+  async function sendMessage(event) {
+    event?.preventDefault(); const message = $('chat-input').value.trim(); if (!message || state.sending || state.chatRunning) return;
+    state.sending = true; updateSend(); showActivity('Sending…');
+    try { await saveDraft(); await call('chat.send',{message}); if ($('chat-input').value.trim() === message) { $('chat-input').value = ''; state.draftDirty = true; await saveDraft(); } state.chatRunning = true; await refreshChat(); }
+    catch (error) { showActivity(errorText(error),true); }
+    finally { state.sending = false; updateSend(); $('chat-input').focus(); }
+  }
+  function refreshChat() {
+    if (state.chatRefreshPromise) return state.chatRefreshPromise;
+    state.chatRefreshPromise = call('chat.status').then(renderChat).catch((error)=>showActivity(errorText(error),true)).finally(()=>{ state.chatRefreshPromise = null; });
+    return state.chatRefreshPromise;
+  }
+  async function refresh() {
+    if (state.refreshBusy) return; state.refreshBusy = true;
+    try { const result = await call('world.query',{facets:['core.appearance','core.text'],limit:500}); renderNotes(resultItems(result),result.complete); state.connected = true; updateSend(); setSystem('Connected'); }
+    catch (error) { state.connected = false; updateSend(); setSystem('Disconnected','error'); notice(errorText(error)); }
+    finally { state.refreshBusy = false; }
+    await refreshChat();
+  }
+  function packageSource(pkg) { return pkg.facets?.['agora.package'] || pkg; }
+  function packageId(pkg) { const source = packageSource(pkg); return source.id || source.package || source.name; }
+  async function openPackages() {
+    $('packages-dialog').showModal(); const content = $('packages-content'); content.textContent = 'Loading…';
+    try { const [packages,tools] = await Promise.all([call('package.list'),call('tools.list')]); content.replaceChildren(element('h3','section-title','Packages'));
+      const packageItems = resultItems(packages); if (!packageItems.length) content.append(element('p','','No packages are available.'));
+      for (const pkg of packageItems) { const source = packageSource(pkg); const row = element('div','package-row'); const info = element('div'); info.append(element('div','package-name',source.manifest?.name || source.name || packageId(pkg))); const installed = (packages.installations || []).find((item)=>item.facets?.['agora.installation']?.package===packageId(pkg)); info.append(element('div','package-detail',`${packageId(pkg)} · source ${pkg.revision}${installed ? ` · installed ${installed.revision}` : ' · not installed'}`)); const button = element('button','button','View source'); button.onclick = () => openSource(packageId(pkg)); row.append(info,button); content.append(row); }
+      content.append(element('h3','section-title','Available tools')); const toolItems = tools.operations ? [...tools.operations,...(tools.actions || [])] : resultItems(tools); if (!toolItems.length) content.append(element('p','','No tools are installed.'));
+      for (const tool of toolItems) { const row = element('div','tool-row'); row.append(element('div','tool-name',tool.name || tool.id || `${tool.package}.${tool.action}`),element('div','tool-description',tool.description || '')); content.append(row); }
+    } catch (error) { content.textContent = errorText(error); }
+  }
+  async function openSource(id) {
+    $('source-dialog').showModal(); $('source-title').textContent = 'Package source'; $('source-description').textContent = id; $('source-code').textContent = 'Loading…'; $('source-picker').replaceChildren();
+    try { const pkg = packageSource(await call('package.get',{id})); const files = pkg.files || pkg.source?.files || {}; const entries = [['manifest.json',JSON.stringify(pkg.manifest || {},null,2)],...Object.entries(files)]; for (const [name] of entries) $('source-picker').append(new Option(name,name));
+      const show = () => { const file = entries.find(([name])=>name===$('source-picker').value)?.[1]; $('source-code').textContent = typeof file === 'string' ? file : JSON.stringify(file,null,2); }; $('source-picker').onchange = show; show();
+    } catch (error) { $('source-code').textContent = errorText(error); }
+  }
+  function showPanel(chat) { $('app').classList.toggle('chat-visible',chat); $('show-chat').setAttribute('aria-pressed',String(chat)); $('show-desk').setAttribute('aria-pressed',String(!chat)); }
+  async function refreshSystem() {
+    try { const status = await call('system.status'); const jeff = status.jeff || status; if (jeff.model) $('chat-model').textContent = jeff.model; $('account-connect').hidden = jeff.signed_in !== false; }
+    catch (_) { /* World and chat report their own connection errors. */ }
+  }
+  $('connect-account').onclick = async () => {
+    $('connect-account').disabled = true; $('account-link').textContent = 'Preparing sign-in…';
+    try { const result = await call('chat.login'); const target = $('account-link'); target.replaceChildren();
+      if (result.signed_in) { $('account-connect').hidden = true; await refreshSystem(); return; }
+      if (result.user_code) { target.append(element('p','','Enter this code when asked: '),element('code','',result.user_code)); }
+      const url = new URL(result.url || result.auth_url || result.verification_url);
+      if (url.protocol !== 'https:') throw new Error('The sign-in service did not return a secure link.');
+      const link = element('a','','Continue to OpenAI sign-in ↗'); link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; target.append(link);
+    } catch (error) { $('account-link').textContent = errorText(error); } finally { $('connect-account').disabled = false; }
+  };
+  $('add-note').onclick = addNote; $('empty-add').onclick = addNote; $('nav-desk').onclick = () => showPanel(false); $('show-desk').onclick = () => showPanel(false); $('show-chat').onclick = () => showPanel(true);
+  $('nav-packages').onclick = openPackages; $('chat-tools').onclick = openPackages; $('close-packages').onclick = () => $('packages-dialog').close(); $('close-source').onclick = () => $('source-dialog').close();
+  $('chat-form').onsubmit = sendMessage; $('chat-input').addEventListener('keydown',(event)=>{ if (event.key==='Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendMessage(); } });
+  $('chat-input').addEventListener('input',()=>{ state.draftDirty = true; updateSend(); clearTimeout(draftTimer); draftTimer = setTimeout(()=>saveDraft().catch(()=>{}),500); }); $('chat-input').addEventListener('blur',()=>saveDraft().catch(()=>{}));
+  $('stop-message').onclick = async () => { $('stop-message').disabled = true; try { await call('chat.stop'); await refreshChat(); } catch (error) { showActivity(errorText(error),true); } finally { $('stop-message').disabled = false; } };
+  for (const suggestion of document.querySelectorAll('[data-suggestion]')) suggestion.onclick = () => { $('chat-input').value = suggestion.dataset.suggestion; $('chat-input').dispatchEvent(new Event('input')); $('chat-input').focus(); };
+  document.addEventListener('keydown',(event)=>{ if ((event.metaKey || event.ctrlKey) && event.key==='Enter') { showPanel(true); $('chat-input').focus(); } });
+  window.addEventListener('resize',()=>{ if (state.notes.size) renderNotes([...state.notes.values()].map((entry)=>entry.object),true); });
+  refreshSystem(); loadDraft(); refresh(); setInterval(refreshChat,2000); setInterval(()=>{ refresh(); refreshSystem(); },12000);
+  </script>
+</body>
+</html>
