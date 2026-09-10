@@ -9,9 +9,13 @@ import os
 import re
 import shlex
 import subprocess
+import tempfile
 import threading
+import time
 from pathlib import Path, PurePosixPath
 from uuid import UUID
+
+from agora3.locking import ProcessLock
 
 MAX_OUTPUT = 4 * 1024 * 1024
 OWNER_KEY = "Agora3/managed"
@@ -160,10 +164,23 @@ class Guest:
     @staticmethod
     def _vbox(*arguments: str) -> str:
         executable = str(VBOX) if os.name == "nt" else "VBoxManage"
-        result = _process([executable, *arguments], 20)
-        if result["exit_code"]:
-            raise GuestError(result["stderr"] or "VirtualBox did not respond successfully")
-        return result["stdout"].replace("\r\n", "\n")
+        lock_path = Path(
+            os.environ.get(
+                "AGORA_VBOX_LOCKFILE", str(Path(tempfile.gettempdir()) / "agora3-vbox-command.lock")
+            )
+        )
+        with ProcessLock(lock_path, timeout=90):
+            for attempt in range(3):
+                result = _process([executable, *arguments], 20)
+                if not result["exit_code"]:
+                    return result["stdout"].replace("\r\n", "\n")
+                error = result["stderr"] or "VirtualBox did not respond successfully"
+                transient_read = arguments[0] in {"getextradata", "showvminfo"} and any(
+                    text in error.lower() for text in ["lock request pending", "already locked"]
+                )
+                if not transient_read or attempt == 2:
+                    raise GuestError(error)
+                time.sleep(0.25 * (attempt + 1))
 
     def _owned(self, config: dict) -> str:
         owner = self._vbox("getextradata", config["vm_id"], OWNER_KEY).strip()
@@ -261,7 +278,11 @@ class Guest:
     def execute(self, command: str, timeout: int = 30) -> dict:
         if not isinstance(command, str) or not command.strip() or len(command) > 65536:
             raise GuestError("Supply a nonempty guest command of at most 65536 characters.")
-        return self._ssh(command, timeout)
+        # Transport the authored command as input, not Windows process arguments.
+        runner = (
+            "import os,sys; command=sys.stdin.read(); os.execv('/bin/bash', ['bash','-lc',command])"
+        )
+        return self._ssh("python3 -c " + shlex.quote(runner), timeout, command)
 
     def run(
         self,

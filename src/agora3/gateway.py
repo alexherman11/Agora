@@ -9,10 +9,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from agora3.check_tools import SPEC as CHECK_SPEC
+from agora3.check_tools import check_package
 from agora3.guest import Guest
 from agora3.locking import ProcessLock
+from agora3.package_catalog import SPEC as CATALOG_SPEC
+from agora3.package_catalog import catalog
 from agora3.packages import Packages
 from agora3.schemas import BUILTINS, check_schema, record, validate, validate_facets
+from agora3.scoped_context import assert_reads
+from agora3.source_tools import dispatch_source, source_specs
 from agora3.world import Refusal, World, encoded, identifier
 from agora3.yard import Yard
 
@@ -106,10 +112,14 @@ class Gateway:
             self._save_keep(keep)
         return {"enabled": True, "generation": keep["generation"]}
 
-    def commit(self, actor, changes, *, internal=False, guards=None, watermark=None):
+    def commit(
+        self, actor, changes, *, internal=False, guards=None, watermark=None, read_guards=None
+    ):
         with self.lock:
             self.check_authority(actor)
             validator = (lambda *args: None) if internal else validate_facets
+            if read_guards is not None:
+                assert_reads(self.world, read_guards)
             return self.world.commit(
                 actor.name, changes, validator, guards=guards, watermark=watermark
             )
@@ -177,6 +187,12 @@ class Gateway:
             return self.packages.skills()
         if name == "package.list":
             return self.packages.list()
+        if name == "package.catalog":
+            return catalog(self)
+        if name in {"package.read", "package.search", "package.patch"}:
+            return dispatch_source(self, actor, name, args)
+        if name == "package.check":
+            return check_package(self, actor, **args)
         if name == "package.get":
             return self.packages.get(args["id"])
         if name in {"package.save", "package.build", "package.install"}:
@@ -259,7 +275,13 @@ class Gateway:
                 {},
                 None,
             ),
-            ("package.list", "List native source packages and installation revisions.", {}, None),
+            (
+                "package.list",
+                "Full-source package listing. Prefer package.catalog for compact "
+                "discovery and package.read/search for focused inspection.",
+                {},
+                None,
+            ),
             (
                 "package.get",
                 "Read editable source files and manifest of a native package. Shell "
@@ -271,7 +293,11 @@ class Gateway:
                 "package.save",
                 "Create/revise native package source. Manifest runtime python-1 or "
                 "browser-1; actions map name to entry file.py:function, "
-                "input_schema, description. UI uses self-contained HTML. Skills map "
+                "input_schema, description. UI accepts self-contained HTML or optional ordered "
+                "ui.scripts [.js paths] and ui.styles [.css paths]; index HTML must contain "
+                "exactly one <!-- agora:scripts --> / <!-- agora:styles --> marker for each "
+                "nonempty list. Package-local classic scripts/styles are assembled at build, "
+                "with exact bytes retained; no imports, bundler or transpiler. Skills map "
                 "name to source path.",
                 package
                 | {"files": {"type": "object", "additionalProperties": string}, "manifest": obj},
@@ -312,7 +338,16 @@ class Gateway:
                 "Run a pinned installed Python action in Linux. "
                 "Function(arguments,context) sees context.objects and returns "
                 "{result,changes?}; proposed writes commit atomically against the "
-                "input snapshot. Use guest.execute for broader OS work.",
+                "input snapshot. Optional action manifest reads selects coherent inputs: "
+                "queries is an array of facet-name arrays (AND in each, union across queries), "
+                "ids selects explicit native IDs including absence, arg_ids names argument fields "
+                "containing one ID or a list. Empty reads means no native inputs. At most 1000 "
+                "matching objects; overflow refuses, never truncates. Declared inputs validate "
+                "object revisions and full query membership under the native writer lock; "
+                "unrelated "
+                "writes do not invalidate them. This is dependency tracking, not a sandbox for "
+                "guest I/O or separate native calls. Without reads the whole-world guard remains. "
+                "Use guest.execute for broader OS work.",
                 action | {"revision": number},
                 None,
             ),
@@ -334,16 +369,24 @@ class Gateway:
                 ["command"],
             ),
         ]
-        return [
-            {
-                "name": name,
-                "description": description,
-                "input_schema": record(properties, required)
-                if required != []
-                else {"type": "object", "properties": properties, "additionalProperties": False},
-            }
-            for name, description, properties, required in specs
-        ]
+        return (
+            [
+                {
+                    "name": name,
+                    "description": description,
+                    "input_schema": record(properties, required)
+                    if required != []
+                    else {
+                        "type": "object",
+                        "properties": properties,
+                        "additionalProperties": False,
+                    },
+                }
+                for name, description, properties, required in specs
+            ]
+            + source_specs()
+            + [CATALOG_SPEC, CHECK_SPEC]
+        )
 
     def seed(self):
         actor = self.principal("bootstrap")

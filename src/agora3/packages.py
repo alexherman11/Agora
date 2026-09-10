@@ -8,7 +8,9 @@ import tempfile
 import uuid
 from pathlib import PurePosixPath
 
+from agora3.browser_assembly import assemble, retained_html, validate_assets
 from agora3.schemas import check_schema, validate, validate_facets
+from agora3.scoped_context import assert_reads, check_reads, scoped_snapshot
 from agora3.world import Refusal, World, encoded, identifier
 
 
@@ -54,8 +56,13 @@ def check_source(files, manifest):
         identifier(name)
         if manifest["runtime"] != "python-1" or not isinstance(action, dict):
             raise Refusal("Headless actions use the python-1 runtime.")
-        if set(action) - {"entry", "description", "input_schema", "output_schema"}:
-            raise Refusal("An action accepts entry, description, input_schema, output_schema.")
+        if set(action) - {"entry", "description", "input_schema", "output_schema", "reads"}:
+            raise Refusal(
+                "An action accepts entry, description, input_schema, output_schema, "
+                "and optional reads."
+            )
+        if "reads" in action:
+            check_reads(action["reads"])
         entry = action.get("entry", "")
         if (
             ":" not in entry
@@ -70,10 +77,15 @@ def check_source(files, manifest):
             check_schema(action["output_schema"])
     if "ui" in manifest:
         ui = manifest["ui"]
-        if not isinstance(ui, dict) or set(ui) - {"entry", "mount"} or ui.get("entry") not in files:
+        if (
+            not isinstance(ui, dict)
+            or set(ui) - {"entry", "mount", "scripts", "styles"}
+            or ui.get("entry") not in files
+        ):
             raise Refusal("ui requires a source entry and optional shell mount.")
         if manifest["runtime"] != "browser-1" or not ui["entry"].endswith(".html"):
             raise Refusal("This browser runtime requires a self-contained HTML entry.")
+        validate_assets(files, ui)
     skills = manifest.get("skills", {})
     if not isinstance(skills, dict) or not all(
         isinstance(v, str) and v in files for v in skills.values()
@@ -123,6 +135,11 @@ class Packages:
             raise Refusal("Source revision changed; read it before building.")
         source = obj["facets"]["agora.package"]
         base_installation = self.installation(id)
+        browser_artifact = (
+            assemble(source)
+            if source["manifest"]["runtime"] == "browser-1" and "ui" in source["manifest"]
+            else None
+        )
         check_source(source["files"], source["manifest"])
         diagnostics = {
             "check": "HTML entry and manifest admitted; browser interaction not yet tested"
@@ -150,6 +167,12 @@ class Packages:
             if source["manifest"]["runtime"] == "browser-1"
             else self.yard.status(),
         }
+        if browser_artifact is not None:
+            receipt["browser_artifact"] = dict(browser_artifact, source_digest=receipt["digest"])
+            diagnostics.update(
+                assembled_html_sha256=browser_artifact["sha256"],
+                assembled_bytes=len(browser_artifact["html"].encode("utf-8")),
+            )
         self.commit(
             actor,
             [{"id": build_id, "expected_revision": 0, "facets": {"agora.build": receipt}}],
@@ -159,13 +182,28 @@ class Packages:
                 base_installation["id"]: base_installation["revision"],
             },
         )
-        return {"build": build_id, "digest": receipt["digest"], "diagnostics": diagnostics}
+        return {
+            "build": build_id,
+            "digest": receipt["digest"],
+            "diagnostics": diagnostics,
+            "package_id": id,
+            "source_revision": expected_revision,
+            "base_installation_revision": base_installation["revision"],
+            "install_args": {
+                "id": id,
+                "build": build_id,
+                "expected_revision": base_installation["revision"],
+            },
+            "installed": False,
+        }
 
     def receipt(self, build):
         obj = self.world.get(build)
         receipt = obj["facets"].get("agora.build")
         if receipt is None or source_digest(receipt["source"]) != receipt["digest"]:
             raise Refusal("Not an intact native build receipt.")
+        if "browser_artifact" in receipt:
+            retained_html(receipt)
         return receipt
 
     def install(self, actor, *, id, build, expected_revision, restore=False):
@@ -243,7 +281,12 @@ class Packages:
         if spec is None:
             raise Refusal("This action is not exported by the selected package version.")
         validate(spec.get("input_schema", {}), args)
-        snapshot = self.world.query(limit=1000)
+        scoped = "reads" in spec
+        snapshot = (
+            scoped_snapshot(self.world, spec["reads"], args)
+            if scoped
+            else self.world.query(limit=1000)
+        )
         if not snapshot["complete"]:
             raise Refusal("This runtime supports at most 1000 objects per action snapshot.")
         self.check_authority(actor)
@@ -256,6 +299,11 @@ class Packages:
                 "objects": snapshot["items"],
                 "watermark": snapshot["watermark"],
                 "candidate": bool(candidate),
+                **(
+                    {"missing_ids": snapshot["missing_ids"], "declared_reads": spec["reads"]}
+                    if scoped
+                    else {}
+                ),
             },
             timeout=30,
         )
@@ -274,8 +322,13 @@ class Packages:
                 with self.world.connection() as source_db, disposable.connection() as target_db:
                     source_db.backup(target_db)
                 if changes:
+                    if scoped:
+                        assert_reads(disposable, snapshot["read_guards"])
                     disposable.commit(
-                        actor.name, changes, validate_facets, watermark=snapshot["watermark"]
+                        actor.name,
+                        changes,
+                        validate_facets,
+                        watermark=None if scoped else snapshot["watermark"],
                     )
             return {
                 "result": result,
@@ -289,7 +342,8 @@ class Packages:
             committed = self.commit(
                 actor,
                 changes,
-                watermark=snapshot["watermark"],
+                watermark=None if scoped else snapshot["watermark"],
+                read_guards=snapshot["read_guards"] if scoped else None,
                 guards={installation["id"]: revision},
             )
         return {
@@ -303,5 +357,8 @@ class Packages:
         installation = self.installation("agora.shell")
         if installation["revision"] == 0:
             raise Refusal("The shell has not been installed; use host recovery to restore it.")
-        source = self.receipt(installation["facets"]["agora.installation"]["build"])["source"]
-        return source["files"][source["manifest"]["ui"]["entry"]], installation["revision"]
+        receipt = self.receipt(installation["facets"]["agora.installation"]["build"])
+        return retained_html(receipt), installation["revision"]
+
+    def browser_html(self, build):
+        return retained_html(self.receipt(build))

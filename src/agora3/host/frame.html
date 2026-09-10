@@ -22,7 +22,7 @@ if(!pending)document.querySelector('#status').textContent=v.enabled?'Local devel
 if(v.revision!==revision&&!pending)await replace(v);
 if(v.watermark!==watermark){watermark=v.watermark;frame.contentWindow.postMessage({agora:true,event:'changed'},'*')}}
 catch(e){document.querySelector('#login').hidden=false;document.querySelector('#problem').textContent=e.message}finally{syncing=false}}
-const allowed=new Set(['world.query','world.get','world.transact','schema.define','schema.list','tools.list','skills.list','package.list','package.get','package.save','package.build','package.install','package.restore','candidate.exercise','action.invoke','guest.status','guest.execute','chat.send','chat.status','chat.stop','chat.login','system.status']);
+const allowed=new Set(['world.query','world.get','world.transact','schema.define','schema.list','tools.list','skills.list','package.list','package.get','package.check','package.save','package.build','package.install','package.restore','candidate.exercise','action.invoke','guest.status','guest.execute','chat.send','chat.status','chat.stop','chat.login','system.status']);
 window.addEventListener('message',async e=>{if(e.source!==frame.contentWindow||!e.data?.agora)return;
 if(e.data.event==='reload-ready'&&flush?.id===e.data.id){flush.resolve(e.data.result?.ready===true);flush=null;return}
 if(!e.data.id||!e.data.method)return;const {id,method,args}=e.data;try{if(!allowed.has(method))throw Error('Not an authored-surface operation');

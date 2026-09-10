@@ -3,7 +3,9 @@ Never run a candidate in the live credentialed guest or fall back to host execut
 """
 
 import json
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from uuid import UUID
 
@@ -16,6 +18,7 @@ class Yard:
         self.config_path = Path(config_path).resolve()
         self.main_guest = main_guest
         self.lock = ProcessLock(self.config_path.with_suffix(".lock"), timeout=300)
+        self.local = threading.local()
 
     def _configured(self):
         try:
@@ -43,7 +46,12 @@ class Yard:
             machine, snapshot = self._configured()
             result = machine.status()
             result.update(
-                {"snapshot_id": snapshot, "isolation": "separate VM reset per invocation"}
+                {
+                    "snapshot_id": snapshot,
+                    "isolation": (
+                        "separate VM reset per ordinary invocation or explicit check session"
+                    ),
+                }
             )
             return result
         except GuestError as exc:
@@ -67,11 +75,12 @@ class Yard:
             time.sleep(1)
         raise GuestError(f"Candidate yard did not become ready within {timeout}s: {error}")
 
-    def run(self, source_files, entry, arguments, context, timeout=30):
-        validate_sources(source_files, entry)
+    @contextmanager
+    def session(self):
+        if getattr(self.local, "machine", None) is not None:
+            raise GuestError("Nested candidate sessions are not supported.")
         with self.lock:
             machine, snapshot = self._configured()
-            # Also serialize aliases from different native worlds using this VM.
             with ProcessLock(machine.config_path.with_suffix(".yard.lock"), timeout=300):
                 config = machine._config()
                 machine.stop()
@@ -79,7 +88,16 @@ class Yard:
                 try:
                     machine.start()
                     self._ready(machine)
-                    return machine.run(source_files, entry, arguments, context, timeout)
+                    self.local.machine = machine
+                    yield machine
                 finally:
-                    # Candidate root cannot keep processes running beyond this boundary.
+                    self.local.machine = None
                     machine.stop()
+
+    def run(self, source_files, entry, arguments, context, timeout=30):
+        validate_sources(source_files, entry)
+        machine = getattr(self.local, "machine", None)
+        if machine is not None:
+            return machine.run(source_files, entry, arguments, context, timeout)
+        with self.session() as machine:
+            return machine.run(source_files, entry, arguments, context, timeout)
