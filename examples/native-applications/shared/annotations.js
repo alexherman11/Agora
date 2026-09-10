@@ -44,7 +44,12 @@
       for (const thread of threads) {
         const card = node('article', 'annotation'); const location = locate(thread.anchor, snapshot.text, hash);
         card.append(node('blockquote', '', thread.anchor.quote), node('p', '', thread.message), node('small', '', thread.status + ' · ' + location.state));
-        const jump = node('button', '', 'Show text'); jump.disabled = location.state !== 'attached'; jump.onclick = () => editor.selectRange(location.start, location.end);
+        const jump = node('button', '', 'Show text'); jump.disabled = location.state !== 'attached'; jump.onclick = async () => {
+          try { await editor.save(); const current = editor.snapshot(), hash = await digest(current.text), fresh = locate(thread.anchor, current.text, hash);
+            if (fresh.state !== 'attached') throw new Error('Anchor no longer resolves.');
+            await editor.revealSelection({subject: current.subject, revision: current.object.revision, text_hash: hash, ...fresh, quote: thread.anchor.quote});
+          } catch (error) { status.textContent = error.message; }
+        };
         const resolve = node('button', '', thread.status === 'resolved' ? 'Reopen' : 'Resolve');
         resolve.onclick = async () => {
           try { await editor.save(); const current = editor.snapshot().object; const all = current.facets['text.annotations'].threads;

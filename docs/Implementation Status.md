@@ -8,14 +8,28 @@
 `d8a7415` and adds independently installed Notes/Documents browser applications.
 They share native content and an editor/annotation contract while keeping separate
 frames, pinned builds, leases, drafts and appearances. Portable application
-export/import and removal preserve user objects. The current Desk and its JEFF
-work remain on their existing runtime/world.
+export/import and removal preserve user objects. Alex subsequently authorized
+moving the existing resident, named JEFF0, into this application world. The move
+preserves the original journal, conversation, documents, discussions, packages
+and guest workspace. The old native world remains an archive.
 
-Verification: 140 Python tests passed (one optional inventory test skipped), the
-real runtime inventory passed separately with local mock inference, and 16 real
-Edge browser acceptance checks passed. See [[Application Experiment]] for exact
+Verification: 145 Python tests passed (two optional inventory cases skipped),
+fresh and resumed compiled-runtime inventory cases passed separately with local
+mock inference, and 28 real Edge browser checks passed across the independent
+application lifecycle and migrated-world interactions. See [[Application Experiment]] for exact
 scope, retained evidence and limitations, and `examples/native-applications/`
-for runnable source. This is not a port of the full research Desk.
+for runnable source. Existing research/packet actions and source remain installed;
+their former composite UI has not been extracted into independent applications.
+
+JEFF0 has a protected resident identity and exact durable model-thread binding.
+Service restart resumes that thread; failed resume refuses rather than silently
+starting a replacement. Copying a world does not transfer ownership automatically.
+The previous ephemeral model context could not be recovered: the original native
+transcript and JEFF0-authored checkpoint provide the initial handoff. Native replay
+and model-conversation persistence remain different mechanisms.
+The live handoff and an idle service restart succeeded: the same thread remained
+bound, JEFF0 recalled the preceding exchange and confirmed that he was ready to
+talk. These checks added four native messages and did not modify authored work.
 
 The sections below retain the September 9 checkpoint evidence. On this branch,
 the combined runtime additionally includes scoped action dependencies, targeted

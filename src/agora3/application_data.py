@@ -4,6 +4,7 @@ Never expose generic management, guest execution or another view's state to a pa
 
 import copy
 
+from agora3.application_relations import related
 from agora3.world import Refusal, encoded
 
 
@@ -21,6 +22,8 @@ def request(gateway, actor, obj, method, args):
     subject, grant = view["subject"], view["grant"]
     if not isinstance(args, dict):
         raise Refusal("Application request arguments must be an object.")
+    if method.startswith("related."):
+        return related(gateway, actor, view, method, args)
     if method == "read":
         if set(args) - {"id"} or args.get("id", subject) != subject:
             raise Refusal("This view can read only its explicitly bound subject.")

@@ -19,6 +19,7 @@ class ScriptedClient:
         self.config, self.handler = config, approval_handler
         self.script = deque()
         self.starts, self.turns, self.responses = [], [], []
+        self.resumes = []
         self.signed_in, self.closed = True, False
         self.available = "gpt-6-astra"
 
@@ -52,6 +53,10 @@ class ScriptedClient:
     def thread_start(self, params):
         self.starts.append(params)
         return NS(thread=NS(id="thread"), model=params["model"])
+
+    def thread_resume(self, thread, params):
+        self.resumes.append((thread, params))
+        return NS(thread=NS(id=thread), model=params["model"])
 
     def turn_start(self, thread, prompt, params):
         self.turns.append((thread, prompt, params))
@@ -361,7 +366,8 @@ def test_history_starts_from_recent_retained_messages(tmp_path):
 
 
 @pytest.mark.skipif(not os.environ.get("AGORA_CODEX_BIN"), reason="Set a current AGORA_CODEX_BIN")
-def test_real_runtime_inventory_with_local_mock_model(tmp_path):
+@pytest.mark.parametrize("persist", [False, True])
+def test_real_runtime_inventory_with_local_mock_model(tmp_path, persist):
     """Real runtime, simulated inference. No model spending or live authorship claim."""
     from openai_codex.client import CodexClient
 
@@ -378,12 +384,12 @@ def test_real_runtime_inventory_with_local_mock_model(tmp_path):
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
             output = []
-            if len(requests) == 1:
+            if len(requests) in (1, 3):
                 output = [
                     {
                         "type": "custom_tool_call",
-                        "id": "ct1",
-                        "call_id": "call1",
+                        "id": f"ct{len(requests)}",
+                        "call_id": f"call{len(requests)}",
                         "name": "exec",
                         "namespace": "functions",
                         "input": "text({names:ALL_TOOLS.map(t=>t.name),"
@@ -442,7 +448,7 @@ def test_real_runtime_inventory_with_local_mock_model(tmp_path):
                         "cwd": str(tmp_path),
                         "environments": [],
                         "selectedCapabilityRoots": [],
-                        "ephemeral": True,
+                        "ephemeral": not persist,
                         "approvalPolicy": "never",
                         "sandbox": "read-only",
                         "baseInstructions": "Runtime boundary test.",
@@ -450,7 +456,10 @@ def test_real_runtime_inventory_with_local_mock_model(tmp_path):
                         "dynamicTools": TOOLS,
                     }
                 )
-                turn = client.turn_start(thread.thread.id, "Inspect the boundary.").turn.id
+                turn = client.turn_start(
+                    thread.thread.id,
+                    "Inspect the boundary. Preserve this marker: resident-first-turn.",
+                ).turn.id
                 while True:
                     event = client.next_turn_notification(turn)
                     if event.method == "turn/completed":
@@ -458,11 +467,50 @@ def test_real_runtime_inventory_with_local_mock_model(tmp_path):
                         break
             finally:
                 timer.cancel()
+        if persist:
+            with CodexClient(
+                runtime_config(str(tmp_path)), approval_handler=lambda *_: {"decision": "decline"}
+            ) as resumed_client:
+                resumed_client.initialize()
+                resumed = resumed_client.thread_resume(
+                    thread.thread.id,
+                    {
+                        "model": "gpt-6-astra",
+                        "modelProvider": "probe",
+                        "config": config,
+                        "cwd": str(tmp_path),
+                        "environments": [],
+                        "selectedCapabilityRoots": [],
+                        "approvalPolicy": "never",
+                        "sandbox": "read-only",
+                        "baseInstructions": "Runtime boundary test.",
+                        "developerInstructions": "",
+                    },
+                )
+                assert resumed.thread.id == thread.thread.id
+                assert resumed.thread.ephemeral is False
+                assert resumed.thread.turns
+                timer = threading.Timer(45, resumed_client.close)
+                timer.daemon = True
+                timer.start()
+                try:
+                    turn = resumed_client.turn_start(
+                        thread.thread.id,
+                        "Continue the same conversation and inspect the boundary.",
+                        {"environments": []},
+                    ).turn.id
+                    while True:
+                        event = resumed_client.next_turn_notification(turn)
+                        if event.method == "turn/completed":
+                            assert event.payload.turn.status == TurnStatus.completed
+                            break
+                finally:
+                    timer.cancel()
     finally:
         server.shutdown()
         server.server_close()
         worker.join()
-    assert len(requests) == 2
+    assert len(requests) == (4 if persist else 2)
     outputs = [i for i in requests[1]["input"] if i.get("type") == "custom_tool_call_output"]
     assert len(outputs) == 1
     text = outputs[0]["output"]
@@ -472,3 +520,14 @@ def test_real_runtime_inventory_with_local_mock_model(tmp_path):
     assert set(result["names"]) == {"agora_discover", "agora_invoke", "clock__curr_time"}
     assert result["globals"] == ["undefined"] * 3
     assert result["shell"] == result["patch"] == "undefined"
+    if persist:
+        assert "resident-first-turn" in json.dumps(requests[2]["input"])
+        outputs = [i for i in requests[3]["input"] if i.get("type") == "custom_tool_call_output"]
+        assert len(outputs) == 2
+        text = outputs[-1]["output"]
+        if isinstance(text, list):
+            text = "\n".join(item.get("text", "") for item in text)
+        result, _ = json.JSONDecoder().raw_decode(text[text.index('{"names"') :])
+        assert set(result["names"]) == {"agora_discover", "agora_invoke", "clock__curr_time"}
+        assert result["globals"] == ["undefined"] * 3
+        assert result["shell"] == result["patch"] == "undefined"

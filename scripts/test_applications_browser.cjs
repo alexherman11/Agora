@@ -30,6 +30,7 @@ let browser;
   await page.goto(base + '/#' + token);
   let desk;
   await eventually(async () => { desk = page.frames().find(f => f.parentFrame() === page.mainFrame()); return desk && await desk.locator('.application-window').count() === 3; }, 'Three application appearances mount');
+  await desk.getByRole('button', {name: 'Close conversation', exact: true}).click();
   const initial = await rpc('application.list');
   const sharedNote = initial.views.find(v => v.package === 'agora.notes' && v.subject === 'example.shared');
   const sharedDoc = initial.views.find(v => v.package === 'agora.documents' && v.subject === 'example.shared');
@@ -39,6 +40,7 @@ let browser;
     return eventually(async () => {
       const element = await windowFor(id).locator('iframe').elementHandle();
       const frame = element && await element.contentFrame();
+      if (frame && await frame.getByRole('combobox', {name: 'Editor view', exact: true}).count()) await frame.getByRole('combobox', {name: 'Editor view', exact: true}).selectOption('split');
       return frame && await frame.getByRole('textbox', {name: 'Text', exact:true}).isEnabled() ? frame : null;
     }, 'Application editor becomes ready');
   }
@@ -70,7 +72,11 @@ let browser;
   const selectedBefore = await docsText().evaluate(el => [el.selectionStart, el.selectionEnd]);
   await new Promise(resolve => setTimeout(resolve, 3000));
   check('selection survives background data refresh', JSON.stringify(await docsText().evaluate(el => [el.selectionStart,el.selectionEnd])) === JSON.stringify(selectedBefore));
-  await Promise.all([notesText().fill('First writer wins this conflict.'), docsText().fill('Second writer draft must survive.')]);
+  // One physical browser input stream cannot fill two frames concurrently: focus
+  // races can concatenate both strings in one control. Both drafts are still
+  // unsaved here; deliver the two real inputs in order before the explicit save.
+  await notesText().fill('First writer wins this conflict.');
+  await docsText().fill('Second writer draft must survive.');
   await notesText().press('Control+s');
   await eventually(async () => (await rpc('world.get',{id:'example.shared'})).facets['core.text'].text === 'First writer wins this conflict.', 'First editor wins');
   await docsText().press('Control+s');

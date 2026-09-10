@@ -101,7 +101,10 @@ class Applications:
             "open": True,
             "lease": secrets.token_urlsafe(24),
             "state": {},
-            "grant": {k: list(app[k]) for k in ("read_facets", "write_facets")},
+            "grant": {
+                **{k: list(app[k]) for k in ("read_facets", "write_facets")},
+                "relations": copy.deepcopy(app.get("relations", {})),
+            },
             "bounds": self.bounds(
                 bounds or {"x": 24 + active * 28, "y": 24 + active * 28, **app["size"]}
             ),
@@ -160,6 +163,11 @@ class Applications:
             raise Refusal(
                 "Update requests broader access. Open a new view to grant that access explicitly."
             )
+        if any(
+            value["grant"].get("relations", {}).get(name) != rule
+            for name, rule in app.get("relations", {}).items()
+        ):
+            raise Refusal("Update changes related-object access. Open a new view explicitly.")
         if not set(app["accepts"]) <= set(self.world.get(value["subject"])["facets"]):
             raise Refusal("Updated application no longer accepts this subject.")
         return self.update(
@@ -168,7 +176,10 @@ class Applications:
             build=installation["facets"]["agora.installation"]["build"],
             installation_revision=installation["revision"],
             lease=secrets.token_urlsafe(24),
-            grant={k: list(app[k]) for k in ("read_facets", "write_facets")},
+            grant={
+                **{k: list(app[k]) for k in ("read_facets", "write_facets")},
+                "relations": copy.deepcopy(app.get("relations", {})),
+            },
         )
 
     def uninstall(self, actor, package, expected_revision):

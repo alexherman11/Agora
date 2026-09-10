@@ -149,3 +149,10 @@ See docs/Implementation Status.md and experiments/visual-presentation/README.md.
 - Keep this experiment on its own branch and world. Its tested browser boundary
   is not a full migration of the research Desk or a multi-user permission system.
   See docs/Reference/Application Experiment.md for checks and limitations.
+
+## September 10, 2026 — Resident continuity and first-party extraction
+
+- Name the continuing resident JEFF0 and preserve the exact durable model-thread binding across service runs; a failed resume must refuse rather than silently start another identity. The previous ephemeral context is unavailable, so its full native transcript and authored checkpoint form the initial handoff.
+- Carry existing discussion object IDs, original anchor evidence and unfinished drafts into independent Documents views. A bounded declared subject-linked collection and the public editor selection contract provide the required composition without importing editor internals.
+- Declare Markdown/source semantics and UTF-16 object/revision/hash selections explicitly. Shared storage does not authorize silently changing editing semantics, and a refresh must never overwrite another view's unsaved draft.
+- Treat this migration as trusted first-party extraction. Browser capability tests do not establish safe installation of arbitrary untrusted applications or isolation of root-capable guest packages.

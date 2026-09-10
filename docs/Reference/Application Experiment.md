@@ -4,8 +4,10 @@
 
 The experiment separates an application release, its open appearances, and the
 objects it operates on. It preserves the combined experimental runtime at commit
-`d8a7415` and adds a browser application slice in an isolated worktree/world. The
-existing improved Desk on port 8870 and its active JEFF work are not its targets.
+`d8a7415` and adds a browser application slice in an isolated worktree/world. After
+the initial prototype, Alex authorized migrating the existing resident as JEFF0.
+The migration preserves the old journal and authored work while installing the
+new desktop and applications in a new canonical world.
 
 ## What the experiment establishes
 
@@ -31,8 +33,8 @@ independently retained package; there is no runtime shared-global dependency.
 
 This replaces several implicit dependencies with small explicit contracts. It
 does not establish that the same contract suffices for every future application.
-The next useful test is a non-text application and then migration of an existing
-research feature onto the editor contract.
+Existing native discussions now consume that contract. A non-text application and
+further extraction of research/packet surfaces remain useful next experiments.
 
 ## Implemented contract
 
@@ -101,19 +103,26 @@ different operation from application distribution.
 
 ## Verification and evidence
 
-- Full Python suite: **140 passed, 1 optional test skipped**. Thirteen added native
+- Full Python suite: **145 passed, 2 optional cases skipped**. Thirteen original native
   tests cover scope, refusal atomicity, revisions, drafts, installation/schema
   compatibility, refresh/revocation, removal/reimport, portable fresh-world
   installation, malformed manifests and open-view limits. Replay equivalence is
-  checked across the lifecycle cases.
-- The optional real Codex runtime inventory passed separately with a local mock
-  model: native discovery/invocation and clock/composition remained the effective
+  checked across the lifecycle cases. Five subsequent tests cover protected
+  resident continuity and subject-linked discussion authority, including stale
+  selection revisions and failed-resume preservation.
+- Both optional real Codex runtime inventory cases passed separately with a local mock
+  model, including a new process resuming an existing thread: native
+  discovery/invocation and clock/composition remained the effective
   capability surface. This is not a live model-authoring claim.
 - Final real Edge run: **16 browser checks passed**, using actual text/selection
   input, cross-app updates, annotation reuse, retained conflict drafts, one-view
   updates, actual download/upload, remove/reimport, reload and a narrow viewport.
   It also exercised child-frame scope refusals and parent DOM isolation, with no
   page JavaScript errors. Headless Edge did not take over the user's browser.
+- A separate migrated-world run passed **12 browser checks**: visible JEFF0
+  transcript, carried-over live Markdown, actual typing and undo, selection staged
+  without sending, existing discussion identities/original anchors, new discussion
+  creation, migrated new-thread/reply drafts and a reply on an existing thread.
 - Ruff lint/format and whitespace checks pass. The clean demonstration world is
   separate from the mutation-heavy browser test worlds.
 
@@ -123,19 +132,24 @@ Reproduce native checks with `python -m pytest`; the optional inventory uses
 by `scripts/application_demo.py`. It intentionally refuses the active Desk port.
 Set `PLAYWRIGHT_MODULE` when Playwright is provided outside the repository.
 
-Local retained evidence is in `local/application-browser-evidence-v2/` (report,
-screenshots and exported bundle). It is not committed along with private worlds.
+Local retained evidence is in `local/application-browser-evidence-v4/` and
+`local/resident-migration-browser/` (reports, screenshots and exported bundle).
+It is not committed along with private worlds.
 The launcher and runnable source are in the repository; start at
 [the example README](../../examples/native-applications/README.md).
 
 ## Limits and next questions
 
-This is a focused two-application prototype, not a replacement for the current
-research Desk. Citations, packets, comment replies, JEFF chat and existing
-`studio.*` data migrations have not been ported. The annotation example introduces
-`text.annotations`; it does not claim compatibility with the old comments schema.
-Its anchors use revision/hash plus UTF-16 ranges and quote/context evidence;
-ambiguous relocation remains unresolved rather than selecting a wrong passage.
+This is a trusted first-party extraction. It now hosts the resident conversation,
+live Markdown, and existing `studio.comment-thread` discussions through a separate
+extension using public editor methods. Native `studio.document` Markdown is
+recognized; a contradictory `text.format` refuses editing. Both releases declare
+`agora.text/1`, UTF-16 selection units, source-edit semantics and supported operations.
+`text.annotations` remains a separate small example; it does not rewrite old
+discussions. Both anchor mechanisms preserve revision/hash and quote/context
+evidence; ambiguous relocation remains unresolved rather than selecting a wrong
+passage. Existing citation, packet and research data/tools survive, but their old
+specialized UI has not all been ported.
 
 Text uses revision-checked replacement, not a CRDT merge. The example assumes one
 live browser owner per retained appearance; cross-tab editing of the same view
@@ -153,6 +167,45 @@ checks facets rather than value-level predicates.
 The authored desktop retains broad local authority; the browser-app boundary does
 not constrain a compromised desktop or the existing root guest. Imported code
 is not evaluated on the host, but this is not proof against every browser escape,
-network side channel or denial of service. No VM was started and no live model
-turn was invoked to validate this slice. A separate execution design is needed
+network side channel or denial of service. Initial prototype acceptance used no
+VM or live model. The subsequent resident handoff reuses the existing VM and
+performs live continuity checks, separately from application-security evidence.
+A separate execution design is needed
 before bundling backend programs under equivalent per-app authority.
+
+## Resident handoff and persistence
+
+`scripts/migrate_resident.py` uses SQLite's consistent backup API, then adds native
+events through the authenticated gateway. It refuses an existing destination and
+verifies an identical original event prefix and every old object's identity/value.
+Only the desktop's source and installation advance; their prior revisions remain
+in history. The actual handoff retained 1,280 events, 1,135 objects, 30 messages
+and 54 discussions. Existing unfinished discussion drafts are attached to retained
+Documents views, including closed ones. An older observation-browser composer is
+kept in a separately labelled unsent recovery object, never sent automatically or
+used to replace a newer native composer.
+
+The protected `agora.agent.resident` record names JEFF0, pins an owner-world path,
+references the authored `jeff0.continuity` checkpoint and binds the exact durable
+Codex thread/provider/model. New service instances resume this binding. A failed
+resume or model mismatch refuses; neither silently resets the conversation.
+The previous runtime used an ephemeral model thread, so its hidden internal
+context is unavailable. The retained native transcript and authored checkpoint
+bootstrap the first persistent session. Subsequent model context is retained by
+the managed runtime; native journal backup alone is not a portable backup of that
+runtime's conversation storage. Model/runtime changes must recheck effective tools,
+including resumed sessions and their per-turn empty environment configuration.
+
+The live handoff and an idle service restart both completed successfully. The
+same saved thread ID remained bound, JEFF0 recalled the check phrase from the
+preceding exchange without a new history bootstrap, and he confirmed readiness
+after restart. These two handoff/check turns added four native conversation
+messages. They were read-only checks of existing work, not live app-authoring tests.
+
+The local canonical JEFF0 service reuses the existing guest and candidate VM
+configurations; migration does not reset or clone their files. The former launcher
+forwards to the canonical service and the old service refuses direct restart, so
+ordinary launching does not accidentally create another JEFF0 from the archive.
+Never launch an archived copy as the continuing resident without an explicit
+transfer. Source, native state, guest files and managed model history have separate
+storage and recovery responsibilities.

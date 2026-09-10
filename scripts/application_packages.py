@@ -2,6 +2,7 @@
 Never bundle a native world, a credential, or runtime application state.
 """
 
+import json
 from pathlib import Path
 
 from agora3.application_schema import BUNDLE, PROTOCOL
@@ -42,6 +43,7 @@ SCHEMAS = {
         }
     ),
 }
+SCHEMAS.update(json.loads((ROOT / "shared/discussion-schemas.json").read_text(encoding="utf-8")))
 
 
 def bundle(variant):
@@ -51,9 +53,17 @@ def bundle(variant):
         "index.html": (ROOT / variant / "index.html").read_text(encoding="utf-8"),
         "app.js": (ROOT / variant / "app.js").read_text(encoding="utf-8"),
     }
-    shared = ["sdk.js", "editor.js", "annotations.js", "style.css"]
+    shared = ["sdk.js", "editor.js", "annotations.js", "discussions.js", "style.css"]
     if variant == "documents":
         shared += ["vendor.js", "THIRD-PARTY.md"]
+        for name in (
+            "live-markdown.bundle.js",
+            "live-markdown.js",
+            "editor-build/package.json",
+            "editor-build/package-lock.json",
+            "editor-build/LICENSES.txt",
+        ):
+            files[name] = (ROOT / "documents" / name).read_text(encoding="utf-8")
     for name in shared:
         files["shared/" + name] = (ROOT / "shared" / name).read_text(encoding="utf-8")
     facets = ["core.title", "core.text", "text.format", "text.annotations"]
@@ -67,15 +77,41 @@ def bundle(variant):
             "entry": "index.html",
             "mount": "application",
             "styles": ["shared/style.css"],
-            "scripts": (["shared/vendor.js"] if variant == "documents" else [])
-            + ["shared/sdk.js", "shared/editor.js", "shared/annotations.js", "app.js"],
+            "scripts": (
+                ["shared/vendor.js", "live-markdown.bundle.js"] if variant == "documents" else []
+            )
+            + [
+                "shared/sdk.js",
+                "shared/editor.js",
+                "shared/annotations.js",
+                "shared/discussions.js",
+                "app.js",
+            ],
         },
         "application": {
             "protocol": PROTOCOL,
             "accepts": ["core.text"],
-            "read_facets": facets,
+            "read_facets": facets + ["studio.document"],
             "write_facets": facets,
             "schemas": SCHEMAS,
+            "contracts": {
+                "text": {
+                    "protocol": "agora.text/1",
+                    "formats": ["plain", "markdown"],
+                    "editing": "source",
+                    "selection_offsets": "utf16-code-units",
+                    "operations": ["replace-text", "set-title", "select", "annotate", "discuss"],
+                    "legacy_markdown_marker": "studio.document",
+                }
+            },
+            "relations": {
+                "discussions": {
+                    "facet": "studio.comment-thread",
+                    "subject_field": "document_id",
+                    "write": True,
+                    "max_items": 16,
+                }
+            },
             "size": {"width": 310, "height": 360}
             if variant == "notes"
             else {"width": 650, "height": 620},
@@ -94,16 +130,18 @@ def bundle(variant):
 def desktop_source():
     files = {
         name: (ROOT / "desktop" / name).read_text(encoding="utf-8")
-        for name in ("index.html", "desktop.js", "style.css")
+        for name in ("index.html", "desktop.js", "chat.js", "style.css", "chat.css")
     }
+    files["vendor.js"] = (ROOT / "shared/vendor.js").read_text(encoding="utf-8")
+    files["THIRD-PARTY.md"] = (ROOT / "shared/THIRD-PARTY.md").read_text(encoding="utf-8")
     manifest = {
         "name": "Agora Application Workspace",
         "runtime": "browser-1",
         "ui": {
             "entry": "index.html",
             "mount": "shell",
-            "scripts": ["desktop.js"],
-            "styles": ["style.css"],
+            "scripts": ["vendor.js", "desktop.js", "chat.js"],
+            "styles": ["style.css", "chat.css"],
         },
     }
     return {"id": "agora.shell", "files": files, "manifest": manifest}

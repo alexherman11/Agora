@@ -3,8 +3,8 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const node = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text !== undefined) el.textContent = text; return el; };
-  const pending = new Map(), windows = new Map();
-  let registry = [], subjects = [], selected = '', syncing = false, syncAgain = false, nextZ = 2;
+  const pending = new Map(), windows = new Map(), flushers = new Set();
+  let registry = [], subjects = [], selected = '', syncing = false, syncAgain = false, nextZ = 2, stageSelection;
   function notice(text) { $('notice').hidden = !text; $('notice').textContent = text; }
   function call(method, args = {}) {
     return new Promise((resolve, reject) => {
@@ -12,6 +12,7 @@
       pending.set(id, {resolve, reject, timer}); parent.postMessage({agora: true, id, method, args}, '*');
     });
   }
+  window.AgoraDesktop = Object.freeze({request: call, onFlush(handler) { flushers.add(handler); return () => flushers.delete(handler); }, selectionHandler(handler) { stageSelection = handler; }});
   const title = subject => subjects.find(o => o.id === subject)?.facets['core.title']?.text || 'Untitled';
   const app = packageId => registry.find(a => a.package === packageId);
   const compatible = (application, subject) => application.contract.accepts.every(f => subjects.find(o => o.id === subject)?.facets[f]);
@@ -181,7 +182,7 @@
       if (value.event === 'cancel-reload') { for (const entry of windows.values()) thaw(entry); return; }
       if (value.event === 'changed') { sync(); for (const entry of windows.values()) if (entry.ready) send(entry, {type: 'changed'}); return; }
       if (value.event === 'prepare-reload') {
-        try { await Promise.all([...windows.values()].map(flush)); parent.postMessage({agora: true, event: 'reload-ready', id: value.id, result: {ready: true}}, '*'); }
+        try { await Promise.all([...windows.values()].map(flush).concat([...flushers].map(handler => handler()))); parent.postMessage({agora: true, event: 'reload-ready', id: value.id, result: {ready: true}}, '*'); }
         catch (error) { for (const entry of windows.values()) thaw(entry); notice(error.message); parent.postMessage({agora: true, event: 'reload-ready', id: value.id, result: {ready: false}}, '*'); } return;
       }
       const task = pending.get(value.id); if (task) { pending.delete(value.id); clearTimeout(task.timer); if (value.error) task.reject(new Error(value.error)); else task.resolve(value.result); } return;
@@ -194,7 +195,20 @@
     if (value.type === 'request') {
       if (entry.inFlight >= 8) { send(entry, {type: 'response', id: value.id, error: 'Too many pending application requests.'}); return; }
       entry.inFlight++;
-      try { const result = await call('application.request', {view: entry.info.id, lease: entry.context.lease, method: value.method, args: value.args || {}}); send(entry, {type: 'response', id: value.id, result}); }
+      try {
+        let result;
+        if (value.method === 'stage-chat') {
+          const selection = value.args?.selection;
+          const object = await call('application.request', {view: entry.info.id, lease: entry.context.lease, method: 'read', args: {}});
+          const text = object.facets['core.text']?.text;
+          if (!stageSelection || !selection || selection.subject !== object.id || selection.revision !== object.revision || typeof text !== 'string' || !Number.isInteger(selection.start) || !Number.isInteger(selection.end) || selection.start < 0 || selection.end <= selection.start || selection.end - selection.start > 12000 || selection.end > text.length || !selection.quote?.trim() || text.slice(selection.start, selection.end) !== selection.quote) throw new Error('The selected object or revision changed; select the passage again.');
+          const boundary = index => !(index > 0 && /[\uD800-\uDBFF]/.test(text[index - 1]) && /[\uDC00-\uDFFF]/.test(text[index] || ''));
+          if (!boundary(selection.start) || !boundary(selection.end)) throw new Error('Select complete characters.');
+          await stageSelection({subject: object.id, revision: object.revision, title: object.facets['core.title']?.text || 'Untitled', start: selection.start, end: selection.end, quote: selection.quote});
+          result = {staged: true, sent: false};
+        } else result = await call('application.request', {view: entry.info.id, lease: entry.context.lease, method: value.method, args: value.args || {}});
+        send(entry, {type: 'response', id: value.id, result});
+      }
       catch (error) { send(entry, {type: 'response', id: value.id, error: error.message}); }
       finally { entry.inFlight--; }
     }

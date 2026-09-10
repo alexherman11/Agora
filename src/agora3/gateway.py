@@ -29,6 +29,7 @@ from agora3.yard import Yard
 class Principal:
     name: str
     generation: int
+    agent_id: str | None = None
 
 
 class Gateway:
@@ -67,8 +68,8 @@ class Gateway:
             os.fsync(handle.fileno())
         os.replace(pending, self.keep_path)
 
-    def principal(self, name):
-        return Principal(name, self.keep["generation"])
+    def principal(self, name, *, agent_id=None):
+        return Principal(name, self.keep["generation"], agent_id)
 
     def authenticate(self, token, *, operator=False, name="guest"):
         """Bind a verified current token to the same authority generation.
@@ -93,6 +94,10 @@ class Gateway:
             "bootstrap",
         }:
             raise Refusal("Authenticated local development identity required.")
+        if actor.agent_id is not None:
+            if actor.name != "jeff":
+                raise Refusal("Only a resident agent principal carries an agent identity.")
+            identifier(actor.agent_id)
         keep = self.keep
         if actor.generation != keep["generation"] or not keep["enabled"]:
             raise Refusal(
@@ -133,7 +138,9 @@ class Gateway:
                 if not (internal and obj_id.startswith("agora.")):
                     validate_facets(obj_id, old, patch, db)
 
-            attribution = actor.name if via is None else actor.name + ":" + identifier(via)
+            attribution = actor.name + (":" + actor.agent_id if actor.agent_id else "")
+            if via is not None:
+                attribution += ":" + identifier(via)
             if read_guards is not None:
                 assert_reads(self.world, read_guards)
             return self.world.commit(

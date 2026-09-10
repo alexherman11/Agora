@@ -21,7 +21,12 @@ def check_application(manifest):
     ):
         raise Refusal("Applications require browser-1 and ui.mount: application.")
     keys = {"protocol", "accepts", "read_facets", "write_facets", "size", "create", "schemas"}
-    if not isinstance(app, dict) or set(app) != keys or app["protocol"] != PROTOCOL:
+    if (
+        not isinstance(app, dict)
+        or not keys <= set(app)
+        or set(app) - keys - {"contracts", "relations"}
+        or app["protocol"] != PROTOCOL
+    ):
         raise Refusal(
             "Application requires protocol, accepts, read_facets, write_facets, "
             "size, create, schemas."
@@ -66,6 +71,31 @@ def check_application(manifest):
         if name.startswith(("agora.", "core.")):
             raise Refusal("Application bundles cannot define protected or core schemas.")
         check_schema(schema)
+    contracts = app.get("contracts", {})
+    if not isinstance(contracts, dict) or len(encoded(contracts)) > 10000:
+        raise Refusal("Application contracts must be a bounded descriptive object.")
+    relations = app.get("relations", {})
+    if not isinstance(relations, dict) or len(relations) > 8:
+        raise Refusal("Application relations must declare at most eight collections.")
+    for name, rule in relations.items():
+        identifier(name)
+        if not isinstance(rule, dict) or set(rule) != {
+            "facet",
+            "subject_field",
+            "write",
+            "max_items",
+        }:
+            raise Refusal("A relation requires facet, subject_field, write and max_items.")
+        identifier(rule["facet"])
+        identifier(rule["subject_field"])
+        if rule["facet"].startswith(("agora.", "core.")):
+            raise Refusal("Relations cannot grant access to runtime or core facets.")
+        if (
+            type(rule["write"]) is not bool
+            or type(rule["max_items"]) is not int
+            or not 1 <= rule["max_items"] <= 100
+        ):
+            raise Refusal("Relation write must be boolean and max_items must be 1–100.")
 
 
 def schema_changes(world, manifest):
