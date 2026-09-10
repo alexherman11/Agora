@@ -28,6 +28,8 @@ be corrected rather than resolved through an ever-growing hierarchy of prose.
 - [[Presentation and Operators]] — style, composition, arrangement and interaction.
 - [[Native Development]] — building applications and improving the development loop.
 - [[Extensions]] — packages, discovery, reuse and adoption.
+- [[Application Experiment]] — isolated Notes/Documents application boundaries,
+  shared objects, per-view state and portable browser releases.
 - [[Reconcilers]] — observations, maintained intent and ongoing work.
 - [[Security]] — current authority boundaries and the questions new integrations raise.
 - [[The Web]] — browsing, sources, links, integrations and publication.

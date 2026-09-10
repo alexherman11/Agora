@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from agora3.application_specs import specs as application_specs
+from agora3.applications import Applications
 from agora3.check_tools import SPEC as CHECK_SPEC
 from agora3.check_tools import check_package
 from agora3.guest import Guest
@@ -49,6 +51,7 @@ class Gateway:
         self.packages = Packages(
             self.world, self.guest, self.yard, self.commit, self.check_authority
         )
+        self.applications = Applications(self)
 
     @property
     def keep(self):
@@ -113,15 +116,28 @@ class Gateway:
         return {"enabled": True, "generation": keep["generation"]}
 
     def commit(
-        self, actor, changes, *, internal=False, guards=None, watermark=None, read_guards=None
+        self,
+        actor,
+        changes,
+        *,
+        internal=False,
+        guards=None,
+        watermark=None,
+        read_guards=None,
+        via=None,
     ):
         with self.lock:
             self.check_authority(actor)
-            validator = (lambda *args: None) if internal else validate_facets
+
+            def validator(obj_id, old, patch, db):
+                if not (internal and obj_id.startswith("agora.")):
+                    validate_facets(obj_id, old, patch, db)
+
+            attribution = actor.name if via is None else actor.name + ":" + identifier(via)
             if read_guards is not None:
                 assert_reads(self.world, read_guards)
             return self.world.commit(
-                actor.name, changes, validator, guards=guards, watermark=watermark
+                attribution, changes, validator, guards=guards, watermark=watermark
             )
 
     def define_schema(self, actor, *, type, schema, expected_revision=0):
@@ -168,6 +184,8 @@ class Gateway:
         if spec is None:
             raise Refusal("Unknown operation. Discover the current registry with tools.list.")
         validate(spec["input_schema"], args)
+        if name.startswith("application."):
+            return self.applications.dispatch(actor, name.split(".", 1)[1], args)
         if name == "world.get":
             return self.world.get(args["id"])
         if name == "world.query":
@@ -386,6 +404,7 @@ class Gateway:
             ]
             + source_specs()
             + [CATALOG_SPEC, CHECK_SPEC]
+            + application_specs()
         )
 
     def seed(self):

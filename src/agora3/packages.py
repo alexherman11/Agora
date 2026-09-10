@@ -8,6 +8,7 @@ import tempfile
 import uuid
 from pathlib import PurePosixPath
 
+from agora3.application_schema import check_application, schema_changes
 from agora3.browser_assembly import assemble, retained_html, validate_assets
 from agora3.schemas import check_schema, validate, validate_facets
 from agora3.scoped_context import assert_reads, check_reads, scoped_snapshot
@@ -42,9 +43,10 @@ def check_source(files, manifest):
         "actions",
         "ui",
         "skills",
+        "application",
     }:
         raise Refusal(
-            "Manifest supports name, description, runtime, actions, ui, skills. "
+            "Manifest supports name, description, runtime, actions, ui, skills, application. "
             "Dependencies are not implemented."
         )
     if manifest.get("runtime") not in ("python-1", "browser-1"):
@@ -91,6 +93,7 @@ def check_source(files, manifest):
         isinstance(v, str) and v in files for v in skills.values()
     ):
         raise Refusal("skills maps skill names to retained instruction files.")
+    check_application(manifest)
 
 
 class Packages:
@@ -221,9 +224,12 @@ class Packages:
             "digest": receipt["digest"],
             "source_revision": receipt["source_revision"],
         }
+        definitions, schema_guards = schema_changes(self.world, receipt["source"]["manifest"])
+        guards.update(schema_guards)
         return self.commit(
             actor,
-            [
+            definitions
+            + [
                 {
                     "id": "agora.installation." + id,
                     "expected_revision": expected_revision,
@@ -238,6 +244,8 @@ class Packages:
         result = []
         for obj in self.world.query(["agora.installation"], 1000)["items"]:
             installation = obj["facets"]["agora.installation"]
+            if installation.get("enabled") is False:
+                continue
             source = self.receipt(installation["build"])["source"]
             for name, action in source["manifest"].get("actions", {}).items():
                 result.append(
@@ -254,6 +262,8 @@ class Packages:
         result = []
         for obj in self.world.query(["agora.installation"], 1000)["items"]:
             installation = obj["facets"]["agora.installation"]
+            if installation.get("enabled") is False:
+                continue
             source = self.receipt(installation["build"])["source"]
             for name, path in source["manifest"].get("skills", {}).items():
                 result.append(
@@ -273,6 +283,10 @@ class Packages:
             if receipt["package"] != package:
                 raise Refusal("Candidate belongs to another package.")
         else:
+            if installation.get("facets", {}).get("agora.installation", {}).get("enabled") is False:
+                raise Refusal(
+                    "This package has been disabled; install it before invoking its actions."
+                )
             if installation["revision"] != revision or revision == 0:
                 raise Refusal("Installed action changed; discover current tools before invoking.")
             receipt = self.receipt(installation["facets"]["agora.installation"]["build"])

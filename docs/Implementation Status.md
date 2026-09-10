@@ -1,6 +1,28 @@
 # Implementation Status
 
-**Current source and recorded evidence · September 9, 2026.**
+**Branch experiment and recorded evidence · September 10, 2026.**
+
+## Independent application branch
+
+`experiment/native-applications` preserves the combined improved-Desk runtime at
+`d8a7415` and adds independently installed Notes/Documents browser applications.
+They share native content and an editor/annotation contract while keeping separate
+frames, pinned builds, leases, drafts and appearances. Portable application
+export/import and removal preserve user objects. The current Desk and its JEFF
+work remain on their existing runtime/world.
+
+Verification: 140 Python tests passed (one optional inventory test skipped), the
+real runtime inventory passed separately with local mock inference, and 16 real
+Edge browser acceptance checks passed. See [[Application Experiment]] for exact
+scope, retained evidence and limitations, and `examples/native-applications/`
+for runnable source. This is not a port of the full research Desk.
+
+The sections below retain the September 9 checkpoint evidence. On this branch,
+the combined runtime additionally includes scoped action dependencies, targeted
+package source tools, ordered browser asset assembly and grouped candidate
+checks. Their earlier VM/model experiments were not rerun for this browser-only
+slice. General dependencies, multiple people and guest-package isolation remain
+unimplemented; browser appearance identity is now exercised in the new slice.
 
 ## Current runtime
 

@@ -133,3 +133,19 @@ and the post-comparison human-UI repairs. It does not modify the main installed
 world. The next requested work is five comparative application-development rounds
 with two independent worldlines per variant and correctness-led winner selection.
 See docs/Implementation Status.md and experiments/visual-presentation/README.md.
+
+## 2026-09-10 — Independent browser applications experiment
+
+- Separate package release, subject identity and open appearance. Notes and
+  Documents can edit one object without copying data or sharing browser globals.
+- Use a generic desktop and a small subject-bound browser protocol. App methods
+  pass through existing native commits; guest-root authority is a separate scope.
+- Retain drafts/selection per appearance, pin running code, and flush before
+  replacing or closing a view. App installation alone does not reload siblings.
+- Author a shared editor/annotation contract once and vendor it into releases.
+  Defer a runtime dependency resolver until an observed need justifies it.
+- Export only installed application source/manifest/digest. Disable applications
+  without deleting content/schema/state; refuse implicit schema migrations.
+- Keep this experiment on its own branch and world. Its tested browser boundary
+  is not a full migration of the research Desk or a multi-user permission system.
+  See docs/Reference/Application Experiment.md for checks and limitations.
