@@ -133,3 +133,28 @@ and the post-comparison human-UI repairs. It does not modify the main installed
 world. The next requested work is five comparative application-development rounds
 with two independent worldlines per variant and correctness-led winner selection.
 See docs/Implementation Status.md and experiments/visual-presentation/README.md.
+
+## 2026-09-10 — Restore depth without restoring dogma
+
+The September 9 compression removed false universal requirements, but it also
+removed ordinary-life workflows, failure cases, alternatives, open questions and
+the moral rationale needed to understand why Agora exists. Restore the detailed
+Constitution, master Spec, Essays and References as the active documentation on a
+new `agora4` branch. Preserve the September 9 corrections by explicitly classifying
+claims as durable commitments, current invariants, tested behavior, candidate
+mechanisms, open questions or rejected universals. Git history is evidence, not a
+substitute for keeping important rationale readable in the current tree.
+
+The restored Constitution is an unratified moral charter rather than a fixed
+technical or legal constitution. It retains personal direction, loyal JEFF,
+anti-surveillance, provenance, recovery, practical exit and accountable shared
+power while leaving schemas, runtimes, licenses, governance structures and agent
+topologies revisable. [Design Commitments](docs/Design%20Commitments.md) is the
+status key for the restored documents; [Implementation Status](docs/Implementation%20Status.md)
+remains the dated evidence inventory.
+
+Carry forward Personal Lenses, Executable Components, Astra Harness and the
+Security Addendum from the older `docs` branch as explicitly labeled prototype
+lineage. Their implemented results and boundary lessons are important design
+evidence, while their operation names, module paths and limits do not describe the
+Agora3 runtime unless revalidated there.

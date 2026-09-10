@@ -7,7 +7,8 @@ and history make that work understandable and portable.
 
 Start with [the documentation index](docs/Start%20Here.md),
 [the unratified values statement](docs/Constitution.md), and
-[the vision and present structure](docs/Agora%20Spec.md).
+[the design commitments](docs/Design%20Commitments.md), then
+[the whole-system vision and present structure](docs/Agora%20Spec.md).
 [Native Development](docs/Reference/Native%20Development.md) connects the Linux VM,
 native packages and the experience of asking JEFF to create new capabilities.
 
@@ -79,9 +80,16 @@ private world databases and VM files remain ignored by Git.
 
 ## Development through use
 
-The documentation now separates vision and current structure from speculative
-future machinery. [Review Coverage](docs/Review%20Coverage.md) maps the September
-9 commitment review to the revision. [The isolated presentation experiment](experiments/visual-presentation/README.md)
-retains initial evidence and the repaired review package; it does not activate
-that package in the main world. Future experiments will compare candidate
-machinery on increasingly realistic native application work.
+The documentation preserves the detailed vision, ordinary workflows, alternatives
+and failure cases while labeling current contracts, evidence, hypotheses and open
+questions separately. [Review Coverage](docs/Review%20Coverage.md) maps the
+September 9 critique and the September 10 restoration. [The isolated presentation
+experiment](experiments/visual-presentation/README.md) retains initial evidence and
+the repaired review package; it does not activate that package in the main world.
+Future experiments should compare candidate machinery on increasingly realistic
+native application work without deleting the rationale that produced it.
+
+The restored reference set also retains the older `docs` branch's Personal Lenses,
+Executable Components, Astra Harness and Security Addendum as explicitly labeled
+prototype lineage. Their evidence informs the current design; their APIs do not
+replace the Runtime Guide.

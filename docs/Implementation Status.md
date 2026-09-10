@@ -1,6 +1,18 @@
 # Implementation Status
 
-**Current source and recorded evidence · September 9, 2026.**
+**Current source and recorded evidence · September 9, 2026; documentation map
+updated September 10.**
+
+This file is the evidence inventory, not a substitute for the restored design.
+[[Design Commitments]] explains the difference between a durable commitment,
+current implementation, tested behavior, candidate mechanism and open question.
+[[Start Here]] routes the full vision and reference set. No September 10 prose
+change by itself advances the runtime status recorded below.
+
+Documents explicitly labeled **prototype lineage** contain evidence from the
+older `docs` implementation branch. They remain useful, but their results are not
+counted as Agora3 runtime verification unless this file names a corresponding
+Agora3 check.
 
 ## Current runtime
 

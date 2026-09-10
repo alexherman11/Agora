@@ -2,7 +2,8 @@
 
 Agora3 is a fresh implementation of a programmable computing environment.
 Read [Start Here](docs/Start%20Here.md), [Constitution](docs/Constitution.md),
-[Agora Spec](docs/Agora%20Spec.md), the relevant reference contract, and
+[Design Commitments](docs/Design%20Commitments.md), [Agora Spec](docs/Agora%20Spec.md),
+the relevant reference material, and
 [Implementation Status](docs/Implementation%20Status.md) before domain work.
 
 ## Working agreement
@@ -12,14 +13,22 @@ working behavior support implementation claims. Explain conflicts and revise
 the relevant contract when evidence changes the design. Do not invent approval
 requirements for routine work already authorized by the person.
 
-Keep vision, implemented contracts, evidence and examples distinguishable.
-Documents are navigation and working context, not a hierarchy of permanent future
-requirements. Simplify or remove stale constraints when the person's direction
-or evidence calls for it. Keep exact APIs beside their current implementation.
+Keep constitutional values, chosen directions, current contracts, hypotheses,
+examples and evidence distinguishable. Design references preserve arguments,
+alternatives and pressure tests; they do not turn every illustrated mechanism
+into a permanent future requirement. When a constraint is too broad, name the
+property it was protecting and reclassify or revise the mechanism. Do not erase
+the surrounding reasoning merely to make the design less prescriptive. Keep exact
+APIs beside their current implementation.
 
-Keep current design self-contained. Historical rationale belongs in Git history
-or dated decisions; current documents must not require obsolete specifications
-to resolve their meaning. Record new architectural decisions and evidence.
+Keep the current design self-contained. Git history is a recovery aid, not a
+substitute for active rationale, concrete workflows or failed-route knowledge.
+Archive material only when the current documents preserve the reasons a future
+designer would need. Record new architectural decisions and evidence.
+
+Documents labeled **prototype lineage** describe another implementation branch.
+Preserve their evidence and lessons, but never infer a current API or working
+guarantee from them; translate through Runtime Guide and Implementation Status.
 
 ## Architecture boundaries
 

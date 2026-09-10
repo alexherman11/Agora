@@ -1,12 +1,23 @@
 # Review coverage
 
-**Dated documentation audit · September 9, 2026.** This maps the 56 review
-entries to the rewritten design. It is an adoption record, not another set of
-future requirements. The exact runtime API remains in [[Runtime Guide]].
+**Dated documentation audit · September 9, 2026; restoration disposition added
+September 10.** This maps the 56 review entries to their active design homes. It
+is an adoption record, not another set of future requirements. The exact runtime
+API remains in [[Runtime Guide]], and [[Design Commitments]] defines the status
+vocabulary used by the restored long-form documents.
 
-The revised notes retain authority, continuity, explicit effects and recovery;
-scope useful technical policies to their implementation; remove false or
-unnecessary universal claims; and leave future machinery open to evidence.
+The September 10 restoration brought back the detailed workflows, alternatives,
+failure cases and moral rationale that the compressed rewrite had removed. It did
+not reinstate the review's false universal claims. Where a mechanism was too broad,
+the active notes now classify it as a current invariant, a local contract, a
+candidate mechanism, an open question or a rejected universal. This preserves the
+reasoning without promoting every old proposal back into law.
+
+It also carries forward four substantial documents that existed only on the older
+`docs` line: [[Personal Lenses]], [[Executable Components]], [[Astra Harness]] and
+[[Security Addendum]]. Their status banners distinguish verified behavior of that
+prototype from the current Agora3 runtime. The implemented lessons remain visible;
+their obsolete operation names and limits do not become current contracts.
 
 | Review | Former claim or concern | Revised discussion |
 |---|---|---|
@@ -84,6 +95,9 @@ hidden behind successful agent actions.
 
 The old commitments to a universal heat model, mandatory native-product novelty,
 one publication mode, immutable witness retention, fixed worker topology,
-constitutional technical promotion and predetermined governance/organization have
-been removed or reframed as options. Rights-oriented values remain in the
-unratified [[Constitution]]; this revision does not change actual license terms.
+constitutional technical promotion and predetermined governance/organization are
+now explicitly rejected or reframed as options in the restored detailed notes.
+Their motivating problems—attention abuse, coherent publication, continuity,
+accountable power and practical exit—remain active. Rights-oriented values remain
+in the unratified [[Constitution]]; this documentation revision changes neither
+actual license terms nor deployed guarantees.
