@@ -7,7 +7,7 @@ iframe{border:0;flex:1;width:100%}#login{padding:48px;max-width:600px}#problem{c
 <header><strong>AGORA · HOST</strong><span id="status">Connecting to your world</span>
 <button id="reload" hidden>Reload updated interface</button><button id="stop">Stop JEFF</button><a id="recovery" href="/recovery" target="_blank">Recovery</a></header>
 <div id="login" hidden>Open the launch link printed by <code>agora3 serve</code> to connect this browser.
-<p id="problem"></p></div><iframe title="Your Agora environment" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+<p id="problem"></p></div><iframe title="Your Agora environment" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
 <script>
 const frame=document.querySelector('iframe');let token=location.hash.slice(1)||sessionStorage.getItem('agora-operator');
 if(token){sessionStorage.setItem('agora-operator',token);history.replaceState(null,'',location.pathname)}
@@ -18,11 +18,12 @@ async function replace(v){if(revision){const id=crypto.randomUUID();const ready=
 frame.contentWindow.postMessage({agora:true,event:'prepare-reload',id},'*');if(!await ready){pending=v;document.querySelector('#reload').hidden=false;document.querySelector('#status').textContent='Update ready · save your edits before reloading';return}}
 revision=v.revision;frame.srcdoc=v.html;pending=null;document.querySelector('#reload').hidden=true}
 async function sync(){if(syncing)return;syncing=true;try{const v=await rpc('host.surface');document.querySelector('#login').hidden=true;
-if(!pending)document.querySelector('#status').textContent=v.enabled?'Local development · Linux guest + native world':'Development stopped';
+if(!pending)document.querySelector('#status').textContent=v.enabled?'Workspace connected':'Development stopped';
 if(v.revision!==revision&&!pending)await replace(v);
 if(v.watermark!==watermark){watermark=v.watermark;frame.contentWindow.postMessage({agora:true,event:'changed'},'*')}}
 catch(e){document.querySelector('#login').hidden=false;document.querySelector('#problem').textContent=e.message}finally{syncing=false}}
-const allowed=new Set(['world.query','world.get','world.transact','schema.define','schema.list','tools.list','skills.list','package.list','package.get','package.save','package.build','package.install','package.restore','candidate.exercise','action.invoke','guest.status','guest.execute','chat.send','chat.status','chat.stop','chat.login','system.status']);
+const allowed=new Set(['world.query','world.get','world.transact','schema.define','schema.list','tools.list','skills.list','package.list','package.get','package.check','package.save','package.build','package.install','package.restore','candidate.exercise','action.invoke','guest.status','guest.execute','chat.send','chat.status','chat.stop','chat.login','system.status']);
+for(const method of ['package.catalog','application.list','application.open','application.surface','application.request','application.position','application.close','application.reopen','application.refresh','application.uninstall','application.export','application.import'])allowed.add(method);
 window.addEventListener('message',async e=>{if(e.source!==frame.contentWindow||!e.data?.agora)return;
 if(e.data.event==='reload-ready'&&flush?.id===e.data.id){flush.resolve(e.data.result?.ready===true);flush=null;return}
 if(!e.data.id||!e.data.method)return;const {id,method,args}=e.data;try{if(!allowed.has(method))throw Error('Not an authored-surface operation');

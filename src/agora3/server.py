@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from agora3.agent_state import AgentState
 from agora3.bridge import NativeBridge
 from agora3.chat_activity import ChatActivity
 from agora3.gateway import Gateway
@@ -26,6 +27,7 @@ class Application:
         self.gateway = Gateway(directory)
         self.directory = Path(directory)
         self.gateway.seed()
+        self.resident = AgentState(self.gateway, self.directory)
         self.chat_lock = threading.RLock()
         self.running, self.events, self.reply, self.error = False, [], "", None
         self.activity = ChatActivity()
@@ -45,7 +47,8 @@ class Application:
             return {"connected": False, "error": self.bridge_error}
 
     def _agent(self):
-        identity = self.gateway.principal("jeff")
+        resident = self.resident.owned()
+        identity = self.gateway.principal("jeff", agent_id=resident["id"])
         if self.jeff is None or identity != self.jeff_identity:
             if self.jeff:
                 self.jeff.close()
@@ -54,6 +57,10 @@ class Application:
                 self.directory,
                 lambda name, args: self.gateway.dispatch(identity, name, args),
                 self.gateway.describe,
+                continuity=self.resident,
+                bind_session=lambda thread_id, model: self.resident.bind(
+                    identity, thread_id, model
+                ),
             )
         return self.jeff
 
@@ -70,6 +77,7 @@ class Application:
                 "activity": self.activity.snapshot(),
                 "messages": messages,
                 "complete": query["complete"],
+                "resident": self.resident.public(),
             }
 
     def send(self, message, actor):

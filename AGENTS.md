@@ -110,8 +110,9 @@ remain design options unless Implementation Status records their evidence.
   comes from its installed native revision. `host/` is the independent parent and
   recovery UI. The iframe receives a message bridge, never operator credentials.
   Flush pending native edits before replacing a live shell.
-- `prompts/jeff.md` incorporates Alex's orientation. Keep his core wording and
-  intent; describe actual capabilities and missing infrastructure accurately.
+- `prompts/jeff.md` preserves Alex's original orientation verbatim. Do not rewrite
+  his text without his direction. Maintain current environment guidance separately
+  in `prompts/runtime.md`; verify both reach the first resumed model turn.
   Authored skills remain versioned package content, separate from this prompt.
 
 Run `uv run pytest -q`, documentation checks, and Ruff for this runtime. VM and

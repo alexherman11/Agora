@@ -158,3 +158,32 @@ Security Addendum from the older `docs` branch as explicitly labeled prototype
 lineage. Their implemented results and boundary lessons are important design
 evidence, while their operation names, module paths and limits do not describe the
 Agora3 runtime unless revalidated there.
+
+## 2026-09-10 — Independent browser applications experiment
+
+- Separate package release, subject identity and open appearance. Notes and
+  Documents can edit one object without copying data or sharing browser globals.
+- Use a generic desktop and a small subject-bound browser protocol. App methods
+  pass through existing native commits; guest-root authority is a separate scope.
+- Retain drafts/selection per appearance, pin running code, and flush before
+  replacing or closing a view. App installation alone does not reload siblings.
+- Author a shared editor/annotation contract once and vendor it into releases.
+  Defer a runtime dependency resolver until an observed need justifies it.
+- Export only installed application source/manifest/digest. Disable applications
+  without deleting content/schema/state; refuse implicit schema migrations.
+- Keep this experiment on its own branch and world. Its tested browser boundary
+  is not a full migration of the research Desk or a multi-user permission system.
+  See docs/Reference/Application Experiment.md for checks and limitations.
+
+## September 10, 2026 — Resident continuity and first-party extraction
+
+- Name the continuing resident JEFF0 and preserve the exact durable model-thread binding across service runs; a failed resume must refuse rather than silently start another identity. The previous ephemeral context is unavailable, so its full native transcript and authored checkpoint form the initial handoff.
+- Carry existing discussion object IDs, original anchor evidence and unfinished drafts into independent Documents views. A bounded declared subject-linked collection and the public editor selection contract provide the required composition without importing editor internals.
+- Declare Markdown/source semantics and UTF-16 object/revision/hash selections explicitly. Shared storage does not authorize silently changing editing semantics, and a refresh must never overwrite another view's unsaved draft.
+- Treat this migration as trusted first-party extraction. Browser capability tests do not establish safe installation of arbitrary untrusted applications or isolation of root-capable guest packages.
+
+## September 10, 2026 — Agora4 integration and authored orientation
+
+- Merge the application runtime into Agora4 while retaining its restored Constitution, full specification, essays and design references. Keep current APIs and evidence in Runtime Guide and Implementation Status rather than replacing the design vault with implementation summaries.
+- Restore Alex's original three-paragraph JEFF orientation verbatim; maintain current runtime guidance separately. Compose both files into base instructions because a compiled-runtime probe found that changed supplemental developer instructions were omitted on the first resumed turn. Preserve the resident's exact conversation instead of resetting it to update the prompt.
+- Point the canonical JEFF0 launcher at Agora4 source while retaining its world path, guest machines and durable conversation binding. A branch integration changes code provenance, not ownership or identity of the existing world.

@@ -1,18 +1,67 @@
 # Implementation Status
 
-**Current source and recorded evidence · September 9, 2026; documentation map
-updated September 10.**
+**Agora4 source, restored design and recorded evidence · September 10, 2026.**
 
 This file is the evidence inventory, not a substitute for the restored design.
 [[Design Commitments]] explains the difference between a durable commitment,
 current implementation, tested behavior, candidate mechanism and open question.
-[[Start Here]] routes the full vision and reference set. No September 10 prose
-change by itself advances the runtime status recorded below.
+[[Start Here]] routes the full vision and reference set. Documentation restoration alone does not advance runtime evidence;
+implementation and checks are recorded separately below.
 
 Documents explicitly labeled **prototype lineage** contain evidence from the
 older `docs` implementation branch. They remain useful, but their results are not
 counted as Agora3 runtime verification unless this file names a corresponding
 Agora3 check.
+
+## Agora4 integration
+
+`agora4` combines its restored design vault with the implementation from
+`experiment/native-applications` through `2a0e60a`, including the combined
+improved-Desk runtime and independent Notes/Documents browser applications.
+They share native content and an editor/annotation contract while keeping separate
+frames, pinned builds, leases, drafts and appearances. Portable application
+export/import and removal preserve user objects. Alex subsequently authorized
+moving the existing resident, named JEFF0, into this application world. The move
+preserves the original journal, conversation, documents, discussions, packages
+and guest workspace. The old native world remains an archive.
+
+Verification: 145 Python tests passed (two optional inventory cases skipped),
+fresh and resumed compiled-runtime inventory cases passed separately with local
+mock inference, and 28 real Edge browser checks passed across the independent
+application lifecycle and migrated-world interactions. See [[Application Experiment]] for exact
+scope, retained evidence and limitations, and `examples/native-applications/`
+for runnable source. Existing research/packet actions and source remain installed;
+their former composite UI has not been extracted into independent applications.
+
+JEFF0 has a protected resident identity and exact durable model-thread binding.
+Service restart resumes that thread; failed resume refuses rather than silently
+starting a replacement. Copying a world does not transfer ownership automatically.
+The previous ephemeral model context could not be recovered: the original native
+transcript and JEFF0-authored checkpoint provide the initial handoff. Native replay
+and model-conversation persistence remain different mechanisms.
+The live handoff and an idle service restart succeeded: the same thread remained
+bound, JEFF0 recalled the preceding exchange and confirmed that he was ready to
+talk. These checks added four native messages and did not modify authored work.
+
+The Agora4 merge also restores Alex's original three-paragraph JEFF orientation
+from his September 6 request. Runtime guidance lives in a separate source file.
+Both are loaded on fresh and resumed conversations. An actual compiled-runtime
+test using local mock inference verifies that the first resumed request contains
+the restored wording and current guidance while retaining preceding history.
+The tested runtime omitted updated supplemental developer instructions on that
+first resumed turn; composing the two files into base instructions resolved this
+without resetting JEFF0. The live Agora4 source switch preserved the resident
+binding and replay integrity; an open Notes appearance saved its view state during
+the switch, so the journal was not byte-identical across the restart. JEFF0 then
+acknowledged the integration on the same model thread, adding two native chat
+messages without invoking tools or modifying authored work.
+
+The sections below retain the September 9 checkpoint evidence. On this branch,
+the combined runtime additionally includes scoped action dependencies, targeted
+package source tools, ordered browser asset assembly and grouped candidate
+checks. Their earlier VM/model experiments were not rerun for this browser-only
+slice. General dependencies, multiple people and guest-package isolation remain
+unimplemented; browser appearance identity is now exercised in the new slice.
 
 ## Current runtime
 

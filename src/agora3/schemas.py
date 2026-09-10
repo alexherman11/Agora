@@ -28,10 +28,15 @@ ALLOWED = {
 
 
 def check_schema(schema, depth=0):
-    if depth > 12 or not isinstance(schema, dict) or set(schema) - ALLOWED:
+    if depth > 12 or not isinstance(schema, dict):
         raise Refusal(
             "Use bounded JSON record/list/scalar schemas, without references or "
             "executable validators."
+        )
+    unknown = set(schema) - ALLOWED
+    if unknown:
+        raise Refusal(
+            f"Unsupported schema keywords: {sorted(unknown)}. Supported: {sorted(ALLOWED)}"
         )
     try:
         Draft202012Validator.check_schema(schema)

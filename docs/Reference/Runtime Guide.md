@@ -24,7 +24,12 @@ not implemented yet. “Living in Agora” currently means acting in the shared 
 and its guest through this adapter.
 
 The editable human orientation is
-[jeff.md](../../src/agora3/prompts/jeff.md). `AGORA_JEFF_MODEL` defaults to
+[jeff.md](../../src/agora3/prompts/jeff.md), restored from Alex's original wording.
+Current environment guidance lives separately in
+[runtime.md](../../src/agora3/prompts/runtime.md). The adapter loads the unchanged
+authored text first, then the labelled guidance, including on the first resumed
+turn. See [prompt provenance](../../src/agora3/prompts/README.md).
+`AGORA_JEFF_MODEL` defaults to
 `gpt-6-astra`; `AGORA_JEFF_REASONING` defaults to `high`. `AGORA_CODEX_BIN` can select
 a compatible Codex executable. An unavailable requested model fails explicitly;
 the harness does not substitute another. `AGORA_JEFF_LOGIN=device` selects the

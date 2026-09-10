@@ -64,6 +64,7 @@ the absence of implementation does not make the product vision disposable.
 | [[Objects and Facets]] | Entities, identity, references, facet schemas, overlays, copy/transfer choices, actions, relationships, projection, storage and everyday examples |
 | [[Native Development]] | Protected native state, Linux execution, source/build/install identities, persistent tools, candidates, shell/chat authorship and development evidence |
 | [[Presentation and Operators]] | Retained visual intent, composition, layout, direct manipulation, preview, truthful rendering and the September 9 experiment |
+| [[Application Experiment]] | Independent Notes/Documents releases, shared content and selections, per-view drafts, discussions and JEFF0 continuity; implemented on Agora4 |
 | [[Personal Lenses]] | Older implemented declarative list/detail lens, revision-pinned activation, recovery and interaction evidence; prototype-lineage status |
 | [[Executable Components]] | Older implemented QuickJS authored-component boundary, scoped effects, candidate worlds and action discovery; prototype-lineage status |
 | [[Astra Harness]] | Earlier managed-account adapter design and runtime-inventory evidence, with current Agora3 differences routed to Runtime Guide |
