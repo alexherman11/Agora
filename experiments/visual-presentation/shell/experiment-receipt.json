@@ -1,0 +1,35 @@
+{
+  "label": "Post-comparison review build; excluded from measured JEFF metrics",
+  "old_source_revision": 3,
+  "build": {
+    "build": "agora.build.4c13d82911884e28aa96c5968fe51751",
+    "digest": "24d98cab83ff2ba35d9f597ecd192d51c4f97cb2bf127e926a5399da5b95c5e3",
+    "diagnostics": {
+      "check": "HTML entry and manifest admitted; browser interaction not yet tested"
+    }
+  },
+  "installation": {
+    "items": [
+      {
+        "id": "agora.installation.agora.shell",
+        "revision": 4,
+        "facets": {
+          "agora.installation": {
+            "package": "agora.shell",
+            "build": "agora.build.4c13d82911884e28aa96c5968fe51751",
+            "digest": "24d98cab83ff2ba35d9f597ecd192d51c4f97cb2bf127e926a5399da5b95c5e3",
+            "source_revision": 4
+          }
+        },
+        "written_by": "human",
+        "event": 59
+      }
+    ],
+    "watermark": 59
+  },
+  "changes": [
+    "Use installed action registry field actions",
+    "Preserve unchanged reference-card text nodes",
+    "Preview styles and composition transiently; close restores retained intent"
+  ]
+}

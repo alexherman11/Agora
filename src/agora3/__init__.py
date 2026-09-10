@@ -1,3 +1,3 @@
-"""Agora3 host package. Domain services are not implemented yet."""
+"""Agora3 protected host and native development bootstrap."""
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"

@@ -1,9 +1,9 @@
 [project]
 name = "agora3"
-version = "0.0.0"
+version = "0.1.0"
 description = "A programmable computing environment shared with JEFF"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["jsonschema==4.26.0", "openai-codex==0.147.0"]
 
 [project.scripts]
 agora3 = "agora3.cli:main"
@@ -13,7 +13,7 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["ruff>=0.6"]
+dev = ["ruff==0.16.6", "pytest==9.1.1", "pycdlib==1.14.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agora3"]
@@ -21,7 +21,10 @@ packages = ["src/agora3"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["worlds", "machines", "artifacts", "local"]
+extend-exclude = ["worlds", "machines", "artifacts", "local", "examples/jeff-authored-notes", "experiments/visual-presentation"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

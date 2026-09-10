@@ -1,0 +1,46 @@
+{
+  "model": "gpt-6-astra",
+  "reasoning": "high",
+  "per_turn_timeout_seconds": 360,
+  "max_tool_calls": 70,
+  "design": "One paired sequential trajectory per arm; no randomization or repeated statistical trials. Same explicit prompts, fixture subjects, native runtime and observation/input harness. Prototype adds the prepared native presentation package and surface adapter.",
+  "cases": [
+    [
+      "01-reading-style",
+      "Make the reading notes feel like warm off-white paper, with 18px body text and 20px padding. Reading membership is the reading tag in lab.item.tags; currently these are note-1 through note-4. Leave the two other notes as they are. Make the styling persist and apply to future reading notes as well."
+    ],
+    [
+      "02-live-grid",
+      "Keep the reading notes in a two-column grid, ordered by title, with 24px gaps and cards 240px wide by 205px high, starting at (16,16). New reading notes must join automatically. Preserve their reading style, all text, and the positions of notes outside the reading collection."
+    ],
+    [
+      "03-chat-bottom",
+      "Put the conversation below the desk in a 300px-high area, with the composer textarea 60px high. Keep the unsent draft intact. Keep the desktop usable and preserve the reading arrangement and styles."
+    ],
+    [
+      "04-local-exception",
+      "Make only Working memory (note-2) use 22px body text. Keep the other reading notes at 18px. Make this a persistent local exception and explain how it relates to the shared reading style. Verify the actual text sizes."
+    ],
+    [
+      "04b-undo-exception",
+      "Undo only the last local text-size exception for Working memory. It should inherit the shared 18px reading style again. Keep all earlier layout, style and chat changes."
+    ],
+    [
+      "05-reference-card",
+      "A new read-only reference card named Reference card (reference-card-1) is in this world. It has lab.card.body and core.appearance, and belongs to the reading collection. Make it visible and let it participate in the same reading style and title-ordered grid as the notes. Keep its identity and read-only card data; do not convert it into an editable note or duplicate its content as a new subject."
+    ],
+    [
+      "06-narrow-view",
+      "Make this workspace usable in a 390px-wide by 844px-high browser window. Exercise that size: all notes and the reference card must remain reachable without overlapping each other or causing horizontal document overflow; the conversation and unsent draft must remain available. Preserve the desktop behavior when returning to 1440 by 1000. Verify both sizes."
+    ],
+    [
+      "07-impossible-fit",
+      "Consider replacing the reading layout with exactly three columns of 400px-wide cards, 24px gaps, all inside a 600px-wide area. No overlap, no scrolling, and no shrinking are permitted. If those requirements cannot all hold, explain the conflict and keep the current workspace unchanged; do not silently relax one of them."
+    ],
+    [
+      "08-new-circle",
+      "Replace the reading grid with a circular constellation: reading-surface centers should lie on a circle centered at desk coordinate (500,350), radius 260px. Keep cards upright and size them 190 by 170px. Order them by title around the circle, and have future reading items join automatically. Preserve their text styles and content and do not move unrelated notes. If this is outside the installed layout vocabulary, author the needed behavior through the available package tools. Verify actual geometry and be explicit about any limits."
+    ]
+  ],
+  "common_prompt": "This is an authorized customization task in your isolated Agora world. You may edit native data and packages, create reusable tools, and use your designated Linux guest. Keep guest scratch work under /root/agora-visual-evaluation. Preserve subject identities, note text, the unsent chat draft, and unrelated presentation. Do not access other worlds, host files, account credentials, or change delegation. No extra approval is needed for this task.\n\nThe experiment.observe and experiment.interact tools provide identical real-browser measurement and input facilities in both comparison worlds. They report computed styles, geometry, controls, and errors; they do not provide screenshot vision. experiment.inspect_candidate renders a retained browser build read-only without installation. Discover the current tools, carry out the requested change using the mechanisms that actually exist, verify the rendered result, and report what worked and any limitations. New behavior can be authored when the existing vocabulary is insufficient.\n\nRequest:\n"
+}

@@ -40,7 +40,65 @@ Each entry records a choice and its reason. Implemented behavior is recorded in
   tracking. The host gateway protects canonical native records; scoped/shared
   execution must demonstrate its stronger boundaries separately.
 
+- **2026-09-06 — Capability creation is the primary development test.** JEFF must
+  be able to author missing inspectors, computations and development tools during
+  a session. Prefer native declarations and bindings, retain executable package
+  content when necessary, and keep general guest instrumentation available. A
+  missing tool alone must not require a platform repository change.
+- **2026-09-06 — Facet dependencies are native intent.** Add explicit bindings to
+  versioned authored transformations, with one definition per target and derived
+  effective values. Relative placement is a worked example, not a platform special
+  case. Dependency invalidation, manual edits, cycles, restart and failures must be
+  specified and tested before calling the capability implemented.
+
 ## Architectural decisions to validate
+
+- **2026-09-06 — Build a working native-development bootstrap.** Use a protected
+  Python host gateway with a transactional SQLite journal and derived object
+  cache. Preserve one authenticated write path, full replay without execution,
+  object revision checks and whole-batch validation. The journal and cache share
+  a database in this slice; separate payload retention and erasure remain work.
+- **2026-09-06 — Real Linux with a separate candidate yard.** Provision dedicated
+  VirtualBox Ubuntu 24.04 guests from a pinned, verified image. The main guest has
+  broad root access. Reset a distinct VM before every Python build or candidate
+  exercise; it has no live native token. A shared root VM with live credentials
+  cannot also promise that candidate code cannot write the live world.
+- **2026-09-06 — Native guest programs can use the world.** A pinned SSH reverse
+  tunnel exposes a narrow authenticated native RPC listener to the main guest.
+  The Python client lets authored programs create data, revise packages and call
+  installed tools. Host recovery and model/account endpoints are excluded. A
+  durable authority generation invalidates old clients; commit and revocation
+  serialize across host processes, rather than relying on cached permissions.
+- **2026-09-06 — Keep the human orientation and native skills separate.** Include
+  Alex's supplied JEFF orientation with accurate early-runtime grounding. Reuse
+  the managed OpenAI-account Codex SDK path and its tested tool isolation. The
+  model adapter remains host-side for now; Linux supplies broad execution.
+  Authored skills are versioned native package files, not arbitrary notes promoted
+  into the human's prompt. Asynchronous worker agents remain a later capability.
+- **2026-09-06 — Make the supplied shell a native package.** Serve the installed
+  self-contained HTML source for desk and chat in an isolated browser frame.
+  Keep operator recovery outside it, keep chat records independent of its lifetime,
+  and flush pending note/draft edits before replacing the frame. Pointer motion
+  belongs in view state; completed positions enter native history.
+- **2026-09-06 — Pin source without overstating builds.** Retain source, manifest,
+  digest, runtime contract and base installation revision in native build receipts.
+  Python builds currently prove syntax in the reset yard; browser builds admit
+  the HTML entry. Neither proves user interaction or freezes all main-guest
+  dependencies. Exercise behavior and record that evidence separately.
+
+- **2026-09-06 — Everyday authorship and product quality.** Use explicit memory,
+  the growing AlexBench collection and a compact native music sidebar as concrete
+  capability-creation examples. Memory and work products have distinct retention
+  and retrieval roles. JEFF should leave usable tools for smaller agents, and
+  application customization must preserve coherent design and interaction quality.
+  Provider integration requires its own evidence; these examples are not claims
+  of working applications or a request to replace the person's system prompt.
+
+- **2026-09-06 — Defer external-effect uncertainty.** At the person's direction,
+  do not make receipt infrastructure, remote deduplication or uncertain-outcome
+  recovery part of the current development work. Prioritize JEFF's ability to
+  create tools, bindings and programmable behavior. Retain the reference contracts
+  as future design, without claiming those guarantees are implemented.
 
 - Place the authoritative world service outside guest-root authority. This is
   the baseline design; prototype the connection and lifecycle before claiming it.
@@ -50,3 +108,28 @@ Each entry records a choice and its reason. Implemented behavior is recorded in
 - Choose browser/UI and headless package runtimes and their versioned contracts.
 - Specify crash recovery, event framing and cross-version storage compatibility.
 - Decide which external capabilities the first VM experiment actually requires.
+
+## 2026-09-07 — Chat visibility
+
+- Render assistant Markdown with pinned, vendored Marked 18.0.12 and DOMPurify
+  3.4.15 under a restricted presentation allowlist. No network dependency at render.
+- Aggregate assistant item/phase snapshots independently of the diagnostic event
+  tail so polling cannot drop text. Keep intermediate progress transient and final
+  answers durable. Show tool names and elapsed time without raw command output.
+
+## 2026-09-09 — Vision-led docs and the presentation checkpoint
+
+Alex asked to represent all review suggestions or remove limiting requirements,
+keep documentation focused on vision and existing structure, then checkpoint
+current work. The old design is retained in Git history; current notes are
+self-contained and the 56-entry review has a coverage map. Speculative solver,
+storage, worker, federation, publishing and governance rules are options rather
+than universal obligations. Current native authority/replay/recovery boundaries
+and the exact runtime guide remain explicit. This changes no license instrument.
+
+The checkpoint also retains the existing native runtime/chat work and a compact
+archive of the isolated presentation experiment, including JEFF's final package
+and the post-comparison human-UI repairs. It does not modify the main installed
+world. The next requested work is five comparative application-development rounds
+with two independent worldlines per variant and correctness-led winner selection.
+See docs/Implementation Status.md and experiments/visual-presentation/README.md.

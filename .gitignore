@@ -10,7 +10,9 @@ dist/
 .env.*
 !.env.example
 worlds/
-machines/
+machines/*
+!machines/README.md
+!machines/machine.example.json
 artifacts/
 local/
 *.db
