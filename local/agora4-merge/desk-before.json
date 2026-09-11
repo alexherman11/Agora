@@ -1,0 +1,52 @@
+{
+  "world": "C:\\Projects\\Agora\\worlds\\jeff0-desk\\world",
+  "port": 8873,
+  "source_arm": "r5/b2",
+  "machines": {
+    "live": {
+      "source_vm": "0feb8868-d4eb-4e3c-8bf6-a7d8c4cbda2d",
+      "source_snapshot": "24307ec6-ef3b-4144-ac06-991978a97759",
+      "vm_id": "bbdd25e7-1e05-4d94-a257-168cd78b04da",
+      "port": 22601,
+      "name": "Agora3-Improved-Desk-live-bbdd25e7",
+      "config": "C:\\Projects\\Agora\\worlds\\improved-desk\\machines\\live\\machine.json"
+    },
+    "yard": {
+      "source_vm": "ae9e7b3a-ead8-42a2-a335-baf9e5fcc8fe",
+      "source_snapshot": "150044ab-520e-4d9e-bfee-6bbba23d5176",
+      "vm_id": "32cea95c-58f1-4cc9-8351-916e5d4628c3",
+      "port": 22602,
+      "name": "Agora3-Improved-Desk-yard-32cea95c",
+      "config": "C:\\Projects\\Agora\\worlds\\improved-desk\\machines\\yard\\machine.json"
+    }
+  },
+  "source_hashes": {
+    "src\\agora3\\__init__.py": "fe1f0638197991e3ac24406bf309b57bf4b82267547754d200927303d1b96f40",
+    "src\\agora3\\bridge.py": "88df8bfa4891c47cb19d02556496407f61d78d7880adfe96925330c2f63be26c",
+    "src\\agora3\\browser_assembly.py": "98451b46b7250467555cca548ac24c364f0f04a4f3e0715aa203f2f97a1da12c",
+    "src\\agora3\\builtin\\shell\\CHAT-DEPENDENCIES.md": "739010d4ec2575836b24a303dcedf0af26a16fa118c40a52d7d8bdff1c9a4c2c",
+    "src\\agora3\\builtin\\shell\\index.html": "8dfe1e7340c7b94eb3baaeb4df70783dd1a7a0a4e6403e697e33342dfe4687df",
+    "src\\agora3\\chat_activity.py": "d893c05e3d738b8631da973b6a68a1d75a95b34255e087c5c87f5e9ea7bc16b4",
+    "src\\agora3\\check_tools.py": "954ca8b94ea3b212897daee10f170cf5d6c471a99f2948cf164c4401d529b83a",
+    "src\\agora3\\cli.py": "035fe216657a22b23090dc24e36cc0aa767208e98bed2306dd663c2879a1c7ee",
+    "src\\agora3\\gateway.py": "89a7db683efc05873fb316f113590534058a9572025b02f4d1638fa1312d4b35",
+    "src\\agora3\\guest.py": "e4a8857d2bb8c774371bb432314bbfe8ca962c225ef94a95153676467acff061",
+    "src\\agora3\\host\\frame.html": "c2d42db8dd96880b85a9d7b32fb53227cfbe35fcb2af281547cc8b409cd00568",
+    "src\\agora3\\host\\recovery.html": "cb2adad56cfd37ad7e48ccfc4a8ae4fd7b68f1c0d3e289bcfab130128fdf7911",
+    "src\\agora3\\http_transport.py": "862a1c7370d7057fea872342c2c6365c5f22284e6202810cdb28743319f83a8f",
+    "src\\agora3\\jeff.py": "ead1987858fb0eee7d5d6fa28011b7051a4a2a3db3d267056f77978683c24d53",
+    "src\\agora3\\locking.py": "bd76a587fa92486d172c96cbc929ee08ae4f9b0a3bc27b4c16994692e74b7ee5",
+    "src\\agora3\\package_catalog.py": "0d8d277bb38bd6b47d220fdf512cbd0f3c4216663d16a432c10e476cbdc2a3a1",
+    "src\\agora3\\packages.py": "32c1f6bff684beaff789e42878e3e311fdfa8a9f8fa7f25fca65739dcdca8d25",
+    "src\\agora3\\prompts\\jeff.md": "77306d7808b04ae425d32ad737a853f35f2e656c03ad507ffb22ec583ae33955",
+    "src\\agora3\\schemas.py": "7473700f3b803865e6c8f57ecfa4551a4c8c6aaeb49e826f9c389bb9ea4d5e06",
+    "src\\agora3\\scoped_context.py": "9d7c220d04e9462ebee5d991e728c040c80e317067de53c7be27ed901cd0b6f1",
+    "src\\agora3\\server.py": "02fa30660f68cac256a528e8e254edad3287308ca27d79e4e714f150be374b40",
+    "src\\agora3\\source_tools.py": "e425e9d1572083604c8029f5d796ad53c3c2a250be75f158e1d0709050980538",
+    "src\\agora3\\world.py": "38ee72d9618d90dc269212132a72d8563c6e2739f825550b8a571a0357cea1be",
+    "src\\agora3\\yard.py": "13b624b6e3698969604f47fd8fae216e6968b773bd9afd75c8f317c867dc156b"
+  },
+  "resident": "jeff0",
+  "source_repository": "C:\\Projects\\Agora\\worlds\\application-experiment\\repo",
+  "runtime_commit": "2a0e60a"
+}

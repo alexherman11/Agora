@@ -1,0 +1,12 @@
+{
+  "branch": "agora4",
+  "commit": "d397482a54db28fa868ed26110b06c7af869e016",
+  "worktree_clean": true,
+  "resident_binding_unchanged": true,
+  "replay": {
+    "ok": true,
+    "objects": 1259
+  },
+  "live_acknowledged": true,
+  "messages": 40
+}

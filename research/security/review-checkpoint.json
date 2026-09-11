@@ -175,11 +175,11 @@
   "artifacts": [
     {
       "path": "docs/Start Here.md",
-      "sha256": "DF5B6E32DD17E2E3EA1A7D70A72BA42BBC0EC467244858DA9BEF594D9AE8A5A4"
+      "sha256": "A4AA9CFF02486BE13D25C852AB71D3A4521F51984811147E9CB07915C08757DE"
     },
     {
       "path": "research/security/scoped-collaboration.md",
-      "sha256": "0C11C8F3AF469CCA5A261BA44610257800B205E9E32EC9928064E4B0AC92A252"
+      "sha256": "3D2E4658BDC39FB733E93DFFFB29AD4FFDC04C0FE1A559F5DE8AC52F6EDD71C6"
     },
     {
       "path": "research/security/composed-export-model.md",
@@ -187,17 +187,21 @@
     },
     {
       "path": "research/security/m1-choke-point-review.md",
-      "sha256": "22F95D1BA7A8BA357F249F626083B877C80D473D10A2B3528E434149C715EC48"
+      "sha256": "D218A5FD02FF140352A88F28486AEDC0F68CBB675CB69BCE1F0C3DB6E82889A3"
+    },
+    {
+      "path": "research/security/executable-admission-and-preview-review.md",
+      "sha256": "5682E8FCCFBA2D59CB5E934BF08A2683B40EE68BE2E055BA0AAA67C334589362"
     }
   ],
   "coverage_limits": [
     "Static review only; committed project tests and runtime behavior were not executed.",
     "No .env content, provider credential, world data, external service, or production resource was accessed.",
-    "Files not listed in sources must not be treated as reviewed; some listed design files have explicitly targeted coverage.",
+    "Files not listed in the applicable review run's sources must not be treated as reviewed; some listed design files have explicitly targeted coverage.",
     "The checkout was clean at review start; the security artifacts and research-index edit are uncommitted review output.",
     "Source fingerprints and a commit identify observed versions; they are not security attestations."
   ],
-  "next_question": "Have M1-C1 and M1-C2 been closed with a synthetic ingress root and authenticated shell, without adding another file-read path? If not, continue the private-preview artifact investigation.",
+  "next_question": "What is the smallest local-adoption record and runtime compatibility identity that lets safe updates flow automatically while ensuring a fork, merge, restore, or foreign world can never carry executable authority with it?",
   "automation_setup": {
     "recorded_at_utc": "2026-08-31T19:22:38.8446109Z",
     "automation_id": "agora-security-review",
@@ -310,6 +314,102 @@
       ],
       "evidence_state": "Static review of named files and committed tests. No project code, tests, model calls, exploit, or credential content executed or read.",
       "artifact": "research/security/m1-choke-point-review.md",
+      "implementation_tests_run": false
+    },
+    {
+      "review_date": "2026-09-09",
+      "captured_at_utc": "2026-09-09T16:18:59.3658692Z",
+      "trigger": "agora-security-review heartbeat",
+      "git_repository_present": true,
+      "head_commit": "5ad7c0af98bfa556a57343b31c5c4486f311c08d",
+      "previous_head_commit": "80a43dadd7220a61e49d67b999087286b17b9709",
+      "branch": "docs",
+      "working_tree_at_start": "clean",
+      "change_scope": "One commit with 208 changed files and 41,240 insertions was present. Review was focused on prior M1 gates, executable components, candidate artifacts, component admission, and the Codex runtime capability boundary; unlisted changes were not reviewed.",
+      "investigation": "Whether private executable-component preview artifacts or portable admission can escape through future collaborative version histories",
+      "result": "Candidate effects are isolated from the live world, but successful tests persist complete case bodies in transferable world history, and admission plus active display state is not bound to a local adopter, runtime contract, or revocation domain. Before shared worlds, split redacted portable evidence from non-transferable local adoption and fail closed on foreign, restored, or runtime-incompatible activation.",
+      "prior_gate_follow_up": {
+        "M1-C1": "Statically closed for the local prototype by explicit bounded import roots, checks before preparation, post-resolution validation, and deferred blob writes. General grant-plan semantics remain later scope.",
+        "M1-C2": "Statically closed by launch session, host/origin checks, a mutation token, and server-bound actor identity.",
+        "evidence": "Relevant committed tests were inspected but not executed. No second caller-controlled host-file read path was found in reviewed production modules."
+      },
+      "findings": [
+        {
+          "id": "PA-C1",
+          "gate": "Before shared worlds or synchronized application-development artifacts",
+          "status": "Static design finding",
+          "summary": "Passing component tests persist complete case bodies in core.component-test. Cases can contain private-derived expected text, values, state, or node properties; the protected-write rule prevents forgery but does not prevent read, projection, replay, fork, or future synchronization.",
+          "locations": [
+            "kernel/component_testing.py:61",
+            "kernel/component_testing.py:71",
+            "kernel/component_schema.py:53",
+            "kernel/project.py:105",
+            "kernel/verbs.py:109"
+          ]
+        },
+        {
+          "id": "PA-C2",
+          "gate": "Before foreign world import, shared forks, rollback, or automatic component updates",
+          "status": "Static design finding",
+          "summary": "Component admission and active display selection are portable world facets. Admission binds only a definition digest, so it carries no recipient/adopter identity, runtime and validator contract, policy ceiling, expiry, or revocation generation.",
+          "locations": [
+            "kernel/component_commands.py:98",
+            "kernel/component_commands.py:122",
+            "kernel/component_commands.py:127",
+            "kernel/component_data.py:33",
+            "kernel/component_data.py:79"
+          ]
+        },
+        {
+          "id": "PA-I1",
+          "gate": "Before candidate operations are available to remote or mutually untrusted callers",
+          "status": "Availability and minimization finding",
+          "summary": "Every component test or interactive candidate copies and replays the complete append-only world log. Cost and temporary private residue scale with total history rather than the declared component binding closure.",
+          "locations": [
+            "kernel/component_testing.py:19",
+            "kernel/component_testing.py:21",
+            "kernel/component_candidates.py:42",
+            "kernel/component_candidates.py:46",
+            "kernel/events.py:201"
+          ]
+        }
+      ],
+      "reviewed_sources": [
+        {"path": "AGENTS.md", "sha256": "5EC39035FA2319E8EA5344E11E3BEBDE6A82D85407CD2791E63C48DBCBF5440D", "coverage": "Full applicable project instructions from the supplied context; workspace copy fingerprinted."},
+        {"path": "docs/Start Here.md", "sha256": "A4AA9CFF02486BE13D25C852AB71D3A4521F51984811147E9CB07915C08757DE", "coverage": "Targeted read and research-index update only."},
+        {"path": "docs/Reference/Security.md", "sha256": "31EEB16CB1D5A44D927252670857435B03553BAC47F6842F67FF47A028502B90", "coverage": "Full read."},
+        {"path": "docs/Reference/Security Addendum.md", "sha256": "826A9622EA771D1EC9816F3AA9952DD70CAF4944A50541D36A760AFB5CBCBB96", "coverage": "Full read."},
+        {"path": "docs/Reference/Executable Components.md", "sha256": "F484E2BB261E857D96A17FC8C53809DF5EC918A8586CCAC5D50047407CC017E9", "coverage": "Full read; component inputs, effects, candidate, activation, runtime, and stated scope."},
+        {"path": "docs/Reference/Personal Lenses.md", "sha256": "7909E1CC4FC864720B15959E3E1F0EEA17FA58AA8B6EEA49E4456482E608CF4D", "coverage": "Full read for display activation and recovery context."},
+        {"path": "docs/Reference/Astra Harness.md", "sha256": "78F63AC210ACCF8CA6F0D06ACC15AE0702F4A6F63094A52B2FA4D3A7C4AAE23F", "coverage": "Full read for model-provider and capability claims."},
+        {"path": "kernel/imports.py", "sha256": "2818280690340EF90112C451828D35B34174E3428252FB4DF64412E614978A09", "coverage": "Full static read."},
+        {"path": "kernel/verbs.py", "sha256": "09C31D3B5FB00EA106C16F5D8F7A3E6CC425247893F1916D1676BDB8CE7AB350", "coverage": "Full static read."},
+        {"path": "shell/session.py", "sha256": "3B0B1A7E538DACB9633D549B53B9FECEBF5B30774470A4ED6DD4BD7AE30D5F37", "coverage": "Full static read."},
+        {"path": "shell/server.py", "sha256": "CF39998216E0BD368A3AC1B3A360A9D63F1433C6EECE523E24F9986FE69D4550", "coverage": "Full static read; shell auth, actor binding, import-root configuration, and JEFF endpoints."},
+        {"path": "kernel/component_api.py", "sha256": "49A205E4A6C1C81FDAAF4C66F812D2F9A0598AAB5822ED5F0DA0F72607BEE83D", "coverage": "Full static read."},
+        {"path": "kernel/component_candidates.py", "sha256": "2799A44487C3F778E36B3F8633EB5155575C3A91737C8CB15C6C0E711BCDBE8A", "coverage": "Full static read."},
+        {"path": "kernel/component_commands.py", "sha256": "5CA64D61824BB3FD38FFE1812BBF8B902C4117A506ECF65EE1F01FA1A0F1773D", "coverage": "Full static read."},
+        {"path": "kernel/component_data.py", "sha256": "D0F20FE85D3A653F73398CF3C795D8044099DC5EE0DCDA1B356DAEE3AB394550", "coverage": "Full static read."},
+        {"path": "kernel/component_effects.py", "sha256": "30F83E1E25367EAA564176EAA3A96B9B79A63F24C6CEE03A2E922003F2F97334", "coverage": "Full static read."},
+        {"path": "kernel/component_runtime.py", "sha256": "2C56937638B7026C4F20F7A3CECCCEFD68CFC88074562E0AD556EE29A7FEA01D", "coverage": "Full static read."},
+        {"path": "kernel/component_schema.py", "sha256": "2649FE5FF0FF3973906741ECF94882240DC9982F0DBC516819C81FC2B06998B3", "coverage": "Full static read."},
+        {"path": "kernel/component_testing.py", "sha256": "5DAF3B4AAE8692162C8E5CED5E52B4B2ACBBE0F4A9D8145B59E59D7C028C2EED", "coverage": "Full static read."},
+        {"path": "kernel/component_tree.py", "sha256": "C1737903D0312551A4BC30BABA48777C9628C74C80917750CACB8B3B785147D7", "coverage": "Full static read."},
+        {"path": "component_runtime/host.py", "sha256": "9E661D1686755440BE6301A86E1D0A24564633E60ABB1EFED73A6832D4546A6A", "coverage": "Full static read."},
+        {"path": "component_runtime/runner.py", "sha256": "4C9DD242DEAA5BAA52C08A49FF0CF1B6F566CDEDC21DFB9F10177516B64C0342", "coverage": "Full static read."},
+        {"path": "shell/components.js", "sha256": "C5FD2D753177AA2AE75643F214F24250774DB9CA4968560C2CF9C9648C1AB49E", "coverage": "Full static read."},
+        {"path": "jeff/codex_agent.py", "sha256": "AD6D7CAFA08807A164BC49959CE10BEC1BF036DDE46CF6FE55F89BA705488F89", "coverage": "Full static read; tool dispatch, thread configuration, cancellation, and output path."},
+        {"path": "jeff/codex_config.py", "sha256": "3DB30E987836EA19B6E421FDF64DB948E3183CE70A43B5A6D57F92BBC453C9AC", "coverage": "Full static read."},
+        {"path": "tests/test_components.py", "sha256": "F0397C7BDB54C383C18A983C9344BD35C643BB5193FF82A1E36C4287D8B64581", "coverage": "Full static read; not executed."},
+        {"path": "tests/test_codex_runtime.py", "sha256": "9D72360A75389A6A2CC5DF61FC93596DB17C691965AB48778B7E7D96274DDCAB", "coverage": "Full static read; not executed."},
+        {"path": "tests/test_repairs.py", "sha256": "C6E3974CB3A32EC53C061A105DC46E40E8566194CD908660F25C146666C6D4A9", "coverage": "Full static read; not executed."},
+        {"path": "tests/test_lenses.py", "sha256": "DDD3C34AAE481B57C010FFAE8970FCC55F83ACEFE873FFE7F2091BC0D40772A7", "coverage": "Targeted static read of session and stop tests; not executed."},
+        {"path": "research/security/scoped-collaboration.md", "sha256": "3D2E4658BDC39FB733E93DFFFB29AD4FFDC04C0FE1A559F5DE8AC52F6EDD71C6", "coverage": "Full read and focused update."},
+        {"path": "research/security/m1-choke-point-review.md", "sha256": "D218A5FD02FF140352A88F28486AEDC0F68CBB675CB69BCE1F0C3DB6E82889A3", "coverage": "Full read and static follow-up appended."},
+        {"path": "research/security/executable-admission-and-preview-review.md", "sha256": "5682E8FCCFBA2D59CB5E934BF08A2683B40EE68BE2E055BA0AAA67C334589362", "coverage": "New advisory artifact produced by this review."}
+      ],
+      "evidence_state": "Static review only. No repository code, project test, hook, build, model call, account, credential, private world, or external service was executed or read. Prior validation reports were treated as recorded evidence, not reproduced results.",
+      "artifact": "research/security/executable-admission-and-preview-review.md",
       "implementation_tests_run": false
     }
   ],

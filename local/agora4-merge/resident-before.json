@@ -1,0 +1,20 @@
+{
+  "event": 1483,
+  "facets": {
+    "agora.agent": {
+      "checkpoint": "jeff0.continuity",
+      "continuity": "Transferred from the retained Desk with its entire native journal and JEFF0's authored jeff0.continuity checkpoint. The previous runtime used an ephemeral model thread; its hidden internal context cannot be recovered. The full retained native transcript and checkpoint bootstrap this first durable conversation. Subsequent runs must resume its exact saved thread, never silently replace it.",
+      "id": "jeff0",
+      "name": "JEFF0",
+      "owner_world": "C:\\Projects\\Agora\\worlds\\jeff0-desk\\world",
+      "session": {
+        "model": "gpt-6-astra",
+        "provider": "openai",
+        "thread_id": "01a08da1-e73e-7340-a283-45ca0cbb56b8"
+      }
+    }
+  },
+  "id": "agora.agent.resident",
+  "revision": 2,
+  "written_by": "jeff:jeff0"
+}

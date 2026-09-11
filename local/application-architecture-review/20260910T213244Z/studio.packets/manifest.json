@@ -1,0 +1,150 @@
+{
+  "actions": {
+    "apply_import": {
+      "description": "Explicit atomic import from a retained preview. Validates again; exact retries return the original mapping without duplicate copies. Stale/cancelled/colliding inputs refuse.",
+      "entry": "packet.py:apply_import",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "checksum": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "preview_revision": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "preview_revision",
+          "checksum"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "attempt_id"
+        ],
+        "queries": [
+          [
+            "core.collection"
+          ]
+        ]
+      }
+    },
+    "cancel": {
+      "description": "Cancel a pending attempt durably; creates no collection/documents and prevents later apply. Applied copies are not deleted.",
+      "entry": "packet.py:cancel",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt_id"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "attempt_id"
+        ]
+      }
+    },
+    "export_packet": {
+      "description": "Export 1\u20138 native documents and required current/historical source evidence as retained v2 including bounded anchored threads JSON. No fetch/proposals. Returns packet_json and packet_id.",
+      "entry": "packet.py:export_packet",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "document_ids": {
+            "items": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_ids"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "queries": [
+          [
+            "studio.document"
+          ],
+          [
+            "studio.citation"
+          ],
+          [
+            "studio.citation-history"
+          ],
+          [
+            "studio.source"
+          ],
+          [
+            "studio.packet-history-event"
+          ],
+          [
+            "studio.comment-thread"
+          ]
+        ]
+      }
+    },
+    "preview": {
+      "description": "Validate a v1/v2 JSON packet and retain a preview only. Supply a stable 8\u2013128 character attempt_token for retries; no collection/documents yet.",
+      "entry": "packet.py:preview",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_token": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "collection_name": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "packet_json": {
+            "maxLength": 2097152,
+            "type": "string"
+          }
+        },
+        "required": [
+          "packet_json",
+          "collection_name",
+          "attempt_token"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "queries": [
+          [
+            "core.collection"
+          ],
+          [
+            "studio.packet-attempt"
+          ]
+        ]
+      }
+    }
+  },
+  "description": "Portable bounded data-only research handoffs with preview, atomic copy and idempotent attempts.",
+  "name": "Research packets",
+  "runtime": "python-1",
+  "skills": {
+    "research-packets": "usage.md"
+  }
+}

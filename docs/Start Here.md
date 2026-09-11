@@ -58,7 +58,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | `research/object-facet-review/` | [[ASSESSMENT]], executable toy counterexamples, an illustrative example world |
 | `research/graph-memory/` | memory for a world of objects; start at [[operating-system-memory]] |
 | `research/holistic-review/` | [[holistic-assessment-2026-09-04]], baseline probes, and implementation validation |
-| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], and [[m1-choke-point-review]], follow-ons and implementation reviews for the security model |
+| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], [[m1-choke-point-review]], and [[executable-admission-and-preview-review]], follow-ons and implementation reviews for the security model |
 
 ## Conventions
 

@@ -1,0 +1,220 @@
+{
+  "actions": {
+    "create": {
+      "description": "Create one bounded thread from a current exact UTF-16 selection.",
+      "entry": "comments.py:create",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "type": "string"
+          },
+          "document_revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "end": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "message": {
+            "maxLength": 3000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "quote": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "document_id",
+          "document_revision",
+          "start",
+          "end",
+          "quote",
+          "message"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "document_id"
+        ],
+        "queries": [
+          [
+            "studio.comment-thread"
+          ]
+        ]
+      }
+    },
+    "list_threads": {
+      "description": "List all threads with current conservative anchor locations.",
+      "entry": "comments.py:list_threads",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "document_id"
+        ],
+        "queries": [
+          [
+            "studio.comment-thread"
+          ]
+        ]
+      }
+    },
+    "reanchor": {
+      "description": "Explicitly replace current anchor; immutable original evidence retained.",
+      "entry": "comments.py:reanchor",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "type": "string"
+          },
+          "document_revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "end": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "quote": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "thread_revision": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "thread_id",
+          "thread_revision",
+          "document_id",
+          "document_revision",
+          "start",
+          "end",
+          "quote"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "document_id",
+          "thread_id"
+        ],
+        "queries": [
+          [
+            "studio.comment-thread"
+          ]
+        ]
+      }
+    },
+    "reply": {
+      "description": "Append a message; eight total maximum.",
+      "entry": "comments.py:reply",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "maxLength": 3000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "thread_revision": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "thread_id",
+          "thread_revision",
+          "message"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "thread_id"
+        ],
+        "queries": [
+          [
+            "studio.comment-thread"
+          ]
+        ]
+      }
+    },
+    "set_status": {
+      "description": "Resolve or reopen without changing anchor or messages.",
+      "entry": "comments.py:set_status",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ]
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "thread_revision": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "thread_id",
+          "thread_revision",
+          "status"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "thread_id"
+        ],
+        "queries": [
+          [
+            "studio.comment-thread"
+          ]
+        ]
+      }
+    }
+  },
+  "name": "Anchored comments",
+  "runtime": "python-1",
+  "skills": {
+    "anchored-comments": "usage.md"
+  }
+}

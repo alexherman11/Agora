@@ -98,3 +98,32 @@ No case below was run in this review.
 The M1 commit includes a substantial invariant-oriented test suite, but this heartbeat did not execute it. Existing tests cover validation refusal, ordinary replay, a deliberately torn tail, projections, the shell happy path, and boundary imports. They do not cover the disclosure chain, request authentication, precheck ordering, recursive scenes, or concurrent tail application.
 
 The recommended M1 boundary is a configured, synthetic ingress directory plus launch authentication for the shell. A single-use import ticket belongs with the trusted surface and broker in the later spine; implementing a miniature grant system now would fight the project's scope discipline. The next review should check whether M1-C1 and M1-C2 were closed without adding another file-read path. If no implementation change is ready, the open private-preview artifact investigation remains the next research question.
+
+## Static follow-up — 9 September 2026
+
+Commit `5ad7c0af98bfa556a57343b31c5c4486f311c08d` materially closes the two
+immediate M1 gates identified above. This is a focused static follow-up, not a
+rerun of the original review or of the committed tests.
+
+- **M1-C1 — implemented for the local prototype, statically verified.**
+  `kernel/imports.py` resolves imports beneath explicit roots, reads at most 8 MiB,
+  and revalidates the transformed facet. `mint` and `attach` call their authority
+  and grant hooks before preparation; blobs are written only after the complete
+  request has prepared successfully. The trusted CLI authorizes an exact path and
+  the shell accepts configured roots. No second caller-controlled host-file read
+  path was found in the reviewed production modules.
+- **M1-C2 — implemented, statically verified.** `shell/session.py` adds a
+  launch-scoped token, trusted-host and same-origin checks, an HttpOnly strict
+  cookie, a required mutation header, content-type and request-size limits, and
+  no-store/CSP headers. `shell/server.py` derives the actor from the configured
+  viewer and refuses an actor field in `/verb` input.
+- **M1-C3 — still a stated later-scope limitation.** The general hooks retain the
+  narrow `(world, actor, verb, entity)` signature and always allow. The current
+  development guide explicitly leaves the multi-user grant system for later;
+  component-specific input/effect checks are real and separate. Do not treat the
+  M1 root list as a future grant protocol.
+
+`tests/test_repairs.py` and `tests/test_lenses.py` contain relevant import,
+post-resolution bound, session, origin/host, actor, and no-write assertions. They
+were inspected but not executed by this follow-up. The next investigation moved
+to [[executable-admission-and-preview-review]].

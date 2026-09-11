@@ -1,0 +1,162 @@
+{
+  "actions": {
+    "apply": {
+      "description": "Atomically apply selected prepared proposals with document/citation revision checks. Any conflict aborts the entire batch. Repeats skip applied proposals.",
+      "entry": "actions.py:apply",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "proposal_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "proposal_ids"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "queries": [
+          [
+            "studio.citation-proposal"
+          ],
+          [
+            "studio.citation"
+          ],
+          [
+            "studio.document"
+          ],
+          [
+            "studio.source"
+          ]
+        ]
+      }
+    },
+    "dismiss": {
+      "description": "Dismiss prepared proposals without changing documents; repeated dismissal is harmless.",
+      "entry": "actions.py:dismiss",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "proposal_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "proposal_ids"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "proposal_ids"
+        ]
+      }
+    },
+    "import_source": {
+      "description": "Import a JSON Markdown source URL. Returns ok/source_id/reused or ok:false/error; failures write nothing.",
+      "entry": "actions.py:import_source",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "queries": [
+          [
+            "studio.source"
+          ]
+        ]
+      }
+    },
+    "prepare": {
+      "description": "Persist an exact-source replacement preview for one outdated citation. No document changes.",
+      "entry": "actions.py:prepare",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "citation_id": {
+            "type": "string"
+          },
+          "excerpt": {
+            "maxLength": 20000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation_id",
+          "excerpt"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "queries": [
+          [
+            "studio.source"
+          ],
+          [
+            "studio.citation"
+          ],
+          [
+            "studio.document"
+          ]
+        ]
+      }
+    },
+    "refresh_source": {
+      "description": "Refresh one retained source from URL, preserving versions; refuses different identity. Does not update citations.",
+      "entry": "actions.py:refresh_source",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "url"
+        ],
+        "type": "object"
+      },
+      "reads": {
+        "arg_ids": [
+          "source_id"
+        ]
+      }
+    }
+  },
+  "description": "Versioned source import, explicit citation review previews and atomic cross-document updates.",
+  "name": "Research Sources",
+  "runtime": "python-1",
+  "skills": {
+    "citation-review": "review-usage.md",
+    "research-sources": "usage.md"
+  }
+}

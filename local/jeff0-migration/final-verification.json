@@ -1,0 +1,60 @@
+{
+  "ready": true,
+  "thread_id": "01a08da1-e73e-7340-a283-45ca0cbb56b8",
+  "same_binding_after_restart": true,
+  "original_events": 1280,
+  "identical_event_prefix": true,
+  "original_objects": 1135,
+  "unchanged_original_objects": 1133,
+  "changed": [
+    "agora.package.agora.shell",
+    "agora.installation.agora.shell"
+  ],
+  "messages": 34,
+  "discussions": 54,
+  "replay": {
+    "ok": true,
+    "objects": 1245
+  },
+  "system": {
+    "guest": {
+      "available": true,
+      "backend": "virtualbox",
+      "vm_id": "bbdd25e7-1e05-4d94-a257-168cd78b04da",
+      "state": "running",
+      "execution": "Linux guest root; SSH key pinned; no shared host folders"
+    },
+    "yard": {
+      "available": true,
+      "backend": "virtualbox",
+      "vm_id": "32cea95c-58f1-4cc9-8351-916e5d4628c3",
+      "state": "poweroff",
+      "execution": "Linux guest root; SSH key pinned; no shared host folders",
+      "snapshot_id": "2581847e-8d0b-464f-886b-807a638ec277",
+      "isolation": "separate VM reset per ordinary invocation or explicit check session"
+    },
+    "native_bridge": {
+      "connected": true,
+      "transport_running": true,
+      "guest_port": 18790,
+      "generation": 1,
+      "scope": "native development; no protected host or model endpoints",
+      "error": null
+    },
+    "jeff": {
+      "provider": "openai-account",
+      "model": "gpt-6-astra",
+      "signed_in": true,
+      "busy": false
+    },
+    "delegation": {
+      "profile": "broad local development",
+      "enabled": true,
+      "generation": 1
+    }
+  },
+  "browser_errors": [],
+  "app_frame_observation_verified": true,
+  "old_service_stopped": true,
+  "screenshot": "C:\\Projects\\Agora\\worlds\\jeff0-desk\\evidence\\jeff0-ready.png"
+}
