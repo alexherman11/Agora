@@ -1,0 +1,8 @@
+{
+  "name": "Agora Home",
+  "runtime": "browser-1",
+  "ui": {
+    "entry": "index.html",
+    "mount": "shell"
+  }
+}

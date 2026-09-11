@@ -1,0 +1,9 @@
+{
+  "backend": "virtualbox",
+  "vm_id": "00000000-0000-0000-0000-000000000000",
+  "ssh_host": "127.0.0.1",
+  "ssh_port": 22333,
+  "ssh_user": "jeff",
+  "identity_file": "path/to/provisioned/id_ed25519",
+  "known_hosts": "path/to/provisioned/known_hosts"
+}

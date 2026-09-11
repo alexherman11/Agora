@@ -1,0 +1,51 @@
+{
+  "baseline": {
+    "selection": {
+      "initial": "A read-only ",
+      "after2500": "A read-only ",
+      "after15000": "A read-only ",
+      "gesture_selected_text": true,
+      "retained": true
+    }
+  },
+  "prototype": {
+    "selection": {
+      "initial": "A read-only ",
+      "after2500": "A read-only ",
+      "after15000": "A read-only ",
+      "gesture_selected_text": true,
+      "retained": true
+    },
+    "appearance_preview": {
+      "before": {
+        "background": "rgb(255, 250, 240)",
+        "text_size": 18
+      },
+      "during": {
+        "background": "rgb(250, 230, 237)",
+        "text_size": 20
+      },
+      "after": {
+        "background": "rgb(255, 250, 240)",
+        "text_size": 18
+      },
+      "summary": "Fixed circle extends beyond the available desk viewport; it is not shrunk. Mobile uses the existing stacked layout.",
+      "native_writes": 0,
+      "style_preview_visible": true,
+      "close_restores": true
+    },
+    "keep_and_undo": {
+      "kept": {
+        "background": "rgb(250, 230, 237)",
+        "text_size": 20
+      },
+      "undone": {
+        "background": "rgb(255, 250, 240)",
+        "text_size": 18
+      },
+      "keep_applied": true,
+      "undo_restored": true,
+      "draft_preserved": true
+    }
+  }
+}

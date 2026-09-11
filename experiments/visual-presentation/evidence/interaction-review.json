@@ -1,0 +1,37 @@
+{
+  "baseline": {
+    "selection": {
+      "initial": "A read-only ",
+      "after2500": "A read-only ",
+      "after15000": "A read-only ",
+      "gesture_selected_text": true,
+      "retained": true
+    }
+  },
+  "prototype": {
+    "selection": {
+      "initial": "A read-only ",
+      "after2500": "",
+      "after15000": "",
+      "gesture_selected_text": true,
+      "retained": false
+    },
+    "appearance_preview": {
+      "before": {
+        "background": "rgb(255, 250, 240)",
+        "text_size": 18
+      },
+      "during": {
+        "background": "rgb(255, 250, 240)",
+        "text_size": 18
+      },
+      "after": {
+        "background": "rgb(255, 250, 240)",
+        "text_size": 18
+      },
+      "summary": "Cannot read properties of undefined (reading 'find')",
+      "style_preview_visible": false,
+      "close_restores": true
+    }
+  }
+}

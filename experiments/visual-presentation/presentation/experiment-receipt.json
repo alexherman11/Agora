@@ -1,0 +1,18 @@
+{
+  "installation": {
+    "event": 50,
+    "facets": {
+      "agora.installation": {
+        "build": "agora.build.b81750bf09ab4e2899b5066069535ae6",
+        "digest": "12107c95ec63311d0d44a196a28351fb61e064ad71597d5eb8725be94544367f",
+        "package": "lab.presentation",
+        "source_revision": 2
+      }
+    },
+    "id": "agora.installation.lab.presentation",
+    "revision": 2,
+    "written_by": "jeff"
+  },
+  "digest": "12107c95ec63311d0d44a196a28351fb61e064ad71597d5eb8725be94544367f",
+  "source_revision": 2
+}

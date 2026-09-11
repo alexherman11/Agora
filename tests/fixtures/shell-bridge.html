@@ -1,0 +1,33 @@
+<!doctype html><style>body{margin:0}iframe{width:100vw;height:100vh;border:0}</style>
+<script>
+const copy=x=>JSON.parse(JSON.stringify(x));
+window.objects = {
+ n:{id:'n',revision:1,facets:{'core.title':{text:'A title to edit'},'core.text':{text:'Keep this note body'},'core.appearance':{scene:'desk',x:20,y:20,width:245,height:205}}},
+ 'shell.chat-draft':{id:'shell.chat-draft',revision:1,facets:{'core.text':{text:'Existing unsent draft'},'core.draft':{conversation:'main'}}}
+};
+window.requests=[]; window.replies=[]; window.delayMove=0; window.delayText=0; window.refuse=false;
+window.addEventListener('message',async event=>{
+ const d=event.data;if(!d.agora)return;
+ if(d.event){replies.push(d);return;}
+ requests.push(copy(d));
+ let result,error;
+ try {
+  if(d.method==='world.query') result={items:[copy(objects.n)],complete:true};
+  else if(d.method==='world.get') {if(!objects[d.args.id])throw Error('not found');result=copy(objects[d.args.id]);}
+  else if(d.method==='world.transact'){
+   const moving=d.args.changes.some(c=>c.facets['core.appearance']);
+   await new Promise(r=>setTimeout(r,moving?delayMove:delayText));
+   if(moving&&refuse)throw Error('Write refused for test');
+   for(const c of d.args.changes)if((objects[c.id]?.revision||0)!==c.expected_revision)throw Error('Stale revision');
+   result={items:d.args.changes.map(c=>{
+    const obj=objects[c.id]={id:c.id,revision:(objects[c.id]?.revision||0)+1,facets:{...objects[c.id]?.facets,...c.facets}};
+    return copy(obj);
+   })};
+  }
+  else if(d.method==='chat.status')result={running:false,messages:[{id:'m',role:'assistant',text:'Existing conversation'}]};
+  else if(d.method==='system.status')result={signed_in:true};
+  else result={};
+ }catch(e){error=e.message;}
+ event.source.postMessage({agora:true,id:d.id,result,error},'*');
+});
+</script><iframe src="/shell"></iframe>
