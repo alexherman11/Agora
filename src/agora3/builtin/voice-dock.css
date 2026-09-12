@@ -1,0 +1,5 @@
+#chat-voice-footer{flex:none;background:#f5f7ef;padding-bottom:8px}
+#chat-voice-slot{height:40px}
+#chat-voice-footer #chat-progress{margin:0;padding:2px 16px 5px;border:0;background:transparent;font-size:10px;line-height:1.4;color:#6a7864;max-height:42px;overflow:auto}
+#chat-voice-footer #chat-progress[data-stage=delivery_error],#chat-voice-footer #chat-progress[data-stage=failed]{color:#895b39}
+#conversation .chat-composer{padding-bottom:6px}

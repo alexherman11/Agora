@@ -206,3 +206,10 @@ Agora3 runtime unless revalidated there.
 - **2026-09-12 — Preserve protocol failure distinctions.** Tolerate newer runtime
   history/envelopes through narrow identity/payload adapters; actual failures,
   time limits and cleanup failures cannot produce a ready worker result.
+- **2026-09-12 — Compact voice footer.** The prototype chat reserves a footer
+  rectangle for host-owned voice controls and places work status underneath.
+  Microphone access and call actions remain in the host; closing chat restores
+  the independent Voice control. The live shell package was installed without
+  restarting the service. Isolated browser checks cover docking, close/reopen,
+  laptop width and call-control layout; live refresh verification is blocked by
+  a separately observed executive follow-up/chat-lock deadlock.
