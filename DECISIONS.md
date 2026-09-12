@@ -217,3 +217,6 @@ Agora3 runtime unless revalidated there.
 - 2026-09-12: Keep Agora4 in a standalone checkout, preserving the existing parallel Desk world in place. Never wait for runtime steering while holding the chat callback lock: a live thread dump confirmed that cycle blocked all history HTTP slots. Typed, voice and worker follow-ups release the lock before steering.
 
 - 2026-09-12: Preserve metadata-only voice failure diagnostics (operation, exception class, close codes and stack locations) in status and local service logs. Generic disconnect messages hid repeated result-delivery failures; never log audio, transcripts, exception text or credentials.
+
+- 2026-09-12: Voice sideband liveness follows incoming server events with a 120-second deadline; retain ping traffic but disable the independent pong deadline. A live drop sent close 1011 despite recent speech events, and a real local socket reproduced the false disconnect with delayed pongs.
+- 2026-09-12: Allow protected, explicit voice-generation reload between calls while JEFF continues. Compile isolated trusted context/transport/coordination/session source before swapping factories; keep closed-call context and reject active/delegating calls. General updates during running tasks require process separation and versioned interfaces, not in-place module reload.

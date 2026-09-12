@@ -5,6 +5,8 @@
 <button data-action="host.resume">Resume development</button><button data-action="host.reset_shell">Restore supplied shell</button>
 <button data-action="host.stop_guest">Power off Agora VM</button><button data-action="host.start_guest">Start Agora VM</button>
 <button data-action="host.connect_guest">Reconnect native guest tools</button>
+<p>Between calls, load voice source changes while JEFF continues working.</p>
+<button data-action="host.voice.reload">Reload voice code</button>
 <p><a href="/">Return to Agora</a></p><pre id="result"></pre><script>
 const token=location.hash.slice(1)||sessionStorage.getItem('agora-operator');if(location.hash){sessionStorage.setItem('agora-operator',token);history.replaceState(null,'','/recovery')}
 document.querySelectorAll('button').forEach(b=>b.onclick=async()=>{try{const r=await fetch('/api/rpc',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({method:b.dataset.action,args:{}})});document.querySelector('#result').textContent=JSON.stringify(await r.json(),null,2)}catch(e){document.querySelector('#result').textContent=e.message}});

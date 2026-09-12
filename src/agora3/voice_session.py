@@ -34,6 +34,7 @@ class VoiceSession:
         self.coordination = Coordination()
         self.started = False
         self.failure = None
+        self.threads = ()
         self.phase = "starting"
         self.last_event = None
 
@@ -76,6 +77,8 @@ class VoiceSession:
             code = getattr(getattr(exc, direction, None), "code", None)
             if isinstance(code, int):
                 detail[direction + "_close_code"] = code
+            if getattr(getattr(exc, direction, None), "reason", None) == "keepalive ping timeout":
+                detail[direction + "_close_reason"] = "keepalive ping timeout"
         self.failure = detail
         logging.getLogger(__name__).error("Voice failure %s", json.dumps(detail))
         self.error = (
@@ -88,8 +91,12 @@ class VoiceSession:
 
     def attach(self, connection):
         self.connection = connection
-        threading.Thread(target=self.run, daemon=True, name="agora-voice-events").start()
-        threading.Thread(target=self.work, daemon=True, name="agora-voice-delegation").start()
+        self.threads = (
+            threading.Thread(target=self.run, daemon=True, name="agora-voice-events"),
+            threading.Thread(target=self.work, daemon=True, name="agora-voice-delegation"),
+        )
+        for thread in self.threads:
+            thread.start()
 
     def send(self, kind, **values):
         event_id = values.pop("event_id", uuid.uuid4().hex)

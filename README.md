@@ -32,6 +32,13 @@ The local `origin` points to the preserved parallel prototype repository;
 `archive/agora4-before-recovery` retains the previous Agora4 source snapshot.
 No remote publication was performed. New development belongs in this checkout.
 
+For voice-only Python updates, end the voice call, then open **Recovery → Reload
+voice code**. JEFF can keep working. This swaps the voice context, transport,
+coordination and session implementation from this checkout; it does not restart
+the server or update the model harness. Reload the browser separately for JS/CSS
+changes after saving drafts. The first server version exposing this recovery
+operation must already be running.
+
 ## Development
 
 Python 3.12 or later, uv, OpenSSH, and VirtualBox are required on the host.

@@ -227,3 +227,25 @@ is diagnostic instrumentation, not a confirmed repair of the transport failure.
 Tests: 190 passed, two runtime inventory checks skipped without the runtime
 environment override; Ruff passed. The diagnostic build was loaded into the
 existing Desk; a new failing call is needed to identify the original cause.
+
+## Voice repair and reload between calls
+
+The sideband retains keepalive pings without imposing a separate pong deadline;
+120 seconds without server events still ends the connection. A real local
+WebSocket test with withheld pongs reproduces the old disconnect and verifies
+that the new configuration receives all events and observes normal closure.
+This supports the diagnosis from a live client-sent 1011 close shortly after
+speech; provider behavior after deployment remains a separate live check.
+
+Protected `host.voice.reload` (Recovery: Reload voice code) loads trusted
+`voice_context.py`, `voice_transport.py`, `voice_coordination.py`, and
+`voice_session.py` from this checkout into isolated namespaces. It atomically
+swaps factories between voice calls, retains closed-call context, and leaves
+JEFF's turn, workers, world, and model client intact. Active calls or outstanding
+voice delegation threads refuse reload. Invalid source retains the old factories.
+It does not accept a caller-supplied path or load world-authored host code.
+
+The voice service, server, model harness, storage, and browser assets are outside
+this reload operation. Broader live updates require independent process
+lifetimes and compatible versioned request boundaries. Existing requests must
+finish on their admitted version; storage changes need explicit migration rules.

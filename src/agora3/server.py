@@ -250,6 +250,10 @@ class Application:
         if method.startswith("host."):
             if role != "operator":
                 raise Refusal("This operation belongs to the independent human recovery surface.")
+            if method == "host.voice.reload":
+                if args:
+                    raise Refusal("Voice reload takes no arguments; it loads this checkout only.")
+                return self.voice.reload()
             if method == "host.voice.status":
                 return self.voice.status(args.get("client"))
             if method == "host.voice.end":

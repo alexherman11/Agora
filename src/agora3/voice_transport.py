@@ -4,6 +4,7 @@ Never expose the project key or retry a request that might have created a sessio
 
 import json
 import threading
+import time
 import urllib.error
 import urllib.request
 from urllib.parse import quote
@@ -63,14 +64,25 @@ class LiveConnection:
                 additional_headers={"Authorization": "Bearer " + key},
                 open_timeout=15,
                 close_timeout=3,
+                # Live events can continue while control-frame pongs are delayed.
+                # Retain keepalive pings, but use incoming traffic for liveness.
+                ping_timeout=None,
                 max_size=2_000_000,
             )
+            self._last_received = time.monotonic()
         except Exception:
             self.hangup()
             raise Refusal("Could not attach JEFF to voice; call closure was requested.") from None
 
     def receive(self, timeout=0.5):
-        return json.loads(self.socket.recv(timeout=timeout))
+        try:
+            raw = self.socket.recv(timeout=timeout)
+        except TimeoutError:
+            if time.monotonic() - self._last_received >= 120:
+                raise Refusal("No voice server events arrived for 120 seconds.") from None
+            raise
+        self._last_received = time.monotonic()
+        return json.loads(raw)
 
     def send(self, event):
         with self._lock:

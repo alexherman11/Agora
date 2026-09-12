@@ -6,7 +6,7 @@ import threading
 import uuid
 from contextlib import nullcontext
 
-from agora3 import voice_credentials
+from agora3 import voice_credentials, voice_reload
 from agora3.voice_context import MODEL, VOICE, configuration
 from agora3.voice_session import VoiceSession
 from agora3.voice_transport import LiveConnection
@@ -18,6 +18,30 @@ class VoiceService:
         self.app, self.connect = app, connect
         self.lock = threading.RLock()
         self.session = None
+        self.session_factory = VoiceSession
+        self.configuration, self.model, self.voice = configuration, MODEL, VOICE
+        self.version = "startup"
+
+    def reload(self):
+        with self.lock:
+            if self.session and (
+                not self.session.done.is_set()
+                or any(t.is_alive() for t in getattr(self.session, "threads", ()))
+            ):
+                raise Refusal(
+                    "End the voice call and let it finish closing before reloading voice."
+                )
+            try:
+                replacement = voice_reload.load()
+            except Exception as exc:
+                raise Refusal(
+                    "Voice reload failed ("
+                    + type(exc).__name__
+                    + "); the current version is retained."
+                ) from None
+            for name, value in replacement.items():
+                setattr(self, name, value)
+            return {"reloaded": True, "version": self.version, "jeff_uninterrupted": True}
 
     @staticmethod
     def client(value):
@@ -34,12 +58,13 @@ class VoiceService:
         with self.lock:
             if self.session and not self.session.done.is_set():
                 raise Refusal("A voice call is already active. End it before starting another.")
-            session = VoiceSession(self.app, actor, client, resident["id"])
+            session = self.session_factory(self.app, actor, client, resident["id"])
+            connect, configure = self.connect, self.configuration
             self.session = session
         try:
-            connection = self.connect(
+            connection = connect(
                 voice_credentials.load_key(self.app.directory),
-                configuration(resident["name"], self.app.chat_status()["messages"]),
+                configure(resident["name"], self.app.chat_status()["messages"]),
                 sdp,
             )
             session.attach(connection)
@@ -51,7 +76,7 @@ class VoiceService:
             session.authorized()
             if session.closing.is_set():
                 raise Refusal("The voice call was cancelled while connecting.")
-            return {"sdp": connection.sdp, "model": MODEL, "voice": VOICE}
+            return {"sdp": connection.sdp, "model": self.model, "voice": self.voice}
         except Exception:
             session.close()
             if session.connection is None:
@@ -69,8 +94,9 @@ class VoiceService:
                 "configured": voice_credentials.configured(self.app.directory),
                 "active": bool(session and not session.done.is_set()),
                 "owner": own,
-                "model": MODEL,
-                "voice": VOICE,
+                "model": self.model,
+                "runtime_version": self.version,
+                "voice": self.voice,
                 **(session.status() if session else {}),
             }
 
