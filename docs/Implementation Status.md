@@ -13,6 +13,27 @@ older `docs` implementation branch. They remain useful, but their results are no
 counted as Agora3 runtime verification unless this file names a corresponding
 Agora3 check.
 
+## September 12 recovery
+
+The standalone `C:\Projects\Agora4` checkout now uses branch `agora4` and the
+newer parallel Desk source. Earlier source snapshots remain in local Git history;
+private worlds stay in their original directories. `Open Agora4.cmd` opens the
+retained newer Desk on port 8874.
+
+A live Python thread dump confirmed a deadlock: typed follow-up steering held
+`chat_lock` while the SDK reader callback waited for it. All 16 HTTP slots then
+blocked on history requests. Typed, voice and worker steering now release that
+lock before waiting for the runtime. Regression tests exercise callback progress
+on all three routes. A fresh checkout also now configures pytest's repository
+import path so the documented test command collects shared fixtures correctly.
+
+Verification: 190 tests passed, including real runtime inventory with simulated
+inference; documentation links and examples passed. Restart replay verified 1508
+objects. All 196 pre-restart message objects matched their saved content hash;
+chat history returned complete, the managed account was signed in, and the live
+Linux guest bridge was connected. No new model turn was sent during recovery.
+The backup and thread dump remain in the Desk's private recovery evidence folder.
+
 ## Isolated parallel-work prototype
 
 The `codex/parallel-worldline` checkout adds an opt-in worker supervisor in the

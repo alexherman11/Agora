@@ -213,3 +213,5 @@ Agora3 runtime unless revalidated there.
   restarting the service. Isolated browser checks cover docking, close/reopen,
   laptop width and call-control layout; live refresh verification is blocked by
   a separately observed executive follow-up/chat-lock deadlock.
+
+- 2026-09-12: Keep Agora4 in a standalone checkout, preserving the existing parallel Desk world in place. Never wait for runtime steering while holding the chat callback lock: a live thread dump confirmed that cycle blocked all history HTTP slots. Typed, voice and worker follow-ups release the lock before steering.

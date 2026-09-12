@@ -55,12 +55,13 @@ class Application:
     def worker_update(self, text):
         """Route important worker reports into the continuing executive conversation."""
         with self.chat_lock:
-            if self.running:
-                return bool(self.jeff and self.jeff.steer(text))
-            try:
-                result = self.send(text, self.gateway.principal("human"), record=False)
-            except Exception:
-                return False
+            agent = self.jeff if self.running else None
+        if agent:
+            return bool(agent.steer(text))
+        try:
+            result = self.send(text, self.gateway.principal("human"), record=False)
+        except Exception:
+            return False
         # If voice is connected, its ordinary activity observer delivers the executive's reply.
         with self.voice.lock:
             session = self.voice.session
@@ -129,17 +130,27 @@ class Application:
             conversational = self.voice.converse(message, actor, delegate=delegate)
             if conversational:
                 return conversational
+        # Runtime steering can deliver callbacks that acquire chat_lock. Snapshot
+        # the target here, then wait for the runtime only after releasing the lock.
+        with self.chat_lock:
+            self.gateway.check_authority(actor)
+            followup = (self.jeff, self.activity.id) if self.running and self.work else None
+        if followup:
+            agent, activity_id = followup
+            if agent and agent.steer(message):
+                if record:
+                    self.gateway.record_message(actor, "user", message)
+                return {
+                    "accepted": True,
+                    "running": True,
+                    "activity_id": activity_id,
+                    "route": "executive_followup",
+                }
+            raise Refusal(
+                "The active turn could not accept the follow-up; check JEFF before retrying."
+            )
         with self.chat_lock:
             if self.running:
-                if self.work and self.jeff and self.jeff.steer(message):
-                    if record:
-                        self.gateway.record_message(actor, "user", message)
-                    return {
-                        "accepted": True,
-                        "running": True,
-                        "activity_id": self.activity.id,
-                        "route": "executive_followup",
-                    }
                 raise Refusal(
                     "JEFF is working. Stop the active turn before starting another in "
                     "this first runtime."
@@ -189,9 +200,11 @@ class Application:
     def voice_request(self, message, actor):
         with self.chat_lock:
             self.gateway.check_authority(actor)
-            if self.running:
-                return self.activity.id if self.jeff.steer(message) else None
-            return self.send(message, actor, record=False)["activity_id"]
+            followup = (self.jeff, self.activity.id) if self.running else None
+        if followup:
+            agent, activity_id = followup
+            return activity_id if agent and agent.steer(message) else None
+        return self.send(message, actor, record=False)["activity_id"]
 
     def backend_snapshot(self, activity=None):
         with self.chat_lock:

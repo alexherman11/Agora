@@ -1,4 +1,4 @@
-# Agora3
+# Agora4
 
 Agora is a general-purpose operating environment shared by a person and JEFF:
 ordinary things keep their identity while the ways of viewing and using them can
@@ -17,6 +17,20 @@ JEFF through managed OpenAI-account sign-in, and native Python packages executed
 inside a dedicated Linux VM. A second VM resets before candidate execution.
 See [Implementation Status](docs/Implementation%20Status.md) for verified behavior
 and [Runtime Guide](docs/Reference/Runtime%20Guide.md) for the implemented API.
+
+## Local Agora4 checkout
+
+`C:\Projects\Agora4` is the standalone working repository on branch `agora4`.
+It contains the newer parallel Desk implementation and retained voice layout.
+Run `uv sync --dev --locked`, then double-click `Open Agora4.cmd` to open the
+existing Desk on port 8874. Its world and history remain at
+`C:\Projects\Agora\worlds\parallel-desk\world`; the launcher refuses to create
+an empty replacement if that history is missing. The old Desk on port 8873 and
+previous checkouts remain available. Private state is not tracked by Git.
+
+The local `origin` points to the preserved parallel prototype repository;
+`archive/agora4-before-recovery` retains the previous Agora4 source snapshot.
+No remote publication was performed. New development belongs in this checkout.
 
 ## Development
 
