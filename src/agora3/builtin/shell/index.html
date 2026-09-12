@@ -177,6 +177,7 @@ if(__exports != exports)module.exports = exports;return module.exports}));
     if (event.source !== parent || !event.data || event.data.agora !== true) return;
     const data = event.data;
     if (data.event === 'changed') { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 120); return; }
+    if (data.event === 'voice-active') { showPanel(true); refreshChat(); return; }
     if (data.event === 'prepare-reload') { prepareReload(data.id); return; }
     if (data.event === 'cancel-reload') { cancelReload(data.id); return; }
     const task = pending.get(data.id);
@@ -275,7 +276,7 @@ if(__exports != exports)module.exports = exports;return module.exports}));
       .finally(() => { state.draftPromise = null; });
     return state.draftPromise;
   }
-  function updateSend() { $('send-message').disabled = !state.connected || state.sending || state.chatRunning || !$('chat-input').value.trim(); $('send-message').hidden = state.chatRunning; $('stop-message').hidden = !state.chatRunning; }
+  function updateSend() { const blocked = state.chatRunning && !state.voiceActive; $('send-message').disabled = !state.connected || state.sending || blocked || !$('chat-input').value.trim(); $('send-message').hidden = blocked; $('stop-message').hidden = !state.chatRunning; }
   function cancelReload(id) {
     const reload = state.pendingReload; if (!reload || reload.id !== id) return;
     clearTimeout(reload.thawTimer); state.pendingReload = null; $('app').inert = false;
@@ -309,7 +310,7 @@ if(__exports != exports)module.exports = exports;return module.exports}));
     } finally { clearTimeout(deadline); }
   }
   function showActivity(text,error=false) { const target = $('chat-activity'); target.hidden = !text; target.classList.toggle('error',error); target.replaceChildren(); if (text) target.append(element('span',`dot ${error?'error':'pending'}`),element('span','',text)); }
-  function chatMessage(message,index) { const facet = message.facets?.['core.message'] || message; const role = facet.role || 'assistant'; const text = facet.text ?? facet.content ?? ''; return {id:message.id || facet.id || `message-${index}`,role,text:typeof text === 'string' ? text : JSON.stringify(text),created_at:facet.created_at}; }
+  function chatMessage(message,index) { const facet = message.facets?.['core.message'] || message; const role = facet.role || 'assistant'; const text = facet.text ?? facet.content ?? ''; return {id:message.id || facet.id || `message-${index}`,role,text:typeof text === 'string' ? text : JSON.stringify(text),created_at:facet.created_at,source:message.source,streaming:message.streaming}; }
   // Markdown is presentation only: no executable HTML, remote images or embedded controls.
   function renderMarkdown(target, text) {
     if (target.dataset.source === text) return;
@@ -336,7 +337,21 @@ if(__exports != exports)module.exports = exports;return module.exports}));
     return `${labels[tool.name] || tool.name} · ${elapsed}s`;
   }
   function renderChat(status) {
-    state.chatRunning = !!status.running; updateSend();
+    state.voiceActive = !!status.voice?.active;
+    state.chatRunning = !!status.running;
+    let handoffButton = $('handoff-message');
+    if (!handoffButton) { handoffButton = element('button','button','Hand to Astra'); handoffButton.id='handoff-message'; handoffButton.type='button'; handoffButton.title='Hand the current idea or typed request to Astra'; $('stop-message').before(handoffButton); handoffButton.onclick=()=>sendMessage(null,true); }
+    handoffButton.hidden = !state.voiceActive;
+    handoffButton.disabled = state.sending || !state.connected;
+    updateSend();
+    let flow = $('voice-work');
+    if (!flow) { flow = element('div','activity'); flow.id = 'voice-work'; flow.setAttribute('role','status'); flow.style.cssText='flex:none;border-top:1px solid var(--line);padding:10px 23px;line-height:1.5;'; $('chat-activity').before(flow); }
+    const handoffs = (status.voice?.coordination?.requests || []).filter(r=>r.source!=='conversation');
+    const handoff = handoffs.filter(r=>['received','accepted','working'].includes(r.stage)).at(-1) || handoffs.at(-1);
+    flow.hidden = !state.voiceActive && !handoff;
+    flow.dataset.stage = handoff?.stage || 'discussing';
+    flow.textContent = handoff ? handoff.detail : 'Discuss with JEFF · hand work to Astra when you’re ready';
+    $('chat-input').placeholder = state.voiceActive ? 'Talk or type with JEFF…' : 'Ask JEFF anything…';
     const messages = (status.messages || []).map(chatMessage);
     const activity = status.activity;
     // After completion, the durable final message replaces its streamed counterpart.
@@ -347,6 +362,10 @@ if(__exports != exports)module.exports = exports;return module.exports}));
     if (!status.running && status.reply && displayed.at(-1)?.role === 'assistant') {
       displayed.splice(displayed.length-1,0,...live);
     } else displayed.push(...live);
+    if (state.voiceActive) {
+      const timestamp = m => typeof m.created_at === 'number' ? m.created_at*1000 : Date.parse(m.created_at);
+      displayed.sort((a,b) => (timestamp(a)||0)-(timestamp(b)||0));
+    }
     const signature = JSON.stringify(displayed);
     if (signature !== state.lastChat) {
       const scroller = $('messages'); const nearEnd = scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<100; const hadNone = !state.lastChat;
@@ -379,10 +398,10 @@ if(__exports != exports)module.exports = exports;return module.exports}));
     if (status.model) $('chat-model').textContent = status.model;
   }
 
-  async function sendMessage(event) {
-    event?.preventDefault(); const message = $('chat-input').value.trim(); if (!message || state.sending || state.chatRunning) return;
+  async function sendMessage(event, delegate=false) {
+    event?.preventDefault(); const message = $('chat-input').value.trim() || (delegate ? 'Please proceed with the idea and constraints we just agreed on.' : ''); if (!message || state.sending || (state.chatRunning && !state.voiceActive)) return;
     state.sending = true; updateSend(); showActivity('Sending…');
-    try { await saveDraft(); await call('chat.send',{message}); if ($('chat-input').value.trim() === message) { $('chat-input').value = ''; state.draftDirty = true; await saveDraft(); } state.chatRunning = true; await refreshChat(); }
+    try { await saveDraft(); const sent = await call('chat.send',{message,...(delegate?{delegate:true}:{})}); if ($('chat-input').value.trim() === message) { $('chat-input').value = ''; state.draftDirty = true; await saveDraft(); } if (sent.running !== undefined) state.chatRunning = sent.running; await refreshChat(); }
     catch (error) { showActivity(errorText(error),true); }
     finally { state.sending = false; updateSend(); $('chat-input').focus(); }
   }

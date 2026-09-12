@@ -20,7 +20,14 @@ class ChatActivity:
             if item_id not in self.messages and len(self.messages) >= 100:
                 return
             item = self.messages.setdefault(
-                item_id, {"id": item_id, "text": "", "phase": "commentary", "complete": False}
+                item_id,
+                {
+                    "id": item_id,
+                    "text": "",
+                    "phase": "commentary",
+                    "complete": False,
+                    "created_at": time.time(),
+                },
             )
             available = max(
                 0,

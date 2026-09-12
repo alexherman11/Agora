@@ -15,6 +15,7 @@ from agora3.chat_activity import ChatActivity
 from agora3.gateway import Gateway
 from agora3.http_transport import BoundedHTTPServer
 from agora3.jeff import Jeff
+from agora3.voice import VoiceService
 from agora3.world import Refusal, encoded
 
 FRAME = (Path(__file__).parent / "host/frame.html").read_text(encoding="utf-8")
@@ -31,11 +32,13 @@ class Application:
         self.chat_lock = threading.RLock()
         self.running, self.events, self.reply, self.error = False, [], "", None
         self.activity = ChatActivity()
+        self.completed = {}
         self.jeff = self.jeff_identity = None
         self._status_cache = (0, {})
         self.bridge = NativeBridge(self.gateway)
         self.gateway.native_bridge = self.bridge
         self.bridge_error = None
+        self.voice = VoiceService(self)
 
     def connect_guest(self):
         try:
@@ -65,8 +68,13 @@ class Application:
         return self.jeff
 
     def chat_status(self):
-        query = self.gateway.world.query(["core.message"], 1000, reverse=True)
-        messages = [item["facets"]["core.message"] for item in query["items"]]
+        query, voice = self.voice.chat_projection()
+        messages = [{"id": item["id"], **item["facets"]["core.message"]} for item in query["items"]]
+        for message in messages:
+            if message["text"].startswith("[Voice transcript]\n"):
+                message["text"] = message["text"].removeprefix("[Voice transcript]\n")
+                message["source"] = "voice"
+        messages.extend(voice.pop("messages"))
         messages.sort(key=lambda m: m["created_at"])
         with self.chat_lock:
             return {
@@ -78,22 +86,33 @@ class Application:
                 "messages": messages,
                 "complete": query["complete"],
                 "resident": self.resident.public(),
+                "voice": voice,
             }
 
-    def send(self, message, actor):
+    def send(self, message, actor, *, record=True, delegate=False):
         if not isinstance(message, str) or not message.strip() or len(message) > 30000:
             raise Refusal("Send a nonempty message of at most 30000 characters.")
+        if record:
+            conversational = self.voice.converse(message, actor, delegate=delegate)
+            if conversational:
+                return conversational
         with self.chat_lock:
             if self.running:
                 raise Refusal(
                     "JEFF is working. Stop the active turn before starting another in "
                     "this first runtime."
                 )
-            self.gateway.record_message(actor, "user", message)
+            self.gateway.check_authority(actor)
+            if record:
+                context = self.voice.text_context()
+                self.gateway.record_message(actor, "user", message)
+                if context:
+                    message = context + "\n\nAlex now writes:\n" + message
             agent = self._agent()
             identity = self.jeff_identity
             self.running, self.reply, self.error, self.events = True, "", None, []
             self.activity = ChatActivity()
+            activity_id = self.activity.id
 
         def observe(event):
             with self.chat_lock:
@@ -105,14 +124,45 @@ class Application:
             try:
                 reply = agent.send(message, observe)
                 self.gateway.record_message(identity, "assistant", reply)
-                self.reply = reply
+                with self.chat_lock:
+                    self.reply = reply
             except Exception as exc:
-                self.error = str(exc)
+                with self.chat_lock:
+                    self.error = str(exc)
             finally:
-                self.running = False
+                with self.chat_lock:
+                    self.running = False
+                    self.completed[activity_id] = {
+                        "id": activity_id,
+                        "running": False,
+                        "reply": self.reply,
+                        "error": self.error,
+                    }
+                    while len(self.completed) > 20:
+                        del self.completed[next(iter(self.completed))]
 
         threading.Thread(target=work, daemon=True, name="agora-jeff").start()
-        return {"accepted": True, "running": True}
+        return {"accepted": True, "running": True, "activity_id": activity_id}
+
+    def voice_request(self, message, actor):
+        with self.chat_lock:
+            self.gateway.check_authority(actor)
+            if self.running:
+                return self.activity.id if self.jeff.steer(message) else None
+            return self.send(message, actor, record=False)["activity_id"]
+
+    def backend_snapshot(self, activity=None):
+        with self.chat_lock:
+            if activity in self.completed:
+                return dict(self.completed[activity])
+            return {
+                "id": self.activity.id,
+                "running": self.running,
+                "reply": self.reply,
+                "error": self.error,
+                "tool": self.activity.snapshot()["tool"],
+                "messages": self.activity.snapshot()["messages"],
+            }
 
     def stop(self):
         if self.jeff:
@@ -145,6 +195,12 @@ class Application:
         if method.startswith("host."):
             if role != "operator":
                 raise Refusal("This operation belongs to the independent human recovery surface.")
+            if method == "host.voice.status":
+                return self.voice.status(args.get("client"))
+            if method == "host.voice.end":
+                return self.voice.end(args.get("client"))
+            if method == "host.voice.start":
+                return self.voice.start(actor, args.get("client"), args.get("sdp"))
             if method == "host.surface":
                 html, revision = self.gateway.packages.shell()
                 return {
@@ -156,6 +212,7 @@ class Application:
             if method == "host.stop":
                 return self.stop()
             if method == "host.revoke":
+                self.voice.close()
                 self.gateway.revoke()
                 self.stop()
                 self.bridge.close()
@@ -165,6 +222,7 @@ class Application:
                 self.connect_guest()
                 return result
             if method == "host.stop_guest":
+                self.voice.close()
                 self.gateway.revoke()
                 self.stop()
                 self.bridge.close()
@@ -209,7 +267,9 @@ class Application:
         if method == "chat.status":
             return self.chat_status()
         if method == "chat.send":
-            return self.send(args.get("message"), actor)
+            if not isinstance(args.get("delegate", False), bool):
+                raise Refusal("delegate must be true or false.")
+            return self.send(args.get("message"), actor, delegate=args.get("delegate", False))
         if method == "chat.stop":
             return self.stop()
         if method == "chat.login":
@@ -239,14 +299,16 @@ def serve(directory, port=8790):
                 "X-Content-Type-Options": "nosniff",
                 "Referrer-Policy": "no-referrer",
                 "X-Frame-Options": "DENY",
+                "Permissions-Policy": "microphone=(self), camera=()",
             }.items():
                 self.send_header(name, value)
             if mime == "text/html":
                 self.send_header(
                     "Content-Security-Policy",
                     (
-                        "default-src 'none'; script-src 'unsafe-inline'; style-src "
-                        "'unsafe-inline'; connect-src 'self'; frame-src 'self' about:; "
+                        "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src "
+                        "'self' 'unsafe-inline'; connect-src 'self'; media-src blob:; "
+                        "frame-src 'self' about:; "
                         "img-src data:; base-uri 'none'; frame-ancestors 'none'"
                     ),
                 )
@@ -262,6 +324,11 @@ def serve(directory, port=8790):
             path = urlsplit(self.path).path
             if path in {"/", "/recovery"}:
                 return self.respond(200, FRAME if path == "/" else RECOVERY, "text/html")
+            if path in {"/voice.js", "/voice.css"}:
+                source = (Path(__file__).parent / "host" / path[1:]).read_text(encoding="utf-8")
+                return self.respond(
+                    200, source, "text/javascript" if path.endswith(".js") else "text/css"
+                )
             return self.respond(404, {"error": "Not found."})
 
         def do_POST(self):

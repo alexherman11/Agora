@@ -13,6 +13,8 @@ from agora3.application_specs import specs as application_specs
 from agora3.applications import Applications
 from agora3.check_tools import SPEC as CHECK_SPEC
 from agora3.check_tools import check_package
+from agora3.focus import SPEC as FOCUS_SPEC
+from agora3.focus import read as focus_read
 from agora3.guest import Guest
 from agora3.locking import ProcessLock
 from agora3.package_catalog import SPEC as CATALOG_SPEC
@@ -199,6 +201,8 @@ class Gateway:
             return self.world.query(**args)
         if name == "world.transact":
             return self.commit(actor, args["changes"])
+        if name == "world.focus":
+            return focus_read(self, args)
         if name == "schema.define":
             return self.define_schema(actor, **args)
         if name == "schema.list":
@@ -410,7 +414,7 @@ class Gateway:
                 for name, description, properties, required in specs
             ]
             + source_specs()
-            + [CATALOG_SPEC, CHECK_SPEC]
+            + [FOCUS_SPEC, CATALOG_SPEC, CHECK_SPEC]
             + application_specs()
         )
 

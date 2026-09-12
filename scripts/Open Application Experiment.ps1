@@ -6,13 +6,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $demoWorld = Join-Path $repo 'worlds\application-demo'
-if ($Port -eq 8870 -or $Port -lt 1024 -or $Port -gt 65535) {
-    throw 'Choose a separate local port (1024-65535); 8870 belongs to the active Desk.'
+if ($Port -in @(8870, 8873) -or $Port -lt 1024 -or $Port -gt 65535) {
+    throw 'Choose a separate local port (1024-65535); 8870 and 8873 are reserved for resident Desks.'
 }
 if (-not $Python) {
-    foreach ($candidate in @((Join-Path $repo '.venv\Scripts\python.exe'), 'C:\Projects\Agora3\.venv\Scripts\python.exe')) {
-        if (Test-Path -LiteralPath $candidate) { $Python = $candidate; break }
-    }
+    $Python = Join-Path $repo '.venv\Scripts\python.exe'
 }
 if (-not $Python -or -not (Test-Path -LiteralPath $Python)) {
     throw 'Install this repository dependencies, then supply -Python with that environment executable.'

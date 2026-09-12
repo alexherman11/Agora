@@ -1,11 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert/strict');
-const { chromium } = require('C:/Users/Alex/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(__dirname, '../local/chat-browser-check'); fs.mkdirSync(root,{recursive:true});
 const source = fs.readFileSync(process.argv[2] || path.resolve(__dirname,'../src/agora3/builtin/shell/index.html'),'utf8');
-const oldTest = fs.readFileSync(path.resolve(__dirname,'../examples/jeff-authored-notes/tests/drag_browser.py'),'utf8');
-const bridge = oldTest.split('BRIDGE = r"""')[1].split('"""')[0];
+const bridge = fs.readFileSync(path.resolve(__dirname,'../tests/fixtures/shell-bridge.html'),'utf8');
 (async()=>{
  const browser = await chromium.launch({channel:'msedge',headless:true});
  const page = await browser.newPage({viewport:{width:1400,height:900}});

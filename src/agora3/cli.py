@@ -36,6 +36,7 @@ def main() -> None:
         except KeyboardInterrupt:
             app.stop()
         finally:
+            app.voice.close()
             app.bridge.close()
             if app.jeff:
                 app.jeff.close()

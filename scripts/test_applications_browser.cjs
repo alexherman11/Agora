@@ -6,7 +6,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const world = path.resolve(process.argv[2] || 'worlds/application-browser-test');
 const output = path.resolve(process.argv[3] || 'local/application-browser-evidence');
 const ready = JSON.parse(fs.readFileSync(path.join(world, 'application-ready.json')));
-if (ready.port === 8870) throw Error('Refusing to target the active Desk port.');
+if ([8870, 8873].includes(ready.port)) throw Error('Refusing to target a resident Desk port.');
 const token = JSON.parse(fs.readFileSync(path.join(world, 'keep.json'))).operator;
 const base = `http://127.0.0.1:${ready.port}`;
 fs.mkdirSync(output, {recursive: true});

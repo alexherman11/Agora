@@ -107,6 +107,8 @@ def connected(tmp_path, monkeypatch):
 
     def dispatch(name, args):
         calls.append((name, args))
+        if name == "world.focus":
+            return {"watermark": 1, "changed": args.get("since") != 1, "entries": [], "views": []}
         if name == "world.query":
             return {"items": [], "complete": True}
         if name == "package.install":
@@ -155,10 +157,10 @@ def test_unknown_stale_and_inactive_callbacks_cannot_dispatch(connected):
         ]
     )
     jeff.send("Inspect the boundary.")
-    assert len(calls) == 1  # context rehydration only
+    assert [name for name, _ in calls] == ["world.query", "world.focus"]  # adapter context only
     assert all(not result["success"] for result in runtime.responses)
     runtime.invoke("world.query")
-    assert len(calls) == 1
+    assert len(calls) == 2
     for method in ("item/commandExecution/requestApproval", "item/fileChange/requestApproval"):
         assert runtime.handler(method, {}) == {"decision": "decline"}
     assert runtime.handler("item/permissions/requestApproval", {}) == {
@@ -180,7 +182,7 @@ def test_revocation_and_cancel_prevent_following_calls(connected):
         ]
     )
     assert jeff.send("Make changes.").startswith("Stopped.")
-    assert [name for name, _ in calls] == ["world.query", "mutate"]
+    assert [name for name, _ in calls] == ["world.query", "world.focus", "mutate"]
     assert not runtime.responses[-1]["success"]
     assert not runtime.responses[-2]["success"]
 
@@ -192,7 +194,8 @@ def test_call_limit_prevents_additional_dispatch(connected):
         [lambda: runtime.invoke("world.query"), lambda: runtime.invoke("world.query")]
     )
     assert "tool-call limit" in jeff.send("Read twice.")
-    assert len(calls) == 2  # startup context plus one admitted action
+    # startup context, the focus header, and one admitted action
+    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.query"]
 
 
 def test_instructive_gateway_refusal_reaches_jeff(connected):
@@ -268,7 +271,8 @@ def test_transport_failure_keeps_completed_actions_and_reconnects(connected, mon
 
     monkeypatch.setattr(runtime, "next_turn_notification", next_notification)
     assert "request failed" in jeff.send("Read.")
-    assert len(calls) == 2 and runtime.closed
+    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.query"]
+    assert runtime.closed
     assert "private" not in jeff.send("Try again.")
     assert jeff._client is not runtime
 
