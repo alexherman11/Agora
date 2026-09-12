@@ -13,6 +13,32 @@ older `docs` implementation branch. They remain useful, but their results are no
 counted as Agora3 runtime verification unless this file names a corresponding
 Agora3 check.
 
+## Isolated parallel-work prototype
+
+The `codex/parallel-worldline` checkout adds an opt-in worker supervisor in the
+separate `parallel-desk` world (port 8874). The original JEFF0 desk remains on
+port 8873. Native database, source, managed conversation and live/yard VMs are
+separate. [[Parallel Work]] records the exact boundaries, live rounds, observed
+friction and return path.
+
+Implemented here: scoped private candidates, two concurrent workers, durable
+briefs/attempts, resource wait reasons, linked reports, mid-turn messages,
+important executive wakeups, explicit retry, guarded adoption and independent
+worker stop/recovery. Adoption is distinct from build/install. Worker results
+are preserved across service restart; uncertain attempts are not replayed.
+
+Four live rounds established delegation, a real shared-resource wait, peer
+collaboration, scoped refusal, retained message drafts, concurrent chat,
+26 candidate checks in the cloned Linux yard, cancellation, brief revision,
+stale-input refusal and actual package installation/invocation. The final
+revision/restart check verified that old-brief messages are not replayed, adopted
+task outputs remain editable and interrupted work does not run again. The suite
+passed 185 tests, two actual-runtime inventory checks passed separately, Ruff
+passed, and final native replay matched 1,406 objects. The general runtime
+limits below still apply; this is not general autonomous or external-effect
+orchestration. Voice notification routing is wired through the existing activity
+observer; a new end-to-end audio call was not part of these worker rounds.
+
 ## Agora4 integration
 
 `agora4` combines its restored design vault with the implementation from
@@ -95,7 +121,7 @@ Stopping a turn rejects later callbacks but does not undo completed changes or
 terminate every independent guest process. Revocation blocks native commits;
 VM poweroff stops that machine. Package restoration, native replay, guest reset
 and external recovery have different scope. Multiple people, general bindings,
-appearance identities, fine-grained merges, asynchronous task machinery, shared
+appearance identities, fine-grained merges, general autonomous scheduling, shared
 rooms, witness memory and external-effect recovery are not established by this
 runtime. They are directions to evaluate, not required implementation stages.
 

@@ -23,6 +23,7 @@ from agora3.packages import Packages
 from agora3.schemas import BUILTINS, check_schema, record, validate, validate_facets
 from agora3.scoped_context import assert_reads
 from agora3.source_tools import dispatch_source, source_specs
+from agora3.work_specs import SPECS as WORK_SPECS
 from agora3.world import Refusal, World, encoded, identifier
 from agora3.yard import Yard
 
@@ -193,6 +194,8 @@ class Gateway:
         if spec is None:
             raise Refusal("Unknown operation. Discover the current registry with tools.list.")
         validate(spec["input_schema"], args)
+        if name.startswith("work."):
+            return self.work.dispatch(actor, name, args)
         if name.startswith("application."):
             return self.applications.dispatch(actor, name.split(".", 1)[1], args)
         if name == "world.get":
@@ -416,6 +419,7 @@ class Gateway:
             + source_specs()
             + [FOCUS_SPEC, CATALOG_SPEC, CHECK_SPEC]
             + application_specs()
+            + (WORK_SPECS if hasattr(self, "work") else [])
         )
 
     def seed(self):

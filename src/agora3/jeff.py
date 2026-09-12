@@ -5,6 +5,7 @@ Never reads OAuth tokens, world files, or exposes host execution to the model.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -13,7 +14,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from agora3.guest import GuestError
+from agora3.model_protocol import ThreadEnvelope, payload
 from agora3.world import Refusal
 
 MODEL = "gpt-6-astra"
@@ -130,14 +134,16 @@ class Jeff:
         *,
         continuity=None,
         bind_session=None,
+        role_instructions=None,
     ):
         self.world_directory = Path(world_directory)  # identity only; never read directly
         self.dispatch = dispatch
         self.describe = describe
         self.continuity = continuity
         self.bind_session = bind_session
+        self.role_instructions = role_instructions
         self.model = os.environ.get("AGORA_JEFF_MODEL", MODEL)
-        self.reasoning = os.environ.get("AGORA_JEFF_REASONING", "high")
+        self.reasoning = os.environ.get("AGORA_JEFF_REASONING", "medium")
         self.max_calls = int(os.environ.get("AGORA_JEFF_MAX_CALLS", "100"))
         self.timeout = float(os.environ.get("AGORA_JEFF_TIMEOUT", "1200"))
         if self.max_calls < 1 or self.timeout <= 0:
@@ -309,7 +315,7 @@ class Jeff:
             "approvalPolicy": "never",
             "sandbox": "read-only",
             "config": thread_config(client),
-            "baseInstructions": model_instructions(),
+            "baseInstructions": self.role_instructions or model_instructions(),
             "developerInstructions": (
                 "Only the supplied Agora gateway accesses the world or designated Linux guest. "
                 "Tool discovery is live. No ambient Codex tools, host skills, or host commands "
@@ -329,7 +335,16 @@ class Jeff:
             if session["model"] != self.model or session["provider"] != "openai":
                 raise ValueError("Resident model binding differs; no conversation was reset.")
             try:
-                started = client.thread_resume(session["thread_id"], parameters)
+                try:
+                    started = client.thread_resume(session["thread_id"], parameters)
+                except ValidationError:
+                    # Recent runtimes retain items unknown to the installed SDK (e.g.
+                    # subAgentActivity). Resume the same ID without parsing historical items.
+                    started = client.request(
+                        "thread/resume",
+                        {"threadId": session["thread_id"], **parameters},
+                        response_model=ThreadEnvelope,
+                    )
             except Exception as exc:
                 raise ValueError(
                     "The saved resident conversation could not be resumed. Its binding and "
@@ -405,6 +420,7 @@ class Jeff:
                 "JEFF already has an active turn. Stop it or wait before sending again."
             )
         try:
+            self.last_outcome = "incomplete"
             self._cancel.clear()
             self._exhausted.clear()
             self._calls = 0
@@ -464,19 +480,21 @@ class Jeff:
         watcher = threading.Thread(target=watch, daemon=True)
         watcher.start()
         chunks, failed, interrupted = [], False, False
+        failure = "The runtime reported a failed turn without further detail."
         final_messages = []
         try:
             while True:
                 event = client.next_turn_notification(turn)
+                data = payload(event)
                 if event.method == "item/agentMessage/delta":
-                    chunks.append(event.payload.delta)
-                    message_event = {"type": "text.delta", "text": event.payload.delta}
-                    item_id = getattr(event.payload, "item_id", None)
+                    chunks.append(data.delta)
+                    message_event = {"type": "text.delta", "text": data.delta}
+                    item_id = getattr(data, "item_id", None)
                     if item_id:
                         message_event["id"] = item_id
                     self._emit(message_event)
                 elif event.method in {"item/started", "item/completed"}:
-                    item = event.payload.item
+                    item = getattr(data, "item", None)
                     item = getattr(item, "root", item)
                     phase = getattr(item, "phase", None)
                     phase = getattr(phase, "value", phase)
@@ -493,13 +511,24 @@ class Jeff:
                         if completed and phase == "final_answer":
                             final_messages.append(item.text)
                 elif event.method == "turn/completed":
-                    status = event.payload.turn.status
+                    status = data.turn.status
                     status = getattr(status, "value", status)
                     failed = status == "failed"
                     interrupted = status == "interrupted"
+                    error = getattr(data.turn, "error", None)
+                    if error:
+                        failure = str(getattr(error, "message", error))[:1000]
                     break
-        except Exception:
+                elif event.method == "error":
+                    error = getattr(data, "error", None)
+                    failure = str(getattr(error, "message", error or "Runtime error"))[:1000]
+        except Exception as exc:
             failed = True
+            logging.getLogger(__name__).exception("Model runtime receive failed")
+            failure = (
+                type(exc).__name__ + " while receiving runtime events; "
+                "details are in local service diagnostics."
+            )
         finally:
             self._accept_calls = False
             done.set()
@@ -510,12 +539,16 @@ class Jeff:
         if self._cancel.is_set() or interrupted:
             return "Stopped. Completed changes remain recorded."
         if timed_out.is_set():
+            self.last_outcome = "timeout"
             return "JEFF reached the time limit. Completed changes remain recorded."
         if self._exhausted.is_set():
+            self.last_outcome = "budget"
             return "JEFF reached the tool-call limit. Completed changes remain recorded."
         if failed:
-            return (
-                "The OpenAI account request failed. Completed changes remain recorded; try again."
+            self._emit({"type": "runtime.error", "text": failure})
+            raise RuntimeError(
+                "JEFF's model turn failed: " + failure + " Completed changes remain recorded."
             )
+        self.last_outcome = "completed"
         reply = "\n\n".join(final_messages) if final_messages else "".join(chunks)
         return reply.strip() or "The turn completed without a text reply."

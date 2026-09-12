@@ -187,3 +187,22 @@ Agora3 runtime unless revalidated there.
 - Merge the application runtime into Agora4 while retaining its restored Constitution, full specification, essays and design references. Keep current APIs and evidence in Runtime Guide and Implementation Status rather than replacing the design vault with implementation summaries.
 - Restore Alex's original three-paragraph JEFF orientation verbatim; maintain current runtime guidance separately. Compose both files into base instructions because a compiled-runtime probe found that changed supplemental developer instructions were omitted on the first resumed turn. Preserve the resident's exact conversation instead of resetting it to update the prompt.
 - Point the canonical JEFF0 launcher at Agora4 source while retaining its world path, guest machines and durable conversation binding. A branch integration changes code provenance, not ownership or identity of the existing world.
+
+- **2026-09-12 — Isolate the parallel prototype.** Fork the native database, managed
+  conversation, source and both VMs; preserve the original launcher and world.
+- **2026-09-12 — Separate commitment, attempt and adoption.** A durable task owns
+  versioned intent; a worker edits a scoped candidate. Ready is not installed.
+  Adoption checks current inputs and prerequisite results atomically.
+- **2026-09-12 — Bound execution and expose contention.** Two worker slots, explicit
+  resource leases and visible wait reasons keep independent conversation useful.
+  Interrupted attempts require explicit retry; budget exhaustion is not success.
+- **2026-09-12 — Route reports without widening authority.** Linked tasks exchange
+  public reports, current-brief messages can steer a running worker, and important
+  events wake JEFF. Routine evidence stays inspectable. Never hold world authority
+  while waiting for another runtime to accept a message.
+- **2026-09-12 — Preserve revised intent.** Old messages remain in history but are
+  excluded from the new brief's working context. Adopted task-owned outputs are
+  baseline inputs to later attempts rather than permanent write-once names.
+- **2026-09-12 — Preserve protocol failure distinctions.** Tolerate newer runtime
+  history/envelopes through narrow identity/payload adapters; actual failures,
+  time limits and cleanup failures cannot produce a ready worker result.

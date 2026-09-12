@@ -270,7 +270,8 @@ def test_transport_failure_keeps_completed_actions_and_reconnects(connected, mon
         raise RuntimeError("private provider details")
 
     monkeypatch.setattr(runtime, "next_turn_notification", next_notification)
-    assert "request failed" in jeff.send("Read.")
+    with pytest.raises(RuntimeError, match="RuntimeError while receiving runtime events"):
+        jeff.send("Read.")
     assert [name for name, _ in calls] == ["world.query", "world.focus", "world.query"]
     assert runtime.closed
     assert "private" not in jeff.send("Try again.")

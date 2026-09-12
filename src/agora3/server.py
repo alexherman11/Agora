@@ -3,6 +3,7 @@ Never give authored frames operator credentials or execute their source on the h
 """
 
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler
@@ -16,9 +17,14 @@ from agora3.gateway import Gateway
 from agora3.http_transport import BoundedHTTPServer
 from agora3.jeff import Jeff
 from agora3.voice import VoiceService
+from agora3.work_specs import SPECS as WORK_SPECS
 from agora3.world import Refusal, encoded
 
-FRAME = (Path(__file__).parent / "host/frame.html").read_text(encoding="utf-8")
+FRAME = (
+    (Path(__file__).parent / "host/frame.html")
+    .read_text(encoding="utf-8")
+    .replace("__WORK_METHODS__", json.dumps([s["name"] for s in WORK_SPECS]))
+)
 
 RECOVERY = (Path(__file__).parent / "host/recovery.html").read_text(encoding="utf-8")
 
@@ -39,6 +45,30 @@ class Application:
         self.gateway.native_bridge = self.bridge
         self.bridge_error = None
         self.voice = VoiceService(self)
+        self.work = None
+        if os.environ.get("AGORA_WORKERS") == "1":
+            from agora3.work_scheduler import WorkService
+
+            self.work = WorkService(self.gateway, notify=self.worker_update)
+            self.work.start()
+
+    def worker_update(self, text):
+        """Route important worker reports into the continuing executive conversation."""
+        with self.chat_lock:
+            if self.running:
+                return bool(self.jeff and self.jeff.steer(text))
+            try:
+                result = self.send(text, self.gateway.principal("human"), record=False)
+            except Exception:
+                return False
+        # If voice is connected, its ordinary activity observer delivers the executive's reply.
+        with self.voice.lock:
+            session = self.voice.session
+            if session and not session.done.is_set():
+                identifier = "work-update-" + result["activity_id"]
+                session.coordination.received(identifier, "worker")
+                session.coordination.accepted(identifier, result["activity_id"])
+        return True
 
     def connect_guest(self):
         try:
@@ -86,6 +116,9 @@ class Application:
                 "messages": messages,
                 "complete": query["complete"],
                 "resident": self.resident.public(),
+                "work": self.gateway.work.dispatch(self.gateway.principal("human"), "work.list", {})
+                if self.work
+                else None,
                 "voice": voice,
             }
 
@@ -98,6 +131,15 @@ class Application:
                 return conversational
         with self.chat_lock:
             if self.running:
+                if self.work and self.jeff and self.jeff.steer(message):
+                    if record:
+                        self.gateway.record_message(actor, "user", message)
+                    return {
+                        "accepted": True,
+                        "running": True,
+                        "activity_id": self.activity.id,
+                        "route": "executive_followup",
+                    }
                 raise Refusal(
                     "JEFF is working. Stop the active turn before starting another in "
                     "this first runtime."
@@ -208,21 +250,46 @@ class Application:
                     "revision": revision,
                     "watermark": self.gateway.world.query(limit=1)["watermark"],
                     "enabled": self.gateway.keep["enabled"],
+                    "workers": self.work is not None,
                 }
             if method == "host.stop":
                 return self.stop()
+            if method == "host.stop_workers":
+                stopped = []
+                if self.work:
+                    human = self.gateway.principal("human")
+                    with self.gateway.lock:
+                        for task in self.work.tasks():
+                            if task["state"] in {
+                                "queued",
+                                "starting",
+                                "running",
+                                "waiting_resource",
+                            }:
+                                self.work.dispatch(human, "work.cancel", {"id": task["id"]})
+                                stopped.append(task["id"])
+                return {"cancelled": stopped, "retained_candidates": True}
             if method == "host.revoke":
                 self.voice.close()
+                if self.work:
+                    self.work.close()
                 self.gateway.revoke()
                 self.stop()
                 self.bridge.close()
                 return {"enabled": False}
             if method == "host.resume":
                 result = self.gateway.resume()
+                if self.work and self.work.closed.is_set():
+                    from agora3.work_scheduler import WorkService
+
+                    self.work = WorkService(self.gateway, notify=self.worker_update)
+                    self.work.start()
                 self.connect_guest()
                 return result
             if method == "host.stop_guest":
                 self.voice.close()
+                if self.work:
+                    self.work.close()
                 self.gateway.revoke()
                 self.stop()
                 self.bridge.close()

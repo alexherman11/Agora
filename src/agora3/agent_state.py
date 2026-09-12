@@ -92,3 +92,24 @@ class AgentState:
                 return
             value["session"] = session
             self._save(actor, obj, value)
+
+    def fork(self, actor, *, thread_id, continuity):
+        """Bind an explicitly forked world to its own model conversation."""
+        if actor.name != "human":
+            raise Refusal("Only the operator can establish a worldline fork.")
+        with self.gateway.lock:
+            obj, value = self.read()
+            if not obj or value["owner_world"] == self.directory:
+                raise Refusal("Fork binding requires a copied, not already owned, resident.")
+            if not thread_id or thread_id == (value.get("session") or {}).get("thread_id"):
+                raise Refusal("A fork needs its own distinct model conversation.")
+            value["fork_origin"] = {"world": value["owner_world"], "session": value.get("session")}
+            value["owner_world"] = self.directory
+            value["session"] = {
+                "thread_id": thread_id,
+                "model": "gpt-6-astra",
+                "provider": "openai",
+            }
+            value["continuity"] = continuity
+            self._save(actor, obj, value)
+        return self.public()

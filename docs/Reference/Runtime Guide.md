@@ -30,7 +30,7 @@ Current environment guidance lives separately in
 authored text first, then the labelled guidance, including on the first resumed
 turn. See [prompt provenance](../../src/agora3/prompts/README.md).
 `AGORA_JEFF_MODEL` defaults to
-`gpt-6-astra`; `AGORA_JEFF_REASONING` defaults to `high`. `AGORA_CODEX_BIN` can select
+`gpt-6-astra`; `AGORA_JEFF_REASONING` defaults to `medium` in the parallel prototype. `AGORA_CODEX_BIN` can select
 a compatible Codex executable. An unavailable requested model fails explicitly;
 the harness does not substitute another. `AGORA_JEFF_LOGIN=device` selects the
 SDK's device-code login; the default uses its browser login.
@@ -287,12 +287,12 @@ guest software installation currently changes the shared mutable machine.
   or per-package permission isolation yet. Cross-package invocation can use the
   connected native client and `action.invoke`, but dependency resolution and
   automatic version pinning across such calls remain the package author's work.
-- JEFF accepts one conversation turn at a time. Server execution is asynchronous
-  so the interface remains responsive, but multiple concurrent agent tasks,
-  persistent worker jobs and automatic notification-driven wakeups are not built.
+- JEFF has one foreground conversation turn. In the opt-in parallel prototype,
+  `work.*` delegates independent scoped attempts; chat can steer the active turn.
+  See [[Parallel Work]] for durable jobs, notifications, queues and guarded adoption.
 - Conversation records and ordinary native collections persist. A separate witness
-  memory system, durable facet bindings/dependency evaluation and autonomous
-  worker agents are not implemented. They remain [[Native Development]] targets.
+  memory system, general facet bindings/dependency evaluation and open-ended
+  autonomous scheduling are not implemented. They remain [[Native Development]] targets.
 
 From the repository root, with dependencies installed, an existing account sign-in
 and the live Linux VM running with a configured candidate yard, explicitly run:
