@@ -2,9 +2,12 @@
 Never infer actions from speech or retry a possibly accepted backend request.
 """
 
+import json
+import logging
 import queue
 import threading
 import time
+import traceback
 import uuid
 from collections import deque
 
@@ -30,6 +33,9 @@ class VoiceSession:
         self.jobs = queue.Queue(maxsize=20)
         self.coordination = Coordination()
         self.started = False
+        self.failure = None
+        self.phase = "starting"
+        self.last_event = None
 
     def authorized(self):
         self.app.gateway.check_authority(self.actor)
@@ -50,8 +56,35 @@ class VoiceSession:
             "confirmed_closed": self.confirmed_closed,
             "seconds": self.seconds,
             "error": self.error,
+            "failure": self.failure,
             "coordination": self.coordination.snapshot(),
         }
+
+    def failed(self, exc, phase=None):
+        # Keep diagnostic metadata, never event payloads, audio, keys or exception text.
+        detail = {
+            "at": time.time(),
+            "phase": phase or self.phase,
+            "exception": type(exc).__name__,
+            "last_event": self.last_event,
+            "stack": [
+                {"function": frame.name, "line": frame.lineno}
+                for frame in traceback.extract_tb(exc.__traceback__)[-8:]
+            ],
+        }
+        for direction in ("rcvd", "sent"):
+            code = getattr(getattr(exc, direction, None), "code", None)
+            if isinstance(code, int):
+                detail[direction + "_close_code"] = code
+        self.failure = detail
+        logging.getLogger(__name__).error("Voice failure %s", json.dumps(detail))
+        self.error = (
+            "Voice disconnected during "
+            + detail["phase"]
+            + " ("
+            + detail["exception"]
+            + "). Your completed work remains in chat."
+        )
 
     def attach(self, connection):
         self.connection = connection
@@ -60,7 +93,11 @@ class VoiceSession:
 
     def send(self, kind, **values):
         event_id = values.pop("event_id", uuid.uuid4().hex)
-        self.connection.send({"type": kind, "event_id": event_id, **values})
+        try:
+            self.connection.send({"type": kind, "event_id": event_id, **values})
+        except Exception as exc:
+            self.failed(exc, "sending " + kind)
+            raise
 
     def close(self):
         if not self.closing.is_set():
@@ -73,6 +110,7 @@ class VoiceSession:
 
     def handle(self, event):
         kind = event.get("type", "")
+        self.last_event = kind if isinstance(kind, str) and len(kind) < 100 else "unknown"
         # Reflected raw audio is deliberately neither retained nor interpreted.
         event_id = event.get("event_id")
         if event_id:
@@ -172,17 +210,22 @@ class VoiceSession:
                         break
                 else:
                     try:
+                        self.phase = "updating voice context"
                         self.tick()
                     except Refusal:
                         self.error = "Voice authority changed; the call was ended."
                         self.close()
                         continue
                 try:
-                    self.handle(self.connection.receive())
+                    self.phase = "receiving voice events"
+                    event = self.connection.receive()
+                    self.phase = "handling voice event"
+                    self.handle(event)
                 except TimeoutError:
                     pass
-        except Exception:
-            self.error = "The voice connection ended unexpectedly; check the last request in chat."
+        except Exception as exc:
+            if self.failure is None:
+                self.failed(exc)
         finally:
             self.close()
             self.coordination.close()

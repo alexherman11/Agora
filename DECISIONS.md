@@ -215,3 +215,5 @@ Agora3 runtime unless revalidated there.
   a separately observed executive follow-up/chat-lock deadlock.
 
 - 2026-09-12: Keep Agora4 in a standalone checkout, preserving the existing parallel Desk world in place. Never wait for runtime steering while holding the chat callback lock: a live thread dump confirmed that cycle blocked all history HTTP slots. Typed, voice and worker follow-ups release the lock before steering.
+
+- 2026-09-12: Preserve metadata-only voice failure diagnostics (operation, exception class, close codes and stack locations) in status and local service logs. Generic disconnect messages hid repeated result-delivery failures; never log audio, transcripts, exception text or credentials.

@@ -187,3 +187,37 @@ def test_authored_surface_cannot_start_voice(tmp_path):
     app = Application(tmp_path)
     with pytest.raises(Refusal, match="independent human"):
         app.dispatch("guest", "host.voice.start", {})
+
+
+def test_transport_failure_preserves_reason_without_payloads(tmp_path, caplog):
+    app = Application(tmp_path)
+    session = VoiceSession(app, app.gateway.principal("human"), "test-diagnostics", "jeff")
+    connection = Connection()
+
+    def fail_receive(*args, **kwargs):
+        raise OSError("private-key-and-transcript-must-not-be-logged")
+
+    connection.receive = fail_receive
+    session.attach(connection)
+    assert session.done.wait(3)
+    assert session.failure["exception"] == "OSError"
+    assert session.failure["phase"] == "receiving voice events"
+    assert connection.hung_up and connection.disconnected
+    assert "private-key" not in caplog.text
+    assert "Voice failure" in caplog.text
+
+
+def test_result_delivery_failure_retains_its_send_phase(tmp_path):
+    app = Application(tmp_path)
+    session = VoiceSession(app, app.gateway.principal("human"), "test-diagnostics", "jeff")
+    connection = Connection()
+
+    def fail_send(event):
+        raise OSError("private content")
+
+    connection.send = fail_send
+    session.connection = connection
+    with pytest.raises(OSError):
+        session.send("session.commentary.append", content="private result")
+    assert session.failure["phase"] == "sending session.commentary.append"
+    assert "private" not in str(session.status())

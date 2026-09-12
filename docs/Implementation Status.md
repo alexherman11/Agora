@@ -216,3 +216,14 @@ Live VM/model probes consume real resources and have separate explicit commands
 in [[Runtime Guide]]. Private world databases, credentials, VM disks and detailed
 account artifacts stay outside Git. A successful build does not replace actual
 input, persistence or runtime-boundary checks appropriate to the change.
+
+## Voice disconnect diagnostics
+
+September 12: repeated calls ended during delivery of completed backend results.
+The earlier generic exception handler discarded the underlying exception. Voice
+status and local service logs now retain the failing operation, exception class,
+WebSocket close codes when available, and stack locations without payloads. This
+is diagnostic instrumentation, not a confirmed repair of the transport failure.
+Tests: 190 passed, two runtime inventory checks skipped without the runtime
+environment override; Ruff passed. The diagnostic build was loaded into the
+existing Desk; a new failing call is needed to identify the original cause.
