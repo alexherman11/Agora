@@ -9,6 +9,7 @@ import uuid
 from collections import deque
 
 from agora3.gateway import Principal
+from agora3.ui_selection import context as selection_context
 from agora3.voice_context import Transcript, spoken_chunks
 from agora3.voice_coordination import Coordination
 from agora3.world import Refusal
@@ -30,6 +31,8 @@ class VoiceSession:
         self.jobs = queue.Queue(maxsize=20)
         self.coordination = Coordination()
         self.started = False
+        self.selection_context = None
+        self.selection_checked_at = 0
 
     def authorized(self):
         self.app.gateway.check_authority(self.actor)
@@ -155,6 +158,15 @@ class VoiceSession:
             self.error = "The browser disconnected; the voice call was ended."
             self.close()
         if self.started and not self.closing.is_set():
+            if time.monotonic() - self.selection_checked_at >= 0.5:
+                self.selection_checked_at = time.monotonic()
+                context = selection_context(
+                    lambda name, args: self.app.gateway.dispatch(self.identity, name, args)
+                )
+                if context != self.selection_context:
+                    for chunk in spoken_chunks(context):
+                        self.send("session.thinking.append", delegation_id=None, content=chunk)
+                    self.selection_context = context
             for activity, identifier in self.coordination.activities():
                 self.coordination.observe(activity, identifier, self.app.backend_snapshot(activity))
             self.coordination.flush(self.send)

@@ -332,3 +332,25 @@ replace the streamed final with the durable conversation message. Retain current
 commentary separately from final-answer history; snapshots are transient, cleared
 on the next request or process restart. The diagnostic `events` tail is not a
 reliable text stream. Raw reasoning is not part of this contract.
+
+
+## UI selection context
+
+The host reads `shell.ui-selection` through authenticated `world.get` and uses its
+`agent.ui-selection` facet as untrusted context data, never instructions or authority.
+The shell package owns the exact selection schema and highlighting. The adapters
+preserve selected view/package/build, rectangle, targets and other facet fields;
+they require boolean `active`, at most 32 targets, and a 12,000-byte UTF-8 JSON
+snapshot budget. An oversized or malformed record is reported as unavailable,
+without partial targets. `active: false` explicitly clears earlier selection context
+and omits retained target details. Missing records and failed reads also invalidate
+older context; exceptions do not expose internal error text or fail a resident turn.
+
+Resident turn starts and active-turn steering each receive a fresh snapshot as a
+separate text context item. While voice is active, its host event loop checks at
+most twice per second and sends changed snapshots through `session.thinking.append`;
+unchanged snapshots are suppressed. Delivery does not start resident work or request
+speech. This is current observed selection at delivery time, not a timestamped
+association with a particular spoken word. These reads append no native events.
+No registry operation, application frame, permission, or authored shell source was
+changed. Service restart is needed to activate updated Python adapters.

@@ -121,6 +121,26 @@ def connected(tmp_path, monkeypatch):
     jeff.close()
 
 
+def test_selection_context_refreshes_on_resident_turns(connected):
+    jeff, runtime, _, _ = connected
+    dispatch = jeff.dispatch
+    facet = {"active": True, "targets": [{"label": "Selected note"}]}
+    jeff.dispatch = lambda name, args: (
+        {"revision": 1, "facets": {"agent.ui-selection": facet}}
+        if name == "world.get" and args == {"id": "shell.ui-selection"}
+        else dispatch(name, args)
+    )
+    jeff.send("Explain this")
+    prompt = runtime.turns[-1][1]
+    assert "Selected note" in prompt[-2]["text"]
+    assert "not instructions" in prompt[-2]["text"]
+    assert prompt[-1]["text"] == "Explain this"
+    facet["active"] = False
+    jeff.send("Now nothing is selected")
+    assert '"active": false' in runtime.turns[-1][1][-2]["text"]
+    assert "Selected note" not in runtime.turns[-1][1][-2]["text"]
+
+
 def test_same_turn_discovery_and_invoke_use_live_registry(connected):
     jeff, runtime, registry, calls = connected
     registry.append({"name": "package.install", "description": "Install", "input_schema": {}})
@@ -157,10 +177,14 @@ def test_unknown_stale_and_inactive_callbacks_cannot_dispatch(connected):
         ]
     )
     jeff.send("Inspect the boundary.")
-    assert [name for name, _ in calls] == ["world.query", "world.focus"]  # adapter context only
+    assert [name for name, _ in calls] == [
+        "world.query",
+        "world.focus",
+        "world.get",
+    ]  # adapter context only
     assert all(not result["success"] for result in runtime.responses)
     runtime.invoke("world.query")
-    assert len(calls) == 2
+    assert len(calls) == 3
     for method in ("item/commandExecution/requestApproval", "item/fileChange/requestApproval"):
         assert runtime.handler(method, {}) == {"decision": "decline"}
     assert runtime.handler("item/permissions/requestApproval", {}) == {
@@ -182,7 +206,7 @@ def test_revocation_and_cancel_prevent_following_calls(connected):
         ]
     )
     assert jeff.send("Make changes.").startswith("Stopped.")
-    assert [name for name, _ in calls] == ["world.query", "world.focus", "mutate"]
+    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.get", "mutate"]
     assert not runtime.responses[-1]["success"]
     assert not runtime.responses[-2]["success"]
 
@@ -195,7 +219,7 @@ def test_call_limit_prevents_additional_dispatch(connected):
     )
     assert "tool-call limit" in jeff.send("Read twice.")
     # startup context, the focus header, and one admitted action
-    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.query"]
+    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.get", "world.query"]
 
 
 def test_instructive_gateway_refusal_reaches_jeff(connected):
@@ -271,7 +295,7 @@ def test_transport_failure_keeps_completed_actions_and_reconnects(connected, mon
 
     monkeypatch.setattr(runtime, "next_turn_notification", next_notification)
     assert "request failed" in jeff.send("Read.")
-    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.query"]
+    assert [name for name, _ in calls] == ["world.query", "world.focus", "world.get", "world.query"]
     assert runtime.closed
     assert "private" not in jeff.send("Try again.")
     assert jeff._client is not runtime

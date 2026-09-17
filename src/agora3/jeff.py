@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from agora3.guest import GuestError
+from agora3.ui_selection import context as selection_context
 from agora3.world import Refusal
 
 MODEL = "gpt-6-astra"
@@ -212,7 +213,14 @@ class Jeff:
         if not client or not turn or not self._accept_calls:
             return False
         try:
-            result = client.turn_steer(thread, turn, [{"type": "text", "text": message}])
+            result = client.turn_steer(
+                thread,
+                turn,
+                [
+                    {"type": "text", "text": selection_context(self.dispatch)},
+                    {"type": "text", "text": message},
+                ],
+            )
             if result.turn_id != turn:
                 raise ValueError("Unexpected turn")
         except Exception:
@@ -423,6 +431,7 @@ class Jeff:
             header = self._focus_header()
             if header:
                 prompt.append({"type": "text", "text": header})
+            prompt.append({"type": "text", "text": selection_context(self.dispatch)})
             prompt.append({"type": "text", "text": message})
             if self._cancel.is_set():
                 return "Stopped before starting a model turn."

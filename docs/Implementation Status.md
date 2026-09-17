@@ -169,3 +169,21 @@ Live VM/model probes consume real resources and have separate explicit commands
 in [[Runtime Guide]]. Private world databases, credentials, VM disks and detailed
 account artifacts stay outside Git. A successful build does not replace actual
 input, persistence or runtime-boundary checks appropriate to the change.
+
+
+## UI selection context — September 12, 2026
+
+Resident turn starts/steering and the voice event adapter now read the shell-owned
+`shell.ui-selection` object, `agent.ui-selection` facet, through authenticated
+`world.get`. Both deliver explicitly untrusted context; inactive, unavailable and
+oversized snapshots invalidate earlier selection. Voice coalesces unchanged reads
+and checks at most twice per second. The shell owns exact schema, highlighting and
+record writes; no application frames, permissions or registry operations changed.
+See Runtime Guide for the 32-target / 12 KB limits and delivery semantics.
+
+Verification: all 173 Python tests passed, including fresh and resumed compiled
+Codex runtime inventory with local mock inference. Tests cover resident prompt
+refresh, steering context, voice change/clear delivery, byte/target bounds and
+read-only native delivery. Targeted Ruff checks passed. This is source and scripted
+transport evidence: the running service was not restarted, and actual model/voice
+receipt of a live selection has not been tested.

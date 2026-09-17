@@ -98,7 +98,9 @@ def test_steering_is_pinned_to_active_turn_and_never_retries(tmp_path):
     assert jeff.steer("wait") is False
     jeff._thread, jeff._turn, jeff._accept_calls = "resident", "turn", True
     assert jeff.steer("Read only") is True
-    assert calls == [("resident", "turn", [{"type": "text", "text": "Read only"}])]
+    assert calls[0][:2] == ("resident", "turn")
+    assert "UI selection snapshot" in calls[0][2][0]["text"]
+    assert calls[0][2][-1] == {"type": "text", "text": "Read only"}
     jeff.cancel()
     with pytest.raises(Refusal, match="stopping"):
         jeff.steer("More")

@@ -49,7 +49,8 @@ def test_restart_resumes_same_thread_and_preserves_native_identity(tmp_path, mon
     assert second._client.resumes[0][1]["baseInstructions"] == model_instructions()
     resumed_prompt = second._client.turns[0][1]
     assert resumed_prompt[0]["text"].startswith("World focus")  # header precedes the message
-    assert resumed_prompt[1:] == [{"type": "text", "text": "Continue."}]
+    assert resumed_prompt[1]["text"].startswith("UI selection snapshot")
+    assert resumed_prompt[2:] == [{"type": "text", "text": "Continue."}]
     assert state.read()[1] == binding
     assert gateway.world.verify()["ok"]
     second.close()
