@@ -39,7 +39,7 @@ class World:
         sid = self._id("s")
         self.subjects[sid] = {
             "id": sid, "kind": kind, "title": title, "text": text,
-            "tags": list(tags), "due": due, "rev": 1, "comments": [],
+            "tags": list(tags), "due": due, "rev": 1, "comments": [], "props": {},
         }
         return sid
 
@@ -480,8 +480,8 @@ class World:
             return r
         elif verb == "create":
             kind = args.get("kind", "note")
-            if kind not in ("note", "task", "chat", "image", "doc", "surface", "view"):
-                raise Refusal("kind= must be note, task, chat, image, doc, surface or view")
+            if kind not in ("note", "task", "chat", "image", "doc", "trial", "surface", "view"):
+                raise Refusal("kind= must be note, task, chat, image, doc, trial, surface or view")
             title = args.get("title")
             if not title:
                 raise Refusal("create needs title=")
@@ -689,6 +689,8 @@ class World:
         if later:
             raise Refusal(f"{event_id} is not the latest change to {ev['target']}; {later[-1]['id']} came after it. undo that first, or act on the current state")
         u = ev["undo"]
+        if u.get("external"):
+            raise Refusal(f"{event_id} had an effect outside the desk ({ev['verb']}); undo cannot take it back")
         if "restore" in u:
             r = deepcopy(u["restore"])
             r["rev"] = (self.nodes[r["id"]]["rev"] if r["id"] in self.nodes else r["rev"]) + 1

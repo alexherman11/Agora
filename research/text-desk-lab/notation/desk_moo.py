@@ -6,7 +6,7 @@ New commands: examine id, help [verb], verbs id (by origin). `do` goes through t
 import shlex
 
 import moo
-from desk import Desk, HELP
+from desk import Desk, HELP, unescape_value
 from world import Refusal
 
 HELP_MOO = HELP.replace(
@@ -111,7 +111,7 @@ class DeskMoo(Desk):
                 k, eq, v = a.partition("=")
                 if not eq:
                     raise Refusal(f"argument {a!r} must be key=value")
-                kv[k] = v.replace("\\n", "\n")
+                kv[k] = unescape_value(v)
             verb, target = argv[0], argv[1]
             if target.lower() in self._verb_names() and verb.lower() not in self._verb_names() and (verb in self.world.nodes or verb in self.world.subjects):
                 verb, target = target, verb

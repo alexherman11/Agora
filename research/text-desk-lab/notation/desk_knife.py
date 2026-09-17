@@ -3,8 +3,10 @@
 import re
 import shlex
 
+import harness   # registers launch; provides sync
 import knife
 import moo
+from desk import unescape_value
 from desk_moo import DeskMoo, HELP_MOO
 from world import Refusal
 
@@ -121,7 +123,8 @@ class DeskKnife(DeskMoo):
             if len(tl) > limit:
                 out.append(f"{indent}* … {len(tl) - limit} more line(s) folded; read {nid} for all")
         for c in s.get("comments", []):
-            out.append(f"{indent}* {c['id']} {c['by']} ({'resolved' if c['resolved'] else 'open'}): {c['text'][:90]}")
+            ct = c["text"] if len(c["text"]) <= 160 else c["text"][:160] + "… (read " + nid + " for all)"
+            out.append(f"{indent}* {c['id']} {c['by']} ({'resolved' if c['resolved'] else 'open'}): {ct}")
         for l in w.links_of(s["id"]):
             other = l["to"] if l["from"] == s["id"] else l["from"]
             ot = w.subjects[other]["title"]
@@ -313,6 +316,8 @@ class DeskKnife(DeskMoo):
         are reassigned on replay. Says what it cannot carry (others' comments, resolved state, exact geometry)."""
         w = self.world
         out = ["# export of this desk; replay on an empty desk after one look", "look"]
+        if self.today:
+            out.append(f"clock {self.today}")   # first: texts may mention $today, and age rules need a clock
         titles = {}
         for n in w.nodes.values():
             titles.setdefault(w.title(n).lower(), []).append(n["id"])
@@ -322,7 +327,9 @@ class DeskKnife(DeskMoo):
             out.append("# WARNING: these titles name several different things, and replay resolves by title: " + ", ".join(dup))
 
         def q(s):
-            return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+            # a literal backslash becomes four: shlex halves it, then the do parser halves it again after
+            # turning unescaped \n into newlines, so text with a literal backslash-n survives a round trip
+            return '"' + str(s).replace("\\", "\\\\\\\\").replace('"', '\\"').replace("\n", "\\n").replace("$today", "\\$today") + '"'
 
         def ref(nid):
             return "desk" if nid == w.root else q(w.title(w.nodes[nid]))
@@ -352,6 +359,8 @@ class DeskKnife(DeskMoo):
                     if s.get("due"):
                         line += f" due={s['due']}"
                     out.append(line)
+                    if s.get("props"):
+                        out.append(f"do prop {q(s['title'])} " + " ".join(f"{k}={q(v)}" for k, v in s["props"].items()))
                     for c in s.get("comments", []):
                         if c["by"] == "alex":
                             out.append(f"do comment {q(s['title'])} line={q(c['text'])}")
@@ -367,8 +376,6 @@ class DeskKnife(DeskMoo):
             a, b = w.subjects.get(l["from"]), w.subjects.get(l["to"])
             if a and b:
                 out.append(f"do link {q(a['title'])} {q(b['title'])} as={l['kind']}")
-        if self.today:
-            out.append(f"clock {self.today}")   # before the rules: a due<today rule cannot be defined without it
         for r in self.rules or []:
             out.append(f"rule {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {r.get('target') or ''} {self._fmt_args(r['kv'])}".replace("  ", " ").rstrip())
         for name, body in (self.scripts or {}).items():
@@ -569,9 +576,9 @@ class DeskKnife(DeskMoo):
             return HELP_KNIFE
         if "$today" in line and not line.lower().startswith("script "):
             # substituted when a command runs, not when a script is defined
-            if not self.today:
+            if not self.today and re.search(r"(?<!\\)\$today", line):
                 raise Refusal("$today is unset; clock YYYY-MM-DD sets it")
-            line = line.replace("$today", self.today)
+            line = re.sub(r"(?<!\\)\$today", self.today or "", line)   # \$today stays literal (export writes it so)
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
@@ -583,6 +590,9 @@ class DeskKnife(DeskMoo):
             return self.cmd_export()
         if cmd == "why":
             return self.cmd_why(arg)
+        if cmd == "sync":
+            # the harness writes as another actor: its changes are not "seen" by you; the delta header names them
+            return "sync:\n" + "\n".join(harness.sync(self))
         if cmd == "vars":
             return "\n".join(f"${k} = {v}" for k, v in (self.vars or {}).items()) or "no handles. set name = <id or title>, or create ... as=name; then $name names it"
         if cmd == "set":
@@ -618,7 +628,7 @@ class DeskKnife(DeskMoo):
             for a in argv[1:]:
                 if "=" in a and not a.startswith("?"):
                     k, _, v = a.partition("=")
-                    kv[k] = v.replace("\\n", "\n")
+                    kv[k] = unescape_value(v)
             return self.cmd_do_knife(verb, positional, kv)
         return super().repl(line)
 
@@ -646,6 +656,12 @@ class DeskKnife(DeskMoo):
         "handles": """handles: names for ids. do create ... as=draft, or set draft = <id or title>; then $draft names it.
   vars lists them. $new is the last surface created, $item the last thing.""",
         "export": "export: prints the commands that rebuild this desk from an empty one, by title. Replay them after one look.",
+        "trials": """trials: model runs as things on the desk.
+  do create <surface> kind=trial title=<str> then do prop <trial> task=home2 variant=lean model=gpt-5.6-sol
+  do launch <trial>        starts it in the background; external effect, undo cannot take it back
+  sync                     brings finished trials in, as the actor harness: props status/pass/score/calls/seconds,
+                           a comment with the model's reply, and a linked transcript doc (## call N sections)
+  prop:status=running / prop:pass=0 select trials; rule on prop by=harness watches results arriving""",
         "why": "why <id>: the events that put a thing where it is (by whom, via which rule, because of what) and which rule would act on it next.",
     }
 

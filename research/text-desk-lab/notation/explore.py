@@ -56,7 +56,8 @@ def main():
                 else:
                     s = w.subjects[k["subject"]]
                     bits = [s["kind"], repr(s["title"]), f"tags={s['tags']}", f"due={s.get('due')}", f"text={__import__('hashlib').md5(s['text'].encode()).hexdigest()[:6]}",
-                            f"comments={[(c['by'], c['text'], c['resolved']) for c in s['comments']]}", "folded" if k["folded"] else ""]
+                            f"comments={[(c['by'], c['text'], c['resolved']) for c in s['comments']]}", "folded" if k["folded"] else "",
+                            f"props={sorted((s.get('props') or {}).items())}" if s.get("props") else ""]
                     print("  " * depth + " ".join(b for b in bits if b))
         walk(w.root, 0)
         for l in w.links:
@@ -71,7 +72,7 @@ def main():
         print("reset")
         return
     for raw in sys.stdin:
-        line = raw.rstrip("\n").replace("\\n", "\n")
+        line = raw.rstrip("\n")   # the desk's own grammar handles \n inside values; do not pre-convert
         if not line.strip() or line.startswith("#"):
             continue
         print(f"> {line}")

@@ -50,7 +50,7 @@ def parse_selection(w, token):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
-    if not terms or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "title:", "comments:", "links:")) or t == "hidden" for t in terms):
+    if not terms or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:")) or t == "hidden" for t in terms):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -87,6 +87,18 @@ def parse_selection(w, token):
                 raise Refusal(f"also: needs an appearance id, not {a}")
             others = set(w.appearances_of(w.nodes[a]["subject"])) - {a}
             cands = [c for c in cands if c in others]
+        elif t.startswith("prop:"):
+            k, eq, v = t[5:].partition("=")
+            if not eq or not k:
+                raise Refusal("prop:k=v (prop:k alone selects things that have k)")
+
+            def okp(nid, k=k, v=v, eq=eq):
+                n = w.nodes[nid]
+                if n["type"] != "appearance":
+                    return False
+                props = w.subjects[n["subject"]].get("props") or {}
+                return (props.get(k) == v) if v else (k in props)
+            cands = [c for c in cands if okp(c)]
         elif t.startswith("age<") or t.startswith("age>"):
             # days since the last event that touched the thing, by the clock; things never touched under a clock have no age
             if not w.today:

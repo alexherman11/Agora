@@ -212,7 +212,10 @@ def assess(task, desk):
         morning = (desk.scripts or {}).get("morning", "")
         out["morning_script_exists"] = bool(morning)
         out["morning_sets_clock_from_arg"] = "clock $1" in morning
-        out["morning_shows_overdue_and_today"] = "overdue" in morning.lower() and "today" in morning.lower()
+        names_overdue = {"overdue"} | {n["id"] for n in w.nodes.values() if n["type"] == "surface" and n["title"] == "Overdue"}
+        names_today = {"today"} | {n["id"] for n in w.nodes.values() if n["type"] == "surface" and n["title"] == "Today"}
+        ml = morning.lower()
+        out["morning_shows_overdue_and_today"] = any(x in ml for x in names_overdue) and any(x in ml for x in names_today)
         out["clock_is_2026_10_01"] = desk.today == "2026-10-01"
         moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
         out["nothing_moved_by_hand"] = not moves

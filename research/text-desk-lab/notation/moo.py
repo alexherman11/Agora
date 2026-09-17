@@ -41,6 +41,7 @@ KIND_CHAIN = {
     "chat": ["chat", "text", "appearance", "thing"],
     "doc": ["doc", "text", "appearance", "thing"],
     "image": ["image", "appearance", "thing"],
+    "trial": ["trial", "text", "appearance", "thing"],
 }
 
 
@@ -386,6 +387,28 @@ def v_done(w, nid, a):
     if t.startswith("✓ "):
         raise Refusal("already done")
     return _prim(w, "retitle", nid, {"title": "✓ " + t})
+
+
+@verb("prop", ["appearance"], "Set or clear named properties on this thing's subject (k=v ...; remove=k). prop:k=v selects by them.",
+      "k=v ... | remove=k", "do prop a12 model=gpt-5.6-sol status=queued")
+def v_prop(w, nid, a):
+    actor = a.pop("_by", "jeff")
+    s = w.subjects[w.nodes[nid]["subject"]]
+    props = s.setdefault("props", {})
+    rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]
+    if not a and not rem:
+        raise Refusal("prop needs k=v and/or remove=k")
+    before = dict(s, props=dict(props))
+    for k in rem:
+        props.pop(k, None)
+    for k, v in a.items():
+        props[k] = str(v)
+    s["rev"] += 1
+    for x in w.appearances_of(s["id"]):
+        w._bump(x)
+    ev = w._event("prop", nid, dict(a, **({"remove": ",".join(rem)} if rem else {})), {"restore_subject": before}, actor)
+    return {"ok": True, "event": ev["id"], "changed": [s["id"]] + w.appearances_of(s["id"]),
+            "note": "props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)")}
 
 
 @verb("tag", ["appearance"], "Add or remove tags on this thing's subject. Tags are what tag: selects and rules watch.",

@@ -1050,3 +1050,22 @@ came from the rule receipt's hint; it wrote the rule with ids, which is fine). C
 Call 6: rules, scripts, look at both panels to verify. Reply listed the six overdue tasks correctly. Its words: "the
 automation help was clear; the clock-dependent age behavior was the key affordance". First run in the lab where the
 model added behaviour to the desk rather than moving things on it.
+
+## Round 11g: trials as things on the desk (2026-09-17)
+Alex asked what it would take to manage the Terra trials from inside the desk. Built the answer:
+- `prop`: named properties on any thing (`do prop a12 model=gpt-5.6-sol status=queued`, `remove=k`); shown on the
+  line; `prop:k=v` selects by them; export carries them. `due` and `tag` were the first two; this is the general form.
+- kind `trial`; `launch` (harness.py): starts run.py in the background from the trial's props. The first verb whose
+  effect leaves the world: its event is marked external, `undo` refuses it by name, the receipt says so.
+- `sync`: brings finished trials in as the actor `harness`: props status/pass/score/calls/seconds, a comment with the
+  model's reply, and a transcript doc (`## call N` sections) placed beside the trial and linked to it. Rules watch
+  `on prop by=harness`; views `Running` (prop:status=running) and `Failed` (kind:trial,prop:pass=0).
+- Sol on home2 (before this): full pass, 8 calls, 32 s. Both models build the automation from `help`.
+First use: `do launch $t1` from my desk started a real Terra run of home2; `undo` refused it correctly.
+**Terra launched from the desk (desk-home2-on-terra-from-the-desk-1):** 8 of 9 in 6 calls; the miss was the
+assessor wanting the words Overdue/Today where Terra wrote the ids (fixed to accept ids). `sync` brought it back:
+props, a comment with the reply, a transcript doc with six `## call` sections, a link; rules tagged it needs-look
+and filed it into Today. Export round trip then exposed the escape grammar: explore.py had been pre-converting
+`\n`; escaped quotes broke the batch splitter; `$today` inside quoted text was substituted on replay. Settled: the
+desk owns escapes (unescaped `\n` newline, `\` backslash, `\$today` literal), the splitter honours them, export
+writes them. Replay is identical except comments by other actors, which the grammar cannot write by design.

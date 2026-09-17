@@ -30,13 +30,22 @@ HELP = """commands (one per call):
 ids: f.. surface, a.. appearance, s.. subject, e.. event. quote values with spaces."""
 
 
+def unescape_value(v):
+    """A k=v value after shlex: an unescaped \\n is a newline; \\\\ is one literal backslash (so \\\\n stays literal)."""
+    return re.sub(r"(?<!\\)\\n", "\n", v).replace("\\\\", "\\").replace("\\$", "$")
+
+
 def split_batch(line):
     """Split on ; or newlines outside quotes."""
-    out, cur, q = [], "", None
+    out, cur, q, esc = [], "", None, False
     for ch in line or "":
         if q:
             cur += ch
-            if ch == q:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True   # an escaped quote inside a value does not close it (export writes \" inside text=)
+            elif ch == q:
                 q = None
         elif ch in "\"'":
             q = ch
@@ -208,7 +217,7 @@ class Desk:
                 k, eq, v = a.partition("=")
                 if not eq:
                     raise Refusal(f"argument {a!r} must be key=value")
-                kv[k] = v
+                kv[k] = unescape_value(v)
             if argv[1].lower() in self._verb_names() and argv[0].lower() not in self._verb_names():
                 return self.cmd_do(argv[1], argv[0], kv)
             return self.cmd_do(argv[0], argv[1], kv)
@@ -317,7 +326,9 @@ class Desk:
                 bits.append(geo)
             if s.get("due"):
                 bits.append(f"due {s['due']}")
-            if s["kind"] in ("note", "task", "chat", "doc"):
+            if s.get("props"):
+                bits.append(" ".join(f"{k}={v}" for k, v in s["props"].items() if k not in ("label", "started")))
+            if s["kind"] in ("note", "task", "chat", "doc", "trial"):
                 bits.append(f"{len(s['text'].split())}w")
             if n["folded"]:
                 bits.append("folded")
@@ -661,7 +672,7 @@ class Desk:
                     raise
                 raise Refusal(f"{verb} is not a verb (form: do <verb> <id> key=value); try verbs <id>")
         nid = self._resolve(target)
-        kv = {k: v.replace("\\n", "\n") for k, v in kv.items()}
+        kv = dict(kv)   # values were unescaped where they were parsed
         cur = w.nodes[nid]["rev"] if nid in w.nodes else w.subjects[nid]["rev"]
         seen = self.seen.get(nid)
         if seen is None:
