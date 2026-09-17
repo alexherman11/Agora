@@ -226,6 +226,8 @@ class World:
             weights = [1] * n
         wsum = float(sum(weights))
         shares = [max(24, int(total * wt / wsum)) for wt in weights]
+        if sum(shares) > total:
+            shares = [max(24, total // n)] * n   # proportional shares clamped past the space: fall back to equal, never spill
         if f["layout"] == "column":
             y = gap
             for k, sh in zip(kids, shares):
@@ -347,6 +349,8 @@ class World:
                 dest = args["into"]
                 if dest not in self.nodes or self.nodes[dest]["type"] != "surface":
                     raise Refusal(f"into= must name a surface, not {dest}")
+                if self.nodes[dest].get("layout") == "view":
+                    raise Refusal(f"{dest} is a view of {self.nodes[dest].get('query')}: things cannot be moved into it; change the thing so the query matches it")
                 if dest == target or self._is_inside(dest, target):
                     raise Refusal("cannot move a surface into itself")
                 if n["parent"] == dest and "at" not in args:
@@ -429,6 +433,8 @@ class World:
             lay = args.get("as", "column")
             if lay not in ("column", "row"):
                 raise Refusal("as= must be column or row")
+            if n["layout"] == lay:
+                return {"ok": True, "event": None, "changed": [], "note": f"{target} is already a {lay}; nothing changed"}
             n["layout"] = lay
             self.reflow(target)
             changed += [k["id"] for k in self.children(target)]
@@ -453,11 +459,28 @@ class World:
             return r
         elif verb == "create":
             kind = args.get("kind", "note")
-            if kind not in ("note", "task", "chat", "image", "doc", "surface"):
-                raise Refusal("kind= must be note, task, chat, image, doc or surface")
+            if kind not in ("note", "task", "chat", "image", "doc", "surface", "view"):
+                raise Refusal("kind= must be note, task, chat, image, doc, surface or view")
             title = args.get("title")
             if not title:
                 raise Refusal("create needs title=")
+            if n.get("layout") == "view":
+                raise Refusal(f"{target} is a view: it shows a selection and holds nothing itself; create inside a real surface")
+            if kind == "view":
+                # round 11d: a live collection. A view is a surface whose contents are a selection, evaluated at each look.
+                query = str(args.get("query", "")).strip()
+                if not query:
+                    raise Refusal("a view needs query=<selection>, e.g. query=kind:task,due<today")
+                x, y, free = self.free_spot(target, 400, 300)
+                fid = self.add_surface(str(title), target, "view", x, y, 400, 300)
+                self.nodes[fid]["query"] = query
+                self._fair_share(fid)
+                self.reflow(target)
+                self.last_created = self.last_surface = fid
+                self._bump(target)
+                ev = self._event(verb, target, args, {"delete": fid}, actor)
+                return {"ok": True, "event": ev["id"], "changed": [target, fid], "created": fid,
+                        "note": f"new view {fid} of {query} inside {target}; it lists whatever matches, wherever it is"}
             if kind == "surface":
                 # round 11c: a new empty panel inside this one (group <surface> did this by accident of wording)
                 layout = str(args.get("layout", "column"))
@@ -600,7 +623,11 @@ class World:
             if "text" in args:
                 s["text"] = str(args["text"])
             if "append" in args:
-                s["text"] = (s["text"].rstrip("\n") + "\n" + str(args["append"])).strip("\n")
+                line = str(args["append"])
+                if s["kind"] == "chat" and actor in ("jeff", "alex") and not re.match(r"^\w+:", line.strip()):
+                    line = "Alex: " + line.strip()   # chat lines carry a speaker; an unsigned line from us is ours
+                    args = dict(args, append=line, signed="Alex")
+                s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
         elif verb == "place":
             dest = args.get("into")
             if dest not in self.nodes or self.nodes[dest]["type"] != "surface":

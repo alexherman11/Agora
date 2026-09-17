@@ -103,7 +103,9 @@ def tools_for(variant):
             "verbs that apply now) · read id [#n|:3] · find words · where id · pivot id · history [id] · help [verb|selections] · "
             "do <verb> <target> k=v ... · undo eN. General verbs (move, remove, group, tile, sort, create, append, rewrite, "
             "comment, resolve, check, link, ...) work on any thing; a target is an id, an id list, or a selection such as "
-            "?harbor,kind:task,in:f02. Pair verbs: swap A B · beside A B · link A B as=refers. Start with look."
+            "?harbor,kind:task,in:f02. Pair verbs: swap A B · beside A B · link A B as=refers. The desk may also carry "
+            "rules (rules lists them; they file things automatically and report as ~ lines), views (a surface that lists "
+            "a selection), scripts (scripts, run name args) and a clock (today). Start with look."
         )
     if variant in ("knife", "tiled"):
         tool["description"] = (

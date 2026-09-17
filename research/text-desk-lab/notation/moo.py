@@ -66,6 +66,8 @@ def _applies(w, nid, v):
         return False
     if v.name in ("untile",) and n.get("layout") == "free":
         return False
+    if n.get("layout") == "view" and v.name in ("tile", "untile", "group", "create", "sort", "tidy", "split", "stack"):
+        return False   # a view holds nothing of its own
     if v.name in ("tile", "tidy", "split", "sort", "stack") and n["type"] == "surface" and not w.children(nid):
         return False
     if v.name == "unfold" and not n.get("folded"):

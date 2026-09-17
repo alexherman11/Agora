@@ -127,8 +127,30 @@ class DeskKnife(DeskMoo):
                        + f"{other} \"{ot}\"" + (f" ({', '.join(apps_o)})" if apps_o else "") + f"  [{l['id']}]")
         return "\n".join(out)
 
+    # ---- views: live collections (round 11d) ---------------------------------------------------------
+    def view_matches(self, nid):
+        q = self.world.nodes[nid].get("query", "")
+        try:
+            sel = self._parse_selection(q)
+        except Refusal:
+            return None
+        return [] if sel is None else [i for i in sel[0] if i != nid]
+
+    def view_lines(self, nid, depth):
+        ind = "  " * (depth + 1)
+        ids = self.view_matches(nid)
+        if ids is None:
+            return [ind + f"(query {self.world.nodes[nid].get('query')!r} could not be evaluated now: help selections)"]
+        out = []
+        for i in ids:
+            out.append(ind + self.line(i, 1) + f"  (in {self.world.nodes[i]['parent']})")
+            extra = self.child_extra(i, depth + 1) if self.world.nodes[i]["type"] == "appearance" else None
+            if extra:
+                out.append(extra)
+        return out
+
     def child_extra(self, nid, depth):
-        if not self.bullets:
+        if not (self.bullets or getattr(self, "_deep", False)):
             return None
         w = self.world
         s = w.subjects[w.nodes[nid]["subject"]]
@@ -142,9 +164,10 @@ class DeskKnife(DeskMoo):
         if not tl:
             return None
         rest = len(tl) - 1
-        line = f"{ind}* {tl[0][:100]}"
-        if rest:
-            line += f"  (+{rest} more line(s); examine {nid})"
+        first = tl[0] if len(tl[0]) <= 160 else tl[0][:160] + "…"
+        line = f"{ind}* {first}"
+        if rest or first.endswith("…"):
+            line += f"  (+{rest} more line(s); examine {nid})" if rest else f"  (cut; examine {nid})"
         return line
 
     # ---- rules: the first automation layer (round 11c) ----------------------------------------------
@@ -232,6 +255,38 @@ class DeskKnife(DeskMoo):
             out += f"\n  {len(ids)} thing(s) already match {desc}; the rule fires on things that enter it from now on. rules lists it; rule drop {rid} removes it"
         return out
 
+    # ---- why: how a thing got where it is (round 11d; Terra: "where a rule will file a new item felt awkward")
+    def cmd_why(self, ident):
+        w = self.world
+        nid = self._resolve(ident)
+        sid = w.nodes[nid].get("subject") if nid in w.nodes else nid
+        mine = [e for e in w.events if e["target"] in (nid, sid) or nid in (e.get("changed") or []) or sid in (e.get("changed") or [])]
+        head = self.line(nid, 1) if nid in w.nodes else f"{sid} (subject)"
+        if not mine:
+            return head + "\n  no recorded history: it was here before this session began"
+        out = [head]
+        for e in mine[-12:]:
+            who = e["by"]
+            via = e.get("via")
+            how = f" by rule {via.split()[1]}" if via and via.startswith("rule ") else (f" via {via}" if via else "")
+            cause = f" (because of {e['cause']})" if e.get("cause") else ""
+            done = " (undone)" if e.get("undone") else ""
+            out.append(f"  {e['id']} {e['verb']} {self._fmt_args(e.get('args') or {})}".rstrip() + f" · {who}{how}{cause}{done}")
+        # what would happen next: rules whose selection this thing matches but has not been handled by
+        pending = []
+        for r in self.rules or []:
+            if r.get("on"):
+                continue
+            try:
+                ids, _ = self._parse_selection(r["sel"])
+            except Refusal:
+                continue
+            if nid in ids and nid not in r["done"]:
+                pending.append(f"{r['id']} would {r['verb']} {self._fmt_args(r['kv'])}".rstrip())
+        if pending:
+            out.append("  next: " + "; ".join(pending))
+        return "\n".join(out)
+
     # ---- export: the desk as the commands that rebuild it (round 11c) --------------------------------
     def cmd_export(self):
         """Emit desk commands that rebuild this desk from an empty one. Things are named by title, since ids
@@ -257,6 +312,9 @@ class DeskKnife(DeskMoo):
 
         def walk(fid):
             for k in w.children(fid):
+                if k["type"] == "surface" and k["layout"] == "view":
+                    out.append(f"do create {ref(fid)} kind=view title={q(k['title'])} query={q(k.get('query', ''))}")
+                    continue
                 if k["type"] == "surface":
                     out.append(f"do create {ref(fid)} kind=surface title={q(k['title'])} layout={k['layout']}")
                     walk(k["id"])
@@ -332,7 +390,13 @@ class DeskKnife(DeskMoo):
         missing = sorted({m for m in re.findall(r"\$(\d+)", body) if int(m) > len(args)})
         if missing:
             raise Refusal(f"run {name} needs {max(int(m) for m in missing)} argument(s); got {len(args)}")
-        line = re.sub(r"\$(\d+)", lambda m: shlex.quote(args[int(m.group(1)) - 1]) if " " in args[int(m.group(1)) - 1] else args[int(m.group(1)) - 1], body)
+        def fill(m):
+            val = args[int(m.group(1)) - 1]
+            inside = body[:m.start()].count('"') % 2 == 1   # already inside a double-quoted value: paste raw
+            if inside:
+                return val.replace("\\", "\\\\").replace('"', '\\"')
+            return '"' + val.replace("\\", "\\\\").replace('"', '\\"') + '"' if (" " in val or not val) else val
+        line = re.sub(r"\$(\d+)", fill, body)
         r = self.dispatch("desk", {"line": line})
         body_text = r["text"] if "text" in r else "ERR " + r["error"]
         return f"run {name}: {line}\n" + body_text
@@ -479,6 +543,11 @@ class DeskKnife(DeskMoo):
         line = (line or "").strip()
         if not line:
             return HELP_KNIFE
+        if "$today" in line and not line.lower().startswith("script "):
+            # substituted when a command runs, not when a script is defined
+            if not self.today:
+                raise Refusal("$today is unset; clock YYYY-MM-DD sets it")
+            line = line.replace("$today", self.today)
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
@@ -488,6 +557,8 @@ class DeskKnife(DeskMoo):
             return self.cmd_rule(arg)
         if cmd == "export":
             return self.cmd_export()
+        if cmd == "why":
+            return self.cmd_why(arg)
         if cmd == "clock":
             return self.cmd_clock(arg)
         if cmd == "scripts":
@@ -540,7 +611,12 @@ class DeskKnife(DeskMoo):
             out = [self.line(nid, 1)]
         finally:
             self._hints_on = False
-        if n["type"] == "surface":
+        if n["type"] == "surface" and n["layout"] == "view":
+            kids = []
+            out.append(f"  a view inside {n['parent']}: it lists whatever matches {n.get('query')}, wherever it is. "
+                       f"Things are not in it; change a thing (tag, due, move) and it appears or leaves.")
+            out.extend(self.view_lines(nid, 0))
+        elif n["type"] == "surface":
             kids = w.children(nid)
             out.append(f"  a {n['layout']} surface" + (f" inside {n['parent']}" if n["parent"] else " (the desk itself)")
                        + (f", holding {len(kids)} thing(s):" if kids else ", empty"))

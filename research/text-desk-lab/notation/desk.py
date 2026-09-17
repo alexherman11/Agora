@@ -274,6 +274,13 @@ class Desk:
         """Verbs worth showing on this line right now. Plain desks show none; the acme desk overrides."""
         return None
 
+    def view_matches(self, nid):
+        """Ids a view currently shows. Plain desks have no selections, so no views."""
+        return None
+
+    def view_lines(self, nid, depth):
+        return []
+
     def child_extra(self, nid, depth):
         """Extra lines printed under an appearance in an outline. Plain desks print none; the bullets desk overrides."""
         return None
@@ -283,12 +290,22 @@ class Desk:
         n = w.nodes[nid]
         self._mark_seen(nid)
         bits = []
-        if n["type"] == "surface":
+        if n["type"] == "surface" and n["layout"] == "view":
+            head = f"{nid} view \"{n['title']}\" of {n.get('query')}"
+            kids = []
+            m = self.view_matches(nid)
+            bits.append("query not evaluable" if m is None else f"{len(m)} match" + ("es" if len(m) != 1 else ""))
+        elif n["type"] == "surface":
             kids = w.children(nid)
             head = f"{nid} surface \"{n['title']}\" {n['layout']}"
             geo = self._geom(nid) if n["parent"] else f"{n['w']}x{n['h']}"
             bits.append(geo)
             bits.append(f"{len(kids)} inside" if kids else "empty")
+            if kids and n["layout"] != "free":
+                axis = "h" if n["layout"] == "column" else "w"
+                share = min(k[axis] for k in kids)
+                if share < 80:
+                    bits.append(f"cramped, {share}px each")   # fuller than it is tall: the fold that a screen would show
         else:
             s = w.subjects[n["subject"]]
             self._mark_seen(s["id"])
@@ -346,6 +363,12 @@ class Desk:
             n = self.world.nodes[nid]
             lvl = 2 if (depth == 0 and level >= 2) else 1
             lines.append(("  " * depth) + self.line(nid, lvl).replace("\n", "\n" + "  " * depth))
+            if n["type"] == "surface" and n["layout"] == "view":
+                if depth == 0 or force_open or deep or nid in self.open:
+                    lines.extend(self.view_lines(nid, depth))
+                elif self.view_matches(nid):
+                    lines[-1] += f"  (open {nid} to see them)"
+                return
             if n["type"] == "appearance":
                 extra = self.child_extra(nid, depth)
                 if extra:
@@ -358,7 +381,11 @@ class Desk:
                 elif kids:
                     lines[-1] += f"  (open {nid} to see inside)"
 
-        walk(root, 0, True)
+        self._deep = deep   # :3 also shows each thing's first line (child_extra reads this)
+        try:
+            walk(root, 0, True)
+        finally:
+            self._deep = False
         return "\n".join(lines)
 
     def delta_header(self):
@@ -536,14 +563,19 @@ class Desk:
             raise Refusal("find needs words")
         w = self.world
         hits = []
+        scored = []
         for s in w.subjects.values():
             hay = (s["title"] + " " + s["text"] + " " + " ".join(s["tags"])).lower()
             if all(t in hay for t in q.split()):
-                apps = w.appearances_of(s["id"])
-                for a in apps:
-                    hits.append(f"  {self.line(a, 1)}  in {w.nodes[a]['parent']}")
-                if not apps:
-                    hits.append(f"  {s['id']} {s['kind']} \"{s['title']}\" (not on the desk)")
+                # things named by the words come before things that merely mention them (Terra's friction note)
+                rank = 0 if all(t in s["title"].lower() for t in q.split()) else 1 if all(t in " ".join(s["tags"]).lower() for t in q.split()) else 2
+                scored.append((rank, s))
+        for _, s in sorted(scored, key=lambda x: x[0]):
+            apps = w.appearances_of(s["id"])
+            for a in apps:
+                hits.append(f"  {self.line(a, 1)}  in {w.nodes[a]['parent']}")
+            if not apps:
+                hits.append(f"  {s['id']} {s['kind']} \"{s['title']}\" (not on the desk)")
         for n in w.nodes.values():
             if n["type"] == "surface" and q in n["title"].lower():
                 hits.append(f"  {self.line(n['id'], 1)}")

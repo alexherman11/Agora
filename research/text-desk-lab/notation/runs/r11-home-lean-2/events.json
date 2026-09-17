@@ -1,0 +1,115 @@
+[
+  {
+    "id": "e1",
+    "verb": "edit",
+    "target": "a06",
+    "args": {
+      "append": "Alex: Yes, it’s still planned for this month."
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s05",
+        "kind": "chat",
+        "title": "Priya",
+        "text": "Alex: not yet, Friday\nPriya: did the grammar land?\nAlex: Friday.\nPriya: and the renderer?\nAlex: next week.\nPriya: ping?\nAlex: pong.\nAlex: pong, unsigned\nPriya: is the renderer still planned for this month?",
+        "tags": [
+          "needs-reply"
+        ],
+        "due": null,
+        "rev": 3,
+        "comments": []
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s05",
+      "a06"
+    ],
+    "via": "append",
+    "cmd": 75
+  },
+  {
+    "id": "e2",
+    "verb": "create",
+    "target": "f01",
+    "args": {
+      "kind": "note",
+      "title": "Model's view",
+      "tags": "friction",
+      "text": "Finding the latest chat question required several separate lookups.\nThe distinction between an appearance and its subject, and where rules would file a new note, felt awkward to infer."
+    },
+    "undo": {
+      "delete": "a92",
+      "delete_subject": "s91"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "f01",
+      "a92"
+    ],
+    "via": "create",
+    "cmd": 76
+  },
+  {
+    "id": "e3",
+    "verb": "move",
+    "target": "a92",
+    "args": {
+      "into": "f11"
+    },
+    "undo": {
+      "restore": {
+        "id": "a92",
+        "type": "appearance",
+        "subject": "s91",
+        "parent": "f01",
+        "x": 1121,
+        "y": 8,
+        "w": 151,
+        "h": 784,
+        "z": 8,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a92",
+      "f01",
+      "f11"
+    ],
+    "via": "rule r2",
+    "cause": "e2"
+  },
+  {
+    "id": "e4",
+    "verb": "due",
+    "target": "a86",
+    "args": {
+      "on": "2026-09-30"
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s85",
+        "kind": "task",
+        "title": "Design the on-event grammar properly",
+        "text": "",
+        "tags": [],
+        "due": "2026-09-19",
+        "rev": 1,
+        "comments": []
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s85",
+      "a86"
+    ],
+    "via": "due",
+    "cmd": 77
+  }
+]

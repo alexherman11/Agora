@@ -203,7 +203,8 @@ class DeskMoo(Desk):
         cur = w.nodes[nid]["rev"]
         seen = self.seen.get(nid)
         if seen is None:
-            raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first")
+            raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
+                          + (" (on a fresh desk, start with look)" if not self.seen else ""))
         if seen != cur:
             raise Refusal(f"stale: {nid} changed since you last saw it; look at it again before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}

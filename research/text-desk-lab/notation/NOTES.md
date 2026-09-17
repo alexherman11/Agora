@@ -1002,3 +1002,26 @@ Today → I reply, untag, move back" ran end to end with an injected actor.
 The finding that matters: `export` emits the commands that rebuild the desk by title, and replaying that on an
 empty desk reproduced the desk exactly (30-line shape diff empty, zero refusals; again after the last changes).
 The text is the desk. All of this is unmeasured on Terra or Sol.
+
+## Round 11d: views, a journal, and Terra on my own desk (2026-09-17)
+Continued open-ended building on the home desk. Added: `create kind=view title= query=<selection>` (a live
+collection: a surface whose contents are the selection, evaluated at each look; nothing can be moved into it);
+`$today` in commands, substituted at run time; a Journal doc with `script log = do append Journal line="$today: $1"`;
+`look :3` prints each thing's first line as a bullet (depth means depth); tiled panels declare `cramped, Npx each`
+under 80 px and proportional shares that clamp past the space fall back to equal shares; `tile` on an already
+tiled surface says so; the fresh-desk refusal says "start with look". Fixes found by use: `$today` substituted at
+script definition; run arguments quoted inside quoted values; views offering tile/group/create.
+
+**Terra on the home desk (task `home`, one run):** the desk rebuilt from its own export, Priya's question injected
+(the reply rule had already tagged and filed the chat into Today). 7 calls, 0 refusals, 22 s, 6 of 7 checks.
+Terra: `look`, two finds, read the chat and examine the task, `rules` unprompted, four helps, then one batched call
+with all three writes; the tag rule filed its note into Friction. Its own friction note: finding the chat took
+several lookups (find Priya had four hits), and "where a rule will file a new item felt a little awkward". The
+miss: its reply had no `Alex:` prefix, so the chat still counts Priya's question as unanswered. Fix next: append on
+a chat signs unsigned lines. Description grew by one sentence naming rules, views, scripts and the clock (est. +45
+tokens); it read `rules` on its own, so the sentence earned its place.
+**Home trial 2** (after: find ranks title matches first; append on a chat signs unsigned lines): full pass, 8 calls,
+0 refusals, 24 s. Terra signed its own reply this time, found the chat as the first hit, read `rules` unprompted
+again, and put all three writes in one call. Its Model's view note: "the chat's reply/signing behavior and
+rule-driven filing were initially unclear". Added `why <id>`: the events that put a thing where it is, by whom, via
+which rule and because of what, plus which rule would act on it next.

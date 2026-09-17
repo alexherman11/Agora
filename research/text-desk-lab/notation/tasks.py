@@ -16,7 +16,43 @@ def _mk_desk(w, variant):
         return d
     return DeskMoo(w, variant) if variant in ("moo", "acme") else Desk(w, variant)
 
+
+def build_home(variant):
+    """Round 11d: Claude's home desk, rebuilt from its own export, as a task world. Rules, views, scripts and the
+    clock are live; a question from Priya is injected before the model looks."""
+    from pathlib import Path
+    w = World()
+    w.nodes[w.root]["layout"] = "row"
+    w.equal_share = False
+    desk = _mk_desk(w, variant)
+    text = (Path(__file__).resolve().parent / "sessions" / "home.desk.txt").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if line.strip() and not line.startswith("#"):
+            r = desk.dispatch("desk", {"line": line})
+            if "error" in r:
+                raise RuntimeError(f"home replay refused: {line[:60]} -> {r['error']}")
+    by_title = {s["title"]: s["id"] for s in w.subjects.values()}
+    chat, grammar = by_title["Priya"], by_title["Design the on-event grammar properly"]
+    w.apply("append", w.appearances_of(chat)[0], None, {"line": "Priya: is the renderer still planned for this month?"}, "priya")
+    desk._run_rules(cause=None)
+    desk._rule_notes = None
+    w.events.clear()
+    desk.seen.clear()
+    desk.open = {w.root}
+    desk.last_event_seen = 0
+    desk.ids = {"chat": chat, "grammar": grammar,
+                "friction": next(n["id"] for n in w.nodes.values() if n["type"] == "surface" and n["title"] == "Friction"),
+                "original_subjects": list(w.subjects)}
+    return desk
+
+
 TASKS = {
+    "home": (
+        "This is Claude's own desk, with rules and views on it. Priya asked something in the Priya chat; answer her "
+        "there in one line. Then add a note titled \"Model's view\" tagged friction, saying in two or three lines what on "
+        "this desk was unclear or awkward for you. Finally set the due date of the task 'Design the on-event grammar "
+        "properly' to 2026-09-30. Do not move anything yourself; the desk's rules do the filing."
+    ),
     "harbor": (
         "Gather everything about the Harbor project into the Harbor column, soonest due date first. "
         "Leave unrelated things where they are, but nothing Harbor-related may be left covered up."
@@ -55,6 +91,8 @@ def build(task, variant="outline"):
         return build_priya(variant)
     if task == "review":
         return build_review(variant)
+    if task == "home":
+        return build_home(variant)
     w = World()
     root = w.root
     harbor = w.add_surface("Harbor", root, "column", 0, 0, 400, 800)
@@ -131,6 +169,20 @@ def assess(task, desk):
         kids = [k for k in w.children(harbor)]
         subj = [w.nodes[k["id"]]["subject"] for k in kids if k["type"] == "appearance"]
         out["all_harbor_in_column"] = all(any(w.nodes[a]["parent"] == harbor for a in w.appearances_of(s)) for s in ids["harbor_subjects"])
+    if task == "home":
+        chat = w.subjects[ids["chat"]]
+        lines = [l for l in chat["text"].splitlines() if l.strip()]
+        out["replied_last_line"] = bool(lines) and lines[-1].lower().startswith("alex:")
+        note = next((s for s in w.subjects.values() if s["title"].strip().lower().rstrip(".") == "model's view"), None)
+        out["note_exists_tagged_friction"] = bool(note) and "friction" in note["tags"]
+        out["note_filed_by_rule"] = bool(note) and any(w.nodes[a]["parent"] == ids["friction"] for a in w.appearances_of(note["id"]))
+        out["note_has_content"] = bool(note) and len(note["text"].split()) >= 8
+        out["due_changed"] = w.subjects[ids["grammar"]].get("due") == "2026-09-30"
+        moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
+        out["nothing_moved_by_hand"] = not moves
+        out["nothing_lost"] = all(w.appearances_of(s) for s in ids["original_subjects"])
+        out["pass"] = all(v for k, v in out.items())
+        return out
         out["no_stray_harbor_appearances"] = all(
             all(w.nodes[a]["parent"] == harbor for a in w.appearances_of(s)) for s in ids["harbor_subjects"])
         out["only_harbor_in_column"] = all(s in ids["harbor_subjects"] for s in subj)

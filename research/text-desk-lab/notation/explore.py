@@ -51,7 +51,7 @@ def main():
         def walk(fid, depth):
             for k in w.children(fid):
                 if k["type"] == "surface":
-                    print("  " * depth + f"surface {k['title']!r} {k['layout']}")
+                    print("  " * depth + f"surface {k['title']!r} {k['layout']}" + (f" query={k['query']!r}" if k.get("query") else ""))
                     walk(k["id"], depth + 1)
                 else:
                     s = w.subjects[k["subject"]]
