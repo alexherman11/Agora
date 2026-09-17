@@ -24,6 +24,7 @@ SELECTION_HELP = """selections: a target can be one id, or a selection that name
   hidden             more than 5% covered by something
   also:a18           the other appearances of a18's subject
   due<2026-09-20     due before (due> after)
+  age<2              touched within the last 2 days by the clock (age>7: untouched for a week); needs clock
   title:agenda       title contains the word
   a20,a22            an explicit list
 combine terms with commas (AND): kind:image,in:f04. The receipt lists everything the verb touched.
@@ -163,6 +164,13 @@ class DeskKnife(DeskMoo):
             return f"{ind}* sections: {', '.join(secs)}" if secs else None
         if not tl:
             return None
+        if getattr(self, "_full", False):
+            # :4 — the text itself, up to eight lines, each uncut to 240; the fold is declared
+            shown = tl[:8]
+            out = [f"{ind}* " + (l if len(l) <= 240 else l[:240] + "… (cut; read " + nid + ")") for l in shown]
+            if len(tl) > 8:
+                out.append(f"{ind}* … {len(tl) - 8} more line(s); read {nid} for all")
+            return "\n".join(out)
         rest = len(tl) - 1
         first = tl[0] if len(tl[0]) <= 160 else tl[0][:160] + "…"
         line = f"{ind}* {first}"
@@ -252,7 +260,9 @@ class DeskKnife(DeskMoo):
             self._run_rules()
         else:
             rule["done"].update(ids)
-            out += f"\n  {len(ids)} thing(s) already match {desc}; the rule fires on things that enter it from now on. rules lists it; rule drop {rid} removes it"
+            out += (f"\n  {len(ids)} thing(s) already match {desc}; the rule fires on things that enter it from now on"
+                    + (f" (to fire on these {len(ids)} too, define it with now=1)" if ids else "")
+                    + f". rules lists it; rule drop {rid} removes it")
         return out
 
     # ---- why: how a thing got where it is (round 11d; Terra: "where a rule will file a new item felt awkward")
@@ -494,6 +504,7 @@ class DeskKnife(DeskMoo):
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", arg):
             raise Refusal("clock YYYY-MM-DD")
         self.today = arg
+        self.world.today = arg
         self._run_rules(cause=None)
         return f"ok today is {arg}"
 
@@ -655,6 +666,9 @@ class DeskKnife(DeskMoo):
                     out.append(f"  link {l['id']}: " + (f"{l['kind']} → " if l["from"] == s["id"] else f"← {l['kind']} from ")
                                + f"{other} \"{ot}\"" + (f" (at {', '.join(apps_o)})" if apps_o else ""))
         out.append("  where: " + self._where_line(nid))
+        if self.today:
+            d = w.last_day(nid)
+            out.append("  when: " + (f"last touched {d} ({w.days_between(d, self.today)}d ago by the clock)" if d else "not touched since the clock was set"))
         if self.lean:
             groups = [" ".join(names) for names in knife.general_verbs_by_origin(w, nid).values()]
             out.append("  verbs: " + " · ".join(groups) + (" · pair: swap beside match link" if n["parent"] else "")

@@ -16,7 +16,7 @@ from copy import deepcopy
 from world import Refusal, SCREEN, World
 
 HELP = """commands (one per call):
-  look [id] [:1|:2|:3]   outline from id (default desk). :1 the line, :2 its children (default), :3 everything under it
+  look [id] [:1|:2|:3|:4] outline from id (default desk). :1 the line, :2 its children (default), :3 everything under it with first lines, :4 with full text
   open id | close id     expand / collapse id in later looks (view only; nothing moves)
   read id                full text of a note/task/etc (via an appearance or subject id)
   where id               exact geometry and spatial relations
@@ -356,8 +356,9 @@ class Desk:
             out += "\n    verbs: " + " ".join(w.verbs_for(nid))
         return out
 
-    def outline(self, root, level=2, deep=False):
+    def outline(self, root, level=2, deep=False, full=False):
         lines = []
+        self._full = full   # :4 shows each thing's text, not only its first line
 
         def walk(nid, depth, force_open):
             n = self.world.nodes[nid]
@@ -386,6 +387,7 @@ class Desk:
             walk(root, 0, True)
         finally:
             self._deep = False
+            self._full = False
         return "\n".join(lines)
 
     def delta_header(self):
@@ -406,7 +408,7 @@ class Desk:
             # look's suffix is containment depth: :3 on a surface walks everything under it, open or not.
             # An appearance has nothing under it, so :3 there is examine (the plain desk keeps its focus form).
             if self.world.nodes[nid]["type"] == "surface":
-                return header + self.outline(nid, 2, deep=True)
+                return header + self.outline(nid, 2, deep=True, full=level >= 4)
             return header + (self.cmd_examine(nid) if hasattr(self, "cmd_examine") else self.focus(nid))
         if level <= 1:
             return header + self.line(nid, 1)

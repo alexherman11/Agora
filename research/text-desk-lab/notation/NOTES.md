@@ -1025,3 +1025,13 @@ tokens); it read `rules` on its own, so the sentence earned its place.
 again, and put all three writes in one call. Its Model's view note: "the chat's reply/signing behavior and
 rule-driven filing were initially unclear". Added `why <id>`: the events that put a thing where it is, by whom, via
 which rule and because of what, plus which rule would act on it next.
+
+## Round 11e: text at a glance, and time (2026-09-17)
+From the reflection on living in the desk: it held my state better than it showed it back, and it had no time.
+- `look X :4` prints each thing's text under its line, up to eight lines uncut to 240, fold declared. Depth 1 line,
+  2 children, 3 first lines, 4 text. My Friction panel reads as a page.
+- Time without timestamps: the clock stamps events with its day; a thing's age is derived from its last stamped
+  event. `age<N` / `age>N` are selection terms (untouched-since-the-clock counts as older than any N); examine
+  prints a `when:` line. `script morning = clock $1; look Overdue; look Today; find age<1` is how a day starts, and
+  because the clock tick fires the due rules, the ritual is also the scheduler.
+- Archive as a rule: `rule when in:Done,age>3 do move into=Archive`.

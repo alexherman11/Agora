@@ -50,7 +50,7 @@ def parse_selection(w, token):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
-    if not terms or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "title:", "comments:", "links:")) or t == "hidden" for t in terms):
+    if not terms or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "title:", "comments:", "links:")) or t == "hidden" for t in terms):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -87,6 +87,21 @@ def parse_selection(w, token):
                 raise Refusal(f"also: needs an appearance id, not {a}")
             others = set(w.appearances_of(w.nodes[a]["subject"])) - {a}
             cands = [c for c in cands if c in others]
+        elif t.startswith("age<") or t.startswith("age>"):
+            # days since the last event that touched the thing, by the clock; things never touched under a clock have no age
+            if not w.today:
+                raise Refusal("age needs a clock: clock YYYY-MM-DD")
+            op, n_days = t[3], t[4:]
+            if not n_days.isdigit():
+                raise Refusal("age<N or age>N, N in days")
+
+            def oka(nid, op=op, n_days=int(n_days)):
+                d = w.last_day(nid)
+                if not d:
+                    return op == ">"   # untouched since the clock began: older than any N, never "recent"
+                age = w.days_between(d, w.today)
+                return age < n_days if op == "<" else age > n_days
+            cands = [c for c in cands if oka(c)]
         elif t.startswith("due<") or t.startswith("due>"):
             op, date = t[3], t[4:]
             def okd(nid, op=op, date=date):
@@ -115,7 +130,7 @@ def parse_selection(w, token):
             linked = {l["to"] if l["from"] == src else l["from"] for l in w.links_of(src)}
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in linked]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> title: comments:open links:<id>")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id>")
     return cands, token
 
 

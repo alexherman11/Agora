@@ -259,11 +259,30 @@ class World:
         if nid in self.nodes:
             self.nodes[nid]["rev"] += 1
 
+    today = None   # the clock, when a desk sets one; events are stamped with it so things can have an age
+
     def _event(self, verb, target, args, undo, actor="jeff", note=""):
         ev = {"id": f"e{len(self.events) + 1}", "verb": verb, "target": target,
               "args": deepcopy(args), "undo": undo, "note": note, "by": actor}
+        if self.today:
+            ev["day"] = self.today
         self.events.append(ev)
         return ev
+
+    def last_day(self, nid):
+        """The clock day of the last event that touched this thing (or its subject), or None."""
+        sid = self.nodes[nid].get("subject") if nid in self.nodes else nid
+        for e in reversed(self.events):
+            if e.get("day") and (e["target"] in (nid, sid) or nid in (e.get("changed") or []) or sid in (e.get("changed") or [])):
+                return e["day"]
+        return None
+
+    @staticmethod
+    def days_between(a, b):
+        from datetime import date
+        ya, ma, da = map(int, a.split("-"))
+        yb, mb, db = map(int, b.split("-"))
+        return (date(yb, mb, db) - date(ya, ma, da)).days
 
     def fence(self, nid, rev):
         cur = self.nodes[nid]["rev"] if nid in self.nodes else self.subjects[nid]["rev"]
