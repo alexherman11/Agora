@@ -1,0 +1,7 @@
+[
+  {"steps":[],"assert":[{"expr":["count",["query","atlas.cards"]],"equals":3},{"expr":["count",["query","atlas.connections"]],"equals":2},{"expr":["get",["record","surfaces","atlas"],"dock"],"equals":"right"}]},
+  {"steps":[{"action":"atlas.connect","args":{"id":"route-evidence","fromId":"atlas-route","toId":"atlas-evidence"}}],"assert":[{"expr":["count",["query","atlas.connections"]],"equals":3},{"expr":["get",["record","connections","route-evidence"],"fromId"],"equals":"atlas-route"}]},
+  {"steps":[{"action":"atlas.disconnect","args":{"id":"atlas-signal-route"}}],"assert":[{"expr":["count",["query","atlas.connections"]],"equals":1},{"expr":["record","connections","atlas-signal-route"],"equals":null}]},
+  {"steps":[{"action":"atlas.connect","args":{"id":"bad-loop","fromId":"atlas-route","toId":"atlas-route"},"ok":false},{"action":"atlas.connect","args":{"id":"bad-end","fromId":"atlas-route","toId":"missing"},"ok":false}],"assert":[{"expr":["record","connections","bad-loop"],"equals":null},{"expr":["record","connections","bad-end"],"equals":null},{"expr":["count",["query","atlas.connections"]],"equals":2}]},
+  {"steps":[{"action":"card.move","args":{"id":"atlas-signal","x":40,"y":50,"drop":"studio.host"},"ok":false}],"assert":[{"expr":["get",["record","cards","atlas-signal"],"host"],"equals":"atlas.host"},{"expr":["get",["record","cards","atlas-signal"],"x"],"equals":62},{"expr":["count",["query","atlas.connections"]],"equals":2}]}
+]

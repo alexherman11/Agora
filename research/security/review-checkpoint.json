@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
-  "review_date": "2026-09-04",
-  "captured_at_utc": "2026-09-04T17:12:59.4124296Z",
+  "review_date": "2026-09-15",
+  "captured_at_utc": "2026-09-15T17:09:42.0358800Z",
   "workspace": "C:/Projects/Agora",
-  "review_type": "Git-based static M1 security choke-point review",
+  "review_type": "Ongoing Git-based static security review",
   "git_repository_present": true,
-  "head_commit": "80a43dadd7220a61e49d67b999087286b17b9709",
+  "head_commit": "39ae665554629502c87be8b4b0788b6bedb0e217",
   "branch": "docs",
   "implementation_tests_run_by_this_review": false,
   "sources": [
@@ -175,11 +175,11 @@
   "artifacts": [
     {
       "path": "docs/Start Here.md",
-      "sha256": "A4AA9CFF02486BE13D25C852AB71D3A4521F51984811147E9CB07915C08757DE"
+      "sha256": "BC2AFA596C0DF2E1F872CD60741093569064C01AFB78572E627AB95AE40BF6DE"
     },
     {
       "path": "research/security/scoped-collaboration.md",
-      "sha256": "3D2E4658BDC39FB733E93DFFFB29AD4FFDC04C0FE1A559F5DE8AC52F6EDD71C6"
+      "sha256": "BA945B1D13BB5D018C722F3977A269ABFDCDA5FE56C7B5E3122A068F65D0ABDF"
     },
     {
       "path": "research/security/composed-export-model.md",
@@ -191,17 +191,25 @@
     },
     {
       "path": "research/security/executable-admission-and-preview-review.md",
-      "sha256": "5682E8FCCFBA2D59CB5E934BF08A2683B40EE68BE2E055BA0AAA67C334589362"
+      "sha256": "11B3F9AB09BC4936D822C93DCDB99415AD4BCF178783BFEA4EE34D23F49DF5C5"
+    },
+    {
+      "path": "research/security/local-adoption-and-executable-identity.md",
+      "sha256": "64E09D9E52AB61E8EB7DC8F3879D5FB7F5AF07BD0CA2960123AE31BDE1936658"
+    },
+    {
+      "path": "research/security/shared-state-version-compatibility.md",
+      "sha256": "804C34C1864560547E07BBE24842D6AEF311D1892242DBA0516A1816F82C83C6"
     }
   ],
   "coverage_limits": [
     "Static review only; committed project tests and runtime behavior were not executed.",
-    "No .env content, provider credential, world data, external service, or production resource was accessed.",
-    "Files not listed in the applicable review run's sources must not be treated as reviewed; some listed design files have explicitly targeted coverage.",
-    "The checkout was clean at review start; the security artifacts and research-index edit are uncommitted review output.",
+    "No .env content, provider credential, world data, external account, integration, or production resource was accessed.",
+    "Files not listed in the applicable review run's sources must not be treated as reviewed; some listed files have explicitly targeted coverage.",
+    "Working-tree and stash state is recorded per run; unrelated pre-existing changes and untracked material were not read or modified.",
     "Source fingerprints and a commit identify observed versions; they are not security attestations."
   ],
-  "next_question": "What is the smallest local-adoption record and runtime compatibility identity that lets safe updates flow automatically while ensuring a fork, merge, restore, or foreign world can never carry executable authority with it?",
+  "next_question": "What immutable operation envelope and adapter language can express Agora's first mixed-version facet while remaining small enough for the verb boundary and replay model to verify?",
   "automation_setup": {
     "recorded_at_utc": "2026-08-31T19:22:38.8446109Z",
     "automation_id": "agora-security-review",
@@ -410,6 +418,136 @@
       ],
       "evidence_state": "Static review only. No repository code, project test, hook, build, model call, account, credential, private world, or external service was executed or read. Prior validation reports were treated as recorded evidence, not reproduced results.",
       "artifact": "research/security/executable-admission-and-preview-review.md",
+      "implementation_tests_run": false
+    },
+    {
+      "review_date": "2026-09-11",
+      "captured_at_utc": "2026-09-11T17:16:35.0796837Z",
+      "trigger": "agora-security-review heartbeat",
+      "git_repository_present": true,
+      "head_commit": "39ae665554629502c87be8b4b0788b6bedb0e217",
+      "previous_head_commit": "5ad7c0af98bfa556a57343b31c5c4486f311c08d",
+      "branch": "docs",
+      "working_tree_at_start": "Twelve tracked local handoff scripts were deleted and one local ZIP was untracked; these pre-existing, unrelated changes were not read or modified.",
+      "change_scope": "The new commit contains the prior security review plus local migration and application-architecture artifacts. No kernel, shell, JEFF, or invariant-test files changed from the source reviewed on 9 September. Local artifact trees were not reviewed and must not be treated as covered.",
+      "investigation": "The minimum non-transferable adoption record and executable identity for safe collaborative updates",
+      "result": "Use four separate identities: a portable definition with logical capability slots, a versioned execution contract, a locally resolved installation plan, and a local standing adoption policy in the keep. Exact runtime builds belong in per-launch execution snapshots; compatible platform security patches should re-run conformance without prompting for every app. A foreign world carries only inert definition and evidence claims. Same-owner forks may inherit policy only through a keep-created local lineage relation, never copied IDs.",
+      "findings": [
+        {
+          "id": "LA-D1",
+          "gate": "Before portable components or shared application branches",
+          "status": "Design proposal",
+          "summary": "The current component digest combines source with concrete local entity bindings and permissions. A shared definition should instead declare logical slots; the recipient resolves them into a local plan so one code revision can be shared without sharing object IDs or authority."
+        },
+        {
+          "id": "LA-D2",
+          "gate": "Before automatic updates",
+          "status": "Design proposal",
+          "summary": "Plan equality or reduction cannot by itself authorize new code. Quiet adoption also needs a user-selected authorship or review rule, a compatible execution contract, fresh non-revoked update metadata, and required local evidence."
+        },
+        {
+          "id": "LA-D3",
+          "gate": "Before runtime upgrades or world rollback can affect installed applications",
+          "status": "Design proposal",
+          "summary": "Record the exact engine and validator build in each execution snapshot, but keep user application policy bound to a semantic contract. Same-contract security patches can re-run platform conformance without per-app prompts; incompatible semantics pause on the protected default desk. Revocation and accepted release-sequence or causal-frontier state remain outside world rollback."
+        }
+      ],
+      "reviewed_sources": [
+        {"path": "AGENTS.md", "sha256": "5EC39035FA2319E8EA5344E11E3BEBDE6A82D85407CD2791E63C48DBCBF5440D", "coverage": "Full applicable project instructions."},
+        {"path": "docs/Start Here.md", "sha256": "61C126D554530CC391ED4565A19CBC6CABEA5F763C00BA6555AA5B044B2E6F26", "coverage": "Full read and focused research-index update."},
+        {"path": "docs/Agora Spec.md", "sha256": "A1118DE1266B711FDE269FF9610BA0C0B4E813BEF78E8CFB066C7E8F3F121DD4", "coverage": "Targeted read of application distribution, update, rollback, compatibility, and roadmap passages."},
+        {"path": "docs/Reference/Objects and Facets.md", "sha256": "03EA4F4157AAD6C6CF166A030F525363F19D76D2574F6B9D6A81EE8BAB161F85", "coverage": "Targeted read of grants-never-copy, fork, cross-world sharing, compatibility, and replay/restore passages."},
+        {"path": "docs/Reference/Security.md", "sha256": "31EEB16CB1D5A44D927252670857435B03553BAC47F6842F67FF47A028502B90", "coverage": "Targeted read of claim/grant/effect, keep, adoption ladder, rollback, update, and collaboration controls."},
+        {"path": "docs/Reference/Security Addendum.md", "sha256": "826A9622EA771D1EC9816F3AA9952DD70CAF4944A50541D36A760AFB5CBCBB96", "coverage": "Full read."},
+        {"path": "docs/Reference/Executable Components.md", "sha256": "F484E2BB261E857D96A17FC8C53809DF5EC918A8586CCAC5D50047407CC017E9", "coverage": "Full read."},
+        {"path": "kernel/component_data.py", "sha256": "D0F20FE85D3A653F73398CF3C795D8044099DC5EE0DCDA1B356DAEE3AB394550", "coverage": "Targeted static recheck of definition digest and admission lookup; unchanged from 9 September."},
+        {"path": "kernel/component_commands.py", "sha256": "5CA64D61824BB3FD38FFE1812BBF8B902C4117A506ECF65EE1F01FA1A0F1773D", "coverage": "Targeted static recheck of activation and display records; unchanged from 9 September."},
+        {"path": "kernel/component_schema.py", "sha256": "2649FE5FF0FF3973906741ECF94882240DC9982F0DBC516819C81FC2B06998B3", "coverage": "Targeted static recheck of combined source, binding, permission, state, and action body; unchanged from 9 September."},
+        {"path": "tests/test_components.py", "sha256": "F0397C7BDB54C383C18A983C9344BD35C643BB5193FF82A1E36C4287D8B64581", "coverage": "Targeted static recheck of activation, restoration, stale input, and replay cases; not executed and unchanged from 9 September."},
+        {"path": "research/security/scoped-collaboration.md", "sha256": "F2D8E2A6E4F2D7A42160BDA041D32D56D76DC0C93C91ACC07E6CB859C04299B2", "coverage": "Full read and focused update."},
+        {"path": "research/security/executable-admission-and-preview-review.md", "sha256": "11B3F9AB09BC4936D822C93DCDB99415AD4BCF178783BFEA4EE34D23F49DF5C5", "coverage": "Full read and follow-up link added."},
+        {"path": "research/security/local-adoption-and-executable-identity.md", "sha256": "9DE58B90CDA14EA0A647B1227203C1B016B5B20B5FBDDA20ABFCFAD068E3E616", "coverage": "New focused design artifact."}
+      ],
+      "primary_sources": [
+        {"url": "https://theupdateframework.github.io/specification/v1.0.28/", "use": "Rollback, freeze, mix-and-match, wrong-target, data-bound, and delegated-update attack model."},
+        {"url": "https://slsa.dev/spec/v1.2/build-provenance", "use": "Separation of process definition, external parameters, resolved dependencies, builder identity, and exact run details."},
+        {"url": "https://github.com/in-toto/specification/blob/master/in-toto-spec.md", "use": "Portable step evidence versus client-owned verification layout; replay limitation and client inspection."},
+        {"url": "https://www.inkandswitch.com/universal-version-control/", "use": "Universal history, cross-media collaboration, and creative privacy goals."}
+      ],
+      "evidence_state": "Design reasoning and targeted primary-source research. No Agora code, test, hook, build, package, model, account, credential, private world, or external service was executed or read. Twelve pre-existing tracked deletions and one untracked ZIP under local/ were left untouched. No implementation change or independent runtime evidence was produced.",
+      "artifact": "research/security/local-adoption-and-executable-identity.md",
+      "implementation_tests_run": false
+    },
+    {
+      "review_date": "2026-09-15",
+      "captured_at_utc": "2026-09-15T17:09:42.0358800Z",
+      "trigger": "agora-security-review heartbeat",
+      "git_repository_present": true,
+      "head_commit": "39ae665554629502c87be8b4b0788b6bedb0e217",
+      "previous_head_commit": "39ae665554629502c87be8b4b0788b6bedb0e217",
+      "branch": "docs",
+      "working_tree_at_start": "Agora Spec had a trailing-space-only edit, the Constitution preamble was deleted, and two local files plus research/tessera-lab were untracked. The tracked diffs were inspected but not modified; untracked material was not read.",
+      "change_scope": "HEAD and reviewed kernel/component sources are unchanged from 11 September. The prior security-only review output was present in an existing stash and was restored selectively; unrelated stashed local-script deletions were not restored. This run reviewed the mixed-version write and rollback boundary only, not the untracked research tree or unrelated application architecture.",
+      "investigation": "Which writes remain safe when collaborators run different application versions against shared data, and how code rollback preserves newer work",
+      "result": "Gate compatibility per immutable semantic operation rather than per application version or parseable schema. A write may commit only when its translation has one bounded meaning, its read and write sets are explicit, the writer could observe everything it can replace, and current invariants and authority pass. Ambiguous or lossy translations remain attributed proposals or make that operation read-only. Code rollback keeps the current data head and uses a pinned adapter or partial capability list; it never implies down-migration, authority rollback, or effect replay.",
+      "findings": [
+        {
+          "id": "SV-I1",
+          "gate": "Before the first mutually untrusted shared writer",
+          "status": "Static implementation boundary",
+          "summary": "The local prototype has an event-format version but FacetRecord and facet-attached carry no facet schema identity. attach records whole replacement bodies and its revision precondition is optional. Additive event parsing therefore does not prevent a current but older-shaped writer from erasing newer fields.",
+          "locations": ["kernel/schema.py:10", "kernel/schema.py:17", "kernel/schema.py:74", "kernel/verbs.py:71"]
+        },
+        {
+          "id": "SV-D1",
+          "gate": "Before mixed-version writes",
+          "status": "Design proposal",
+          "summary": "Give shared facets an immutable semantic operation vocabulary. The trusted gate supplies writer schema, operation identity, read set, and derived write set. Stable bounded operations may commit; a write that could touch facts hidden from its writer becomes a proposal or read-only capability."
+        },
+        {
+          "id": "SV-D2",
+          "gate": "Before portable schema adapters influence validation or authority",
+          "status": "Design proposal",
+          "summary": "Schema-carried lenses are claims. Pin immutable schema, adapter, and path identities; run adapters with deterministic bounds and no credentials; and surface non-equivalent paths as conflicts. Adding a shorter path must not silently reinterpret an accepted effect."
+        },
+        {
+          "id": "SV-D3",
+          "gate": "Before state migration or code rollback",
+          "status": "Design proposal",
+          "summary": "Migrations are explicit idempotent candidates on a named input head and never run during open, render, or replay. Rolling back code keeps the current data head and current revocations; old code receives a safe translated view, partial operations, or read-only inspection instead of an implicit down-migration."
+        }
+      ],
+      "reviewed_sources": [
+        {"path": "AGENTS.md", "sha256": "5EC39035FA2319E8EA5344E11E3BEBDE6A82D85407CD2791E63C48DBCBF5440D", "coverage": "Full applicable project instructions from the workspace and supplied context."},
+        {"path": "docs/Start Here.md", "sha256": "BC2AFA596C0DF2E1F872CD60741093569064C01AFB78572E627AB95AE40BF6DE", "coverage": "Full read and focused research-index update."},
+        {"path": "docs/Agora Spec.md", "coverage": "Working-tree diff only; trailing whitespace change observed and left untouched. Other content was not re-reviewed."},
+        {"path": "docs/Constitution.md", "coverage": "Working-tree diff only; preamble deletion observed and left untouched. Operative articles were not re-reviewed."},
+        {"path": "docs/Reference/Objects and Facets.md", "sha256": "03EA4F4157AAD6C6CF166A030F525363F19D76D2574F6B9D6A81EE8BAB161F85", "coverage": "Targeted read of facet schema identity, write pipeline, concurrency, replay, compatibility, migration, and rollback sections."},
+        {"path": "docs/Reference/Security.md", "sha256": "31EEB16CB1D5A44D927252670857435B03553BAC47F6842F67FF47A028502B90", "coverage": "Targeted read of adoption, authority, rollback, effect replay, and invariants; unchanged by hash."},
+        {"path": "docs/Reference/Security Addendum.md", "sha256": "826A9622EA771D1EC9816F3AA9952DD70CAF4944A50541D36A760AFB5CBCBB96", "coverage": "Targeted read of external-effect, recovery, and internal trust boundaries; unchanged by hash."},
+        {"path": "docs/Reference/Executable Components.md", "sha256": "F484E2BB261E857D96A17FC8C53809DF5EC918A8586CCAC5D50047407CC017E9", "coverage": "Full read for implemented state shape, restoration, replay, admission, and declared deployment scope."},
+        {"path": "kernel/schema.py", "sha256": "05D810D123BEF4C5F2F7AFAF4344BC38C2C15C07D79052B8BE63531ACF676C70", "coverage": "Targeted static read of event version and FacetRecord fields."},
+        {"path": "kernel/verbs.py", "sha256": "09C31D3B5FB00EA106C16F5D8F7A3E6CC425247893F1916D1676BDB8CE7AB350", "coverage": "Targeted static read of attach body replacement, optional revision precondition, and read history."},
+        {"path": "kernel/events.py", "sha256": "D03CB300E411E96D2C8F490E2E7E251D0FE37DC696D03135E48F49CF64C83393", "coverage": "Targeted static read of append and replay boundaries."},
+        {"path": "kernel/store.py", "sha256": "F45BD4AFF222FF0AD5FC155909A996612C65867FBC28CF387692535415BC388B", "coverage": "Targeted static read of facet replacement, history, and component batch replay."},
+        {"path": "kernel/facets.py", "sha256": "7F343EFC93090B12449A1DB1B3EE2AC4AC8CDBC0CD22E90DF9687660AEE244ED", "coverage": "Targeted static read of current schema validation."},
+        {"path": "kernel/component_commands.py", "sha256": "5CA64D61824BB3FD38FFE1812BBF8B902C4117A506ECF65EE1F01FA1A0F1773D", "coverage": "Full static read of activation, restoration, and state compatibility check."},
+        {"path": "kernel/component_data.py", "sha256": "D0F20FE85D3A653F73398CF3C795D8044099DC5EE0DCDA1B356DAEE3AB394550", "coverage": "Full static read of definitions, state validation, fingerprints, and active lookup."},
+        {"path": "kernel/component_schema.py", "sha256": "2649FE5FF0FF3973906741ECF94882240DC9982F0DBC516819C81FC2B06998B3", "coverage": "Full static read of component and exact state shapes."},
+        {"path": "kernel/component_effects.py", "sha256": "30F83E1E25367EAA564176EAA3A96B9B79A63F24C6CEE03A2E922003F2F97334", "coverage": "Targeted static read of complete-body attach effects and component-owned state writes."},
+        {"path": "tests/test_components.py", "sha256": "F0397C7BDB54C383C18A983C9344BD35C643BB5193FF82A1E36C4287D8B64581", "coverage": "Targeted static read of state, restoration, stale-input, and replay cases; not executed."},
+        {"path": "research/security/scoped-collaboration.md", "sha256": "BA945B1D13BB5D018C722F3977A269ABFDCDA5FE56C7B5E3122A068F65D0ABDF", "coverage": "Full read and focused update."},
+        {"path": "research/security/executable-admission-and-preview-review.md", "sha256": "11B3F9AB09BC4936D822C93DCDB99415AD4BCF178783BFEA4EE34D23F49DF5C5", "coverage": "Full read; prior follow-up restored from the existing stash, no new edit in this run."},
+        {"path": "research/security/local-adoption-and-executable-identity.md", "sha256": "64E09D9E52AB61E8EB7DC8F3879D5FB7F5AF07BD0CA2960123AE31BDE1936658", "coverage": "Prior focused proposal restored from the existing stash, fully read, and follow-up added."},
+        {"path": "research/security/shared-state-version-compatibility.md", "sha256": "804C34C1864560547E07BBE24842D6AEF311D1892242DBA0516A1816F82C83C6", "coverage": "New focused design artifact."}
+      ],
+      "primary_sources": [
+        {"url": "https://www.inkandswitch.com/cambria/", "use": "Schema-tagged writes, read-time translation, edit lenses, mixed-version collaboration, and documented limits where old and new representations cannot preserve consistency, conservation, and predictable intent together."},
+        {"url": "https://protobuf.dev/programming-guides/proto3/", "use": "Unknown-field preservation, loss through field-by-field or JSON conversion, safe evolution limits, and permanent field identity."},
+        {"url": "https://avro.apache.org/docs/1.12.0/specification/", "use": "Writer-schema versus reader-schema resolution and explicit errors for incompatible shapes."}
+      ],
+      "evidence_state": "Static review, design reasoning, and targeted primary-source research only. No repository code, project test, hook, build, package, model call, account, credential, private world, untracked research material, or external service was executed or read. Prior security-only work was selectively restored from an existing stash; unrelated stash content remained untouched. No implementation change or independent runtime evidence was produced.",
+      "artifact": "research/security/shared-state-version-compatibility.md",
       "implementation_tests_run": false
     }
   ],

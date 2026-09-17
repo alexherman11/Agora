@@ -1,0 +1,33 @@
+{
+  "id": "tasks",
+  "claims": [
+    {"kind":"field","id":"items.isTask","type":"boolean","default":false,"merge":"register"},
+    {"kind":"field","id":"items.done","type":"boolean","default":false,"merge":"register"},
+    {"kind":"field","id":"items.priority","type":"number","default":2,"merge":"register"},
+    {"kind":"seed","id":"items/task-prototype","values":{"title":"Test the shared workspace","body":"Exercise notes, tasks, and library contributions together.","isTask":true,"priority":1}},
+    {"kind":"seed","id":"items/task-review","values":{"title":"Review the research notes","body":"Check the prototype after all modules load.","isTask":true,"priority":2,"done":true}},
+    {"kind":"query","id":"tasks.active","from":"items","where":["and",["row","isTask"],["not",["row","archived"]]],"sort":"priority"},
+    {"kind":"query","id":"tasks.open","from":"items","where":["and",["row","isTask"],["not",["row","archived"]],["not",["row","done"]]],"sort":"priority"},
+    {"kind":"query","id":"tasks.done","from":"items","where":["and",["row","isTask"],["not",["row","archived"]],["row","done"]]},
+    {"kind":"action","id":"task.make","requires":["and",["ne",["record","items",["arg","id"]],null],["not",["get",["record","items",["arg","id"]],"archived"]]],"effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"isTask","value":true}]},
+    {"kind":"action","id":"task.setDone","requires":["and",["get",["record","items",["arg","id"]],"isTask"],["not",["get",["record","items",["arg","id"]],"archived"]]],"effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"done","value":["arg","done"]}]},
+    {"kind":"action","id":"task.setPriority","requires":["and",["get",["record","items",["arg","id"]],"isTask"],["not",["get",["record","items",["arg","id"]],"archived"]],["gte",["arg","priority"],1],["lte",["arg","priority"],3]],"effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"priority","value":["arg","priority"]}]},
+    {"kind":"action","id":"task.add","requires":["ne",["trim",["arg","title"]],""],"effects":[{"op":"create","collection":"items","id":["arg","id"],"values":{"title":["trim",["arg","title"]],"body":"","isTask":true,"done":false,"priority":2,"archived":false}}]},
+    {"kind":"view","id":"tasks.panel","parent":"workspace","widget":"panel","title":"Tasks","order":20},
+    {"kind":"view","id":"tasks.summary","parent":"tasks.panel","widget":"text","text":["concat",["count",["query","tasks.done"]]," of ",["count",["query","tasks.active"]]," active tasks complete; ",["count",["query","tasks.open"]]," open."],"order":1},
+    {"kind":"view","id":"tasks.addRow","parent":"tasks.panel","widget":"row","order":2},
+    {"kind":"view","id":"tasks.newTitle","parent":"tasks.addRow","widget":"input","bind":"taskTitle","placeholder":"New task","order":1},
+    {"kind":"view","id":"tasks.addButton","parent":"tasks.addRow","widget":"button","text":"Add task","action":"task.add","args":{"id":["local","newId"],"title":["local","taskTitle"]},"disabled":["eq",["trim",["coalesce",["local","taskTitle"],""]],""],"order":2},
+    {"kind":"view","id":"tasks.openLabel","parent":"tasks.panel","widget":"text","text":"Open tasks (priority 1 is highest)","order":3},
+    {"kind":"view","id":"tasks.openList","parent":"tasks.panel","widget":"list","query":"tasks.open","order":4},
+    {"kind":"view","id":"tasks.openRow","parent":"tasks.openList","widget":"row","role":"task-row","order":1},
+    {"kind":"view","id":"tasks.openTitle","parent":"tasks.openRow","widget":"text","text":["concat","P",["row","priority"]," · ",["row","title"]],"order":1},
+    {"kind":"view","id":"tasks.openComplete","parent":"tasks.openRow","widget":"button","text":"Complete","action":"task.setDone","args":{"id":["row","id"],"done":true},"order":2},
+    {"kind":"view","id":"tasks.cardBadge","parent":"notes.card","widget":"badge","text":["if",["row","done"],"Task complete",["concat","Task · priority ",["row","priority"]]],"visible":["row","isTask"],"order":40},
+    {"kind":"view","id":"tasks.cardMake","parent":"notes.card.tools","widget":"button","text":"Make task","action":"task.make","args":{"id":["row","id"]},"visible":["and",["not",["row","isTask"]],["not",["row","archived"]]],"order":40},
+    {"kind":"view","id":"tasks.cardToggle","parent":"notes.card.tools","widget":"button","text":["if",["row","done"],"Reopen","Complete"],"action":"task.setDone","args":{"id":["row","id"],"done":["not",["row","done"]]},"visible":["and",["row","isTask"],["not",["row","archived"]]],"order":41},
+    {"kind":"view","id":"tasks.cardHigh","parent":"notes.card.tools","widget":"button","text":"P1","action":"task.setPriority","args":{"id":["row","id"],"priority":1},"visible":["and",["row","isTask"],["not",["row","archived"]]],"disabled":["eq",["row","priority"],1],"order":42},
+    {"kind":"view","id":"tasks.cardNormal","parent":"notes.card.tools","widget":"button","text":"P2","action":"task.setPriority","args":{"id":["row","id"],"priority":2},"visible":["and",["row","isTask"],["not",["row","archived"]]],"disabled":["eq",["row","priority"],2],"order":43},
+    {"kind":"view","id":"tasks.cardLow","parent":"notes.card.tools","widget":"button","text":"P3","action":"task.setPriority","args":{"id":["row","id"],"priority":3},"visible":["and",["row","isTask"],["not",["row","archived"]]],"disabled":["eq",["row","priority"],3],"order":44}
+  ]
+}

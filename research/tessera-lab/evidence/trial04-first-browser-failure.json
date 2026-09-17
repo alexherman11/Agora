@@ -1,0 +1,6 @@
+{
+  "ok": false,
+  "checks": [],
+  "errors": [],
+  "failure": "page.waitForFunction: Timeout 8000ms exceeded."
+}

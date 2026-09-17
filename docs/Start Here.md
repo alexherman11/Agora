@@ -57,8 +57,9 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | `research/whole-os-object-review/` | [[REVISION]] notes; [[Agora Objects (superseded)]], the object design that [[Objects and Facets]] replaced; pre-revision copies of the Spec, Objects, and Facets |
 | `research/object-facet-review/` | [[ASSESSMENT]], executable toy counterexamples, an illustrative example world |
 | `research/graph-memory/` | memory for a world of objects; start at [[operating-system-memory]] |
+| `research/language-interface/` | [[conversational-capabilities|Conversational interfaces to Agora capabilities]]: small language adapters, grounded discovery and invocation, research precedents, and a proposed evaluation |
 | `research/holistic-review/` | [[holistic-assessment-2026-09-04]], baseline probes, and implementation validation |
-| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], [[m1-choke-point-review]], and [[executable-admission-and-preview-review]], follow-ons and implementation reviews for the security model |
+| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], [[m1-choke-point-review]], [[executable-admission-and-preview-review]], [[local-adoption-and-executable-identity]], and [[shared-state-version-compatibility]], follow-ons and implementation reviews for the security model |
 
 ## Conventions
 

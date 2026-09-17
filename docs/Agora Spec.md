@@ -25,7 +25,7 @@ The vault index, with reading order and citation conventions, is [[Start Here]].
 
 ## 1. Core idea
 
-AgoraOS is a general-purpose operating environment that a person shares with a persistent, personalized, real-time AI agent. It must support ordinary computer use — reading, listening, watching, talking, browsing, scheduling, organizing, using devices, running applications — and it must make creating and reshaping software a natural part of that use rather than a separate profession.
+AgoraOS is a general-purpose operating environment that a person shares with a persistent, personalized, real-time AI agent. It must support ordinary computer use — reading, listening, watching, talking, browsing, scheduling, organizing, using devices, running applications — and it must make creating and reshaping software a natural part of that use rather than a separate profession. 
 
 **Objects are the persistent subjects of everyday life on the machine.** Documents, songs, conversations, appointments, collections, accounts, devices, and services keep understandable identities across applications, sessions, and years. Many objects arrive from elsewhere, are never edited, and are simply used; they need no project, derivation, or executable behavior to justify existing. 
 

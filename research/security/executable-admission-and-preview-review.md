@@ -126,3 +126,12 @@ The next useful question is: **what is the smallest local-adoption record and
 runtime compatibility identity that lets safe updates flow automatically while
 ensuring a fork, merge, restore, or foreign world can never carry executable
 authority with it?**
+
+## Follow-up — 11 September 2026
+
+[[local-adoption-and-executable-identity]] answers that question with a four-part
+identity: portable definition, versioned execution contract, locally resolved
+installation plan, and non-transferable local adoption policy. The important
+refinement is to separate logical capability slots from concrete local entity
+bindings. This lets collaborators share one definition while their objects,
+permissions, update trust, and active execution decision remain local.

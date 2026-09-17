@@ -1,0 +1,30 @@
+[
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\base.tessera.json",
+    "Hash": "BE3DD3FD0C1ADC9B433BA8C7CE8FA2AC2F0175DE8B3A1F07CE76EEACC26D4FC9"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\field.tessera.json",
+    "Hash": "A3DBF421243414F2B6E9B05D6B87B6482F4A0C3EF944CC93B9F24BD38915A44A"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\instrument.tessera.json",
+    "Hash": "3ABA6437D79869C99777A1EB9D02FA0AA11CA0A1B3E42327C4ED88059B536B5D"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\motion.tessera.json",
+    "Hash": "5AF99902EF2499C64A2BCA531D50C5564C06677F9A4EA29D6A7649C030D6D2AA"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\field.cases.json",
+    "Hash": "50F8FA0371B93EFA8A2E10BE5C759261A9C8EFBEECE184CFA78450A73FB29061"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\instrument.cases.json",
+    "Hash": "9711F775AB4D5E64A758F7460816D0D3FF205B38298DE747C2D954F92717E5F5"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\06-live-sandbox\\motion.cases.json",
+    "Hash": "171D73C84A1E43F5DE76A92706D6FB9A53D5DEF052AECD4C69BFCEA5BDE8D98D"
+  }
+]

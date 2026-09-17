@@ -351,3 +351,29 @@ read or mutate the world. Every world action still derives from the registry.
 `component_actions` plus pinned `invoke_component` provide same-turn discovery
 without rebuilding Codex's top-level tools. Never extract OAuth tokens. The
 API-key Agents SDK adapter remains an alternative, with a separate loop contract.
+
+### Baseline fidelity for Agora comparisons
+
+When comparing against "current", "latest", or "what we built", identify both the
+repository checkout and the actual installed world-authored environment before
+running trials. Repository examples are not a substitute for installed packages.
+Record source hashes, world snapshot/watermark, installed package/build digests,
+relevant arrangement state, model/tool inventory, runtime origin, and observed UI.
+Show a concise baseline description before the trial. A screenshot of a fixture
+does not establish equivalence to the user's environment.
+
+Use matched isolated copies with explicit candidate deltas. If a required layer
+is absent or unverified, stop that comparison or explicitly classify it as an
+example-fixture experiment. Preserve useful observations, failures, and timings,
+but do not generalize them to a newer environment. Treat world-authored code as
+part of the software baseline, not merely as user data to omit during setup.
+
+### Separate architectural ideation from implementation
+
+For Agora/JEFF refinement, choose bounded experiments from the user's documented
+design work. Record the source idea, evidence, acceptance criteria, and scope
+before implementing. Distinguish tested mechanisms, promising gaps, unsupported
+claims, and unresolved design questions. Routine implementation and debugging may
+proceed; when success requires inventing a new architectural contract, stop that
+part and give Alex a concrete question to delegate for separate ideation. Do not
+quietly design a new framework while implementing the selected experiment.

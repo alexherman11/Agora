@@ -1,0 +1,33 @@
+{
+  "id": "notes",
+  "claims": [
+    {"kind":"query","id":"notes.visible","from":"items","where":["not",["row","archived"]],"sort":"title"},
+    {"kind":"action","id":"notes.create","requires":["ne",["trim",["arg","title"]],""],"effects":[{"op":"create","collection":"items","id":["arg","id"],"values":{"title":["trim",["arg","title"]],"body":["arg","body"],"archived":false}}]},
+    {"kind":"action","id":"notes.editBody","effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"body","value":["arg","body"]}]},
+    {"kind":"action","id":"notes.archive","effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"archived","value":true}]},
+    {"kind":"action","id":"notes.restore","effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"archived","value":false}]},
+    {"kind":"query","id":"notes.archived","from":"items","where":["row","archived"],"sort":"title"},
+
+    {"kind":"view","id":"notes.panel","parent":"workspace","widget":"panel","title":"Notes","order":10},
+    {"kind":"view","id":"notes.intro","parent":"notes.panel","widget":"text","text":"Capture research notes and keep them alongside tasks and references.","order":0},
+    {"kind":"view","id":"notes.new","parent":"notes.panel","widget":"stack","title":"New note","order":10},
+    {"kind":"view","id":"notes.new.title","parent":"notes.new","widget":"input","bind":"newTitle","placeholder":"Note title","order":10},
+    {"kind":"view","id":"notes.new.body","parent":"notes.new","widget":"textarea","bind":"newBody","placeholder":"Write a note…","order":20},
+    {"kind":"view","id":"notes.new.save","parent":"notes.new","widget":"button","text":"Create note","action":"notes.create","args":{"id":["local","newId"],"title":["local","newTitle"],"body":["coalesce",["local","newBody"],""]},"disabled":["eq",["trim",["coalesce",["local","newTitle"],""]],""],"order":30},
+    {"kind":"view","id":"notes.active.heading","parent":"notes.panel","widget":"text","text":"Active notes","order":20},
+    {"kind":"view","id":"notes.list","parent":"notes.panel","widget":"list","query":"notes.visible","order":30},
+    {"kind":"view","id":"notes.card","parent":"notes.list","widget":"panel","role":"item-card","order":10},
+    {"kind":"view","id":"notes.card.title","parent":"notes.card","widget":"input","bind":"title","value":["row","title"],"placeholder":"Title","order":10},
+    {"kind":"view","id":"notes.card.body","parent":"notes.card","widget":"textarea","bind":"body","value":["row","body"],"placeholder":"Note body","order":20},
+    {"kind":"view","id":"notes.card.tools","parent":"notes.card","widget":"row","order":30},
+    {"kind":"view","id":"notes.card.tools.rename","parent":"notes.card.tools","widget":"button","text":"Save title","action":"item.rename","args":{"id":["row","id"],"title":["local","title"]},"disabled":["eq",["trim",["coalesce",["local","title"],""]],""],"order":10},
+    {"kind":"view","id":"notes.card.tools.saveBody","parent":"notes.card.tools","widget":"button","text":"Save body","action":"notes.editBody","args":{"id":["row","id"],"body":["coalesce",["local","body"],""]},"order":20},
+    {"kind":"view","id":"notes.card.tools.archive","parent":"notes.card.tools","widget":"button","text":"Archive","action":"notes.archive","args":{"id":["row","id"]},"order":30},
+    {"kind":"view","id":"notes.archive.heading","parent":"notes.panel","widget":"text","text":"Archive","order":40},
+    {"kind":"view","id":"notes.archive.list","parent":"notes.panel","widget":"list","query":"notes.archived","order":50},
+    {"kind":"view","id":"notes.archive.card","parent":"notes.archive.list","widget":"row","order":10},
+    {"kind":"view","id":"notes.archive.card.title","parent":"notes.archive.card","widget":"text","text":["row","title"],"order":10},
+    {"kind":"view","id":"notes.archive.card.restore","parent":"notes.archive.card","widget":"button","text":"Restore","action":"notes.restore","args":{"id":["row","id"]},"order":20},
+    {"kind":"style","id":"notes.cards","selector":"role:item-card","priority":10,"values":{"background":"#ffffff","color":"#17243b","borderRadius":"12px","padding":"16px"}}
+  ]
+}

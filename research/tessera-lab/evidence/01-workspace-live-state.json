@@ -1,0 +1,80 @@
+{
+  "state": {
+    "items": {
+      "blooml": {
+        "body": "A lattice-based language for coordination-aware distributed programs.",
+        "reference": "Conway et al., EECS-2012-167",
+        "sourceUrl": "https://www2.eecs.berkeley.edu/Pubs/TechRpts/2012/EECS-2012-167.html",
+        "title": "BloomL: distributed programming with lattices",
+        "archived": false,
+        "done": false,
+        "isTask": false,
+        "priority": 2
+      },
+      "calm": {
+        "body": "Coordination and monotonicity in distributed programs.",
+        "reference": "CALM / Bloom research overview",
+        "sourceUrl": "https://bloom-lang.net/calm/",
+        "title": "CALM and Bloom",
+        "archived": false,
+        "done": false,
+        "isTask": false,
+        "priority": 2
+      },
+      "task-prototype": {
+        "body": "Exercise notes, tasks, and library contributions together.",
+        "isTask": true,
+        "priority": 1,
+        "title": "Test the shared workspace",
+        "archived": false,
+        "done": false,
+        "reference": "",
+        "sourceUrl": ""
+      },
+      "task-review": {
+        "body": "Check the prototype after all modules load.",
+        "done": true,
+        "isTask": true,
+        "priority": 2,
+        "title": "Review the research notes",
+        "archived": false,
+        "reference": "",
+        "sourceUrl": ""
+      },
+      "welcome": {
+        "body": "Three builders, one workspace.",
+        "reference": "Invariant confluence — Bailis et al.",
+        "sourceUrl": "https://arxiv.org/abs/1402.2237",
+        "title": "A shared research note",
+        "archived": false,
+        "done": false,
+        "isTask": false,
+        "priority": 2
+      },
+      "ca510038-9fd2-464d-918c-18466a955993": {
+        "title": "Browser collaboration test",
+        "body": "Created through the composed language UI.",
+        "archived": false,
+        "done": true,
+        "isTask": true,
+        "priority": 2,
+        "reference": "",
+        "sourceUrl": "https://example.org/composition"
+      }
+    }
+  },
+  "versions": {
+    "items/ca510038-9fd2-464d-918c-18466a955993/$exists": 1,
+    "items/ca510038-9fd2-464d-918c-18466a955993/title": 1,
+    "items/ca510038-9fd2-464d-918c-18466a955993/body": 1,
+    "items/ca510038-9fd2-464d-918c-18466a955993/archived": 1,
+    "items/ca510038-9fd2-464d-918c-18466a955993/done": 4,
+    "items/ca510038-9fd2-464d-918c-18466a955993/isTask": 2,
+    "items/ca510038-9fd2-464d-918c-18466a955993/priority": 1,
+    "items/ca510038-9fd2-464d-918c-18466a955993/reference": 1,
+    "items/ca510038-9fd2-464d-918c-18466a955993/sourceUrl": 3,
+    "$collection/items": 4
+  },
+  "serial": 4,
+  "conflicts": []
+}

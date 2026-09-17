@@ -6,17 +6,7 @@
 
 ## Preamble
 
-I am writing this while the project is small enough that writing it costs me nothing, which is the only honest time to do it.
 
-Every system that ever tried to hold a person's whole working life eventually faced a moment where betraying that person was the profitable move. WinFS and OpenDoc died before they got there. The ones that lived — the platforms we all still use and quietly resent — got there and took the deal, and none of them took it in a single dramatic vote. They took it one reasonable quarter at a time, and by the time anyone noticed, the exits had been welded shut and the walls were opaque.
-
-Agora is a home where a machine has root, holds your memories, watches your attention, and stays for years. There is no version of that which is safe on the strength of my good intentions. So this document is not a mission statement and it is not a list of things we value. It is a set of constraints on what Agora is permitted to become, written by someone who currently has all the power here and would like to make sure that stops being true on a schedule.
-
-The whole thing reduces to one line, and every article below is that line wearing different clothes:
-
-> **Whatever holds people's lives must be structurally incapable of betraying them.**
-
-Not unwilling. Incapable.
 
 ---
 

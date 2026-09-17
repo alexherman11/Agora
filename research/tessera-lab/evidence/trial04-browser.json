@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "checks": [
+    "Intrinsic card expansion without a shared size constant",
+    "Cross-window measured endpoints follow expanded/edited content",
+    "Connected expanded document moves into an independently added host",
+    "Reachable focused editing and correct links at 1000×800",
+    "Reachable focused editing and correct links at 600×900",
+    "Three concurrent isolated clients move distinct windows from one snapshot",
+    "Competing same-window stale movement preserves an explicit conflict"
+  ],
+  "errors": [],
+  "metrics": {
+    "renders": 36,
+    "renderMs": 992.0999998450279,
+    "maxRenderMs": 189.09999999403954,
+    "previewFrames": 19,
+    "previewMs": 461.3999999463558,
+    "commits": 7
+  }
+}

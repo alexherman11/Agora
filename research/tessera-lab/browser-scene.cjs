@@ -1,0 +1,43 @@
+const {chromium}=require('C:/Users/Alex/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
+(async()=>{
+ const dataDir=fs.mkdtempSync(path.join(os.tmpdir(),'tessera-scene-'));
+ const proc=spawn(process.execPath,['server.mjs'],{cwd:__dirname,windowsHide:true,env:{...process.env,TESSERA_PORT:'4383',TESSERA_DATA_DIR:dataDir}});let browser;
+ try{
+ await new Promise((resolve,reject)=>{proc.stdout.on('data',d=>{if(String(d).includes('listening'))resolve()});proc.on('error',reject)});
+ browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+ const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[],checks=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:4383/scene?trial=03-scene');await page.locator('[data-view="studio.surface"]').waitFor();
+ const view=id=>page.locator(`[data-view="${id}"]`),card=id=>page.locator(`[data-view="card.shell"][data-scope$="/${id}"]`);
+ const get=()=>page.evaluate(()=>window.tessera.saved);
+ const dragBy=async(locator,dx,dy)=>{const r=await locator.boundingBox();assert(r);await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:12});await page.mouse.up();await page.waitForTimeout(150);};
+ assert.equal(await view('console.dawn').isVisible(),true);assert.deepEqual(await page.evaluate(()=>window.tessera.issues),[]);
+ await page.screenshot({path:'evidence/trial03-free.png'});
+ let before=await get();
+ await dragBy(view('studio.header'),10,25);
+ await page.waitForFunction(()=>window.tessera.saved.state.surfaces.studio.y===93);
+ let after=await get();assert.equal(after.state.surfaces.studio.x,before.state.surfaces.studio.x+10);assert.equal(after.serial,before.serial+1);checks.push('Window drag persists one decision');
+ before=await get();const r=await view('atlas.resize').boundingBox();await page.mouse.move(r.x+12,r.y+12);await page.mouse.down();await page.mouse.move(r.x+32,r.y+52,{steps:10});await page.mouse.up();
+ await page.waitForFunction(w=>window.tessera.saved.state.surfaces.atlas.width===w+20,before.state.surfaces.atlas.width);checks.push('Independent window resize');
+ const edgeBefore=await view('atlas.edge').first().locator('line').getAttribute('x1');
+ const grip=card('atlas-signal').locator('[data-view="card.grip"]'),gr=await grip.boundingBox();before=await get();
+ await page.mouse.move(gr.x+40,gr.y+5);await page.mouse.down();await page.mouse.move(gr.x+70,gr.y+25,{steps:10});await page.waitForTimeout(80);
+ const preview=await page.evaluate(()=>({state:window.tessera.state,saved:window.tessera.saved,frames:window.tessera.metrics.previewFrames}));
+ assert.equal(preview.saved.serial,before.serial);assert.equal(preview.state.cards['atlas-signal'].x,before.state.cards['atlas-signal'].x+30);
+ assert.equal(Number(await view('atlas.edge').first().locator('line').getAttribute('x1')),Number(edgeBefore)+30);await page.mouse.up();
+ await page.waitForFunction(x=>window.tessera.saved.state.cards['atlas-signal'].x===x+30,before.state.cards['atlas-signal'].x);checks.push('Card and connector follow local preview without network commits');
+ const source=await card('studio-brief').locator('[data-view="card.grip"]').boundingBox(),host=await view('atlas.host').boundingBox();
+ await page.mouse.move(source.x+40,source.y+5);await page.mouse.down();await page.mouse.move(host.x+120,host.y+80,{steps:22});await page.mouse.up();
+ await page.waitForFunction(()=>window.tessera.saved.state.cards['studio-brief'].host==='atlas.host');
+ assert.equal(await card('studio-brief').evaluate(n=>n.closest('[data-view="atlas.host"]')!==null),true);checks.push('One stable card portals between independently authored windows');
+ await view('console.dawn').click();await page.waitForFunction(()=>window.tessera.saved.state.settings.scene.theme==='dawn');
+ await view('console.mosaic').click();await page.waitForFunction(()=>window.tessera.saved.state.settings.scene.mode==='mosaic');
+ const atlasBox=await view('atlas.surface').boundingBox(),atlasHost=await view('atlas.host').boundingBox();assert(atlasHost.width<=atlasBox.width);assert(atlasHost.x>=atlasBox.x);checks.push('Scene theme and docking recompute descendant layout');
+ await view('console.off').click();await page.waitForFunction(()=>window.tessera.issues.some(i=>i.code==='style-conflict'));checks.push('Equal-priority competing styles stay explicit');
+ await page.screenshot({path:'evidence/trial03-style-conflict.png'});
+ await view('console.square').click();await page.waitForFunction(()=>!window.tessera.issues.some(i=>i.code==='style-conflict'));
+ await page.screenshot({path:'evidence/trial03-mosaic.png'});
+ const report={ok:errors.length===0,errors,checks,metrics:await page.evaluate(()=>window.tessera.metrics),state:await get()};
+ fs.writeFileSync('evidence/trial03-browser.json',JSON.stringify(report,null,2));console.log(JSON.stringify({...report,state:undefined},null,2));
+ }finally{if(browser)await browser.close();proc.kill();}
+})().catch(e=>{console.error(e);process.exit(1)});

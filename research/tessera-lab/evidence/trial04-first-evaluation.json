@@ -1,0 +1,75 @@
+{
+  "trial": "04-fluid-scene",
+  "modules": [
+    "atlas",
+    "base",
+    "studio",
+    "toolkit"
+  ],
+  "claims": 230,
+  "diagnostics": [],
+  "cases": [
+    {
+      "name": "atlas.cases.json:1",
+      "ok": true
+    },
+    {
+      "name": "atlas.cases.json:2",
+      "ok": true
+    },
+    {
+      "name": "atlas.cases.json:3",
+      "ok": true
+    },
+    {
+      "name": "atlas.cases.json:4",
+      "ok": true
+    },
+    {
+      "name": "atlas.cases.json:5",
+      "ok": true
+    },
+    {
+      "name": "atlas.cases.json:6",
+      "ok": true
+    },
+    {
+      "name": "studio.cases.json:1",
+      "ok": true
+    },
+    {
+      "name": "studio.cases.json:2",
+      "ok": true
+    },
+    {
+      "name": "studio.cases.json:3",
+      "ok": true
+    },
+    {
+      "name": "studio.cases.json:4",
+      "ok": true
+    },
+    {
+      "name": "studio.cases.json:5",
+      "ok": true
+    },
+    {
+      "name": "toolkit.cases.json:1",
+      "ok": true
+    },
+    {
+      "name": "toolkit.cases.json:2",
+      "ok": true
+    },
+    {
+      "name": "toolkit.cases.json:3",
+      "ok": true
+    },
+    {
+      "name": "toolkit.cases.json:4",
+      "ok": true
+    }
+  ],
+  "permutations": 24,
+  "ok": true
+}

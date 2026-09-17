@@ -1,0 +1,30 @@
+[
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\base.tessera.json",
+    "Hash": "118E6CE5E3D7B5AC1258F138B279AB1DD4BECE56EEC380E2233E85F02206A3F0"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\finance.cases.json",
+    "Hash": "19DEDD2B8A3FD6D69FD193629E94A21D1B2C5231E1446CF8F8B7742FAC5695F3"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\finance.tessera.json",
+    "Hash": "CF3EBB144E0E608F0167571BCCEE8385CED4CAF5F56E49AE2101DACB982C8BE8"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\logistics.cases.json",
+    "Hash": "6B1E38B5ABB4BCECC9B24D7ECC21DF5CFAB7164DB8AF22B619E2834613D77C48"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\logistics.tessera.json",
+    "Hash": "21DF689A10FF7C0C9AFC080554702EC30234DA32AD21EA3E566656A1C27EDE0D"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\planning.cases.json",
+    "Hash": "8C925F5C6DB4B758911732DB435EF47D6692EEB339EC7D9317769BC90FEDC69A"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\02-expedition\\planning.tessera.json",
+    "Hash": "0D6F6B7B7AF2600CCE67836BEE51F58AC03D879461FB527167E96BB8B7ED1E4A"
+  }
+]

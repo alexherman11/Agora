@@ -115,6 +115,23 @@ The general authority hooks still lack a complete operation plan and remain an
 explicit later-scope stub. Committed tests were inspected but not executed by the
 security review.
 
+The next adoption question is developed in
+[[local-adoption-and-executable-identity]]. It separates a shared definition from
+local object bindings, a computed effective plan, and the person's standing
+update policy. Routine trusted updates may remain quiet when the contract is
+compatible and the plan stays within the ceiling. A fork, merge, restore, passing
+test, or package signature cannot carry the local adoption record. This is a
+proposal informed by TUF, SLSA, in-toto, and Universal Version Control; it is not
+implemented or tested in Agora.
+
+The 15 September [[shared-state-version-compatibility]] follow-up applies that
+separation to people editing shared data with different application versions.
+Its central rule is per-operation compatibility: stable, bounded operations may
+commit; ambiguous or lossy translations become attributed proposals or
+read-only capabilities. Code rollback keeps the current data head and never runs
+an implicit down-migration. This too is a proposal; no mixed-version Agora
+experiment has run.
+
 Compare whole-application isolation with smaller independent components. Measure denied effects, unintended disclosure, retained user work, recovery, review effort, and user interruptions. More components may reduce authority per component but increase dependency and compatibility complexity.
 
-Acceptance tests T21–T24 in [[Security|Security Model]] cover the earlier scenarios. T25 extends the same precision to ordinary OS actions. The new preview/adoption cases PA-1–PA-7 are in [[executable-admission-and-preview-review]]. None was run by the security review. Compartment granularity, adoption policy, exact wire protocols, and confidentiality enforcement remain open.
+Acceptance tests T21–T24 in [[Security|Security Model]] cover the earlier scenarios. T25 extends the same precision to ordinary OS actions. Preview/adoption cases PA-1–PA-7 are in [[executable-admission-and-preview-review]], LA-1–LA-12 cover local adoption and update identity, and SV-1–SV-12 cover mixed-version state. None was run by the security review. Compartment granularity, adoption protocol, the first operation envelope and adapter language, exact wire protocols, and confidentiality enforcement remain open.
