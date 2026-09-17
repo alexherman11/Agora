@@ -23,3 +23,6 @@ local/
 *.vdi
 **/.obsidian/workspace*.json
 **/.obsidian/cache/
+
+# Claude Code session lock (per-machine)
+.claude/scheduled_tasks.lock
