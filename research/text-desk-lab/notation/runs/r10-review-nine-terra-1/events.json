@@ -1,0 +1,193 @@
+[
+  {
+    "id": "e1",
+    "verb": "resolve",
+    "target": "a20",
+    "args": {
+      "id": "c35",
+      "line": "The timestamps are UTC, per the Parser notes."
+    },
+    "undo": {
+      "reopen": "c35"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s07",
+      "a20",
+      "s07",
+      "a20"
+    ],
+    "via": "resolve"
+  },
+  {
+    "id": "e2",
+    "verb": "comment",
+    "target": "s07",
+    "args": {
+      "line": "And where does the feed come from?"
+    },
+    "undo": {
+      "drop_comment": "c40"
+    },
+    "note": "",
+    "by": "priya",
+    "changed": [
+      "s07",
+      "a20"
+    ]
+  },
+  {
+    "id": "e3",
+    "verb": "resolve",
+    "target": "a20",
+    "args": {
+      "id": "c36",
+      "line": "The cadence is fixed at 6 minutes by the feed, per the Parser notes."
+    },
+    "undo": {
+      "reopen": "c36"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s07",
+      "a20",
+      "s07",
+      "a20"
+    ],
+    "via": "resolve"
+  },
+  {
+    "id": "e4",
+    "verb": "edit",
+    "target": "a32",
+    "args": {
+      "append": "## Status"
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s31",
+        "kind": "doc",
+        "title": "Harbor plan",
+        "text": "Plan for the Harbor project, owner Alex.\n## Goals\nInstrument the pier and publish tide data by the end of the month.\n## Timeline\nKickoff on the 20th. Sensors ordered by the 18th. Dock survey on the 25th.\n## Risks\nPermit renewal is slow. Vendor quotes may exceed budget.\n## Checklist\n- [ ] vendor shortlist\n- [x] tide feed access\n- [ ] survey booked",
+        "tags": [],
+        "due": null,
+        "rev": 2,
+        "comments": [
+          {
+            "id": "c37",
+            "by": "sam",
+            "text": "Please add a Status section at the end listing what blocks the Dock survey.",
+            "resolved": false,
+            "replies": []
+          }
+        ]
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s31",
+      "a32"
+    ],
+    "via": "append"
+  },
+  {
+    "id": "e5",
+    "verb": "link",
+    "target": "s07",
+    "args": {
+      "to": "a30",
+      "as": "refers"
+    },
+    "undo": {
+      "drop_link": "l41"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s07",
+      "s29",
+      "a20",
+      "a30"
+    ]
+  },
+  {
+    "id": "e6",
+    "verb": "resolve",
+    "target": "a20",
+    "args": {
+      "id": "c40",
+      "line": "The feed comes from the harbor master's station, per the Parser notes."
+    },
+    "undo": {
+      "reopen": "c40"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s07",
+      "a20",
+      "s07",
+      "a20"
+    ],
+    "via": "resolve"
+  },
+  {
+    "id": "e7",
+    "verb": "edit",
+    "target": "a32",
+    "args": {
+      "append": "- Dock survey is blocked by Order pier sensors and Harbor permit renewal."
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s31",
+        "kind": "doc",
+        "title": "Harbor plan",
+        "text": "Plan for the Harbor project, owner Alex.\n## Goals\nInstrument the pier and publish tide data by the end of the month.\n## Timeline\nKickoff on the 20th. Sensors ordered by the 18th. Dock survey on the 25th.\n## Risks\nPermit renewal is slow. Vendor quotes may exceed budget.\n## Checklist\n- [ ] vendor shortlist\n- [x] tide feed access\n- [ ] survey booked\n## Status",
+        "tags": [],
+        "due": null,
+        "rev": 3,
+        "comments": [
+          {
+            "id": "c37",
+            "by": "sam",
+            "text": "Please add a Status section at the end listing what blocks the Dock survey.",
+            "resolved": false,
+            "replies": []
+          }
+        ]
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s31",
+      "a32"
+    ],
+    "via": "append"
+  },
+  {
+    "id": "e8",
+    "verb": "resolve",
+    "target": "a32",
+    "args": {
+      "id": "c37",
+      "line": "Added Status: Dock survey is blocked by Order pier sensors and Harbor permit renewal."
+    },
+    "undo": {
+      "reopen": "c37"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s31",
+      "a32",
+      "s31",
+      "a32"
+    ],
+    "via": "resolve"
+  }
+]

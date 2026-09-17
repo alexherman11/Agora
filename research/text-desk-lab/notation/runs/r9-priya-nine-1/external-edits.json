@@ -1,0 +1,15 @@
+[
+  {
+    "after_event": 4,
+    "actor": "priya",
+    "receipt": {
+      "ok": true,
+      "event": "e5",
+      "changed": [
+        "s15",
+        "a27"
+      ],
+      "note": "subject s15 changed; 1 appearance(s) now show the new content"
+    }
+  }
+]
