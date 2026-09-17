@@ -16,7 +16,7 @@ from copy import deepcopy
 from world import Refusal, SCREEN, World
 
 HELP = """commands (one per call):
-  look [id] [:1|:2|:3]   outline from id (default desk). :1 folded line, :2 open (default), :3 focus
+  look [id] [:1|:2|:3]   outline from id (default desk). :1 the line, :2 its children (default), :3 everything under it
   open id | close id     expand / collapse id in later looks (view only; nothing moves)
   read id                full text of a note/task/etc (via an appearance or subject id)
   where id               exact geometry and spatial relations
@@ -169,6 +169,8 @@ class Desk:
         if cmd in ("open", "close"):
             if not argv:
                 raise Refusal(f"{cmd} needs an id")
+            if len(argv) > 1:
+                raise Refusal(f"{cmd} takes only an id; examine {argv[0]} shows what is inside")
             return self.cmd_fold(argv[0], cmd == "open")
         if cmd == "read":
             section, full = None, False
@@ -329,7 +331,7 @@ class Desk:
             out += "\n    verbs: " + " ".join(w.verbs_for(nid))
         return out
 
-    def outline(self, root, level=2):
+    def outline(self, root, level=2, deep=False):
         lines = []
 
         def walk(nid, depth, force_open):
@@ -342,7 +344,7 @@ class Desk:
                     lines.append(extra)
             if n["type"] == "surface":
                 kids = self.world.children(nid)
-                if kids and (force_open or nid in self.open):
+                if kids and (force_open or deep or nid in self.open):
                     for k in kids:
                         walk(k["id"], depth + 1, False)
                 elif kids:
@@ -366,7 +368,11 @@ class Desk:
         if nid in self.world.subjects:
             return header + self.cmd_pivot(nid)
         if level >= 3:
-            return header + self.focus(nid)
+            # look's suffix is containment depth: :3 on a surface walks everything under it, open or not.
+            # An appearance has nothing under it, so :3 there is examine (the plain desk keeps its focus form).
+            if self.world.nodes[nid]["type"] == "surface":
+                return header + self.outline(nid, 2, deep=True)
+            return header + (self.cmd_examine(nid) if hasattr(self, "cmd_examine") else self.focus(nid))
         if level <= 1:
             return header + self.line(nid, 1)
         return header + self.outline(nid, 2)
@@ -387,8 +393,8 @@ class Desk:
             out.append("  where: " + self._where_line(nid))
             out.append("  verbs: " + "  ".join(f"{v} {sig}".strip() for v, sig in w.verbs_for(nid).items()))
         else:
-            for k in w.children(nid):
-                out.append("  " + self.line(k["id"], 1))
+            # :3 on a surface: everything under it, whether or not it is open, then its verbs
+            out = [self.outline(nid, 2, deep=True)]
             out.append("  verbs: " + " ".join(w.verbs_for(nid)) + f"   (verbs {nid} for argument forms)")
         return "\n".join(out)
 
@@ -398,9 +404,19 @@ class Desk:
             raise Refusal(f"{nid} is not a surface; read {nid} for its content")
         if opening:
             self.open.add(nid)
-        else:
-            self.open.discard(nid)
-        return self.outline(nid if opening else self.world.nodes[nid]["parent"] or nid, 2)
+            # a look walks from the root and only descends into open surfaces, so an open
+            # surface inside a closed one would never be reached: open the ancestors too, and say so
+            also = []
+            p = self.world.nodes[nid]["parent"]
+            while p and p != self.world.root:
+                if p not in self.open:
+                    self.open.add(p)
+                    also.append(p)
+                p = self.world.nodes[p]["parent"]
+            note = ("\n(also opened " + ", ".join(also) + f" so that look reaches {nid})") if also else ""
+            return self.outline(nid, 2) + note
+        self.open.discard(nid)
+        return self.outline(self.world.nodes[nid]["parent"] or nid, 2)
 
     def cmd_read(self, ident, section=None, full=False):
         nid = self._resolve(ident)
@@ -499,8 +515,12 @@ class Desk:
         for a in w.appearances_of(sid):
             n = w.nodes[a]
             out.append(f"  {self.line(a, 1)}  in {n['parent']} \"{w.title(w.nodes[n['parent']])}\"")
-        out.append("  verbs: " + "  ".join(f"{v} {sig}".strip() for v, sig in w.verbs_for(sid).items()))
+        out.append(self.subject_verbs_line(sid))
         return "\n".join(out)
+
+    def subject_verbs_line(self, sid):
+        """The verbs a subject answers to. The plain desk uses the world's table; verb-registry desks override."""
+        return "  verbs: " + "  ".join(f"{v} {sig}".strip() for v, sig in self.world.verbs_for(sid).items())
 
     def cmd_find(self, words):
         q = words.lower().strip()
@@ -580,6 +600,9 @@ class Desk:
             out += f" → created {r['created']}"
         if r.get("note"):
             out += f"\n  {r['note']}"
+        if r.get("created") in w.nodes:
+            self._mark_seen(r["created"])
+            out += "\n  now: " + self.line(r["created"], 1) + self.position_note(r["created"])
         for c in r.get("changed", []):
             if c in w.nodes and c != nid:
                 self._mark_seen(c)   # your own change; the receipt is the look

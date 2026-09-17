@@ -951,3 +951,28 @@ description (harbor: 4, 4, 3 + find). It still read eleven of twelve things on h
   a shorter `verbs:` line, and a short form on re-examine of a thing already shown.
 - Every hint must be a runnable command. Checked the others: `try: raise`, `sort`, `tile`, `remove also:aNN`,
   `raise hidden,in:fNN`, `group kind:x,in:fNN` all run as printed; `resolve cNN` was the only one that did not.
+
+### Round 11b: changes from human use of the desk (playground session with Alex; unmeasured on a model)
+A local playground (drawn desk + the lean REPL) put a person on the desk for the first time. Defects found by
+navigating like a person (open drawers, step back) rather than like the model (aim `look` at known ids):
+- `open f04` inside a closed f28 was unreachable by `look`: open now opens the ancestors and says so.
+- `open x :3` silently ignored the depth: refused now, pointing at examine.
+- `look x :3` on a surface printed children + a verb list from the round-1 world table, which lacks sort/raise/
+  lower/pair verbs; `examine x` printed no children. Settled with Alex: look's suffix is containment depth (`:3` = everything under a surface, open or not);
+  `look aNN :3` on an appearance is examine; examine on a surface prints its children as lines; examine refuses a
+  depth suffix. Verbs are printed only by examine, verbs and help.
+- Subject verbs (`pivot`, `verbs sNN`) also came from the round-1 table and printed `place into=<surface>` while
+  `help place` said place was not a verb. `place` is now a registered verb on subjects (a new appearance); the
+  synonym place→move is gone; pivot's verb line comes from the registry; the knife desk hides the specialized verbs
+  in `verbs` as it did in examine. One verb source.
+- A created appearance's receipt now carries a `now:` line like every other write.
+- `do resolve c35 line=UTC, per the Parser notes` (unquoted) silently kept "UTC," and dropped the rest as stray
+  positionals. Refused now: `unexpected words after the target ...; quote values with spaces`.
+Observed but left alone: undo of my own change is blocked once another actor has written to the same subject
+(conservative, by design); a reply-less resolve cannot be given a reply afterwards; `group <selection>` spanning
+surfaces asks for `in=<surface>` and then works.
+All of the above is unmeasured on Terra or Sol; the round-11 numbers are for the desk before these changes.
+- Alex: "how do I list all the pngs, or everything with a tag inside a panel?" There was no listing view for a
+  selection; selections were verb targets only. `find <selection>` now lists matches grouped by surface
+  (`find kind:image`, `find tag:harbor,in:f04`, `find hidden`, `find due<date`), with the selection footer.
+  Sections inside a doc are not things and cannot be selected into; that is a limit of the model, stated.

@@ -90,7 +90,10 @@ class DeskMoo(Desk):
                 return HELP_MOO
             return "\n\n".join(self.cmd_help(a.lstrip("@")) for a in arg.split())
         if cmd in ("examine", "x", "ex"):
-            return self.cmd_examine(arg.split()[0] if arg else None)
+            words = arg.split()
+            if len(words) > 1:
+                raise Refusal(f"examine takes only an id; depth belongs to look (look {words[0]} :3 shows everything under it)")
+            return self.cmd_examine(words[0] if words else None)
         if cmd == "verbs":
             return self.cmd_verbs(arg.split()[0] if arg else None)
         if cmd == "do":
@@ -159,13 +162,28 @@ class DeskMoo(Desk):
         out.append("  (help <verb> [<verb> ...] explains; do <verb> " + nid + " ... uses one)")
         return "\n".join(out)
 
+    _hidden_verbs = ()   # the knife desk hides the specialized verbs everywhere, not only in examine
+
+    def _verbs_by_origin(self, nid):
+        return moo.verbs_by_origin(self.world, nid)
+
+    def subject_verbs_line(self, sid):
+        """Subject verbs from the registry: the text-level verbs of its kind, plus place. One verb source."""
+        s = self.world.subjects[sid]
+        chain = set(moo.KIND_CHAIN.get(s["kind"], [])) - {"appearance", "thing"}
+        names = [v.name for v in moo.REGISTRY.values() if set(v.kinds) & chain]
+        if not self.world.checklist(s["text"]):
+            names = [n for n in names if n != "check"]
+        names = [n for n in names if n not in self._hidden_verbs]
+        return "  verbs: " + " ".join(names) + " · place into=<surface> (a new appearance)   (help <verb> for args; edits change every appearance)"
+
     def cmd_verbs(self, ident):
         nid = self._resolve(ident)
         if nid in self.world.subjects:
-            return super().cmd_verbs(nid)
+            return f"{nid} verbs:\n" + self.subject_verbs_line(nid)
         self._mark_seen(nid)
         out = [f"{nid} verbs:"]
-        for origin, names in moo.verbs_by_origin(self.world, nid).items():
+        for origin, names in self._verbs_by_origin(nid).items():
             for name in names:
                 v = moo.REGISTRY[name]
                 out.append(f"  {name} {v.args}".rstrip() + f"   - {v.doc.split('.')[0]}." + (f"  [{origin}]" if origin != "thing" else ""))

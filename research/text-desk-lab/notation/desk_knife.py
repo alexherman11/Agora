@@ -26,6 +26,7 @@ SELECTION_HELP = """selections: a target can be one id, or a selection that name
   title:agenda       title contains the word
   a20,a22            an explicit list
 combine terms with commas (AND): kind:image,in:f04. The receipt lists everything the verb touched.
+find <selection> lists what it matches, grouped by surface: find kind:image   find tag:harbor,in:f04   find hidden
 e.g. do move ?harbor into=f02 one=1     do raise hidden,in:f04     do group kind:image,in:f04 as=column title=Pictures"""
 
 
@@ -52,6 +53,11 @@ class DeskKnife(DeskMoo):
         if self.lean and n["parent"] and self.world.nodes[n["parent"]]["layout"] != "free":
             return ""
         return super()._geom(nid)
+
+    _hidden_verbs = knife.SPECIALIZED
+
+    def _verbs_by_origin(self, nid):
+        return knife.general_verbs_by_origin(self.world, nid)
 
     def _verb_names(self):
         return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(moo.SYNONYMS)
@@ -141,6 +147,22 @@ class DeskKnife(DeskMoo):
         return line
 
     def cmd_find(self, words):
+        # round 11b: find also takes a selection, which is the scalable listing view (examine is one thing in depth)
+        sel = knife.parse_selection(self.world, words.strip()) if words.strip() else None
+        if sel is not None:
+            ids, desc = sel
+            if not ids:
+                return f"find {desc}: nothing matches"
+            w = self.world
+            by_parent = {}
+            for i in ids:
+                by_parent.setdefault(w.nodes[i]["parent"], []).append(i)
+            out = [f"find {desc}: {len(ids)} thing(s)"]
+            for p, kids in by_parent.items():
+                out.append(f"  in {p} \"{w.title(w.nodes[p])}\":")
+                out.extend("    " + self.line(i, 1) for i in kids)
+            out.append(f"  as a selection: {words.strip()}   e.g. do move {words.strip()} into=<surface>   (help selections)")
+            return "\n".join(out)
         text = super().cmd_find(words)
         q = "+".join(words.lower().split())
         if q and not text.endswith(": nothing"):
@@ -202,7 +224,13 @@ class DeskKnife(DeskMoo):
         if n["type"] == "surface":
             kids = w.children(nid)
             out.append(f"  a {n['layout']} surface" + (f" inside {n['parent']}" if n["parent"] else " (the desk itself)")
-                       + (f", holding {len(kids)} thing(s): " + ", ".join(k["id"] for k in kids) if kids else ", empty"))
+                       + (f", holding {len(kids)} thing(s):" if kids else ", empty"))
+            # round 11: a surface's content is its children, shown as lines, the way a note shows its lines
+            for k in kids:
+                kl = "    " + self.line(k["id"], 1)
+                if k["type"] == "surface" and w.children(k["id"]):
+                    kl += f"  (examine {k['id']} for inside)"
+                out.append(kl)
         else:
             s = w.subjects[n["subject"]]
             self._mark_seen(s["id"])
@@ -262,6 +290,10 @@ class DeskKnife(DeskMoo):
         w = self.world
         if not positional:
             raise Refusal("do needs a target after the verb")
+        if verb not in knife.PAIR_DOC and len(positional) > 1:
+            # unquoted values with spaces land here as stray words; refusing beats silently keeping the first word
+            raise Refusal(f"unexpected words after the target: {' '.join(positional[1:])!r}; quote values with spaces, "
+                          f"e.g. line=\"{' '.join(positional[1:])}\"")
         if verb == "resolve" and positional[0].startswith("c") and positional[0][1:].isdigit():
             owner, c = w.find_comment(positional[0])
             if owner is None:

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Text Desk Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#f6f4ee; --ink:#1d1c1a; --mute:#7a766d; --line:#d9d4c7; --card:#fffdf8; --acc:#b4530a; --seen:#2f7a5b; --chg:#e0b100;
+          --note:#e8dcc0; --task:#d7e4d0; --image:#d4dcea; --chat:#ead6d1; --doc:#e3d9ea; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#1b1a17; --ink:#ece8de; --mute:#9a958a; --line:#3a3731; --card:#242320; --acc:#f08a3c; --seen:#6fd0a4; --chg:#ffd23f;
+          --note:#4a4230; --task:#34452f; --image:#2e3a4d; --chat:#4b3530; --doc:#3f3448; } }
+  :root[data-theme="dark"] { --bg:#1b1a17; --ink:#ece8de; --mute:#9a958a; --line:#3a3731; --card:#242320; --acc:#f08a3c; --seen:#6fd0a4; --chg:#ffd23f;
+          --note:#4a4230; --task:#34452f; --image:#2e3a4d; --chat:#4b3530; --doc:#3f3448; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui, sans-serif; }
+  header { display:flex; gap:12px; align-items:center; padding:8px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap }
+  header b { font-size:15px }
+  header select, header button, #line { font:inherit; padding:4px 8px; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:6px }
+  header button { cursor:pointer }
+  #prompt { color:var(--mute); font-size:13px; flex-basis:100%; }
+  main { display:grid; grid-template-columns: minmax(320px, 55%) 1fr; gap:0; height: calc(100vh - 70px); }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; height:auto } }
+  #left { padding:12px 16px; border-right:1px solid var(--line); overflow:auto }
+  #right { display:flex; flex-direction:column; min-height:360px }
+  svg { width:100%; height:auto; background:var(--card); border:1px solid var(--line); border-radius:8px }
+  .surf { fill:none; stroke:var(--mute); stroke-dasharray:4 3; stroke-width:1.5 }
+  .surf.open { stroke:var(--ink) }
+  .card { stroke:var(--ink); stroke-width:1; rx:6 }
+  .lbl { font: 12px system-ui, sans-serif; fill:var(--ink); pointer-events:none }
+  .id { font: 10px ui-monospace, monospace; fill:var(--mute); pointer-events:none }
+  .chg { stroke:var(--chg); stroke-width:3 }
+  .seen-dot { fill:var(--seen) }
+  #out { flex:1; overflow:auto; padding:12px 16px; font: 12.5px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
+  #out .c { color:var(--acc); font-weight:600 }
+  #out .e { color:#c0392b }
+  #out .r { border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:8px }
+  form { display:flex; gap:8px; padding:10px 16px; border-top:1px solid var(--line) }
+  #line { flex:1; font-family: ui-monospace, monospace }
+  #legend { display:flex; gap:10px; flex-wrap:wrap; color:var(--mute); font-size:12px; margin-top:8px }
+  #legend i { display:inline-block; width:12px; height:12px; border:1px solid var(--ink); border-radius:3px; vertical-align:-2px; margin-right:3px }
+  #meta { margin-top:10px; font-size:12px; color:var(--mute) }
+  #meta code { color:var(--ink) }
+</style>
+</head>
+<body>
+<header>
+  <b>Text Desk Playground</b>
+  <label>task <select id="task"></select></label>
+  <label>desk <select id="variant"><option>lean</option><option>nine</option><option>tiled</option><option>knife</option><option>acme</option><option>outline</option></select></label>
+  <button id="reset">reset</button>
+  <button data-q="look">look</button>
+  <button data-q="help">help</button>
+  <button data-q="help selections">help selections</button>
+  <button data-q="history">history</button>
+  <span id="prompt"></span>
+</header>
+<main>
+  <section id="left">
+    <svg id="desk" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="legend">
+      <span><i style="background:var(--note)"></i>note</span><span><i style="background:var(--task)"></i>task</span>
+      <span><i style="background:var(--image)"></i>image</span><span><i style="background:var(--chat)"></i>chat</span>
+      <span><i style="background:var(--doc)"></i>doc</span>
+      <span><i style="border:1.5px dashed var(--mute); background:none"></i>surface</span>
+      <span><i style="border:3px solid var(--chg); background:none"></i>changed by last command</span>
+      <span><i style="border-radius:50%; background:var(--seen); border:none; width:9px; height:9px"></i>looked at (seen)</span>
+    </div>
+    <div id="meta"></div>
+  </section>
+  <section id="right">
+    <div id="out"></div>
+    <form id="f"><input id="line" autocomplete="off" placeholder="type a desk command, e.g. look   examine a20   do move a20 into=f02" autofocus><button>run</button></form>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const KIND = {note:'var(--note)', task:'var(--task)', image:'var(--image)', chat:'var(--chat)', doc:'var(--doc)'};
+let state = null;
+
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function draw(st){
+  state = st;
+  const svg = $('#desk'); svg.innerHTML = '';
+  const nodes = [...st.nodes].sort((a,b) => a.depth - b.depth || a.z - b.z);
+  const chg = new Set(st.last_changed);
+  for (const n of nodes){
+    const [x,y,w,h] = n.rect;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.style.cursor = 'pointer';
+    g.addEventListener('click', () => { const i = $('#line'); i.value = (i.value + ' ' + n.id).trim(); i.focus(); });
+    if (n.type === 'surface'){
+      g.innerHTML = `<rect class="surf ${n.open?'open':''} ${chg.has(n.id)?'chg':''}" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>
+        <text class="lbl" x="${x+8}" y="${y+16}" font-weight="600">${esc(n.title)} <tspan class="id">${n.id} · ${n.layout}</tspan></text>`;
+    } else {
+      const op = n.hidden >= 0.95 ? 0.35 : 1;
+      const bits = [];
+      if (n.due) bits.push('due ' + n.due.slice(5));
+      if (n.comments) bits.push(n.open_comments + '/' + n.comments + ' cmt');
+      if (n.links) bits.push(n.links + ' lnk');
+      if (n.hidden > 0.05) bits.push(Math.round(n.hidden*100) + '% hidden');
+      g.innerHTML = `<rect class="card ${chg.has(n.id)?'chg':''}" x="${x}" y="${y}" width="${w}" height="${h}" fill="${KIND[n.kind]||'var(--card)'}" opacity="${op}"/>
+        <text class="lbl" x="${x+8}" y="${y+16}">${esc(n.title).slice(0, Math.max(4, w/7|0))}</text>
+        <text class="id" x="${x+8}" y="${y+30}">${n.id} ${n.kind}${bits.length? ' · ' + esc(bits.join(' · ')):''}</text>
+        ${n.seen != null ? `<circle class="seen-dot" cx="${x+w-9}" cy="${y+9}" r="4"/>` : ''}`;
+    }
+    svg.appendChild(g);
+  }
+  $('#prompt').textContent = 'task: ' + st.prompt;
+  const a = st.assessment; const fails = Object.entries(a).filter(([k,v]) => v === false && k !== 'pass').map(([k]) => k);
+  $('#meta').innerHTML = `<code>${st.n_events}</code> events · seen <code>${Object.keys(st.seen).length}</code> things · desk <code>${st.variant}</code> · assessment: <code>${a.pass ? 'pass' : 'not yet: ' + fails.join(', ')}</code>`;
+  const out = $('#out');
+  out.innerHTML = st.log.map(l => `<div class="r"><span class="c">&gt; ${esc(l.line)}</span>\n<span class="${l.error?'e':''}">${esc(l.text)}</span></div>`).join('');
+  out.scrollTop = out.scrollHeight;
+}
+
+async function post(url, body){ const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}); return r.json(); }
+async function send(line){ if(!line.trim()) return; const r = await post('/cmd', {line}); draw(r.state); }
+
+$('#f').addEventListener('submit', e => { e.preventDefault(); const i = $('#line'); const v = i.value; i.value=''; send(v); });
+document.querySelectorAll('header button[data-q]').forEach(b => b.addEventListener('click', () => send(b.dataset.q)));
+$('#reset').addEventListener('click', async () => { const r = await post('/reset', {task: $('#task').value, variant: $('#variant').value}); draw(r.state); });
+
+(async () => {
+  const st = await (await fetch('/state')).json();
+  const sel = $('#task'); st.tasks.forEach(t => { const o = document.createElement('option'); o.textContent = t; sel.appendChild(o); });
+  sel.value = st.task; $('#variant').value = st.variant;
+  draw(st);
+})();
+</script>
+</body>
+</html>

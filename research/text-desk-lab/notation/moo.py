@@ -95,6 +95,12 @@ def v_move(w, nid, a):
     return _prim(w, "move", nid, a)
 
 
+@verb("place", ["subject"], "Put a subject on a surface as a new appearance; its other appearances stay where they are.",
+      "into=<surface>", "do place s10 into=f02")
+def v_place(w, sid, a):
+    return w.apply("place", sid, None, a)
+
+
 @verb("resize", ["thing"], "Change width and height.", "to=<w>x<h>", "do resize a04 to=300x160")
 def v_resize(w, nid, a):
     return _prim(w, "resize", nid, a)
@@ -410,7 +416,7 @@ def v_stack(w, nid, a):
 # ---------------------------------------------------------------- adapter
 
 SYNONYMS = {
-    "put": "move", "place": "move", "drag": "move", "send": "move", "relocate": "move", "insert": "move", "reorder": "sort",
+    "put": "move", "drag": "move", "send": "move", "relocate": "move", "insert": "move", "reorder": "sort",
     "arrange": "tidy", "organize": "tidy", "organise": "tidy", "layout": "tile", "align": "tile", "clean": "tidy", "cleanup": "tidy",
     "delete": "remove", "close": "remove", "dismiss": "remove", "hide": "fold", "collapse": "fold", "expand": "unfold", "show": "unfold",
     "add": "append", "edit": "rewrite", "set": "rewrite", "title": "retitle", "name": "rename", "label": "rename",
