@@ -226,7 +226,7 @@ class Desk:
     def _resolve(self, ident, allow_subject=True):
         if not ident:
             raise Refusal("which id?")
-        ident = ident.lstrip("@")
+        ident = ident.lstrip("@").strip().strip('"\'')   # any command may name a thing by its quoted title
         if ident in ("$new", "$item"):
             want = (self.world.last_surface or self.world.last_created) if ident == "$new" else self.world.last_created
             if not want:
