@@ -1035,3 +1035,18 @@ From the reflection on living in the desk: it held my state better than it showe
   prints a `when:` line. `script morning = clock $1; look Overdue; look Today; find age<1` is how a day starts, and
   because the clock tick fires the due rules, the ritual is also the scheduler.
 - Archive as a rule: `rule when in:Done,age>3 do move into=Archive`.
+
+## Round 11f: rules with targets, handles, help topics, and Terra building automation (2026-09-17)
+- A rule may name a target other than the thing that entered: `rule when in:Today do sort Today by=due` keeps a
+  panel ordered on arrival. With r4 filing overdue tasks and r8 sorting, both fired in one pass.
+- Handles: `do create ... as=tiny` then `$tiny`; `set plan = "Exploration plan"`; `vars`. Ids stop mattering.
+- `help rules · scripts · views · clock · handles · why · export` so the layers are discoverable in-desk.
+- Task `home2`: the home desk with its archive rule and morning script removed and Archive emptied back into Done;
+  the model must write the sweep rule (now and from now on), define a morning script, run it and report overdue
+  tasks. Hand-solved offline: pass. Terra run: see below.
+**Terra on home2: full pass, 6 calls, 0 refusals, 30 s.** Call 1: look + help rules + help scripts. Call 2: help
+selections, help clock, examine the four panels. Call 3: `rule when in:f45,age>3 do move into=f63 now=1` (the now=1
+came from the rule receipt's hint; it wrote the rule with ids, which is fine). Call 4: the script. Call 5: run it.
+Call 6: rules, scripts, look at both panels to verify. Reply listed the six overdue tasks correctly. Its words: "the
+automation help was clear; the clock-dependent age behavior was the key affordance". First run in the lab where the
+model added behaviour to the desk rather than moving things on it.

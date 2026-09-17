@@ -39,7 +39,8 @@ HELP_LEAN = HELP_KNIFE.replace(
     "  examine id             description plus every verb this thing answers to, by origin",
     "  examine id             a thing's detail: its lines, comments, links, and the verbs that apply right now",
 ) + """
-  $new                   the surface created earlier in this session; $item the last created thing"""
+  $new                   the surface created earlier in this session; $item the last created thing
+  more: help rules · help scripts · help views · help clock · help handles · help why · help export"""
 
 
 class DeskKnife(DeskMoo):
@@ -49,6 +50,7 @@ class DeskKnife(DeskMoo):
 
     lean = False        # round 11: no geometry inside tiled parents, no try: tags on outline lines (examine has them)
     _hints_on = False
+    vars = None         # named handles: $draft
 
     def _geom(self, nid):
         n = self.world.nodes[nid]
@@ -194,7 +196,7 @@ class DeskKnife(DeskMoo):
     def cmd_rules(self):
         if not self.rules:
             return "no rules. rule when <selection> do <verb> [k=v ...]   e.g. rule when kind:task,due<2026-09-19 do move into=Today"
-        return "\n".join(f"{r['id']} {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {self._fmt_args(r['kv'])}".rstrip()
+        return "\n".join(f"{r['id']} {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {r.get('target') or ''} {self._fmt_args(r['kv'])}".replace("  ", " ").rstrip()
                          + f"   (fired {r['fired']}x)" for r in self.rules)
 
     def cmd_rule(self, arg):
@@ -223,17 +225,21 @@ class DeskKnife(DeskMoo):
             verb = argv[i + 1].lower() if len(argv) > i + 1 else ""
             if verb not in self._verb_names() or verb in knife.SPECIALIZED:
                 raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL))
+            rest = argv[i + 2:]
+            target = None
+            if rest and "=" not in rest[0]:
+                target = rest.pop(0)   # an explicit target instead of the thing that entered: rule on append do sort Today by=due
             kv = {}
-            for a in argv[i + 2:]:
+            for a in rest:
                 if "=" not in a:
                     raise Refusal(f"rule arguments are k=v; got {a!r}")
                 k, _, v = a.partition("=")
                 kv[k] = v
             self.rules = self.rules or []
             rid = self._next_rule_id()
-            self.rules.append({"id": rid, "on": on_verb, "by": by, "verb": verb, "kv": kv, "done": set(), "fired": 0,
+            self.rules.append({"id": rid, "on": on_verb, "by": by, "verb": verb, "kv": kv, "target": target, "done": set(), "fired": 0,
                                "cursor": len(self.world.events), "sel": f"on {on_verb}" + (f" by={by}" if by else "")})
-            return f"ok {rid}: on {on_verb}" + (f" by={by}" if by else "") + f" do {verb} {self._fmt_args(kv)}".rstrip()
+            return f"ok {rid}: on {on_verb}" + (f" by={by}" if by else "") + f" do {verb} {target or ''} {self._fmt_args(kv)}".rstrip()
         if len(argv) < 4 or argv[0] != "when" or argv[2] != "do":
             raise Refusal("rule when <selection> do <verb> [k=v ...]   |   rule on <verb> [by=<actor>] do <verb> [k=v ...]   |   rule drop rN")
         sel_text, verb = argv[1], argv[3].lower()
@@ -241,17 +247,21 @@ class DeskKnife(DeskMoo):
             raise Refusal(f"{sel_text!r} is not a selection (help selections)")
         if verb not in self._verb_names() or verb in knife.SPECIALIZED:
             raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL))
+        rest = argv[4:]
+        target = None
+        if rest and "=" not in rest[0]:
+            target = rest.pop(0)   # explicit target: rule when in:Today do sort Today by=due (fires when something enters)
         kv = {}
-        for a in argv[4:]:
+        for a in rest:
             if "=" not in a:
                 raise Refusal(f"rule arguments are k=v; got {a!r}")
             k, _, v = a.partition("=")
             kv[k] = v
         self.rules = self.rules or []
-        rid = f"r{len(self.rules) + 1}"
-        rule = {"id": rid, "sel": sel_text, "verb": verb, "kv": kv, "done": set(), "fired": 0}
+        rid = self._next_rule_id()
+        rule = {"id": rid, "sel": sel_text, "verb": verb, "kv": kv, "target": target, "done": set(), "fired": 0}
         self.rules.append(rule)
-        out = f"ok {rid}: when {sel_text} do {verb} {self._fmt_args(kv)}".rstrip()
+        out = f"ok {rid}: when {sel_text} do {verb} {target or ''} {self._fmt_args(kv)}".replace("  ", " ").rstrip()
         # things already in the selection count as already handled: a rule is about what enters, not what is,
         # unless now=1 says to fire on the current matches too
         ids, desc = self._parse_selection(sel_text)
@@ -360,7 +370,7 @@ class DeskKnife(DeskMoo):
         if self.today:
             out.append(f"clock {self.today}")   # before the rules: a due<today rule cannot be defined without it
         for r in self.rules or []:
-            out.append(f"rule {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {self._fmt_args(r['kv'])}".rstrip())
+            out.append(f"rule {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {r.get('target') or ''} {self._fmt_args(r['kv'])}".replace("  ", " ").rstrip())
         for name, body in (self.scripts or {}).items():
             out.append(f"script {name} = {body}")
         if skipped:
@@ -461,7 +471,10 @@ class DeskKnife(DeskMoo):
                         revs0 = {k: v["rev"] for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items())}
                         self._mark_seen(i)
                         try:
-                            receipt = self.cmd_do_knife(r["verb"], [i], dict(r["kv"]))
+                            tgt = r.get("target") or i
+                            if r.get("target"):
+                                self._mark_seen(self._resolve(tgt))
+                            receipt = self.cmd_do_knife(r["verb"], [tgt], dict(r["kv"]))
                             r["fired"] += 1
                             fired = True
                             self._note(f"~ {r['id']} fired on {i}: " + receipt.splitlines()[0])
@@ -570,6 +583,16 @@ class DeskKnife(DeskMoo):
             return self.cmd_export()
         if cmd == "why":
             return self.cmd_why(arg)
+        if cmd == "vars":
+            return "\n".join(f"${k} = {v}" for k, v in (self.vars or {}).items()) or "no handles. set name = <id or title>, or create ... as=name; then $name names it"
+        if cmd == "set":
+            name, eq, val = arg.partition("=")
+            name, val = name.strip().lstrip("$"), val.strip()
+            if not eq or not name or not val or " " in name:
+                raise Refusal("set name = <id or title>")
+            self.vars = self.vars or {}
+            self.vars[name] = self._resolve(val)
+            return f"ok ${name} = {self.vars[name]}"
         if cmd == "clock":
             return self.cmd_clock(arg)
         if cmd == "scripts":
@@ -599,8 +622,37 @@ class DeskKnife(DeskMoo):
             return self.cmd_do_knife(verb, positional, kv)
         return super().repl(line)
 
+    HELP_TOPICS = {
+        "rules": """rules: the desk acts on its own when things change.
+  rule when <selection> do <verb> [target] [k=v ...]   fires once on each thing that enters the selection
+                                                        (now=1: also on the things that match right now)
+  rule on <verb> [by=<actor>] do <verb> [target] [k=v]  fires on each such event, on the thing it happened to
+  target is the thing itself unless you name one: rule when in:Today do sort Today by=due
+  rules              list them, with how often each fired      rule drop rN   remove one
+  A rule's actions print as ~ lines after your command's receipt; undo of your command undoes them too.
+  why <id> shows how a thing got where it is and which rule would act on it next.
+  e.g. rule when tag:fixed do move into=Done      rule on append by=priya do tag add=needs-reply""",
+        "scripts": """scripts: named command sequences.
+  script <name> = <commands separated by ;>     $1 $2 .. stand for run's arguments; $today for the clock's date
+  run <name> [args]                              scripts may call scripts
+  scripts                                        list them
+  e.g. script morning = clock $1; look Overdue; look Today; find age<1""",
+        "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
+  whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
+  do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today""",
+        "clock": """clock: the desk has no time of its own. clock YYYY-MM-DD sets today and re-evaluates the rules.
+  today in due< / due> terms is the clock's date; $today in any command; age<N / age>N select by days since a
+  thing was last touched (undo is not touching). examine prints when: with the last touch.""",
+        "handles": """handles: names for ids. do create ... as=draft, or set draft = <id or title>; then $draft names it.
+  vars lists them. $new is the last surface created, $item the last thing.""",
+        "export": "export: prints the commands that rebuild this desk from an empty one, by title. Replay them after one look.",
+        "why": "why <id>: the events that put a thing where it is (by whom, via which rule, because of what) and which rule would act on it next.",
+    }
+
     def cmd_help(self, name):
         name = name.lower()
+        if name in self.HELP_TOPICS:
+            return self.HELP_TOPICS[name]
         if name in ("selections", "selection", "select"):
             return SELECTION_HELP
         if name in knife.PAIR_DOC:
@@ -699,6 +751,12 @@ class DeskKnife(DeskMoo):
         w = self.world
         if not positional:
             raise Refusal("do needs a target after the verb")
+        alias = kv.pop("as", None) if verb in ("create", "group") else None
+        if alias:
+            out = self.cmd_do_knife(verb, positional, kv)
+            self.vars = self.vars or {}
+            self.vars[alias] = w.last_created
+            return out + f"\n  ${alias} = {w.last_created}"
         if verb == "place" and positional[0] not in w.subjects:
             # place is a subject verb; a title or appearance id names the subject behind it
             hit = self._resolve(positional[0])

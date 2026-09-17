@@ -227,6 +227,8 @@ class Desk:
         if not ident:
             raise Refusal("which id?")
         ident = ident.lstrip("@").strip().strip('"\'')   # any command may name a thing by its quoted title
+        if ident.startswith("$") and ident[1:] in (getattr(self, "vars", None) or {}):
+            ident = self.vars[ident[1:]]   # a handle you named: create ... as=draft, or set draft = a98
         if ident in ("$new", "$item"):
             want = (self.world.last_surface or self.world.last_created) if ident == "$new" else self.world.last_created
             if not want:

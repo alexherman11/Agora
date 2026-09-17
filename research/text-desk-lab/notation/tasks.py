@@ -46,12 +46,43 @@ def build_home(variant):
     return desk
 
 
+def build_home2(variant):
+    """Round 11f: the home desk with its archive rule and morning script removed, Archive emptied back into Done,
+    clock at 2026-09-26. The model must build the automation itself."""
+    desk = build_home(variant)
+    w = desk.world
+    desk.rules = [r for r in desk.rules if "Archive" not in (r["kv"].get("into") or "") and r["verb"] != "sort"]
+    desk.scripts.pop("morning", None)
+    archive = next(n["id"] for n in w.nodes.values() if n["type"] == "surface" and n["title"] == "Archive")
+    done = next(n["id"] for n in w.nodes.values() if n["type"] == "surface" and n["title"] == "Done")
+    for k in list(w.children(archive)):
+        w.apply("move", k["id"], None, {"into": done}, "jeff")
+    desk.today = w.today = "2026-09-26"
+    w.events.clear()
+    desk.seen.clear()
+    desk.open = {w.root}
+    desk.last_event_seen = 0
+    desk._rule_notes = None
+    desk.ids.update({"archive": archive, "done": done, "n_done": len(w.children(done)),
+                     "overdue_titles": sorted(w.subjects[w.nodes[a]["subject"]]["title"] for a in w.nodes
+                                              if w.nodes[a]["type"] == "appearance" and w.subjects[w.nodes[a]["subject"]]["kind"] == "task"
+                                              and (w.subjects[w.nodes[a]["subject"]].get("due") or "9999") < "2026-10-01")})
+    return desk
+
+
 TASKS = {
     "home": (
         "This is Claude's own desk, with rules and views on it. Priya asked something in the Priya chat; answer her "
         "there in one line. Then add a note titled \"Model's view\" tagged friction, saying in two or three lines what on "
         "this desk was unclear or awkward for you. Finally set the due date of the task 'Design the on-event grammar "
         "properly' to 2026-09-30. Do not move anything yourself; the desk's rules do the filing."
+    ),
+    "home2": (
+        "This is Claude's own desk. Three things. (1) Make the Done panel sweep itself: anything in Done that has not "
+        "been touched for more than 3 days should move to the Archive panel, now and from now on. (2) Define a script "
+        "called morning that sets the clock to a given date and then shows the Overdue view and the Today panel. "
+        "(3) Run morning for 2026-10-01 and tell me which tasks are overdue. help rules and help scripts explain the "
+        "desk's automation; do not move anything by hand."
     ),
     "harbor": (
         "Gather everything about the Harbor project into the Harbor column, soonest due date first. "
@@ -93,6 +124,8 @@ def build(task, variant="outline"):
         return build_review(variant)
     if task == "home":
         return build_home(variant)
+    if task == "home2":
+        return build_home2(variant)
     w = World()
     root = w.root
     harbor = w.add_surface("Harbor", root, "column", 0, 0, 400, 800)
@@ -169,6 +202,23 @@ def assess(task, desk):
         kids = [k for k in w.children(harbor)]
         subj = [w.nodes[k["id"]]["subject"] for k in kids if k["type"] == "appearance"]
         out["all_harbor_in_column"] = all(any(w.nodes[a]["parent"] == harbor for a in w.appearances_of(s)) for s in ids["harbor_subjects"])
+    if task == "home2":
+        rules = desk.rules or []
+        sweep = [r for r in rules if not r.get("on") and "age>" in r["sel"] and "in:" in r["sel"] and r["verb"] == "move"
+                 and (r["kv"].get("into") or "").lower() in ("archive", ids["archive"])]
+        out["sweep_rule_exists"] = bool(sweep)
+        out["sweep_rule_uses_3_days"] = any("age>3" in r["sel"] for r in sweep)
+        out["done_swept_now"] = len(w.children(ids["done"])) == 0 and len(w.children(ids["archive"])) >= ids["n_done"]
+        morning = (desk.scripts or {}).get("morning", "")
+        out["morning_script_exists"] = bool(morning)
+        out["morning_sets_clock_from_arg"] = "clock $1" in morning
+        out["morning_shows_overdue_and_today"] = "overdue" in morning.lower() and "today" in morning.lower()
+        out["clock_is_2026_10_01"] = desk.today == "2026-10-01"
+        moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
+        out["nothing_moved_by_hand"] = not moves
+        out["nothing_lost"] = all(w.appearances_of(s) for s in ids["original_subjects"])
+        out["pass"] = all(v for k, v in out.items())
+        return out
     if task == "home":
         chat = w.subjects[ids["chat"]]
         lines = [l for l in chat["text"].splitlines() if l.strip()]
