@@ -273,6 +273,8 @@ class World:
         """The clock day of the last event that touched this thing (or its subject), or None."""
         sid = self.nodes[nid].get("subject") if nid in self.nodes else nid
         for e in reversed(self.events):
+            if e["verb"] == "undo" or e.get("undone"):
+                continue   # undoing is not touching: it restores the past, including the thing's age
             if e.get("day") and (e["target"] in (nid, sid) or nid in (e.get("changed") or []) or sid in (e.get("changed") or [])):
                 return e["day"]
         return None
