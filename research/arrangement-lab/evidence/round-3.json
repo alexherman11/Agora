@@ -1,0 +1,16 @@
+{
+  "at": "2026-09-16T19:49:42.329328+00:00",
+  "python": "3.14.0",
+  "scope": "in-memory executable contract model, no production or browser integration",
+  "tests_run": 41,
+  "successful": true,
+  "failures": [],
+  "errors": [],
+  "source_sha256": {
+    "fixtures.py": "0e7f33d9ddad193778d203e19380e0f9762a64334b3a47f8a6971014142f782b",
+    "model.py": "bd07ff2bc7e56f1d647db24c676ead800833cf16a3254fd8672573a3dc86ca33",
+    "planners.py": "c96e5e966afa0b35d8fccc470be11aaa5348c301e21869fc3acde25322256d76",
+    "run_checks.py": "851de865a3b594341633e1c0babcd919c63d289020b21779125669ea567e6a1d",
+    "test_mechanics.py": "9a5760ad608a0959f1fddd79d6b60e444d571ded5dab61730e030fe91b0011c4"
+  }
+}

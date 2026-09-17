@@ -1,0 +1,67 @@
+[
+  {
+    "id": "event-1",
+    "verb": "edit",
+    "target": "n-86ae35d5",
+    "before": {
+      "n-86ae35d5": {
+        "id": "n-86ae35d5",
+        "title": "Procurement decision",
+        "kind": "document",
+        "rev": 1,
+        "parts": [
+          {
+            "id": "supplier",
+            "text": "Supplier: TBD."
+          },
+          {
+            "id": "total",
+            "text": "Landed total: TBD."
+          },
+          {
+            "id": "time",
+            "text": "Review time: TBD."
+          },
+          {
+            "id": "status",
+            "text": "Status: Draft."
+          },
+          {
+            "id": "terms",
+            "text": "Do not place the order before review approval."
+          }
+        ]
+      }
+    },
+    "after": {
+      "n-86ae35d5": {
+        "id": "n-86ae35d5",
+        "title": "Procurement decision",
+        "kind": "document",
+        "rev": 2,
+        "parts": [
+          {
+            "id": "supplier",
+            "text": "Supplier: TBD."
+          },
+          {
+            "id": "total",
+            "text": "Landed total: TBD."
+          },
+          {
+            "id": "time",
+            "text": "Review time: TBD."
+          },
+          {
+            "id": "status",
+            "text": "Status: Ready for review."
+          },
+          {
+            "id": "terms",
+            "text": "Do not place the order before review approval."
+          }
+        ]
+      }
+    }
+  }
+]

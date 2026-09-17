@@ -1,0 +1,313 @@
+[
+  {
+    "id": "event-1",
+    "verb": "external-edit",
+    "target": "proposal",
+    "before": {
+      "proposal": {
+        "id": "proposal",
+        "kind": "document",
+        "title": "Project proposal",
+        "rev": 1,
+        "parts": [
+          {
+            "id": "overview",
+            "text": "The pilot begins 3 October; this is not the delivery milestone."
+          },
+          {
+            "id": "delivery",
+            "text": "Delivery milestone: 3 October. Owner: Maya."
+          },
+          {
+            "id": "cost",
+            "text": "Budget ceiling: $18,000."
+          },
+          {
+            "id": "acceptance",
+            "text": "Accept after the accessibility review."
+          }
+        ]
+      }
+    },
+    "after": {
+      "proposal": {
+        "id": "proposal",
+        "kind": "document",
+        "title": "Project proposal",
+        "rev": 2,
+        "parts": [
+          {
+            "id": "overview",
+            "text": "The pilot begins 3 October; this is not the delivery milestone."
+          },
+          {
+            "id": "delivery",
+            "text": "Delivery milestone: 3 October. Owner: Maya."
+          },
+          {
+            "id": "cost",
+            "text": "Budget ceiling: $19,500 (approved by colleague)."
+          },
+          {
+            "id": "acceptance",
+            "text": "Accept after the accessibility review."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "event-2",
+    "verb": "edit",
+    "target": "proposal",
+    "before": {
+      "proposal": {
+        "id": "proposal",
+        "kind": "document",
+        "title": "Project proposal",
+        "rev": 2,
+        "parts": [
+          {
+            "id": "overview",
+            "text": "The pilot begins 3 October; this is not the delivery milestone."
+          },
+          {
+            "id": "delivery",
+            "text": "Delivery milestone: 3 October. Owner: Maya."
+          },
+          {
+            "id": "cost",
+            "text": "Budget ceiling: $19,500 (approved by colleague)."
+          },
+          {
+            "id": "acceptance",
+            "text": "Accept after the accessibility review."
+          }
+        ]
+      }
+    },
+    "after": {
+      "proposal": {
+        "id": "proposal",
+        "kind": "document",
+        "title": "Project proposal",
+        "rev": 3,
+        "parts": [
+          {
+            "id": "overview",
+            "text": "The pilot begins 3 October; this is not the delivery milestone."
+          },
+          {
+            "id": "delivery",
+            "text": "Delivery milestone: 10 October. Owner: Maya."
+          },
+          {
+            "id": "cost",
+            "text": "Budget ceiling: $19,500 (approved by colleague)."
+          },
+          {
+            "id": "acceptance",
+            "text": "Accept after the accessibility review."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "event-3",
+    "verb": "insert",
+    "target": "proposal",
+    "before": {
+      "proposal": {
+        "id": "proposal",
+        "kind": "document",
+        "title": "Project proposal",
+        "rev": 3,
+        "parts": [
+          {
+            "id": "overview",
+            "text": "The pilot begins 3 October; this is not the delivery milestone."
+          },
+          {
+            "id": "delivery",
+            "text": "Delivery milestone: 10 October. Owner: Maya."
+          },
+          {
+            "id": "cost",
+            "text": "Budget ceiling: $19,500 (approved by colleague)."
+          },
+          {
+            "id": "acceptance",
+            "text": "Accept after the accessibility review."
+          }
+        ]
+      }
+    },
+    "after": {
+      "proposal": {
+        "id": "proposal",
+        "kind": "document",
+        "title": "Project proposal",
+        "rev": 4,
+        "parts": [
+          {
+            "id": "overview",
+            "text": "The pilot begins 3 October; this is not the delivery milestone."
+          },
+          {
+            "id": "delivery",
+            "text": "Delivery milestone: 10 October. Owner: Maya."
+          },
+          {
+            "id": "reserve-stock",
+            "text": "Maya will confirm reserve stock before the supplier call."
+          },
+          {
+            "id": "cost",
+            "text": "Budget ceiling: $19,500 (approved by colleague)."
+          },
+          {
+            "id": "acceptance",
+            "text": "Accept after the accessibility review."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "event-4",
+    "verb": "reference",
+    "target": "review",
+    "before": {
+      "review": {
+        "id": "review",
+        "kind": "surface",
+        "title": "Review reading list",
+        "rev": 1,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "root"
+      },
+      "appearance-4": null
+    },
+    "after": {
+      "review": {
+        "id": "review",
+        "kind": "surface",
+        "title": "Review reading list",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "root"
+      },
+      "appearance-4": {
+        "id": "appearance-4",
+        "kind": "appearance",
+        "source": "proposal",
+        "parent": "review",
+        "x": 16,
+        "y": 16,
+        "width": 180,
+        "height": 130,
+        "rev": 1,
+        "part": "delivery"
+      }
+    }
+  },
+  {
+    "id": "event-5",
+    "verb": "remove",
+    "target": "doc-old",
+    "before": {
+      "doc-old": {
+        "id": "doc-old",
+        "kind": "appearance",
+        "source": "proposal-2025",
+        "parent": "review",
+        "x": 16,
+        "y": 300,
+        "width": 180,
+        "height": 130,
+        "rev": 1
+      },
+      "review": {
+        "id": "review",
+        "kind": "surface",
+        "title": "Review reading list",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "root"
+      }
+    },
+    "after": {
+      "doc-old": null,
+      "review": {
+        "id": "review",
+        "kind": "surface",
+        "title": "Review reading list",
+        "rev": 3,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "root"
+      }
+    }
+  },
+  {
+    "id": "event-6",
+    "verb": "order",
+    "target": "review",
+    "before": {
+      "review": {
+        "id": "review",
+        "kind": "surface",
+        "title": "Review reading list",
+        "rev": 3,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "root"
+      },
+      "appearance-4": {
+        "id": "appearance-4",
+        "kind": "appearance",
+        "source": "proposal",
+        "parent": "review",
+        "x": 16,
+        "y": 16,
+        "width": 180,
+        "height": 130,
+        "rev": 1,
+        "part": "delivery"
+      }
+    },
+    "after": {
+      "review": {
+        "id": "review",
+        "kind": "surface",
+        "title": "Review reading list",
+        "rev": 4,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "root"
+      },
+      "appearance-4": {
+        "id": "appearance-4",
+        "kind": "appearance",
+        "source": "proposal",
+        "parent": "review",
+        "x": 16,
+        "y": 0,
+        "width": 180,
+        "height": 130,
+        "rev": 2,
+        "part": "delivery"
+      }
+    }
+  }
+]

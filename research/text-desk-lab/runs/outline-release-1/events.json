@@ -1,0 +1,311 @@
+[
+  {
+    "id": "event-1",
+    "verb": "place",
+    "target": "card-t-sign",
+    "before": {
+      "done": {
+        "id": "done",
+        "kind": "surface",
+        "title": "Done",
+        "rev": 1,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "done",
+        "parent": "release"
+      },
+      "card-t-sign": {
+        "id": "card-t-sign",
+        "kind": "appearance",
+        "source": "t-sign",
+        "parent": "doing",
+        "x": 16,
+        "y": 300,
+        "width": 180,
+        "height": 130,
+        "rev": 1
+      },
+      "t-sign": {
+        "id": "t-sign",
+        "kind": "task",
+        "title": "Sign release",
+        "rev": 1,
+        "parts": [
+          {
+            "id": "details",
+            "text": "Sign release for the OAS desktop release."
+          }
+        ],
+        "status": "doing",
+        "depends": []
+      },
+      "doing": {
+        "id": "doing",
+        "kind": "surface",
+        "title": "In progress",
+        "rev": 1,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "doing",
+        "parent": "release"
+      }
+    },
+    "after": {
+      "done": {
+        "id": "done",
+        "kind": "surface",
+        "title": "Done",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "done",
+        "parent": "release"
+      },
+      "card-t-sign": {
+        "id": "card-t-sign",
+        "kind": "appearance",
+        "source": "t-sign",
+        "parent": "done",
+        "x": 16,
+        "y": 16,
+        "width": 180,
+        "height": 130,
+        "rev": 2
+      },
+      "t-sign": {
+        "id": "t-sign",
+        "kind": "task",
+        "title": "Sign release",
+        "rev": 2,
+        "parts": [
+          {
+            "id": "details",
+            "text": "Sign release for the OAS desktop release."
+          }
+        ],
+        "status": "done",
+        "depends": []
+      },
+      "doing": {
+        "id": "doing",
+        "kind": "surface",
+        "title": "In progress",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "doing",
+        "parent": "release"
+      }
+    }
+  },
+  {
+    "id": "event-2",
+    "verb": "place",
+    "target": "card-t-smoke",
+    "before": {
+      "card-t-smoke": {
+        "id": "card-t-smoke",
+        "kind": "appearance",
+        "source": "t-smoke",
+        "parent": "doing",
+        "x": 16,
+        "y": 150,
+        "width": 180,
+        "height": 130,
+        "rev": 1
+      },
+      "t-smoke": {
+        "id": "t-smoke",
+        "kind": "task",
+        "title": "Desktop smoke test",
+        "rev": 1,
+        "parts": [
+          {
+            "id": "details",
+            "text": "Desktop smoke test for the OAS desktop release."
+          }
+        ],
+        "status": "doing",
+        "depends": [
+          "t-sign"
+        ]
+      },
+      "done": {
+        "id": "done",
+        "kind": "surface",
+        "title": "Done",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "done",
+        "parent": "release"
+      },
+      "doing": {
+        "id": "doing",
+        "kind": "surface",
+        "title": "In progress",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "doing",
+        "parent": "release"
+      }
+    },
+    "after": {
+      "card-t-smoke": {
+        "id": "card-t-smoke",
+        "kind": "appearance",
+        "source": "t-smoke",
+        "parent": "done",
+        "x": 16,
+        "y": 16,
+        "width": 180,
+        "height": 130,
+        "rev": 2
+      },
+      "t-smoke": {
+        "id": "t-smoke",
+        "kind": "task",
+        "title": "Desktop smoke test",
+        "rev": 2,
+        "parts": [
+          {
+            "id": "details",
+            "text": "Desktop smoke test for the OAS desktop release."
+          }
+        ],
+        "status": "done",
+        "depends": [
+          "t-sign"
+        ]
+      },
+      "done": {
+        "id": "done",
+        "kind": "surface",
+        "title": "Done",
+        "rev": 3,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "done",
+        "parent": "release"
+      },
+      "doing": {
+        "id": "doing",
+        "kind": "surface",
+        "title": "In progress",
+        "rev": 3,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "doing",
+        "parent": "release"
+      }
+    }
+  },
+  {
+    "id": "event-3",
+    "verb": "create",
+    "target": "todo",
+    "before": {
+      "appearance-3": null,
+      "todo": {
+        "id": "todo",
+        "kind": "surface",
+        "title": "To do",
+        "rev": 1,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "todo",
+        "parent": "release"
+      },
+      "content-3": null
+    },
+    "after": {
+      "appearance-3": {
+        "id": "appearance-3",
+        "kind": "appearance",
+        "source": "content-3",
+        "parent": "todo",
+        "x": 16,
+        "y": 16,
+        "width": 180,
+        "height": 130,
+        "rev": 1
+      },
+      "todo": {
+        "id": "todo",
+        "kind": "surface",
+        "title": "To do",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "status": "todo",
+        "parent": "release"
+      },
+      "content-3": {
+        "id": "content-3",
+        "kind": "task",
+        "title": "Fix payment keyboard focus",
+        "parts": [
+          {
+            "id": "details",
+            "text": "Fix the payment dialog where keyboard focus is lost."
+          }
+        ],
+        "rev": 1,
+        "status": "todo",
+        "depends": []
+      }
+    }
+  },
+  {
+    "id": "event-4",
+    "verb": "reference",
+    "target": "questions",
+    "before": {
+      "appearance-4": null,
+      "questions": {
+        "id": "questions",
+        "kind": "surface",
+        "title": "Questions for supplier",
+        "rev": 1,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "planning"
+      }
+    },
+    "after": {
+      "appearance-4": {
+        "id": "appearance-4",
+        "kind": "appearance",
+        "source": "content-3",
+        "parent": "questions",
+        "x": 16,
+        "y": 16,
+        "width": 180,
+        "height": 130,
+        "rev": 1
+      },
+      "questions": {
+        "id": "questions",
+        "kind": "surface",
+        "title": "Questions for supplier",
+        "rev": 2,
+        "layout": "list",
+        "width": 640,
+        "height": 560,
+        "parent": "planning"
+      }
+    }
+  }
+]

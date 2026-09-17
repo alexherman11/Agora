@@ -1,0 +1,1243 @@
+{
+  "root": {
+    "id": "root",
+    "kind": "surface",
+    "title": "Desk",
+    "rev": 1,
+    "layout": "fixed",
+    "width": 1600,
+    "height": 1000
+  },
+  "n-42361483": {
+    "id": "n-42361483",
+    "kind": "surface",
+    "title": "OAS Planning",
+    "rev": 3,
+    "layout": "free",
+    "width": 640,
+    "height": 560,
+    "parent": "root",
+    "window": true,
+    "x": 0,
+    "y": 0,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 1,
+    "hidden": false
+  },
+  "n-17d5efa6": {
+    "id": "n-17d5efa6",
+    "kind": "surface",
+    "title": "Questions for supplier",
+    "rev": 2,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "parent": "n-42361483"
+  },
+  "n-c97ace4c": {
+    "id": "n-c97ace4c",
+    "kind": "surface",
+    "title": "Review reading list",
+    "rev": 1,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "parent": "root",
+    "window": true,
+    "x": 120,
+    "y": 65,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 2,
+    "hidden": false
+  },
+  "n-382635c9": {
+    "id": "n-382635c9",
+    "kind": "surface",
+    "title": "Project proposal",
+    "rev": 1,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "parent": "root",
+    "window": true,
+    "x": 240,
+    "y": 130,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 3,
+    "hidden": false
+  },
+  "n-a4d451ec": {
+    "id": "n-a4d451ec",
+    "kind": "surface",
+    "title": "Release control",
+    "rev": 1,
+    "layout": "fixed",
+    "width": 640,
+    "height": 560,
+    "parent": "root",
+    "window": true,
+    "x": 360,
+    "y": 195,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 4,
+    "hidden": false
+  },
+  "n-602fae58": {
+    "id": "n-602fae58",
+    "kind": "surface",
+    "title": "To do",
+    "rev": 2,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "status": "todo",
+    "parent": "n-a4d451ec"
+  },
+  "n-c7f57f54": {
+    "id": "n-c7f57f54",
+    "kind": "surface",
+    "title": "In progress",
+    "rev": 3,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "status": "doing",
+    "parent": "n-a4d451ec"
+  },
+  "n-a4c3ed04": {
+    "id": "n-a4c3ed04",
+    "kind": "surface",
+    "title": "Done",
+    "rev": 3,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "status": "done",
+    "parent": "n-a4d451ec"
+  },
+  "n-00d8d3f1": {
+    "id": "n-00d8d3f1",
+    "kind": "surface",
+    "title": "Mail",
+    "rev": 1,
+    "layout": "list",
+    "width": 640,
+    "height": 560,
+    "parent": "root",
+    "window": true,
+    "x": 480,
+    "y": 260,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 5,
+    "hidden": true
+  },
+  "n-ce85ef43": {
+    "id": "n-ce85ef43",
+    "kind": "note",
+    "title": "Delivery risks",
+    "rev": 2,
+    "parts": [
+      {
+        "id": "context",
+        "text": "Current supplier: Aster. Confirmed shipment plan."
+      },
+      {
+        "id": "fallback",
+        "text": "If Aster misses 3 October, use the reserve stock."
+      },
+      {
+        "id": "owner",
+        "text": "Inez owns supplier follow-up."
+      }
+    ]
+  },
+  "n-2b86145d": {
+    "id": "n-2b86145d",
+    "kind": "note",
+    "title": "Delivery risks",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "context",
+        "text": "Archived 2025 supplier: Birch."
+      },
+      {
+        "id": "fallback",
+        "text": "If Birch misses 3 October, cancel the order."
+      }
+    ]
+  },
+  "n-df71fb0b": {
+    "id": "n-df71fb0b",
+    "kind": "note",
+    "title": "Call agenda",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "agenda",
+        "text": "Budget, risks, next actions."
+      }
+    ]
+  },
+  "n-4a0a339b": {
+    "id": "n-4a0a339b",
+    "kind": "note",
+    "title": "Dentist appointment",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "note",
+        "text": "Personal. Keep this where it is."
+      }
+    ]
+  },
+  "n-cd0241a9": {
+    "id": "n-cd0241a9",
+    "kind": "appearance",
+    "source": "n-ce85ef43",
+    "parent": "n-42361483",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 2
+  },
+  "n-b68399a3": {
+    "id": "n-b68399a3",
+    "kind": "appearance",
+    "source": "n-ce85ef43",
+    "parent": "n-42361483",
+    "x": 216,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 2
+  },
+  "n-bd5420ab": {
+    "id": "n-bd5420ab",
+    "kind": "appearance",
+    "source": "n-2b86145d",
+    "parent": "n-42361483",
+    "x": 20,
+    "y": 340,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-0323628f": {
+    "id": "n-0323628f",
+    "kind": "appearance",
+    "source": "n-df71fb0b",
+    "parent": "n-42361483",
+    "x": 430,
+    "y": 20,
+    "width": 180,
+    "height": 130,
+    "rev": 1,
+    "pinned": true
+  },
+  "n-8a8f2a0b": {
+    "id": "n-8a8f2a0b",
+    "kind": "appearance",
+    "source": "n-4a0a339b",
+    "parent": "n-42361483",
+    "x": 430,
+    "y": 180,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-448c811f": {
+    "id": "n-448c811f",
+    "kind": "appearance",
+    "source": "n-ce85ef43",
+    "parent": "n-c97ace4c",
+    "x": 16,
+    "y": 150,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-ecd1378b": {
+    "id": "n-ecd1378b",
+    "kind": "document",
+    "title": "Project proposal",
+    "rev": 3,
+    "parts": [
+      {
+        "id": "overview",
+        "text": "The pilot begins 3 October; this is not the delivery milestone."
+      },
+      {
+        "id": "delivery",
+        "text": "Delivery milestone: 10 October. Owner: Maya."
+      },
+      {
+        "id": "cost",
+        "text": "Budget ceiling: $19,500 (approved by colleague)."
+      },
+      {
+        "id": "acceptance",
+        "text": "Accept after the accessibility review."
+      }
+    ]
+  },
+  "n-c04c0011": {
+    "id": "n-c04c0011",
+    "kind": "document",
+    "title": "Project proposal",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "delivery",
+        "text": "Archived delivery milestone: 3 October."
+      }
+    ]
+  },
+  "n-463f1a24": {
+    "id": "n-463f1a24",
+    "kind": "appearance",
+    "source": "n-ecd1378b",
+    "parent": "n-382635c9",
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-a7408fac": {
+    "id": "n-a7408fac",
+    "kind": "appearance",
+    "source": "n-c04c0011",
+    "parent": "n-c97ace4c",
+    "x": 16,
+    "y": 300,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-a821607c": {
+    "id": "n-a821607c",
+    "kind": "email",
+    "title": "Aster shipment confirmation",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Aster confirms delivery on 10 October. Keep the pilot kickoff on 3 October. Maya will verify reserve stock."
+      }
+    ]
+  },
+  "n-e58b8388": {
+    "id": "n-e58b8388",
+    "kind": "appearance",
+    "source": "n-a821607c",
+    "parent": "n-00d8d3f1",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-9070311c": {
+    "id": "n-9070311c",
+    "kind": "email",
+    "title": "Release verification",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "7 October 18:00 UTC, build 104 PRODUCTION. Signing verified and desktop smoke test passed. Accessibility remains unapproved: keyboard focus disappears in the payment dialog. Do not ship."
+      }
+    ]
+  },
+  "n-b0064f08": {
+    "id": "n-b0064f08",
+    "kind": "appearance",
+    "source": "n-9070311c",
+    "parent": "n-00d8d3f1",
+    "x": 16,
+    "y": 160,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-203c0eef": {
+    "id": "n-203c0eef",
+    "kind": "task",
+    "title": "Sign release",
+    "rev": 2,
+    "parts": [
+      {
+        "id": "details",
+        "text": "Sign release for the OAS desktop release."
+      }
+    ],
+    "status": "done",
+    "depends": []
+  },
+  "n-4664cbc6": {
+    "id": "n-4664cbc6",
+    "kind": "appearance",
+    "source": "n-203c0eef",
+    "parent": "n-a4c3ed04",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 2
+  },
+  "n-366d46a6": {
+    "id": "n-366d46a6",
+    "kind": "task",
+    "title": "Desktop smoke test",
+    "rev": 2,
+    "parts": [
+      {
+        "id": "details",
+        "text": "Desktop smoke test for the OAS desktop release."
+      }
+    ],
+    "status": "done",
+    "depends": [
+      "n-203c0eef"
+    ]
+  },
+  "n-316634ef": {
+    "id": "n-316634ef",
+    "kind": "appearance",
+    "source": "n-366d46a6",
+    "parent": "n-a4c3ed04",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 2
+  },
+  "n-84d97223": {
+    "id": "n-84d97223",
+    "kind": "task",
+    "title": "Accessibility approval",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "details",
+        "text": "Accessibility approval for the OAS desktop release."
+      }
+    ],
+    "status": "doing",
+    "depends": []
+  },
+  "n-d262c557": {
+    "id": "n-d262c557",
+    "kind": "appearance",
+    "source": "n-84d97223",
+    "parent": "n-c7f57f54",
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-f7dfb501": {
+    "id": "n-f7dfb501",
+    "kind": "task",
+    "title": "Ship release",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "details",
+        "text": "Ship release for the OAS desktop release."
+      }
+    ],
+    "status": "todo",
+    "depends": [
+      "n-366d46a6",
+      "n-84d97223"
+    ]
+  },
+  "n-fe156aab": {
+    "id": "n-fe156aab",
+    "kind": "appearance",
+    "source": "n-f7dfb501",
+    "parent": "n-602fae58",
+    "x": 16,
+    "y": 300,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-b49fcc6d": {
+    "id": "n-b49fcc6d",
+    "kind": "note",
+    "title": "Unrelated reference 0",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-bde89c45": {
+    "id": "n-bde89c45",
+    "kind": "appearance",
+    "source": "n-b49fcc6d",
+    "parent": "root",
+    "x": 0,
+    "y": 0,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-f10123a7": {
+    "id": "n-f10123a7",
+    "kind": "note",
+    "title": "Unrelated reference 1",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-1ecd949b": {
+    "id": "n-1ecd949b",
+    "kind": "appearance",
+    "source": "n-f10123a7",
+    "parent": "root",
+    "x": 30,
+    "y": 20,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-56adc2b7": {
+    "id": "n-56adc2b7",
+    "kind": "note",
+    "title": "Unrelated reference 2",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-0d685b0f": {
+    "id": "n-0d685b0f",
+    "kind": "appearance",
+    "source": "n-56adc2b7",
+    "parent": "root",
+    "x": 60,
+    "y": 40,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-5c74b988": {
+    "id": "n-5c74b988",
+    "kind": "note",
+    "title": "Unrelated reference 3",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-62b48a02": {
+    "id": "n-62b48a02",
+    "kind": "appearance",
+    "source": "n-5c74b988",
+    "parent": "root",
+    "x": 90,
+    "y": 60,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-0fd4dc95": {
+    "id": "n-0fd4dc95",
+    "kind": "note",
+    "title": "Unrelated reference 4",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-b9835fe9": {
+    "id": "n-b9835fe9",
+    "kind": "appearance",
+    "source": "n-0fd4dc95",
+    "parent": "root",
+    "x": 120,
+    "y": 80,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-330e88a8": {
+    "id": "n-330e88a8",
+    "kind": "note",
+    "title": "Unrelated reference 5",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-c8e0db65": {
+    "id": "n-c8e0db65",
+    "kind": "appearance",
+    "source": "n-330e88a8",
+    "parent": "root",
+    "x": 150,
+    "y": 100,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-b287c6d1": {
+    "id": "n-b287c6d1",
+    "kind": "note",
+    "title": "Unrelated reference 6",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-f612f077": {
+    "id": "n-f612f077",
+    "kind": "appearance",
+    "source": "n-b287c6d1",
+    "parent": "root",
+    "x": 180,
+    "y": 120,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-eddcb77c": {
+    "id": "n-eddcb77c",
+    "kind": "note",
+    "title": "Unrelated reference 7",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Unrelated material; retain."
+      }
+    ]
+  },
+  "n-cc23871c": {
+    "id": "n-cc23871c",
+    "kind": "appearance",
+    "source": "n-eddcb77c",
+    "parent": "root",
+    "x": 210,
+    "y": 140,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "n-7b892481": {
+    "id": "n-7b892481",
+    "kind": "surface",
+    "title": "Cost workbook",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 1300,
+    "y": 100,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 7,
+    "hidden": false
+  },
+  "n-a37984d6": {
+    "id": "n-a37984d6",
+    "kind": "surface",
+    "title": "Decision editor",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 400,
+    "y": 80,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 8,
+    "hidden": false
+  },
+  "n-d32df780": {
+    "id": "n-d32df780",
+    "kind": "surface",
+    "title": "Calendar",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 50,
+    "y": 200,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 9,
+    "hidden": false
+  },
+  "n-ff4e6544": {
+    "id": "n-ff4e6544",
+    "kind": "surface",
+    "title": "Drafts",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 500,
+    "y": 200,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 10,
+    "hidden": false
+  },
+  "n-4c8c7ee6": {
+    "id": "n-4c8c7ee6",
+    "kind": "surface",
+    "title": "Quote documents",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 60,
+    "y": 100,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 11,
+    "hidden": false
+  },
+  "n-257a855f": {
+    "id": "n-257a855f",
+    "kind": "surface",
+    "title": "Terminal — build in progress",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 800,
+    "y": 200,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 12,
+    "hidden": false
+  },
+  "n-3844232a": {
+    "id": "n-3844232a",
+    "kind": "surface",
+    "title": "Chat — unsent draft",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 900,
+    "y": 250,
+    "width": 640,
+    "height": 560,
+    "min_width": 480,
+    "min_height": 400,
+    "z": 13,
+    "hidden": false
+  },
+  "n-c57d7e92": {
+    "id": "n-c57d7e92",
+    "kind": "surface",
+    "title": "Voice call — connected",
+    "rev": 1,
+    "layout": "list",
+    "parent": "root",
+    "window": true,
+    "x": 0,
+    "y": 920,
+    "width": 1600,
+    "height": 80,
+    "min_width": 1600,
+    "min_height": 80,
+    "z": 10000,
+    "hidden": false,
+    "pinned": true
+  },
+  "n-78af7bdb": {
+    "id": "n-78af7bdb",
+    "title": "OAS purchase cost",
+    "kind": "sheet",
+    "rev": 1,
+    "inputs": {
+      "supplier": "TBD",
+      "quantity": 12,
+      "unit_price": 0,
+      "shipping": 0,
+      "extras": 0
+    },
+    "total": 0,
+    "formula": "quantity * unit_price + shipping + extras",
+    "budget": 3000
+  },
+  "n-bb8d7eb1": {
+    "id": "n-bb8d7eb1",
+    "kind": "appearance",
+    "source": "n-78af7bdb",
+    "parent": "n-7b892481",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "n-86ae35d5": {
+    "id": "n-86ae35d5",
+    "title": "Procurement decision",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "supplier",
+        "text": "Supplier: TBD."
+      },
+      {
+        "id": "total",
+        "text": "Landed total: TBD."
+      },
+      {
+        "id": "time",
+        "text": "Review time: TBD."
+      },
+      {
+        "id": "status",
+        "text": "Status: Draft."
+      },
+      {
+        "id": "terms",
+        "text": "Do not place the order before review approval."
+      }
+    ]
+  },
+  "n-a03a4da4": {
+    "id": "n-a03a4da4",
+    "title": "Procurement decision",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Archived 2025 decision. Supplier: Aster. Total: $2600."
+      }
+    ]
+  },
+  "n-d7d30296": {
+    "id": "n-d7d30296",
+    "kind": "appearance",
+    "source": "n-86ae35d5",
+    "parent": "n-a37984d6",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "n-62f1f2ce": {
+    "id": "n-62f1f2ce",
+    "kind": "appearance",
+    "source": "n-a03a4da4",
+    "parent": "n-c97ace4c",
+    "rev": 1,
+    "x": 16,
+    "y": 450,
+    "width": 180,
+    "height": 130
+  },
+  "n-b9245a5b": {
+    "id": "n-b9245a5b",
+    "title": "Aster sensor quote",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Current quote, 6 October 2026. Aster: $225 per kit; $180 shipping per order; no mandatory extras. Quoted delivery 9 October. 12 kits available."
+      }
+    ]
+  },
+  "n-5ea8af9b": {
+    "id": "n-5ea8af9b",
+    "kind": "appearance",
+    "source": "n-b9245a5b",
+    "parent": "n-4c8c7ee6",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "n-548a4251": {
+    "id": "n-548a4251",
+    "title": "Birch sensor quote",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Current quote, 6 October 2026. Birch: $240 per kit, free shipping, mandatory setup $90 per order. Delivery 9 October. 12 kits available."
+      }
+    ]
+  },
+  "n-41dd1314": {
+    "id": "n-41dd1314",
+    "kind": "appearance",
+    "source": "n-548a4251",
+    "parent": "n-4c8c7ee6",
+    "rev": 1,
+    "x": 16,
+    "y": 150,
+    "width": 180,
+    "height": 130
+  },
+  "n-e41f15a2": {
+    "id": "n-e41f15a2",
+    "title": "Cedar sensor quote",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Superseded quote, 1 October 2026. Cedar: $205 per kit, $240 shipping, calibration included. Delivery 8 October."
+      }
+    ]
+  },
+  "n-324838c5": {
+    "id": "n-324838c5",
+    "kind": "appearance",
+    "source": "n-e41f15a2",
+    "parent": "n-4c8c7ee6",
+    "rev": 1,
+    "x": 16,
+    "y": 300,
+    "width": 180,
+    "height": 130
+  },
+  "n-0c274639": {
+    "id": "n-0c274639",
+    "title": "Cedar sensor quote",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Current quote, 7 October 2026, supersedes 1 October. Cedar: $215 per kit, $240 shipping per order, mandatory calibration $120 per order. Delivery 10 October. 12 kits available."
+      }
+    ]
+  },
+  "n-a621bc96": {
+    "id": "n-a621bc96",
+    "kind": "appearance",
+    "source": "n-0c274639",
+    "parent": "n-4c8c7ee6",
+    "rev": 1,
+    "x": 16,
+    "y": 450,
+    "width": 180,
+    "height": 130
+  },
+  "n-34053b5c": {
+    "id": "n-34053b5c",
+    "title": "Aster shipment update — 7 October",
+    "kind": "email",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "This supersedes the 6 October sensor quote delivery promise: earliest delivery is now 12 October 2026. Price unchanged."
+      }
+    ]
+  },
+  "n-3024f3c3": {
+    "id": "n-3024f3c3",
+    "kind": "appearance",
+    "source": "n-34053b5c",
+    "parent": "n-00d8d3f1",
+    "rev": 1,
+    "x": 16,
+    "y": 310,
+    "width": 180,
+    "height": 130
+  },
+  "n-26c29e90": {
+    "id": "n-26c29e90",
+    "title": "Release verification",
+    "kind": "email",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "7 October, build 104, STAGING ONLY. All checks including accessibility passed. This is not production approval."
+      }
+    ]
+  },
+  "n-7e5a8cfa": {
+    "id": "n-7e5a8cfa",
+    "title": "Release verification",
+    "kind": "email",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "6 October, build 103 PRODUCTION. Accessibility approved. Evidence applies only to build 103."
+      }
+    ]
+  },
+  "n-939b1349": {
+    "id": "n-939b1349",
+    "kind": "appearance",
+    "source": "n-26c29e90",
+    "parent": "n-00d8d3f1",
+    "rev": 1,
+    "x": 16,
+    "y": 470,
+    "width": 180,
+    "height": 130
+  },
+  "n-567a9a28": {
+    "id": "n-567a9a28",
+    "kind": "appearance",
+    "source": "n-7e5a8cfa",
+    "parent": "n-00d8d3f1",
+    "rev": 1,
+    "x": 16,
+    "y": 620,
+    "width": 180,
+    "height": 130
+  },
+  "n-fd37f875": {
+    "id": "n-fd37f875",
+    "title": "OAS procurement review",
+    "kind": "calendar-event",
+    "rev": 1,
+    "date": "2026-10-08",
+    "zone": "UTC",
+    "start": 840,
+    "duration": 30,
+    "attendees": [
+      "Maya",
+      "Inez",
+      "Alex"
+    ],
+    "review_interval": [
+      840,
+      960
+    ],
+    "busy": {
+      "Maya": [
+        [
+          840,
+          870
+        ]
+      ],
+      "Inez": [
+        [
+          870,
+          900
+        ]
+      ],
+      "Alex": [
+        [
+          850,
+          880
+        ]
+      ]
+    },
+    "availability_note": "Intervals are [start,end) UTC minutes after midnight; excludes this appointment itself."
+  },
+  "n-a5f0fbb3": {
+    "id": "n-a5f0fbb3",
+    "kind": "appearance",
+    "source": "n-fd37f875",
+    "parent": "n-d32df780",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "n-d4706dca": {
+    "id": "n-d4706dca",
+    "title": "Purchase confirmation",
+    "kind": "draft",
+    "rev": 1,
+    "to": "",
+    "subject": "",
+    "body": "",
+    "sent": false
+  },
+  "n-72d73e25": {
+    "id": "n-72d73e25",
+    "title": "Personal unsaved reply",
+    "kind": "draft",
+    "rev": 1,
+    "to": "friend@example.invalid",
+    "subject": "Weekend",
+    "body": "Maybe Saturday — unfinished",
+    "sent": false
+  },
+  "n-552a19bd": {
+    "id": "n-552a19bd",
+    "kind": "appearance",
+    "source": "n-d4706dca",
+    "parent": "n-ff4e6544",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "n-fe80df38": {
+    "id": "n-fe80df38",
+    "kind": "appearance",
+    "source": "n-72d73e25",
+    "parent": "n-ff4e6544",
+    "rev": 1,
+    "x": 16,
+    "y": 150,
+    "width": 180,
+    "height": 130
+  },
+  "n-5e8c9902": {
+    "id": "n-5e8c9902",
+    "title": "Build 104",
+    "kind": "process",
+    "rev": 1,
+    "pid": 4312,
+    "state": "running",
+    "progress": 63,
+    "command": "build --production",
+    "buffered_output": "Compiling module 47"
+  },
+  "n-9c9023fc": {
+    "id": "n-9c9023fc",
+    "kind": "appearance",
+    "source": "n-5e8c9902",
+    "parent": "n-257a855f",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "n-11a63851": {
+    "id": "n-11a63851",
+    "title": "Unsent chat text",
+    "kind": "document",
+    "rev": 1,
+    "parts": [
+      {
+        "id": "body",
+        "text": "Remember to ask Maya about the warranty — not sent."
+      }
+    ]
+  },
+  "n-8df58ccb": {
+    "id": "n-8df58ccb",
+    "kind": "appearance",
+    "source": "n-11a63851",
+    "parent": "n-3844232a",
+    "rev": 1,
+    "x": 16,
+    "y": 0,
+    "width": 180,
+    "height": 130
+  },
+  "content-3": {
+    "id": "content-3",
+    "kind": "task",
+    "title": "Fix production payment focus",
+    "parts": [
+      {
+        "id": "details",
+        "text": "keyboard focus disappears in the payment dialog."
+      }
+    ],
+    "rev": 1,
+    "status": "todo",
+    "depends": []
+  },
+  "appearance-3": {
+    "id": "appearance-3",
+    "kind": "appearance",
+    "source": "content-3",
+    "parent": "n-602fae58",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "appearance-4": {
+    "id": "appearance-4",
+    "kind": "appearance",
+    "source": "content-3",
+    "parent": "n-17d5efa6",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  },
+  "content-8": {
+    "id": "content-8",
+    "kind": "note",
+    "title": "Handoff note",
+    "parts": [
+      {
+        "id": "body",
+        "text": "Production accessibility still needs approval."
+      }
+    ],
+    "rev": 1
+  },
+  "appearance-8": {
+    "id": "appearance-8",
+    "kind": "appearance",
+    "source": "content-8",
+    "parent": "n-42361483",
+    "x": 16,
+    "y": 16,
+    "width": 180,
+    "height": 130,
+    "rev": 1
+  }
+}

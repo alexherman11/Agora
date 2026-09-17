@@ -1,0 +1,26 @@
+{
+  "offset_skips_unread_sibling_after_removal": {
+    "page_one": "questions [surface; rev 4] Questions for supplier (3 children; list)\n  appearance-1 [appearance; rev 1] Delivery risks -> risk-live\nOMITTED 2 entries; continue offset=1, same depth.",
+    "continuation": "questions [surface; rev 5] Questions for supplier (2 children; list)\n  appearance-3 [appearance; rev 1] Call agenda -> agenda",
+    "missed": "appearance-2",
+    "still_present": true,
+    "reproduced": true
+  },
+  "task_reference_into_done_without_completion": {
+    "receipt": {
+      "text": "Committed event-1: reference done.\nappearance-1 [appearance; rev 1] Sign release -> t-sign\ndone [surface; rev 2] Done (1 children; list)"
+    },
+    "task_status": "doing",
+    "done_children": [
+      "appearance-1"
+    ],
+    "reproduced": true
+  },
+  "tile_overlaps_unselected_pinned_card": {
+    "receipt": {
+      "text": "Committed event-1: tile planning.\np-risk [appearance; rev 2] Delivery risks -> risk-live\nplanning [surface; rev 2] OAS Planning (6 children; free)"
+    },
+    "reproduced": true,
+    "pinned_card_preserved": true
+  }
+}
