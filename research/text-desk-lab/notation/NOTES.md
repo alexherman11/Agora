@@ -1083,3 +1083,7 @@ command). Rebuilt worlds have no event history, so state rules pre-mark their cu
 new trial + prop + launch in one call; look again. Reply gave the label and said where the result would appear. The
 inner run (desk-harbor-check-1) was a real harbor trial; adopted onto my desk with `prop ... label= status=running`
 and `sync`.
+**Sol on home3: full pass, 6 calls, 22 s.** Both models start a trial from the desk from `help trials` alone.
+**Bug found by the adopted run's score line:** the `home` assessor had been inserted inside the harbor branch, so
+harbor assessments since round 11d reported one check. Moved out; the two inner harbor runs rescored from their
+final.json.
