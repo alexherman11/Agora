@@ -1,0 +1,11 @@
+{"trial": "desk-big-recheck-1", "call": 1, "name": "desk", "line": "look", "error": null}
+{"trial": "desk-big-recheck-1", "call": 2, "name": "desk", "line": "find Harbor", "error": null}
+{"trial": "desk-big-recheck-1", "call": 3, "name": "desk", "line": "examine f01", "error": null}
+{"trial": "desk-big-recheck-1", "call": 4, "name": "desk", "line": "help create; help move; help sort", "error": null}
+{"trial": "desk-big-recheck-1", "call": 5, "name": "desk", "line": "do create f01 kind=surface title=\"Harbor\" layout=column", "error": null}
+{"trial": "desk-big-recheck-1", "call": 6, "name": "desk", "line": "do move f69 before=f02", "error": null}
+{"trial": "desk-big-recheck-1", "call": 7, "name": "desk", "line": "help selections", "error": null}
+{"trial": "desk-big-recheck-1", "call": 8, "name": "desk", "line": "do move a60 into=f69; do move a61 into=f69; do move a64 into=f69; do move a65 into=f69", "error": null}
+{"trial": "desk-big-recheck-1", "call": 9, "name": "desk", "line": "do move a67 into=f69; do remove a66; do sort f69 by=due", "error": null}
+{"trial": "desk-big-recheck-1", "call": 10, "name": "desk", "line": "look f01; find Harbor", "error": null}
+{"finished": "desk-big-recheck-1", "assessment": {"harbor_column_exists": true, "all_five_present": true, "no_duplicates_elsewhere": true, "only_harbor": true, "ordered_by_due": true, "on_the_left": true, "hides_nothing": true, "within_budget": true, "pass": true}, "calls": 10, "refusals": 0, "seconds": 33.1, "error": null}

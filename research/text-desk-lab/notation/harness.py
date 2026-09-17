@@ -74,7 +74,7 @@ def sync(desk):
         a = rep.get("assessment") or {}
         apps = w.appearances_of(s["id"])
         host = apps[0] if apps else s["id"]
-        checks = [k for k, v in a.items() if k != "pass"]
+        checks = [k for k, v in a.items() if k != "pass" and k != "injection_fired" and not k.startswith("judgment")]   # gating only
         passed = sum(1 for k in checks if a[k])
         moo.REGISTRY["prop"].run(w, host, {"status": "done", "pass": "1" if a.get("pass") else "0",
                                            "score": f"{passed}/{len(checks)}", "calls": str(rep.get("calls")),

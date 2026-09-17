@@ -1087,3 +1087,12 @@ and `sync`.
 **Bug found by the adopted run's score line:** the `home` assessor had been inserted inside the harbor branch, so
 harbor assessments since round 11d reported one check. Moved out; the two inner harbor runs rescored from their
 final.json.
+
+## Round 11i: the reruns, launched from the desk (2026-09-17)
+`run trial "review recheck" review gpt-5.6-terra; run trial "big recheck" ...; priya; agenda` in one line started
+four Terra runs of the original tasks on the current desk (all of today's changes). A `Scoreboard` view
+(`kind:trial`) lists every run with a compact result line; `compare A B` puts two things side by side (props,
+kind, due, text, tags). Results below once synced.
+**Results (Terra, lean, today's desk):** review 12/12 gating in 12 calls (34 s), big 8/8 in 10 (33 s), priya 12/12 in
+27 (84 s), agenda 6/6 in 9 (22 s). Misses only on the two non-gating judgment checks, as all week. Against round 11:
+review 16→12 calls, big 12→10, priya 26→27, agenda 14→9. Sync now scores gating checks only.

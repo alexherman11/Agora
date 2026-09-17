@@ -278,6 +278,39 @@ class DeskKnife(DeskMoo):
                     + f". rules lists it; rule drop {rid} removes it")
         return out
 
+    # ---- compare: two things side by side (round 11i) ------------------------------------------------
+    def cmd_compare(self, arg):
+        try:
+            words = shlex.split(arg)
+        except ValueError as e:
+            raise Refusal(f"could not parse: {e}")
+        if len(words) != 2:
+            raise Refusal('compare A B   (two ids or quoted titles)')
+        w = self.world
+        a, b = (self._resolve(x) for x in words)
+        sa = w.subjects.get(w.nodes[a]["subject"]) if a in w.nodes and w.nodes[a]["type"] == "appearance" else w.subjects.get(a)
+        sb = w.subjects.get(w.nodes[b]["subject"]) if b in w.nodes and w.nodes[b]["type"] == "appearance" else w.subjects.get(b)
+        if not sa or not sb:
+            raise Refusal("compare needs two things with content, not surfaces")
+        out = [f"compare {a} \"{sa['title']}\"  |  {b} \"{sb['title']}\""]
+        keys = sorted(set(sa.get("props") or {}) | set(sb.get("props") or {}))
+        for k in keys:
+            va, vb = (sa.get("props") or {}).get(k, "-"), (sb.get("props") or {}).get(k, "-")
+            out.append(f"  {k:10} {va:>24}  |  {vb:<24}" + ("" if va == vb else "   <- differs"))
+        for k in ("kind", "due"):
+            if sa.get(k) != sb.get(k):
+                out.append(f"  {k:10} {str(sa.get(k)):>24}  |  {str(sb.get(k)):<24}   <- differs")
+        ta, tb = sa["text"].splitlines(), sb["text"].splitlines()
+        if ta != tb:
+            only_a, only_b = [l for l in ta if l not in tb], [l for l in tb if l not in ta]
+            out.append(f"  text: {len(ta)} vs {len(tb)} lines; {len(only_a)} only in {a}, {len(only_b)} only in {b}")
+        tags_a, tags_b = set(sa["tags"]), set(sb["tags"])
+        if tags_a != tags_b:
+            out.append(f"  tags: only {a}: {','.join(sorted(tags_a - tags_b)) or '-'}; only {b}: {','.join(sorted(tags_b - tags_a)) or '-'}")
+        if len(out) == 1:
+            out.append("  no differences in props, kind, due, text or tags")
+        return "\n".join(out)
+
     # ---- why: how a thing got where it is (round 11d; Terra: "where a rule will file a new item felt awkward")
     def cmd_why(self, ident):
         w = self.world
@@ -593,6 +626,8 @@ class DeskKnife(DeskMoo):
             return self.cmd_export()
         if cmd == "why":
             return self.cmd_why(arg)
+        if cmd == "compare":
+            return self.cmd_compare(arg)
         if cmd == "sync":
             # the harness writes as another actor: its changes are not "seen" by you; the delta header names them
             return "sync:\n" + "\n".join(harness.sync(self))

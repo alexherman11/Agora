@@ -326,7 +326,13 @@ class Desk:
                 bits.append(geo)
             if s.get("due"):
                 bits.append(f"due {s['due']}")
-            if s.get("props"):
+            if s.get("props") and s["kind"] == "trial":
+                p = s["props"]   # a trial's line reads as a result, not as a property dump
+                bits.append(" ".join(x for x in [p.get("task", ""), str(p.get("model", "")).replace("gpt-5.6-", ""),
+                                                 p.get("status", ""), p.get("score", ""),
+                                                 f"{p['calls']} calls" if p.get("calls") else "",
+                                                 f"{p['seconds']}s" if p.get("seconds") else ""] if x))
+            elif s.get("props"):
                 bits.append(" ".join(f"{k}={v}" for k, v in s["props"].items() if k not in ("label", "started")))
             if s["kind"] in ("note", "task", "chat", "doc", "trial"):
                 bits.append(f"{len(s['text'].split())}w")
