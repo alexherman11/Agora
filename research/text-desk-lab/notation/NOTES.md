@@ -1072,3 +1072,14 @@ writes them. Replay is identical except comments by other actors, which the gram
 **Sol launched from the desk through a script** (`script trial = do create Trials kind=trial title=$1 as=t; do prop $t
 task=$2 model=$3 variant=lean; do launch $t`): 9/9, 8 calls, 32.8 s; synced back and filed by the rules.
 `find kind:trial` lists both models' runs with their props on the line: the scoreboard is a selection.
+
+## Round 11h: a model runs a trial from the desk (2026-09-17)
+Task `home3`: on the home desk (Trials panel, Running/Failed views, `help trials`), start a harbor trial on
+gpt-5.6-terra titled "harbor check", do not wait, report its label. Measures whether `help trials` is enough for a
+model to use `prop` and `launch`, and whether it respects "do not wait" (no sync polling). The launched inner run is
+a real harbor trial; I sync it from my desk afterwards. Also added `clock now` (the wall clock, read once, as a
+command). Rebuilt worlds have no event history, so state rules pre-mark their current matches as handled.
+**Terra on home3: full pass, 4 calls, 0 refusals, 12 s.** look + help trials; look at Trials + create; look at the
+new trial + prop + launch in one call; look again. Reply gave the label and said where the result would appear. The
+inner run (desk-harbor-check-1) was a real harbor trial; adopted onto my desk with `prop ... label= status=running`
+and `sync`.

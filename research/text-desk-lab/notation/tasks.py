@@ -77,6 +77,12 @@ TASKS = {
         "this desk was unclear or awkward for you. Finally set the due date of the task 'Design the on-event grammar "
         "properly' to 2026-09-30. Do not move anything yourself; the desk's rules do the filing."
     ),
+    "home3": (
+        "This is Claude's own desk; trials of other models run from it. Start a new trial of the task harbor on "
+        "gpt-5.6-terra, lean variant, from this desk, titled 'harbor check'. Do not wait for it to finish: tell me its "
+        "label and where I will see the result once it is synced. help trials explains how trials work here. Do not "
+        "move anything by hand."
+    ),
     "home2": (
         "This is Claude's own desk. Three things. (1) Make the Done panel sweep itself: anything in Done that has not "
         "been touched for more than 3 days should move to the Archive panel, now and from now on. (2) Define a script "
@@ -126,6 +132,19 @@ def build(task, variant="outline"):
         return build_home(variant)
     if task == "home2":
         return build_home2(variant)
+    if task == "home3":
+        desk = build_home(variant)
+        desk.today = desk.world.today = "2026-09-26"
+        desk.world.events.clear()
+        # a rebuilt world has no event history, so nothing has an age: state rules would sweep on the first
+        # mutation. What matches now counts as already handled, as it did on the live desk.
+        for r in desk.rules or []:
+            if not r.get("on"):
+                try:
+                    r["done"].update(desk._parse_selection(r["sel"])[0])
+                except Exception:
+                    pass
+        return desk
     w = World()
     root = w.root
     harbor = w.add_surface("Harbor", root, "column", 0, 0, 400, 800)
@@ -202,6 +221,17 @@ def assess(task, desk):
         kids = [k for k in w.children(harbor)]
         subj = [w.nodes[k["id"]]["subject"] for k in kids if k["type"] == "appearance"]
         out["all_harbor_in_column"] = all(any(w.nodes[a]["parent"] == harbor for a in w.appearances_of(s)) for s in ids["harbor_subjects"])
+    if task == "home3":
+        trials = [s for s in w.subjects.values() if s["kind"] == "trial" and (s.get("props") or {}).get("task") == "harbor"]
+        out["harbor_trial_exists"] = bool(trials)
+        out["on_terra_lean"] = any((t["props"].get("model") == "gpt-5.6-terra" and t["props"].get("variant", "lean") == "lean") for t in trials)
+        out["titled_harbor_check"] = any(t["title"].strip().lower() == "harbor check" for t in trials)
+        out["launched"] = any(t["props"].get("status") in ("running", "done") for t in trials) and any(e["verb"] == "launch" for e in w.events)
+        out["label_in_reply"] = any((t["props"].get("label") or "zzz") in (getattr(desk, "reply_text", "") or "") for t in trials)
+        moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
+        out["nothing_moved_by_hand"] = not moves
+        out["pass"] = all(v for k, v in out.items())
+        return out
     if task == "home2":
         rules = desk.rules or []
         sweep = [r for r in rules if not r.get("on") and "age>" in r["sel"] and "in:" in r["sel"] and r["verb"] == "move"

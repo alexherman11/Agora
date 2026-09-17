@@ -521,8 +521,11 @@ class DeskKnife(DeskMoo):
     def cmd_clock(self, arg):
         if not arg:
             return f"today is {self.today}" if self.today else "no clock set. clock YYYY-MM-DD sets today and re-evaluates the rules"
+        if arg == "now":
+            from datetime import date
+            arg = date.today().isoformat()   # the wall clock, read once, as a command: still nothing advances on its own
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", arg):
-            raise Refusal("clock YYYY-MM-DD")
+            raise Refusal("clock YYYY-MM-DD, or clock now")
         self.today = arg
         self.world.today = arg
         self._run_rules(cause=None)
@@ -650,7 +653,7 @@ class DeskKnife(DeskMoo):
         "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today""",
-        "clock": """clock: the desk has no time of its own. clock YYYY-MM-DD sets today and re-evaluates the rules.
+        "clock": """clock: the desk has no time of its own. clock YYYY-MM-DD (or clock now) sets today and re-evaluates the rules.
   today in due< / due> terms is the clock's date; $today in any command; age<N / age>N select by days since a
   thing was last touched (undo is not touching). examine prints when: with the last touch.""",
         "handles": """handles: names for ids. do create ... as=draft, or set draft = <id or title>; then $draft names it.

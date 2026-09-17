@@ -65,6 +65,7 @@ def main():
         raise
     finally:
         jeff.close()
+        desk.reply_text = str(report.get("reply") or "")   # some assessors read the reply (home3: the label)
         report["assessment"] = assess(options.task, desk)
         report["calls"] = len(traces)
         report["refusals"] = sum("error" in t["result"] for t in traces)
