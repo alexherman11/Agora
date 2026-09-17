@@ -90,7 +90,10 @@ class DeskMoo(Desk):
                 return HELP_MOO
             return "\n\n".join(self.cmd_help(a.lstrip("@")) for a in arg.split())
         if cmd in ("examine", "x", "ex"):
-            words = arg.split()
+            try:
+                words = shlex.split(arg)
+            except ValueError as e:
+                raise Refusal(f"could not parse: {e}")
             if len(words) > 1:
                 raise Refusal(f"examine takes only an id; depth belongs to look (look {words[0]} :3 shows everything under it)")
             return self.cmd_examine(words[0] if words else None)
@@ -226,7 +229,10 @@ class DeskMoo(Desk):
             out += f" → created {r['created']}"
             cid = str(r["created"]).split()[0]
             if cid in w.nodes:
-                out += "\n  " + self.line(cid, 1) + "\n    where: " + self._where_line(cid)
+                out += "\n  " + self.line(cid, 1)
+                parent = w.nodes[cid]["parent"]
+                if parent and w.nodes[parent]["layout"] == "free":
+                    out += "\n    where: " + self._where_line(cid)   # geometry matters only where things can overlap
         if r.get("note"):
             out += f"\n  {r['note']}"
         for c in r.get("changed", []):

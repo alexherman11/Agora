@@ -28,7 +28,7 @@ import re
 import moo
 from world import Refusal
 
-SPECIALIZED = {"split", "gather", "dedupe", "reveal", "reply", "tidy", "stack", "done", "due"}
+SPECIALIZED = {"split", "gather", "dedupe", "reveal", "reply", "tidy", "stack", "done"}   # due and tag are property setters: general
 GENERAL = [n for n in moo.REGISTRY if n not in SPECIALIZED]
 
 

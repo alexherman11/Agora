@@ -240,6 +240,18 @@ class World:
             if k["type"] == "surface":
                 self.reflow(k["id"])
 
+    def _fair_share(self, nid):
+        """A thing created at runtime inside a tiled parent takes the mean of its siblings' share, not a default size
+        (otherwise proportional reflow squeezes every later arrival). Build-time placement is untouched."""
+        n = self.nodes[nid]
+        p = n["parent"]
+        if not p or self.nodes[p]["layout"] == "free":
+            return
+        axis = "h" if self.nodes[p]["layout"] == "column" else "w"
+        sib = [k[axis] for k in self.children(p) if k["id"] != nid]
+        if sib:
+            n[axis] = int(sum(sib) / len(sib))
+
     # ---- mutation -----------------------------------------------------
     def _bump(self, nid):
         if nid in self.nodes:
@@ -337,6 +349,8 @@ class World:
                     raise Refusal(f"into= must name a surface, not {dest}")
                 if dest == target or self._is_inside(dest, target):
                     raise Refusal("cannot move a surface into itself")
+                if n["parent"] == dest and "at" not in args:
+                    return {"ok": True, "event": None, "changed": [], "note": f"{target} is already in {dest}; nothing changed"}
                 old = n["parent"]
                 n["parent"] = dest
                 n["z"] = self._next_z(dest)
@@ -428,6 +442,7 @@ class World:
             x, y, free = self.free_spot(target, gw, gh)
             gid = self.add_surface(str(args.get("title", "group")), target, lay, x, y, gw, gh)
             self.last_created = self.last_surface = gid
+            self._fair_share(gid)
             self.reflow(target)
             self._bump(target)
             ev = self._event(verb, target, args, {"delete": gid}, actor)
@@ -438,17 +453,37 @@ class World:
             return r
         elif verb == "create":
             kind = args.get("kind", "note")
-            if kind not in ("note", "task", "chat", "image", "doc"):
-                raise Refusal("kind= must be note, task, chat, image or doc")
+            if kind not in ("note", "task", "chat", "image", "doc", "surface"):
+                raise Refusal("kind= must be note, task, chat, image, doc or surface")
             title = args.get("title")
             if not title:
                 raise Refusal("create needs title=")
+            if kind == "surface":
+                # round 11c: a new empty panel inside this one (group <surface> did this by accident of wording)
+                layout = str(args.get("layout", "column"))
+                if layout not in ("free", "column", "row"):
+                    raise Refusal("layout= must be free, column or row")
+                x, y, free = self.free_spot(target, 400, 300)
+                fid = self.add_surface(str(title), target, layout, x, y, 400, 300)
+                self._fair_share(fid)
+                self.reflow(target)
+                self.last_created = self.last_surface = fid
+                self._bump(target)
+                ev = self._event(verb, target, args, {"delete": fid}, actor)
+                r = {"ok": True, "event": ev["id"], "changed": [target, fid], "created": fid,
+                     "note": f"new {layout} surface {fid} inside {target}"}
+                if n["layout"] == "free" and not free:
+                    r["note"] += f"; no free space, it covers things: move it or tile {target}"
+                return r
             due = args.get("due")
             if due and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(due)):
                 raise Refusal("due= must be YYYY-MM-DD")
             sid = self.add_subject(kind, str(title), str(args.get("text", "")), [t for t in str(args.get("tags", "")).split(",") if t], due)
-            x, y, free = self.free_spot(target, 300, 160)
-            aid = self.place(sid, target, x, y, 300, 160)
+            cw, ch = max(120, min(300, n["w"] - 16)), max(80, min(160, n["h"] - 16))   # never larger than the parent
+            x, y, free = self.free_spot(target, cw, ch)
+            aid = self.place(sid, target, x, y, cw, ch)
+            self._fair_share(aid)
+            self.reflow(target)
             self.last_created = aid
             self._bump(target)
             ev = self._event(verb, target, args, {"delete": aid, "delete_subject": sid}, actor)

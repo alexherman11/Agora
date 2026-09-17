@@ -976,3 +976,29 @@ All of the above is unmeasured on Terra or Sol; the round-11 numbers are for the
   selection; selections were verb targets only. `find <selection>` now lists matches grouped by surface
   (`find kind:image`, `find tag:harbor,in:f04`, `find hidden`, `find due<date`), with the selection footer.
   Sections inside a doc are not things and cannot be selected into; that is a limit of the model, stated.
+
+## Round 11c: building my own desk from nothing, and the first automation layer (2026-09-17)
+Alex: save point, then build your own desk inside the system, find friction, fix what you don't like, try the
+scripting layer, use the desk as your home base and keep your notes in it.
+
+Save point: commit 4a87357 in the Agora repo (lab + playground). New harness: `explore.py <session>` (empty tiled
+desk, lean REPL, pickled between runs; `--reset`, `--dump`, `--shape`; `!actor verb target k=v` injects another
+actor's write). The desk I built is exported as `sessions/home.desk.txt` and FRICTION.md indexes the session.
+
+What happened, in order: creating surfaces needed `group` by accident of wording (added `create kind=surface`);
+created things spilled narrow parents and proportional reflow squeezed later arrivals to 37 px (clamp + fair
+share); titles turned out to be the practical names and were made to resolve everywhere (examine, selection
+terms, place); undo needed an id and undid one step of a sort (bare undo, composed undo, causal undo of rule
+consequences, undo keeps the view, command-number grouping so consecutive same-verb commands stay separate);
+`due` was hidden as specialized and `tag` did not exist (both general now); script definitions were eaten by the
+batch splitter; my own rule made my own view stale.
+
+The automation layer that emerged: `rule when <selection> do <verb>` (state rules, fire once per thing entering
+the selection, `now=1` to fire on current matches), `rule on <verb> [by=actor] do <verb>` (event rules), `script
+name = cmds` with `$1..` and `run`, `clock YYYY-MM-DD` with `today` in due terms. Rule receipts print as `~` lines
+after the command's receipt and are undone with their cause. The chain "Priya appends → tag needs-reply → move to
+Today → I reply, untag, move back" ran end to end with an injected actor.
+
+The finding that matters: `export` emits the commands that rebuild the desk by title, and replaying that on an
+empty desk reproduced the desk exactly (30-line shape diff empty, zero refusals; again after the last changes).
+The text is the desk. All of this is unmeasured on Terra or Sol.

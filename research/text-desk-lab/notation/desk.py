@@ -78,6 +78,8 @@ class Desk:
     def dispatch(self, name, args):
         if self.batch and name == "desk":
             parts = split_batch(args.get("line", ""))
+            if parts and parts[0].lower().startswith("script "):
+                parts = [args.get("line", "").strip()]   # a script definition keeps its ; for later
             if len(parts) > 1:
                 outs, error = [], False
                 reads = 0
@@ -100,9 +102,15 @@ class Desk:
                 return {"text": "\n\n".join(outs), "batch": len(parts), "batch_error": error}
         return self._one(args, name)
 
+    _cmd_no = 0
+
     def _one(self, args, name="desk"):
         header = self.delta_header()
+        self._cmd_no += 1
+        n0 = len(self.world.events)
         r = self._dispatch(name, args)
+        for e in self.world.events[n0:]:
+            e.setdefault("cmd", self._cmd_no)   # which command produced it: undo groups steps by this, not by verb
         if header:
             if "text" in r:
                 r["text"] = header + r["text"]
@@ -559,9 +567,47 @@ class Desk:
 
     def cmd_undo(self, eid):
         if not eid:
-            raise Refusal("undo needs an event id like e3")
-        r = self.world.undo(eid)
+            mine = [e for e in self.world.events if e["by"] == "jeff" and e["verb"] != "undo" and not e.get("undone")]
+            if not mine:
+                raise Refusal("nothing of yours to undo")
+            eid = mine[-1]["id"]   # bare undo: your latest change
+        ev = next((e for e in self.world.events if e["id"] == eid), None)
+        if ev is None:
+            raise Refusal(f"no event {eid}")
+        if ev.get("cause"):
+            # a rule's consequence: undo the command that caused it, and everything it caused
+            eid = ev["cause"]
+            ev = next(e for e in self.world.events if e["id"] == eid)
+        group = [ev]
+        if ev.get("via"):
+            # a composed verb (sort, move <selection>, group ...) is undone as a whole: its contiguous steps,
+            # on both sides of the named one
+            evs = self.world.events
+            at = evs.index(ev)
+            same = lambda e: (e.get("via") == ev["via"] and e.get("cmd") == ev.get("cmd") and not e.get("undone")
+                              and e["by"] == ev["by"] and not e.get("cause"))
+            j = at - 1
+            while j >= 0 and same(evs[j]):
+                group.insert(0, evs[j])
+                j -= 1
+            j = at + 1
+            while j < len(evs) and same(evs[j]):
+                group.append(evs[j])
+                j += 1
+        caused = [e for e in self.world.events if e.get("cause") in {g["id"] for g in group} and not e.get("undone")]
+        group = sorted(group + caused, key=lambda e: int(e["id"][1:]))
+        done = []
+        revs0 = {k: v["rev"] for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items())}
+        for e in reversed(group):
+            r = self.world.undo(e["id"])
+            done.append(e["id"])
+        for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items()):
+            if revs0.get(k) != v["rev"]:
+                self._mark_seen(k)   # an undo is your own change; what it touched stays seen
         self._after_mutation()
+        if len(done) > 1:
+            what = f"{len(done)} steps of {ev['via']}" if ev.get("via") else f"{eid} and {len(caused)} rule consequence(s)"
+            return f"ok {r['event']}: reverted {done[-1]}..{done[0]} ({what})"
         return f"ok {r['event']}: reverted {eid}"
 
     def cmd_do(self, verb, target, kv):

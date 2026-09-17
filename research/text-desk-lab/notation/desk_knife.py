@@ -1,5 +1,6 @@
 """The knife desk (round 7): the MOO desk with general verbs only, selections as targets, and pair verbs."""
 
+import re
 import shlex
 
 import knife
@@ -146,9 +147,313 @@ class DeskKnife(DeskMoo):
             line += f"  (+{rest} more line(s); examine {nid})"
         return line
 
+    # ---- rules: the first automation layer (round 11c) ----------------------------------------------
+    # rule when <selection> do <verb> [k=v ...]   fires the verb once on each thing that enters the selection
+    rules = None
+    _rule_notes = None
+    _in_rules = False
+
+    _rule_seq = 0
+
+    def _next_rule_id(self):
+        # ids never reuse a dropped rule's number; history and receipts keep naming the old one
+        self._rule_seq = max(self._rule_seq, max((int(r["id"][1:]) for r in self.rules or []), default=0)) + 1
+        return f"r{self._rule_seq}"
+
+    def cmd_rules(self):
+        if not self.rules:
+            return "no rules. rule when <selection> do <verb> [k=v ...]   e.g. rule when kind:task,due<2026-09-19 do move into=Today"
+        return "\n".join(f"{r['id']} {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {self._fmt_args(r['kv'])}".rstrip()
+                         + f"   (fired {r['fired']}x)" for r in self.rules)
+
+    def cmd_rule(self, arg):
+        try:
+            argv = shlex.split(arg)
+        except ValueError as e:
+            raise Refusal(f"could not parse: {e}")
+        if len(argv) >= 2 and argv[0] == "drop":
+            rid = argv[1]
+            before = len(self.rules or [])
+            self.rules = [r for r in (self.rules or []) if r["id"] != rid]
+            if len(self.rules) == before:
+                raise Refusal(f"no rule {rid}; rules lists them")
+            return f"ok dropped {rid}"
+        if len(argv) >= 4 and argv[0] == "on":
+            # rule on <verb> [by=<actor>] do <verb> [k=v ...]: fires on each such event, on the event's thing
+            i = argv.index("do") if "do" in argv else -1
+            if i < 2:
+                raise Refusal("rule on <verb> [by=<actor>] do <verb> [k=v ...]")
+            on_verb, by = argv[1].lower(), None
+            for a in argv[2:i]:
+                if a.startswith("by="):
+                    by = a[3:]
+                else:
+                    raise Refusal(f"rule on: only by=<actor> may follow the event verb, not {a!r}")
+            verb = argv[i + 1].lower() if len(argv) > i + 1 else ""
+            if verb not in self._verb_names() or verb in knife.SPECIALIZED:
+                raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL))
+            kv = {}
+            for a in argv[i + 2:]:
+                if "=" not in a:
+                    raise Refusal(f"rule arguments are k=v; got {a!r}")
+                k, _, v = a.partition("=")
+                kv[k] = v
+            self.rules = self.rules or []
+            rid = self._next_rule_id()
+            self.rules.append({"id": rid, "on": on_verb, "by": by, "verb": verb, "kv": kv, "done": set(), "fired": 0,
+                               "cursor": len(self.world.events), "sel": f"on {on_verb}" + (f" by={by}" if by else "")})
+            return f"ok {rid}: on {on_verb}" + (f" by={by}" if by else "") + f" do {verb} {self._fmt_args(kv)}".rstrip()
+        if len(argv) < 4 or argv[0] != "when" or argv[2] != "do":
+            raise Refusal("rule when <selection> do <verb> [k=v ...]   |   rule on <verb> [by=<actor>] do <verb> [k=v ...]   |   rule drop rN")
+        sel_text, verb = argv[1], argv[3].lower()
+        if self._parse_selection(sel_text) is None:
+            raise Refusal(f"{sel_text!r} is not a selection (help selections)")
+        if verb not in self._verb_names() or verb in knife.SPECIALIZED:
+            raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL))
+        kv = {}
+        for a in argv[4:]:
+            if "=" not in a:
+                raise Refusal(f"rule arguments are k=v; got {a!r}")
+            k, _, v = a.partition("=")
+            kv[k] = v
+        self.rules = self.rules or []
+        rid = f"r{len(self.rules) + 1}"
+        rule = {"id": rid, "sel": sel_text, "verb": verb, "kv": kv, "done": set(), "fired": 0}
+        self.rules.append(rule)
+        out = f"ok {rid}: when {sel_text} do {verb} {self._fmt_args(kv)}".rstrip()
+        # things already in the selection count as already handled: a rule is about what enters, not what is,
+        # unless now=1 says to fire on the current matches too
+        ids, desc = self._parse_selection(sel_text)
+        if kv.pop("now", None):
+            out += f"\n  {len(ids)} thing(s) match {desc} now; firing on them"
+            self._run_rules()
+        else:
+            rule["done"].update(ids)
+            out += f"\n  {len(ids)} thing(s) already match {desc}; the rule fires on things that enter it from now on. rules lists it; rule drop {rid} removes it"
+        return out
+
+    # ---- export: the desk as the commands that rebuild it (round 11c) --------------------------------
+    def cmd_export(self):
+        """Emit desk commands that rebuild this desk from an empty one. Things are named by title, since ids
+        are reassigned on replay. Says what it cannot carry (others' comments, resolved state, exact geometry)."""
+        w = self.world
+        out = ["# export of this desk; replay on an empty desk after one look", "look"]
+        titles = {}
+        for n in w.nodes.values():
+            titles.setdefault(w.title(n).lower(), []).append(n["id"])
+        dup = sorted(t for t, ids in titles.items() if len(ids) > 1 and not (
+            len({w.nodes[i].get("subject") for i in ids}) == 1))   # several appearances of one subject are fine
+        if dup:
+            out.append("# WARNING: these titles name several different things, and replay resolves by title: " + ", ".join(dup))
+
+        def q(s):
+            return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+
+        def ref(nid):
+            return "desk" if nid == w.root else q(w.title(w.nodes[nid]))
+
+        placed = set()
+        skipped = []
+
+        def walk(fid):
+            for k in w.children(fid):
+                if k["type"] == "surface":
+                    out.append(f"do create {ref(fid)} kind=surface title={q(k['title'])} layout={k['layout']}")
+                    walk(k["id"])
+                    continue
+                s = w.subjects[k["subject"]]
+                if s["id"] in placed:
+                    out.append(f"do place {q(s['title'])} into={ref(fid)}")
+                else:
+                    placed.add(s["id"])
+                    line = f"do create {ref(fid)} kind={s['kind']} title={q(s['title'])}"
+                    if s["text"]:
+                        line += f" text={q(s['text'])}"
+                    if s["tags"]:
+                        line += f" tags={','.join(s['tags'])}"
+                    if s.get("due"):
+                        line += f" due={s['due']}"
+                    out.append(line)
+                    for c in s.get("comments", []):
+                        if c["by"] == "alex":
+                            out.append(f"do comment {q(s['title'])} line={q(c['text'])}")
+                        else:
+                            skipped.append(f"comment {c['id']} by {c['by']} on {q(s['title'])}")
+                if k["folded"]:
+                    out.append(f"do fold {q(s['title'])}")
+                if fid != w.root and w.nodes[fid]["layout"] == "free":
+                    out.append(f"do move {q(s['title'])} to={k['x']},{k['y']}; do resize {q(s['title'])} to={k['w']}x{k['h']}")
+
+        walk(w.root)
+        for l in w.links:
+            a, b = w.subjects.get(l["from"]), w.subjects.get(l["to"])
+            if a and b:
+                out.append(f"do link {q(a['title'])} {q(b['title'])} as={l['kind']}")
+        if self.today:
+            out.append(f"clock {self.today}")   # before the rules: a due<today rule cannot be defined without it
+        for r in self.rules or []:
+            out.append(f"rule {'' if r.get('on') else 'when '}{r['sel']} do {r['verb']} {self._fmt_args(r['kv'])}".rstrip())
+        for name, body in (self.scripts or {}).items():
+            out.append(f"script {name} = {body}")
+        if skipped:
+            out.append("# not carried (only you can write as you): " + "; ".join(skipped))
+        return "\n".join(out)
+
+    # ---- scripts: named command sequences with $1.. placeholders (round 11c) --------------------------
+    scripts = None
+
+    def cmd_scripts(self):
+        if not self.scripts:
+            return "no scripts. script <name> = <commands separated by ;>   ($1 $2 .. stand for run's arguments)   e.g. script tidy = do sort $1 by=due; look $1"
+        return "\n".join(f"{k} = {v}" for k, v in self.scripts.items())
+
+    def cmd_script(self, arg):
+        name, eq, body = arg.partition("=")
+        name, body = name.strip(), body.strip()
+        if not eq or not name or not body:
+            raise Refusal("script <name> = <commands separated by ;>")
+        if " " in name:
+            raise Refusal("a script name is one word")
+        self.scripts = self.scripts or {}
+        self.scripts[name] = body
+        return f"ok script {name} = {body}\n  run {name} [args]   ({body.count('$')} placeholder(s))"
+
+    def cmd_run(self, arg):
+        try:
+            argv = shlex.split(arg)
+        except ValueError as e:
+            raise Refusal(f"could not parse: {e}")
+        if not argv:
+            raise Refusal("run <script> [args]; scripts lists them")
+        name, args = argv[0], argv[1:]
+        body = (self.scripts or {}).get(name)
+        if body is None:
+            raise Refusal(f"no script {name}; scripts lists them")
+        missing = sorted({m for m in re.findall(r"\$(\d+)", body) if int(m) > len(args)})
+        if missing:
+            raise Refusal(f"run {name} needs {max(int(m) for m in missing)} argument(s); got {len(args)}")
+        line = re.sub(r"\$(\d+)", lambda m: shlex.quote(args[int(m.group(1)) - 1]) if " " in args[int(m.group(1)) - 1] else args[int(m.group(1)) - 1], body)
+        r = self.dispatch("desk", {"line": line})
+        body_text = r["text"] if "text" in r else "ERR " + r["error"]
+        return f"run {name}: {line}\n" + body_text
+
+    def _run_rules(self, cause=None):
+        if not self.rules or self._in_rules:
+            return
+        self._in_rules = True
+        try:
+            for _ in range(3):   # a rule's action may make another rule fire; bounded
+                fired = False
+                for r in self.rules:
+                    if r.get("on"):
+                        # event rule: each new matching event names the thing to act on
+                        evs = self.world.events[r["cursor"]:]
+                        r["cursor"] = len(self.world.events)
+                        targets = []
+                        for e in evs:
+                            # the log records append/retitle/rewrite as "edit"; name the event by the verb a person would use
+                            said = e["verb"]
+                            if said == "edit":
+                                a = e.get("args") or {}
+                                said = "append" if "append" in a else "retitle" if "title" in a else "rewrite"
+                            if (said != r["on"] and e.get("via") != r["on"]) or (r["by"] and e["by"] != r["by"]) \
+                                    or str(e.get("via", "")).startswith("rule "):
+                                continue
+                            t = e["target"]
+                            if t in self.world.subjects:
+                                apps = self.world.appearances_of(t)
+                                t = apps[0] if apps else None
+                            if t in self.world.nodes:
+                                targets.append(t)
+                        ids, desc = targets, r["sel"]
+                        r["done"] = set()   # an event rule fires every time
+                    else:
+                        try:
+                            ids, desc = self._parse_selection(r["sel"])
+                        except Refusal as e:
+                            self._note(f"~ {r['id']} could not select ({e})")
+                            continue
+                    for i in ids:
+                        if i in r["done"] or i not in self.world.nodes:
+                            continue
+                        r["done"].add(i)
+                        if r["verb"] == "move" and r["kv"].get("into"):
+                            try:
+                                if self._resolve(r["kv"]["into"], allow_subject=False) == self.world.nodes[i]["parent"]:
+                                    continue   # already where the rule would put it: not a firing
+                            except Refusal:
+                                pass
+                        n0 = len(self.world.events)
+                        revs0 = {k: v["rev"] for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items())}
+                        self._mark_seen(i)
+                        try:
+                            receipt = self.cmd_do_knife(r["verb"], [i], dict(r["kv"]))
+                            r["fired"] += 1
+                            fired = True
+                            self._note(f"~ {r['id']} fired on {i}: " + receipt.splitlines()[0])
+                        except Refusal as e:
+                            self._note(f"~ {r['id']} could not {r['verb']} {i}: {e}")
+                        for ev in self.world.events[n0:]:
+                            ev["via"] = f"rule {r['id']}"
+                            if cause:
+                                ev["cause"] = cause
+                        # the rule is our own automation: what it changed counts as seen, like our own writes
+                        for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items()):
+                            if revs0.get(k) != v["rev"]:
+                                self._mark_seen(k)
+                if not fired:
+                    break
+        finally:
+            self._in_rules = False
+
+    def _note(self, text):
+        self._rule_notes = (self._rule_notes or []) + [text]
+
+    def _one(self, args, name="desk"):
+        n0 = len(self.world.events)
+        r = super()._one(args, name)
+        if len(self.world.events) > n0:
+            # after the receipt is composed, so the receipt describes the command, then the rules; the command's
+            # last event is the cause of whatever the rules do, so one undo takes both back
+            self._run_rules(cause=self.world.events[-1]["id"])
+        if self._rule_notes:
+            key = "text" if "text" in r else "error"
+            r[key] = r[key] + "\n" + "\n".join(self._rule_notes)
+            self._rule_notes = None
+        return r
+
+    today = None   # set by the clock command; `today` in a due< / due> term stands for it
+
+    def cmd_clock(self, arg):
+        if not arg:
+            return f"today is {self.today}" if self.today else "no clock set. clock YYYY-MM-DD sets today and re-evaluates the rules"
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", arg):
+            raise Refusal("clock YYYY-MM-DD")
+        self.today = arg
+        self._run_rules(cause=None)
+        return f"ok today is {arg}"
+
+    def _selection_terms(self, token):
+        """Titles are allowed wherever a selection term wants an id: in:Today, also:"Standup agenda", links:Tessera.
+        `today` in a due term is the clock's date."""
+        out = []
+        if "today" in token:
+            if not self.today:
+                raise Refusal("today is unset; clock YYYY-MM-DD sets it")
+            token = token.replace("today", self.today)
+        for t in re.split(r",", token):
+            for key in ("in:", "also:", "links:"):
+                if t.startswith(key) and t[len(key):] not in self.world.nodes and t[len(key):] not in self.world.subjects:
+                    t = key + self._resolve(t[len(key):].strip('"'))
+            out.append(t)
+        return ",".join(out)
+
+    def _parse_selection(self, token):
+        return knife.parse_selection(self.world, self._selection_terms(token.strip()))
+
     def cmd_find(self, words):
         # round 11b: find also takes a selection, which is the scalable listing view (examine is one thing in depth)
-        sel = knife.parse_selection(self.world, words.strip()) if words.strip() else None
+        sel = self._parse_selection(words) if words.strip() else None
         if sel is not None:
             ids, desc = sel
             if not ids:
@@ -177,6 +482,20 @@ class DeskKnife(DeskMoo):
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
+        if cmd == "rules":
+            return self.cmd_rules()
+        if cmd == "rule":
+            return self.cmd_rule(arg)
+        if cmd == "export":
+            return self.cmd_export()
+        if cmd == "clock":
+            return self.cmd_clock(arg)
+        if cmd == "scripts":
+            return self.cmd_scripts()
+        if cmd == "script":
+            return self.cmd_script(arg)
+        if cmd == "run":
+            return self.cmd_run(arg)
         if cmd in ("help", "?"):
             if not arg:
                 return HELP_LEAN if self.lean else HELP_KNIFE
@@ -290,6 +609,11 @@ class DeskKnife(DeskMoo):
         w = self.world
         if not positional:
             raise Refusal("do needs a target after the verb")
+        if verb == "place" and positional[0] not in w.subjects:
+            # place is a subject verb; a title or appearance id names the subject behind it
+            hit = self._resolve(positional[0])
+            if hit in w.nodes and w.nodes[hit]["type"] == "appearance":
+                positional = [w.nodes[hit]["subject"]] + positional[1:]
         if verb not in knife.PAIR_DOC and len(positional) > 1:
             # unquoted values with spaces land here as stray words; refusing beats silently keeping the first word
             raise Refusal(f"unexpected words after the target: {' '.join(positional[1:])!r}; quote values with spaces, "
@@ -321,7 +645,7 @@ class DeskKnife(DeskMoo):
                    "reveal": "raise", "tidy": "tile", "split": "group kind:<k>,in:<surface> then tile the surface as=row",
                    "gather": "move ?<words> into=<surface> one=1", "done": "retitle", "stack": "tile"}.get(verb, "a general verb")
             raise Refusal(f"no {verb} here; use {alt}. help selections lists the selection forms")
-        sel = knife.parse_selection(w, positional[0])
+        sel = self._parse_selection(positional[0])
         if sel is None:
             return super().cmd_do(verb, positional[0], kv)
         ids, desc = sel

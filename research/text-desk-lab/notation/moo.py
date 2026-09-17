@@ -141,7 +141,7 @@ def v_group(w, nid, a):
     return _prim(w, "group", nid, a)
 
 
-@verb("create", ["surface"], "Make a new note, task or chat and place it on this surface.", "kind=note|task|chat title=<str> [text=<str>] [due=YYYY-MM-DD] [tags=a,b]", 'do create f03 kind=task title="Send parser" due=2026-09-19')
+@verb("create", ["surface"], "Make a new note, task, chat, doc, image or surface inside this surface.", "kind=note|task|chat|doc|image|surface title=<str> [text=<str>] [due=YYYY-MM-DD] [tags=a,b] [layout=column|row|free]", 'do create f03 kind=task title="Send parser" due=2026-09-19')
 def v_create(w, nid, a):
     return _prim(w, "create", nid, a)
 
@@ -386,7 +386,25 @@ def v_done(w, nid, a):
     return _prim(w, "retitle", nid, {"title": "✓ " + t})
 
 
-@verb("due", ["task", "note"], "Set or clear the due date.", "on=YYYY-MM-DD | clear=1", "do due a22 on=2026-09-19", level=2)
+@verb("tag", ["appearance"], "Add or remove tags on this thing's subject. Tags are what tag: selects and rules watch.",
+      "add=a,b | remove=a,b", "do tag a22 add=harbor,urgent")
+def v_tag(w, nid, a):
+    s = w.subjects[w.nodes[nid]["subject"]]
+    add = [t for t in str(a.get("add", "")).split(",") if t.strip()]
+    rem = [t for t in str(a.get("remove", "")).split(",") if t.strip()]
+    if not add and not rem:
+        raise Refusal("tag needs add=a,b and/or remove=a,b")
+    before = dict(s, tags=list(s["tags"]))
+    s["tags"] = [t for t in s["tags"] if t not in rem] + [t for t in add if t not in s["tags"]]
+    s["rev"] += 1
+    for x in w.appearances_of(s["id"]):
+        w._bump(x)
+    ev = w._event("tag", nid, a, {"restore_subject": before})
+    return {"ok": True, "event": ev["id"], "changed": [s["id"]] + w.appearances_of(s["id"]),
+            "note": "tags now: " + (",".join(s["tags"]) or "(none)")}
+
+
+@verb("due", ["task", "note"], "Set or clear the due date.", "on=YYYY-MM-DD | clear=1", "do due a22 on=2026-09-19", level=1)
 def v_due(w, nid, a):
     s = w.subjects[w.nodes[nid]["subject"]]
     if a.get("clear"):
