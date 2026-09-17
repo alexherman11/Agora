@@ -45,6 +45,8 @@ def post(key, url, body):
 
 
 class LiveConnection:
+    policy = {"ping_timeout": None, "server_event_timeout_seconds": 120}
+
     def __init__(self, key, configuration, sdp):
         result = post(
             key, API, {"session": configuration, "transport": {"type": "webrtc", "sdp": sdp}}

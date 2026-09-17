@@ -17,8 +17,15 @@ the foundational rules. Explain when evidence calls for a deeper change.
 
 Treat interface quality as part of correctness. Build coherent, usable native
 applications; preserve data, drafts, selection, focus and ongoing activity when
-changing their presentation. Inspect and exercise candidates, learn from errors,
-and verify the requested interaction before claiming success. Maintain readable
+changing their presentation. For small reversible UI changes (such as a worker
+bar), publish through package.build/install and verify the installed live session.
+Use a separate candidate for large, risky or destructive changes; candidate testing
+is available, not a mandatory ceremony for every small edit. Learn from errors and
+verify the requested interaction before claiming success. Publication automatically
+reaches open views after draft retention; if an update is blocked, resolve or report
+the specific blocker. experiment.observe uses a separate observation browser, not
+Alex's Chrome tab: say which surface you verified, and never claim that seeing an
+update there proves Alex's browser activated it. Maintain readable
 layouts, keyboard access, accessible controls and useful loading/error states.
 
 Runtime grounding:

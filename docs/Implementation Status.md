@@ -13,6 +13,30 @@ older `docs` implementation branch. They remain useful, but their results are no
 counted as Agora3 runtime verification unless this file names a corresponding
 Agora3 check.
 
+## September 12 live publication repair
+
+Alex requested that small published UI changes reach his live view without routine
+candidate-shell testing. Compatible application updates now preserve a view's lease
+and each browser flushes before remounting. Open views adopt compatible installed
+releases automatically. The host reports and retries blocked shell handoffs, with
+a 20-second deadline matching the longer application flush. Per-tab retained state
+prevents the observation browser from replacing the human tab's conflict draft.
+Runtime guidance permits direct live verification for small reversible changes and
+reserves candidates for changes that warrant isolation. It identifies
+experiment.observe as a separate browser, not Alex's Chrome.
+
+Verification before activation: 201 Python tests passed, two optional tests skipped;
+Ruff checks passed. The focused real Edge test uses two independent browser contexts
+against a disposable local server, no VM or model calls. It verifies automatic app
+publication with typed text, continued access after another browser refreshes,
+shell publication preserving a conflicting document draft and unsent chat, and
+automatic retry after a transient flush failure, with no JavaScript errors.
+Run scripts/application_demo.py with a fresh --world and --port 0 --serve, then
+scripts/test_live_updates_browser.cjs with that world path and PLAYWRIGHT_MODULE
+configured. Actual resident activation and Chrome verification are recorded in the
+local live-update repair report after deployment; these preactivation checks alone
+do not establish activation.
+
 ## September 12 recovery
 
 The standalone `C:\Projects\Agora4` checkout now uses branch `agora4` and the
@@ -249,3 +273,40 @@ The voice service, server, model harness, storage, and browser assets are outsid
 this reload operation. Broader live updates require independent process
 lifetimes and compatible versioned request boundaries. Existing requests must
 finish on their admitted version; storage changes need explicit migration rules.
+
+## September 12 voice deployment audit
+
+The active Desk was verified at port 8874, launched from
+`worlds/parallel-desk/serve_desk.py` with `C:/Projects/Agora4/src`. Its resident is
+`jeff0`, bound to the existing model conversation. The port 8873 Desk and the old
+paused voice monitor were not the active test environment.
+
+The old process started at 12:19, before the 12:23 pong-timeout repair, and its
+live status lacked the newer runtime-version field. Earlier service traces
+explicitly record `sent 1011 ... keepalive ping timeout`; later failures again
+record client-sent 1011 while audio events were arriving. This establishes a real
+prior timeout failure and a deployment gap; the truncated diagnostics cannot
+prove the exact close reason for every later call.
+
+An idle-only graceful restart loaded the repair and bounded closure diagnostics.
+Protected reload returned generation `dd5dd2153e0c896e`, independently matching
+live status. Verification retained the exact resident binding, 225 saved messages,
+and installed package inventory; startup replay verified 1,557 objects. No model
+prompt or voice call was sent. The existing monitor was corrected to port 8874,
+with resident verification and fresh-baseline instructions; it remains paused.
+
+Voice diagnostics now distinguish provider closure reasons, provider error codes,
+browser heartbeat expiry and transport failures, retain the first exception, and
+report heartbeat age and loaded transport policy. Logs omit audio, transcripts,
+keys and provider error messages. Cleanup still marks completion and disconnects
+if the hangup request raises. The original 30-second browser heartbeat and the
+browser's single failed-status-request shutdown behavior remain unchanged; they
+are additional lifecycle risks, not proven causes of these recorded failures.
+
+Validation: 201 tests passed with two optional runtime checks skipped, then both
+compiled-runtime inventory checks passed separately using local simulated
+inference. Focused voice coverage: 27 passed, including real loopback WebSocket
+traffic with withheld pongs. Ruff passed for changed Python files. A sustained
+real GPT Live call after activation remains unverified. The UI-selection helper
+from the older docs-restoration source is absent here and did not cause the
+recorded failures in this process.

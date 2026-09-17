@@ -166,7 +166,7 @@ def test_stale_edit_keeps_other_writer_and_retained_draft(setup):
     assert request(setup, editor, "state.get")["state"]["draft"] == "second writer"
 
 
-def test_refresh_is_per_view_and_revokes_old_lease_without_losing_state(setup):
+def test_refresh_preserves_other_browsers_lease_and_drafts(setup):
     gateway, _ = setup
     note, other = surface(setup), surface(setup, "test.documents")
     request(setup, note, "state.set", state={"selection": [4, 7], "draft": "keep this"})
@@ -179,6 +179,14 @@ def test_refresh_is_per_view_and_revokes_old_lease_without_losing_state(setup):
     refreshed = call(setup, "surface", view=note["view"]["id"])
     assert "Version two" in refreshed["html"]
     assert request(setup, refreshed, "state.get")["state"]["draft"] == "keep this"
+    # A second browser using the same view can still flush its own draft.
+    assert request(setup, note, "read")
+    request(setup, note, "state.set", state={"draft": "second browser retained"})
+    assert request(setup, refreshed, "state.get")["state"]["draft"] == "second browser retained"
+    before = watermark(gateway)
+    call(setup, "refresh", view=note["view"]["id"])
+    assert watermark(gateway) == before  # Same publication is idempotent.
+    call(setup, "close", view=note["view"]["id"])
     with pytest.raises(Refusal, match="closed, refreshed or revoked"):
         request(setup, note, "read")
     assert request(setup, other, "read")

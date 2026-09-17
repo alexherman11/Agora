@@ -5,6 +5,7 @@ Never infer actions from speech or retry a possibly accepted backend request.
 import json
 import logging
 import queue
+import re
 import threading
 import time
 import traceback
@@ -37,6 +38,9 @@ class VoiceSession:
         self.threads = ()
         self.phase = "starting"
         self.last_event = None
+        self.close_reason = None
+        self.provider_error = None
+        self.opened_at = time.time()
 
     def authorized(self):
         self.app.gateway.check_authority(self.actor)
@@ -58,10 +62,17 @@ class VoiceSession:
             "seconds": self.seconds,
             "error": self.error,
             "failure": self.failure,
+            "opened_at": self.opened_at,
+            "close_reason": self.close_reason,
+            "provider_error": self.provider_error,
+            "heartbeat_age_seconds": round(time.monotonic() - self.last_seen, 1),
+            "transport": getattr(self.connection, "policy", None),
             "coordination": self.coordination.snapshot(),
         }
 
     def failed(self, exc, phase=None):
+        if self.failure is not None:
+            return
         # Keep diagnostic metadata, never event payloads, audio, keys or exception text.
         detail = {
             "at": time.time(),
@@ -106,8 +117,9 @@ class VoiceSession:
             self.failed(exc, "sending " + kind)
             raise
 
-    def close(self):
+    def close(self, reason="close_requested"):
         if not self.closing.is_set():
+            self.close_reason = reason
             self.close_started = time.monotonic()
             self.closing.set()
 
@@ -133,11 +145,23 @@ class VoiceSession:
                 self.seconds = max(self.seconds, seconds)
         if kind == "session.closed":
             self.confirmed_closed = True
-            self.close()
+            reason = event.get("reason")
+            self.close_reason = reason if reason in {
+                "close_requested", "expired", "content", "remote_hangup", "connection_lost"
+            } else "provider_closed_unknown"
+            self.close(self.close_reason)
             return
         if kind == "error":
+            detail = event.get("error")
+            detail = detail if isinstance(detail, dict) else {}
+            # Machine identifiers only; messages may reflect private command content.
+            self.provider_error = {
+                key: value for key in ("code", "type", "param")
+                if isinstance(value := detail.get(key), str)
+                and re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", value)
+            }
             self.error = "GPT Live reported a session error. End the call and try again."
-            self.close()
+            self.close("provider_error")
             return
         if kind in {"session.input_transcript.delta", "session.output_transcript.delta"}:
             with self.lock:
@@ -198,7 +222,7 @@ class VoiceSession:
         self.authorized()
         if time.monotonic() - self.last_seen > 30:
             self.error = "The browser disconnected; the voice call was ended."
-            self.close()
+            self.close("browser_heartbeat_timeout")
         if self.started and not self.closing.is_set():
             for activity, identifier in self.coordination.activities():
                 self.coordination.observe(activity, identifier, self.app.backend_snapshot(activity))
@@ -221,7 +245,7 @@ class VoiceSession:
                         self.tick()
                     except Refusal:
                         self.error = "Voice authority changed; the call was ended."
-                        self.close()
+                        self.close("authority_changed")
                         continue
                 try:
                     self.phase = "receiving voice events"
@@ -234,16 +258,28 @@ class VoiceSession:
             if self.failure is None:
                 self.failed(exc)
         finally:
-            self.close()
+            self.close("transport_failure" if self.failure else "connection_ended")
             self.coordination.close()
             try:
                 with self.lock:
                     self.transcript.flush()
             except Exception:
                 self.error = "Voice ended; the last transcript fragments could not be saved."
-            if not self.confirmed_closed:
-                self.connection.hangup()
             try:
-                self.connection.disconnect()
+                if not self.confirmed_closed:
+                    self.connection.hangup()
             finally:
-                self.done.set()
+                try:
+                    self.connection.disconnect()
+                finally:
+                    self.done.set()
+                    logging.getLogger(__name__).warning(
+                        "Voice closed %s", json.dumps({
+                            "at": time.time(), "opened_at": self.opened_at,
+                            "reason": self.close_reason,
+                            "confirmed_closed": self.confirmed_closed,
+                            "provider_error": self.provider_error,
+                            "failure": self.failure,
+                            "transport": getattr(self.connection, "policy", None),
+                        })
+                    )

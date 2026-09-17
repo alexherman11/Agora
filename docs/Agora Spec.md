@@ -683,7 +683,7 @@ See [[Design Commitments]].
 23. Subjects and intent should survive changes of renderer and input mode; a new
     medium may still require new interaction semantics.
 24. The OS remains usable, inspectable, and exportable without JEFF.
-
+25. New capabilities should be discoverable from within the interface, not need to be known beforehand
 ---
 
 ## 22. Direction: a working foundation and an open feature horizon

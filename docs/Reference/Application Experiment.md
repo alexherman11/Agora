@@ -25,8 +25,11 @@ Each open appearance is a separate protected native object carrying its subject,
 package/build binding, bounds, retained UI state, open status and scoped lease.
 Closing, moving or refreshing it does not change the content object's revision.
 Two appearances of one application are independent, just as appearances of two
-different applications are. Installing new code does not replace open frames;
-each view adopts it explicitly after retaining its draft.
+different applications are. The September 12 live-update repair automatically
+adopts compatible installed releases in open views after retaining each browser's
+draft. An explicit Update control remains available to retry blocked updates.
+Compatible refresh keeps the subject-bound lease so another browser can finish
+retaining its draft; close, reopen and uninstall still revoke/renew leases.
 
 An authored generic desktop discovers installed applications and hosts each in
 an opaque-origin iframe. It contains no Notes/Documents case. Common editor code
@@ -82,7 +85,21 @@ Change signals prompt bounded subject reads; they are not a new query-subscripti
 engine. The editor preserves local selection during background refresh. Revision
 conflicts keep the draft with explicit Use my draft / Use saved text actions.
 Close/update flushes freeze input while the frame confirms retention. Retention
-does not require resolving a content conflict first.
+does not require resolving a content conflict first. Each tab also keeps its own
+retained view state in the protected host's session storage; native state remains
+the durable fallback. This prevents an observation browser's clean state from
+overwriting another tab's conflicting draft during remount. These local copies
+survive reload within the tab, not closing it or clearing browser storage.
+
+The host waits up to 20 seconds for shell draft retention (application flushes
+have a 12-second deadline), reports the failure reason, and retries pending
+publication after 10 seconds using the latest installed shell. Frames that never
+completed the application ready/init handshake have received no subject context;
+they do not block replacement of the shell. Running applications must acknowledge
+retention before replacement. Ordinary shell polls run every 1.5 seconds and
+application polls every 2.5 seconds; these are not a real-time delivery guarantee.
+Broken initialized applications, unresolved storage failures and expanded grants
+can still block updates and must remain visible rather than discard edits.
 
 ## Distribution and lifecycle
 

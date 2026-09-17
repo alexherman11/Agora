@@ -170,12 +170,20 @@ class Applications:
             raise Refusal("Update changes related-object access. Open a new view explicitly.")
         if not set(app["accepts"]) <= set(self.world.get(value["subject"])["facets"]):
             raise Refusal("Updated application no longer accepts this subject.")
+        if (
+            value["build"] == installation["facets"]["agora.installation"]["build"]
+            and value["installation_revision"] == installation["revision"]
+        ):
+            return self.public_view(obj)
         return self.update(
             actor,
             obj,
             build=installation["facets"]["agora.installation"]["build"],
             installation_revision=installation["revision"],
-            lease=secrets.token_urlsafe(24),
+            # Compatible publication preserves this subject-bound view's lease.
+            # Other browsers must still be able to retain their drafts before
+            # mounting the new code. Close/reopen/uninstall still revoke leases;
+            # every request continues to use the current, non-expanded grant.
             grant={
                 **{k: list(app[k]) for k in ("read_facets", "write_facets")},
                 "relations": copy.deepcopy(app.get("relations", {})),

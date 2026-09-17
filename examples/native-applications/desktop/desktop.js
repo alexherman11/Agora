@@ -20,7 +20,10 @@
   function thaw(entry) { entry.frame.inert = false; }
   function flush(entry) {
     return new Promise((resolve, reject) => {
-      if (!entry.context || !entry.ready) { reject(new Error('Wait for the application to finish opening.')); return; }
+      // No init/context was delivered to a frame that never became ready.
+      // It cannot have read or edited its bound subject through the SDK.
+      if (!entry.ready) { resolve(); return; }
+      if (!entry.context) { reject(new Error('Missing context for ' + title(entry.info.subject))); return; }
       entry.frame.inert = true;
       const id = crypto.randomUUID(), timer = setTimeout(() => { entry.flushes.delete(id); thaw(entry); reject(new Error('The application did not confirm its drafts were retained.')); }, 12000);
       entry.flushes.set(id, {resolve, reject, timer}); send(entry, {type: 'flush', id});
@@ -169,7 +172,21 @@
       for (const [id, entry] of windows) if (!active.some(view => view.id === id)) { entry.node.remove(); windows.delete(id); }
       for (const info of active) {
         let entry = windows.get(info.id);
+        if (entry && entry.info.build !== info.build) {
+          try { await flush(entry); }
+          catch (error) { thaw(entry); notice('Update waiting for ' + title(info.subject) + ': ' + error.message); continue; }
+        }
         if (!entry || entry.info.build !== info.build) entry = await mount(info, entry);
+        const installed = app(info.package);
+        if (info.installation_revision !== installed.revision && Date.now() >= (entry.updateAfter || 0)) {
+          entry.updateAfter = Date.now() + 10000;
+          try {
+            await flush(entry);
+            const updated = await call('application.refresh', {view: info.id});
+            entry = await mount(updated, entry);
+            Object.assign(info, updated);
+          } catch (error) { thaw(entry); notice('Update waiting for ' + title(info.subject) + ': ' + error.message); }
+        }
         if (!entry.gesture) { entry.info = info; applyBounds(entry); } decorate(entry);
       }
       $('view-count').textContent = active.length + ' open views'; $('empty').hidden = !!active.length;
@@ -183,7 +200,7 @@
       if (value.event === 'changed') { sync(); for (const entry of windows.values()) if (entry.ready) send(entry, {type: 'changed'}); return; }
       if (value.event === 'prepare-reload') {
         try { await Promise.all([...windows.values()].map(flush).concat([...flushers].map(handler => handler()))); parent.postMessage({agora: true, event: 'reload-ready', id: value.id, result: {ready: true}}, '*'); }
-        catch (error) { for (const entry of windows.values()) thaw(entry); notice(error.message); parent.postMessage({agora: true, event: 'reload-ready', id: value.id, result: {ready: false}}, '*'); } return;
+        catch (error) { for (const entry of windows.values()) thaw(entry); notice(error.message); parent.postMessage({agora: true, event: 'reload-ready', id: value.id, result: {ready: false, error: error.message}}, '*'); } return;
       }
       const task = pending.get(value.id); if (task) { pending.delete(value.id); clearTimeout(task.timer); if (value.error) task.reject(new Error(value.error)); else task.resolve(value.result); } return;
     }
@@ -221,7 +238,7 @@
       const bundle = JSON.parse(await file.text());
       const catalog = await call('package.catalog'); const existing = catalog.packages.find(p => p.package_id === bundle.source?.id);
       await call('application.import', {bundle, expected_revision: existing?.source_revision || 0}); await sync();
-      notice('Application installed. Existing views can adopt it with Update after retaining their drafts.');
+      notice('Application installed. Open views update after retaining their drafts.');
     } catch (error) { notice(error.message); } finally { $('bundle-file').value = ''; }
   };
   window.addEventListener('resize', sizeBoard);
