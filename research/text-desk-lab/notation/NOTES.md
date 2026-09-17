@@ -1096,3 +1096,5 @@ kind, due, text, tags). Results below once synced.
 **Results (Terra, lean, today's desk):** review 12/12 gating in 12 calls (34 s), big 8/8 in 10 (33 s), priya 12/12 in
 27 (84 s), agenda 6/6 in 9 (22 s). Misses only on the two non-gating judgment checks, as all week. Against round 11:
 review 16→12 calls, big 12→10, priya 26→27, agenda 14→9. Sync now scores gating checks only.
+**Tokens, reruns vs round 11 (chars/3.8, cumulative context):** review 40k→32k, big 23k→14k, agenda 19k→10k,
+priya 59k→64k. Schema 266→318 (the trials sentence). Three of four tasks cost less on today's desk; priya is flat.

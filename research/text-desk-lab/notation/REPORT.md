@@ -359,3 +359,52 @@ research/text-desk-lab/notation/
   REPORT.md         this file
   runs/             47 recorded trials with frozen source copies
 ```
+
+---
+
+## Addendum: rounds 11b to 11i (2026-09-17). The desk as a workspace, and trials as things on it
+
+The rounds after this report's original scope changed the question from "can a model use a text desk" to
+"can a desk be lived in and built from inside". Everything below is in `NOTES.md` (rounds 11b to 11i),
+`FRICTION.md`, and the desk itself: `sessions/home.desk.txt` is an `export` that rebuilds it exactly.
+
+**What was added, all from inside the system.** A person (Alex) and then I used the desk instead of running
+tasks on it. Each friction became a fix the same hour: surfaces creatable (`create kind=surface`), titles as the
+practical names everywhere (`in:Today`, `examine "Two words"`), property verbs (`tag`, `due`, then general
+`prop k=v` with `prop:k=v` selections), one deep view (`examine` shows a surface's children; `look :3` first lines,
+`look :4` full text), `find <selection>` as the scalable listing, and an undo that takes a command and its
+consequences back together.
+
+**The automation layer.** `rule when <selection> do <verb> [target] [k=v]` fires once per thing entering a
+selection (`now=1` for current matches); `rule on <verb> [by=actor] do ...` fires on happenings; both may name an
+explicit target (`rule when in:Today do sort Today by=due`). `script name = cmds` with `$1..` and `run`. `clock
+YYYY-MM-DD` or `clock now`; `today`/`$today`; events stamped with the clock day so `age<N`/`age>N` select by time
+without storing timestamps. Views (`create kind=view query=`) are the declarative twin of rules: a surface whose
+contents are a selection. `why <id>` gives provenance and the next rule that would act. `export` writes the
+commands that rebuild the desk; a replay is shape-identical, which makes the text the desk's source form.
+
+**Trials as things.** `kind=trial` with props task/variant/model; `launch` starts a run in the background (the
+first verb whose effect leaves the world: `undo` refuses it by name); `sync` brings results back as events by the
+actor `harness` (props, a reply comment, a transcript doc with `## call N` sections, a link). Rules file them,
+views list them (`Running`, `Failed`, `Scoreboard`), `compare A B` sets two side by side.
+
+**Measured with models on the home desk (one run each unless noted):**
+
+| task | what the model must do | Terra | Sol |
+|---|---|---|---|
+| home | reply to Priya, file a friction note (a rule files it), change a due date | 6/7 then 7/7 after fixing what its note named (7, 8 calls) | not run |
+| home2 | write a sweep rule (now and from now on), a morning script, run it, report overdue | 7/7 in 6 calls | 9/9 in 8 calls |
+| home3 | start a trial from the desk, report its label, do not wait | 6/6 in 4 calls | 6/6 in 6 calls |
+| the four original tasks, rerun on the changed desk, launched from the desk | | review 12/12 in 12, big 8/8 in 10, priya 12/12 in 27, agenda 6/6 in 9 | not run |
+
+Both models built automation from `help rules` / `help scripts` alone, and both started a trial from `help trials`
+alone. Two runs left friction notes on my desk in their own words; both were acted on.
+
+**What the desk taught about itself.** Selections are the primitive: rules, views, scoreboards and sweeps are
+all one afternoon each on top of them. Every printed hint must run as printed, and every fold must declare
+itself, including cut comments and cramped panels. Time is a command, and undo is not touching. Log after the
+look, never before: two journal entries had to be corrected because I wrote the result I expected.
+
+**Still open.** Nothing advances on its own; a sweep rule over an age term needs `now=1`; rule-fed panels order
+by arrival unless a sort rule is added; comments by other actors cannot be written by the grammar, so an export
+cannot carry them.
