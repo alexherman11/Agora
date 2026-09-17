@@ -37,11 +37,18 @@ is the desk.
 | time | events stamped with the clock day; `age<N` / `age>N` terms; examine prints `when:`; undo is not touching |
 | provenance | `why <id>`: the events that put a thing where it is, and which rule would act on it next |
 | chat | `append` on a chat signs unsigned lines as Alex; `find` ranks title matches first |
+| properties | `prop k=v remove=k` on any thing, shown on the line, `prop:k=v` selects; export carries them |
+| trials | kind `trial`; `launch` runs run.py in the background (external effect, undo refuses); `sync` brings results back as `harness` events with a transcript doc; `help trials` |
+| rules | a rule may name an explicit target: `rule when in:Today do sort Today by=due` |
+| handles | `create ... as=name`, `set name = <id or title>`, `$name`, `vars` |
+| escapes | the desk owns them: unescaped `
+` newline, `\` backslash, `\$today` literal; the batch splitter honours escaped quotes |
 | receipts | `move` to the current parent is a no-op; `where:` only printed where overlap is possible |
 
 ## Measured
 
 Terra on the home desk (task `home`): 6 of 7 in 7 calls, then 7 of 7 in 8 calls after fixing what its own Model's view note named.
+Terra and Sol on `home2` (write a sweep rule and a morning script): 7/7 in 6 calls and 8 calls. A Terra run launched from inside the desk: 8/9 (assessor strictness), synced back as harness events.
 
 ## Still open (also on the desk under Friction)
 

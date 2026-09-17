@@ -623,7 +623,7 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
-            positional = [a for a in argv[1:] if "=" not in a or a.startswith("?")]
+            positional = [unescape_value(a) for a in argv[1:] if "=" not in a or a.startswith("?")]   # titles carry escapes too
             kv = {}
             for a in argv[1:]:
                 if "=" in a and not a.startswith("?"):

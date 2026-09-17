@@ -1069,3 +1069,6 @@ and filed it into Today. Export round trip then exposed the escape grammar: expl
 `\n`; escaped quotes broke the batch splitter; `$today` inside quoted text was substituted on replay. Settled: the
 desk owns escapes (unescaped `\n` newline, `\` backslash, `\$today` literal), the splitter honours them, export
 writes them. Replay is identical except comments by other actors, which the grammar cannot write by design.
+**Sol launched from the desk through a script** (`script trial = do create Trials kind=trial title=$1 as=t; do prop $t
+task=$2 model=$3 variant=lean; do launch $t`): 9/9, 8 calls, 32.8 s; synced back and filed by the rules.
+`find kind:trial` lists both models' runs with their props on the line: the scoreboard is a selection.
