@@ -23,8 +23,23 @@
     await refresh(true);
   }
 
+  // Iris, Astra: replacing the whole tree destroyed a reader's selection whenever anyone else acted. A part whose
+  // own facts did not change keeps its element; only what changed is made again.
+  let kept = new Map(), next = new Map();
   function make(n) {
+    const sig = JSON.stringify({ ...n, kids: n.kids.map(k => k.key) }), old = kept.get(n.key);
+    if (old && old.sig === sig) {
+      const els = n.kids.map(make), same = els.length === old.el.children.length && els.every((e, i) => old.el.children[i] === e);
+      // a part with its own words cannot have its children swapped without losing the words: make it again
+      if (same || n.text === null) {
+        // place only what differs: re-inserting an untouched sibling would drop the reader's selection inside it
+        els.forEach((e, i) => { if (old.el.children[i] !== e) old.el.insertBefore(e, old.el.children[i] || null); });
+        while (old.el.children.length > els.length) old.el.lastChild.remove();
+        next.set(n.key, old); return old.el;
+      }
+    }
     const el = document.createElement("div");
+    next.set(n.key, { el, sig });
     el.dataset.key = n.key;      // Iris: with the key on the paint, agreement is a join, not two trees walked side by side
     if (n.role) el.className = Style.roleClass(n.role);
     if (n.layout) el.classList.add("l-" + n.layout);
@@ -72,10 +87,13 @@
     last = key;
     sceneAt = r.events_total;
     if (r.refused) { paint.replaceChildren(); said.textContent = "refused: " + r.refused; return; }
-    paint.replaceChildren(make(r.scene));
+    next = new Map();
+    const root = make(r.scene);
+    kept = next;
+    if (paint.firstChild !== root) paint.replaceChildren(root);
     said.textContent = r.text;
   }
 
   await refresh();
-  setInterval(refresh, 1500);
+  setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
 })();
