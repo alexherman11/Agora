@@ -342,7 +342,10 @@ class Desk:
             if s.get("props") and s["kind"] == "trial":
                 p = s["props"]   # a trial's line reads as a result, not as a property dump
                 bits.append(" ".join(x for x in [p.get("task", ""), str(p.get("model", "")).replace("gpt-5.6-", ""),
-                                                 p.get("status", ""), p.get("score", ""),
+                                                 p.get("status", ""),
+                                                 ("FAIL" + (f" ({p['failed']})" if p.get("failed") else "")) if p.get("pass") == "0"
+                                                 else "pass" if p.get("pass") == "1" else "",
+                                                 p.get("score", ""),
                                                  f"{p['calls']} calls" if p.get("calls") else "",
                                                  f"{p['seconds']}s" if p.get("seconds") else ""] if x))
             elif s.get("props"):
@@ -426,7 +429,7 @@ class Desk:
         return "\n".join(lines)
 
     def delta_header(self):
-        evs = [e for e in self.world.events[self.last_event_seen:] if e["by"] != "jeff"]
+        evs = [e for e in self.world.events[self.last_event_seen:] if e["by"] != self.world.me]
         self.last_event_seen = len(self.world.events)
         if not evs:
             return ""
@@ -643,7 +646,7 @@ class Desk:
 
     def cmd_undo(self, eid):
         if not eid:
-            mine = [e for e in self.world.events if e["by"] == "jeff" and e["verb"] != "undo" and not e.get("undone")]
+            mine = [e for e in self.world.events if e["by"] == self.world.me and e["verb"] != "undo" and not e.get("undone")]
             if not mine:
                 raise Refusal("nothing of yours to undo")
             eid = mine[-1]["id"]   # bare undo: your latest change

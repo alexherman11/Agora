@@ -398,7 +398,7 @@ def v_done(w, nid, a):
 @verb("prop", ["appearance"], "Set or clear named properties on this thing's subject (k=v ...; remove=k). prop:k=v selects by them.",
       "k=v ... | remove=k", "do prop a12 model=gpt-5.6-sol status=queued")
 def v_prop(w, nid, a):
-    actor = a.pop("_by", "jeff")
+    actor = a.pop("_by", None) or w.me
     s = w.subjects[w.nodes[nid]["subject"]]
     props = s.setdefault("props", {})
     rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]

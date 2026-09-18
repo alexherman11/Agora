@@ -41,6 +41,8 @@ def main():
         desk = fresh()
     else:
         desk = pickle.loads(path.read_bytes())
+    # --as <name>: a visitor works under their own name for this visit (events say by <name>); the owner is jeff
+    desk.world.me = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
     if "--dump" in sys.argv:
         print(json.dumps(desk.snapshot(), indent=1))
         return

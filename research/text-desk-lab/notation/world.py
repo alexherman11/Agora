@@ -64,7 +64,8 @@ class World:
                     return s, c
         return None, None
 
-    def add_link(self, a, b, kind, actor="jeff"):
+    def add_link(self, a, b, kind, actor=None):
+        actor = actor or self.me
         sa, sb = self.subject_of(a), self.subject_of(b)
         if not sa or not sb:
             raise Refusal("link needs two things with content (appearances or subjects), not surfaces")
@@ -263,7 +264,10 @@ class World:
 
     today = None   # the clock, when a desk sets one; events are stamped with it so things can have an age
 
-    def _event(self, verb, target, args, undo, actor="jeff", note=""):
+    me = "jeff"   # who is at the desk: the owner by default; a visitor works under their own name
+
+    def _event(self, verb, target, args, undo, actor=None, note=""):
+        actor = actor or self.me
         ev = {"id": f"e{len(self.events) + 1}", "verb": verb, "target": target,
               "args": deepcopy(args), "undo": undo, "note": note, "by": actor}
         if self.today:
@@ -349,7 +353,8 @@ class World:
             v["unlink"] = "id=<lNN>"
         return v
 
-    def apply(self, verb, target, rev, args, actor="jeff"):
+    def apply(self, verb, target, rev, args, actor=None):
+        actor = actor or self.me
         args = dict(args or {})
         if target in self.subjects:
             return self._apply_subject(verb, target, rev, args, actor)
@@ -652,6 +657,9 @@ class World:
                 s["text"] = str(args["text"])
             if "append" in args:
                 line = str(args["append"])
+                if s["kind"] == "chat" and actor not in ("jeff", "alex") and actor == self.me and not re.match(r"^\w+:", line.strip()):
+                    line = actor.capitalize() + ": " + line.strip()   # a visitor signs with their own name
+                    args = dict(args, append=line, signed=actor.capitalize())
                 if s["kind"] == "chat" and actor in ("jeff", "alex") and not re.match(r"^\w+:", line.strip()):
                     line = "Alex: " + line.strip()   # chat lines carry a speaker; an unsigned line from us is ours
                     args = dict(args, append=line, signed="Alex")

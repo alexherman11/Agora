@@ -79,6 +79,7 @@ def sync(desk):
         moo.REGISTRY["prop"].run(w, host, {"status": "done", "pass": "1" if a.get("pass") else "0",
                                            "score": f"{passed}/{len(checks)}", "calls": str(rep.get("calls")),
                                            "seconds": str(rep.get("elapsed_seconds")), "refusals": str(rep.get("refusals")),
+                                           **({"failed": ",".join(k for k in checks if not a[k])} if not a.get("pass") else {}),
                                            "_by": "harness"})
         reply = (rep.get("reply") or "").strip()
         if reply:

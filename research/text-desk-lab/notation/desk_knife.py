@@ -641,6 +641,8 @@ class DeskKnife(DeskMoo):
                                     or str(e.get("via", "")).startswith("rule "):
                                 continue
                             t = e["target"]
+                            if e["verb"] == "create" and isinstance(e.get("undo"), dict) and e["undo"].get("delete"):
+                                t = e["undo"]["delete"]   # a create happens to the new thing, not to the surface it landed in
                             if t in self.world.subjects:
                                 apps = self.world.appearances_of(t)
                                 t = apps[0] if apps else None
@@ -1019,7 +1021,7 @@ class DeskKnife(DeskMoo):
             if seen is not None and seen != w.nodes[i]["rev"]:
                 sid = w.nodes[i].get("subject")
                 last = [e for e in w.events if e["target"] == i or (sid and e["target"] == sid) or i in (e.get("changed") or [])]
-                if last and last[-1]["by"] != "jeff":
+                if last and last[-1]["by"] != self.world.me:
                     stale.append(f"{i} (changed by {last[-1]['by']})")
         if stale:
             raise Refusal("stale: " + ", ".join(stale) + "; look at them again before acting")
