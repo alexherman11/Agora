@@ -523,10 +523,11 @@ class Desk:
             body = f"## {pick[0]}\n{pick[1]}"
         if tail:
             bl = body.splitlines()
-            keep = bl[:1] if bl and bl[0].startswith("## ") else []
-            rest = bl[len(keep):]
-            if len(rest) > tail:
-                body = "\n".join(keep + [f"(… {len(rest) - tail} earlier line(s) folded; without tail= for all)"] + rest[-tail:])
+            if len(bl) > tail:
+                cut = bl[:-tail]
+                heading = next((l for l in reversed(cut) if l.startswith("## ")), None)   # the section the tail lines belong to
+                keep = [heading] if heading else []
+                body = "\n".join(keep + [f"(… {len(cut) - len(keep)} earlier line(s) folded; without tail= for all)"] + bl[-tail:])
         out = f"{head}\n---\n{body}\n---"
         if s.get("comments"):
             out += "\ncomments:"

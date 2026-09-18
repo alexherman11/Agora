@@ -50,7 +50,9 @@ def parse_selection(w, token):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
-    if not terms or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:")) or t == "hidden" for t in terms):
+    neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
+    terms = [t for t in terms if not t.startswith("-")]
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:")) or t == "hidden" for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -142,7 +144,13 @@ def parse_selection(w, token):
             linked = {l["to"] if l["from"] == src else l["from"] for l in w.links_of(src)}
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in linked]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id>")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id>; -term leaves out")
+    for n in neg:
+        r = parse_selection(w, n)
+        if r is None:
+            raise Refusal(f"-{n}: {n!r} is not a selection term")
+        out = set(r[0])
+        cands = [c for c in cands if c not in out]
     return cands, token
 
 

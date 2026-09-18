@@ -28,6 +28,8 @@ SELECTION_HELP = """selections: a target can be one id, or a selection that name
   due<2026-09-20     due before (due> after)
   age<2              touched within the last 2 days by the clock (age>7: untouched for a week); needs clock
   title:agenda       title contains the word
+  prop:status=done   by property (prop:status alone: has the property)
+  -tag:fixed         leaves out what the term would select (any term may be negated)
   a20,a22            an explicit list
 combine terms with commas (AND): kind:image,in:f04. The receipt lists everything the verb touched.
 find <selection> lists what it matches, grouped by surface: find kind:image   find tag:harbor,in:f04   find hidden
