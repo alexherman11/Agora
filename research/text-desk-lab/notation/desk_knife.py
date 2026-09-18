@@ -492,7 +492,7 @@ class DeskKnife(DeskMoo):
         w = self.world
         out = ["# export of this desk; replay on an empty desk after one look", "look"]
         if self.today:
-            out.append(f"clock {self.today}")   # first: texts may mention $today, and age rules need a clock
+            out.append("clock follow" if self.follow else f"clock {self.today}")   # first: texts may mention $today, and age rules need a clock
         titles = {}
         for n in w.nodes.values():
             titles.setdefault(w.title(n).lower(), []).append(n["id"])
@@ -690,7 +690,35 @@ class DeskKnife(DeskMoo):
     def _note(self, text):
         self._rule_notes = (self._rule_notes or []) + [text]
 
+    follow = False      # clock follow: today is the wall date, read at every command; time passes on its own
+    last_here = None    # when the last command ran (wall time), so the desk can say how long you were away
+
+    def _tick(self):
+        """Following the wall clock: notice a new day (and run the rules for it), or a long absence."""
+        if not self.follow or self._in_rules:
+            return None
+        from datetime import datetime
+        now = datetime.now()
+        wall, last, note = now.date().isoformat(), self.last_here, None
+        away = ""
+        if last:
+            hours = (now - last).total_seconds() / 3600
+            away = (f"; you were last here {int(hours // 24)} day(s) {int(hours % 24)} h ago" if hours >= 24
+                    else f"; you were last here {hours:.0f} h ago" if hours >= 1 else "")
+        if wall != self.today:
+            n = self.world.days_between(self.today, wall) if self.today else 0
+            self.today = self.world.today = wall
+            self._run_rules(cause=None)
+            note = f"~ {n} day(s) passed: today is {wall}{away}"
+        elif away:
+            note = "~ same day" + away
+        self.last_here = now
+        return note
+
     def _one(self, args, name="desk"):
+        tick = self._tick()
+        if tick:
+            self._rule_notes = [tick] + (self._rule_notes or [])
         n0 = len(self.world.events)
         r = super()._one(args, name)
         if len(self.world.events) > n0:
@@ -707,7 +735,21 @@ class DeskKnife(DeskMoo):
 
     def cmd_clock(self, arg):
         if not arg:
-            return f"today is {self.today}" if self.today else "no clock set. clock YYYY-MM-DD sets today and re-evaluates the rules"
+            if self.follow:
+                from datetime import datetime
+                return f"today is {self.today}, {datetime.now():%H:%M}; following the wall clock (clock YYYY-MM-DD stops following)"
+            return f"today is {self.today}" if self.today else "no clock set. clock follow keeps today on the wall date; clock YYYY-MM-DD sets it by hand"
+        if arg == "follow":
+            from datetime import date, datetime
+            wall, w = date.today().isoformat(), self.world
+            ahead = [e for e in w.events if (e.get("day") or "") > wall]
+            for e in ahead:
+                e["day"] = wall   # days that were simulated by hand: they happened no later than today
+            self.follow, self.today, w.today, self.last_here = True, wall, wall, datetime.now()
+            self._run_rules(cause=None)
+            return (f"ok following the wall clock: today is {wall}. Days pass on their own now; the desk says so on the first command of a new day"
+                    + (f"\n  {len(ahead)} event(s) carried simulated dates after today; they now count as today" if ahead else ""))
+        self.follow = False
         if arg == "now":
             from datetime import date
             arg = date.today().isoformat()   # the wall clock, read once, as a command: still nothing advances on its own
@@ -858,7 +900,9 @@ class DeskKnife(DeskMoo):
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
   with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)""",
-        "clock": """clock: the desk has no time of its own. clock YYYY-MM-DD (or clock now) sets today and re-evaluates the rules.
+        "clock": """clock: clock follow keeps today on the wall date: days pass on their own, the rules run when a new day is
+  noticed, and the first command after an absence says how long you were away. clock alone shows the date and hour.
+  clock YYYY-MM-DD (or clock now) sets today by hand, re-evaluates the rules, and stops following.
   today in due< / due> terms is the clock's date; $today in any command; age<N / age>N select by days since a
   thing was last touched (undo is not touching). examine prints when: with the last touch.""",
         "handles": """handles: names for ids. do create ... as=draft, or set draft = <id or title>; then $draft names it.
