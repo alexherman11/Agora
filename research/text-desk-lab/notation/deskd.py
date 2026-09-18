@@ -108,6 +108,9 @@ class Handler(SimpleHTTPRequestHandler):
                     out = {"scene": sc, "text": text, "events_total": len(desk.world.events)}
                 except scene.LensRefusal as e:
                     out = {"refused": str(e), "events_total": len(desk.world.events)}
+                except Exception as e:      # Astra: a compiler fault must arrive as a refusal, not as a dead endpoint
+                    out = {"refused": f"the lens compiler failed ({type(e).__name__}: {e}); this is a bug in scene.py, not in your lens",
+                           "events_total": len(desk.world.events)}
             return self._json(out)
         if u.path == "/api/events":
             since = int(q.get("since", 0))
@@ -127,6 +130,15 @@ class Handler(SimpleHTTPRequestHandler):
         sess = Session(body.get("session", "desktop"), body.get("as"))
         with sess as desk:
             before, n0 = set(desk.world.nodes), len(desk.world.events)
+            ob = body.get("observed") or {}
+            if ob.get("item") in desk.world.nodes and isinstance(ob.get("rev"), int):
+                # Astra: a gesture acts on the generation its maker SAW. The painter used to prefix `look item;`, which
+                # turned stale pixels into fresh permission. Now the act carries what was observed and the fence judges that.
+                desk.seen[ob["item"]] = ob["rev"]
+                idx = getattr(desk, "_seen_idx", None)
+                if idx is None:
+                    idx = desk._seen_idx = {}
+                idx[(sess.actor, ob["item"])] = int(ob.get("at", 0))
             if line.lower().split(" ")[0] == "worktree":
                 text, desk = worktree.handle(line, sess.name, desk, sess.actor)
                 sess.desk = desk

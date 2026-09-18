@@ -11,18 +11,17 @@
   const paint = document.getElementById("paint"), said = document.getElementById("said");
   Style.install(await (await fetch("style/calm.style")).text(), q.get("theme") || undefined);
 
-  let last = "", busy = false;
+  let last = "", busy = false, sceneAt = 0;
 
-  async function send(line) {
-    const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line }) })).json();
+  // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
+  async function send(n, line) {
+    const observed = n.item ? { item: n.item, rev: n.rev, at: sceneAt } : null;
+    const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json();
     const t = r.text || r.error || "";
     if (r.error || t.startsWith("ERR")) said.textContent = "refused: " + t + "\n\n" + said.textContent;
     busy = false;
     await refresh(true);
   }
-
-  // the desk refuses an act on a thing you have not looked at; a gesture on a painted thing IS having looked
-  const looked = (item, line) => (item ? `look ${item}; ` : "") + line;
 
   function make(n) {
     const el = document.createElement("div");
@@ -35,7 +34,7 @@
       if (n.clamp) { el.classList.add("clamp"); el.style.webkitLineClamp = n.clamp; }
     }
     for (const a of n.acts) {
-      if (a.on === "click") el.addEventListener("click", () => send(looked(n.item, a.line)));
+      if (a.on === "click") el.addEventListener("click", () => send(n, a.line));
       if (a.on === "edit") {
         el.contentEditable = "plaintext-only";
         el.addEventListener("focus", () => { busy = true; });
@@ -43,7 +42,7 @@
         el.addEventListener("blur", () => {
           // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
           const v = el.textContent.trim().replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
-          if (v && v !== n.text) send(looked(n.item, a.line.replace("$value", v))); else busy = false;
+          if (v && v !== n.text) send(n, a.line.replace("$value", () => v)); else busy = false;
         });
       }
       if (a.on === "drag" && n.box) {
@@ -55,7 +54,7 @@
           const move = m => { x = Math.max(0, n.box[0] + m.clientX - x0); y = Math.max(0, n.box[1] + m.clientY - y0); el.style.left = x + "px"; el.style.top = y + "px"; };
           const up = () => {
             el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up);
-            if (x !== n.box[0] || y !== n.box[1]) send(looked(n.item, a.line.replace("$x", Math.round(x)).replace("$y", Math.round(y)))); else busy = false;
+            if (x !== n.box[0] || y !== n.box[1]) send(n, a.line.replace("$x", Math.round(x)).replace("$y", Math.round(y))); else busy = false;
           };
           el.addEventListener("pointermove", move); el.addEventListener("pointerup", up);
         });
@@ -71,6 +70,7 @@
     const key = JSON.stringify(r.scene || r.refused);
     if (key === last) return;
     last = key;
+    sceneAt = r.events_total;
     if (r.refused) { paint.replaceChildren(); said.textContent = "refused: " + r.refused; return; }
     paint.replaceChildren(make(r.scene));
     said.textContent = r.text;

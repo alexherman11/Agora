@@ -28,15 +28,49 @@ Anything else is refused with the line number. There is no escape to raw HTML, C
 the pressure that builds against that wall is the research result.
 """
 
+import pathlib
 import re
 
 LAYOUTS = ("column", "row", "free")
-GESTURES = ("click", "edit", "drag", "drop")
+GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n")
 
 
 class LensRefusal(Exception):
     pass
+
+
+# ---- admission: what Astra's foundations audit (research/shared-visual-desk/round5-bridge) reproduced ----------
+BUDGET = 1500          # scene nodes. A lens that needs more must say `clamp N` on its repeat and let the text say the rest.
+
+
+def _outside_quotes(line, sep):
+    """Split `line` at `sep` wherever it is not inside double quotes."""
+    out, cur, q, i = [], "", False, 0
+    while i < len(line):
+        if line[i] == '"' and (i == 0 or line[i - 1] != "\\"):
+            q = not q
+        if not q and line.startswith(sep, i):
+            out.append(cur)
+            cur, i = "", i + len(sep)
+            continue
+        cur += line[i]
+        i += 1
+    out.append(cur)
+    return out
+
+
+def _roles():
+    try:
+        src = (pathlib.Path(__file__).resolve().parent / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")
+        return {l.split()[1] for l in src.splitlines() if l.startswith("role ") and len(l.split()) > 1}
+    except OSError:
+        return None
+
+
+def _cmd_value(v):
+    """A value going inside a quoted desk command keeps its quotes and backslashes (Astra: `She said "yes"` lost them)."""
+    return str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 # ---- rows: parts of the world that are not appearances, made repeatable ------------------------------------
@@ -109,8 +143,9 @@ def rows_text(desk, source):
 def parse(src):
     """-> (root_name, parts) where parts[name] = node {name, props, kids}"""
     parts, stack, root = {}, [], None
-    for n, raw in enumerate(src.replace("\\n", "\n").splitlines(), 1):
-        line = raw.split(" # ")[0].rstrip()
+    known_roles = _roles()
+    for n, raw in enumerate(src.splitlines(), 1):
+        line = _outside_quotes(raw, " # ")[0].rstrip()
         if not line.strip() or line.strip().startswith("#") or line.strip().startswith("lens "):
             continue
         indent = len(line) - len(line.lstrip())
@@ -119,11 +154,13 @@ def parse(src):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": []}
-        for p in [p.strip() for p in rest.split(", ") if p.strip()]:
+        for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if p in LAYOUTS:
                 node["layout"] = p
             elif word in ("role", "each") and re.fullmatch(r"[\w.-]+", val):
+                if word == "role" and known_roles is not None and val not in known_roles:
+                    raise LensRefusal(f"line {n}: no role {val!r} in calm.style. Roles: {' '.join(sorted(known_roles))}")
                 node[word] = val
             elif word == "text" and val:
                 node["text"] = val.strip('"')
@@ -154,6 +191,8 @@ def parse(src):
         if (node["of"] or node["over"]) and not node["each"]:
             raise LensRefusal(f"line {n}: `of`/`over` repeats something; say what with `each <part>`")
         if indent == 0:
+            if name in parts:
+                raise LensRefusal(f"line {n}: part {name!r} is already defined on line {parts[name]['line']}; one name, one part")
             parts[name] = node
             root = root or name
             stack = [(0, node)]
@@ -162,6 +201,8 @@ def parse(src):
                 stack.pop()
             if not stack:
                 raise LensRefusal(f"line {n}: indented part with no parent")
+            if any(k["name"] == name for k in stack[-1][1]["kids"]):
+                raise LensRefusal(f"line {n}: {stack[-1][1]['name']} already has a child named {name!r}; siblings need different names (they are its address)")
             stack[-1][1]["kids"].append(node)
             stack.append((indent, node))
     if not root:
@@ -170,6 +211,15 @@ def parse(src):
         for k in _walk(p):
             if k["each"] and k["each"] not in parts:
                 raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
+
+    def reach(name, trail):
+        if name in trail:
+            raise LensRefusal(f"part {name!r} repeats itself ({' -> '.join(trail + [name])}); a lens may not recurse")
+        for k in _walk(parts[name]):
+            if k["each"]:
+                reach(k["each"], trail + [name])
+    for name in parts:
+        reach(name, [])
     return root, parts
 
 
@@ -195,6 +245,8 @@ def build(desk, src, depth=0):
     root, parts = parse(src)
     w = desk.world
 
+    count = [0]
+
     def make(node, ctx, key, parent_layout="free"):
         if node["at"] == "item" and parent_layout != "free":
             raise LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
@@ -205,23 +257,37 @@ def build(desk, src, depth=0):
             n = w.nodes[ctx["item"]]
             out["box"] = [n["x"], n["y"], n["w"], n["h"]]
         if node["text"] is not None:
-            out["text"] = _fill(node["text"], ctx)
-        out["acts"] = [{"on": a["on"], "line": _fill(a["line"], ctx)} for a in node["on"]]
+            out["text"] = _fill(node["text"], {k: v for k, v in ctx.items() if k != "n"} if node["each"] else ctx)   # a repeat words its own count
+        safe = {k: (_cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
+        out["acts"] = [{"on": a["on"], "line": _fill(a["line"], safe)} for a in node["on"]]
+        if ctx.get("item") in w.nodes and out["acts"]:
+            out["rev"] = w.nodes[ctx["item"]]["rev"]      # Astra: a gesture acts on the generation that was observed, not on a fresh look
+        count[0] += 1
+        if count[0] > BUDGET:
+            raise LensRefusal(f"this lens makes more than {BUDGET} scene nodes. Put `clamp N` on the repeat (line {node['line']}); the text will say how many are left")
         if node["each"]:
             each = parts[node["each"]]
             if node["of"]:
                 out["of"] = node["of"]
                 rs = rows(desk, _fill(node["of"], ctx))
-                for k, r in enumerate(rs or []):
+                keep = node["clamp"] or 10 ** 9       # Flint: clamp N on a repeat; 305 things put 305 nodes in both printers
+                total = len(rs) if rs is not None else None
+                for k, r in enumerate((rs or [])[:keep]):
                     out["kids"].append(make(each, dict(ctx, **r), f"{key}/{r.get('cid') or r.get('eid') or r.get('name') or k}", node["layout"]))
                 sel = desk._parse_selection(_fill(node["of"], ctx)) if rs is None else None
                 ids = sel[0] if sel else []
-                for i in ids:
+                total = len(ids) if total is None else total
+                for i in ids[:keep]:
                     out["kids"].append(make(each, _ctx_for(w, i), f"{key}/{i}", node["layout"]))
+                if total > keep:
+                    out["cut"] = total - keep
+                    out["kids"].append({"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
+                                        "text": f"{total - keep} more not shown (clamp {keep}); find {_fill(node['of'], ctx)} lists all {total}",
+                                        "clamp": None, "acts": [], "kids": []})
             else:
                 for k, v in enumerate(ctx.get("_" + node["over"], [])):
                     out["kids"].append(make(each, dict(ctx, it=v), f"{key}/{k}", node["layout"]))
-            out["n"] = len(out["kids"])
+            out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
             if out["text"] is not None:                         # Flint bug 4: the count existed and could not be put into words
                 out["text"] = out["text"].replace("$n", str(out["n"]))
         for kid in node["kids"]:
@@ -241,7 +307,7 @@ def to_text(scene, name, who, at):
         if n["text"] is not None:
             # Lark: fidelity is a property of a printer, not of a tree. This printer says every cut it makes.
             t = n["text"].split("\n")
-            shown = t[: n["clamp"]] if n["clamp"] else t
+            shown = t[: n["clamp"]] if n["clamp"] and "n" not in n else t
             body, cut = " / ".join(shown), ""
             if len(body) > 240:
                 body, cut = body[:240], f" (=240 of {len(n['text'])} chars printed here; read {n.get('item') or 'it'} for all)"
