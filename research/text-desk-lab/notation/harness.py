@@ -89,6 +89,7 @@ def sync(desk):
         for t in (json.loads(l) for l in (RUNS / label / "tools.jsonl").open(encoding="utf-8")):
             line = t["arguments"].get("line", json.dumps(t["arguments"]))
             body = t["result"].get("text") if "text" in t["result"] else "ERR " + str(t["result"].get("error"))
+            body = "\n".join("    " + l for l in str(body).splitlines())   # indented: a ## inside a result is not a section
             secs.append(f"## call {t['index']}: {line[:80]}\n{body}")
         doc = w.add_subject("doc", f"{label} transcript", "\n".join(secs))
         parent = w.nodes[host]["parent"] if host in w.nodes else w.root

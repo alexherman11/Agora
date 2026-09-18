@@ -450,8 +450,10 @@ class World:
             self.reflow(before["parent"])
             self._bump(before["parent"])
             ev = self._event(verb, target, args, {"restore": before}, actor)
-            return {"ok": True, "event": ev["id"], "changed": [target, before["parent"]],
-                    "note": "appearance removed; the subject still exists"}
+            what = ("view removed; what it listed stays where it is" if n.get("layout") == "view"
+                    else "empty surface removed" if n["type"] == "surface"
+                    else "appearance removed; the subject still exists")
+            return {"ok": True, "event": ev["id"], "changed": [target, before["parent"]], "note": what}
         elif verb == "tile":
             lay = args.get("as", "column")
             if lay not in ("column", "row"):

@@ -566,6 +566,15 @@ class DeskKnife(DeskMoo):
         return "\n".join(f"{k} = {v}" for k, v in self.scripts.items())
 
     def cmd_script(self, arg):
+        if arg.startswith("drop "):
+            name = arg[5:].strip()
+            if name not in (self.scripts or {}):
+                raise Refusal(f"no script {name}; scripts lists them")
+            users = [r["id"] for r in (self.rules or []) if r["verb"] == "run" and r.get("script") == name]
+            if users:
+                raise Refusal(f"{', '.join(users)} run {name}; drop those rules first (rule drop rN)")
+            del self.scripts[name]
+            return f"ok dropped script {name}"
         name, eq, body = arg.partition("=")
         name, body = name.strip(), body.strip()
         if not eq or not name or not body:
@@ -574,7 +583,10 @@ class DeskKnife(DeskMoo):
             raise Refusal("a script name is one word")
         self.scripts = self.scripts or {}
         self.scripts[name] = body
-        return f"ok script {name} = {body}\n  run {name} [args]   ({body.count('$')} placeholder(s))"
+        out = f"ok script {name} = {body}\n  run {name} [args]   ({body.count('$')} placeholder(s))"
+        if ";" in body:
+            out += f"\n  ({body.count(';') + 1} commands in the script: a definition keeps every ; as its own, so define a script alone on its line)"
+        return out
 
     def cmd_run(self, arg):
         try:

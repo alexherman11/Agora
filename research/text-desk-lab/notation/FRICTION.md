@@ -59,3 +59,27 @@ Terra and Sol on `home2` (write a sweep rule and a morning script): 7/7 in 6 cal
 - Order inside a rule-fed panel is arrival order only.
 
 See NOTES.md rounds 11c to 11e for the narrative and `sessions/home.desk.txt` for the desk itself.
+
+## Session 2 (2026-09-17, after a compaction): the desk as the workbench
+
+Everything below was found by working at the desk or by reading a model's transcript *on* the desk (`read <transcript> #N`),
+then fixed in the lab source and filed on the desk's Done panel. Terra and Sol each ran the new task `home4` once.
+
+| area | change |
+|---|---|
+| sessions | the shell's default python is 3.14, where `itertools.count` no longer pickles; the id counter is a plain int (old pickles migrate) |
+| rules | `rule ... do run <script> [args]`; `$item` and `$item.title` in a rule's args or k=v; the seen fence stands aside while a rule fires; a refused script inside a rule is a could-not line, not a firing; `script drop <name>` refuses while a rule runs it |
+| scripts | `$1.title` (Terra used it before it existed, having found my note about it with `find`); a definition with `;` says how many commands it holds |
+| tables | `table <selection> [cols=] [by=] [desc=1]`; a view created with `cols=` renders as a table at every look; export carries the columns |
+| reading | `read X tail=N`; `read X #Section name` without quotes; `help` answers for table, find, read, sync, compare |
+| selections | registry verbs (tag, prop, due) run over selections and id lists, not only over one id |
+| receipts | a stopped batch lists its unrun commands; `prop remove=` of an absent key and `prop k=v` with the same value refuse; removing a view or surface says so; a full column says `N past the bottom (offscreen)`; `clock` going backwards says how many things are now in its future |
+| find | folds at 8 per surface with a pointer |
+| harness | transcript docs indent result bodies so a `##` inside a result is not a section |
+
+Measured: `home4` (name the trial with the most calls per passed check; make harness results announce themselves in the Journal;
+the assessor probes the rule with a fake harness prop): Terra 6/6 in 8 calls, Sol 6/6 in 10 calls. The priya rerun's 27 calls
+were read from its transcript on the desk: one stale refusal mid-batch, then six calls of one-write-per-call caution.
+
+Still open on the desk: nothing tagged friction at the time of writing. Open in my head: a column that overflows only declares it;
+a real desktop would scroll. The clock is simulation time (2026-09-27 at the end of the session), not the wall date.

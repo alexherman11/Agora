@@ -1,0 +1,11 @@
+{"trial": "desk-home4-on-sol-1", "call": 1, "name": "desk", "line": "look", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 2, "name": "desk", "line": "help rules; help scripts; help trials; help table", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 3, "name": "desk", "line": "table kind:trial cols=title,status,task,model,score,calls,pass", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 4, "name": "desk", "line": "find Journal; rules; scripts", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 5, "name": "desk", "line": "find announce; read a08", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 6, "name": "desk", "line": "script announce = do append Journal line=\"Trial result: $1.title\"; rule on prop by=harness do run announce $item", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 7, "name": "desk", "line": "scripts; rules", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 8, "name": "desk", "line": "script announce = do append Journal line=\"Trial result: $1.title\"", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 9, "name": "desk", "line": "rule on prop by=harness do run announce $item", "error": null}
+{"trial": "desk-home4-on-sol-1", "call": 10, "name": "desk", "line": "scripts; rules; read a08", "error": null}
+{"finished": "desk-home4-on-sol-1", "assessment": {"names_priya_recheck": true, "rule_on_harness_prop": true, "rule_appends_journal": true, "announce_fires": true, "announce_names_trial": true, "nothing_moved_by_hand": true, "judgment_ratio_stated": true, "pass": true}, "calls": 10, "refusals": 0, "seconds": 37.1, "error": null}

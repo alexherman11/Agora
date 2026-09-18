@@ -507,7 +507,7 @@ class Desk:
         secs = w.sections(s["text"])
         named = [(h, b) for h, b in secs if h]
         body = s["text"]
-        if named and section is None and not full:
+        if named and section is None and not full and not tail:   # tail= wants the end of the text, not its outline
             # fold-as-budget for text: the outline of sections, each with its word count
             pre = next((b for h, b in secs if h is None), "")
             lines = ([pre] if pre else []) + [f"## {h}  ({len(b.split())}w)" for h, b in named]
