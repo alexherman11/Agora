@@ -915,6 +915,12 @@ class DeskKnife(DeskMoo):
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
   with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)""",
+        "worktree": """worktree: work apart from a shared desk, then come back as commands.
+  worktree fork <name>    copy this world into <session>@<name>; enter it as its own session
+  worktree                list them (inside one: where it came from and how much is journalled)
+  worktree diff <name>    the commands made there, and what this desk did since (! = both touched it)
+  worktree merge <name>   replay those commands here, signed by who made them, all or nothing. A command whose
+                          target someone else changed since the fork is refused, and then nothing is applied.""",
         "clock": """clock: clock follow keeps today on the wall date: days pass on their own, the rules run when a new day is
   noticed, and the first command after an absence says how long you were away. clock alone shows the date and hour.
   clock YYYY-MM-DD (or clock now) sets today by hand, re-evaluates the rules, and stops following.

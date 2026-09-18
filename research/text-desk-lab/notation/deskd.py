@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import explore
+import worktree
 
 HERE = Path(__file__).resolve().parent
 SESSIONS = HERE / "sessions"
@@ -91,6 +92,8 @@ class Handler(SimpleHTTPRequestHandler):
                 snap = desk.snapshot()
                 snap["events_total"] = len(desk.world.events)
                 # Lark: each person's reading position is a fact others may see (how far into the log they have looked)
+                wt = getattr(desk, "_wt", None)
+                snap["worktree"] = {k: (len(v) if k == "journal" else v) for k, v in wt.items()} if wt else None
                 snap["readers"] = {a: v[2] for a, v in (getattr(desk, "_per", None) or {}).items()}
                 seen, header = dict(desk.seen), desk.last_event_seen      # reading for the renderer must not count as the actor looking
                 snap["outline"] = desk.outline(desk.world.root, 2, deep=True)
@@ -111,9 +114,18 @@ class Handler(SimpleHTTPRequestHandler):
         line = str(body.get("line", "")).strip()
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)
-        with Session(body.get("session", "desktop"), body.get("as")) as desk:
+        sess = Session(body.get("session", "desktop"), body.get("as"))
+        with sess as desk:
             before, n0 = set(desk.world.nodes), len(desk.world.events)
-            r = desk.dispatch("desk", {"line": line})
+            if line.lower().split(" ")[0] == "worktree":
+                text, desk = worktree.handle(line, sess.name, desk, sess.actor)
+                sess.desk = desk
+                desk._per = sess.per
+                r = {"text": text}
+            else:
+                allids = worktree.ids_of(desk)
+                r = desk.dispatch("desk", {"line": line})
+                worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably
             events = [e["id"] for e in desk.world.events[n0:]]

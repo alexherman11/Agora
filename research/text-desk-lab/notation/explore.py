@@ -33,9 +33,40 @@ def fresh():
     return d
 
 
+def via_deskd(name, me, lines):
+    """When deskd is up it is the one owner of every world: send each line as one turn and hold nothing between
+    turns. Returns False when no server answers, and the caller falls back to the file lock."""
+    import os, urllib.request, urllib.error
+    if os.environ.get("DESKD", "") == "off":
+        return False
+    url = os.environ.get("DESKD", "http://127.0.0.1:8780") + "/api/do"
+    for k, line in enumerate(lines):
+        body = json.dumps({"session": name, "as": me, "line": line, "cli": True}).encode("utf-8")
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, body, {"Content-Type": "application/json"}), timeout=60) as f:
+                r = json.loads(f.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError):
+            if k == 0:
+                return False
+            print("ERR deskd stopped answering; the lines above were applied, this one and the rest were not")
+            return True
+        print(f"> {line}")
+        print(r.get("text") or ("ERR " + str(r.get("error"))))
+        print()
+    return True
+
+
 def main():
     name = sys.argv[1]
     SESSIONS.mkdir(exist_ok=True)
+    if not [a for a in sys.argv[2:] if a.startswith("--") and a != "--as"]:
+        lines = [l.rstrip("\n") for l in sys.stdin]
+        lines = [l for l in lines if l.strip() and not l.startswith("#")]
+        who = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
+        if not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines):
+            return
+        import io
+        sys.stdin = io.StringIO("\n".join(lines) + "\n")
     path = SESSIONS / f"{name}.pickle"
     # several people may work one session at once: each invocation holds the session's lock from load to save
     import atexit, os, time
@@ -119,7 +150,16 @@ def main():
                 print("ERR", e)
             print()
             continue
+        import worktree
+        if line.strip().lower().split(" ")[0] == "worktree":
+            text, desk = worktree.handle(line, name, desk, me)
+            desk._per = per
+            print(text)
+            print()
+            continue
+        before, n0 = worktree.ids_of(desk), len(desk.world.events)
         r = desk.dispatch("desk", {"line": line})
+        worktree.record(desk, line, me, before, n0)
         print(r.get("text") or ("ERR " + r["error"]))
         print()
     per[me] = (desk.seen, desk.open, desk.last_event_seen)
