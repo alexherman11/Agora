@@ -178,6 +178,60 @@ announced test domain is a rehearsal, not a blind holdout; state what passing ch
 finding that whole-object revision fences are too blunt was reached by modelling; ours by living in the desk.
 Same conclusion, two methods.
 
+## Round three (same day): make it visible, make it programmable
+
+Alex's prompt, given verbatim to both teams: a rich, styled visualization; an agent on each team in charge of
+viewing the screen; how agents work on software inside the desk, build code through rules, and what unlocks
+visual scripting. The designers were allowed to build. Prototypes are in `prototypes/`, served at
+http://localhost:8770 . A fifth agent, **Iris**, joined as the studio's eyes (browser screenshots and in-page
+measurement), asked through an Eyes column on the studio desk.
+
+**What was built.**
+- `prototypes/lark-two-sides/` : a two-sided desk (Alex, Lark, House rules) drawn live from a session dump.
+  Iris: calm, "normal quiet desktop software, not a debug view".
+- `prototypes/wren-render/` : a renderer whose every colour, size and space comes from `calm.style`, written in
+  Wren's notation and parsed at runtime; refusals fire with runnable escapes and the previous style keeps
+  drawing; `why <id> :look` shows the winning clause and the ones it beat; an honesty tab lists what the render
+  hid or substituted. Theme switch moved 0 of 79 boxes (Iris, measured).
+- `prototypes/moss-rulegraph/` : the desk's own `rules` listing plus derived wires. "A rule is not a node, a
+  rule is already a line": nothing is stored in a position, so picture and text cannot drift apart.
+- `prototypes/flint-desk-as-program/` and session `proto-flint` : an issue tracker built with only today's desk.
+
+**The answer three of them reached independently: the scripting is already here.** A tag is a button, a rule on
+a verb is an event handler with an actor filter, rules chain (three deep in Flint's tracker) with every step
+printed, attributed, undoable as one act, and explained by `why`. A script can define a rule, so the language
+extends itself from inside. Visual scripting is therefore mostly a *rendering* of rules, scripts, fire counts
+and `why` trails. What is missing, in the order Moss and Flint converge on: **a dry run for a rule** (first,
+because it makes everything after it safe), **re-arming** (a state rule fires once per thing, ever, so the
+layer is a filing system, not a program), **values** (`$item.count`, `count=+1`), **comparison on props**,
+**checking a rule when it is defined**, **cascade limits before conditions**. Dangerous: `count`, because a
+count-guarded rule fires because of something that did not happen to the thing it acts on, and "because of e19"
+stops being true. Not needed: loops (a rule over a selection is already map).
+
+**What drawing broke in the notation** (Wren, `wren-08`): the clause separator collided with the selection
+language's colons (114 cards silently roleless); a bare colour was ambiguous between foreground and background;
+the notation said how things look and never what they are made of, so structure hid in JavaScript until
+`present card : title, body :3, meta, tags`; it cannot say arrangement, and the stored 1280x800 geometry was
+ignored entirely. Who owns width is the largest open hole.
+
+**The eyes protocol, tested for real** (Lark with Iris; `iris-how-i-look.md`). Lark planted two faults, sealed
+predictions, asked blind; both were caught, one Lark predicted she would miss ("looked, found it in the text,
+did not see it", a stale flag at 1.13:1), plus three faults nobody planted. Rules: the eyes must not be shown
+the text; the asker predicts first; a seeing agent is a `~` machine and `~` looks like `=` after one hop, so
+marks survive quotation; `?` with an extent is a complete answer; a disagreement between text and screen is
+filed, not resolved; the observer's memory is `~`, never `!`; a declaration of incompleteness must be at least
+as loud as what it qualifies. Questions that force a count or an exact quotation find faults; "does it look
+calm" finds none. Iris's cross-cutting finding: on all four pages, every honesty mark was drawn quieter than
+the thing it warns about; the one she understood before reading it was a hatched band sized to what is missing.
+Failures: no queue and no price on a serial resource (six requests in ten minutes); a request cannot name a
+version, and pages changed under her between measuring and writing; her tab was navigated away by others' saves.
+Lark's architectural point: if a render is computed client-side, the eyes become the only verifier, so the
+render must be derivable from served text; and the eyes should run a fixed script of measured checks.
+
+**Fixed in the desk the same day, from this round:** `create` refuses arguments it would ignore; `$item` as a
+rule's target is the thing it fired on; `prop:k` alone selects things having k (so `-prop:owner` works); props
+on surfaces (`do prop Alex owner=alex`), shown, selectable, exported; rules, scripts and the clock in `--dump`.
+
 ## Where to read
 
 - If only one file: `lark-a-morning-together.md` (twenty unbroken minutes of a shared session in the combined

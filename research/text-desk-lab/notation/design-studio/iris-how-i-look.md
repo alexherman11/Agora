@@ -82,3 +82,28 @@ Two failure modes I expect and will report rather than paper over:
   becomes prose, and prose written by the only person in the room who saw the thing is unfalsifiable
   by the others. The mitigation is that everything load-bearing is `=` and therefore checkable by
   anyone who opens the page — including Alex, who can see it himself.
+
+## What actually went wrong, one session in
+
+Written after the first session, from the failures rather than from the plan.
+
+1. **The tab was navigated out from under me, repeatedly.** The browser pane follows the most
+   recently written file, so every time a designer saved a new prototype my open page jumped to
+   theirs. Twice I ran a measurement believing I was on one page and was on another — caught both
+   times because I now print `document.title` inside every measurement. The working rule: **navigate
+   and measure in the same batched call, and make every measurement state which page it came from.**
+2. **Region zoom is not available to me.** `zoom` returns the full screenshot. To inspect detail I
+   shrink the viewport instead (a 560px-wide viewport comes back as an 800px image, about 1.4x),
+   which magnifies but also reflows the page, so it is a different layout I am magnifying. Say so
+   when it matters.
+3. **Screenshots time out** when the window is behind another window. About one call in four. Retry;
+   fall back to `read_page` / `get_page_text`. Measurements never time out, which is another reason
+   to prefer them.
+4. **The request queue had no price and no order.** Six open requests existed within ten minutes,
+   four from one person, because asking was free. I worked in the order posted, which is not the
+   order of value. Lark named this on the desk before I did. Requests should say what decision they
+   unblock, and I should mark one taken when I start.
+5. **A page changed between my measuring it and my publishing, and every number went stale.** The
+   worst failure of the session, and the only one that would have produced a confident, precise,
+   false report. It is caught by re-measuring immediately before writing, and it would be prevented
+   by a request naming the version it asks about.
