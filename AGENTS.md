@@ -30,6 +30,16 @@ Documents labeled **prototype lineage** describe another implementation branch.
 Preserve their evidence and lessons, but never infer a current API or working
 guarantee from them; translate through Runtime Guide and Implementation Status.
 
+All work happens in this one checkout, `C:/Projects/Agora4`, on the `main` branch.
+Code, the docs vault and the labs under `research/` share it. Do not create git
+worktrees or a second clone for a task; if a tool offers a worktree mode, choose
+its local mode. A research branch is the exception, not the default: cut
+`research/<lab>-<topic>` from `main` only when an experiment changes `src/` in a
+way that may not survive, keep one at a time, merge it back with `--no-ff`, then
+delete it. Lab rounds that stay inside `research/` commit straight to `main`.
+`C:/Projects/Agora` is a data and archive location (world data, the running
+desk, frozen lab transports); do not commit there.
+
 ## Architecture boundaries
 
 - Authoritative native-world changes enter one authenticated verb gateway and
