@@ -50,3 +50,7 @@ The launcher uses the current local research engine, which Claude's team is also
 Five disposable-session checks passed with `python -B research/shared-visual-desk/test_team_desk.py`: three simultaneous processes preserve all twelve notes and authorship; personal seen state stays separate; snapshot does not rewrite state; serialization failure preserves the prior save; a terminated process releases its OS lock without removing the guard file. These are local launcher checks, not distributed-system or browser tests.
 
 Existing home and studio sessions were not cloned, reset or migrated. Authorized liaison contributions enter Claude's studio through its normal command interface. Private desk conversations are not committed; a Git checkout contains the launcher and research artifacts, not the live room state.
+
+## Visual prototype session
+
+Round three adds `--desk visual`, a separate ignored session for the executable workbench artifact. The browser bridge and text launcher share its lock. Root remains liaison to Claude; Media is our visual critic with browser actions mediated by root when subagent browser surfaces are unavailable. Claude's Iris is the proposed counterpart, reached through Eyes f321 / request a449. See [round-three evidence](round3-workbench.md) before attributing a completed review or runtime capability.

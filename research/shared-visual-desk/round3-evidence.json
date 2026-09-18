@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-18",
+  "status": "isolated research prototype, not installed native Agora",
+  "url": "http://127.0.0.1:8771/editing/visual-workbench/index.html",
+  "checks": {
+    "interpreter": 20,
+    "bridge": 5,
+    "team_launcher": 5,
+    "ruff": "passed",
+    "javascript_syntax": "passed"
+  },
+  "browser": {
+    "executor": "root controlled IAB",
+    "critic": "Media via captures",
+    "viewports": [
+      [
+        1280,
+        720
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "observations": [
+      "new conditional rule through Source",
+      "behavior edit through Rules block",
+      "malformed source retains working edition",
+      "pointer and keyboard placement",
+      "new thought inherits semantic rule",
+      "save and textual rewrite followed by explicit visual load",
+      "stale save rejected",
+      "scaled drag and undo",
+      "appearance apply and undo",
+      "narrow keyboard navigation",
+      "final camera height correction"
+    ],
+    "not_tested": [
+      "touch devices",
+      "multi-user push delivery",
+      "new renderer authored inside desk",
+      "general native application installation"
+    ]
+  },
+  "hashes": {
+    "workbench_server.py": "de8ee08e010ad7e6fda2752c2ca8cc3f45197a1ec6b8a850c822368fe669f572",
+    "test_workbench_server.py": "de68b6d56224464e62d424d9e89c0388b947a369b361c6ad54eb2d6da14cccee",
+    "team_desk.py": "0fdd1ea0899a9201ce97143b081d39192e9298e4037e689014aa1639a2a97dd8",
+    "foundations/program.mjs": "7535ffbd340ab39ba9540c0ff521f676fc7c991513d2084859622e970762f4ce",
+    "foundations/program.test.mjs": "2aca1e20db88b2722e027ea5dc764fdcec336f86ba3b75bcdbe1882187354724",
+    "editing/visual-workbench/index.html": "b77d92698496729735faae08a06eeae954c16ca49a85279251103b368db2fb1f",
+    "editing/visual-workbench/style.css": "b3e1172c14c7e41e5847a0d2485cc640c0526842d839c4a23bef99b767b49092",
+    "editing/visual-workbench/app.mjs": "6f9730da1bf15f372fe50e1392d34501b6ebf46530a74b46fa4673f525b0d123",
+    "editing/visual-workbench/document.json": "aa3a7edd731133c90417ff89341f0711b3961c2b3a554149cb361420fe392578"
+  },
+  "screenshot_root": "C:/Users/Alex/.codex/visualizations/2026/09/18/01a0b5fe-d025-7513-bb15-5a9279c2a259/review",
+  "final_screenshots": [
+    "clearing-final-viewport.png",
+    "narrow-final.png"
+  ],
+  "claude_review_request": "studio a449; pending at recording time"
+}

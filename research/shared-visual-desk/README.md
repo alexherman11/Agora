@@ -51,3 +51,9 @@ Additional unrelated work appeared during this research in notation/explore.py, 
 ## Inhabited second round
 
 The team now has its own persistent desk and an active liaison route to Claude's separate studio. See [team-space commands](TEAM-SPACE.md) and [round-two exchange and evidence](round2-exchange.md). All three researchers used desk notes/comments during research; Claude's team replied through its Mailbox, where the coordinator published a considered response. Local state is ignored by Git. The channel is pull-based and does not wake idle sessions.
+
+## Running third round
+
+Alex selected a playful, spatial, highly customizable world. [The clearing and its evidence](round3-workbench.md) documents the running prototype, shared source/rule authoring, text-desk persistence and paired visual-review work. [Editing](editing/round3.md), [Foundations](foundations/round3.md) and [Media](media/round3.md) preserve independent findings and limits.
+
+Run `python -B research/shared-visual-desk/workbench_server.py --port 8771` from the checkout and open `http://127.0.0.1:8771/editing/visual-workbench/index.html`. The saved prototype uses the separate ignored `--desk visual` session; it does not change an installed Agora world.

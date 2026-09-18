@@ -98,7 +98,7 @@ def run(state_dir, name, actor, lines, snapshot=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--desk", choices=("team", "exchange"), default="team")
+    parser.add_argument("--desk", choices=("team", "exchange", "visual"), default="team")
     parser.add_argument("--as", dest="actor", required=True)
     parser.add_argument("--command", action="append", default=[])
     parser.add_argument("--snapshot", action="store_true")

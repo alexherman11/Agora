@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Astra narrow viewport observation</title>
+<style>
+  body { margin: 24px; background: #e7e7e7; color: #222; font: 14px/1.5 system-ui; min-width: 420px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  p { max-width: 70ch; margin: 4px 0 12px; }
+  iframe { display: block; width: 390px; height: 844px; border: 1px solid #555; background: white; }
+  output { display: block; margin: 8px 0; font-family: monospace; }
+</style>
+<h1>Controlled narrow viewport review</h1>
+<p>The embedded application has a 390 by 844 CSS pixel viewport. This is an iframe responsiveness test, not mobile device emulation. The wrapper does not edit application state.</p>
+<output id="observation">Awaiting application load.</output>
+<iframe id="specimen" title="Astra Field Notes narrow viewport" src="../editing/visual-workbench/index.html"></iframe>
+<script>
+const specimen = document.getElementById('specimen');
+specimen.addEventListener('load', () => {
+  try {
+    const target = specimen.contentWindow;
+    document.getElementById('observation').textContent =
+      `Observed iframe viewport ${target.innerWidth} x ${target.innerHeight}; URL ${target.location.href}; loaded ${new Date().toISOString()}`;
+  } catch (error) {
+    document.getElementById('observation').textContent = `Cannot inspect iframe viewport: ${error.message}`;
+  }
+});
+</script>
