@@ -1,0 +1,151 @@
+{
+  "state": {
+    "lines": {
+      "coast-radio": {
+        "missionId": "coast",
+        "qty": 2,
+        "sku": "radio"
+      },
+      "ridge-radio": {
+        "missionId": "ridge",
+        "qty": 2,
+        "sku": "radio"
+      },
+      "ridge-tent": {
+        "missionId": "ridge",
+        "qty": 1,
+        "sku": "tent"
+      },
+      "51df26ee-a296-4b91-84de-446ef976ed1f": {
+        "missionId": "d09b465f-1b73-4503-b1dd-3a288717bc40",
+        "sku": "tent",
+        "qty": 2
+      }
+    },
+    "missions": {
+      "coast": {
+        "projectId": "ocean",
+        "status": "dispatched",
+        "title": "Coastal survey",
+        "charged": 240
+      },
+      "ridge": {
+        "projectId": "alpine",
+        "status": "cancelled",
+        "title": "Ridge survey",
+        "charged": 540
+      },
+      "d09b465f-1b73-4503-b1dd-3a288717bc40": {
+        "title": "Glacier observatory",
+        "projectId": "alpine",
+        "status": "draft",
+        "charged": 0
+      }
+    },
+    "projects": {
+      "alpine": {
+        "available": 1000,
+        "name": "Alpine research"
+      },
+      "ocean": {
+        "available": 160,
+        "name": "Coastal research"
+      }
+    },
+    "stock": {
+      "radio": {
+        "available": 1,
+        "name": "Field radio",
+        "unitCost": 120
+      },
+      "tent": {
+        "available": 2,
+        "name": "Storm tent",
+        "unitCost": 300
+      }
+    },
+    "ledger": {
+      "09c04b16-6416-4e55-966e-b0426b7676e6": {
+        "missionId": "ridge",
+        "projectId": "alpine",
+        "kind": "dispatch",
+        "amount": 540
+      },
+      "cd961d56-f764-4e7c-bc34-184e95ade585": {
+        "missionId": "ridge",
+        "projectId": "alpine",
+        "kind": "refund",
+        "amount": 540
+      },
+      "03dd8f10-7e40-4990-acbb-e31a5c48d95e": {
+        "missionId": "coast",
+        "projectId": "ocean",
+        "kind": "dispatch",
+        "amount": 240
+      }
+    }
+  },
+  "versions": {
+    "missions/ridge/status": 2,
+    "missions/ridge/charged": 1,
+    "$collection/missions": 4,
+    "projects/alpine/available": 2,
+    "$collection/projects": 3,
+    "stock/radio/available": 3,
+    "stock/tent/available": 2,
+    "$collection/stock": 3,
+    "ledger/09c04b16-6416-4e55-966e-b0426b7676e6/$exists": 1,
+    "ledger/09c04b16-6416-4e55-966e-b0426b7676e6/missionId": 1,
+    "ledger/09c04b16-6416-4e55-966e-b0426b7676e6/projectId": 1,
+    "ledger/09c04b16-6416-4e55-966e-b0426b7676e6/kind": 1,
+    "ledger/09c04b16-6416-4e55-966e-b0426b7676e6/amount": 1,
+    "$collection/ledger": 3,
+    "ledger/cd961d56-f764-4e7c-bc34-184e95ade585/$exists": 2,
+    "ledger/cd961d56-f764-4e7c-bc34-184e95ade585/missionId": 2,
+    "ledger/cd961d56-f764-4e7c-bc34-184e95ade585/projectId": 2,
+    "ledger/cd961d56-f764-4e7c-bc34-184e95ade585/kind": 2,
+    "ledger/cd961d56-f764-4e7c-bc34-184e95ade585/amount": 2,
+    "missions/coast/status": 3,
+    "missions/coast/charged": 3,
+    "projects/ocean/available": 3,
+    "ledger/03dd8f10-7e40-4990-acbb-e31a5c48d95e/$exists": 3,
+    "ledger/03dd8f10-7e40-4990-acbb-e31a5c48d95e/missionId": 3,
+    "ledger/03dd8f10-7e40-4990-acbb-e31a5c48d95e/projectId": 3,
+    "ledger/03dd8f10-7e40-4990-acbb-e31a5c48d95e/kind": 3,
+    "ledger/03dd8f10-7e40-4990-acbb-e31a5c48d95e/amount": 3,
+    "missions/d09b465f-1b73-4503-b1dd-3a288717bc40/$exists": 4,
+    "missions/d09b465f-1b73-4503-b1dd-3a288717bc40/title": 4,
+    "missions/d09b465f-1b73-4503-b1dd-3a288717bc40/projectId": 4,
+    "missions/d09b465f-1b73-4503-b1dd-3a288717bc40/status": 4,
+    "missions/d09b465f-1b73-4503-b1dd-3a288717bc40/charged": 4,
+    "lines/51df26ee-a296-4b91-84de-446ef976ed1f/$exists": 5,
+    "lines/51df26ee-a296-4b91-84de-446ef976ed1f/missionId": 5,
+    "lines/51df26ee-a296-4b91-84de-446ef976ed1f/sku": 5,
+    "lines/51df26ee-a296-4b91-84de-446ef976ed1f/qty": 5,
+    "$collection/lines": 5
+  },
+  "serial": 5,
+  "conflicts": [
+    {
+      "id": "conflict-1",
+      "code": "invariant",
+      "action": "mission.dispatch",
+      "detail": {
+        "id": "logistics.noNegativeStock",
+        "message": "Dispatch exceeds available stock"
+      },
+      "serial": 1
+    }
+  ],
+  "seeded": [
+    "lines/coast-radio",
+    "lines/ridge-radio",
+    "lines/ridge-tent",
+    "missions/coast",
+    "missions/ridge",
+    "projects/alpine",
+    "projects/ocean",
+    "stock/radio",
+    "stock/tent"
+  ]
+}

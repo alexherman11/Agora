@@ -1,0 +1,122 @@
+[
+  {
+    "id": "e1",
+    "verb": "move",
+    "target": "a20",
+    "args": {
+      "into": "f02",
+      "before": "a16"
+    },
+    "undo": {
+      "restore": {
+        "id": "a20",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f04",
+        "x": 60,
+        "y": 60,
+        "w": 300,
+        "h": 160,
+        "z": 1,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a20",
+      "f02",
+      "f04"
+    ]
+  },
+  {
+    "id": "e2",
+    "verb": "move",
+    "target": "a22",
+    "args": {
+      "into": "f02",
+      "before": "a16"
+    },
+    "undo": {
+      "restore": {
+        "id": "a22",
+        "type": "appearance",
+        "subject": "s06",
+        "parent": "f04",
+        "x": 540,
+        "y": 30,
+        "w": 280,
+        "h": 140,
+        "z": 3,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a22",
+      "f02",
+      "f04"
+    ]
+  },
+  {
+    "id": "e3",
+    "verb": "move",
+    "target": "a20",
+    "args": {
+      "before": "a22"
+    },
+    "undo": {
+      "restore": {
+        "id": "a20",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f02",
+        "x": 8,
+        "y": 404,
+        "w": 384,
+        "h": 190,
+        "z": 3,
+        "folded": false,
+        "rev": 2
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a20",
+      "f02"
+    ]
+  },
+  {
+    "id": "e4",
+    "verb": "move",
+    "target": "a17",
+    "args": {
+      "after": "a16"
+    },
+    "undo": {
+      "restore": {
+        "id": "a17",
+        "type": "appearance",
+        "subject": "s08",
+        "parent": "f02",
+        "x": 8,
+        "y": 8,
+        "w": 384,
+        "h": 190,
+        "z": 1,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a17",
+      "f02"
+    ]
+  }
+]

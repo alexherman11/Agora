@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Agora — home</title>
+<style>html,body{margin:0;height:100%;background:#f6f4ee;color:#26372f;font:14px system-ui}
+body{display:flex;flex-direction:column}header{min-height:34px;display:flex;align-items:center;gap:12px;padding:0 16px;background:#e8ece5}
+header strong{letter-spacing:.08em;font-size:11px}header span{flex:1;font-size:12px}button,a{color:inherit}button{cursor:pointer}
+iframe{border:0;flex:1;width:100%}#login{padding:48px;max-width:600px}#problem{color:#a12828}</style>
+<header><strong>AGORA · HOST</strong><span id="status">Connecting to your world</span>
+<button id="reload" hidden>Reload updated interface</button><button id="stop">Stop JEFF</button><a id="recovery" href="/recovery" target="_blank">Recovery</a></header>
+<div id="login" hidden>Open the launch link printed by <code>agora3 serve</code> to connect this browser.
+<p id="problem"></p></div><iframe title="Your Agora environment" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+<script>
+const frame=document.querySelector('iframe');let token=location.hash.slice(1)||sessionStorage.getItem('agora-operator');
+if(token){sessionStorage.setItem('agora-operator',token);history.replaceState(null,'',location.pathname)}
+document.querySelector('#recovery').href='/recovery#'+token;
+async function rpc(method,args={}){const r=await fetch('/api/rpc',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({method,args})});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Connection failed');return v.result}
+let revision=0,watermark=0,syncing=false,pending=null,flush=null;
+async function replace(v){if(revision){const id=crypto.randomUUID();const ready=new Promise(resolve=>{flush={id,resolve};setTimeout(()=>{if(flush?.id===id){frame.contentWindow.postMessage({agora:true,event:'cancel-reload',id},'*');flush=null;resolve(false)}},4000)});
+frame.contentWindow.postMessage({agora:true,event:'prepare-reload',id},'*');if(!await ready){pending=v;document.querySelector('#reload').hidden=false;document.querySelector('#status').textContent='Update ready · save your edits before reloading';return}}
+revision=v.revision;frame.srcdoc=v.html;pending=null;document.querySelector('#reload').hidden=true}
+async function sync(){if(syncing)return;syncing=true;try{const v=await rpc('host.surface');document.querySelector('#login').hidden=true;
+if(!pending)document.querySelector('#status').textContent=v.enabled?'Local development · Linux guest + native world':'Development stopped';
+if(v.revision!==revision&&!pending)await replace(v);
+if(v.watermark!==watermark){watermark=v.watermark;frame.contentWindow.postMessage({agora:true,event:'changed'},'*')}}
+catch(e){document.querySelector('#login').hidden=false;document.querySelector('#problem').textContent=e.message}finally{syncing=false}}
+const allowed=new Set(['world.query','world.get','world.transact','schema.define','schema.list','tools.list','skills.list','package.list','package.get','package.save','package.build','package.install','package.restore','candidate.exercise','action.invoke','guest.status','guest.execute','chat.send','chat.status','chat.stop','chat.login','system.status']);
+window.addEventListener('message',async e=>{if(e.source!==frame.contentWindow||!e.data?.agora)return;
+if(e.data.event==='reload-ready'&&flush?.id===e.data.id){flush.resolve(e.data.result?.ready===true);flush=null;return}
+if(!e.data.id||!e.data.method)return;const {id,method,args}=e.data;try{if(!allowed.has(method))throw Error('Not an authored-surface operation');
+const result=await rpc(method,args||{});e.source.postMessage({agora:true,id,result},'*');if(['package.install','package.restore'].includes(method))setTimeout(sync,100)}
+catch(error){e.source.postMessage({agora:true,id,error:error.message},'*')}});
+document.querySelector('#reload').onclick=()=>{const v=pending;pending=null;replace(v)};
+document.querySelector('#stop').onclick=()=>rpc('host.stop').then(sync).catch(e=>alert(e.message));sync();setInterval(sync,1500);
+</script></html>

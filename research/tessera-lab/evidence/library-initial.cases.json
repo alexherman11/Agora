@@ -1,0 +1,5 @@
+[
+  {"steps":[],"assert":[{"expr":["get",["record","items","welcome"],"sourceUrl"],"equals":"https://arxiv.org/abs/1402.2237"},{"expr":["get",["record","items","calm"],"reference"],"equals":"CALM / Bloom research overview"},{"expr":["count",["query","library.visible"]],"equals":3}]},
+  {"steps":[{"action":"library.setUrl","args":{"id":"welcome","url":"https://example.org/revised-paper"}},{"action":"library.setReference","args":{"id":"welcome","reference":"Updated bibliography entry"}}],"assert":[{"expr":["get",["record","items","welcome"],"sourceUrl"],"equals":"https://example.org/revised-paper"},{"expr":["get",["record","items","welcome"],"reference"],"equals":"Updated bibliography entry"}]},
+  {"steps":[{"action":"item.rename","args":{"id":"calm","title":"Monotonic research"}}],"assert":[{"expr":["get",["record","items","calm"],"title"],"equals":"Monotonic research"},{"expr":["get",["record","items","calm"],"sourceUrl"],"equals":"https://bloom-lang.net/calm/"}]}
+]

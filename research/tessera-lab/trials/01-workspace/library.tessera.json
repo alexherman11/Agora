@@ -1,0 +1,26 @@
+{
+  "id": "library",
+  "claims": [
+    {"kind":"field","id":"items.sourceUrl","type":"string","default":"","merge":"register"},
+    {"kind":"field","id":"items.reference","type":"string","default":"","merge":"register"},
+    {"kind":"seed","id":"items/welcome","values":{"sourceUrl":"https://arxiv.org/abs/1402.2237","reference":"Invariant confluence — Bailis et al."}},
+    {"kind":"seed","id":"items/calm","values":{"title":"CALM and Bloom","body":"Coordination and monotonicity in distributed programs.","sourceUrl":"https://bloom-lang.net/calm/","reference":"CALM / Bloom research overview"}},
+    {"kind":"seed","id":"items/blooml","values":{"title":"BloomL: distributed programming with lattices","body":"A lattice-based language for coordination-aware distributed programs.","sourceUrl":"https://www2.eecs.berkeley.edu/Pubs/TechRpts/2012/EECS-2012-167.html","reference":"Conway et al., EECS-2012-167"}},
+    {"kind":"query","id":"library.visible","from":"items","where":["and",["not",["row","archived"]],["or",["eq",["trim",["local","librarySearch"]],""],["includes",["lower",["row","title"]],["lower",["trim",["local","librarySearch"]]]],["includes",["lower",["row","body"]],["lower",["trim",["local","librarySearch"]]]],["includes",["lower",["row","reference"]],["lower",["trim",["local","librarySearch"]]]],["includes",["lower",["row","sourceUrl"]],["lower",["trim",["local","librarySearch"]]]]]],"sort":"title"},
+    {"kind":"action","id":"library.setUrl","requires":["or",["eq",["trim",["arg","url"]],""],["includes",["arg","url"],"https://"],["includes",["arg","url"],"http://"]],"effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"sourceUrl","value":["trim",["arg","url"]]}]},
+    {"kind":"action","id":"library.setReference","requires":true,"effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"reference","value":["trim",["arg","reference"]]}]},
+    {"kind":"view","id":"library.panel","parent":"workspace","widget":"panel","title":"Research library","order":30},
+    {"kind":"view","id":"library.search","parent":"library.panel","widget":"input","bind":"librarySearch","placeholder":"Search notes, references, or URLs","order":10},
+    {"kind":"view","id":"library.list","parent":"library.panel","widget":"list","query":"library.visible","order":20},
+    {"kind":"view","id":"library.entry","parent":"library.list","widget":"panel","role":"library-entry","order":10},
+    {"kind":"view","id":"library.entry.title","parent":"library.entry","widget":"text","text":["row","title"],"order":10},
+    {"kind":"view","id":"library.entry.reference","parent":"library.entry","widget":"text","text":["row","reference"],"visible":["ne",["row","reference"],""],"order":20},
+    {"kind":"view","id":"library.entry.link","parent":"library.entry","widget":"link","text":["row","sourceUrl"],"href":["row","sourceUrl"],"visible":["ne",["row","sourceUrl"],""],"order":30},
+    {"kind":"view","id":"notes.card.library.link","parent":"notes.card","widget":"link","text":["row","sourceUrl"],"href":["row","sourceUrl"],"visible":["ne",["row","sourceUrl"],""],"order":35},
+    {"kind":"view","id":"notes.card.library.reference","parent":"notes.card","widget":"text","text":["row","reference"],"visible":["ne",["row","reference"],""],"order":36},
+    {"kind":"view","id":"notes.card.library.urlInput","parent":"notes.card.tools","widget":"input","bind":"sourceUrlDraft","value":["row","sourceUrl"],"placeholder":"Research URL (http or https)","order":50},
+    {"kind":"view","id":"notes.card.library.urlSave","parent":"notes.card.tools","widget":"button","text":"Save URL","action":"library.setUrl","args":{"id":["row","id"],"url":["local","sourceUrlDraft"]},"order":51},
+    {"kind":"view","id":"notes.card.library.referenceInput","parent":"notes.card.tools","widget":"input","bind":"referenceDraft","value":["row","reference"],"placeholder":"Citation or reference","order":52},
+    {"kind":"view","id":"notes.card.library.referenceSave","parent":"notes.card.tools","widget":"button","text":"Save reference","action":"library.setReference","args":{"id":["row","id"],"reference":["local","referenceDraft"]},"order":53}
+  ]
+}

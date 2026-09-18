@@ -1,0 +1,8 @@
+{"id":"base","claims":[
+ {"kind":"field","id":"items.title","type":"string","default":"","merge":"register"},
+ {"kind":"field","id":"items.body","type":"string","default":"","merge":"register"},
+ {"kind":"field","id":"items.archived","type":"boolean","default":false,"merge":"register"},
+ {"kind":"seed","id":"items/welcome","values":{"title":"A shared research note","body":"Three builders, one workspace."}},
+ {"kind":"action","id":"item.rename","requires":["ne",["trim",["arg","title"]],""],"effects":[{"op":"set","collection":"items","id":["arg","id"],"field":"title","value":["arg","title"]}]},
+ {"kind":"view","id":"workspace","widget":"stack","title":"Research workspace"}
+]}

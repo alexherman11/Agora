@@ -1,0 +1,17 @@
+{
+  "name": "Agora Home",
+  "runtime": "browser-1",
+  "ui": {
+    "entry": "index.html",
+    "mount": "shell",
+    "scripts": [
+      "live-markdown.bundle.js",
+      "documents.js"
+    ],
+    "styles": [
+      "documents.css",
+      "documents-layout.css",
+      "live-markdown.css"
+    ]
+  }
+}

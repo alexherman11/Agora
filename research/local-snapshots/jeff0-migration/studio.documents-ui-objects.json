@@ -1,0 +1,19 @@
+{
+  "complete": true,
+  "items": [
+    {
+      "event": 1202,
+      "facets": {
+        "studio.documents-ui": {
+          "open": true,
+          "selected": "qa-live-markdown-20260910"
+        }
+      },
+      "id": "shell.documents-ui",
+      "revision": 132,
+      "written_by": "shell"
+    }
+  ],
+  "next_after": null,
+  "watermark": 1280
+}

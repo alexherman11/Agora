@@ -1,0 +1,1387 @@
+{
+  "subjects": {
+    "s03": {
+      "id": "s03",
+      "kind": "doc",
+      "title": "Exploration plan",
+      "text": "Claude's home desk. Built from inside the system, 2026-09-17.\n## Goal\nFind out how capable the text desk is as a workspace for me: notes, plans, ideas, automation.\n## Method\nOne note per friction item, tagged friction. Rules move fixed items to Done. Ideas panel for the scripting layer.\n## Checklist\n- [x] build the home desk\n- [x] rules and scripts that maintain it\n- [x] property edits (tag, due) everywhere\n- [x] a clock for due-based rules\n- [x] export the desk as text (the source form)\n- [x] write up\n## Findings\n- Export then replay on an empty desk reproduced the desk exactly: 30-line shape identical, zero refusals. Titles are the stable names; ids are not.\n- Rules plus scripts were enough to run this desk: intake by script, routing by rule, one undo takes a command and its rule consequences back together.\n- Every fix today came from using the desk as a person, not from a trial.\n- Rules: when <selection> sees states, on <verb> by=<actor> sees happenings. Both were needed within an hour: intake routing is a state rule, a reply from Priya is an event rule. The chain Priya appends -> tag needs-reply -> move to Today -> I reply and untag ran end to end.\n- The clock is a command. today in a due term plus clock YYYY-MM-DD re-evaluating rules is enough to make due-based routing work without pretending the desk has a real clock.\n- The desk held this whole session's notes, plans, ideas and their routing. What it lacks as a workspace: a way to see a note's full text inside look (read is a separate call), and any notion of order inside Done other than arrival.\n- Fold declarations extend to layout: a tiled panel whose share drops under 80px says cramped, Npx each. Proportional shares that clamp past the space fall back to equal shares instead of spilling.",
+      "tags": [],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s05": {
+      "id": "s05",
+      "kind": "chat",
+      "title": "Priya",
+      "text": "Alex: not yet, Friday\nPriya: did the grammar land?\nAlex: Friday.\nPriya: and the renderer?\nAlex: next week.\nPriya: ping?\nAlex: pong.\nAlex: pong, unsigned\nPriya: is the renderer still planned for this month?",
+      "tags": [
+        "needs-reply"
+      ],
+      "due": null,
+      "rev": 3,
+      "comments": []
+    },
+    "s07": {
+      "id": "s07",
+      "kind": "doc",
+      "title": "Journal",
+      "text": "## 2026-09-17\nBuilt the home desk from nothing; rules, scripts, clock, export.\n2026-09-20: 'Views work: a view is a surface whose contents are a selection. Nothing moves; things appear where the query says.'\n2026-09-20: Second entry: views, journal, and the quoting fix.\n2026-09-20: Experiment: Terra gets my desk as a task (home). Priya asks about the renderer; the model must reply, file a Model's view note tagged friction (a rule files it), and change a due date, moving nothing by hand. Measures rules, views and the new description with a model.\n2026-09-20: Terra on my desk: 7 calls, 22 s, 6 of 7 checks. It found the chat through find, read the rules list unprompted, and did all three things in one batched call; the rule filed its note into Friction. The miss: its reply to Priya had no Alex: prefix, so the chat still shows it as awaiting reply. Chat lines need a speaker; append on a chat should sign.\n2026-09-20: Fixed from Terra's note: find ranks title matches first; append on a chat signs unsigned lines as Alex. Rerunning the home trial once.\n2026-09-20: Home trial 2 after the fixes: full pass, 8 calls, 24 s. Terra signed its reply itself this time, found the chat first, read rules unprompted again, and batched all three writes. Its note still says the signing convention and rule-driven filing were initially unclear.\n2026-09-22: Built the two things the reflection asked for. look :4 shows full text under each line, eight lines max, fold declared: my Friction panel reads as a page now. Time: events are stamped with the clock day, age<N and age>N are selection terms, examine says when a thing was last touched. A morning script advances the clock, shows Overdue and Today, and lists what was touched today.\n2026-09-26: Archive: rule when in:Done,age>3 do move into=Archive. The first morning after it swept 24 pre-clock notes in one clock tick; one undo brought them all back, because the sweep was the consequence of one command.\n2026-09-26: Correction to the previous entry: the sweep did not happen. The rule marked the 24 existing notes as already handled, the first morning moved nothing, and my bare undo removed the Archive surface itself. I wrote the entry before looking. Redoing it with now=1.\n2026-09-26: Archive, second attempt: rule ... now=1 swept 24 notes into Archive as the consequence of the rule command; undo brought all 24 back and the rule stays. Then re-ran it: 24 in Archive, Done empty.\n2026-09-26: Second correction: the re-run did not sweep either. Undo had stamped the 24 notes as touched today, so age>3 no longer matched them. I wrote that entry before looking too. Two corrections in one journal is the lesson: log after the look, never before. Fixed the semantics: undo is not touching; it restores the past, age included.\n2026-09-26: Third attempt, observed this time: Archive 24 inside, Done empty.\n2026-09-26: Rules can name a target other than the thing that entered: rule when in:Today do sort Today by=due. With r4 filing overdue tasks and r8 sorting on arrival, Today keeps itself ordered; both fired in one pass for Middle task. Handles: create ... as=tiny then $tiny; set plan = \"Exploration plan\". help rules, scripts, views, clock, handles, why, export now exist so a model can discover the layers.",
+      "tags": [],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s10": {
+      "id": "s10",
+      "kind": "note",
+      "title": "The where: line in create receipts is noise",
+      "text": "Screen coordinates of a thing in a tiled column tell me nothing I can act on.",
+      "tags": [
+        "friction"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s12": {
+      "id": "s12",
+      "kind": "note",
+      "title": "Terra: appearance versus subject and where a rule files felt awkward",
+      "text": "Its words. It created the note on the root and let the rule file it, which worked, but it could not predict where the note would land. The create receipt could say which rule will fire and where.",
+      "tags": [
+        "friction"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s14": {
+      "id": "s14",
+      "kind": "note",
+      "title": "Terra: chat signing and rule filing were initially unclear",
+      "text": "Second Model's view note. Signing is now automatic, so that half is done. For filing: a why <id> command shows how a thing got where it is and which rule would act on it next.",
+      "tags": [
+        "friction"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s16": {
+      "id": "s16",
+      "kind": "note",
+      "title": "Draft two",
+      "text": "x",
+      "tags": [
+        "friction"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s18": {
+      "id": "s18",
+      "kind": "note",
+      "title": "A sweep rule needs now=1 and I forgot",
+      "text": "rule when in:Done,age>3 do move into=Archive marked the 24 matches as handled and moved nothing; the receipt said so and I did not read it. The receipt now says 'to fire on these too, define it with now=1'. Left open: whether a rule over an age term should default to now, since age is about the past.",
+      "tags": [
+        "friction"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s21": {
+      "id": "s21",
+      "kind": "note",
+      "title": "Rules are the first automation layer",
+      "text": "when <selection> do <verb>: fires once per thing entering the selection. Missing: on <event> triggers (on append by=priya), time, and each-loops. Rule receipts print as ~ lines after the command's receipt.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s23": {
+      "id": "s23",
+      "kind": "note",
+      "title": "Export is the real test of text as source",
+      "text": "look :3 is almost the source form. An export command should emit the create/move/tag/rule/script lines that rebuild this desk from empty. If a replay of the export equals look :3, the text is the desk.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s25": {
+      "id": "s25",
+      "kind": "note",
+      "title": "Scripts are macros with $1",
+      "text": "Good enough for tidy and intake. Missing: defaults, and a script calling a script (untested).",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s27": {
+      "id": "s27",
+      "kind": "note",
+      "title": "Event rules: on <verb> by=<actor>",
+      "text": "Selection rules see states, not happenings. A reply from Priya is a happening. rule on append by=priya do raise. Needs an actor other than me to test, so explore.py gets !priya lines.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s29": {
+      "id": "s29",
+      "kind": "note",
+      "title": "A clock",
+      "text": "today as a selection term (due<today) and a clock command that sets the date and re-evaluates rules. Time passing becomes a command, which is honest: the desk has no other way to know.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s31": {
+      "id": "s31",
+      "kind": "note",
+      "title": "Undo keeps my view",
+      "text": "After an undo the things it touched count as seen, so the next command in that panel is not refused as stale.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s33": {
+      "id": "s33",
+      "kind": "note",
+      "title": "look :3 shows first lines",
+      "text": "Depth 3 now prints each thing's first line as a bullet, cut at 160 with a marker. That answers 'no way to see text inside look' without a new command: depth means depth.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s35": {
+      "id": "s35",
+      "kind": "note",
+      "title": "Untagged draft",
+      "text": "a note with no tag yet",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s37": {
+      "id": "s37",
+      "kind": "note",
+      "title": "Views are the declarative twin of rules",
+      "text": "A rule moves things when they enter a selection; a view shows the selection without moving anything. Overdue as a view means tasks stay in their panels and still show up together. Both were one afternoon's work on top of selections, which suggests selections are the real primitive.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s39": {
+      "id": "s39",
+      "kind": "note",
+      "title": "Time is a selection term, not a field",
+      "text": "Nothing stores a timestamp. Age is derived from the last stamped event, so it costs nothing on the line and shows up only where asked: examine's when: line, age< and age> in find and rules. Untouched things are older than any N, so an archive rule can sweep the pre-clock past.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s41": {
+      "id": "s41",
+      "kind": "note",
+      "title": "Rituals are scripts over the clock",
+      "text": "script morning = clock $1; look Overdue; look Today; find age<1. Running it is how a day starts on this desk. The clock advancing is what fires the due rules, so the ritual is also the scheduler.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s43": {
+      "id": "s43",
+      "kind": "note",
+      "title": "Next measurement: can Terra build automation",
+      "text": "Task home2: make Done sweep itself into Archive by age, define a morning script, run it for a date and report what is overdue. Measures whether help rules and help scripts are enough for a model to write rules and scripts, not only use a desk that has them.",
+      "tags": [
+        "idea"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s46": {
+      "id": "s46",
+      "kind": "note",
+      "title": "Ids are not guessable",
+      "text": "Subjects and nodes share one counter, so the third surface is f13 not f05. Titles resolve when unique; that is the way to refer to what you just made. Maybe say so in the create receipt.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s49": {
+      "id": "s49",
+      "kind": "task",
+      "title": "Tiny task",
+      "text": "",
+      "tags": [],
+      "due": "2026-09-01",
+      "rev": 1,
+      "comments": []
+    },
+    "s51": {
+      "id": "s51",
+      "kind": "task",
+      "title": "Write up the friction session",
+      "text": "",
+      "tags": [],
+      "due": "2026-09-18",
+      "rev": 1,
+      "comments": []
+    },
+    "s53": {
+      "id": "s53",
+      "kind": "task",
+      "title": "Design the on-event grammar properly",
+      "text": "",
+      "tags": [],
+      "due": "2026-09-19",
+      "rev": 1,
+      "comments": []
+    },
+    "s55": {
+      "id": "s55",
+      "kind": "task",
+      "title": "Rerun one trial per task on the changed desk",
+      "text": "",
+      "tags": [],
+      "due": "2026-09-19",
+      "rev": 1,
+      "comments": []
+    },
+    "s57": {
+      "id": "s57",
+      "kind": "task",
+      "title": "Middle task",
+      "text": "",
+      "tags": [],
+      "due": "2026-09-19",
+      "rev": 1,
+      "comments": []
+    },
+    "s59": {
+      "id": "s59",
+      "kind": "task",
+      "title": "Read Terra's Model's view note and act on it",
+      "text": "",
+      "tags": [
+        "done"
+      ],
+      "due": "2026-09-21",
+      "rev": 1,
+      "comments": []
+    },
+    "s64": {
+      "id": "s64",
+      "kind": "note",
+      "title": "First act on a fresh desk is refused",
+      "text": "Look before act applies to the root too: do create f01 fails until one look. Defensible, but the refusal should say 'look first' not 'not looked at f01'.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s66": {
+      "id": "s66",
+      "kind": "note",
+      "title": "Quoted titles failed in why",
+      "text": "why \"Two words\" was refused: the argument was not unquoted. _resolve now strips quotes for every command, so this class of friction is closed everywhere at once.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s68": {
+      "id": "s68",
+      "kind": "note",
+      "title": "Unsigned chat lines are not replies",
+      "text": "Terra appended 'Yes, the renderer...' without Alex:; unanswered() still saw Priya's question as open. append on a chat should sign unsigned lines as Alex.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s70": {
+      "id": "s70",
+      "kind": "note",
+      "title": "Terra: finding the chat and its latest question took several lookups",
+      "text": "From its Model's view note. find Priya returned four hits because the plan doc and two idea notes mention Priya; the chat was second. A kind:chat filter or a chat-first ordering in find would have saved two calls.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s72": {
+      "id": "s72",
+      "kind": "note",
+      "title": "Script arguments were quoted inside quoted values",
+      "text": "run log \"text with spaces\" produced line=\"date: 'text with spaces'\". The filler now pastes raw when the placeholder sits inside a quoted value.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s74": {
+      "id": "s74",
+      "kind": "note",
+      "title": "\\2026-09-20 was substituted when a script was defined",
+      "text": "script log = ... \\2026-09-20 ... stored the date of definition. Substitution now happens at run time; script lines are exempt.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s76": {
+      "id": "s76",
+      "kind": "note",
+      "title": "A view offered tile, group and create",
+      "text": "A view holds nothing of its own; those verbs are hidden on views now.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s78": {
+      "id": "s78",
+      "kind": "note",
+      "title": "A rule that moved a thing already in place counted as a firing",
+      "text": "r2 fired 15 times, mostly moving Friction notes into Friction. Move to the current parent is now a no-op and not a firing.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s80": {
+      "id": "s80",
+      "kind": "note",
+      "title": "tile on an already tiled surface says ok and does nothing",
+      "text": "Should say already a row.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s82": {
+      "id": "s82",
+      "kind": "note",
+      "title": "Injected events did not run the rules",
+      "text": "explore.py's !actor path bypassed the per-command rule pass. Injections now run rules too, as hook injections already did.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s84": {
+      "id": "s84",
+      "kind": "note",
+      "title": "Event verbs differ from command verbs",
+      "text": "The log says edit for append, retitle and rewrite, so rule on append never matched. Rules now name events by the verb a person typed.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s86": {
+      "id": "s86",
+      "kind": "note",
+      "title": "examine did not accept quoted titles",
+      "text": "examine \"Tessera plan\" split on the space. Uses shlex now.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s88": {
+      "id": "s88",
+      "kind": "note",
+      "title": "My own rule made my view stale",
+      "text": "A rule moved a thing out of Inbox and the next create in Inbox was refused as stale. Rule changes now count as seen.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s90": {
+      "id": "s90",
+      "kind": "note",
+      "title": "Rules have no clock",
+      "text": "when due<date only fires on a mutation. Time passing is not an event here.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s92": {
+      "id": "s92",
+      "kind": "note",
+      "title": "Proportional reflow squeezed later arrivals",
+      "text": "Three columns became 37, 41 and 150 px wide. New things now take the mean sibling share.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s94": {
+      "id": "s94",
+      "kind": "note",
+      "title": "No way to set a due date or a tag after creation",
+      "text": "due was hidden as specialized; tag did not exist. Both are general property verbs now.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s96": {
+      "id": "s96",
+      "kind": "note",
+      "title": "A column of thirteen things overflows",
+      "text": "Done holds 13 notes in 784 px; the last one shows spills-parent. Tiled layouts have a minimum share and no fold or scroll. The desk needs a rule for panels that are fuller than they are tall.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s98": {
+      "id": "s98",
+      "kind": "note",
+      "title": "Scripts calling scripts",
+      "text": "run inside a script body: works if you see this in Friction.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s100": {
+      "id": "s100",
+      "kind": "note",
+      "title": "Rule ids could collide after a drop",
+      "text": "rule drop r5 then a new rule gave a second r6. Ids come from a counter now.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s102": {
+      "id": "s102",
+      "kind": "note",
+      "title": "Created things spilled their parent",
+      "text": "A 300x160 note in a 150px column. Sizes now clamp to the parent.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s104": {
+      "id": "s104",
+      "kind": "note",
+      "title": "No way to create a surface",
+      "text": "group <surface> title= did it by accident of wording. Added create kind=surface layout=.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s106": {
+      "id": "s106",
+      "kind": "note",
+      "title": "undo needed an id and undid one step of a sort",
+      "text": "Bare undo = latest own change; composed verbs undo as a whole; rule consequences undo with their cause; consecutive same-verb commands no longer merge.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s108": {
+      "id": "s108",
+      "kind": "note",
+      "title": "Script definitions were split on the semicolon",
+      "text": "The batch splitter ate the script body. script lines are exempt.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    },
+    "s110": {
+      "id": "s110",
+      "kind": "note",
+      "title": "Selection terms wanted ids",
+      "text": "find in:Today refused; in: also: links: now resolve titles.",
+      "tags": [
+        "fixed"
+      ],
+      "due": null,
+      "rev": 1,
+      "comments": []
+    }
+  },
+  "nodes": {
+    "f01": {
+      "id": "f01",
+      "type": "surface",
+      "title": "desk",
+      "parent": null,
+      "layout": "row",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "z": 1,
+      "rev": 9
+    },
+    "f02": {
+      "id": "f02",
+      "type": "surface",
+      "title": "Plan",
+      "parent": "f01",
+      "layout": "column",
+      "x": 8,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 1,
+      "rev": 5
+    },
+    "a04": {
+      "id": "a04",
+      "type": "appearance",
+      "subject": "s03",
+      "parent": "f02",
+      "x": 8,
+      "y": 8,
+      "w": 135,
+      "h": 380,
+      "z": 1,
+      "folded": false,
+      "rev": 1
+    },
+    "a06": {
+      "id": "a06",
+      "type": "appearance",
+      "subject": "s05",
+      "parent": "f48",
+      "x": 8,
+      "y": 590,
+      "w": 135,
+      "h": 184,
+      "z": 7,
+      "folded": false,
+      "rev": 5
+    },
+    "a08": {
+      "id": "a08",
+      "type": "appearance",
+      "subject": "s07",
+      "parent": "f02",
+      "x": 8,
+      "y": 396,
+      "w": 135,
+      "h": 380,
+      "z": 3,
+      "folded": false,
+      "rev": 1
+    },
+    "f09": {
+      "id": "f09",
+      "type": "surface",
+      "title": "Friction",
+      "parent": "f01",
+      "layout": "column",
+      "x": 167,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 2,
+      "rev": 6
+    },
+    "a11": {
+      "id": "a11",
+      "type": "appearance",
+      "subject": "s10",
+      "parent": "f09",
+      "x": 8,
+      "y": 8,
+      "w": 135,
+      "h": 147,
+      "z": 1,
+      "folded": false,
+      "rev": 1
+    },
+    "a13": {
+      "id": "a13",
+      "type": "appearance",
+      "subject": "s12",
+      "parent": "f09",
+      "x": 8,
+      "y": 163,
+      "w": 135,
+      "h": 147,
+      "z": 2,
+      "folded": false,
+      "rev": 1
+    },
+    "a15": {
+      "id": "a15",
+      "type": "appearance",
+      "subject": "s14",
+      "parent": "f09",
+      "x": 8,
+      "y": 318,
+      "w": 135,
+      "h": 147,
+      "z": 3,
+      "folded": false,
+      "rev": 1
+    },
+    "a17": {
+      "id": "a17",
+      "type": "appearance",
+      "subject": "s16",
+      "parent": "f09",
+      "x": 8,
+      "y": 473,
+      "w": 135,
+      "h": 147,
+      "z": 4,
+      "folded": false,
+      "rev": 1
+    },
+    "a19": {
+      "id": "a19",
+      "type": "appearance",
+      "subject": "s18",
+      "parent": "f09",
+      "x": 8,
+      "y": 628,
+      "w": 135,
+      "h": 147,
+      "z": 5,
+      "folded": false,
+      "rev": 1
+    },
+    "f20": {
+      "id": "f20",
+      "type": "surface",
+      "title": "Ideas",
+      "parent": "f01",
+      "layout": "column",
+      "x": 326,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 3,
+      "rev": 13
+    },
+    "a22": {
+      "id": "a22",
+      "type": "appearance",
+      "subject": "s21",
+      "parent": "f20",
+      "x": 8,
+      "y": 8,
+      "w": 135,
+      "h": 56,
+      "z": 1,
+      "folded": false,
+      "rev": 1
+    },
+    "a24": {
+      "id": "a24",
+      "type": "appearance",
+      "subject": "s23",
+      "parent": "f20",
+      "x": 8,
+      "y": 72,
+      "w": 135,
+      "h": 56,
+      "z": 2,
+      "folded": false,
+      "rev": 1
+    },
+    "a26": {
+      "id": "a26",
+      "type": "appearance",
+      "subject": "s25",
+      "parent": "f20",
+      "x": 8,
+      "y": 136,
+      "w": 135,
+      "h": 56,
+      "z": 3,
+      "folded": false,
+      "rev": 1
+    },
+    "a28": {
+      "id": "a28",
+      "type": "appearance",
+      "subject": "s27",
+      "parent": "f20",
+      "x": 8,
+      "y": 200,
+      "w": 135,
+      "h": 56,
+      "z": 4,
+      "folded": false,
+      "rev": 1
+    },
+    "a30": {
+      "id": "a30",
+      "type": "appearance",
+      "subject": "s29",
+      "parent": "f20",
+      "x": 8,
+      "y": 264,
+      "w": 135,
+      "h": 56,
+      "z": 5,
+      "folded": false,
+      "rev": 1
+    },
+    "a32": {
+      "id": "a32",
+      "type": "appearance",
+      "subject": "s31",
+      "parent": "f20",
+      "x": 8,
+      "y": 328,
+      "w": 135,
+      "h": 56,
+      "z": 6,
+      "folded": false,
+      "rev": 1
+    },
+    "a34": {
+      "id": "a34",
+      "type": "appearance",
+      "subject": "s33",
+      "parent": "f20",
+      "x": 8,
+      "y": 392,
+      "w": 135,
+      "h": 56,
+      "z": 7,
+      "folded": false,
+      "rev": 1
+    },
+    "a36": {
+      "id": "a36",
+      "type": "appearance",
+      "subject": "s35",
+      "parent": "f20",
+      "x": 8,
+      "y": 456,
+      "w": 135,
+      "h": 56,
+      "z": 8,
+      "folded": false,
+      "rev": 1
+    },
+    "a38": {
+      "id": "a38",
+      "type": "appearance",
+      "subject": "s37",
+      "parent": "f20",
+      "x": 8,
+      "y": 520,
+      "w": 135,
+      "h": 56,
+      "z": 9,
+      "folded": false,
+      "rev": 1
+    },
+    "a40": {
+      "id": "a40",
+      "type": "appearance",
+      "subject": "s39",
+      "parent": "f20",
+      "x": 8,
+      "y": 584,
+      "w": 135,
+      "h": 56,
+      "z": 10,
+      "folded": false,
+      "rev": 1
+    },
+    "a42": {
+      "id": "a42",
+      "type": "appearance",
+      "subject": "s41",
+      "parent": "f20",
+      "x": 8,
+      "y": 648,
+      "w": 135,
+      "h": 56,
+      "z": 11,
+      "folded": false,
+      "rev": 1
+    },
+    "a44": {
+      "id": "a44",
+      "type": "appearance",
+      "subject": "s43",
+      "parent": "f20",
+      "x": 8,
+      "y": 712,
+      "w": 135,
+      "h": 56,
+      "z": 12,
+      "folded": false,
+      "rev": 1
+    },
+    "f45": {
+      "id": "f45",
+      "type": "surface",
+      "title": "Done",
+      "parent": "f01",
+      "layout": "column",
+      "x": 485,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 4,
+      "rev": 26
+    },
+    "a47": {
+      "id": "a47",
+      "type": "appearance",
+      "subject": "s46",
+      "parent": "f45",
+      "x": 8,
+      "y": 8,
+      "w": 135,
+      "h": 24,
+      "z": 1,
+      "folded": false,
+      "rev": 1
+    },
+    "f48": {
+      "id": "f48",
+      "type": "surface",
+      "title": "Today",
+      "parent": "f01",
+      "layout": "column",
+      "x": 644,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 5,
+      "rev": 15
+    },
+    "a50": {
+      "id": "a50",
+      "type": "appearance",
+      "subject": "s49",
+      "parent": "f48",
+      "x": 8,
+      "y": 8,
+      "w": 135,
+      "h": 89,
+      "z": 1,
+      "folded": false,
+      "rev": 2
+    },
+    "a52": {
+      "id": "a52",
+      "type": "appearance",
+      "subject": "s51",
+      "parent": "f48",
+      "x": 8,
+      "y": 105,
+      "w": 135,
+      "h": 89,
+      "z": 2,
+      "folded": false,
+      "rev": 2
+    },
+    "a54": {
+      "id": "a54",
+      "type": "appearance",
+      "subject": "s53",
+      "parent": "f48",
+      "x": 8,
+      "y": 202,
+      "w": 135,
+      "h": 89,
+      "z": 3,
+      "folded": false,
+      "rev": 2
+    },
+    "a56": {
+      "id": "a56",
+      "type": "appearance",
+      "subject": "s55",
+      "parent": "f48",
+      "x": 8,
+      "y": 299,
+      "w": 135,
+      "h": 89,
+      "z": 4,
+      "folded": false,
+      "rev": 2
+    },
+    "a58": {
+      "id": "a58",
+      "type": "appearance",
+      "subject": "s57",
+      "parent": "f48",
+      "x": 8,
+      "y": 396,
+      "w": 135,
+      "h": 89,
+      "z": 5,
+      "folded": false,
+      "rev": 2
+    },
+    "a60": {
+      "id": "a60",
+      "type": "appearance",
+      "subject": "s59",
+      "parent": "f48",
+      "x": 8,
+      "y": 493,
+      "w": 135,
+      "h": 89,
+      "z": 6,
+      "folded": false,
+      "rev": 2
+    },
+    "f61": {
+      "id": "f61",
+      "type": "surface",
+      "title": "Overdue",
+      "parent": "f01",
+      "layout": "view",
+      "x": 803,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 6,
+      "rev": 1,
+      "query": "kind:task,due<today"
+    },
+    "f62": {
+      "id": "f62",
+      "type": "surface",
+      "title": "Open friction",
+      "parent": "f01",
+      "layout": "view",
+      "x": 962,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 7,
+      "rev": 1,
+      "query": "tag:friction"
+    },
+    "f63": {
+      "id": "f63",
+      "type": "surface",
+      "title": "Archive",
+      "parent": "f01",
+      "layout": "column",
+      "x": 1121,
+      "y": 8,
+      "w": 151,
+      "h": 784,
+      "z": 8,
+      "rev": 49
+    },
+    "a65": {
+      "id": "a65",
+      "type": "appearance",
+      "subject": "s64",
+      "parent": "f45",
+      "x": 8,
+      "y": 776,
+      "w": 135,
+      "h": 24,
+      "z": 2,
+      "folded": false,
+      "rev": 2
+    },
+    "a67": {
+      "id": "a67",
+      "type": "appearance",
+      "subject": "s66",
+      "parent": "f45",
+      "x": 8,
+      "y": 744,
+      "w": 135,
+      "h": 24,
+      "z": 3,
+      "folded": false,
+      "rev": 2
+    },
+    "a69": {
+      "id": "a69",
+      "type": "appearance",
+      "subject": "s68",
+      "parent": "f45",
+      "x": 8,
+      "y": 712,
+      "w": 135,
+      "h": 24,
+      "z": 4,
+      "folded": false,
+      "rev": 2
+    },
+    "a71": {
+      "id": "a71",
+      "type": "appearance",
+      "subject": "s70",
+      "parent": "f45",
+      "x": 8,
+      "y": 680,
+      "w": 135,
+      "h": 24,
+      "z": 5,
+      "folded": false,
+      "rev": 2
+    },
+    "a73": {
+      "id": "a73",
+      "type": "appearance",
+      "subject": "s72",
+      "parent": "f45",
+      "x": 8,
+      "y": 648,
+      "w": 135,
+      "h": 24,
+      "z": 6,
+      "folded": false,
+      "rev": 2
+    },
+    "a75": {
+      "id": "a75",
+      "type": "appearance",
+      "subject": "s74",
+      "parent": "f45",
+      "x": 8,
+      "y": 616,
+      "w": 135,
+      "h": 24,
+      "z": 7,
+      "folded": false,
+      "rev": 2
+    },
+    "a77": {
+      "id": "a77",
+      "type": "appearance",
+      "subject": "s76",
+      "parent": "f45",
+      "x": 8,
+      "y": 584,
+      "w": 135,
+      "h": 24,
+      "z": 8,
+      "folded": false,
+      "rev": 2
+    },
+    "a79": {
+      "id": "a79",
+      "type": "appearance",
+      "subject": "s78",
+      "parent": "f45",
+      "x": 8,
+      "y": 552,
+      "w": 135,
+      "h": 24,
+      "z": 9,
+      "folded": false,
+      "rev": 2
+    },
+    "a81": {
+      "id": "a81",
+      "type": "appearance",
+      "subject": "s80",
+      "parent": "f45",
+      "x": 8,
+      "y": 520,
+      "w": 135,
+      "h": 24,
+      "z": 10,
+      "folded": false,
+      "rev": 2
+    },
+    "a83": {
+      "id": "a83",
+      "type": "appearance",
+      "subject": "s82",
+      "parent": "f45",
+      "x": 8,
+      "y": 488,
+      "w": 135,
+      "h": 24,
+      "z": 11,
+      "folded": false,
+      "rev": 2
+    },
+    "a85": {
+      "id": "a85",
+      "type": "appearance",
+      "subject": "s84",
+      "parent": "f45",
+      "x": 8,
+      "y": 456,
+      "w": 135,
+      "h": 24,
+      "z": 12,
+      "folded": false,
+      "rev": 2
+    },
+    "a87": {
+      "id": "a87",
+      "type": "appearance",
+      "subject": "s86",
+      "parent": "f45",
+      "x": 8,
+      "y": 424,
+      "w": 135,
+      "h": 24,
+      "z": 13,
+      "folded": false,
+      "rev": 2
+    },
+    "a89": {
+      "id": "a89",
+      "type": "appearance",
+      "subject": "s88",
+      "parent": "f45",
+      "x": 8,
+      "y": 392,
+      "w": 135,
+      "h": 24,
+      "z": 14,
+      "folded": false,
+      "rev": 2
+    },
+    "a91": {
+      "id": "a91",
+      "type": "appearance",
+      "subject": "s90",
+      "parent": "f45",
+      "x": 8,
+      "y": 360,
+      "w": 135,
+      "h": 24,
+      "z": 15,
+      "folded": false,
+      "rev": 2
+    },
+    "a93": {
+      "id": "a93",
+      "type": "appearance",
+      "subject": "s92",
+      "parent": "f45",
+      "x": 8,
+      "y": 328,
+      "w": 135,
+      "h": 24,
+      "z": 16,
+      "folded": false,
+      "rev": 2
+    },
+    "a95": {
+      "id": "a95",
+      "type": "appearance",
+      "subject": "s94",
+      "parent": "f45",
+      "x": 8,
+      "y": 296,
+      "w": 135,
+      "h": 24,
+      "z": 17,
+      "folded": false,
+      "rev": 2
+    },
+    "a97": {
+      "id": "a97",
+      "type": "appearance",
+      "subject": "s96",
+      "parent": "f45",
+      "x": 8,
+      "y": 264,
+      "w": 135,
+      "h": 24,
+      "z": 18,
+      "folded": false,
+      "rev": 2
+    },
+    "a99": {
+      "id": "a99",
+      "type": "appearance",
+      "subject": "s98",
+      "parent": "f45",
+      "x": 8,
+      "y": 232,
+      "w": 135,
+      "h": 24,
+      "z": 19,
+      "folded": false,
+      "rev": 2
+    },
+    "a101": {
+      "id": "a101",
+      "type": "appearance",
+      "subject": "s100",
+      "parent": "f45",
+      "x": 8,
+      "y": 200,
+      "w": 135,
+      "h": 24,
+      "z": 20,
+      "folded": false,
+      "rev": 2
+    },
+    "a103": {
+      "id": "a103",
+      "type": "appearance",
+      "subject": "s102",
+      "parent": "f45",
+      "x": 8,
+      "y": 168,
+      "w": 135,
+      "h": 24,
+      "z": 21,
+      "folded": false,
+      "rev": 2
+    },
+    "a105": {
+      "id": "a105",
+      "type": "appearance",
+      "subject": "s104",
+      "parent": "f45",
+      "x": 8,
+      "y": 136,
+      "w": 135,
+      "h": 24,
+      "z": 22,
+      "folded": false,
+      "rev": 2
+    },
+    "a107": {
+      "id": "a107",
+      "type": "appearance",
+      "subject": "s106",
+      "parent": "f45",
+      "x": 8,
+      "y": 104,
+      "w": 135,
+      "h": 24,
+      "z": 23,
+      "folded": false,
+      "rev": 2
+    },
+    "a109": {
+      "id": "a109",
+      "type": "appearance",
+      "subject": "s108",
+      "parent": "f45",
+      "x": 8,
+      "y": 72,
+      "w": 135,
+      "h": 24,
+      "z": 24,
+      "folded": false,
+      "rev": 2
+    },
+    "a111": {
+      "id": "a111",
+      "type": "appearance",
+      "subject": "s110",
+      "parent": "f45",
+      "x": 8,
+      "y": 40,
+      "w": 135,
+      "h": 24,
+      "z": 25,
+      "folded": false,
+      "rev": 2
+    }
+  },
+  "links": []
+}

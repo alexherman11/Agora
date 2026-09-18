@@ -1,0 +1,128 @@
+{
+  "ok": true,
+  "clients": 3,
+  "transport": "three isolated Chromium contexts, concurrent fetch with one captured snapshot",
+  "elapsedMs": 53,
+  "results": [
+    {
+      "action": "mission.dispatch",
+      "id": "ridge",
+      "result": {
+        "ok": false,
+        "conflict": {
+          "id": "conflict-1",
+          "code": "invariant",
+          "action": "mission.dispatch",
+          "detail": {
+            "id": "logistics.noNegativeStock",
+            "message": "Dispatch exceeds available stock"
+          },
+          "serial": 2
+        }
+      },
+      "durationMs": 32.099999994039536
+    },
+    {
+      "action": "mission.dispatch",
+      "id": "coast",
+      "result": {
+        "ok": true,
+        "serial": 2,
+        "handlers": [
+          "mission.dispatch",
+          "finance.onDispatch",
+          "logistics.onDispatch"
+        ],
+        "writes": [
+          "ledger/concurrent-coast/amount",
+          "ledger/concurrent-coast/kind",
+          "ledger/concurrent-coast/missionId",
+          "ledger/concurrent-coast/projectId",
+          "missions/coast/charged",
+          "missions/coast/status",
+          "projects/ocean/available",
+          "stock/radio/available"
+        ]
+      },
+      "durationMs": 23.19999998807907
+    },
+    {
+      "action": "finance.topUp",
+      "id": "alpine",
+      "result": {
+        "ok": true,
+        "serial": 1,
+        "handlers": [
+          "finance.topUp"
+        ],
+        "writes": [
+          "projects/alpine/available"
+        ]
+      },
+      "durationMs": 9.099999994039536
+    }
+  ],
+  "state": {
+    "lines": {
+      "coast-radio": {
+        "missionId": "coast",
+        "qty": 2,
+        "sku": "radio"
+      },
+      "ridge-radio": {
+        "missionId": "ridge",
+        "qty": 2,
+        "sku": "radio"
+      },
+      "ridge-tent": {
+        "missionId": "ridge",
+        "qty": 1,
+        "sku": "tent"
+      }
+    },
+    "missions": {
+      "coast": {
+        "projectId": "ocean",
+        "status": "dispatched",
+        "title": "Coastal survey",
+        "charged": 240
+      },
+      "ridge": {
+        "projectId": "alpine",
+        "status": "draft",
+        "title": "Ridge survey",
+        "charged": 0
+      }
+    },
+    "projects": {
+      "alpine": {
+        "available": 1100,
+        "name": "Alpine research"
+      },
+      "ocean": {
+        "available": 160,
+        "name": "Coastal research"
+      }
+    },
+    "stock": {
+      "radio": {
+        "available": 1,
+        "name": "Field radio",
+        "unitCost": 120
+      },
+      "tent": {
+        "available": 2,
+        "name": "Storm tent",
+        "unitCost": 300
+      }
+    },
+    "ledger": {
+      "concurrent-coast": {
+        "missionId": "coast",
+        "projectId": "ocean",
+        "kind": "dispatch",
+        "amount": 240
+      }
+    }
+  }
+}

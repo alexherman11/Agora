@@ -1,0 +1,16 @@
+[
+  {
+    "after_event": 1,
+    "actor": "sam",
+    "receipt": {
+      "ok": true,
+      "event": "e2",
+      "changed": [
+        "s10",
+        "a18",
+        "a24"
+      ],
+      "note": "subject s10 changed; 2 appearance(s) now show the new content"
+    }
+  }
+]

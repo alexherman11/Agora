@@ -1,0 +1,214 @@
+[
+  {
+    "id": "e1",
+    "verb": "group",
+    "target": "f01",
+    "args": {
+      "title": "Priya",
+      "as": "column"
+    },
+    "undo": {
+      "delete": "f30"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "f01",
+      "f30"
+    ],
+    "via": "group"
+  },
+  {
+    "id": "e2",
+    "verb": "edit",
+    "target": "s15",
+    "args": {
+      "append": "Priya: oh, and the sensor quotes too if you have them."
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s15",
+        "kind": "chat",
+        "title": "Priya",
+        "text": "Priya: can you send the tide parser when it's ready?\nAlex: yes, after kickoff.",
+        "tags": [],
+        "due": null,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "priya"
+  },
+  {
+    "id": "e3",
+    "verb": "move",
+    "target": "a27",
+    "args": {
+      "into": "f30"
+    },
+    "undo": {
+      "restore": {
+        "id": "a27",
+        "type": "appearance",
+        "subject": "s15",
+        "parent": "f03",
+        "x": 300,
+        "y": 200,
+        "w": 320,
+        "h": 160,
+        "z": 3,
+        "folded": false,
+        "rev": 2
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a27",
+      "f03",
+      "f30"
+    ],
+    "via": "move"
+  },
+  {
+    "id": "e4",
+    "verb": "move",
+    "target": "a29",
+    "args": {
+      "into": "f30"
+    },
+    "undo": {
+      "restore": {
+        "id": "a29",
+        "type": "appearance",
+        "subject": "s28",
+        "parent": "f03",
+        "x": 440,
+        "y": 200,
+        "w": 260,
+        "h": 140,
+        "z": 4,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a29",
+      "f03",
+      "f30"
+    ],
+    "via": "move"
+  },
+  {
+    "id": "e5",
+    "verb": "move",
+    "target": "a20",
+    "args": {
+      "into": "f30"
+    },
+    "undo": {
+      "restore": {
+        "id": "a20",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f04",
+        "x": 60,
+        "y": 60,
+        "w": 300,
+        "h": 160,
+        "z": 1,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a20",
+      "f04",
+      "f30"
+    ],
+    "via": "move"
+  },
+  {
+    "id": "e6",
+    "verb": "move",
+    "target": "a22",
+    "args": {
+      "into": "f30"
+    },
+    "undo": {
+      "restore": {
+        "id": "a22",
+        "type": "appearance",
+        "subject": "s06",
+        "parent": "f04",
+        "x": 540,
+        "y": 30,
+        "w": 280,
+        "h": 140,
+        "z": 3,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a22",
+      "f04",
+      "f30"
+    ],
+    "via": "move"
+  },
+  {
+    "id": "e7",
+    "verb": "create",
+    "target": "f30",
+    "args": {
+      "kind": "task",
+      "title": "Deliver tide parser and sensor quotes",
+      "due": "2026-09-19",
+      "text": "Send Priya the tide parser and available sensor quotes."
+    },
+    "undo": {
+      "delete": "a32",
+      "delete_subject": "s31"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "f30",
+      "a32"
+    ],
+    "via": "create"
+  },
+  {
+    "id": "e8",
+    "verb": "edit",
+    "target": "a27",
+    "args": {
+      "append": "I found Tide data format and Parser notes."
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s15",
+        "kind": "chat",
+        "title": "Priya",
+        "text": "Priya: can you send the tide parser when it's ready?\nAlex: yes, after kickoff.\nPriya: oh, and the sensor quotes too if you have them.",
+        "tags": [],
+        "due": null,
+        "rev": 2
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s15",
+      "a27"
+    ],
+    "via": "append"
+  }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\atlas.cases.json",
+    "Hash": "5FEB9F1C5C29AADA4D51D59289D7A934E2C03817BC44627B02D3728B247FB472"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\atlas.tessera.json",
+    "Hash": "2E2CDB118015774A87841AA53B944D6E693038B6E236383161A0F7A1D6007CA0"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\base.tessera.json",
+    "Hash": "069FAA24DE4238EC0F78C9C747183C84F5F0133D6FA7DBDE3A0E5BF4ADAF92A3"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\studio.cases.json",
+    "Hash": "BF39FB951ABD4517B85AB99CCAFE8901B9B83EC3733699677A371761008FDF45"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\studio.tessera.json",
+    "Hash": "6A2421918C9CB98B64BE42427DB24353EFDB7565DD07E1FC6CFD40A22B5DF9EC"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\toolkit.cases.json",
+    "Hash": "64EF8D9F6B0F13B30B56D3294AFDD51163D102AB21ED77AD0FA013E341F4E489"
+  },
+  {
+    "Path": "C:\\Projects\\Agora\\research\\tessera-lab\\trials\\04-fluid-scene\\toolkit.tessera.json",
+    "Hash": "8B18FAB5C91AC68033468B4EAD6D4659687EE76F11055A3B59203D4DB98C164B"
+  }
+]

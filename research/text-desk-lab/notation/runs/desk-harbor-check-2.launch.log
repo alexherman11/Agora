@@ -1,0 +1,15 @@
+{"trial": "desk-harbor-check-2", "call": 1, "name": "desk", "line": "look", "error": null}
+{"trial": "desk-harbor-check-2", "call": 2, "name": "desk", "line": "look f02; look f28", "error": null}
+{"trial": "desk-harbor-check-2", "call": 3, "name": "desk", "line": "look f03; look f04", "error": null}
+{"trial": "desk-harbor-check-2", "call": 4, "name": "desk", "line": "read a16; read a17; read a18; read a19", "error": null}
+{"trial": "desk-harbor-check-2", "call": 5, "name": "desk", "line": "read a20; read a21; read a22; read a23", "error": null}
+{"trial": "desk-harbor-check-2", "call": 6, "name": "desk", "line": "read a25; read a26; read a27", "error": null}
+{"trial": "desk-harbor-check-2", "call": 7, "name": "desk", "line": "examine a18; examine a19; examine a21; examine a24", "error": null}
+{"trial": "desk-harbor-check-2", "call": 8, "name": "desk", "line": "find Harbor; examine a20; examine a22; examine a27", "error": null}
+{"trial": "desk-harbor-check-2", "call": 9, "name": "desk", "line": "help move; examine f02", "error": null}
+{"trial": "desk-harbor-check-2", "call": 10, "name": "desk", "line": "help sort", "error": null}
+{"trial": "desk-harbor-check-2", "call": 11, "name": "desk", "line": "do move ?harbor into=f02 one=1", "error": null}
+{"trial": "desk-harbor-check-2", "call": 12, "name": "desk", "line": "look f02", "error": null}
+{"trial": "desk-harbor-check-2", "call": 13, "name": "desk", "line": "do sort f02 by=due", "error": null}
+{"trial": "desk-harbor-check-2", "call": 14, "name": "desk", "line": "look f02; look f04", "error": null}
+{"finished": "desk-harbor-check-2", "assessment": {"all_harbor_in_column": true, "pass": true}, "calls": 14, "refusals": 0, "seconds": 49.4, "error": null}

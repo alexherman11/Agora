@@ -1,0 +1,29 @@
+{
+  "event": 515,
+  "facets": {
+    "agora.schema": {
+      "merge": "register",
+      "projection": "generic",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "drafts": {
+            "additionalProperties": {
+              "maxLength": 6000,
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "drafts"
+        ],
+        "type": "object"
+      },
+      "type": "studio.comment-ui"
+    }
+  },
+  "id": "agora.schema.studio.comment-ui",
+  "revision": 1,
+  "written_by": "guest"
+}

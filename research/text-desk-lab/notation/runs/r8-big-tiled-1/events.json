@@ -1,0 +1,559 @@
+[
+  {
+    "id": "e1",
+    "verb": "group",
+    "target": "f01",
+    "args": {
+      "title": "Harbor",
+      "as": "column"
+    },
+    "undo": {
+      "delete": "f69"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "f01",
+      "f69"
+    ],
+    "via": "group"
+  },
+  {
+    "id": "e2",
+    "verb": "remove",
+    "target": "a66",
+    "args": {},
+    "undo": {
+      "restore": {
+        "id": "a66",
+        "type": "appearance",
+        "subject": "s10",
+        "parent": "f05",
+        "x": 20,
+        "y": 40,
+        "w": 260,
+        "h": 140,
+        "z": 6,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a66",
+      "f05"
+    ],
+    "via": "remove"
+  },
+  {
+    "id": "e3",
+    "verb": "move",
+    "target": "a60",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a60",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f02",
+        "x": 8,
+        "y": 8,
+        "w": 179,
+        "h": 121,
+        "z": 6,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "undone": true
+  },
+  {
+    "id": "e4",
+    "verb": "move",
+    "target": "a61",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a61",
+        "type": "appearance",
+        "subject": "s08",
+        "parent": "f03",
+        "x": 40,
+        "y": 40,
+        "w": 260,
+        "h": 140,
+        "z": 5,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "undone": true
+  },
+  {
+    "id": "e5",
+    "verb": "move",
+    "target": "a64",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a64",
+        "type": "appearance",
+        "subject": "s09",
+        "parent": "f06",
+        "x": 8,
+        "y": 8,
+        "w": 284,
+        "h": 30,
+        "z": 10,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "undone": true
+  },
+  {
+    "id": "e6",
+    "verb": "move",
+    "target": "a65",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a65",
+        "type": "appearance",
+        "subject": "s10",
+        "parent": "f04",
+        "x": 300,
+        "y": 200,
+        "w": 260,
+        "h": 140,
+        "z": 3,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "undone": true
+  },
+  {
+    "id": "e7",
+    "verb": "move",
+    "target": "a67",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a67",
+        "type": "appearance",
+        "subject": "s11",
+        "parent": "f05",
+        "x": 30,
+        "y": 200,
+        "w": 260,
+        "h": 140,
+        "z": 7,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "undone": true
+  },
+  {
+    "id": "e8",
+    "verb": "undo",
+    "target": "e7",
+    "args": {},
+    "undo": {},
+    "note": "reverted e7",
+    "by": "jeff"
+  },
+  {
+    "id": "e9",
+    "verb": "undo",
+    "target": "e6",
+    "args": {},
+    "undo": {},
+    "note": "reverted e6",
+    "by": "jeff"
+  },
+  {
+    "id": "e10",
+    "verb": "undo",
+    "target": "e5",
+    "args": {},
+    "undo": {},
+    "note": "reverted e5",
+    "by": "jeff"
+  },
+  {
+    "id": "e11",
+    "verb": "undo",
+    "target": "e4",
+    "args": {},
+    "undo": {},
+    "note": "reverted e4",
+    "by": "jeff"
+  },
+  {
+    "id": "e12",
+    "verb": "undo",
+    "target": "e3",
+    "args": {},
+    "undo": {},
+    "note": "reverted e3",
+    "by": "jeff"
+  },
+  {
+    "id": "e13",
+    "verb": "move",
+    "target": "a60",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a60",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f02",
+        "x": 8,
+        "y": 141,
+        "w": 179,
+        "h": 102,
+        "z": 6,
+        "folded": false,
+        "rev": 3
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "via": "move ?harbor,kind:note"
+  },
+  {
+    "id": "e14",
+    "verb": "move",
+    "target": "a64",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a64",
+        "type": "appearance",
+        "subject": "s09",
+        "parent": "f06",
+        "x": 8,
+        "y": 46,
+        "w": 284,
+        "h": 26,
+        "z": 10,
+        "folded": false,
+        "rev": 3
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "via": "move ?harbor,kind:note"
+  },
+  {
+    "id": "e15",
+    "verb": "move",
+    "target": "a61",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a61",
+        "type": "appearance",
+        "subject": "s08",
+        "parent": "f03",
+        "x": 40,
+        "y": 40,
+        "w": 260,
+        "h": 140,
+        "z": 5,
+        "folded": false,
+        "rev": 3
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "via": "move ?harbor,kind:task"
+  },
+  {
+    "id": "e16",
+    "verb": "move",
+    "target": "a65",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a65",
+        "type": "appearance",
+        "subject": "s10",
+        "parent": "f04",
+        "x": 300,
+        "y": 200,
+        "w": 260,
+        "h": 140,
+        "z": 3,
+        "folded": false,
+        "rev": 3
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "via": "move ?harbor,kind:task"
+  },
+  {
+    "id": "e17",
+    "verb": "move",
+    "target": "a67",
+    "args": {
+      "into": "f69"
+    },
+    "undo": {
+      "restore": {
+        "id": "a67",
+        "type": "appearance",
+        "subject": "s11",
+        "parent": "f05",
+        "x": 30,
+        "y": 200,
+        "w": 260,
+        "h": 140,
+        "z": 7,
+        "folded": false,
+        "rev": 3
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "via": "move ?harbor,kind:task"
+  },
+  {
+    "id": "e18",
+    "verb": "move",
+    "target": "a64",
+    "args": {
+      "into": "f69",
+      "at": 0
+    },
+    "undo": {
+      "restore": {
+        "id": "a64",
+        "type": "appearance",
+        "subject": "s09",
+        "parent": "f69",
+        "x": 8,
+        "y": 755,
+        "w": 404,
+        "h": 24,
+        "z": 11,
+        "folded": false,
+        "rev": 4
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a60",
+      "a61",
+      "a64",
+      "a65",
+      "a67",
+      "f69"
+    ],
+    "via": "sort"
+  },
+  {
+    "id": "e19",
+    "verb": "move",
+    "target": "a61",
+    "args": {
+      "into": "f69",
+      "at": 1
+    },
+    "undo": {
+      "restore": {
+        "id": "a61",
+        "type": "appearance",
+        "subject": "s08",
+        "parent": "f69",
+        "x": 8,
+        "y": 696,
+        "w": 404,
+        "h": 79,
+        "z": 5,
+        "folded": false,
+        "rev": 4
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a60",
+      "a61",
+      "a64",
+      "a65",
+      "a67",
+      "f69"
+    ],
+    "via": "sort"
+  },
+  {
+    "id": "e20",
+    "verb": "move",
+    "target": "a60",
+    "args": {
+      "into": "f69",
+      "at": 2
+    },
+    "undo": {
+      "restore": {
+        "id": "a60",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f69",
+        "x": 8,
+        "y": 127,
+        "w": 404,
+        "h": 422,
+        "z": 3,
+        "folded": false,
+        "rev": 4
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a60",
+      "a61",
+      "a64",
+      "a65",
+      "a67",
+      "f69"
+    ],
+    "via": "sort"
+  },
+  {
+    "id": "e21",
+    "verb": "move",
+    "target": "a67",
+    "args": {
+      "into": "f69",
+      "at": 3
+    },
+    "undo": {
+      "restore": {
+        "id": "a67",
+        "type": "appearance",
+        "subject": "s11",
+        "parent": "f69",
+        "x": 8,
+        "y": 557,
+        "w": 404,
+        "h": 115,
+        "z": 4,
+        "folded": false,
+        "rev": 4
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a60",
+      "a61",
+      "a64",
+      "a65",
+      "a67",
+      "f69"
+    ],
+    "via": "sort"
+  },
+  {
+    "id": "e22",
+    "verb": "move",
+    "target": "a65",
+    "args": {
+      "into": "f69",
+      "at": 4
+    },
+    "undo": {
+      "restore": {
+        "id": "a65",
+        "type": "appearance",
+        "subject": "s10",
+        "parent": "f69",
+        "x": 8,
+        "y": 680,
+        "w": 404,
+        "h": 95,
+        "z": 5,
+        "folded": false,
+        "rev": 4
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a60",
+      "a61",
+      "a64",
+      "a65",
+      "a67",
+      "f69"
+    ],
+    "via": "sort"
+  },
+  {
+    "id": "e23",
+    "verb": "move",
+    "target": "f69",
+    "args": {
+      "before": "f02"
+    },
+    "undo": {
+      "restore": {
+        "id": "f69",
+        "type": "surface",
+        "title": "Harbor",
+        "parent": "f01",
+        "layout": "column",
+        "x": 850,
+        "y": 8,
+        "w": 420,
+        "h": 784,
+        "z": 6,
+        "rev": 16
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "f01",
+      "f69"
+    ],
+    "via": "move"
+  }
+]

@@ -1,0 +1,115 @@
+[
+  {
+    "id": "e1",
+    "verb": "edit",
+    "target": "a06",
+    "args": {
+      "append": "Yes—the renderer is still planned for this month."
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s05",
+        "kind": "chat",
+        "title": "Priya",
+        "text": "Alex: not yet, Friday\nPriya: did the grammar land?\nAlex: Friday.\nPriya: and the renderer?\nAlex: next week.\nPriya: ping?\nAlex: pong.\nPriya: is the renderer still planned for this month?",
+        "tags": [
+          "needs-reply"
+        ],
+        "due": null,
+        "rev": 3,
+        "comments": []
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s05",
+      "a06"
+    ],
+    "via": "append",
+    "cmd": 70
+  },
+  {
+    "id": "e2",
+    "verb": "due",
+    "target": "a78",
+    "args": {
+      "on": "2026-09-30"
+    },
+    "undo": {
+      "restore_subject": {
+        "id": "s77",
+        "kind": "task",
+        "title": "Design the on-event grammar properly",
+        "text": "",
+        "tags": [],
+        "due": "2026-09-19",
+        "rev": 1,
+        "comments": []
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "s77",
+      "a78"
+    ],
+    "via": "due",
+    "cmd": 71
+  },
+  {
+    "id": "e3",
+    "verb": "create",
+    "target": "f01",
+    "args": {
+      "kind": "note",
+      "title": "Model's view",
+      "tags": "friction",
+      "text": "Finding the exact chat and its latest question took a few separate lookups.\nThe distinction between appearances and subjects, and where a rule will file a new item, felt a little awkward."
+    },
+    "undo": {
+      "delete": "a84",
+      "delete_subject": "s83"
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "f01",
+      "a84"
+    ],
+    "via": "create",
+    "cmd": 72
+  },
+  {
+    "id": "e4",
+    "verb": "move",
+    "target": "a84",
+    "args": {
+      "into": "f09"
+    },
+    "undo": {
+      "restore": {
+        "id": "a84",
+        "type": "appearance",
+        "subject": "s83",
+        "parent": "f01",
+        "x": 1121,
+        "y": 8,
+        "w": 151,
+        "h": 784,
+        "z": 8,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a84",
+      "f01",
+      "f09"
+    ],
+    "via": "rule r2",
+    "cause": "e3"
+  }
+]

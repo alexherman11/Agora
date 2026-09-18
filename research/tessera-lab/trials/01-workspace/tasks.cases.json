@@ -1,0 +1,6 @@
+[
+  {"steps":[],"assert":[{"expr":["count",["query","tasks.active"]],"equals":2},{"expr":["count",["query","tasks.done"]],"equals":1},{"expr":["count",["query","tasks.open"]],"equals":1},{"expr":["get",["record","items","welcome"],"isTask"],"equals":false}]},
+  {"steps":[{"action":"task.make","args":{"id":"welcome"}},{"action":"task.setDone","args":{"id":"welcome","done":true}},{"action":"task.setPriority","args":{"id":"welcome","priority":1}}],"assert":[{"expr":["get",["record","items","welcome"],"done"],"equals":true},{"expr":["get",["record","items","welcome"],"priority"],"equals":1},{"expr":["count",["query","tasks.active"]],"equals":3},{"expr":["count",["query","tasks.done"]],"equals":2}]},
+  {"steps":[{"action":"task.setDone","args":{"id":"task-review","done":false}},{"action":"task.setPriority","args":{"id":"task-review","priority":3}}],"assert":[{"expr":["count",["query","tasks.done"]],"equals":0},{"expr":["count",["query","tasks.open"]],"equals":2},{"expr":["get",["record","items","task-review"],"priority"],"equals":3}]},
+  {"steps":[{"action":"task.add","args":{"id":"new-task","title":"  Check task creation  "}}],"assert":[{"expr":["get",["record","items","new-task"],"title"],"equals":"Check task creation"},{"expr":["get",["record","items","new-task"],"isTask"],"equals":true},{"expr":["count",["query","tasks.active"]],"equals":3}]}
+]

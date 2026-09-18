@@ -1,0 +1,6 @@
+[
+{"steps":[{"action":"sim.step","args":{"dt":0.05}}],"assert":[{"expr":["get",["record","simulation","main"],"steps"],"equals":1},{"expr":["get",["record","bodies","ember"],"x"],"equals":128.1},{"expr":["get",["record","bodies","ember"],"y"],"equals":117.2}]},
+{"steps":[{"action":"body.drag","args":{"id":"ember","x":999,"y":639}},{"action":"sim.step","args":{"dt":1}}],"assert":[{"expr":["get",["record","bodies","ember"],"x"],"equals":41},{"expr":["get",["record","bodies","ember"],"y"],"equals":23}]},
+{"steps":[{"action":"body.drag","args":{"id":"cobalt","x":-30,"y":700}}],"assert":[{"expr":["get",["record","bodies","cobalt"],"x"],"equals":0},{"expr":["get",["record","bodies","cobalt"],"y"],"equals":640}]},
+{"steps":[{"action":"body.drag","args":{"id":"missing","x":50,"y":50},"ok":false}],"assert":[{"expr":["get",["record","bodies","ember"],"x"],"equals":126},{"expr":["get",["record","simulation","main"],"steps"],"equals":0}]}
+]

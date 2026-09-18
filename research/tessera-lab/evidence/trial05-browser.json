@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "checks": [
+    "Composed Step updates simulation and measured visuals",
+    "Dragging a body during authoritative motion commits as an additive displacement",
+    "Independent force handle remains movable during simulation",
+    "Pause stops all authoritative ticks",
+    "Appearance and spatial placement change with stable moving-body identities",
+    "Competing body styles are exposed and resolved explicitly",
+    "Live author-layer withdrawal and restoration preserve exact object state",
+    "All 8 author subsets render without browser exceptions",
+    "Three independent browser clients do not multiply simulation speed"
+  ],
+  "errors": [],
+  "runningDrag": {
+    "before": {
+      "color": "#ff875e",
+      "label": "EMBER",
+      "radius": 18,
+      "vx": 47.446941817024474,
+      "vy": 26.91585713737272,
+      "x": 143.74957460005453,
+      "y": 126.10850653336865,
+      "dragX": 0,
+      "dragY": 0
+    },
+    "after": {
+      "color": "#ff875e",
+      "label": "EMBER",
+      "radius": 18,
+      "vx": 57.376228979916064,
+      "vy": 32.440239184912386,
+      "x": 177.32295745314445,
+      "y": 145.06392198711887,
+      "dragX": 150,
+      "dragY": 60
+    },
+    "newConflicts": []
+  },
+  "clockRates": {
+    "oneBrowserStepsPerSecond": 19.08713692946058,
+    "threeBrowserStepsPerSecond": 19.039735099337747
+  },
+  "metrics": {
+    "renders": 177,
+    "renderMs": 2954.9000001251698,
+    "maxRenderMs": 82.7000000178814,
+    "previewFrames": 34,
+    "previewMs": 544.499999910593,
+    "commits": 9
+  }
+}

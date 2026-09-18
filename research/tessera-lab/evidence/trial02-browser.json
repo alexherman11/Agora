@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "errors": [],
+  "workflow": [
+    "nested packing rows and quote",
+    "three-contributor atomic dispatch",
+    "stock refusal without spending",
+    "cancellation refunds and restocks",
+    "second mission dispatch",
+    "create mission with project select",
+    "add packing line with dynamic quote"
+  ]
+}

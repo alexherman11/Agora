@@ -1,0 +1,57 @@
+{
+  "checks": [
+    {
+      "name": "All program orders produce the same complete dispatch and refund",
+      "ok": true
+    },
+    {
+      "name": "Two dispatches from the same snapshot cannot oversell in either arrival order",
+      "ok": true
+    },
+    {
+      "name": "Counter deltas from two packing lines with the same SKU sum rather than overwrite",
+      "ok": true
+    },
+    {
+      "name": "Arbitrary new SKU participates without any renderer or reaction change",
+      "ok": true
+    },
+    {
+      "name": "Duplicate event identity cannot partially reserve stock or spend funds",
+      "ok": true
+    },
+    {
+      "name": "Different field stale edits commute; same field stale edits preserve a conflict",
+      "ok": true
+    },
+    {
+      "name": "Overlapping handler intent refuses atomically with both proposals",
+      "ok": true
+    },
+    {
+      "name": "Disjoint authors may edit the same view; disagreement never uses file order",
+      "ok": true
+    },
+    {
+      "name": "Same-priority styling disagreement stays visible, explicit precedence works",
+      "ok": true
+    },
+    {
+      "name": "Missing structure targets and graph cycles are diagnosed",
+      "ok": true
+    },
+    {
+      "name": "Replay from persisted state preserves dispatch and exact refunds",
+      "ok": true
+    }
+  ],
+  "limitations": [
+    {
+      "name": "New action bypasses planner-only lifecycle precondition",
+      "reproduced": true,
+      "excessStock": 3,
+      "needed": "Transition invariant or immutable reservation snapshot independent of action name"
+    }
+  ],
+  "ok": true
+}

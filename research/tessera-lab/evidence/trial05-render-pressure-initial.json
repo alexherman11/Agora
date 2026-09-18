@@ -1,0 +1,33 @@
+{
+  "scope": "Local headless Chrome; full-render time excludes interpreter dispatch, network and DOM input handling. Instrumentation is included.",
+  "results": [
+    {
+      "bodies": 20,
+      "observedSteps": 25,
+      "wallMs": 1423,
+      "renders": 29,
+      "meanRenderMs": 20.99310345074226,
+      "maxRenderMs": 89.5,
+      "viewOccurrences": 164
+    },
+    {
+      "bodies": 80,
+      "observedSteps": 119,
+      "wallMs": 8703,
+      "renders": 123,
+      "meanRenderMs": 64.32764227700427,
+      "maxRenderMs": 118.40000000596046,
+      "viewOccurrences": 576
+    },
+    {
+      "bodies": 160,
+      "observedSteps": 118,
+      "wallMs": 16107,
+      "renders": 119,
+      "meanRenderMs": 126.36806722824313,
+      "maxRenderMs": 185.2999999821186,
+      "viewOccurrences": 1107
+    }
+  ],
+  "ok": true
+}

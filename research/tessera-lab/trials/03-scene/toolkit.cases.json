@@ -1,0 +1,313 @@
+[
+  {
+    "steps": [
+      {
+        "action": "scene.theme",
+        "args": {
+          "theme": "dawn"
+        }
+      },
+      {
+        "action": "scene.mode",
+        "args": {
+          "mode": "mosaic"
+        }
+      },
+      {
+        "action": "scene.borderOverride",
+        "args": {
+          "value": "off"
+        }
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "theme"
+        ],
+        "equals": "dawn"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "mode"
+        ],
+        "equals": "mosaic"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "borderOverride"
+        ],
+        "equals": "off"
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "action": "surface.move",
+        "args": {
+          "id": "console",
+          "x": 180,
+          "y": 125
+        }
+      },
+      {
+        "action": "surface.resize",
+        "args": {
+          "id": "console",
+          "width": 440,
+          "height": 360
+        }
+      },
+      {
+        "action": "surface.focus",
+        "args": {
+          "id": "console"
+        }
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "x"
+        ],
+        "equals": 180
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "y"
+        ],
+        "equals": 125
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "width"
+        ],
+        "equals": 440
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "height"
+        ],
+        "equals": 360
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "dock"
+        ],
+        "equals": "free"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "z"
+        ],
+        "equals": 4
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "focusSeq"
+        ],
+        "equals": 4
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "action": "surface.resize",
+        "args": {
+          "id": "console",
+          "width": 100,
+          "height": 90
+        },
+        "ok": false
+      },
+      {
+        "action": "scene.theme",
+        "args": {
+          "theme": "unknown"
+        },
+        "ok": false
+      },
+      {
+        "action": "surface.dock",
+        "args": {
+          "id": "console",
+          "dock": "diagonal"
+        },
+        "ok": false
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "width"
+        ],
+        "equals": 312
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "height"
+        ],
+        "equals": 668
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "dock"
+        ],
+        "equals": "bottom"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "theme"
+        ],
+        "equals": "night"
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "action": "surface.dock",
+        "args": {
+          "id": "console",
+          "dock": "left"
+        }
+      },
+      {
+        "action": "scene.mode",
+        "args": {
+          "mode": "mosaic"
+        }
+      },
+      {
+        "action": "scene.mode",
+        "args": {
+          "mode": "free"
+        }
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "dock"
+        ],
+        "equals": "left"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "x"
+        ],
+        "equals": 1264
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "y"
+        ],
+        "equals": 70
+      }
+    ]
+  }
+]

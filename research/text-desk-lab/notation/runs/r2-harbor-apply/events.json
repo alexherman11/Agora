@@ -1,0 +1,217 @@
+[
+  {
+    "id": "e1",
+    "verb": "move",
+    "target": "a20",
+    "args": {
+      "into": "f02",
+      "before": "a16"
+    },
+    "undo": {
+      "restore": {
+        "id": "a20",
+        "type": "appearance",
+        "subject": "s07",
+        "parent": "f04",
+        "x": 60,
+        "y": 60,
+        "w": 300,
+        "h": 160,
+        "z": 1,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a20",
+      "f02",
+      "f04"
+    ]
+  },
+  {
+    "id": "e2",
+    "verb": "move",
+    "target": "a22",
+    "args": {
+      "into": "f02",
+      "before": "a16"
+    },
+    "undo": {
+      "restore": {
+        "id": "a22",
+        "type": "appearance",
+        "subject": "s06",
+        "parent": "f04",
+        "x": 540,
+        "y": 30,
+        "w": 280,
+        "h": 140,
+        "z": 3,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a22",
+      "f02",
+      "f04"
+    ]
+  },
+  {
+    "id": "e3",
+    "verb": "move",
+    "target": "a17",
+    "args": {
+      "after": "a16"
+    },
+    "undo": {
+      "restore": {
+        "id": "a17",
+        "type": "appearance",
+        "subject": "s08",
+        "parent": "f02",
+        "x": 8,
+        "y": 8,
+        "w": 384,
+        "h": 190,
+        "z": 1,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a17",
+      "f02"
+    ]
+  },
+  {
+    "id": "e4",
+    "verb": "move",
+    "target": "a21",
+    "args": {
+      "into": "f02",
+      "after": "a17"
+    },
+    "undo": {
+      "restore": {
+        "id": "a21",
+        "type": "appearance",
+        "subject": "s12",
+        "parent": "f04",
+        "x": 20,
+        "y": 20,
+        "w": 500,
+        "h": 340,
+        "z": 2,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a21",
+      "f02",
+      "f04"
+    ]
+  },
+  {
+    "id": "e5",
+    "verb": "move",
+    "target": "a27",
+    "args": {
+      "into": "f02",
+      "after": "a21"
+    },
+    "undo": {
+      "restore": {
+        "id": "a27",
+        "type": "appearance",
+        "subject": "s15",
+        "parent": "f03",
+        "x": 300,
+        "y": 200,
+        "w": 320,
+        "h": 160,
+        "z": 3,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a27",
+      "f02",
+      "f03"
+    ]
+  },
+  {
+    "id": "e6",
+    "verb": "move",
+    "target": "a18",
+    "args": {
+      "into": "f02",
+      "after": "a27"
+    },
+    "undo": {
+      "restore": {
+        "id": "a18",
+        "type": "appearance",
+        "subject": "s10",
+        "parent": "f03",
+        "x": 20,
+        "y": 20,
+        "w": 380,
+        "h": 220,
+        "z": 1,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a18",
+      "f02",
+      "f03"
+    ]
+  },
+  {
+    "id": "e7",
+    "verb": "move",
+    "target": "a24",
+    "args": {
+      "into": "f02",
+      "after": "a18"
+    },
+    "undo": {
+      "restore": {
+        "id": "a24",
+        "type": "appearance",
+        "subject": "s10",
+        "parent": "f04",
+        "x": 300,
+        "y": 200,
+        "w": 320,
+        "h": 180,
+        "z": 5,
+        "folded": false,
+        "rev": 1
+      }
+    },
+    "note": "",
+    "by": "jeff",
+    "changed": [
+      "a24",
+      "f02",
+      "f04"
+    ]
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "errors": [],
+  "workflow": [
+    "create note",
+    "make same note a task",
+    "attach research URL",
+    "complete task",
+    "search library"
+  ],
+  "record": {
+    "title": "Browser collaboration test",
+    "body": "Created through the composed language UI.",
+    "archived": false,
+    "done": true,
+    "isTask": true,
+    "priority": 2,
+    "reference": "",
+    "sourceUrl": "https://example.org/composition"
+  }
+}

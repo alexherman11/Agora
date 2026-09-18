@@ -1,0 +1,90 @@
+{
+  "review_date": "2026-09-04",
+  "results": {
+    "refused_place_on_uninitialized_desk": {
+      "error": "VerbError",
+      "detail": "mode must be one of ['icon', 'summary', 'full']; got 'invalid'",
+      "log_unchanged": false,
+      "events_added": 1
+    },
+    "path_import_bypasses_text_limit": {
+      "configured_limit": 1000000,
+      "accepted_characters": 1000001
+    },
+    "refused_mint_retains_imported_blob": {
+      "error": "VerbError",
+      "detail": "core.name.name must be str; got int",
+      "log_unchanged": true,
+      "blob_count": 1
+    },
+    "legal_scene_self_reference": {
+      "projection": {
+        "error": "RecursionError",
+        "detail": "maximum recursion depth exceeded"
+      },
+      "tree": {
+        "error": "RecursionError",
+        "detail": "maximum recursion depth exceeded"
+      }
+    },
+    "anchor_reopen_without_prior_edit": {
+      "snapshot_persisted": false,
+      "resolution": {
+        "error": "BaseException",
+        "detail": "Cannot find relative position. The id is not found."
+      }
+    },
+    "two_text_editors": {
+      "first_local": "A hello world",
+      "second_local": "hello world B",
+      "persisted": "hello world B",
+      "both_edits_present": false,
+      "rebuild_equals_store": true
+    },
+    "anchor_after_plain_replacement": {
+      "error": "BaseException",
+      "detail": "Cannot find relative position. The id is not found."
+    },
+    "projection_budget_and_label": {
+      "budget": 12,
+      "rendered": "notes (by jeff); word word word… (by jeff); +1 more: core.file-backing",
+      "rendered_estimated_tokens": 18,
+      "long_name_label": ""
+    },
+    "no_op_sync_reads_entire_log": {
+      "log_bytes": 5209,
+      "characters_read_per_sync": [
+        5209,
+        5209
+      ]
+    },
+    "concurrent_sync_duplicate_application": {
+      "scheduling": "Both readers capture the same cursor; SQL applications then run serially.",
+      "errors": [],
+      "log_events": 1,
+      "cached_facet_revision": 2,
+      "rebuilt_facet_revision": 1,
+      "rebuild_equals_store": false
+    },
+    "middle_corruption_silently_skipped": {
+      "rebuild_raised": false,
+      "cached_revision": 3,
+      "rebuilt_revision": 2,
+      "rebuild_equals_store": false
+    },
+    "torn_multibyte_tail": {
+      "error": "UnicodeDecodeError",
+      "detail": "'utf-8' codec can't decode byte 0xe2 in position 188: unexpected end of data"
+    },
+    "file_backing_after_text_edit": {
+      "facet_text": "edited",
+      "source_text": "original",
+      "blob_text": "original"
+    },
+    "unauthenticated_cross_origin_request_shape": {
+      "status": 200,
+      "last_event_actor": "claimed-owner",
+      "scope": "TestClient request handling only, not an end-to-end browser attack."
+    }
+  }
+}

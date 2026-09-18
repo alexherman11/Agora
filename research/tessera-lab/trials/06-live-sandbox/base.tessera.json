@@ -1,0 +1,16 @@
+{"id":"base","claims":[
+{"kind":"view","id":"scene","widget":"scene","role":"stage"},
+{"kind":"field","id":"bodies.label","type":"string","default":"Body"},
+{"kind":"field","id":"bodies.x","type":"number","default":100},
+{"kind":"field","id":"bodies.y","type":"number","default":100},
+{"kind":"field","id":"bodies.vx","type":"number","default":20,"merge":"counter"},
+{"kind":"field","id":"bodies.vy","type":"number","default":0,"merge":"counter"},
+{"kind":"field","id":"bodies.radius","type":"number","default":12},
+{"kind":"field","id":"bodies.color","type":"string","default":"#77d9ff"},
+{"kind":"field","id":"simulation.running","type":"boolean","default":false},
+{"kind":"field","id":"simulation.steps","type":"number","default":0,"merge":"counter"},
+{"kind":"field","id":"simulation.width","type":"number","default":1000},
+{"kind":"field","id":"simulation.height","type":"number","default":640},
+{"kind":"seed","id":"simulation/main","values":{}},
+{"kind":"action","id":"sim.step","effects":[{"op":"add","collection":"simulation","id":"main","field":"steps","value":1}]}
+]}

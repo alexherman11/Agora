@@ -1,0 +1,1328 @@
+{
+  "id": "toolkit",
+  "claims": [
+    {
+      "kind": "field",
+      "id": "settings.theme",
+      "type": "string",
+      "default": "night"
+    },
+    {
+      "kind": "field",
+      "id": "settings.mode",
+      "type": "string",
+      "default": "free"
+    },
+    {
+      "kind": "field",
+      "id": "settings.borderOverride",
+      "type": "string",
+      "default": "round"
+    },
+    {
+      "kind": "field",
+      "id": "settings.focusSeq",
+      "type": "number",
+      "default": 3,
+      "merge": "counter"
+    },
+    {
+      "kind": "seed",
+      "id": "settings/scene",
+      "values": {
+        "theme": "night",
+        "mode": "free",
+        "borderOverride": "round",
+        "focusSeq": 3
+      }
+    },
+    {
+      "kind": "seed",
+      "id": "surfaces/console",
+      "values": {
+        "title": "CONTROL / SCENE",
+        "x": 42,
+        "y": 420,
+        "width": 350,
+        "height": 340,
+        "z": 3,
+        "dock": "bottom"
+      }
+    },
+    {
+      "kind": "action",
+      "id": "surface.move",
+      "requires": [
+        "and",
+        [
+          "ne",
+          [
+            "record",
+            "surfaces",
+            [
+              "arg",
+              "id"
+            ]
+          ],
+          null
+        ],
+        [
+          "gte",
+          [
+            "number",
+            [
+              "arg",
+              "x"
+            ]
+          ],
+          0
+        ],
+        [
+          "gte",
+          [
+            "number",
+            [
+              "arg",
+              "y"
+            ]
+          ],
+          0
+        ]
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "x",
+          "value": [
+            "number",
+            [
+              "arg",
+              "x"
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "y",
+          "value": [
+            "number",
+            [
+              "arg",
+              "y"
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "dock",
+          "value": "free"
+        }
+      ]
+    },
+    {
+      "kind": "action",
+      "id": "surface.resize",
+      "requires": [
+        "and",
+        [
+          "ne",
+          [
+            "record",
+            "surfaces",
+            [
+              "arg",
+              "id"
+            ]
+          ],
+          null
+        ],
+        [
+          "gte",
+          [
+            "number",
+            [
+              "arg",
+              "width"
+            ]
+          ],
+          260
+        ],
+        [
+          "gte",
+          [
+            "number",
+            [
+              "arg",
+              "height"
+            ]
+          ],
+          220
+        ]
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "width",
+          "value": [
+            "number",
+            [
+              "arg",
+              "width"
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "height",
+          "value": [
+            "number",
+            [
+              "arg",
+              "height"
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "dock",
+          "value": "free"
+        }
+      ]
+    },
+    {
+      "kind": "action",
+      "id": "surface.focus",
+      "requires": [
+        "ne",
+        [
+          "record",
+          "surfaces",
+          [
+            "arg",
+            "id"
+          ]
+        ],
+        null
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "z",
+          "value": [
+            "add",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "focusSeq"
+            ],
+            1
+          ]
+        },
+        {
+          "op": "add",
+          "collection": "settings",
+          "id": "scene",
+          "field": "focusSeq",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "kind": "action",
+      "id": "surface.dock",
+      "requires": [
+        "and",
+        [
+          "ne",
+          [
+            "record",
+            "surfaces",
+            [
+              "arg",
+              "id"
+            ]
+          ],
+          null
+        ],
+        [
+          "includes",
+          [
+            "lit",
+            [
+              "free",
+              "left",
+              "right",
+              "bottom"
+            ]
+          ],
+          [
+            "arg",
+            "dock"
+          ]
+        ]
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "arg",
+            "id"
+          ],
+          "field": "dock",
+          "value": [
+            "arg",
+            "dock"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "action",
+      "id": "scene.theme",
+      "requires": [
+        "includes",
+        [
+          "lit",
+          [
+            "night",
+            "dawn"
+          ]
+        ],
+        [
+          "arg",
+          "theme"
+        ]
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "settings",
+          "id": "scene",
+          "field": "theme",
+          "value": [
+            "arg",
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "action",
+      "id": "scene.mode",
+      "requires": [
+        "includes",
+        [
+          "lit",
+          [
+            "free",
+            "mosaic"
+          ]
+        ],
+        [
+          "arg",
+          "mode"
+        ]
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "settings",
+          "id": "scene",
+          "field": "mode",
+          "value": [
+            "arg",
+            "mode"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "action",
+      "id": "scene.borderOverride",
+      "requires": [
+        "includes",
+        [
+          "lit",
+          [
+            "round",
+            "square",
+            "off"
+          ]
+        ],
+        [
+          "arg",
+          "value"
+        ]
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "collection": "settings",
+          "id": "scene",
+          "field": "borderOverride",
+          "value": [
+            "arg",
+            "value"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "gesture",
+      "id": "toolkit.windowMove",
+      "selector": "role:surface",
+      "handle": "role:surface-grip",
+      "mode": "drag",
+      "when": [
+        "or",
+        [
+          "eq",
+          [
+            "get",
+            [
+              "record",
+              "settings",
+              "scene"
+            ],
+            "mode"
+          ],
+          "free"
+        ],
+        [
+          "eq",
+          [
+            "row",
+            "dock"
+          ],
+          "free"
+        ]
+      ],
+      "preview": [
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "row",
+            "id"
+          ],
+          "field": "x",
+          "value": [
+            "max",
+            0,
+            [
+              "gesture",
+              "x"
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "row",
+            "id"
+          ],
+          "field": "y",
+          "value": [
+            "max",
+            0,
+            [
+              "gesture",
+              "y"
+            ]
+          ]
+        }
+      ],
+      "commit": {
+        "action": "surface.move",
+        "args": {
+          "id": [
+            "row",
+            "id"
+          ],
+          "x": [
+            "max",
+            0,
+            [
+              "gesture",
+              "x"
+            ]
+          ],
+          "y": [
+            "max",
+            0,
+            [
+              "gesture",
+              "y"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "kind": "gesture",
+      "id": "toolkit.windowResize",
+      "selector": "role:surface",
+      "handle": "role:resize-grip",
+      "mode": "resize",
+      "when": [
+        "or",
+        [
+          "eq",
+          [
+            "get",
+            [
+              "record",
+              "settings",
+              "scene"
+            ],
+            "mode"
+          ],
+          "free"
+        ],
+        [
+          "eq",
+          [
+            "row",
+            "dock"
+          ],
+          "free"
+        ]
+      ],
+      "preview": [
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "row",
+            "id"
+          ],
+          "field": "width",
+          "value": [
+            "max",
+            260,
+            [
+              "gesture",
+              "width"
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "collection": "surfaces",
+          "id": [
+            "row",
+            "id"
+          ],
+          "field": "height",
+          "value": [
+            "max",
+            220,
+            [
+              "gesture",
+              "height"
+            ]
+          ]
+        }
+      ],
+      "commit": {
+        "action": "surface.resize",
+        "args": {
+          "id": [
+            "row",
+            "id"
+          ],
+          "width": [
+            "max",
+            260,
+            [
+              "gesture",
+              "width"
+            ]
+          ],
+          "height": [
+            "max",
+            220,
+            [
+              "gesture",
+              "height"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "kind": "view",
+      "id": "console.surface",
+      "parent": "scene",
+      "widget": "surface",
+      "context": [
+        "record",
+        "surfaces",
+        "console"
+      ],
+      "role": "surface console-window",
+      "box": {
+        "x": [
+          "row",
+          "x"
+        ],
+        "y": [
+          "row",
+          "y"
+        ],
+        "width": [
+          "row",
+          "width"
+        ],
+        "height": [
+          "row",
+          "height"
+        ],
+        "z": [
+          "row",
+          "z"
+        ]
+      },
+      "visible": [
+        "not",
+        [
+          "row",
+          "hidden"
+        ]
+      ]
+    },
+    {
+      "kind": "view",
+      "id": "console.grip",
+      "parent": "console.surface",
+      "widget": "row",
+      "role": "surface-grip",
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.logo",
+      "parent": "console.grip",
+      "widget": "text",
+      "text": "◈  TESSERA / CONTROL",
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.focus",
+      "parent": "console.grip",
+      "widget": "button",
+      "text": "↑",
+      "action": "surface.focus",
+      "args": {
+        "id": [
+          "row",
+          "id"
+        ]
+      },
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.body",
+      "parent": "console.surface",
+      "widget": "stack",
+      "role": "console-body",
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.intro",
+      "parent": "console.body",
+      "widget": "text",
+      "text": "Shape the room while everything stays live.",
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.themeLabel",
+      "parent": "console.body",
+      "widget": "text",
+      "text": "ATMOSPHERE",
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.themes",
+      "parent": "console.body",
+      "widget": "row",
+      "order": 3
+    },
+    {
+      "kind": "view",
+      "id": "console.night",
+      "parent": "console.themes",
+      "widget": "button",
+      "text": "Nocturne",
+      "action": "scene.theme",
+      "args": {
+        "theme": "night"
+      },
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.dawn",
+      "parent": "console.themes",
+      "widget": "button",
+      "text": "Dawn",
+      "action": "scene.theme",
+      "args": {
+        "theme": "dawn"
+      },
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.layoutLabel",
+      "parent": "console.body",
+      "widget": "text",
+      "text": "COMPOSITION",
+      "order": 4
+    },
+    {
+      "kind": "view",
+      "id": "console.layouts",
+      "parent": "console.body",
+      "widget": "row",
+      "order": 5
+    },
+    {
+      "kind": "view",
+      "id": "console.free",
+      "parent": "console.layouts",
+      "widget": "button",
+      "text": "Float",
+      "action": "scene.mode",
+      "args": {
+        "mode": "free"
+      },
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.mosaic",
+      "parent": "console.layouts",
+      "widget": "button",
+      "text": "Mosaic",
+      "action": "scene.mode",
+      "args": {
+        "mode": "mosaic"
+      },
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.overrideLabel",
+      "parent": "console.body",
+      "widget": "text",
+      "text": "SURFACE CORNERS",
+      "order": 6
+    },
+    {
+      "kind": "view",
+      "id": "console.overrides",
+      "parent": "console.body",
+      "widget": "row",
+      "order": 7
+    },
+    {
+      "kind": "view",
+      "id": "console.round",
+      "parent": "console.overrides",
+      "widget": "button",
+      "text": "Round",
+      "action": "scene.borderOverride",
+      "args": {
+        "value": "round"
+      },
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.square",
+      "parent": "console.overrides",
+      "widget": "button",
+      "text": "Square",
+      "action": "scene.borderOverride",
+      "args": {
+        "value": "square"
+      },
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.off",
+      "parent": "console.overrides",
+      "widget": "button",
+      "text": "Expose conflict",
+      "action": "scene.borderOverride",
+      "args": {
+        "value": "off"
+      },
+      "order": 3
+    },
+    {
+      "kind": "view",
+      "id": "console.target",
+      "parent": "console.body",
+      "widget": "select",
+      "bind": "targetSurface",
+      "options": [
+        "all",
+        "surfaces"
+      ],
+      "optionLabel": "title",
+      "value": "studio",
+      "order": 8
+    },
+    {
+      "kind": "view",
+      "id": "console.targets",
+      "parent": "console.body",
+      "widget": "row",
+      "order": 9
+    },
+    {
+      "kind": "view",
+      "id": "console.raise",
+      "parent": "console.targets",
+      "widget": "button",
+      "text": "Bring forward",
+      "action": "surface.focus",
+      "args": {
+        "id": [
+          "local",
+          "targetSurface"
+        ]
+      },
+      "order": 1
+    },
+    {
+      "kind": "view",
+      "id": "console.dockLeft",
+      "parent": "console.targets",
+      "widget": "button",
+      "text": "Dock left",
+      "action": "surface.dock",
+      "args": {
+        "id": [
+          "local",
+          "targetSurface"
+        ],
+        "dock": "left"
+      },
+      "order": 2
+    },
+    {
+      "kind": "view",
+      "id": "console.dockRight",
+      "parent": "console.targets",
+      "widget": "button",
+      "text": "Dock right",
+      "action": "surface.dock",
+      "args": {
+        "id": [
+          "local",
+          "targetSurface"
+        ],
+        "dock": "right"
+      },
+      "order": 3
+    },
+    {
+      "kind": "view",
+      "id": "console.dockFree",
+      "parent": "console.targets",
+      "widget": "button",
+      "text": "Release",
+      "action": "surface.dock",
+      "args": {
+        "id": [
+          "local",
+          "targetSurface"
+        ],
+        "dock": "free"
+      },
+      "order": 4
+    },
+    {
+      "kind": "view",
+      "id": "console.host",
+      "parent": "console.body",
+      "widget": "canvas",
+      "dropRole": "card-host",
+      "role": "console-card-host",
+      "order": 10
+    },
+    {
+      "kind": "view",
+      "id": "console.resizeGrip",
+      "parent": "console.surface",
+      "widget": "badge",
+      "text": "◢",
+      "role": "resize-grip",
+      "order": 99
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.scene",
+      "selector": "role:stage",
+      "priority": 5,
+      "values": {
+        "background": [
+          "if",
+          [
+            "eq",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "theme"
+            ],
+            "night"
+          ],
+          "radial-gradient(circle at 22% 18%, #29416a 0%, #111c34 38%, #070c1b 100%)",
+          "radial-gradient(circle at 78% 8%, #ffdfb9 0%, #bddddf 48%, #739eb6 100%)"
+        ],
+        "color": [
+          "if",
+          [
+            "eq",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "theme"
+            ],
+            "night"
+          ],
+          "#edf5ff",
+          "#15283a"
+        ],
+        "fontFamily": "'Segoe UI', sans-serif",
+        "overflow": "hidden"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.surfaceCommon",
+      "selector": "role:surface",
+      "priority": 5,
+      "values": {
+        "boxShadow": [
+          "if",
+          [
+            "eq",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "theme"
+            ],
+            "night"
+          ],
+          "0 26px 70px rgba(0, 0, 0, .46)",
+          "0 24px 58px rgba(27, 51, 70, .25)"
+        ],
+        "transition": "box-shadow 180ms ease, background 220ms ease"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.borderOverride",
+      "selector": "role:surface",
+      "priority": 30,
+      "values": {
+        "borderRadius": [
+          "if",
+          [
+            "eq",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "borderOverride"
+            ],
+            "round"
+          ],
+          "22px",
+          "4px"
+        ]
+      },
+      "when": [
+        "ne",
+        [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "borderOverride"
+        ],
+        "off"
+      ]
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.consoleSurface",
+      "selector": "id:console.surface",
+      "priority": 20,
+      "values": {
+        "background": [
+          "if",
+          [
+            "eq",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "theme"
+            ],
+            "night"
+          ],
+          "linear-gradient(150deg, rgba(13, 29, 55, .98), rgba(29, 35, 59, .97))",
+          "linear-gradient(150deg, rgba(245, 251, 249, .98), rgba(219, 237, 239, .97))"
+        ],
+        "border": "1px solid rgba(188, 218, 240, .4)",
+        "padding": "18px",
+        "overflow": "hidden",
+        "color": [
+          "if",
+          [
+            "eq",
+            [
+              "get",
+              [
+                "record",
+                "settings",
+                "scene"
+              ],
+              "theme"
+            ],
+            "night"
+          ],
+          "#edf5ff",
+          "#183246"
+        ]
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.consoleGrip",
+      "selector": "id:console.grip",
+      "priority": 20,
+      "values": {
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "cursor": "grab",
+        "fontSize": "13px",
+        "fontWeight": "700",
+        "letterSpacing": "2px",
+        "paddingBottom": "12px",
+        "borderBottom": "1px solid rgba(180, 216, 239, .25)"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.consoleBody",
+      "selector": "id:console.body",
+      "priority": 20,
+      "values": {
+        "gap": "8px",
+        "paddingTop": "12px",
+        "fontSize": "12px"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.consoleHost",
+      "selector": "id:console.host",
+      "priority": 20,
+      "values": {
+        "height": "80px",
+        "border": "1px dashed rgba(130, 205, 230, .55)",
+        "background": "rgba(60, 137, 162, .12)",
+        "overflow": "hidden"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.consoleResizeGrip",
+      "selector": "id:console.resizeGrip",
+      "priority": 20,
+      "values": {
+        "position": "absolute",
+        "right": "10px",
+        "bottom": "8px",
+        "cursor": "nwse-resize",
+        "fontSize": "22px"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.grips",
+      "selector": "role:surface-grip",
+      "priority": 4,
+      "values": {
+        "cursor": "grab"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.resizeGrips",
+      "selector": "role:resize-grip",
+      "priority": 4,
+      "values": {
+        "cursor": "nwse-resize"
+      }
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.mosaicLeft",
+      "selector": "role:surface",
+      "priority": 25,
+      "values": {
+        "left": "24px",
+        "top": "70px",
+        "width": [
+          "concat",
+          [
+            "mul",
+            [
+              "env",
+              "width"
+            ],
+            0.46
+          ],
+          "px"
+        ],
+        "height": [
+          "concat",
+          [
+            "sub",
+            [
+              "env",
+              "height"
+            ],
+            325
+          ],
+          "px"
+        ]
+      },
+      "when": [
+        "and",
+        [
+          "eq",
+          [
+            "get",
+            [
+              "record",
+              "settings",
+              "scene"
+            ],
+            "mode"
+          ],
+          "mosaic"
+        ],
+        [
+          "eq",
+          [
+            "row",
+            "dock"
+          ],
+          "left"
+        ]
+      ]
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.mosaicRight",
+      "selector": "role:surface",
+      "priority": 25,
+      "values": {
+        "left": [
+          "concat",
+          [
+            "mul",
+            [
+              "env",
+              "width"
+            ],
+            0.51
+          ],
+          "px"
+        ],
+        "top": "70px",
+        "width": [
+          "concat",
+          [
+            "mul",
+            [
+              "env",
+              "width"
+            ],
+            0.46
+          ],
+          "px"
+        ],
+        "height": [
+          "concat",
+          [
+            "sub",
+            [
+              "env",
+              "height"
+            ],
+            325
+          ],
+          "px"
+        ]
+      },
+      "when": [
+        "and",
+        [
+          "eq",
+          [
+            "get",
+            [
+              "record",
+              "settings",
+              "scene"
+            ],
+            "mode"
+          ],
+          "mosaic"
+        ],
+        [
+          "eq",
+          [
+            "row",
+            "dock"
+          ],
+          "right"
+        ]
+      ]
+    },
+    {
+      "kind": "style",
+      "id": "toolkit.mosaicBottom",
+      "selector": "role:surface",
+      "priority": 25,
+      "values": {
+        "left": "24px",
+        "top": [
+          "concat",
+          [
+            "sub",
+            [
+              "env",
+              "height"
+            ],
+            235
+          ],
+          "px"
+        ],
+        "width": [
+          "concat",
+          [
+            "sub",
+            [
+              "env",
+              "width"
+            ],
+            48
+          ],
+          "px"
+        ],
+        "height": "205px"
+      },
+      "when": [
+        "and",
+        [
+          "eq",
+          [
+            "get",
+            [
+              "record",
+              "settings",
+              "scene"
+            ],
+            "mode"
+          ],
+          "mosaic"
+        ],
+        [
+          "eq",
+          [
+            "row",
+            "dock"
+          ],
+          "bottom"
+        ]
+      ]
+    }
+  ]
+}

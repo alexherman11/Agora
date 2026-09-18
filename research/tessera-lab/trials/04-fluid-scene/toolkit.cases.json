@@ -1,0 +1,221 @@
+[
+  {
+    "steps": [],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "mode"
+        ],
+        "equals": "overview"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "hosts",
+            "console.host"
+          ],
+          "label"
+        ],
+        "equals": "Control console"
+      },
+      {
+        "expr": [
+          "use",
+          "scene.rank",
+          {
+            "id": "console"
+          }
+        ],
+        "equals": 1
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "action": "scene.focusSurface",
+        "args": {
+          "id": "atlas"
+        }
+      },
+      {
+        "action": "scene.theme",
+        "args": {
+          "theme": "dawn"
+        }
+      },
+      {
+        "action": "scene.borderOverride",
+        "args": {
+          "value": "off"
+        }
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "focusId"
+        ],
+        "equals": "atlas"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "mode"
+        ],
+        "equals": "focused"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "theme"
+        ],
+        "equals": "dawn"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "borderOverride"
+        ],
+        "equals": "off"
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "action": "scene.focusSurface",
+        "args": {
+          "id": "missing"
+        },
+        "ok": false
+      },
+      {
+        "action": "scene.mode",
+        "args": {
+          "mode": "mosaic"
+        },
+        "ok": false
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "mode"
+        ],
+        "equals": "overview"
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "settings",
+            "scene"
+          ],
+          "focusId"
+        ],
+        "equals": "studio"
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "action": "surface.move",
+        "args": {
+          "id": "console",
+          "x": 30,
+          "y": 180
+        }
+      },
+      {
+        "action": "surface.resize",
+        "args": {
+          "id": "console",
+          "width": 410,
+          "height": 520
+        }
+      },
+      {
+        "action": "surface.focus",
+        "args": {
+          "id": "console"
+        }
+      }
+    ],
+    "assert": [
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "x"
+        ],
+        "equals": 30
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "width"
+        ],
+        "equals": 410
+      },
+      {
+        "expr": [
+          "get",
+          [
+            "record",
+            "surfaces",
+            "console"
+          ],
+          "z"
+        ],
+        "equals": 4
+      }
+    ]
+  }
+]
