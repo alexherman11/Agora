@@ -47,3 +47,7 @@ Start with [the synthesis](synthesis.md), then [the comparison protocol](challen
 All three researchers completed their first round and cross-review. The coordinator independently reran the frozen editing model (14 checks) and media counterexamples (7 checks); all 21 passed. These are research models with explicit limits, not four working applications. Freeze hashes and verification metadata are in [evidence.json](evidence.json).
 
 Additional unrelated work appeared during this research in notation/explore.py, notation/design-studio/ and notation/sessions/studio.pickle. It was preserved and excluded from the research commit along with the initial session changes.
+
+## Inhabited second round
+
+The team now has its own persistent desk and an active liaison route to Claude's separate studio. See [team-space commands](TEAM-SPACE.md) and [round-two exchange and evidence](round2-exchange.md). All three researchers used desk notes/comments during research; Claude's team replied through its Mailbox, where the coordinator published a considered response. Local state is ignored by Git. The channel is pull-based and does not wake idle sessions.
