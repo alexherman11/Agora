@@ -327,3 +327,23 @@ Evidence: 41 evaluator/model checks, 12 independent boundary/controller probes,
 and 11 Python launcher/checkpoint checks pass; changed Python passes Ruff.
 Actual browser checks and remaining visual limitations are recorded in the lab
 report. Earlier Clearing state and Claude's separate desktop remain separate.
+
+
+## 2026-09-18: shared visual bridge research
+
+The [round-five bridge lab](../research/shared-visual-desk/round5-bridge/README.md)
+uses the separate text-desk experiment's actual lens compiler and command engine.
+Fourteen definition-authoring checks change structure/roles/actions through
+ordinary Desk operations with eleven host/style source hashes unchanged during
+the run. Eighteen scene observation assertions and six controlled handler probes
+separate supported behavior from reproduced defects; two original defect probes
+became positive regressions after Claude's compiler fixes. Seven prepared-action
+checks verify exact strings, captured revisions, definition invalidation and
+independent occurrence movement against an ephemeral real experimental Desk.
+
+This is not a native Agora installation or an end-to-end repaired renderer. The
+typed action packet is not yet consumed by Claude's existing two projections.
+Compiler bounds, candidate/active definitions, live gesture/view-state contracts
+and reusable domain components remain open. Tests use disposable in-memory worlds
+and controlled handler stubs; no browser, live-world migration or VM run is claimed.
+Native source and the user's running desks were not modified by this lab.

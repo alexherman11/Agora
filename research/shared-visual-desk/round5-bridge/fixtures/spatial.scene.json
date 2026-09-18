@@ -1,0 +1,220 @@
+{
+  "part": "desk",
+  "key": "desk",
+  "role": "window",
+  "layout": "column",
+  "item": null,
+  "box": null,
+  "text": null,
+  "clamp": null,
+  "acts": [],
+  "kids": [
+    {
+      "part": "heading",
+      "key": "desk/heading",
+      "role": "heading",
+      "layout": null,
+      "item": null,
+      "box": null,
+      "text": "Field observations",
+      "clamp": null,
+      "acts": [],
+      "kids": []
+    },
+    {
+      "part": "canvas",
+      "key": "desk/canvas",
+      "role": null,
+      "layout": "free",
+      "item": null,
+      "box": null,
+      "text": null,
+      "clamp": null,
+      "acts": [],
+      "kids": [
+        {
+          "part": "card",
+          "key": "desk/canvas/a03",
+          "role": "card",
+          "layout": "column",
+          "item": "a03",
+          "box": [
+            8,
+            8,
+            416,
+            784
+          ],
+          "text": null,
+          "clamp": null,
+          "acts": [
+            {
+              "on": "drag",
+              "line": "do move a03 x=$x y=$y"
+            }
+          ],
+          "kids": [
+            {
+              "part": "heading",
+              "key": "desk/canvas/a03/heading",
+              "role": "title",
+              "layout": null,
+              "item": "a03",
+              "box": null,
+              "text": "Light on the stairs",
+              "clamp": null,
+              "acts": [
+                {
+                  "on": "edit",
+                  "line": "do retitle a03 title=\"$value\""
+                }
+              ],
+              "kids": []
+            },
+            {
+              "part": "body",
+              "key": "desk/canvas/a03/body",
+              "role": "body",
+              "layout": null,
+              "item": "a03",
+              "box": null,
+              "text": "A bright square crosses the steps.\nIt moves while the room stays still.",
+              "clamp": 2,
+              "acts": [],
+              "kids": []
+            },
+            {
+              "part": "tags",
+              "key": "desk/canvas/a03/tags",
+              "role": null,
+              "layout": "row",
+              "item": "a03",
+              "box": null,
+              "text": null,
+              "clamp": null,
+              "acts": [],
+              "kids": [
+                {
+                  "part": "badge",
+                  "key": "desk/canvas/a03/tags/0",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a03",
+                  "box": null,
+                  "text": "essay",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                },
+                {
+                  "part": "badge",
+                  "key": "desk/canvas/a03/tags/1",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a03",
+                  "box": null,
+                  "text": "light",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                }
+              ],
+              "n": 2
+            }
+          ]
+        },
+        {
+          "part": "card",
+          "key": "desk/canvas/a05",
+          "role": "card",
+          "layout": "column",
+          "item": "a05",
+          "box": [
+            432,
+            8,
+            416,
+            784
+          ],
+          "text": null,
+          "clamp": null,
+          "acts": [
+            {
+              "on": "drag",
+              "line": "do move a05 x=$x y=$y"
+            }
+          ],
+          "kids": [
+            {
+              "part": "heading",
+              "key": "desk/canvas/a05/heading",
+              "role": "title",
+              "layout": null,
+              "item": "a05",
+              "box": null,
+              "text": "The garden after rain",
+              "clamp": null,
+              "acts": [
+                {
+                  "on": "edit",
+                  "line": "do retitle a05 title=\"$value\""
+                }
+              ],
+              "kids": []
+            },
+            {
+              "part": "body",
+              "key": "desk/canvas/a05/body",
+              "role": "body",
+              "layout": null,
+              "item": "a05",
+              "box": null,
+              "text": "Leaves hold small lenses of water.\nThe wall is warm again.",
+              "clamp": 2,
+              "acts": [],
+              "kids": []
+            },
+            {
+              "part": "tags",
+              "key": "desk/canvas/a05/tags",
+              "role": null,
+              "layout": "row",
+              "item": "a05",
+              "box": null,
+              "text": null,
+              "clamp": null,
+              "acts": [],
+              "kids": [
+                {
+                  "part": "badge",
+                  "key": "desk/canvas/a05/tags/0",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a05",
+                  "box": null,
+                  "text": "essay",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                },
+                {
+                  "part": "badge",
+                  "key": "desk/canvas/a05/tags/1",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a05",
+                  "box": null,
+                  "text": "garden",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                }
+              ],
+              "n": 2
+            }
+          ]
+        }
+      ],
+      "of": "tag:essay",
+      "n": 2
+    }
+  ]
+}

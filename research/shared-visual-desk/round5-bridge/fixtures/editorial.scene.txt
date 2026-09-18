@@ -1,0 +1,18 @@
+scene Observations · for editing · world @4
+  reading [sheet] column
+    masthead "Field observations" [heading]
+    contents column · 2 of tag:essay
+      article a03 [card.plain] column
+        title a03 "Light on the stairs" [heading] · click: read a03
+        attribution a03 "note / s02 / a03" [meta]
+        body a03 "A bright square crosses the steps. / It moves while the room stays still." [body] · edit: do rewrite a03 text="$value"
+        tags a03 row · 2
+          badge a03 "essay" [tag]
+          badge a03 "light" [tag]
+      article a05 [card.plain] column
+        title a05 "The garden after rain" [heading] · click: read a05
+        attribution a05 "note / s04 / a05" [meta]
+        body a05 "Leaves hold small lenses of water. / The wall is warm again." [body] · edit: do rewrite a05 text="$value"
+        tags a05 row · 2
+          badge a05 "essay" [tag]
+          badge a05 "garden" [tag]

@@ -61,3 +61,11 @@ Run `python -B research/shared-visual-desk/workbench_server.py --port 8771` from
 ## Fourth round: rules across applications
 
 [Commonplace](round4-shell/README.md) adapts the frozen rule evaluator to a Notes / Editor / Activity desktop inspired by Claude's separate team. The experiment distinguishes authored rules from explicit host mechanisms and preserves failures: one placement per subject, coarse draft revision fences, whole-document checkpoints and no general widget/media authoring. Run `python -B research/shared-visual-desk/round4-shell/server.py --port 8772`. Its ignored `--desk shell` store is separate from the Clearing.
+
+## Fifth round: foundation before desktop
+
+Alex redirected the team to the missing bridge. [Round five](round5-bridge/README.md)
+uses Claude's actual lens/scene implementation as the common experimental basis.
+It records definition-only authoring with frozen host code, independently reproduced
+contract failures, a typed prepared-action binding experiment and a proposal for
+reusable component lifecycle. No new desktop or app-specific renderer was built.

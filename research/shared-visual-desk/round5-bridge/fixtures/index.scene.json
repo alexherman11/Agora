@@ -1,0 +1,200 @@
+{
+  "part": "index",
+  "key": "index",
+  "role": "window",
+  "layout": "column",
+  "item": null,
+  "box": null,
+  "text": null,
+  "clamp": null,
+  "acts": [],
+  "kids": [
+    {
+      "part": "heading",
+      "key": "index/heading",
+      "role": "heading",
+      "layout": null,
+      "item": null,
+      "box": null,
+      "text": "Observation index",
+      "clamp": null,
+      "acts": [],
+      "kids": []
+    },
+    {
+      "part": "contents",
+      "key": "index/contents",
+      "role": null,
+      "layout": "column",
+      "item": null,
+      "box": null,
+      "text": null,
+      "clamp": null,
+      "acts": [],
+      "kids": [
+        {
+          "part": "entry",
+          "key": "index/contents/a03",
+          "role": "card.plain",
+          "layout": "row",
+          "item": "a03",
+          "box": null,
+          "text": null,
+          "clamp": null,
+          "acts": [],
+          "kids": [
+            {
+              "part": "title",
+              "key": "index/contents/a03/title",
+              "role": "title",
+              "layout": null,
+              "item": "a03",
+              "box": null,
+              "text": "Light on the stairs",
+              "clamp": null,
+              "acts": [
+                {
+                  "on": "click",
+                  "line": "read a03"
+                }
+              ],
+              "kids": []
+            },
+            {
+              "part": "identity",
+              "key": "index/contents/a03/identity",
+              "role": "meta",
+              "layout": null,
+              "item": "a03",
+              "box": null,
+              "text": "s02 / a03",
+              "clamp": null,
+              "acts": [],
+              "kids": []
+            },
+            {
+              "part": "tags",
+              "key": "index/contents/a03/tags",
+              "role": null,
+              "layout": "row",
+              "item": "a03",
+              "box": null,
+              "text": null,
+              "clamp": null,
+              "acts": [],
+              "kids": [
+                {
+                  "part": "badge",
+                  "key": "index/contents/a03/tags/0",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a03",
+                  "box": null,
+                  "text": "essay",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                },
+                {
+                  "part": "badge",
+                  "key": "index/contents/a03/tags/1",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a03",
+                  "box": null,
+                  "text": "light",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                }
+              ],
+              "n": 2
+            }
+          ]
+        },
+        {
+          "part": "entry",
+          "key": "index/contents/a05",
+          "role": "card.plain",
+          "layout": "row",
+          "item": "a05",
+          "box": null,
+          "text": null,
+          "clamp": null,
+          "acts": [],
+          "kids": [
+            {
+              "part": "title",
+              "key": "index/contents/a05/title",
+              "role": "title",
+              "layout": null,
+              "item": "a05",
+              "box": null,
+              "text": "The garden after rain",
+              "clamp": null,
+              "acts": [
+                {
+                  "on": "click",
+                  "line": "read a05"
+                }
+              ],
+              "kids": []
+            },
+            {
+              "part": "identity",
+              "key": "index/contents/a05/identity",
+              "role": "meta",
+              "layout": null,
+              "item": "a05",
+              "box": null,
+              "text": "s04 / a05",
+              "clamp": null,
+              "acts": [],
+              "kids": []
+            },
+            {
+              "part": "tags",
+              "key": "index/contents/a05/tags",
+              "role": null,
+              "layout": "row",
+              "item": "a05",
+              "box": null,
+              "text": null,
+              "clamp": null,
+              "acts": [],
+              "kids": [
+                {
+                  "part": "badge",
+                  "key": "index/contents/a05/tags/0",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a05",
+                  "box": null,
+                  "text": "essay",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                },
+                {
+                  "part": "badge",
+                  "key": "index/contents/a05/tags/1",
+                  "role": "tag",
+                  "layout": null,
+                  "item": "a05",
+                  "box": null,
+                  "text": "garden",
+                  "clamp": null,
+                  "acts": [],
+                  "kids": []
+                }
+              ],
+              "n": 2
+            }
+          ]
+        }
+      ],
+      "of": "tag:essay",
+      "n": 2
+    }
+  ]
+}
