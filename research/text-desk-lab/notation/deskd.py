@@ -131,6 +131,12 @@ class Handler(SimpleHTTPRequestHandler):
         with sess as desk:
             before, n0 = set(desk.world.nodes), len(desk.world.events)
             ob = body.get("observed") or {}
+            d = ob.get("def") or {}
+            cur = desk.world.subjects.get(d.get("id"))
+            if d and (cur is None or cur["rev"] != d.get("rev")):
+                return self._json({"text": None, "error": f"refused: lens {d.get('lens')} changed since this was painted "
+                                   f"(you saw revision {d.get('rev')}, it is now {cur['rev'] if cur else 'gone'}); the gesture may no longer mean what it said. "
+                                   f"Nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
             if ob.get("item") in desk.world.nodes and isinstance(ob.get("rev"), int):
                 # Astra: a gesture acts on the generation its maker SAW. The painter used to prefix `look item;`, which
                 # turned stale pixels into fresh permission. Now the act carries what was observed and the fence judges that.

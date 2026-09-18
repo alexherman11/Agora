@@ -375,6 +375,9 @@ def scene_for(desk, name):
     try:
         sc = build(desk, s["text"], (s["title"].lower(),))
         good[s["id"]] = s["text"]
+        # Astra: a revision on a node does not say which DEFINITION gave the gesture its meaning. The scene names its
+        # lens and that lens's revision; a gesture painted under an older definition is refused, not reinterpreted.
+        sc["def"] = {"lens": s["title"], "id": s["id"], "rev": s["rev"]}
         return sc, to_text(sc, s["title"], desk.world.me, len(desk.world.events))
     except LensRefusal as e:
         if s["id"] not in good:

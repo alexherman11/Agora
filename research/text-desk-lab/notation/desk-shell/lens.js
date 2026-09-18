@@ -11,11 +11,11 @@
   const paint = document.getElementById("paint"), said = document.getElementById("said");
   Style.install(await (await fetch("style/calm.style")).text(), q.get("theme") || undefined);
 
-  let last = "", busy = false, sceneAt = 0;
+  let last = "", busy = false, sceneAt = 0, def = null;
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line) {
-    const observed = n.item ? { item: n.item, rev: n.rev, at: sceneAt } : null;
+    const observed = { item: n.item, rev: n.rev, at: sceneAt, def };
     const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json();
     const t = r.text || r.error || "";
     if (r.error || t.startsWith("ERR")) said.textContent = "refused: " + t + "\n\n" + said.textContent;
@@ -86,6 +86,7 @@
     if (key === last) return;
     last = key;
     sceneAt = r.events_total;
+    def = (r.scene && r.scene.def) || null;
     if (r.refused) { paint.replaceChildren(); said.textContent = "refused: " + r.refused; return; }
     next = new Map();
     const root = make(r.scene);
