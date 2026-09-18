@@ -1,0 +1,170 @@
+{
+ "session": "proto-moss",
+ "rules": [
+  {
+   "id": "r1",
+   "gate_kind": "when",
+   "gate": "kind:task,tag:urgent",
+   "act": "tag add=triaged",
+   "fired": 1,
+   "line": "r1 when kind:task,tag:urgent do tag add=triaged   (fired 1x)"
+  },
+  {
+   "id": "r2",
+   "gate_kind": "when",
+   "gate": "tag:triaged",
+   "act": "move into=Today",
+   "fired": 1,
+   "line": "r2 when tag:triaged do move into=Today   (fired 1x)"
+  },
+  {
+   "id": "r3",
+   "gate_kind": "on",
+   "gate": "comment",
+   "act": "run bump $item",
+   "fired": 1,
+   "line": "r3 on comment do run bump $item   (fired 1x)"
+  },
+  {
+   "id": "r4",
+   "gate_kind": "when",
+   "gate": "tag:ping",
+   "act": "tag add=pong",
+   "fired": 1,
+   "line": "r4 when tag:ping do tag add=pong   (fired 1x)"
+  },
+  {
+   "id": "r5",
+   "gate_kind": "when",
+   "gate": "tag:pong",
+   "act": "tag remove=ping",
+   "fired": 1,
+   "line": "r5 when tag:pong do tag remove=ping   (fired 1x)"
+  },
+  {
+   "id": "r6",
+   "gate_kind": "when",
+   "gate": "tag:ghost",
+   "act": "move into=Nowhere",
+   "fired": 0,
+   "line": "r6 when tag:ghost do move into=Nowhere   (fired 0x)"
+  },
+  {
+   "id": "r7",
+   "gate_kind": "when",
+   "gate": "tag:blue",
+   "act": "tag add=seen",
+   "fired": 0,
+   "line": "r7 when tag:blue do tag add=seen   (fired 0x)"
+  },
+  {
+   "id": "r8",
+   "gate_kind": "when",
+   "gate": "due<2026-09-18",
+   "act": "tag add=overdue",
+   "fired": 1,
+   "line": "r8 when due<2026-09-18 do tag add=overdue   (fired 1x)"
+  },
+  {
+   "id": "r9",
+   "gate_kind": "when",
+   "gate": "kind:task,-tag:urgent",
+   "act": "tag add=someday",
+   "fired": 2,
+   "line": "r9 when kind:task,-tag:urgent do tag add=someday   (fired 2x)"
+  },
+  {
+   "id": "r10",
+   "gate_kind": "when",
+   "gate": "due<today",
+   "act": "tag add=overdue-live",
+   "fired": 1,
+   "line": "r10 when due<today do tag add=overdue-live   (fired 1x)"
+  },
+  {
+   "id": "r11",
+   "gate_kind": "when",
+   "gate": "age>3",
+   "act": "tag add=stale",
+   "fired": 0,
+   "line": "r11 when age>3 do tag add=stale   (fired 0x)"
+  },
+  {
+   "id": "r12",
+   "gate_kind": "when",
+   "gate": "kind:task",
+   "act": "sort Today by=due",
+   "fired": 0,
+   "line": "r12 when kind:task do sort Today by=due   (fired 0x)"
+  }
+ ],
+ "scripts": {
+  "bump": "do prop $1 count=1",
+  "mkrule": "rule when tag:$1 do tag add=seen",
+  "report": "do create Done kind=note title=\"report $today\" text=\"made by a script\"",
+  "inner": "do tag $1 add=inner-was-here",
+  "outer": "run inner $1; do tag $1 add=outer-was-here"
+ },
+ "edges": [
+  {
+   "from": "r1",
+   "to": "r2",
+   "kind": "makes",
+   "why": "r1 makes tag:triaged, which r2 waits for"
+  },
+  {
+   "from": "r4",
+   "to": "r5",
+   "kind": "makes",
+   "why": "r4 makes tag:pong, which r5 waits for"
+  },
+  {
+   "from": "r5",
+   "to": "r4",
+   "kind": "unmakes",
+   "why": "r5 removes tag:ping, which r4 waits for"
+  }
+ ],
+ "findings": [
+  {
+   "rule": "r5",
+   "grade": "one-shot",
+   "text": "undoes what r4 waits for. This looks like a cycle and is not one: a `when` rule fires at most ONCE per thing, ever. The loop guard and recurrence are the same knob."
+  },
+  {
+   "rule": "r6",
+   "grade": "broken",
+   "text": "target 'Nowhere' does not exist on this desk; the rule fails only when it fires"
+  },
+  {
+   "rule": "r6",
+   "grade": "unreached",
+   "text": "never fired, and no other rule makes what it waits for. Only a person or a script outside these rules can reach it."
+  },
+  {
+   "rule": "r7",
+   "grade": "unreached",
+   "text": "never fired, and no other rule makes what it waits for. Only a person or a script outside these rules can reach it."
+  },
+  {
+   "rule": "r8",
+   "grade": "frozen",
+   "text": "the date 2026-09-18 is fixed. `due<$today` is substituted when the rule is WRITTEN; `due<today` stays live. The two look alike and behave oppositely."
+  },
+  {
+   "rule": "r11",
+   "grade": "unreached",
+   "text": "never fired, and no other rule makes what it waits for. Only a person or a script outside these rules can reach it."
+  },
+  {
+   "rule": "r12",
+   "grade": "unreached",
+   "text": "never fired, and no other rule makes what it waits for. Only a person or a script outside these rules can reach it."
+  }
+ ],
+ "cycles": [],
+ "raw": {
+  "rules": "> rules\nr1 when kind:task,tag:urgent do tag add=triaged   (fired 1x)\nr2 when tag:triaged do move into=Today   (fired 1x)\nr3 on comment do run bump $item   (fired 1x)\nr4 when tag:ping do tag add=pong   (fired 1x)\nr5 when tag:pong do tag remove=ping   (fired 1x)\nr6 when tag:ghost do move into=Nowhere   (fired 0x)\nr7 when tag:blue do tag add=seen   (fired 0x)\nr8 when due<2026-09-18 do tag add=overdue   (fired 1x)\nr9 when kind:task,-tag:urgent do tag add=someday   (fired 2x)\nr10 when due<today do tag add=overdue-live   (fired 1x)\nr11 when age>3 do tag add=stale   (fired 0x)\nr12 when kind:task do sort Today by=due   (fired 0x)",
+  "scripts": "> scripts\nbump = do prop $1 count=1\nmkrule = rule when tag:$1 do tag add=seen\nreport = do create Done kind=note title=\"report $today\" text=\"made by a script\"\ninner = do tag $1 add=inner-was-here\nouter = run inner $1; do tag $1 add=outer-was-here"
+ }
+}

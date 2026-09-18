@@ -91,14 +91,12 @@ def parse_selection(w, token):
             cands = [c for c in cands if c in others]
         elif t.startswith("prop:"):
             k, eq, v = t[5:].partition("=")
-            if not eq or not k:
-                raise Refusal("prop:k=v (prop:k alone selects things that have k)")
+            if not k:
+                raise Refusal("prop:k=v, or prop:k alone for things that have k")
 
             def okp(nid, k=k, v=v, eq=eq):
                 n = w.nodes[nid]
-                if n["type"] != "appearance":
-                    return False
-                props = w.subjects[n["subject"]].get("props") or {}
+                props = (n.get("props") if n["type"] == "surface" else w.subjects[n["subject"]].get("props")) or {}
                 return (props.get(k) == v) if v else (k in props)
             cands = [c for c in cands if okp(c)]
         elif t.startswith("age<") or t.startswith("age>"):

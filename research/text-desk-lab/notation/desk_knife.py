@@ -403,7 +403,9 @@ class DeskKnife(DeskMoo):
                 raise Refusal(err[4:])
             return line + " → " + (body[0] if body else "ok")
         tgt = r.get("target") or i
-        if r.get("target"):
+        if tgt == "$item":
+            tgt = i
+        elif r.get("target"):
             self._mark_seen(self._resolve(tgt))
         kv = {k: v.replace("$item.title", self._title_of(i)).replace("$item", i) for k, v in r["kv"].items()}
         return self.cmd_do_knife(r["verb"], [tgt], kv).splitlines()[0]
@@ -520,6 +522,8 @@ class DeskKnife(DeskMoo):
                     continue
                 if k["type"] == "surface":
                     out.append(f"do create {ref(fid)} kind=surface title={q(k['title'])} layout={k['layout']}")
+                    if k.get("props"):
+                        out.append(f"do prop {q(k['title'])} " + " ".join(f"{a}={q(b)}" for a, b in k["props"].items()))
                     walk(k["id"])
                     continue
                 s = w.subjects[k["subject"]]
@@ -691,6 +695,15 @@ class DeskKnife(DeskMoo):
 
     def _note(self, text):
         self._rule_notes = (self._rule_notes or []) + [text]
+
+    def snapshot(self):
+        snap = self.world.snapshot()
+        snap["rules"] = [{"id": r["id"], "text": ("" if r.get("on") else "when ") + r["sel"] + " do " + self._action_text(r),
+                          "on": r.get("on"), "by": r.get("by"), "when": None if r.get("on") else r["sel"],
+                          "verb": r["verb"], "script": r.get("script"), "fired": r.get("fired", 0)} for r in (self.rules or [])]
+        snap["scripts"] = dict(self.scripts or {})
+        snap["clock"] = {"today": self.today, "follow": bool(self.follow)}
+        return snap
 
     follow = False      # clock follow: today is the wall date, read at every command; time passes on its own
     last_here = None    # when the last command ran (wall time), so the desk can say how long you were away

@@ -319,6 +319,8 @@ class Desk:
             head = f"{nid} surface \"{n['title']}\" {n['layout']}"
             geo = self._geom(nid) if n["parent"] else f"{n['w']}x{n['h']}"
             bits.append(geo)
+            if n.get("props"):
+                bits.append(" ".join(f"{k}={v}" for k, v in n["props"].items()))
             bits.append(f"{len(kids)} inside" if kids else "empty")
             if kids and n["layout"] != "free":
                 axis = "h" if n["layout"] == "column" else "w"

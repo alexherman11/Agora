@@ -1,0 +1,54 @@
+# calm — the one look of this desk, written in Wren's notation.
+# Tokens are the only place in the world where a hex colour or a bare number may appear.
+# Everything else names a word. Edit this file in the page and press Apply.
+
+token paper    = #FBFAF7
+token ink      = #14171A
+token accent   = #3F5D73
+token gap      = 8
+token text     = ui 16/1.55
+token ramp     = 1.15
+
+token line     = ink at 22%
+token faint    = ink at 11%
+token quiet    = ink at 72%
+token hush     = ink at 60%
+
+# ---- roles: how a thing is presented. A role carries no values, only words. ----
+# Lark's rule, adopted: if a role's rendering cannot be summarised in its name, the role is wrong.
+
+role desk      : on paper, ink, text, pad gap x2
+role column    : on paper, text, pad gap, border right faint, corner gap /2
+role header    : text down 2 tracked strong, hush, pad gap, border bottom faint
+role card      : on paper, ink, text, pad gap x1.5, edge faint, corner gap /2, space below gap
+role title     : text strong
+role body      : text down, quiet
+role meta      : text down 2 tracked, hush
+role tag       : text down 2 tracked, accent, on accent at 14%, pad gap /2, corner gap /4
+role cut       : text down 2 tracked, accent
+role view      : on paper, text, pad gap, border right faint, corner gap /2
+
+# ---- clauses: styling by the desk's own selection language. ----
+# Nothing flows down a tree. Each clause either matched or it did not.
+# The existing desk has no as= field, so every role below is assigned by a clause.
+
+when kind:note            : as=card
+when kind:doc             : as=card
+when kind:chat            : as=card
+when comments:open        : show meta
+when tag:unsolved         : ink -> accent
+when tag:anchor           : ink -> accent
+
+# ---- a theme may redefine tokens. It may never define a role. ----
+
+theme dark of calm
+  token paper  = #15171A
+  token ink    = #E9E7E2
+  token accent = #93B4CC
+
+# ---- presentation: WHICH parts are drawn, and in what order. ----
+# Roles say how a part looks. Nothing said what parts exist until I tried to draw.
+# A part not listed is not drawn. "body :3" clamps to three lines and says so in honesty.
+
+present card   : title, body :3, meta, tags
+present column : header, children

@@ -1,0 +1,254 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>wren-render — a desk drawn from text</title>
+<style>
+  /* The only CSS here is structural: scaffolding the notation cannot be asked to carry.
+     Every colour, size, space and border of the DESK comes from calm.style, at runtime. */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font: 13px ui-sans-serif, system-ui, sans-serif; }
+  #bar { display: flex; gap: 14px; align-items: center; padding: 8px 14px; border-bottom: 1px solid #0002; flex: none; font-size: 12px; }
+  #bar .grow { flex: 1; }
+  #bar button, #bar select { font: inherit; padding: 3px 9px; border-radius: 5px; border: 1px solid #0003; background: transparent; color: inherit; cursor: pointer; }
+  #split { flex: 1; display: flex; min-height: 0; }
+  #desk { flex: 1; min-width: 0; overflow: auto; }
+  #side { width: 380px; flex: none; border-left: 1px solid #0002; display: flex; flex-direction: column; min-height: 0; }
+  #tabs { display: flex; gap: 2px; padding: 6px; border-bottom: 1px solid #0002; flex: none; }
+  #tabs button { font: inherit; padding: 3px 9px; border-radius: 5px; border: 1px solid transparent; background: transparent; color: inherit; cursor: pointer; }
+  #tabs button.on { border-color: #0003; }
+  #pane { flex: 1; overflow: auto; padding: 10px 12px; }
+  pre, textarea { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea { width: 100%; height: 46vh; border: 1px solid #0003; border-radius: 6px; padding: 8px; background: transparent; color: inherit; }
+  .row { display: flex; flex-wrap: wrap; }
+  .sw { width: 13px; height: 13px; border-radius: 3px; border: 1px solid #0003; display: inline-block; vertical-align: -2px; margin-right: 6px; }
+  .dim { opacity: .58; }
+  .refusal { border: 1px solid #b3542e; border-radius: 6px; padding: 9px 10px; white-space: pre-wrap; }
+  .lookable { cursor: pointer; }
+  .lookable.sel { outline: 2px solid #3F5D73; outline-offset: 1px; }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  @media (prefers-color-scheme: dark) { body { background: #0f1113; color: #e9e7e2; } #bar, #side, #tabs { border-color: #fff2; } }
+</style>
+
+<div id="bar">
+  <strong style="font-weight:620">wren-render</strong>
+  <span class="dim" id="src"></span>
+  <span class="grow"></span>
+  <label class="dim">theme <select id="theme"><option value="">calm</option><option value="dark">dark</option></select></label>
+  <button id="apply">Apply style</button>
+</div>
+
+<div id="split">
+  <div id="desk"></div>
+  <div id="side">
+    <div id="tabs">
+      <button data-t="style" class="on">style</button>
+      <button data-t="why">why :look</button>
+      <button data-t="tokens">tokens</button>
+      <button data-t="honesty">honesty</button>
+    </div>
+    <div id="pane"></div>
+  </div>
+</div>
+
+<script type="module">
+import { parseStyle, resolveTokens, resolveLook, matches, Refusal } from './style.js';
+
+const $ = s => document.querySelector(s);
+let world, styleSrc, st, tokens, selected = null, tab = 'style', lastError = null;
+const cuts = [];            // every place this render hid something. printed in "honesty".
+
+const [dj, sj] = await Promise.all([
+  fetch('./desk.json').then(r => r.json()),
+  fetch('./calm.style').then(r => r.text())
+]);
+world = dj; styleSrc = sj;
+$('#src').textContent = `= drawn from desk.json (studio session, snapshot) · ${Object.keys(world.nodes).length} nodes · ${Object.keys(world.subjects).length} subjects`;
+
+function thingFor(node) {
+  const s = node.subject ? world.subjects[node.subject] : null;
+  return Object.assign({}, node, s ? { kind: s.kind, title: s.title, text: s.text, tags: s.tags, comments: s.comments, rev: s.rev } : { kind: node.type, title: node.title });
+}
+
+function build() {
+  cuts.length = 0;
+  try { st = parseStyle(styleSrc); lastError = null; }
+  catch (e) { if (e instanceof Refusal) { lastError = e; drawSide(); return; } throw e; }
+  tokens = resolveTokens(st, $('#theme').value);
+  const root = Object.values(world.nodes).find(n => n.type === 'surface' && !n.parent);
+  const deskLook = look({ id: root.id, type: 'surface', kind: 'surface', title: root.title, as: 'desk', parent: null });
+  document.body.style.background = deskLook.css.background || '';
+  document.body.style.color = deskLook.css.color || '';
+  const host = $('#desk'); host.innerHTML = '';
+  Object.assign(host.style, deskLook.css, { display: 'flex', gap: (tokens.gap?.value || 8) + 'px', alignItems: 'flex-start', minHeight: '100%' });
+  childrenOf(root.id).forEach(n => host.appendChild(drawSurface(n)));
+  drawSide();
+}
+
+function childrenOf(id) {
+  return Object.values(world.nodes).filter(n => n.parent === id)
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+}
+function look(thing) { return resolveLook(thing, st, tokens, world); }
+
+function styled(el, lk) { Object.assign(el.style, lk.css); return el; }
+
+function drawSurface(node) {
+  const thing = thingFor(node);
+  thing.as = node.type === 'view' || (node.layout === undefined && node.of) ? 'view' : 'column';
+  const lk = look(thing);
+  const box = styled(document.createElement('div'), lk);
+  box.className = 'lookable'; box.dataset.id = node.id;
+  Object.assign(box.style, { width: '300px', flex: 'none', maxHeight: '100%', display: 'flex', flexDirection: 'column' });
+
+  const kids = childrenOf(node.id);
+  const h = styled(document.createElement('div'), look({ id: node.id + ':h', kind: 'header', as: 'header', parent: node.id }));
+  h.textContent = `${node.id}  ${node.title}  ·  ${kids.length} inside`;
+  h.style.flex = 'none';
+  box.appendChild(h);
+
+  const list = document.createElement('div');
+  list.style.overflow = 'auto'; list.style.paddingTop = (tokens.gap?.value || 8) + 'px';
+  const CAP = 24;
+  kids.slice(0, CAP).forEach(k => list.appendChild(k.type === 'surface' ? drawSurface(k) : drawCard(k)));
+  if (kids.length > CAP) {
+    const c = styled(document.createElement('div'), look({ id: node.id + ':c', kind: 'cut', as: 'cut', parent: node.id }));
+    c.textContent = `+ ${kids.length - CAP} not drawn  ·  look ${node.id} :2`;
+    list.appendChild(c);
+    cuts.push(`${node.id} "${node.title}": ${kids.length - CAP} of ${kids.length} children not drawn (renderer cap ${CAP})`);
+  }
+  box.appendChild(list);
+  box.addEventListener('click', ev => { ev.stopPropagation(); select(node.id, thing); });
+  return box;
+}
+
+function drawCard(node) {
+  const thing = thingFor(node);
+  const lk = look(thing);
+  const card = styled(document.createElement('div'), lk);
+  card.className = 'lookable'; card.dataset.id = node.id;
+  if (!lk.role) { card.style.outline = '1px dashed #b3542e'; cuts.push(`${node.id}: no role matched; drawn with browser defaults`); }
+
+  // WHICH parts are drawn comes from the style file's `present` line, not from this code.
+  const spec = st.presents[lk.role || 'card'] || st.presents['card'] || { parts: ['title'], line: null };
+  for (const part of spec.parts) {
+    const [name, arg] = part.split(/\s+:/).map(x => x.trim());
+    if (name === 'title') {
+      const t = styled(document.createElement('div'), look({ ...thing, as: 'title' }));
+      t.textContent = thing.title || '(untitled)'; card.appendChild(t);
+    } else if (name === 'body' && thing.text) {
+      const b = styled(document.createElement('div'), look({ ...thing, as: 'body' }));
+      const n = parseInt(arg || '3', 10);
+      b.style.cssText += `display:-webkit-box;-webkit-line-clamp:${n};-webkit-box-orient:vertical;overflow:hidden`;
+      b.textContent = thing.text.replace(/\s+/g, ' ').trim();
+      const words = thing.text.trim().split(/\s+/).length;
+      card.appendChild(b);
+      if (words > n * 9) cuts.push(`${node.id}: body clamped to ${n} lines (${words}w total) — present card :${n}`);
+    } else if (name === 'meta' && lk.parts.meta !== false) {
+      const bits = [];
+      if (thing.kind && thing.kind !== 'note') bits.push(thing.kind);
+      const open = (thing.comments || []).filter(c => !c.resolved).length;
+      if (open) bits.push(`${open} open`);
+      if (thing.rev > 1) bits.push(`rev ${thing.rev}`);
+      if (!bits.length) continue;
+      const m = styled(document.createElement('div'), look({ ...thing, as: 'meta' }));
+      m.textContent = bits.join('  ·  '); card.appendChild(m);
+    } else if (name === 'tags' && (thing.tags || []).length) {
+      const row = document.createElement('div'); row.className = 'row';
+      row.style.gap = ((tokens.gap?.value || 8) / 2) + 'px';
+      row.style.marginTop = ((tokens.gap?.value || 8) / 2) + 'px';
+      thing.tags.forEach(tg => { const e = styled(document.createElement('span'), look({ ...thing, as: 'tag' })); e.textContent = tg; row.appendChild(e); });
+      card.appendChild(row);
+    }
+  }
+  card.addEventListener('click', ev => { ev.stopPropagation(); select(node.id, thing); });
+  return card;
+}
+
+function select(id, thing) {
+  document.querySelectorAll('.sel').forEach(e => e.classList.remove('sel'));
+  const el = document.querySelector(`[data-id="${id}"]`); if (el) el.classList.add('sel');
+  selected = thing; tab = 'why'; setTab(); drawSide();
+}
+
+// ---------------- side panel ----------------
+function setTab() { document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab)); }
+
+function drawSide() {
+  const p = $('#pane');
+  if (lastError && tab !== 'style') { p.innerHTML = `<div class="refusal">${esc(lastError.toText())}</div>`; return; }
+  if (tab === 'style') {
+    p.innerHTML = `${lastError ? `<div class="refusal">${esc(lastError.toText())}</div><br>` : ''}
+      <textarea id="ed" spellcheck="false"></textarea>
+      <p class="dim">Edit and press <b>Apply style</b>. The refusals in the catalogue are real: try
+      <code>role card : on #eeeeee</code> or <code>pad 17px</code>, or add <code>role page : ...</code>
+      indented under the theme.</p>`;
+    $('#ed').value = styleSrc;
+    return;
+  }
+  if (tab === 'tokens') { p.innerHTML = tokenPicker(); return; }
+  if (tab === 'honesty') { p.innerHTML = honesty(); return; }
+  p.innerHTML = why();
+}
+
+function why() {
+  if (!selected) return `<p class="dim">Click anything in the desk. This pane is <code>why &lt;id&gt; :look</code> — every resolved property, the clause that won it, and the clauses it beat.</p>`;
+  const lk = look(selected);
+  const lines = [];
+  lines.push(`${selected.id} ${selected.kind || selected.type} "${esc(selected.title || '')}"`);
+  lines.push(`  as=${lk.role || '(none matched)'}`);
+  lines.push('');
+  lines.push('  applied, in order:');
+  lk.applied.forEach(a => lines.push(`    ${a.from.padEnd(30)} ${a.line ? 'calm :' + a.line : ''}`));
+  lines.push('');
+  lines.push('  resolved:');
+  lk.trace.filter(t => t.css).sort((a, b) => a.css.localeCompare(b.css)).forEach(t => {
+    lines.push(`    ${t.css.padEnd(16)} ${String(t.value).padEnd(28)} ${t.from}${t.line ? ' :' + t.line : ''}`);
+    (t.beat || []).forEach(b => lines.push(`      beat  ${String(b.value).padEnd(26)} ${b.from}${b.line ? ' :' + b.line : ''}`));
+  });
+  const un = lk.trace.filter(t => t.unreadable);
+  if (un.length) { lines.push(''); lines.push('  ! the renderer could not read these properties:'); un.forEach(t => lines.push(`    "${t.prop}"  from ${t.from}`)); }
+  lines.push('');
+  lines.push(`  stored geometry (not used by this renderer): ${selected.x},${selected.y} ${selected.w}x${selected.h} z${selected.z}`);
+  return `<pre>${esc(lines.join('\n'))}</pre>`;
+}
+
+function tokenPicker() {
+  const uses = {};
+  Object.values(world.nodes).forEach(n => { const lk = look(thingFor(n)); lk.applied.forEach(a => a.props.forEach(p => Object.keys(tokens).forEach(k => { if (new RegExp(`\\b${k}\\b`).test(p)) uses[k] = (uses[k] || 0) + 1; }))); });
+  let h = `<p class="dim">You cannot pick a colour. You can pick a word, or coin one — and coining one lands as an event everyone sees.</p><pre>`;
+  Object.keys(tokens).forEach(k => {
+    const t = tokens[k]; if (!t) return;
+    const sw = t.type === 'colour' ? `<span class="sw" style="background:${t.value}"></span>` : '<span class="sw" style="border-style:dashed"></span>';
+    const val = t.type === 'colour' ? t.value : t.type === 'length' ? t.value + 'px' : t.type === 'text' ? `${t.family} ${t.size}/${t.leading}` : t.value;
+    h += `${sw}${k.padEnd(10)} ${String(val).padEnd(18)} <span class="dim">used by ${uses[k] || 0}</span>\n`;
+  });
+  h += `\n<span class="dim">---- new ----\ntoken &lt;name&gt; = &lt;value&gt;            a new ground value, named, for everyone\ntoken &lt;name&gt; = accent at 20%      a shade of one we have</span></pre>`;
+  return h;
+}
+
+function honesty() {
+  const roleless = Object.values(world.nodes).filter(n => !look(thingFor(n)).role).length;
+  const out = [
+    '# what this render is, and is not',
+    '',
+    '= drawn from a SNAPSHOT (desk.json). it does not follow the live desk.',
+    '= every colour, size, space, border and radius comes from calm.style at runtime.',
+    '  the page\'s own CSS is structural only: flex, overflow, the side panel.',
+    '! the stored geometry (x, y, w, h, z on every node) is NOT used. the desk\'s',
+    '  1280x800 absolute model was built for testing; this render lays surfaces out as',
+    '  columns and lets them scroll. each node\'s stored geometry is printed in why :look.',
+    `? ${roleless} node(s) matched no role and are drawn with browser defaults, marked with a dashed edge.`,
+    '',
+    '# what this render hid, declared',
+    ''
+  ].concat(cuts.length ? cuts.map(c => '  · ' + c) : ['  (nothing)']);
+  return `<pre>${esc(out.join('\n'))}</pre>`;
+}
+
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; setTab(); drawSide(); });
+$('#apply').onclick = () => { const ed = document.querySelector('#ed'); if (ed) styleSrc = ed.value; build(); };
+$('#theme').onchange = build;
+build();
+</script>

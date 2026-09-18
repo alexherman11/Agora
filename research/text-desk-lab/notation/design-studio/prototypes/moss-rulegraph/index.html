@@ -1,0 +1,224 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Rule graph</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --paper:#fbfaf8; --ink:#1d1f21; --dim:#6b6f74; --faint:#e6e2dc; --chip:#f2efea;
+  --wire:#8a8f96; --makes:#4a7c59; --unmakes:#a8553f; --warn:#8a6d3b; --accent:#3b5a7a;
+  --gap:8px; --rad:6px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#16181a; --ink:#e7e5e1; --dim:#9aa0a6; --faint:#2a2d30; --chip:#222528;
+  --wire:#6d747c; --makes:#7fb08c; --unmakes:#d08a72; --warn:#c7a76a; --accent:#8fb3d4;
+}}
+:root[data-theme="dark"]{
+  --paper:#16181a; --ink:#e7e5e1; --dim:#9aa0a6; --faint:#2a2d30; --chip:#222528;
+  --wire:#6d747c; --makes:#7fb08c; --unmakes:#d08a72; --warn:#c7a76a; --accent:#8fb3d4;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{max-width:1000px;margin:0 auto;padding:32px 16px 96px}
+h1{font:400 20px/1.3 system-ui,sans-serif;margin:0 0 2px}
+.sub{color:var(--dim);font:13px/1.6 system-ui,sans-serif;margin:0 0 20px}
+.sub code{background:var(--chip);padding:1px 4px;border-radius:3px}
+.bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 18px;
+  font:13px/1 system-ui,sans-serif;color:var(--dim)}
+.bar button{font:13px/1 system-ui,sans-serif;color:var(--ink);background:var(--chip);
+  border:1px solid var(--faint);border-radius:var(--rad);padding:6px 10px;cursor:pointer}
+.bar button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+.wrap{position:relative}
+svg.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+svg.wires path{fill:none;stroke-width:1.5;opacity:.55}
+svg.wires path.makes{stroke:var(--makes)}
+svg.wires path.unmakes{stroke:var(--unmakes);stroke-dasharray:3 3}
+svg.wires path.lit{opacity:1;stroke-width:2.5}
+.row{position:relative;display:grid;grid-template-columns:104px 46px 1fr;gap:var(--gap);
+  align-items:baseline;padding:9px 10px 9px 0;border-top:1px solid var(--faint);cursor:pointer}
+.row:last-child{border-bottom:1px solid var(--faint)}
+.row.lit{background:var(--chip)}
+.rid{color:var(--dim);grid-column:2}
+.body{grid-column:3;display:flex;flex-wrap:wrap;gap:var(--gap);align-items:baseline}
+.kw{color:var(--dim)}
+.chip{background:var(--chip);border-radius:var(--rad);padding:1px 6px;white-space:pre-wrap}
+.chip.gate{border-left:2px solid var(--accent)}
+.chip.act{border-left:2px solid var(--makes)}
+.fired{color:var(--dim);font-size:13px;margin-left:auto;white-space:nowrap}
+.grade{font:12px/1 system-ui,sans-serif;border-radius:3px;padding:2px 5px;margin-left:6px;
+  border:1px solid currentColor;color:var(--warn)}
+.grade.broken{color:var(--unmakes)}
+.detail{grid-column:3;margin:8px 0 2px;padding:10px 12px;background:var(--chip);
+  border-radius:var(--rad);font-size:13px;color:var(--dim);display:none}
+.row.open .detail{display:block}
+.detail b{color:var(--ink);font-weight:400}
+.detail .cmd{display:block;margin:6px 0;color:var(--ink);user-select:all}
+.detail .f{margin:7px 0 0;padding-left:10px;border-left:2px solid var(--warn)}
+.detail .f.broken{border-color:var(--unmakes)}
+pre.raw{background:var(--chip);padding:14px;border-radius:var(--rad);overflow:auto;
+  font-size:13px;white-space:pre-wrap;display:none}
+.note{color:var(--dim);font:13px/1.6 system-ui,sans-serif;margin:26px 0 0;
+  padding-top:14px;border-top:1px solid var(--faint)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font:12px/1 system-ui,sans-serif;color:var(--dim)}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+@media (max-width:620px){.row{grid-template-columns:56px 1fr;padding-left:0}
+  .rid{grid-column:1}.body,.detail{grid-column:2}}
+</style>
+<div class="page">
+<h1>Rule graph</h1>
+<p class="sub">Moss. The <code>rules</code> listing of a real desk, with the wires the listing cannot print.
+Rows are exactly the desk's own lines; a wire is drawn when one rule's action makes (or unmakes) something
+another rule waits for. Click a row for the command that made it and what is wrong with it.</p>
+
+<div class="bar">
+  <button id="t-text" aria-pressed="false">show the text</button>
+  <button id="t-theme" aria-pressed="false">dark</button>
+  <span class="legend">
+    <span><i style="border-color:var(--makes)"></i>makes</span>
+    <span><i style="border-color:var(--unmakes);border-top-style:dashed"></i>unmakes</span>
+  </span>
+  <span id="stamp" style="margin-left:auto"></span>
+</div>
+
+<div class="wrap"><svg class="wires"></svg><div id="rows"></div></div>
+<pre class="raw" id="raw"></pre>
+
+<p class="note" id="cut"></p>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+let G = null;
+
+function chip(cls, t){ const s = document.createElement('span'); s.className='chip '+cls; s.textContent=t; return s; }
+function kw(t){ const s=document.createElement('span'); s.className='kw'; s.textContent=t; return s; }
+
+function defCommand(r){
+  return r.gate_kind === 'when'
+    ? `rule when ${r.gate} do ${r.act}`
+    : `rule on ${r.gate} do ${r.act}`;
+}
+
+function render(){
+  const rows = $('#rows'); rows.textContent='';
+  if (!G.rules.length){
+    const e = document.createElement('p'); e.className='note'; e.style.borderTop='none';
+    e.innerHTML = 'This desk has no rules. The desk itself says: <code>no rules. rule when '
+      + '&lt;selection&gt; do &lt;verb&gt; [k=v ...]</code> &mdash; so there is nothing to wire, and an '
+      + 'empty page here is the truth rather than a failure to load.';
+    rows.append(e); return;
+  }
+  const byRule = {};
+  for (const f of G.findings) (byRule[f.rule] = byRule[f.rule] || []).push(f);
+
+  for (const r of G.rules){
+    const el = document.createElement('div');
+    el.className = 'row'; el.dataset.rid = r.id;
+    const rid = document.createElement('span'); rid.className='rid'; rid.textContent=r.id;
+    const body = document.createElement('div'); body.className='body';
+    body.append(kw(r.gate_kind), chip('gate', r.gate), kw('do'), chip('act', r.act));
+    const fired = document.createElement('span'); fired.className='fired';
+    fired.textContent = `fired ${r.fired}×`;
+    body.append(fired);
+    for (const f of (byRule[r.id]||[])){
+      const g = document.createElement('span');
+      g.className = 'grade' + (f.grade==='broken' ? ' broken' : '');
+      g.textContent = f.grade; body.append(g);
+    }
+    const d = document.createElement('div'); d.className='detail';
+    const cmd = document.createElement('code'); cmd.className='cmd'; cmd.textContent = defCommand(r);
+    d.append(document.createTextNode('the command that made this row, and one that removes it:'), cmd);
+    const drop = document.createElement('code'); drop.className='cmd'; drop.textContent = `rule drop ${r.id}`;
+    d.append(drop);
+    if (r.act.startsWith('run ')){
+      const name = r.act.split(/\s+/)[1];
+      if (G.scripts[name]){
+        const b = document.createElement('div'); b.style.marginTop='8px';
+        b.innerHTML = '<b>script '+name+'</b> = ';
+        const c = document.createElement('code'); c.className='cmd'; c.textContent = G.scripts[name];
+        b.append(c); d.append(b);
+      }
+    }
+    const ins = G.edges.filter(e=>e.to===r.id), outs = G.edges.filter(e=>e.from===r.id);
+    for (const e of ins.concat(outs)){
+      const p = document.createElement('div'); p.style.marginTop='6px'; p.style.color='var(--dim)';
+      p.textContent = '· ' + e.why; d.append(p);
+    }
+    for (const f of (byRule[r.id]||[])){
+      const p = document.createElement('div'); p.className = 'f' + (f.grade==='broken'?' broken':'');
+      p.innerHTML = '<b>'+f.grade+'</b> &mdash; ' + f.text; d.append(p);
+    }
+    el.append(rid, body, d);
+    el.addEventListener('click', ()=>{ el.classList.toggle('open'); requestAnimationFrame(wires); });
+    el.addEventListener('mouseenter', ()=>light(r.id));
+    el.addEventListener('mouseleave', ()=>light(null));
+    rows.append(el);
+  }
+  requestAnimationFrame(wires);
+}
+
+function light(rid){
+  document.querySelectorAll('.row').forEach(e=>e.classList.remove('lit'));
+  document.querySelectorAll('svg.wires path').forEach(p=>p.classList.remove('lit'));
+  if(!rid) return;
+  for (const p of document.querySelectorAll('svg.wires path')){
+    if (p.dataset.from===rid || p.dataset.to===rid){
+      p.classList.add('lit');
+      document.querySelector(`.row[data-rid="${p.dataset.from}"]`)?.classList.add('lit');
+      document.querySelector(`.row[data-rid="${p.dataset.to}"]`)?.classList.add('lit');
+    }
+  }
+}
+
+function wires(){
+  const svg = document.querySelector('svg.wires'); svg.textContent='';
+  const wrap = document.querySelector('.wrap').getBoundingClientRect();
+  const y = id => {
+    const el = document.querySelector(`.row[data-rid="${id}"]`);
+    if(!el) return null;
+    const b = el.getBoundingClientRect();
+    const head = el.querySelector('.body').getBoundingClientRect();
+    return head.top - wrap.top + head.height/2;
+  };
+  const lane = 12, span = 78;
+  G.edges.forEach((e,i)=>{
+    const y1=y(e.from), y2=y(e.to);
+    if(y1==null||y2==null) return;
+    const out = 26 + (i%4)*lane;
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', `M ${span+4} ${y1} C ${span-out} ${y1}, ${span-out} ${y2}, ${span+4} ${y2}`);
+    p.setAttribute('class', e.kind);
+    p.dataset.from = e.from; p.dataset.to = e.to;
+    svg.append(p);
+  });
+}
+
+fetch('graph.json').then(r=>r.json()).then(g=>{
+  G = g;
+  $('#stamp').textContent = `= ${g.rules.length} rules, ${g.edges.length} wires, session "${g.session}"`;
+  $('#raw').textContent = g.raw.rules + '\n\n' + g.raw.scripts;
+  $('#cut').innerHTML =
+    'What this picture cannot see, said out loud. ' +
+    '<b>?</b> It does not know what a person will do: a rule reached only by hand shows as <i>unreached</i>, ' +
+    'which means "no rule feeds it", not "nothing feeds it". ' +
+    '<b>?</b> It reads verbs it understands (tag, move, prop, create, due, run) and is silent about the rest, ' +
+    'so a missing wire is not proof there is none. ' +
+    '<b>!</b> It is a snapshot: rules change, this file does not. Regenerate with ' +
+    '<code>python design-studio/prototypes/moss-rulegraph/make.py &lt;session&gt;</code>. ' +
+    '<b>=</b> Every command printed on this page runs as printed.';
+  render();
+});
+
+$('#t-text').addEventListener('click', e=>{
+  const on = $('#raw').style.display !== 'block';
+  $('#raw').style.display = on ? 'block' : 'none';
+  e.target.setAttribute('aria-pressed', on);
+  e.target.textContent = on ? 'show the graph' : 'show the text';
+});
+$('#t-theme').addEventListener('click', e=>{
+  const dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'dark':'light');
+  e.target.setAttribute('aria-pressed', dark); e.target.textContent = dark ? 'light':'dark';
+  requestAnimationFrame(wires);
+});
+addEventListener('resize', ()=>requestAnimationFrame(wires));
+</script>

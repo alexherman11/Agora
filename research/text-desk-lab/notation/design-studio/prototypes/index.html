@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>Desk prototypes</title>
+<body style="font-family:system-ui;margin:40px;color:#222">
+<h1 style="font-weight:500">Desk prototypes</h1>
+<p>Served from design-studio/prototypes. Each prototype is its own folder or html file; list them here when you add one.</p>
+<ul id="list">
+  <li><a href="./wren-render/">wren-render</a> — <b>Wren.</b> A desk drawn from <code>desk.json</code> (studio snapshot)
+      by a style file written in the studio's notation, parsed at runtime: tokens, roles,
+      <code>when &lt;selection&gt;</code> clauses, and a theme that may redefine tokens but not roles.
+      Click anything for <code>why &lt;id&gt; :look</code> (every resolved property, the clause that won it,
+      and the clauses it beat). The <b>style</b> tab is editable and the refusals are real
+      (try a hex colour or <code>pad 17px</code> in a role). The <b>honesty</b> tab lists everything
+      the render hid or substituted.</li>
+  <li><a href="./lark-two-sides/">lark-two-sides</a> — <b>Lark.</b> One world, two sides, rendered live from
+      <code>explore.py proto-lark --dump</code>. Owner edge per side, warm marker, sight-marks
+      (<code>=</code> measured, <code>~</code> described with its author, <code>?</code> opaque as a hatched
+      extent, <code>!</code> stale), House rules with reach. Used as the test fixture for the eyes protocol
+      (<code>lark-eyes-protocol.md</code>): it contains deliberate text/screen discrepancies.</li>
+  <li><a href="./flint-desk-as-program/">flint-desk-as-program</a> — <b>Flint.</b> A working issue tracker built
+      in <code>proto-flint</code> using <em>only</em> what the desk has today (surfaces, views, props, scripts,
+      rules, the clock) — no proposed notation. Shows that a tag is a button, a rule on a verb is an event
+      handler, and rules chain three deep from one command, all printed and undoable. Click a card for its
+      <code>why</code> trail. Also shows the six places it broke, including a rule that fired on the wrong
+      object and a <code>create</code> that echoed arguments it discarded.</li>
+  <li><a href="./moss-rulegraph/">moss-rulegraph</a> — <b>Moss.</b> The <code>rules</code> listing of a real
+      session (<code>proto-moss</code>) with the wires the listing cannot print: a static read of what each
+      action <em>makes</em> or <em>unmakes</em>, drawn against what every other rule waits for. The rows are
+      the desk's own lines, so the picture and the text are one object — click a row for the exact
+      <code>rule when … do …</code> that made it, the script it runs, and its faults. Finds, on real rules:
+      a dangling target that only fails when it fires, a <code>$today</code> frozen at writing time next to a
+      live <code>today</code>, four rules no other rule can reach, and a near-cycle that terminates only
+      because a <code>when</code> rule fires once per thing, ever. Regenerate with
+      <code>python design-studio/prototypes/moss-rulegraph/make.py &lt;session&gt;</code>.</li>
+</ul>
+</body>

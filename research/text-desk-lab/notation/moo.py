@@ -395,10 +395,28 @@ def v_done(w, nid, a):
     return _prim(w, "retitle", nid, {"title": "✓ " + t})
 
 
-@verb("prop", ["appearance"], "Set or clear named properties on this thing's subject (k=v ...; remove=k). prop:k=v selects by them.",
+@verb("prop", ["appearance", "surface"], "Set or clear named properties on this thing (k=v ...; remove=k). prop:k=v selects by them.",
       "k=v ... | remove=k", "do prop a12 model=gpt-5.6-sol status=queued")
 def v_prop(w, nid, a):
     actor = a.pop("_by", None) or w.me
+    if w.nodes[nid]["type"] == "surface":
+        # a surface has no subject: its properties (owner=alex ...) live on the surface itself
+        node = w.nodes[nid]
+        props = node.setdefault("props", {})
+        rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]
+        if not a and not rem:
+            raise Refusal("prop needs k=v and/or remove=k")
+        if all(props.get(k) == str(v) for k, v in a.items()) and not [k for k in rem if k in props]:
+            raise Refusal(f"{nid} already has that; props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)"))
+        before = dict(props)
+        for k in rem:
+            props.pop(k, None)
+        for k, v in a.items():
+            props[k] = str(v)
+        w._bump(nid)
+        ev = w._event("prop", nid, dict(a, **({"remove": ",".join(rem)} if rem else {})), {"restore_props": (nid, before)}, actor)
+        return {"ok": True, "event": ev["id"], "changed": [nid],
+                "note": "props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)")}
     s = w.subjects[w.nodes[nid]["subject"]]
     props = s.setdefault("props", {})
     rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]

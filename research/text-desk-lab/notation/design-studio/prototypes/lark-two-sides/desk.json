@@ -1,0 +1,401 @@
+{
+ "subjects": {
+  "s05": {
+   "id": "s05",
+   "kind": "doc",
+   "title": "Harbor proposal",
+   "text": "## Risks\nThe lean case is not covered by the current draft.\n## Budget\nTwo readings of lean.\n## Appendix\nNotes.",
+   "tags": [
+    "draft"
+   ],
+   "due": null,
+   "rev": 2,
+   "comments": [],
+   "props": {
+    "warm": "alex",
+    "age": "4s",
+    "rev": "43"
+   }
+  },
+  "s07": {
+   "id": "s07",
+   "kind": "note",
+   "title": "questions for lark",
+   "text": "the roof photo: crack or shadow? Risks reads long, cut it?",
+   "tags": [],
+   "due": null,
+   "rev": 2,
+   "comments": [],
+   "props": {
+    "unread": "lark"
+   }
+  },
+  "s09": {
+   "id": "s09",
+   "kind": "image",
+   "title": "roof detail.png",
+   "text": "",
+   "tags": [],
+   "due": null,
+   "rev": 2,
+   "comments": [],
+   "props": {
+    "measured": "3024x4032 srgb 4layers",
+    "described": "close-up of a slate roof, two cracked tiles lower left | by jeff d12 rev7",
+    "stale": "rev is now 9, pixels changed d14",
+    "opaque": "layer paint: 12 freehand strokes, bbox 940,1200 620x410"
+   }
+  },
+  "s11": {
+   "id": "s11",
+   "kind": "note",
+   "title": "vendor: Halden",
+   "text": "quote pending",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s13": {
+   "id": "s13",
+   "kind": "note",
+   "title": "vendor: Orsk",
+   "text": "quote in",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s15": {
+   "id": "s15",
+   "kind": "note",
+   "title": "vendor: Merrow",
+   "text": "no reply",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s17": {
+   "id": "s17",
+   "kind": "note",
+   "title": "site visit notes",
+   "text": "tide at 4.",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s20": {
+   "id": "s20",
+   "kind": "doc",
+   "title": "harbor v3 (shadow)",
+   "text": "## Risks\nShorter.\n",
+   "tags": [
+    "shadow"
+   ],
+   "due": null,
+   "rev": 2,
+   "comments": [],
+   "props": {
+    "shadowof": "alex/Harbor proposal @rev31"
+   }
+  },
+  "s22": {
+   "id": "s22",
+   "kind": "note",
+   "title": "slate measurements",
+   "text": "two unbroken parallel edges, 8px apart",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s24": {
+   "id": "s24",
+   "kind": "note",
+   "title": "r1 both world  when warm,-mine do defer",
+   "text": "don't take what the other is holding . 3 acts",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s26": {
+   "id": "s26",
+   "kind": "note",
+   "title": "r2 both world  on remove when -mine do offer",
+   "text": "never delete on the other's side . 0 acts",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s28": {
+   "id": "s28",
+   "kind": "note",
+   "title": "r3 both world  on * when -mine,count>3 do slow",
+   "text": "many-at-once lands visibly . 11 acts",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  },
+  "s30": {
+   "id": "s30",
+   "kind": "note",
+   "title": "r4 lark mine   when mine,age>14 do tag stale",
+   "text": "my own housekeeping . 40 acts",
+   "tags": [],
+   "due": null,
+   "rev": 1,
+   "comments": [],
+   "props": {}
+  }
+ },
+ "nodes": {
+  "f01": {
+   "id": "f01",
+   "type": "surface",
+   "title": "desk",
+   "parent": null,
+   "layout": "row",
+   "x": 0,
+   "y": 0,
+   "w": 1280,
+   "h": 800,
+   "z": 1,
+   "rev": 4
+  },
+  "f02": {
+   "id": "f02",
+   "type": "surface",
+   "title": "alex",
+   "parent": "f01",
+   "layout": "column",
+   "x": 8,
+   "y": 8,
+   "w": 416,
+   "h": 784,
+   "z": 1,
+   "rev": 9
+  },
+  "f03": {
+   "id": "f03",
+   "type": "surface",
+   "title": "lark",
+   "parent": "f01",
+   "layout": "column",
+   "x": 432,
+   "y": 8,
+   "w": 416,
+   "h": 784,
+   "z": 2,
+   "rev": 3
+  },
+  "f04": {
+   "id": "f04",
+   "type": "surface",
+   "title": "House rules",
+   "parent": "f01",
+   "layout": "column",
+   "x": 856,
+   "y": 8,
+   "w": 416,
+   "h": 784,
+   "z": 3,
+   "rev": 5
+  },
+  "a06": {
+   "id": "a06",
+   "type": "appearance",
+   "subject": "s05",
+   "parent": "f02",
+   "x": 8,
+   "y": 8,
+   "w": 400,
+   "h": 89,
+   "z": 1,
+   "folded": false,
+   "rev": 2
+  },
+  "a08": {
+   "id": "a08",
+   "type": "appearance",
+   "subject": "s07",
+   "parent": "f02",
+   "x": 8,
+   "y": 105,
+   "w": 400,
+   "h": 89,
+   "z": 2,
+   "folded": false,
+   "rev": 2
+  },
+  "a10": {
+   "id": "a10",
+   "type": "appearance",
+   "subject": "s09",
+   "parent": "f02",
+   "x": 8,
+   "y": 202,
+   "w": 400,
+   "h": 89,
+   "z": 3,
+   "folded": false,
+   "rev": 2
+  },
+  "a12": {
+   "id": "a12",
+   "type": "appearance",
+   "subject": "s11",
+   "parent": "f02",
+   "x": 8,
+   "y": 299,
+   "w": 400,
+   "h": 89,
+   "z": 4,
+   "folded": false,
+   "rev": 1
+  },
+  "a14": {
+   "id": "a14",
+   "type": "appearance",
+   "subject": "s13",
+   "parent": "f02",
+   "x": 8,
+   "y": 396,
+   "w": 400,
+   "h": 89,
+   "z": 5,
+   "folded": false,
+   "rev": 1
+  },
+  "a16": {
+   "id": "a16",
+   "type": "appearance",
+   "subject": "s15",
+   "parent": "f02",
+   "x": 8,
+   "y": 493,
+   "w": 400,
+   "h": 89,
+   "z": 6,
+   "folded": false,
+   "rev": 1
+  },
+  "a18": {
+   "id": "a18",
+   "type": "appearance",
+   "subject": "s17",
+   "parent": "f02",
+   "x": 8,
+   "y": 590,
+   "w": 400,
+   "h": 89,
+   "z": 7,
+   "folded": false,
+   "rev": 1
+  },
+  "f19": {
+   "id": "f19",
+   "type": "surface",
+   "title": "Private",
+   "parent": "f02",
+   "layout": "column",
+   "x": 8,
+   "y": 687,
+   "w": 400,
+   "h": 89,
+   "z": 8,
+   "rev": 1
+  },
+  "a21": {
+   "id": "a21",
+   "type": "appearance",
+   "subject": "s20",
+   "parent": "f03",
+   "x": 8,
+   "y": 8,
+   "w": 400,
+   "h": 380,
+   "z": 1,
+   "folded": false,
+   "rev": 2
+  },
+  "a23": {
+   "id": "a23",
+   "type": "appearance",
+   "subject": "s22",
+   "parent": "f03",
+   "x": 8,
+   "y": 396,
+   "w": 400,
+   "h": 380,
+   "z": 2,
+   "folded": false,
+   "rev": 1
+  },
+  "a25": {
+   "id": "a25",
+   "type": "appearance",
+   "subject": "s24",
+   "parent": "f04",
+   "x": 8,
+   "y": 8,
+   "w": 400,
+   "h": 186,
+   "z": 1,
+   "folded": false,
+   "rev": 1
+  },
+  "a27": {
+   "id": "a27",
+   "type": "appearance",
+   "subject": "s26",
+   "parent": "f04",
+   "x": 8,
+   "y": 202,
+   "w": 400,
+   "h": 186,
+   "z": 2,
+   "folded": false,
+   "rev": 1
+  },
+  "a29": {
+   "id": "a29",
+   "type": "appearance",
+   "subject": "s28",
+   "parent": "f04",
+   "x": 8,
+   "y": 396,
+   "w": 400,
+   "h": 186,
+   "z": 3,
+   "folded": false,
+   "rev": 1
+  },
+  "a31": {
+   "id": "a31",
+   "type": "appearance",
+   "subject": "s30",
+   "parent": "f04",
+   "x": 8,
+   "y": 590,
+   "w": 400,
+   "h": 186,
+   "z": 4,
+   "folded": false,
+   "rev": 1
+  }
+ },
+ "links": []
+}

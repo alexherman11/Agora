@@ -6,6 +6,12 @@
       "runtimeExecutable": "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
       "runtimeArgs": ["C:\\Users\\Alex\\AppData\\Local\\Temp\\claude\\C--Projects-Agora4\\d39e43ef-8ad6-45ce-bf94-b190aa87d924\\scratchpad\\playground.py", "8765"],
       "port": 8765
+    },
+    {
+      "name": "desk-prototypes",
+      "runtimeExecutable": "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8770", "--directory", "C:\\Projects\\Agora4\\research\\text-desk-lab\\notation\\design-studio\\prototypes"],
+      "port": 8770
     }
   ]
 }

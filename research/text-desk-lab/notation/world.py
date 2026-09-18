@@ -488,6 +488,11 @@ class World:
                              f"move it, resize it, or tile {target} so nothing overlaps")
             return r
         elif verb == "create":
+            known = {"kind", "title", "text", "due", "tags", "layout", "query", "cols", "by", "desc", "as", "x", "y", "w", "h", "at"}
+            stray = [k for k in args if k not in known]
+            if stray:
+                raise Refusal(f"create does not take {', '.join(k + '=' for k in stray)}; it takes kind= title= text= due= tags= "
+                              f"(layout= for a surface; query= cols= for a view). Properties are set afterwards: do prop <id> k=v")
             kind = args.get("kind", "note")
             if kind not in ("note", "task", "chat", "image", "doc", "trial", "surface", "view"):
                 raise Refusal("kind= must be note, task, chat, image, doc, trial, surface or view")
@@ -713,6 +718,11 @@ class World:
             if r["parent"]:
                 self.reflow(r["parent"])
                 self._bump(r["parent"])
+        elif "restore_props" in u:
+            nid, props = u["restore_props"]
+            if nid in self.nodes:
+                self.nodes[nid]["props"] = dict(props)
+                self._bump(nid)
         elif "restore_subject" in u:
             r = deepcopy(u["restore_subject"])
             r["rev"] = self.subjects[r["id"]]["rev"] + 1
