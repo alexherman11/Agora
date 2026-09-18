@@ -1,0 +1,29 @@
+/* shell.css : OWNER Wren. Placeholder tokens; to be replaced by the studio's style language (calm.style). */
+:root {
+  --paper: #faf9f6; --surface: #ffffff; --ink: #24231f; --quiet: #6b6a64; --line: #e6e3dc; --accent: #c2553a;
+  --gap: 8px; --radius: 8px; --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--font); display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+#bar { padding: 6px 16px; color: var(--quiet); font-size: 12px; border-bottom: 1px solid var(--line); }
+#stage { position: relative; overflow: hidden; }
+#dock { display: flex; gap: var(--gap); justify-content: center; padding: 8px 16px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.dockitem { display: grid; justify-items: center; gap: 2px; min-width: 64px; padding: 6px 10px; border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.dockitem:hover { background: var(--paper); }
+.dockitem .glyph { font-size: 20px; line-height: 24px; }
+.dockitem .label { font-size: 11px; color: var(--quiet); }
+.dockitem.quiet { margin-left: 16px; }
+.window { position: absolute; width: min(720px, 80vw); height: min(520px, 70vh); display: grid; grid-template-rows: auto 1fr; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(36, 35, 31, .08); overflow: hidden; }
+.titlebar { display: flex; align-items: center; gap: var(--gap); padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--line); cursor: grab; user-select: none; }
+.titlebar .title { flex: 1; font-weight: 500; }
+.titlebar button { border: 0; background: transparent; color: var(--quiet); font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 6px; cursor: pointer; }
+.titlebar button:hover { background: var(--paper); color: var(--ink); }
+.window .body { overflow: auto; position: relative; }
+.window .text { margin: 0; padding: 16px; overflow: auto; font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--ink); white-space: pre-wrap; }
+#said { position: absolute; right: 16px; bottom: 84px; width: 420px; max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; box-shadow: 0 8px 28px rgba(36, 35, 31, .08); z-index: 9999; }
+#said h2 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--quiet); }
+#said .line { padding: 6px 0; border-top: 1px solid var(--line); }
+#said code { font: 12px ui-monospace, Consolas, monospace; }
+#said .ok { color: var(--quiet); font-size: 12px; }
+#said .err { color: var(--accent); font-size: 12px; }

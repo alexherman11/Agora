@@ -12,6 +12,12 @@
       "runtimeExecutable": "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
       "runtimeArgs": ["-m", "http.server", "8770", "--directory", "C:\\Projects\\Agora4\\research\\text-desk-lab\\notation\\design-studio\\prototypes"],
       "port": 8770
+    },
+    {
+      "name": "desk-shell",
+      "runtimeExecutable": "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["C:\\Projects\\Agora4\\research\\text-desk-lab\\notation\\deskd.py", "8780"],
+      "port": 8780
     }
   ]
 }
