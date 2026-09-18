@@ -433,8 +433,32 @@ class Desk:
         self.last_event_seen = len(self.world.events)
         if not evs:
             return ""
-        parts = [f"{e['id']} {e['verb']} {e['target']} by {e['by']}" for e in evs]
-        return "!! since your last look: " + "; ".join(parts) + "\n"
+        if len(evs) <= 4:
+            parts = [f"{e['id']} {e['verb']} {e['target']} by {e['by']}" for e in evs]
+            return "!! since your last look: " + "; ".join(parts) + "\n"
+        w, me = self.world, self.world.me
+        mine = {e["undo"].get("delete_subject") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
+        mine |= {e["undo"].get("delete") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
+        lines, to_me, undone = {}, [], []
+        for e in evs:
+            if e["verb"] == "undo":
+                undone.append(e)
+            if e["verb"] == "comment" and e["target"] in mine:
+                to_me.append(e)
+            where = e["target"]
+            if where in w.nodes and w.nodes[where]["type"] == "appearance":
+                where = w.nodes[where]["parent"]
+            name = w.title(w.nodes[where]) if where in w.nodes else (w.subjects[where]["title"] if where in w.subjects else where)
+            lines.setdefault(e["by"], {}).setdefault((e["verb"], name), []).append(e["id"])
+        out = [f"!! since your last look: {len(evs)} changes by {', '.join(lines)} ({evs[0]['id']}..{evs[-1]['id']}; history lists them)"]
+        for e in to_me:   # never folded: someone answered you
+            t = w.subjects[e["target"]]["title"] if e["target"] in w.subjects else e["target"]
+            out.append(f"   {e['by']} commented on your \"{t}\"  [{e['id']}]")
+        for by, groups in lines.items():
+            top = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:4]
+            out.append(f"   {by}: " + ", ".join(f"{len(ids)} {verb} in {name}" if len(ids) > 1 else f"{verb} in {name}" for (verb, name), ids in top)
+                       + (f", +{len(groups) - 4} more kinds" if len(groups) > 4 else ""))
+        return "\n".join(out) + "\n"
 
     # ---- commands ---------------------------------------------------
     def cmd_look(self, target, level):

@@ -37,12 +37,32 @@ def main():
     name = sys.argv[1]
     SESSIONS.mkdir(exist_ok=True)
     path = SESSIONS / f"{name}.pickle"
+    # several people may work one session at once: each invocation holds the session's lock from load to save
+    import atexit, os, time
+    lock = SESSIONS / f"{name}.lock"
+    for _ in range(600):
+        try:
+            os.close(os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except FileExistsError:
+            if time.time() - lock.stat().st_mtime > 60:
+                lock.unlink(missing_ok=True)   # a crashed holder
+            time.sleep(0.1)
+    atexit.register(lambda: lock.unlink(missing_ok=True))
     if "--reset" in sys.argv or not path.exists():
         desk = fresh()
     else:
         desk = pickle.loads(path.read_bytes())
     # --as <name>: a visitor works under their own name for this visit (events say by <name>); the owner is jeff
-    desk.world.me = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
+    me = desk.world.me = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
+    # what has been seen, what is open and the since-your-last-look mark belong to each person, not to the session
+    per = getattr(desk, "_per", None) or {}
+    if me in per:
+        desk.seen, desk.open, desk.last_event_seen = per[me]
+    elif me != "jeff":
+        desk.seen, desk.open, desk.last_event_seen = {}, {desk.world.root}, len(desk.world.events)
+    per[me] = (desk.seen, desk.open, desk.last_event_seen)
+    desk._per = per
     if "--dump" in sys.argv:
         print(json.dumps(desk.snapshot(), indent=1))
         return
@@ -102,6 +122,7 @@ def main():
         r = desk.dispatch("desk", {"line": line})
         print(r.get("text") or ("ERR " + r["error"]))
         print()
+    per[me] = (desk.seen, desk.open, desk.last_event_seen)
     path.write_bytes(pickle.dumps(desk))
 
 

@@ -567,7 +567,7 @@ class World:
             line = str(args.get("line", args.get("text", ""))).strip()
             if not line:
                 raise Refusal("comment needs line=")
-            cid = self.add_comment(sid, "alex", line, actor)
+            cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor)
             return {"ok": True, "event": self.events[-1]["id"], "changed": [sid] + apps, "created": cid,
                     "note": f"comment {cid} added on {sid}"}
         if verb == "resolve":
@@ -579,7 +579,7 @@ class World:
                 raise Refusal(f"{cid} is already resolved")
             reply = str(args.get("line", "")).strip()
             if reply:
-                c["replies"].append({"by": "alex", "text": reply})
+                c["replies"].append({"by": "alex" if actor in ("jeff", "alex") else actor, "text": reply})
             c["resolved"] = True
             s["rev"] += 1
             for a in apps:

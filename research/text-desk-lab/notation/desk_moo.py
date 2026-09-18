@@ -205,7 +205,7 @@ class DeskMoo(Desk):
         if seen is None:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))
-        if seen != cur:
+        if seen != cur and name not in ("create", "comment"):   # adding beside others cannot conflict with them
             raise Refusal(f"stale: {nid} changed since you last saw it; look at it again before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         v = moo.REGISTRY[name]
