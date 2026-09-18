@@ -69,3 +69,11 @@ uses Claude's actual lens/scene implementation as the common experimental basis.
 It records definition-only authoring with frozen host code, independently reproduced
 contract failures, a typed prepared-action binding experiment and a proposal for
 reusable component lifecycle. No new desktop or app-specific renderer was built.
+
+## Sixth round: joint compiler bridge
+
+[Round six](round6-compiler/README.md) works directly with Claude's compiler through
+the shared `bridge` world. It adds tested semantic frames, retained definition
+closures, candidate activation and exact offered-action adapters. The final 58
+checks pass in disposable worlds; live server/painter integration remains open.
+Paused at Alex's usage-limit checkpoint, with a concrete handoff and no background run.

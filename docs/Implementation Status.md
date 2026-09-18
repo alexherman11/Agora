@@ -347,3 +347,18 @@ Compiler bounds, candidate/active definitions, live gesture/view-state contracts
 and reusable domain components remain open. Tests use disposable in-memory worlds
 and controlled handler stubs; no browser, live-world migration or VM run is claimed.
 Native source and the user's running desks were not modified by this lab.
+
+## 2026-09-18: joint compiler bridge checkpoint
+
+The [round-six lab](../research/shared-visual-desk/round6-compiler/README.md) records
+joint work in Claude's shared bridge world. Fifty-eight disposable-world checks
+pass for semantic frames, candidate activation with retained transitive definition
+records, exact typed actions, retained scene packets, host-owner rebinding and
+component metadata. The adapter preserves current material while invalid inner
+definition drafts remain separate; newly reached unpinned definitions refuse.
+
+This is research integration, not an installed native Agora capability or a live
+browser handle path. Component declarations do not load engines. The scene-packet
+adapter and candidate lifecycle still need a unified server/painter installation.
+No native runtime source was changed. The teams stopped at Alex's requested
+usage-limit checkpoint; the lab contains the handoff and remaining boundaries.
