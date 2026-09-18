@@ -148,6 +148,9 @@ class DeskKnife(DeskMoo):
         ids = self.view_matches(nid)
         if ids is None:
             return [ind + f"(query {self.world.nodes[nid].get('query')!r} could not be evaluated now: help selections)"]
+        n = self.world.nodes[nid]
+        if n.get("cols") and ids:
+            return [ind + l.strip() for l in self._table_lines(ids, n["cols"], n.get("by"), n.get("desc"))[:-1]]
         out = []
         for i in ids:
             out.append(ind + self.line(i, 1) + f"  (in {self.world.nodes[i]['parent']})")
@@ -279,6 +282,10 @@ class DeskKnife(DeskMoo):
         ids, desc = sel
         if not ids:
             return f"table {desc}: nothing matches"
+        return "\n".join([f"table {desc}: {len(ids)} row(s)"] + self._table_lines(ids, kv.get("cols"), kv.get("by"), kv.get("desc")))
+
+    def _table_lines(self, ids, cols_spec, by, desc_flag):
+        """Header, one row per thing, and a columns hint; shared by table and by views with cols=."""
         w = self.world
         def subj(i):
             n = w.nodes[i]
@@ -290,8 +297,8 @@ class DeskKnife(DeskMoo):
             for k in ((s or {}).get("props") or {}):
                 if k not in props_seen:
                     props_seen.append(k)
-        if kv.get("cols"):
-            cols = [c.strip() for c in kv["cols"].split(",") if c.strip()]
+        if cols_spec:
+            cols = [c.strip() for c in cols_spec.split(",") if c.strip()]
             if "title" not in cols:
                 cols.insert(0, "title")   # titles are the names; a table of ids alone cannot be read
         else:
@@ -321,8 +328,7 @@ class DeskKnife(DeskMoo):
                 return str(w.days_between(d, self.today)) if d and self.today else ""
             return str(((s or {}).get("props") or {}).get(c, ""))
         rows = [[i] + [cell(i, c) for c in cols] for i in ids]
-        if kv.get("by"):
-            by = kv["by"]
+        if by:
             if by not in cols:
                 raise Refusal(f"by={by} is not a column here; columns: id " + " ".join(cols))
             j = cols.index(by) + 1
@@ -332,14 +338,14 @@ class DeskKnife(DeskMoo):
                     return (0, float(v.split("/")[0]), v)
                 except ValueError:
                     return (1, 0.0, v.lower())
-            rows.sort(key=key, reverse=bool(kv.get("desc")))
+            rows.sort(key=key, reverse=bool(desc_flag))
         header = ["id"] + cols
         widths = [min(max(len(str(r[k])) for r in [header] + rows), 40 if header[k] == "title" else 24) for k in range(len(header))]
         def fmt(row):
             return "  " + "  ".join(str(v)[:widths[k]].ljust(widths[k]) for k, v in enumerate(row)).rstrip()
-        out = [f"table {desc}: {len(ids)} row(s)", fmt(header)] + [fmt(r) for r in rows]
+        out = [fmt(header)] + [fmt(r) for r in rows]
         out.append("  columns: id title kind tags due in age words, and any prop; cols= picks, by= sorts (desc=1)")
-        return "\n".join(out)
+        return out
 
     def _parse_action(self, argv):
         """The part of a rule after do: <verb> [target] [k=v ...], or run <script> [args ...]. $item stands for the
@@ -506,7 +512,8 @@ class DeskKnife(DeskMoo):
         def walk(fid):
             for k in w.children(fid):
                 if k["type"] == "surface" and k["layout"] == "view":
-                    out.append(f"do create {ref(fid)} kind=view title={q(k['title'])} query={q(k.get('query', ''))}")
+                    out.append(f"do create {ref(fid)} kind=view title={q(k['title'])} query={q(k.get('query', ''))}"
+                               + "".join(f" {x}={q(k[x])}" for x in ("cols", "by", "desc") if k.get(x)))
                     continue
                 if k["type"] == "surface":
                     out.append(f"do create {ref(fid)} kind=surface title={q(k['title'])} layout={k['layout']}")
@@ -834,7 +841,8 @@ class DeskKnife(DeskMoo):
   e.g. script morning = clock $1; look Overdue; look Today; find age<1""",
         "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
-  do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today""",
+  do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
+  with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)""",
         "clock": """clock: the desk has no time of its own. clock YYYY-MM-DD (or clock now) sets today and re-evaluates the rules.
   today in due< / due> terms is the clock's date; $today in any command; age<N / age>N select by days since a
   thing was last touched (undo is not touching). examine prints when: with the last touch.""",
@@ -848,6 +856,15 @@ class DeskKnife(DeskMoo):
                            a comment with the model's reply, and a linked transcript doc (## call N sections)
   prop:status=running / prop:pass=0 select trials; rule on prop by=harness watches results arriving""",
         "why": "why <id>: the events that put a thing where it is (by whom, via which rule, because of what) and which rule would act on it next.",
+        "table": """table <selection> [cols=a,b,c] [by=col] [desc=1]: one row per matching thing, props side by side.
+  columns: id title kind tags due in age words, and any prop name; without cols= every prop present is a column.
+  e.g. table kind:trial cols=task,model,score,calls by=calls desc=1      table in:Today cols=due,age""",
+        "find": """find <words> searches titles and text; find <selection> lists what matches, grouped by surface (8 per surface,
+  then a pointer). Both end with the selection form to act on: do move <selection> into=<surface>. help selections.""",
+        "read": """read <id> shows a text's sections with word counts; read <id> #<n> or #<name> one section (names may have
+  spaces); read <id> :3 all of it; tail=<n> the last n lines of what was asked for.""",
+        "sync": "sync: brings finished trials in as the actor harness (props, a comment with the reply, a transcript doc). help trials.",
+        "compare": "compare <A> <B>: two things side by side, line by line, with what differs marked.",
     }
 
     def cmd_help(self, name):

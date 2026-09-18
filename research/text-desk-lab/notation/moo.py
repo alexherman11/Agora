@@ -232,7 +232,13 @@ def _compose(w, steps):
     events, changed = [], []
     for verb, nid, args in steps:
         try:
-            r = w.apply(verb, nid, None, args)
+            try:
+                r = w.apply(verb, nid, None, args)
+            except Refusal as e:
+                if "is not a verb of" in str(e) and verb in REGISTRY:   # registry verbs (tag, prop, due ...) over a selection
+                    r = REGISTRY[verb].run(w, nid, dict(args))
+                else:
+                    raise
         except Refusal as e:
             for ev in reversed(events):
                 try:

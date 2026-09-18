@@ -310,7 +310,7 @@ class Desk:
         self._mark_seen(nid)
         bits = []
         if n["type"] == "surface" and n["layout"] == "view":
-            head = f"{nid} view \"{n['title']}\" of {n.get('query')}"
+            head = f"{nid} view \"{n['title']}\" of {n.get('query')}" + (f" as table {n['cols']}" if n.get("cols") else "")
             kids = []
             m = self.view_matches(nid)
             bits.append("query not evaluable" if m is None else f"{len(m)} match" + ("es" if len(m) != 1 else ""))
@@ -325,6 +325,11 @@ class Desk:
                 share = min(k[axis] for k in kids)
                 if share < 80:
                     bits.append(f"cramped, {share}px each")   # fuller than it is tall: the fold that a screen would show
+                lim = n["h"] if axis == "h" else n["w"]
+                pos = "y" if axis == "h" else "x"
+                spilled = sum(1 for k in kids if k[pos] + k[axis] > lim + 1)
+                if spilled:
+                    bits.append(f"{spilled} past the {'bottom' if axis == 'h' else 'right edge'} (offscreen)")
         else:
             s = w.subjects[n["subject"]]
             self._mark_seen(s["id"])

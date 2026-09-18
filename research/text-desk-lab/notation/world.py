@@ -497,6 +497,9 @@ class World:
                 x, y, free = self.free_spot(target, 400, 300)
                 fid = self.add_surface(str(title), target, "view", x, y, 400, 300)
                 self.nodes[fid]["query"] = query
+                for k in ("cols", "by", "desc"):        # a view with cols= is a table at every look
+                    if str(args.get(k, "")).strip():
+                        self.nodes[fid][k] = str(args[k]).strip()
                 self._fair_share(fid)
                 self.reflow(target)
                 self.last_created = self.last_surface = fid
