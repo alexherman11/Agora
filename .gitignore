@@ -26,3 +26,5 @@ local/
 
 # Claude Code session lock (per-machine)
 .claude/scheduled_tasks.lock
+
+research/text-desk-lab/notation/sessions/*.lock

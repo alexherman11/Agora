@@ -138,7 +138,9 @@ class Handler(SimpleHTTPRequestHandler):
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably
             events = [e["id"] for e in desk.world.events[n0:]]
-        self._json({"text": r.get("text"), "error": r.get("error"), "events_total": total, "line": line,
+        text = r.get("text") or ""
+        refused = r.get("error") or (text if text.startswith("ERR") else None)     # Rook: a parse failure came back as error=null
+        self._json({"text": r.get("text"), "error": refused, "events_total": total, "line": line,
                     "as": (body.get("as") or "alex"), "created": created, "events": events})
 
 
