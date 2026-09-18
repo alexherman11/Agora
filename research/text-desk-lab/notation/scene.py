@@ -15,14 +15,26 @@ An unindented name defines a part; the first one is the root.
 
     column | row | free          how children are laid out (the same three words surfaces use)
     role <name>                  the look, by a role from the style file. A lens never names a colour or a size.
-    text <template>              words, with $title $text $kind $due $tags $id $item $it $n
-    clamp <N>                    at most N lines of that text
-    of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas)
+    text <template>              words, with $title $text $kind $due $tags $id $item $it $n and any field of a row
+                                 source. Quote it to keep commas and hashes: text "Hello, world # literally"
+    clamp <N>                    on words: at most N lines (printed as ~, the painter clamps wrapped lines).
+                                 on a repeat: at most N instances; both printers say how many are left
+    of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas), or over a row
+                                 source: sections:<id> comments:<id> actors events worktrees (`rows <source>` prints them)
     over $tags                   repeat over a list field of the current thing; $it is each value
-    each <part>                  what to instantiate for each repeated thing
-    at item                      take x,y,w,h from the thing's own appearance in the world
-    on <gesture> do <command>    click | edit | drag | drop. The command is a desk command line; the painter
-                                 fills $x $y (drag), $value (edit), $other (drop) at the moment of the gesture.
+    each <part>                  what to instantiate for each repeated thing; $n is the count, on and under the repeat
+    at item                      take x,y,w,h from the thing's own appearance in the world (parent must be free)
+    spread x <a> step <n|$prop> to <max>   place repeated parts along an axis (also y). $prop is a numeric prop of the
+                                 lens note itself: do prop <lens> spacing=210. Computed presentation, never written back
+    lens <name>                  place another lens here. A lens may not contain itself
+    only when <selection>        the part exists only if the current thing (or anything) matches; the text prints the absence
+    on <gesture> do <command>    click | edit | drag. The command is a desk verb line (`do` is implied); the painter
+                                 fills $x $y (drag, click) and $value (edit) at the moment of the gesture. A gesture
+                                 carries the item revision and the lens revision it was painted under; stale is refused.
+
+Every placed part carries the world's visibility facts (= offscreen-part, 43% hidden by f52). Painters report what
+only they know back through POST /api/observe; the scene prints it per viewer as ~ (viewport, cut by the clamp,
+out of view). A lens that stops compiling keeps showing its last version that did, and says so first.
 
 Anything else is refused with the line number. There is no escape to raw HTML, CSS or script in v0, on purpose:
 the pressure that builds against that wall is the research result.

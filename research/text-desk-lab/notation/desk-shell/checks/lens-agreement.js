@@ -51,41 +51,47 @@ export async function run(session = 'lens', as = 'iris', lens = 'notes') {
 
   const paintRoot = document.querySelector('#paint') || document.body;
   const sceneNodes = flatten(scene);
-  const paintNodes = paintedTree(paintRoot).filter(p => p.el !== paintRoot);
+  const keyed = [...paintRoot.querySelectorAll('[data-key]')];
+  const byKey = new Map();
+  const dupPaint = [];
+  keyed.forEach(el => {
+    const k = el.getAttribute('data-key');
+    if (byKey.has(k)) dupPaint.push(k); else byKey.set(k, el);
+  });
+  const sceneKeys = sceneNodes.map(s => s.node.key);
+  const dupScene = sceneKeys.filter((k, i) => sceneKeys.indexOf(k) !== i);
 
   const stamp = {
     at: new Date().toTimeString().slice(0, 8), href: location.href, title: document.title,
     dpr: window.devicePixelRatio || 1, viewport: innerWidth + 'x' + innerHeight,
-    lens, sceneNodes: sceneNodes.length, paintedNodes: paintNodes.length,
-    join: 'INFERRED by parallel walk — the painter emits no data-key. See the caveat in this file.'
+    lens, sceneNodes: sceneNodes.length, paintedKeyed: keyed.length,
+    domNodes: document.querySelectorAll('*').length,
+    join: 'BY data-key — a set join, not a walk.'
   };
 
   // ---- 1. every scene node painted -------------------------------------------------
-  // Matched by role class where the scene names a role, by layout class where it names a
-  // layout, and by text where it carries text. A scene node with none of the three cannot
-  // be matched at all, and is counted separately rather than silently passed.
-  const classesOf = el => [...el.classList];
-  const unmatched = [], unmatchable = [];
-  const claimed = new Set();
-  sceneNodes.forEach(({ node }) => {
-    const wantRole = node.role ? ROLE_CLASS(node.role) : null;
-    const wantLayout = node.layout ? 'l-' + node.layout : null;
-    const wantText = (node.text || '').trim();
-    if (!wantRole && !wantLayout && !wantText) { unmatchable.push(node.key); return; }
-    const hit = paintNodes.find(({ el }) => {
-      if (claimed.has(el)) return false;
-      const cs = classesOf(el);
-      if (wantRole && !cs.includes(wantRole)) return false;
-      if (wantLayout && !cs.includes(wantLayout)) return false;
-      if (wantText && !(el.textContent || '').includes(wantText.slice(0, 40))) return false;
-      return true;
-    });
-    if (hit) claimed.add(hit.el); else unmatched.push({ key: node.key, role: node.role, text: wantText.slice(0, 26) });
-  });
+  const unmatched = sceneNodes.filter(s => !byKey.has(s.node.key))
+    .map(s => ({ key: s.node.key, role: s.node.role, text: (s.node.text || '').slice(0, 26) }));
 
   // ---- 2. nothing painted that is not in the scene ----------------------------------
-  const extra = paintNodes.filter(({ el }) => !claimed.has(el))
-    .map(({ el }) => ({ tag: el.tagName, cls: [...el.classList].join('.') || '(none)', text: (el.textContent || '').trim().slice(0, 24) }));
+  const sceneSet = new Set(sceneKeys);
+  const extra = [...byKey.entries()].filter(([k]) => !sceneSet.has(k))
+    .map(([k, el]) => ({ key: k, cls: [...el.classList].join('.') || '(none)', text: (el.textContent || '').trim().slice(0, 24) }));
+
+  // Painted nodes with NO key at all: these are the painter's own chrome. They must be
+  // structural only — a keyless node carrying text would be look from outside the scene.
+  const keyless = [...paintRoot.querySelectorAll('*')].filter(e => !e.hasAttribute('data-key'))
+    .filter(e => !e.querySelector('[data-key]'))          // ignore pure wrappers
+    .filter(e => (e.textContent || '').trim().length)
+    .map(e => ({ tag: e.tagName, cls: [...e.classList].join('.') || '(none)', text: (e.textContent || '').trim().slice(0, 30) }));
+
+  // ---- 2b. absent parts painted hidden ---------------------------------------------
+  // Jeff's claim: a part the world does not have is still painted, hidden. So a scene node
+  // may be present and invisible on purpose, and that must be distinguishable from a bug.
+  const hidden = [...byKey.entries()].filter(([, el]) => {
+    const cs = getComputedStyle(el);
+    return cs.display === 'none' || cs.visibility === 'hidden' || el.hasAttribute('hidden');
+  }).map(([k, el]) => ({ key: k, how: getComputedStyle(el).display === 'none' ? 'display:none' : 'hidden' }));
 
   // ---- 3. every role resolves to a real style class ---------------------------------
   const roles = [...new Set(sceneNodes.map(s => s.node.role).filter(Boolean))];
@@ -130,12 +136,7 @@ export async function run(session = 'lens', as = 'iris', lens = 'notes') {
   const boxed = sceneNodes.filter(s => Array.isArray(s.node.box));
   const boxRows = boxed.map(({ node }) => {
     const [x, y, w, h] = node.box;
-    // find the painted card carrying this item's title text
-    const title = (node.kids || []).find(k => k.part === 'title');
-    const t = title && (title.text || '').trim();
-    let el = null;
-    if (t) el = [...paintRoot.querySelectorAll('.' + ROLE_CLASS(node.role || 'card'))]
-      .find(e => (e.textContent || '').includes(t.slice(0, 30)));
+    const el = byKey.get(node.key);          // the join does this now, exactly
     if (!el) return { key: node.key, found: false };
     const r = el.getBoundingClientRect();
     const parent = el.offsetParent || paintRoot;
@@ -171,8 +172,13 @@ export async function run(session = 'lens', as = 'iris', lens = 'notes') {
 
   return {
     stamp,
-    painted: { scene: sceneNodes.length, matched: claimed.size, unmatched, unmatchable },
+    painted: {
+      scene: sceneNodes.length, matched: sceneNodes.length - unmatched.length, unmatched,
+      duplicateSceneKeys: dupScene.length, duplicatePaintedKeys: dupPaint.length
+    },
     extraPainted: { n: extra.length, rows: extra.slice(0, 8) },
+    keylessWithText: { n: keyless.length, rows: keyless.slice(0, 6) },
+    hiddenOnPurpose: { n: hidden.length, rows: hidden.slice(0, 6) },
     roles: { n: roles.length, roles, unresolved, inert },
     gestures: { declared: acts.length, dead: deadActs, undeclaredLiveElements: undeclared, kinds: [...new Set(acts.map(a => a.on))] },
     boxes: { n: boxed.length, wrong: boxWrong.length, rows: boxRows.slice(0, 6) },
