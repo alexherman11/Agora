@@ -1,29 +1,53 @@
-/* shell.css : OWNER Wren. Placeholder tokens; to be replaced by the studio's style language (calm.style). */
-:root {
-  --paper: #faf9f6; --surface: #ffffff; --ink: #24231f; --quiet: #6b6a64; --line: #e6e3dc; --accent: #c2553a;
-  --gap: 8px; --radius: 8px; --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-}
+/* shell.css : OWNER Wren. STRUCTURAL ONLY.
+   Round three, Iris measuring wren-render: "I counted four sizes, not three; something outside the ramp
+   is setting 13px." It was the page's own stylesheet. So this file now contains no colour, no font size,
+   no font family and no spacing value at all. Every one of those comes from style/calm.style at runtime,
+   as :root custom properties (--t-*) and one .r-<role> class per role.
+   What is left here is arrangement: grid, flex, position, overflow — the things the notation admits it
+   cannot say (wren-08 §4). If you find a value in this file that is not arrangement, it is a bug. */
+
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--font); display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
-#bar { padding: 6px 16px; color: var(--quiet); font-size: 12px; border-bottom: 1px solid var(--line); }
+body { display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+
+#bar { display: flex; align-items: center; gap: var(--t-gap); }
+#bar .grow { flex: 1; }
+#bar .state { display: flex; align-items: center; gap: var(--t-gap); }
+
 #stage { position: relative; overflow: hidden; }
-#dock { display: flex; gap: var(--gap); justify-content: center; padding: 8px 16px 12px; border-top: 1px solid var(--line); background: var(--surface); }
-.dockitem { display: grid; justify-items: center; gap: 2px; min-width: 64px; padding: 6px 10px; border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
-.dockitem:hover { background: var(--paper); }
-.dockitem .glyph { font-size: 20px; line-height: 24px; }
-.dockitem .label { font-size: 11px; color: var(--quiet); }
-.dockitem.quiet { margin-left: 16px; }
-.window { position: absolute; width: min(720px, 80vw); height: min(520px, 70vh); display: grid; grid-template-rows: auto 1fr; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(36, 35, 31, .08); overflow: hidden; }
-.titlebar { display: flex; align-items: center; gap: var(--gap); padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--line); cursor: grab; user-select: none; }
-.titlebar .title { flex: 1; font-weight: 500; }
-.titlebar button { border: 0; background: transparent; color: var(--quiet); font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 6px; cursor: pointer; }
-.titlebar button:hover { background: var(--paper); color: var(--ink); }
+
+#dock { display: flex; align-items: flex-end; justify-content: center; }
+.dockitem { display: grid; justify-items: center; border: 0; background: transparent; font: inherit; cursor: pointer; }
+.dockitem .glyph { display: block; }
+
+.window { position: absolute; display: grid; grid-template-rows: auto 1fr; overflow: hidden; min-width: 280px; min-height: 160px; }
+.titlebar { display: flex; align-items: center; cursor: grab; user-select: none; }
+.titlebar .grow { flex: 1; }
+.titlebar button { border: 0; background: transparent; font: inherit; cursor: pointer; }
 .window .body { overflow: auto; position: relative; }
-.window .text { margin: 0; padding: 16px; overflow: auto; font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--ink); white-space: pre-wrap; }
-#said { position: absolute; right: 16px; bottom: 84px; width: 420px; max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; box-shadow: 0 8px 28px rgba(36, 35, 31, .08); z-index: 9999; }
-#said h2 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--quiet); }
-#said .line { padding: 6px 0; border-top: 1px solid var(--line); }
-#said code { font: 12px ui-monospace, Consolas, monospace; }
-#said .ok { color: var(--quiet); font-size: 12px; }
-#said .err { color: var(--accent); font-size: 12px; }
+.window .astext { margin: 0; overflow: auto; white-space: pre-wrap; }
+.window .grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+.window .grip::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px;
+  border-right: 1px solid var(--t-line); border-bottom: 1px solid var(--t-line); }
+
+#said { position: absolute; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+#said .scroll { overflow: auto; }
+#said .line { display: grid; }
+#said button { border: 0; background: transparent; font: inherit; cursor: pointer; }
+
+.row { display: flex; align-items: center; }
+.hidden { display: none !important; }
+
+/* Honesty marks. Iris, across four prototypes: "each of you invented a way for the screen to admit
+   what it does not know, and each of you then drew it quieter than the thing it is warning about...
+   an honesty mark has to be a property of the SURFACE, not a character in the text."
+   So an omission is a hatched band the width of what is missing, not a quiet glyph.
+   NOTATION GAP, declared: calm.style cannot say a texture. The colours below are tokens; the
+   45-degree repeat is arrangement I had to write here. Filed as wren-09 §3. */
+.alarm { background-image: repeating-linear-gradient(45deg,
+    transparent 0 5px, var(--t-warn) 5px 6px); background-color: var(--t-card); }
+.alarm > * { background: var(--t-card); padding: 0 calc(var(--t-gap) / 2); }
+#bar .alarm { border-radius: calc(var(--t-gap) / 4); }
+#stage.hasoff::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: 3px solid transparent; border-image: repeating-linear-gradient(45deg,
+    var(--t-warn) 0 6px, transparent 6px 12px) 3; }

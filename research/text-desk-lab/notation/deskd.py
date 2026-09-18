@@ -90,6 +90,8 @@ class Handler(SimpleHTTPRequestHandler):
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 snap = desk.snapshot()
                 snap["events_total"] = len(desk.world.events)
+                # Lark: each person's reading position is a fact others may see (how far into the log they have looked)
+                snap["readers"] = {a: v[2] for a, v in (getattr(desk, "_per", None) or {}).items()}
                 seen, header = dict(desk.seen), desk.last_event_seen      # reading for the renderer must not count as the actor looking
                 snap["outline"] = desk.outline(desk.world.root, 2, deep=True)
                 desk.seen, desk.last_event_seen = seen, header
@@ -110,9 +112,13 @@ class Handler(SimpleHTTPRequestHandler):
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)
         with Session(body.get("session", "desktop"), body.get("as")) as desk:
+            before, n0 = set(desk.world.nodes), len(desk.world.events)
             r = desk.dispatch("desk", {"line": line})
             total = len(desk.world.events)
-        self._json({"text": r.get("text"), "error": r.get("error"), "events_total": total, "line": line, "as": (body.get("as") or "alex")})
+            created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably
+            events = [e["id"] for e in desk.world.events[n0:]]
+        self._json({"text": r.get("text"), "error": r.get("error"), "events_total": total, "line": line,
+                    "as": (body.get("as") or "alex"), "created": created, "events": events})
 
 
 if __name__ == "__main__":

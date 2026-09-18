@@ -1043,7 +1043,7 @@ class DeskKnife(DeskMoo):
         w = self.world
         if not positional:
             raise Refusal("do needs a target after the verb")
-        alias = kv.pop("as", None) if verb in ("create", "group") else None
+        alias = kv.pop("as", None) if verb == "create" or (verb == "group" and kv.get("as") not in ("column", "row", "free")) else None
         if alias:
             out = self.cmd_do_knife(verb, positional, kv)
             self.vars = self.vars or {}

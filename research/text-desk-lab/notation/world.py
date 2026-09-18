@@ -185,6 +185,9 @@ class World:
             out.append("offscreen-part")
         if n["parent"]:
             px, py, pw, ph = self.abs_rect(n["parent"])
+            ext = str((self.nodes[n["parent"]].get("props") or {}).get("extent", ""))
+            if self.nodes[n["parent"]]["layout"] == "free" and "x" in ext and all(p.isdigit() for p in ext.split("x", 1)):
+                pw, ph = (int(p) for p in ext.split("x", 1))
             if ax + aw > px + pw or ay + ah > py + ph:
                 out.append("spills-parent")
             for s in self.children(n["parent"]):
@@ -269,7 +272,8 @@ class World:
     def _event(self, verb, target, args, undo, actor=None, note=""):
         actor = actor or self.me
         ev = {"id": f"e{len(self.events) + 1}", "verb": verb, "target": target,
-              "args": deepcopy(args), "undo": undo, "note": note, "by": actor}
+              "args": deepcopy(args), "undo": undo, "note": note, "by": actor,
+              "at": __import__("datetime").datetime.now().isoformat(timespec="seconds")}   # wall time; `day` stays the desk's clock
         if self.today:
             ev["day"] = self.today
         self.events.append(ev)

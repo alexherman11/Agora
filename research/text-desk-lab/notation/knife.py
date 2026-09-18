@@ -206,9 +206,26 @@ def group_around(w, ids, args):
     parent = args.get("in") or (parents.pop() if len(parents) == 1 else None)
     if not parent:
         raise Refusal("the selection spans several surfaces; say in=<surface> for the new group")
-    r0 = w.apply("group", parent, None, {"title": args.get("title", "group"), "as": args.get("as", "column")})
+    lay = args.get("as", "column")
+    spatial = lay == "free" and w.nodes[parent]["layout"] == "free"
+    if spatial:
+        # naming an arrangement must not destroy it: the group forms around its members, where they already are
+        pad, head = 16, 28
+        x0 = min(w.nodes[i]["x"] for i in ids) - pad
+        y0 = min(w.nodes[i]["y"] for i in ids) - pad - head
+        x1 = max(w.nodes[i]["x"] + w.nodes[i]["w"] for i in ids) + pad
+        y1 = max(w.nodes[i]["y"] + w.nodes[i]["h"] for i in ids) + pad
+        x0, y0 = max(0, x0), max(0, y0)
+        rel = {i: (w.nodes[i]["x"] - x0, w.nodes[i]["y"] - y0) for i in ids}
+    r0 = w.apply("group", parent, None, {"title": args.get("title", "group"), "as": lay})
     gid = r0["created"]
-    r = moo._compose(w, [("move", i, {"into": gid}) for i in ids])
+    if spatial:
+        g = w.nodes[gid]
+        g["x"], g["y"], g["w"], g["h"] = x0, y0, x1 - x0, y1 - y0
+        steps = [s for i in ids for s in (("move", i, {"into": gid}), ("move", i, {"to": f"{rel[i][0]},{rel[i][1]}"}))]
+    else:
+        steps = [("move", i, {"into": gid}) for i in ids]
+    r = moo._compose(w, steps)
     r["events"] = [r0["event"]] + r["events"]
     r["created"] = gid
     return r

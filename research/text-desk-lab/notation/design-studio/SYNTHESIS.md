@@ -232,6 +232,61 @@ render must be derivable from served text; and the eyes should run a fixed scrip
 rule's target is the thing it fired on; `prop:k` alone selects things having k (so `-prop:owner` works); props
 on surfaces (`do prop Alex owner=alex`), shown, selectable, exported; rules, scripts and the clock in `--dump`.
 
+## Round four (same day): one desktop, built together
+
+Alex's question after round three: each designer had their own visualizer; were they on one substrate? They
+were not. Round four put them on one. `deskd.py` owns the world over HTTP and shares the session lock with the
+CLI, so a person in the browser and an agent in a terminal act in one world. `desk-shell/` is one codebase with
+one owner per file (`OWNERS.md`). Two laws: every gesture is a desk command through `Desk.do`, and every app
+implements `text(ctx)`, its own honest text projection. Live at `http://localhost:8780/?session=desktop&as=alex`.
+
+**What each built.**
+- Wren, the shell and the style language: a bar, a stage, a dock; `style/style.js` reading `style/calm.style`
+  (tokens, roles, `when <selection> : props`); windows as world facts on a per-actor `<actor> screen` surface,
+  with which app a window is stored as a prop on the appearance. `wren-09-the-shell.md`.
+- Flint, Notes: a free canvas with near-groups (`~`, informal) beside named groups (`=`), links, a
+  `release now:` preview while dragging, a declared canvas extent, and a header that says what share of the
+  canvas the window shows and how many cards are outside it.
+- Moss, the Editor: outline rail, a 2.5s settle before a draft becomes a `rewrite`, a fence bar when someone
+  else touched the doc. He caught that my stub's `read id; do rewrite id` silently disarmed the seen fence.
+- Lark, the third app, "Together": who is here, each person's last act and reading position, with the honest
+  line that presence is known only between acts. Every row is a `find` you can run.
+- Iris, `checks/checks.js`: ten measured checks run identically every pass, results in `checks/results.md`.
+
+**What Iris measured over nine passes.** Better: honesty-loudness went green (0 of 11 marks quieter than what
+they qualify; it failed on all four prototypes last round); named controls 45 of 45. Worse: type sizes 6 to 12,
+27 contrast failures, the `said` panel covers 516x48 of the bar. Her sharpest finding: the twelve sizes are
+four scales, one per zone (shell 3, Notes 9, Together 6, Editor 7), and 11.5px was invented independently in
+three apps. The style language does not reach into the apps yet, so "cohesive" is a word, not a fact. Inside a
+window the Editor looks shipped; the frame is what breaks the calm (the said panel, a 34px cascade, the four
+scales). Blocking find, since fixed: a fresh load was once a blank page (`Style is not defined`), and the shell
+dies silently on a boot error. Her instrument had three defects of the same family as what it reports (4 PASS
+on a page that had not booted); recorded, not deleted.
+
+**Fixed in the desk from this round.** Events carry wall time (`at`); the snapshot carries `readers`; `/api/do`
+returns created ids and event ids; props on one appearance (`do prop a12 app=notes at=appearance`); the seen
+fence refuses only when another actor's deed named the thing since you saw it, not when a sibling's reflow moved
+a revision; a free surface may declare `extent=1600x1200` and spills are measured against it; and
+`do group a04,a06 as=free title=Pair` now honors the layout and forms the group at its members' hull, every
+member keeping its place on screen, one undo for the lot (the cause was one line: the command layer ate `as=`
+as a handle alias).
+
+**Still open.** Rules with `owner=` and `reach=` (Lark). `rewrite <id> #<section>` and comments anchored at a
+quoted span (Moss). Two Editor windows on one doc can both settle. The shell calls `app.text(ctx)` without ctx
+and needs a boot guard. Windows opened by alex show "not in the world" on the live desktop. The style language
+must own type scale inside apps, or apps must refuse sizes that are not tokens.
+
+**Has collaboration helped?** Yes, and measurably in three places. Bugs found by a neighbour, not the author:
+Moss found my fence disarm, Flint measured the group bug, Iris caught the blank boot within a minute. One
+contract (`text(ctx)`) let Iris check four people's work with one script. And the desk as the channel meant
+every request to me arrived as a note with a number on it. Where it has not helped yet: taste. Four people
+given one style file still made four type scales. Shared law produced shared honesty faster than shared looks.
+
+**Astra.** 004: their "clearing" workbench runs (rule blocks, preview/apply/undo, a real stale-save refusal).
+005: they are testing their frozen rule evaluator against our desktop in `research/shared-visual-desk/round4-shell/`
+and asked for one workflow that would break it. Mine is in the Mailbox (a532): one subject open twice, a held
+draft, a rule-driven move and a spatial group around the same card, one causal undo.
+
 ## Where to read
 
 - If only one file: `lark-a-morning-together.md` (twenty unbroken minutes of a shared session in the combined

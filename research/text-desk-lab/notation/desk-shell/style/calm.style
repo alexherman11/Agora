@@ -1,0 +1,78 @@
+# calm — the one style of this desktop. OWNER: Wren, but argue with it on the studio desk.
+#
+# Tokens are the only place in this whole interface where a colour or a number may appear.
+# Apps name roles and tokens; they never invent a colour. In an app:
+#     el.className = Style.roleClass("card")        ->  class="r-card"
+#     el.style.gap = Style.varName("gap")           ->  var(--t-gap)
+# Every token is also a CSS custom property: --t-paper, --t-ink, --t-gap, --t-accent ...
+
+token paper    = #FBFAF7      # the desktop itself
+token card     = #FFFFFF      # anything lifted off it
+token ink      = #14171A
+token accent   = #3F5D73
+token warn     = #A24E2C      # refusals and errors only. the one loud colour.
+
+token gap      = 8
+token ramp     = 1.15
+token text     = ui 15/1.5
+
+token line     = ink at 20%
+token faint    = ink at 10%
+token quiet    = ink at 70%
+token hush     = ink at 55%
+
+# ---- the desktop chrome ----
+# Iris: "uniformity is what makes it read as one surface, and what makes it read as wallpaper."
+# So the weights are deliberately three: the work is loud, the chrome is quiet, the machinery is hushed.
+
+role desk      : on paper, ink, text
+role bar       : text down, hush, pad gap, border bottom faint
+role dock      : on card, pad gap, border top faint, between gap
+role dockitem  : text down, quiet, pad gap, corner gap /2
+role dockitem.on : text down medium, ink, on paper
+role glyph     : text up 3, ink
+
+role window    : on card, ink, text, edge faint, corner gap, lift gap /2
+role titlebar  : text down medium, quiet, pad gap, border bottom faint, between gap
+role windowname : text medium, ink
+role tool      : text down, hush, pad gap /2, corner gap /2
+role tool.on   : text down, accent, on accent at 12%
+
+# ---- what apps draw with. Three weights on purpose, not one. ----
+
+role heading   : text up medium, ink, space below gap
+role card      : on card, ink, text, pad gap x1.5, edge faint, corner gap /2, space below gap
+role card.plain : ink, text, pad gap, space below gap /2
+role title     : text medium, ink
+role body      : text down, quiet
+role meta      : text down 2 tracked, hush
+role tag       : text down 2 tracked, accent, on accent at 12%, pad gap /2, corner gap /4
+role cut       : text down 2 tracked, warn
+role said      : on card, text down, quiet, pad gap, edge faint, corner gap
+role source    : text.mono down, quiet
+role refusal   : text.mono down, warn, on warn at 8%, pad gap, corner gap /2, edge warn at 40%
+
+token text.mono = mono 15/1.5
+
+# ---- clauses: styling by the desk's own selection language ----
+
+when kind:note            : as=card
+when kind:doc             : as=card
+when kind:task            : as=card
+when kind:chat            : as=card
+when due                  : ink -> accent
+when comments:open        : show meta
+
+# ---- presentation: WHICH parts are drawn, and in what order ----
+
+present card   : title, body :3, meta, tags
+present window : titlebar, body
+
+# ---- a theme may redefine tokens. It may never define a role. ----
+
+theme dark of calm
+  token paper  = #131517
+  token card   = #191C1F
+  token ink    = #E9E7E2
+  token accent = #93B4CC
+  token warn   = #D98A63

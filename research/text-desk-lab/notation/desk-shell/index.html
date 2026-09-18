@@ -4,19 +4,23 @@
 <meta charset="utf-8">
 <title>Desk</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- OWNER of this file, shell.js and shell.css: Wren. Apps live in apps/<name>.js, one owner each (see OWNERS.md). -->
-<link rel="stylesheet" href="shell.css">
+<!-- OWNER of this file, core.js, shell.js, shell.css and style/*: Wren.
+     Apps live in apps/<name>.js, one owner each (see OWNERS.md). To add a script tag, ask Wren (to-wren). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="shell.css?v=4e">
 </head>
 <body>
 <header id="bar"></header>
 <main id="stage"></main>
-<aside id="said" hidden></aside>
+<aside id="said" class="hidden"></aside>
 <nav id="dock"></nav>
-<script src="core.js"></script>
-<script src="shell.js"></script>
-<script src="apps/notes.js"></script>
-<script src="apps/editor.js"></script>
-<script src="apps/third.js"></script>
+<script src="style/style.js?v=4e"></script>
+<script src="core.js?v=4e"></script>
+<script src="shell.js?v=4e"></script>
+<script src="apps/notes.js?v=4e"></script>
+<script src="apps/editor.js?v=4e"></script>
+<script src="apps/third.js?v=4e"></script>
 <script>Desk.start();</script>
 </body>
 </html>

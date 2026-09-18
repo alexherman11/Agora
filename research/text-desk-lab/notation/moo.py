@@ -399,8 +399,10 @@ def v_done(w, nid, a):
       "k=v ... | remove=k", "do prop a12 model=gpt-5.6-sol status=queued")
 def v_prop(w, nid, a):
     actor = a.pop("_by", None) or w.me
-    if w.nodes[nid]["type"] == "surface":
-        # a surface has no subject: its properties (owner=alex ...) live on the surface itself
+    here = str(a.pop("at", "")) == "appearance"
+    if w.nodes[nid]["type"] == "surface" or here:
+        # a surface has no subject: its properties (owner=alex ...) live on the surface itself.
+        # at=appearance puts them on this one appearance instead of on the subject every appearance shares.
         node = w.nodes[nid]
         props = node.setdefault("props", {})
         rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]

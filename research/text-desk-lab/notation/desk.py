@@ -264,7 +264,27 @@ class Desk:
             raise Refusal(f"{ident!r} names {len(hits)} things: {', '.join(hits)}; use an id")
         raise Refusal(f"no such id {ident!r} (ids look like f02, a05, s03; use look or find)")
 
+    def _touched_by_others(self, nid):
+        """Has another actor's deed named this thing, its subject, or (for a surface) its membership since I last saw it?
+        Geometry that moved because a sibling reflowed is not a reason to refuse."""
+        w = self.world
+        since = (getattr(self, "_seen_idx", None) or {}).get((w.me, nid), 0)
+        n = w.nodes.get(nid)
+        names = {nid} | ({n["subject"]} if n and n.get("subject") else set())
+        for e in w.events[since:]:
+            if e["by"] == w.me or e.get("undone"):
+                continue
+            if e["target"] in names:
+                return True
+            if n and n["type"] == "surface" and e["verb"] in ("sort", "tile", "untile", "remove", "move") and nid in (e.get("changed") or []):
+                return True
+        return False
+
     def _mark_seen(self, nid):
+        idx = getattr(self, "_seen_idx", None)
+        if idx is None:
+            idx = self._seen_idx = {}
+        idx[(self.world.me, nid)] = len(self.world.events)
         if nid in self.world.nodes:
             self.seen[nid] = self.world.nodes[nid]["rev"]
         elif nid in self.world.subjects:
