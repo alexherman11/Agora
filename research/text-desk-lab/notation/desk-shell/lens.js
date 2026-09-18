@@ -93,7 +93,25 @@
     kept = next;
     if (paint.firstChild !== root) paint.replaceChildren(root);
     said.textContent = r.text;
+    report();
   }
+
+  // Iris, Lark: only the painter knows what happened. It says so: which clamps bit, what is out of this viewer's view.
+  let told = "";
+  function report() {
+    const vp = paint.getBoundingClientRect(), facts = {};
+    for (const el of paint.querySelectorAll("[data-key]")) {
+      const r = el.getBoundingClientRect(), f = [];
+      if (el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1) f.push("cut by the clamp");
+      if (el.classList.contains("boxed") && el.scrollHeight > el.clientHeight + 1) f.push("contents overflow the box");
+      if (el.classList.contains("boxed") && (r.bottom < vp.top || r.top > vp.bottom || r.right < vp.left || r.left > vp.right)) f.push("out of view");
+      if (f.length) facts[el.dataset.key] = f.join(", ");
+    }
+    const body = JSON.stringify({ session, as: who, lens, at: sceneAt, facts,
+      viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } });
+    if (body !== told) { told = body; fetch("/api/observe", { method: "POST", body }); }
+  }
+  let scrolling; paint.addEventListener("scroll", () => { clearTimeout(scrolling); scrolling = setTimeout(report, 400); });
 
   await refresh();
   setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line

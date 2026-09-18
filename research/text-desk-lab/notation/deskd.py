@@ -121,9 +121,20 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/do":
-            return self._json({"error": "POST /api/do only"}, 404)
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        if urlparse(self.path).path == "/api/observe":
+            # a painter reports what happened on its screen. Not an event, not undoable, not the world: a viewer's observation.
+            with Session(body.get("session", "desktop"), body.get("as")) as desk:
+                views = getattr(desk, "_views", None)
+                if views is None:
+                    views = desk._views = {}
+                facts = {str(k)[:200]: str(v)[:60] for k, v in list((body.get("facts") or {}).items())[:400]}
+                views[(body.get("as") or "alex").lower()] = {"lens": str(body.get("lens", "")).lower(), "at": int(body.get("at", 0)),
+                                                            "time": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+                                                            "viewport": body.get("viewport"), "facts": facts}
+            return self._json({"ok": True, "kept": len(facts)})
+        if urlparse(self.path).path != "/api/do":
+            return self._json({"error": "POST /api/do or /api/observe"}, 404)
         line = str(body.get("line", "")).strip()
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)

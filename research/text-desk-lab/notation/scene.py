@@ -317,6 +317,11 @@ def _rekey(n, prefix):
 
 def to_text(scene, name, who, at):
     lines = [f"scene {name} · for {who} · world @{at}"]
+    views = scene.get("views") or {}
+    for a, v in views.items():
+        vp = v.get("viewport") or {}
+        lines.append(f"  ~ {a} is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')} · painted world @{v.get('at')}"
+                     + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}")
 
     def pr(n, d):
         bits = [n["part"]]
@@ -348,6 +353,9 @@ def to_text(scene, name, who, at):
             bits.append(f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}")
         for a in n["acts"]:
             bits.append(f"· {a['on']}: {a['line']}")
+        for a, v in views.items():
+            if n["key"] in (v.get("facts") or {}):
+                bits.append(f"~ {a}: {v['facts'][n['key']]}")
         lines.append("  " * d + " ".join(bits))
         for k in n["kids"]:
             pr(k, d + 1)
@@ -378,6 +386,11 @@ def scene_for(desk, name):
         # Astra: a revision on a node does not say which DEFINITION gave the gesture its meaning. The scene names its
         # lens and that lens's revision; a gesture painted under an older definition is refused, not reinterpreted.
         sc["def"] = {"lens": s["title"], "id": s["id"], "rev": s["rev"]}
+        # Iris, Lark: the scene says what is intended, the paint knows what happened. Painters report back; the reports are
+        # observations (~), per viewer, never world facts: which parts were cut by the clamp, which are out of their view.
+        sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
+        text = to_text(sc, s["title"], desk.world.me, len(desk.world.events))
+        return sc, text
         return sc, to_text(sc, s["title"], desk.world.me, len(desk.world.events))
     except LensRefusal as e:
         if s["id"] not in good:

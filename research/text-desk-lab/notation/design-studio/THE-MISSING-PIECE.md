@@ -104,3 +104,32 @@ links, no release preview, no extent. That gap, itemised, is the first experimen
 Owners: `scene.py`, `lens.html`, `lens.js` are Jeff's. Ask with `to-jeff` for a new scene word; I will add it
 the same day if it can be printed as text. Work in worktrees or your own sessions (`cp` of `lens.pickle`),
 write one file in `design-studio/`, leave a Commons note. Disagree in writing.
+
+## State at the end of 18 September (after the studio's and Astra's attacks)
+
+What the compiler is now, in the order it was forced on it:
+
+- **Admission.** Quoted text keeps commas and hashes; a lens's text is data; unknown words, roles, `$names` and
+  selection terms are refused with a line number; duplicate parts and sibling names are refused; a part or a lens
+  that contains itself is refused with the cycle named; 1500-node budget; `clamp N` on a repeat cuts and says how
+  many are left and which `find` lists them. Tests: `notation/test_scene.py`. Most began as Astra's defect table
+  (`research/shared-visual-desk/round5-bridge/foundations.md`).
+- **Rows.** `of sections:<id> | comments:<id> | actors | events | worktrees` beside ordinary selections; the desk
+  prints the same rows (`rows actors`). `do rewrite <id> section=<heading>` makes a paragraph the unit of change.
+- **Composition.** `lens <name>` places another lens. `desktop` is ten lines placing `notes`, `editor`, `together`:
+  200 scene nodes, 200 painted, no duplicate keys, four type sizes, all on the ramp.
+- **Bindings.** A gesture carries what was observed: the item's revision, the world position of the painted scene,
+  and the lens's own revision. deskd sets the fence to exactly that. A stale item is refused; a gesture painted
+  under an older lens is refused. The painter never looks again on the person's behalf. (Astra's critique. Still
+  missing, by their list: operation identity, declared input schema, subject versus appearance as a contract.)
+- **Facts and observations.** Placed nodes carry what the world knows (`= offscreen-part, 43% hidden by f52`).
+  Painters report back what only they know, per viewer, as `~`: viewport and scroll, which clamps bit, what
+  overflows its box, what is out of that viewer's view. `scene notes` in a terminal prints
+  `~ alex is looking: 257x597 at scroll 0,0` and `~ alex: out of view` on the cards he cannot see.
+- **Resilience.** A lens that stops compiling keeps showing its last version that did, and says so first.
+  The painter keeps unchanged parts by key: a reader's selection survives someone else's act (verified).
+- **Painter size:** 118 of 150 lines.
+- **The bridge.** Session `bridge` is one world for both teams: Lenses, Things, Defects, Talk, and a `board` lens.
+
+Still not built: `only when`, click filling `$x $y`, the prose native (Moss's contract), rules as events,
+image and stroke fields, actions as handles (Astra's adapter), incremental scene delivery.
