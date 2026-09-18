@@ -201,7 +201,7 @@ class DeskMoo(Desk):
             return super().cmd_do(verb, target, kv)
         name, note = self.adapter.resolve(w, verb, nid)
         cur = w.nodes[nid]["rev"]
-        seen = self.seen.get(nid)
+        seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         if seen is None:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))

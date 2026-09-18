@@ -9,7 +9,6 @@ Every mutation is an event with an undo; mutations are fenced on the observed re
 """
 
 from copy import deepcopy
-import itertools
 import re
 
 SCREEN = (1280, 800)
@@ -28,12 +27,15 @@ class World:
         self.links = []
         self.last_created = None
         self.last_surface = None
-        self._ids = itertools.count(1)
+        self._ids = 0   # plain int: pickles on every Python (itertools.count stopped pickling in 3.14)
         self.root = self.add_surface("desk", None, "free", 0, 0, *SCREEN)
 
     # ---- construction -------------------------------------------------
     def _id(self, prefix):
-        return f"{prefix}{next(self._ids):02d}"
+        if not isinstance(self._ids, int):          # a session pickled before the counter became an int
+            self._ids = next(self._ids) - 1
+        self._ids += 1
+        return f"{prefix}{self._ids:02d}"
 
     def add_subject(self, kind, title, text="", tags=(), due=None):
         sid = self._id("s")

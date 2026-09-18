@@ -106,7 +106,9 @@ class Desk:
                     if "error" in r:
                         error = True
                         if i < len(parts) - 1:
-                            outs.append(f"(stopped; {len(parts) - i - 1} later command(s) not run)")
+                            rest = parts[i + 1:]
+                            outs.append(f"(stopped; {len(rest)} later command(s) not run. Not run: {'; '.join(rest)}. "
+                                        f"Fix [{i + 1}] and resubmit them in one call)")
                         break
                 return {"text": "\n\n".join(outs), "batch": len(parts), "batch_error": error}
         return self._one(args, name)
@@ -190,13 +192,19 @@ class Desk:
                 raise Refusal(f"{cmd} takes only an id; examine {argv[0]} shows what is inside")
             return self.cmd_fold(argv[0], cmd == "open")
         if cmd == "read":
-            section, full = None, False
+            section, full, tail = None, False, None
             for a in argv[1:]:
                 if a.startswith("#"):
                     section = a[1:]
                 elif a in (":3", ":full"):
                     full = True
-            return self.cmd_read(argv[0] if argv else None, section, full)
+                elif a.startswith("tail="):
+                    if not (a[5:].isdigit() and int(a[5:]) > 0):
+                        raise Refusal("tail=<n> wants a positive number of lines")
+                    tail = int(a[5:])
+                elif section is not None and "=" not in a and not a.startswith(":"):
+                    section += " " + a    # read a07 #Session 2: a section name may have spaces
+            return self.cmd_read(argv[0] if argv else None, section, full, tail)
         if cmd == "where":
             return self.cmd_where(argv[0] if argv else None)
         if cmd == "verbs":
@@ -474,7 +482,7 @@ class Desk:
         self.open.discard(nid)
         return self.outline(self.world.nodes[nid]["parent"] or nid, 2)
 
-    def cmd_read(self, ident, section=None, full=False):
+    def cmd_read(self, ident, section=None, full=False, tail=None):
         nid = self._resolve(ident)
         w = self.world
         if nid in w.subjects:
@@ -508,6 +516,12 @@ class Desk:
             if not pick:
                 raise Refusal(f"no section {section!r}; sections: " + ", ".join(f"#{i + 1} {h}" for i, (h, _) in enumerate(named)))
             body = f"## {pick[0]}\n{pick[1]}"
+        if tail:
+            bl = body.splitlines()
+            keep = bl[:1] if bl and bl[0].startswith("## ") else []
+            rest = bl[len(keep):]
+            if len(rest) > tail:
+                body = "\n".join(keep + [f"(… {len(rest) - tail} earlier line(s) folded; without tail= for all)"] + rest[-tail:])
         out = f"{head}\n---\n{body}\n---"
         if s.get("comments"):
             out += "\ncomments:"
@@ -680,7 +694,7 @@ class Desk:
         nid = self._resolve(target)
         kv = dict(kv)   # values were unescaped where they were parsed
         cur = w.nodes[nid]["rev"] if nid in w.nodes else w.subjects[nid]["rev"]
-        seen = self.seen.get(nid)
+        seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         if seen is None:
             raise Refusal(f"you have not looked at {nid} yet; look, read or where it first")
         if seen != cur:

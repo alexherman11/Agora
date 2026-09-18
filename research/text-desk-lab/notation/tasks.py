@@ -1,5 +1,6 @@
 """My own scenarios. Each builds a Desk and returns hidden checks."""
 
+import re
 from desk import Desk
 from desk_moo import DeskMoo
 from world import World
@@ -17,7 +18,7 @@ def _mk_desk(w, variant):
     return DeskMoo(w, variant) if variant in ("moo", "acme") else Desk(w, variant)
 
 
-def build_home(variant):
+def build_home(variant, export="home.desk.txt"):
     """Round 11d: Claude's home desk, rebuilt from its own export, as a task world. Rules, views, scripts and the
     clock are live; a question from Priya is injected before the model looks."""
     from pathlib import Path
@@ -25,7 +26,7 @@ def build_home(variant):
     w.nodes[w.root]["layout"] = "row"
     w.equal_share = False
     desk = _mk_desk(w, variant)
-    text = (Path(__file__).resolve().parent / "sessions" / "home.desk.txt").read_text(encoding="utf-8")
+    text = (Path(__file__).resolve().parent / "sessions" / export).read_text(encoding="utf-8")
     for line in text.splitlines():
         if line.strip() and not line.startswith("#"):
             r = desk.dispatch("desk", {"line": line})
@@ -70,7 +71,40 @@ def build_home2(variant):
     return desk
 
 
+def build_home4(variant):
+    """Session 2: the desk after the trial reruns (export home-s2), with the announce script and its rule removed.
+    The model must read eight trials' props and build a rule that runs a script."""
+    desk = build_home(variant, "home-s2.desk.txt")
+    w = desk.world
+    desk.rules = [r for r in desk.rules if r["verb"] != "run"]
+    desk.scripts.pop("announce", None)
+    desk.today = w.today = "2026-09-26"
+    w.events.clear()
+    desk.seen.clear()
+    desk.open = {w.root}
+    desk.last_event_seen = 0
+    desk._rule_notes = None
+    for r in desk.rules or []:            # as in home3: what matches now counts as already handled
+        if not r.get("on"):
+            try:
+                r["done"].update(desk._parse_selection(r["sel"])[0])
+            except Exception:
+                pass
+    journal = next(sid for sid, sub in w.subjects.items() if sub["title"] == "Journal")
+    desk.ids.update({"journal": journal, "journal_len": len(w.subjects[journal]["text"]),
+                     "trials": {sid: sub["title"] for sid, sub in w.subjects.items() if sub["kind"] == "trial"}})
+    return desk
+
+
 TASKS = {
+    "home4": (
+        "This is Claude's own desk; trials of other models run from it and their results come back as props on "
+        "each trial. Two things. (1) Among the finished trials, which one cost the most calls per check it passed "
+        "(calls divided by the checks passed in its score)? Name it in one line with the number. (2) Make the desk "
+        "announce results: from now on, whenever the harness reports on a trial, a line naming that trial should "
+        "be appended to the Journal doc, without anyone doing it by hand. help rules, help scripts and help trials "
+        "explain the desk's automation; table lists props side by side. Do not move anything by hand."
+    ),
     "home": (
         "This is Claude's own desk, with rules and views on it. Priya asked something in the Priya chat; answer her "
         "there in one line. Then add a note titled \"Model's view\" tagged friction, saying in two or three lines what on "
@@ -132,6 +166,8 @@ def build(task, variant="outline"):
         return build_home(variant)
     if task == "home2":
         return build_home2(variant)
+    if task == "home4":
+        return build_home4(variant)
     if task == "home3":
         desk = build_home(variant)
         desk.today = desk.world.today = "2026-09-26"
@@ -229,6 +265,40 @@ def assess(task, desk):
         out["nothing_moved_by_hand"] = not moves
         out["nothing_lost"] = all(w.appearances_of(s) for s in ids["original_subjects"])
         out["pass"] = all(v for k, v in out.items())
+        return out
+    if task == "home4":
+        reply = (getattr(desk, "reply_text", "") or "").lower()
+        out["names_priya_recheck"] = "priya recheck" in reply
+        out["states_ratio"] = any(x in reply for x in ("2.25", "2,25", "27/12", "27 / 12"))
+        rules = [r for r in (desk.rules or []) if r.get("on") == "prop" and (r.get("by") in (None, "harness"))]
+        out["rule_on_harness_prop"] = bool(rules)
+        jt = {"journal", ids["journal"]} | set(w.appearances_of(ids["journal"]))
+        def appends_journal(r):
+            if r["verb"] == "run":
+                body = (desk.scripts or {}).get(r["script"], "").lower()
+                return "append" in body and any(t.lower() in body for t in jt)
+            return r["verb"] == "append" and (r.get("target") or "").lower() in {t.lower() for t in jt}
+        out["rule_appends_journal"] = any(appends_journal(r) for r in rules)
+        # does it work? the harness reports on one trial; the journal must grow by a line that names it
+        import moo
+        sid, title = next(iter(ids["trials"].items()))
+        before = w.subjects[ids["journal"]]["text"]
+        host = w.appearances_of(sid)[0]
+        try:
+            moo.REGISTRY["prop"].run(w, host, {"probe": "1", "_by": "harness"})
+            desk._run_rules(cause=None)
+        except Exception:
+            pass
+        after = w.subjects[ids["journal"]]["text"]
+        new = after[len(before):].lower()
+        out["announce_fires"] = len(after) > len(before)
+        # the title, or the id as a word (not "a142.title": a form that was guessed before it existed)
+        out["announce_names_trial"] = title.lower() in new or any(re.search(rf"\b{x}\b(?!\.)", new) for x in (sid, host))
+        moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
+        out["nothing_moved_by_hand"] = not moves
+        out["judgment_ratio_stated"] = out["states_ratio"]   # non-gating: the number itself
+        del out["states_ratio"]
+        out["pass"] = all(v for k, v in out.items() if not k.startswith("judgment"))
         return out
     if task == "home3":
         trials = [s for s in w.subjects.values() if s["kind"] == "trial" and (s.get("props") or {}).get("task") == "harbor"]

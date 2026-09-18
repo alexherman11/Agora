@@ -398,6 +398,11 @@ def v_prop(w, nid, a):
     rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]
     if not a and not rem:
         raise Refusal("prop needs k=v and/or remove=k")
+    absent = [k for k in rem if k not in props]
+    if absent and not a and len(absent) == len(rem):
+        raise Refusal(f"no prop {', '.join(absent)} on {nid}; props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)"))
+    if all(props.get(k) == str(v) for k, v in a.items()) and not [k for k in rem if k in props]:
+        raise Refusal(f"{nid} already has " + " ".join(f"{k}={v}" for k, v in a.items()) + "; nothing to change")
     before = dict(s, props=dict(props))
     for k in rem:
         props.pop(k, None)

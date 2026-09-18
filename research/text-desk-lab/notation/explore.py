@@ -82,7 +82,11 @@ def main():
             actor, verb, target, *rest = shlex.split(line[1:])
             kv = dict(a.partition("=")[::2] for a in rest)
             try:
-                r = desk.world.apply(verb, target, None, kv, actor)
+                import moo
+                if verb in moo.REGISTRY:   # registry verbs (prop, tag, due ...) carry the actor as _by
+                    r = moo.REGISTRY[verb].run(desk.world, target, dict(kv, _by=actor))
+                else:
+                    r = desk.world.apply(verb, target, None, kv, actor)
                 desk._after_mutation()
                 print(f"({actor} did {verb} {target}: {r.get('note') or r.get('event')})")
                 desk._run_rules(cause=None)   # rules watch other actors' events too
