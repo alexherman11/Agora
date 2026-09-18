@@ -39,6 +39,7 @@
       }
     }
     const el = document.createElement("div");
+    if (n.absent) el.hidden = true;
     next.set(n.key, { el, sig });
     el.dataset.key = n.key;      // Iris: with the key on the paint, agreement is a join, not two trees walked side by side
     if (n.role) el.className = Style.roleClass(n.role);
@@ -49,7 +50,11 @@
       if (n.clamp) { el.classList.add("clamp"); el.style.webkitLineClamp = n.clamp; }
     }
     for (const a of n.acts) {
-      if (a.on === "click") el.addEventListener("click", () => send(n, a.line));
+      if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
+        if (e.target !== el && a.line.includes("$x")) return;
+        const r = el.getBoundingClientRect();
+        send(n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)));
+      });
       if (a.on === "edit") {
         el.contentEditable = "plaintext-only";
         el.addEventListener("focus", () => { busy = true; });

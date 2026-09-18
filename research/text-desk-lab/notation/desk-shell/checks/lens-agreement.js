@@ -13,17 +13,16 @@
 //     const L = await import('/checks/lens-agreement.js');
 //     await L.run('lens', 'iris', 'notes')
 //
-// ONE CAVEAT, AND IT IS THE FIRST FINDING.
-// The painter does not put the scene's `key` into the DOM. There is no `data-key`, no id, no
-// attribute carrying it — I checked every attribute on every node and the set is
-// {lang, charset, name, content, rel, href, id, class, data-drag, style, contenteditable, src}.
-// So I cannot JOIN the two trees; I can only WALK them in parallel and assume the nth painted
-// child corresponds to the nth scene child. That assumption is exactly what the check is
-// supposed to be testing, so every result below is weaker than it looks, and a mismatch in
-// the middle of a list will cascade into every node after it.
+// ROUND SIX: THE CAVEAT IS GONE, AND THIS FILE IS NOW A PROOF RATHER THAN AN ARGUMENT.
+// Last round the painter emitted no key, so I could only WALK both trees in parallel and
+// assume the nth painted child was the nth scene child — which is the very thing the check
+// was supposed to establish. Jeff added `data-key`. So the walker is deleted and the check
+// is a set join on the key: two sets, compared by identity, with duplicates fatal on either
+// side. A mismatch anywhere is now local instead of cascading.
 //
-// The fix is one line in the painter and it is Jeff's: emit `data-key` on every node. Then
-// this file gets to delete its walker and do a real join. Asked in Commons as to-jeff.
+// What that changes: "every scene node painted" and "nothing painted that is not in the
+// scene" stop being inferences and become set difference. Nothing else in this file was
+// weakened by the old join, but those two were the whole point.
 
 const ROLE_CLASS = r => 'r-' + r;
 

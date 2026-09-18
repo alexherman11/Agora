@@ -153,7 +153,7 @@ def parse(src):
         if not colon or not re.fullmatch(r"[\w-]+", name):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
-                "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None}
+                "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if p in LAYOUTS:
@@ -177,6 +177,16 @@ def parse(src):
                 node["at"] = "item"
             elif word == "lens" and re.fullmatch(r"[\w$.-]+", val):
                 node["lens"] = val
+            elif word == "spread":
+                # Astra's challenge: x = clamp(20 + order * spacing, 0, 440). Not arithmetic in the lens: a layout word. The
+                # relationship is `spread`; the coefficient is a number or a $prop of the lens note, which is world data:
+                # `do prop <lens> spacing=210` changes every present and future placement, is an event, and can be undone.
+                m = re.fullmatch(r"(x|y) (-?\d+) step (\$?[\w.-]+) to (\d+)", val)
+                if not m:
+                    raise LensRefusal(f"line {n}: `spread x <start> step <number or $prop of this lens> to <max>` (and the same for y); got {p!r}")
+                node.setdefault("spread", {})[m.group(1)] = (int(m.group(2)), m.group(3), int(m.group(4)))
+            elif p.startswith("only when ") and p[10:].strip():
+                node["only"] = p[10:].strip()      # Wren, Flint: the desk's own selection decides; no if, no else
             elif word == "on":
                 g, do, cmd = val.partition(" do ")
                 if g not in GESTURES or not do or not cmd.strip():
@@ -243,15 +253,39 @@ def _ctx_for(w, nid):
             "_tags": list(s.get("tags") or [])}
 
 
-def build(desk, src, stack=(), count=None):
+def build(desk, src, stack=(), count=None, props=None):
     root, parts = parse(src)
     w = desk.world
+    props = props or {}
+
+    def spread_of(node, index, kid):
+        sp, item = node.get("spread"), w.nodes.get(kid.get("item") or "")
+        if not sp:
+            return
+        if node["layout"] != "free":
+            raise LensRefusal(f"line {node['line']}: spread places parts by position, which only a `free` part can honour")
+        xy = {}
+        for axis, (start, step, top) in sp.items():
+            if step.startswith("$"):
+                if step[1:] not in props or not str(props[step[1:]]).lstrip("-").isdigit():
+                    raise LensRefusal(f"line {node['line']}: spread step {step}: this lens has no numeric prop {step[1:]!r}. Set it: do prop <this lens> {step[1:]}=150")
+                step = props[step[1:]]
+            xy[axis] = max(0, min(top, start + index * int(step)))
+        kid["box"] = [xy.get("x", 0), xy.get("y", 0), item["w"] if item else 200, item["h"] if item else 80]
+        kid["placed"] = "spread"          # computed presentation, not the thing's durable position: no drag, nothing written back
     count = count if count is not None else [0]
 
     def make(node, ctx, key, parent_layout="free"):
         if node["at"] == "item" and parent_layout != "free":
             raise LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
                               f"its parent is {parent_layout or 'unlaid'}. Make the parent free, or drop `at item`")
+        if node["only"]:
+            sel = desk._parse_selection(_fill(node["only"], ctx))
+            ids = sel[0] if sel else []
+            if not ((ctx.get("item") in ids) if ctx.get("item") else bool(ids)):
+                # the text prints the absence; it does not pretend the part was never written
+                return {"part": node["name"], "key": key, "role": None, "layout": None, "item": ctx.get("item"), "box": None,
+                        "text": None, "clamp": None, "acts": [], "kids": [], "absent": node["only"]}
         out = {"part": node["name"], "key": key, "role": node["role"], "layout": node["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": node["clamp"], "acts": [], "kids": []}
         if node["at"] == "item" and ctx.get("item") in w.nodes:
@@ -291,6 +325,8 @@ def build(desk, src, stack=(), count=None):
                 for k, v in enumerate(ctx.get("_" + node["over"], [])):
                     out["kids"].append(make(each, dict(ctx, it=v), f"{key}/{k}", node["layout"]))
             out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
+            for k, kid in enumerate(out["kids"][:out["n"]]):
+                spread_of(node, k, kid)
             if out["text"] is not None:                         # Flint bug 4: the count existed and could not be put into words
                 out["text"] = out["text"].replace("$n", str(out["n"]))
         if node["lens"]:
@@ -325,6 +361,9 @@ def to_text(scene, name, who, at):
 
     def pr(n, d):
         bits = [n["part"]]
+        if n.get("absent"):
+            lines.append("  " * d + f"{n['part']} {n.get('item') or ''} (absent: not {n['absent']})".replace("  (", " ("))
+            return
         if n.get("item"):
             bits.append(n["item"])
         if n["text"] is not None:
@@ -346,7 +385,7 @@ def to_text(scene, name, who, at):
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:
-            bits.append(f"at {n['box'][0]},{n['box'][1]} {n['box'][2]}x{n['box'][3]}")
+            bits.append(f"at {n['box'][0]},{n['box'][1]} {n['box'][2]}x{n['box'][3]}" + (f" ({n['placed']}, not its place in the world)" if n.get("placed") else ""))
         if n.get("facts"):
             bits.append("= " + ", ".join(n["facts"]))
         if "n" in n:
@@ -381,7 +420,7 @@ def scene_for(desk, name):
     if good is None:
         good = desk._lens_good = {}
     try:
-        sc = build(desk, s["text"], (s["title"].lower(),))
+        sc = build(desk, s["text"], (s["title"].lower(),), props=s.get("props") or {})
         good[s["id"]] = s["text"]
         # Astra: a revision on a node does not say which DEFINITION gave the gesture its meaning. The scene names its
         # lens and that lens's revision; a gesture painted under an older definition is refused, not reinterpreted.
