@@ -43,15 +43,20 @@ def validate_document(document):
 
 
 class Store:
-    def __init__(self, state_dir=None):
+    def __init__(self, state_dir=None, *, name="visual", tag=TAG, actor=ACTOR,
+                 title="Field Notes - executable workbench"):
+        if not name.isidentifier():
+            raise ValueError("Store name must be an identifier.")
+        self.tag, self.actor, self.title = tag, actor, title
         self.state_dir = Path(state_dir) if state_dir else HERE / ".state"
-        self.path = self.state_dir / "visual.pickle"
+        self.path = self.state_dir / (name + ".pickle")
+        self.guard = self.state_dir / (name + ".guard")
 
     def load(self):
         return pickle.loads(self.path.read_bytes()) if self.path.exists() else fresh()
 
     def record(self, desk):
-        matches = [s for s in desk.world.subjects.values() if TAG in s.get("tags", [])]
+        matches = [s for s in desk.world.subjects.values() if self.tag in s.get("tags", [])]
         if len(matches) > 1:
             raise InvalidDocument("Multiple workbench subjects; resolve the ambiguity in the desk.")
         if not matches:
@@ -72,12 +77,12 @@ class Store:
         }
 
     def read(self):
-        with session_lock(self.state_dir / "visual.guard"):
+        with session_lock(self.guard):
             return self.record(self.load())
 
     def save(self, base_revision, document):
         text = validate_document(document)
-        with session_lock(self.state_dir / "visual.guard"):
+        with session_lock(self.guard):
             desk = self.load()
             before = self.record(desk)
             if before["revision"] != base_revision:
@@ -85,10 +90,10 @@ class Store:
                     "Desk source changed. Your local draft is retained; "
                     "load the newer version before saving."
                 )
-            desk.world.me = ACTOR
+            desk.world.me = self.actor
             per = getattr(desk, "_per", {})
             desk.seen, desk.open, desk.last_event_seen = per.get(
-                ACTOR, ({}, {desk.world.root}, len(desk.world.events))
+                self.actor, ({}, {desk.world.root}, len(desk.world.events))
             )
             if before["subject"]:
                 target = before["subject"]
@@ -106,13 +111,13 @@ class Store:
                         "target": desk.world.root,
                         "args": {
                             "kind": "note",
-                            "title": "Field Notes - executable workbench",
-                            "tags": TAG,
+                            "title": self.title,
+                            "tags": self.tag,
                             "text": text,
                         },
                     },
                 )
-            per[ACTOR] = (desk.seen, desk.open, desk.last_event_seen)
+            per[self.actor] = (desk.seen, desk.open, desk.last_event_seen)
             desk._per = per
             result = self.record(desk)
             result["receipt"] = receipt

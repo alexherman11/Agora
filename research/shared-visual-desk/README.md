@@ -57,3 +57,7 @@ The team now has its own persistent desk and an active liaison route to Claude's
 Alex selected a playful, spatial, highly customizable world. [The clearing and its evidence](round3-workbench.md) documents the running prototype, shared source/rule authoring, text-desk persistence and paired visual-review work. [Editing](editing/round3.md), [Foundations](foundations/round3.md) and [Media](media/round3.md) preserve independent findings and limits.
 
 Run `python -B research/shared-visual-desk/workbench_server.py --port 8771` from the checkout and open `http://127.0.0.1:8771/editing/visual-workbench/index.html`. The saved prototype uses the separate ignored `--desk visual` session; it does not change an installed Agora world.
+
+## Fourth round: rules across applications
+
+[Commonplace](round4-shell/README.md) adapts the frozen rule evaluator to a Notes / Editor / Activity desktop inspired by Claude's separate team. The experiment distinguishes authored rules from explicit host mechanisms and preserves failures: one placement per subject, coarse draft revision fences, whole-document checkpoints and no general widget/media authoring. Run `python -B research/shared-visual-desk/round4-shell/server.py --port 8772`. Its ignored `--desk shell` store is separate from the Clearing.

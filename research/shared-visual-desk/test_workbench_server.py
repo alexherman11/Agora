@@ -70,6 +70,22 @@ class WorkbenchChecks(unittest.TestCase):
             self.store.save(first["revision"], {"state": {}})
         self.assertEqual(self.store.read()["document"], DOC)
 
+    def test_named_shell_store_is_isolated_from_visual(self):
+        visual = self.store.save(None, DOC)
+        before = self.store.path.read_bytes()
+        shell = Store(self.temporary.name, name="shell", tag="round4-shell",
+                      actor="shell-editor", title="Round four")
+        self.assertIsNone(shell.read()["document"])
+        saved = shell.save(None, DOC)
+        self.assertEqual(self.store.path.read_bytes(), before)
+        self.assertEqual(self.store.read()["revision"], visual["revision"])
+        output, refused = run(self.temporary.name, "shell", "reader",
+                              [f"read {saved['subject']}"])
+        self.assertFalse(refused, output)
+        self.assertIn("line one", output[0])
+        self.assertEqual(pickle.loads(shell.path.read_bytes()).world.events[-1]["by"],
+                         "shell-editor")
+
     def test_stale_second_writer_rejected(self):
         first = self.store.save(None, DOC)
         second = Store(self.temporary.name)

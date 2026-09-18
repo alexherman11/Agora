@@ -310,3 +310,20 @@ traffic with withheld pongs. Ruff passed for changed Python files. A sustained
 real GPT Live call after activation remains unverified. The UI-selection helper
 from the older docs-restoration source is absent here and did not cause the
 recorded failures in this process.
+
+
+## 2026-09-18: shared visual desk adaptation lab
+
+The isolated [Commonplace experiment](../research/shared-visual-desk/round4-shell/README.md)
+adapts the unchanged round-three rule interpreter to Notes, Editor and Activity.
+It is not installed in the native runtime. Rules express selection, draft/save,
+layout and classification; the explicit JavaScript controller supplies identity,
+admission, revision guards, history and projection. It has one placement per
+note, plain text editing and whole-document experimental desk checkpoints, not
+the native gateway's per-action application model. No native source, package or
+live Agora world was changed.
+
+Evidence: 41 evaluator/model checks, 12 independent boundary/controller probes,
+and 11 Python launcher/checkpoint checks pass; changed Python passes Ruff.
+Actual browser checks and remaining visual limitations are recorded in the lab
+report. Earlier Clearing state and Claude's separate desktop remain separate.
