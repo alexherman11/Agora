@@ -354,6 +354,121 @@ which fails the fair test too.
 `=` `contrast-min` is now **57 below AA** at 492 nodes, against 33 at 298. The one metric that has moved
 the wrong way on every pass continues to.
 
+---
+
+# The lens: the agreement check made structural
+
+`http://localhost:8780/lens.html?session=lens&as=iris&lens=notes`, 14:51, 1280x800 @1.5x.
+Script: `checks/lens-agreement.js`. Scene from `/api/scene`.
+
+Until now "does the screen say what the text says" was a **word diff** — the words visible in a window
+against the words in its `text()` panel. That is a weak check: it cannot tell a missing node from a
+reworded one, cannot see a node painted that the text never mentioned, and says nothing about roles,
+gestures or boxes. With a scene there is a tree on both sides, so the question becomes structural.
+
+## First finding: there is no join
+
+`=` The painter does not put the scene's `key` into the DOM. I enumerated every attribute on every
+painted node; the complete set is `lang, charset, name, content, rel, href, id, class, data-drag,
+style, contenteditable, src`. No `data-key`, no id carrying it.
+
+`~` So I cannot **join** the two trees, only **walk them in parallel** and assume the nth painted child
+is the nth scene child — which is the very thing the check is meant to prove. Every number below is
+therefore weaker than it looks, and one mismatch mid-list would cascade into everything after it.
+One line in the painter (`data-key` on every node) turns this whole file from an argument into a
+proof. Asked as `to-jeff`.
+
+## The structural check
+
+| question | result |
+|---|---|
+| every scene node painted | `=` **38 of 38 matched**, 0 unmatched, 0 unmatchable |
+| nothing painted that is not in the scene | `=` **0 extra painted nodes** (38 scene, 38 painted) |
+| every role resolves to a real style class | `=` **8 roles, 0 unresolved** — window, titlebar, windowname, meta, card, title, body, tag |
+| every declared gesture live | `=` **16 declared (drag, edit), 0 dead**, 0 undeclared live elements |
+| boxes where the scene says | `=` **8 boxed nodes, 0 wrong.** Every one exact: `510,353,449,511` said, `510,353,449,511` painted; dw=0, dh=0 on all eight |
+
+`=` Two roles resolve but are **inert**: `windowname` and `title` compute to a class indistinguishable
+from body text — same size, same colour, no background, no border, no padding. The role exists, the
+class exists, and the paint does not differ. `~` A role that resolves to nothing is a different defect
+from a role that does not resolve, and only the second one was on Jeff's list.
+
+## The ten checks on lens.html — is it true by construction?
+
+Jeff's claim: type-scale and named-colour discipline pass by construction, because the painter has no
+other source of look.
+
+**It holds, and further than claimed.**
+
+| check | | result |
+|---|---|---|
+| `type-scale` | **PASS** | `=` **3 sizes: 11/13/15.** On the real desktop this has never passed |
+| `contrast-min` | **PASS** | `=` **min 5.58:1, 0 below AA.** This has failed on *every* pass of the real desktop, and got worse on every one |
+| `token-reach` | **PASS** | `=` 10 colour tokens, 1/1 zones use only them |
+
+`~` Contrast passing is the result I did not expect and the most interesting one. It is the metric that
+has moved the wrong way on every single pass since pass 1 — 0 → 25 → 26 → 33 → 57 below AA — because
+every new hand-written app brought new hand-picked greys. A painter with no other source of colour
+cannot do that. **The style language did not fix cohesion by persuading four authors; the lens fixed
+it by removing the opportunity.**
+
+**What is still not true by construction:**
+
+| check | | result |
+|---|---|---|
+| `grid-8` | FAIL | `=` **0/3.** `r-window` height 940.5, `r-titlebar` height 39.17, `r-windowname` 42.26x22.5 |
+| `clipped-unsaid` | FAIL | `=` 8, all of them `r-body.clamp` |
+| `motion` | FAIL | `=` 0 transitions |
+| `window-management` | FAIL | `=` resize 0/1, minimise 0/1, maximise 0/1, close 0/1, drag 0/1 |
+| `scroll-and-selection` | FAIL | `=` 3 scrollable regions, 2 with no visible bar |
+| `text-rendering` | FAIL | `=` 10 of 17 text runs on a sub-pixel baseline |
+| `focus-visible`, `named-controls` | ? | `=` **no focusable controls at all** — the lens paints editable divs and drag targets, never a button |
+
+`=` The `grid-8` result is the sharpest boundary in the whole experiment. **Where the scene states a
+box, the paint is exact to the pixel — all eight cards, dw=0, dh=0. Where the scene is silent, the
+browser computes flow and lands off-grid — 940.5, 39.17, 22.5.** The scene is authoritative exactly as
+far as it speaks, and no further.
+
+## Where the paint still differs from what the text says
+
+These are the measured facts the scene does not have. They are the candidates for flowing back from
+the painter as `~` observations — the eyes protocol made structural.
+
+`=` 12 paint-only facts on this one small lens:
+
+1. **Clamping actually biting.** `=` 8 `r-body` nodes carry `clamp`; the scene says `clamp 3`, which is
+   an *instruction*. Whether it *bit* — whether text was really cut — only the painter knows. `=` One
+   (`"An application autho…"`) both clamps and overflows.
+2. **Line counts.** `=` `r-title "Rendering, from one scene"` wraps to **2 lines**; the scene says one
+   string. Wrapping is invisible to the text printer.
+3. **Offscreen.** `=` 2 nodes are outside the viewport, including `r-title "rule r4: accept tria…"`.
+   The printed text lists them with no indication that they cannot be seen.
+4. **Scroll extent.** `=` `MAIN` is 1701x941 inside 753x785 — more than half the scene is off to the
+   right and below, and `=` 2 of the 3 scrollers have no visible bar.
+
+`~` All four are the same shape: **the scene says what is intended, the paint knows what happened.**
+A `clamp 3` is a wish; "this was cut at 2 of 4 lines" is a fact. The honest scene needs a second
+channel, from painter back to text, and every item in it is a `~` or a `=` with conditions — which is
+precisely the vocabulary this studio already built for me.
+
+## How it looks
+
+`~` **Calm, and generic does not mean ugly.** The painted side is a white canvas with cards at their
+world positions, one hairline border, one type family, three sizes, comfortable spacing; the right
+half is the text printer's output in monospace. Side by side they are legibly the same thing, which is
+the entire point and it lands. I would not have guessed this window was drawn by a painter with no
+knowledge of notes, cards, or canvases.
+
+`~` What it is missing is not beauty, it is **furniture**. There is no window chrome — nothing to
+resize, minimise, maximise or close; `=` not one button on the page; nothing to focus with a keyboard.
+It reads less like an application window than like a **printed page of an application window**. That
+is a fair state for v0 and it is the honest description: the lens has solved the inside of the window
+and has not yet been asked about the edge of it.
+
+`~` And against Alex's standard specifically: this is the first surface I have measured all week that
+passes type, contrast and colour cohesion **at the same time**. Eleven lines of lens did what four
+rounds of persuading four authors did not.
+
 ## Does it read as calm, normal desktop software yet?
 
 `~` Mine, by hand, at pass 9. **Nearly, in the windows. Not yet, in the shell.**

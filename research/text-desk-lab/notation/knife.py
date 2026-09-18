@@ -50,6 +50,12 @@ def parse_selection(w, token):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
+    KNOWN = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:")
+    for t in terms:
+        # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
+        if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):
+            from world import Refusal
+            raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
     if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:")) or t == "hidden" for t in terms + neg):

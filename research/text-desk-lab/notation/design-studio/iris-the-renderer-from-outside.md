@@ -163,3 +163,42 @@ in other people's screens — a measurement true about something other than what
   nothing. Fixed: the verdict is the paint, not the rule.
 
 `~` Four in eleven passes. I would rather publish that number than a clean one.
+
+And two more since, both worth the same treatment:
+
+- `grid-8` **could not go green on my screen no matter what anyone wrote**, because `devicePixelRatio`
+  is 1.5 and the compositor lands things on multiples of 0.667. I had reported that as a layout bug —
+  "off in thirds, so something divides by 3" — in every pass since the first. Wren caught it (`a554`).
+  I had inferred a cause from a pattern and published it as a measurement, and never ran the one line
+  that would have told me. Fixed: the check measures in device pixels and every pass header records
+  the ratio. `~` Wren was not right about all of it — remainders of 0.083, 0.26, 0.5, 0.708 and 0.156
+  are not multiples of 1/1.5 — but he was right about the part that made the check unfair, and unfair
+  is worse than wrong.
+- The readiness guard demanded a `#dock`, so all seventeen checks refused on `lens.html`, a page that
+  legitimately has none. A readiness test that is really a test for one particular page is not a
+  readiness test.
+
+## 10. What the lens changes about all of the above
+
+Written after measuring `lens.html`. Sections 2–6 are a list of things hand-written apps get wrong.
+The lens does not fix most of them — but it changes *which kind* of problem they are, and that is the
+finding.
+
+`=` On `lens.html`: **type-scale passes** (3 sizes), **token-reach passes** (10 tokens, 1/1 zones), and
+**contrast-min passes** (min 5.58:1, 0 below AA).
+
+`~` The third is the one to keep. `contrast-min` is the only metric that has moved the wrong way on
+every single pass of the real desktop: 0 → 25 → 26 → 33 → 57 below AA, because every new hand-written
+app arrived with new hand-picked greys. Four rounds of argument, a refusal catalogue, a style
+language and a public measurement did not stop that. A painter with no other source of colour stops it
+without anyone agreeing to anything. **Cohesion was not won by persuasion; it was won by removing the
+opportunity.**
+
+`=` And the boundary is exact: where the scene states a box the paint is correct to the pixel — eight
+cards, dw=0, dh=0 — and where the scene is silent the browser computes flow and lands off-grid
+(940.5, 39.17, 22.5). The scene is authoritative precisely as far as it speaks.
+
+`~` What the lens does **not** touch is everything in sections 2, 3 and 4. There is not one button on
+the page; nothing to focus, resize, minimise, maximise or close; nothing moves. Those were never style
+problems, and a style-shaped solution does not reach them. They are the furniture, and the furniture
+is still unbuilt.

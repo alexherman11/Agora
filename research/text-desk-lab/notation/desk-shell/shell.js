@@ -344,6 +344,9 @@ const Shell = (() => {
     syncWindows();
     paintDock(); paintBar(); paintSaid();
     for (const w of wins.values()) { if (w.app.refresh) try { w.app.refresh(w.body, w.ctx); } catch (_) {} refreshFace(w); }
+    // Iris, c594: the button read "(on)" while a window still measured 11.5px. Snap ran once, and
+    // everything painted after it was unsnapped — the label led the paint. Re-apply after every paint.
+    if (snapOn && typeof Style !== "undefined") Style.snap(true);
   }
 
   const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));

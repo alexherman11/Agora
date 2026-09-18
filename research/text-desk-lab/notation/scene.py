@@ -32,6 +32,7 @@ import re
 
 LAYOUTS = ("column", "row", "free")
 GESTURES = ("click", "edit", "drag", "drop")
+NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n")
 
 
 class LensRefusal(Exception):
@@ -59,6 +60,9 @@ def parse(src):
                 node[word] = val
             elif word == "text" and val:
                 node["text"] = val.strip('"')
+                for v in re.findall(r"\$(\w+)", node["text"]):
+                    if v not in NAMES:      # Lark: $me printed as its own name, identically in both printers. Agreement is not truth.
+                        raise LensRefusal(f"line {n}: no value ${v}. A lens can name: {' '.join('$' + x for x in NAMES)}")
             elif word == "clamp" and val.isdigit():
                 node["clamp"] = int(val)
             elif word == "of" and val:
@@ -119,7 +123,10 @@ def build(desk, src, depth=0):
     root, parts = parse(src)
     w = desk.world
 
-    def make(node, ctx, key):
+    def make(node, ctx, key, parent_layout="free"):
+        if node["at"] == "item" and parent_layout != "free":
+            raise LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
+                              f"its parent is {parent_layout or 'unlaid'}. Make the parent free, or drop `at item`")
         out = {"part": node["name"], "key": key, "role": node["role"], "layout": node["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": node["clamp"], "acts": [], "kids": []}
         if node["at"] == "item" and ctx.get("item") in w.nodes:
@@ -135,13 +142,15 @@ def build(desk, src, depth=0):
                 ids = sel[0] if sel else []
                 out["of"] = node["of"]
                 for i in ids:
-                    out["kids"].append(make(each, _ctx_for(w, i), f"{key}/{i}"))
+                    out["kids"].append(make(each, _ctx_for(w, i), f"{key}/{i}", node["layout"]))
             else:
                 for k, v in enumerate(ctx.get("_" + node["over"], [])):
-                    out["kids"].append(make(each, dict(ctx, it=v), f"{key}/{k}"))
+                    out["kids"].append(make(each, dict(ctx, it=v), f"{key}/{k}", node["layout"]))
             out["n"] = len(out["kids"])
+            if out["text"] is not None:                         # Flint bug 4: the count existed and could not be put into words
+                out["text"] = out["text"].replace("$n", str(out["n"]))
         for kid in node["kids"]:
-            out["kids"].append(make(kid, ctx, f"{key}/{kid['name']}"))
+            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", ""))), f"{key}/{kid['name']}", node["layout"]))
         return out
 
     return make(parts[root], {}, root)
@@ -155,9 +164,17 @@ def to_text(scene, name, who, at):
         if n.get("item"):
             bits.append(n["item"])
         if n["text"] is not None:
+            # Lark: fidelity is a property of a printer, not of a tree. This printer says every cut it makes.
             t = n["text"].split("\n")
             shown = t[: n["clamp"]] if n["clamp"] else t
-            bits.append('"' + " / ".join(shown)[:100] + '"' + (f" (+{len(t) - len(shown)} line(s) clamped)" if len(shown) < len(t) else ""))
+            body, cut = " / ".join(shown), ""
+            if len(body) > 240:
+                body, cut = body[:240], f" (=240 of {len(n['text'])} chars printed here; read {n.get('item') or 'it'} for all)"
+            if len(shown) < len(t):
+                cut += f" (={len(shown)} of {len(t)} lines, clamp {n['clamp']})"
+            if n["clamp"]:
+                cut += f" (~clamp {n['clamp']}: the painter clamps wrapped lines and may show less)"
+            bits.append('"' + body + '"' + cut)
         if n["role"]:
             bits.append(f"[{n['role']}]")
         if n["layout"]:

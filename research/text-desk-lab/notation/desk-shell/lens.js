@@ -1,4 +1,6 @@
 // lens.js : the generic painter. OWNER: Jeff.
+// LINE BUDGET (Wren's rule): 150 lines, ever. Each new scene word costs lines here; at the ceiling a word must
+// be removed to add one. This is the guard against growing into a worse HTML that cannot be argued around.
 // It paints a scene tree from /api/scene and sends gestures back as desk command lines. It knows the scene
 // vocabulary (layout, role, text, clamp, box, acts) and nothing else: no app, no kind, no colour, no size.
 // If a lens needs something this file cannot paint, the answer is a new scene word argued for on the studio
@@ -24,6 +26,7 @@
 
   function make(n) {
     const el = document.createElement("div");
+    el.dataset.key = n.key;      // Iris: with the key on the paint, agreement is a join, not two trees walked side by side
     if (n.role) el.className = Style.roleClass(n.role);
     if (n.layout) el.classList.add("l-" + n.layout);
     if (n.box) { el.classList.add("boxed"); Object.assign(el.style, { left: n.box[0] + "px", top: n.box[1] + "px", width: n.box[2] + "px", height: n.box[3] + "px" }); }

@@ -134,14 +134,19 @@ const check = (id, fn) => CHECKS.push({ id, fn });
 // "4 pass" against a page that had not finished booting: 0 font sizes, no text, no dock.
 // So: nothing content-shaped may return a verdict until the shell is actually up.
 // Readiness is itself a measured check, and it fails loudly rather than waiting.
+// Generalised 2026-09-18: the guard originally demanded a #dock, which made all seventeen
+// checks refuse on lens.html — a page that legitimately has no dock. A readiness test that
+// is really a test for one particular page is not a readiness test.
 const MIN_LEAVES = 6;
+const ROOTS = '[class*=dock],#paint,#stage,.r-window,[class*=window]';
 function notReady() {
   const n = leaves().length;
-  if (n >= MIN_LEAVES && document.querySelector('[class*=dock]')) return null;
+  const root = document.querySelector(ROOTS);
+  if (n >= MIN_LEAVES && root) return null;
   return {
     mark: '?', ok: null,
-    value: 'page not ready (' + n + ' text leaves, dock ' + (document.querySelector('[class*=dock]') ? 'present' : 'absent') + ')',
-    detail: 'extent: everything. Re-run when the shell has booted; this is not a pass.'
+    value: 'page not ready (' + n + ' text leaves, painted root ' + (root ? 'present' : 'absent') + ')',
+    detail: 'extent: everything. Re-run when the page has painted; this is not a pass.'
   };
 }
 
