@@ -10,27 +10,43 @@
 html, body { height: 100%; margin: 0; }
 body { display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
 
-#bar { display: flex; align-items: center; gap: var(--t-gap); }
+/* grid-8: heights are declared in gap multiples so the layout never depends on line-box rounding.
+   Iris measured every miss "in thirds" (718.67, 44.17, 72.83) — that is a 1.5x device pixel ratio
+   snapping CSS pixels to 2/3, not a layout bug I can remove; what I CAN remove is anything whose
+   size comes from content. These four do not. */
+#bar { display: flex; align-items: center; gap: var(--t-gap); height: calc(var(--t-gap) * 5);
+       padding-left: var(--t-gap); padding-right: var(--t-gap); }
+#bar button { background: transparent; border: 0; font: inherit; cursor: pointer; }
 #bar .grow { flex: 1; }
 #bar .state { display: flex; align-items: center; gap: var(--t-gap); }
 
 #stage { position: relative; overflow: hidden; }
 
-#dock { display: flex; align-items: flex-end; justify-content: center; }
+#dock { display: flex; align-items: center; justify-content: center; height: calc(var(--t-gap) * 8); }
 .dockitem { display: grid; justify-items: center; border: 0; background: transparent; font: inherit; cursor: pointer; }
 .dockitem .glyph { display: block; }
 
 .window { position: absolute; display: grid; grid-template-rows: auto 1fr; overflow: hidden; min-width: 280px; min-height: 160px; }
-.titlebar { display: flex; align-items: center; cursor: grab; user-select: none; }
+.titlebar { display: flex; align-items: center; cursor: grab; user-select: none; height: calc(var(--t-gap) * 5); }
 .titlebar .grow { flex: 1; }
 .titlebar button { border: 0; background: transparent; font: inherit; cursor: pointer; }
 .window .body { overflow: auto; position: relative; }
-.window .astext { margin: 0; overflow: auto; white-space: pre-wrap; }
+/* The as-text panel is the ONE surface whose whole job is to be complete (Flint, a515: Iris read
+   "...this is the idea space Notes draw" at 640px). It must wrap, never clip, and if it ever does
+   clip, shell.js appends a footer saying how much. */
+.window .astext { margin: 0; overflow: auto; white-space: pre-wrap;
+  overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
 .window .grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
 .window .grip::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px;
   border-right: 1px solid var(--t-line); border-bottom: 1px solid var(--t-line); }
 
-#said { position: absolute; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+/* said sits UNDER the bar and ABOVE the dock, never over either (Iris, pass 3: "470x48 overlapping
+   the top bar ... a debug console taped over the chrome, and the first thing I see"). */
+#said { position: fixed; display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+  right: var(--t-gap);
+  top: calc(var(--t-gap) * 6);                  /* the bar is 5 gaps tall; never cover it */
+  bottom: calc(var(--t-gap) * 9);               /* the dock is 8 gaps tall; never cover it either */
+  width: min(520px, 46vw); z-index: 99999; }
 #said .scroll { overflow: auto; }
 #said .line { display: grid; }
 #said button { border: 0; background: transparent; font: inherit; cursor: pointer; }
@@ -51,3 +67,11 @@ body { display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
 #stage.hasoff::after { content: ""; position: absolute; inset: 0; pointer-events: none;
   border: 3px solid transparent; border-image: repeating-linear-gradient(45deg,
     var(--t-warn) 0 6px, transparent 6px 12px) 3; }
+
+/* The shell's own failure surface. A missing part subtracts itself and says so; it never stops the
+   boot (Lark, a474). If the style never loaded, this is the only styled thing on the page. */
+#boot { position: fixed; left: 0; right: 0; top: 0; z-index: 100000;
+  font: 13px/1.5 ui-monospace, Consolas, monospace; color: #14171A; padding: 8px 12px;
+  background-color: #fff; background-image: repeating-linear-gradient(45deg,
+    transparent 0 5px, #A24E2C 5px 6px); }
+#boot > span { background: #fff; padding: 0 6px; }

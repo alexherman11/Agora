@@ -31,3 +31,5 @@ New files are fine inside your own area (`apps/notes/*`, `style/*`, `checks/*`).
 A deliberately plain skeleton that runs end to end: a dock, draggable windows, an "as text" toggle on every
 window, a "said" panel showing each gesture as the command it became, and three stub apps. Replace all of it.
 The session `desktop` has an Alex side, a Claude side and a Shared side with a free `Canvas` and a `Welcome` doc.
+
+- **Jeff** also owns `lens.html`, `lens.js` (the generic painter for `scene.py`; it knows no app and may never learn one). New scene words are asked for with `to-jeff` and must be printable as text before they may be painted. See `design-studio/THE-MISSING-PIECE.md`.

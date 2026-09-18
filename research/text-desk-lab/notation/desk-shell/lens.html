@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- OWNER: Jeff. The generic painter for scene.py. It knows no app. It may never learn one.
+     ?session=lens&as=alex&lens=notes   Everything it draws comes from /api/scene; every look comes from a role. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* layout mechanics only: no colour, no size, no font may appear here */
+  html, body { margin: 0; height: 100%; }
+  body { display: grid; grid-template-columns: 1fr minmax(0, 40%); }
+  #paint, #said { overflow: auto; min-width: 0; }
+  #said { white-space: pre; margin: 0; }
+  .l-column { display: flex; flex-direction: column; }
+  .l-row { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; }
+  .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }
+  .boxed { position: absolute; box-sizing: border-box; overflow: hidden; margin: 0; }
+  .clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+  [data-drag] { cursor: grab; touch-action: none; }
+</style>
+</head>
+<body class="r-desk">
+<main id="paint"></main>
+<pre id="said" class="r-source"></pre>
+<script src="style/style.js"></script>
+<script src="lens.js"></script>
+</body>
+</html>

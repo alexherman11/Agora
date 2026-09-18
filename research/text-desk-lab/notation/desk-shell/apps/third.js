@@ -35,21 +35,71 @@
     const snap = Desk.snapshot, ev = view.events, sections = [];
     if (!snap) return { sections: [S("Together", [{ mark: "?", text: "no snapshot yet", acts: [] }])] };
 
-    // --- presence: derived from who acted, and how recently, in acts
+    // --- presence. Two different facts, deliberately not merged into one word.
+    //   HANDS: where each actor last ACTED (from the event log).
+    //   EYES : how far each actor has READ (snapshot.readers, which Jeff built after my round-four ask).
+    // readers is a reading position, NOT attendance: someone caught up may have closed the tab a second
+    // ago, and someone far behind may be sitting there thinking. So it never prints "here". It prints
+    // "caught up" or "N behind", which is what it actually measures.
     const byActor = {};
     ev.forEach((e, i) => { (byActor[e.by] = byActor[e.by] || []).push(i); });
-    const presence = Object.keys(byActor).sort().map(a => {
-      const last = byActor[a][byActor[a].length - 1], ago = ev.length - 1 - last;
-      const you = a === ME ? " (you)" : "";
-      return { mark: "=", text: `${a}${you} · last act ${ago === 0 ? 'just now' : ago + (ago===1?' act':' acts') + ' ago'} · ${byActor[a].length} act${byActor[a].length===1?'':'s'} today`,
+    const readers = snap.readers || {};
+    const everyone = [...new Set([...Object.keys(byActor), ...Object.keys(readers)])].sort();
+    const presence = everyone.map(a => {
+      const acts = byActor[a] || [];
+      const ago = acts.length ? ev.length - 1 - acts[acts.length - 1] : null;
+      const at = readers[a];
+      const behind = at === undefined ? null : snap.events_total - at;
+      const hands = ago === null ? "has not acted" : ago === 0 ? "acted just now" : `acted ${ago === 1 ? "1 act" : ago + " acts"} ago`;
+      const eyes = behind === null ? "?not a reader of this world"
+                 : behind <= 1 ? "=read up to now"
+                 : `=${behind} behind`;
+      return { mark: "=", text: `${a}${a === ME ? " (you)" : ""} · ${hands} · ${eyes}`,
                acts: a === ME ? [] : [`find ?${a}`] };
     });
-    presence.push({ mark: "?", text: "nobody's presence is known between acts: the desk records who acted, not who is here", acts: [] });
+    presence.push({ mark: "?", text: "none of this is attendance. the desk knows who ACTED and how far each has READ; " +
+      "it does not know who is sitting there. a reader caught up may have closed the tab a second ago", acts: [] });
     // A version stamp, so an observer's report can name the world it was true of. Iris, a447: "until a
     // request can name a version, my answers are true of a page that may no longer exist." events_total
     // is that version, it is free, and a window that does not print it cannot be quoted safely.
     presence.unshift({ mark: "=", text: `this window is true of ${Desk.session} at events_total=${snap.events_total} · ${ev.length} acts read`, acts: [] });
     sections.push(S("Who is here", presence));
+
+    // --- elsewhere: worktrees. A worktree is an ELECTED ABSENCE - not the veil (which hides a place)
+    // and not the bench (which shares one); it forks TIME, and what returns is a signed sequence.
+    const wt = snap.worktree;
+    const elsewhere = [];
+    if (wt) {
+      elsewhere.push({ mark: "=", text: `you are in a worktree · forked from ${wt.base} at event ${wt.base_events} by ${wt.by}` +
+        ` · ${wt.journal} command${wt.journal === 1 ? "" : "s"} journalled`, acts: [`worktree`] });
+      elsewhere.push({ mark: "!", text: `nothing you do here is visible in ${wt.base}. the others cannot collide with you ` +
+        `and cannot see you working. when you merge, all ${wt.journal} land at once, signed by you`,
+        acts: [`worktree diff ${Desk.session.split("@")[1] || ""}`.trim()] });
+    } else {
+      elsewhere.push({ mark: "?", text: `this snapshot does not list the worktrees of ${Desk.session}, so I cannot tell you ` +
+        `whether anyone is working elsewhere right now, nor how much they have journalled. the desk knows: ` +
+        `the 'worktree' command prints it. to-jeff: put the list in the snapshot`, acts: [`worktree`] });
+    }
+    sections.push(S("Elsewhere", elsewhere,
+      "a worktree is the only way to be absent on purpose here, and it is the one absence this window cannot see"));
+
+    // --- bursts: a merge lands as N events by one actor at one moment and is INDISTINGUISHABLE from
+    // N minutes of steady work, because a merged event carries no provenance (via says 'retitle', never
+    // 'worktree:name'). So this is ~ my reading of the shape, never = a fact. to-jeff: via=worktree:<name>.
+    const bursts = [];
+    let run = [];
+    const flush = () => {
+      if (run.length >= 4 && run[0].by !== ME)
+        bursts.push({ mark: "~", text: `${run[0].by} · ${run.length} acts in a row, no other hand between them ` +
+          `(${[...new Set(run.map(e => e.verb))].join(", ")}) — this is the SHAPE of a worktree merge, but the events ` +
+          `do not say, so it may equally be ${run.length} ordinary acts`,
+          acts: [`history`, `why ${(run[run.length - 1].changed || [])[0] || run[run.length - 1].target}`] });
+      run = [];
+    };
+    ev.forEach(e => { if (run.length && run[0].by !== e.by) flush(); run.push(e); });
+    flush();
+    if (bursts.length) sections.push(S("Bursts", bursts.slice(-3),
+      "a merge is a bulk act wearing ordinary clothes. until an event says it was replayed, nobody can tell one from an afternoon"));
 
     // --- needs you: never folded. Anything by someone else that touches what I touched FIRST.
     // Bug found by running this against the real log from a terminal: I was matching any event by anyone
@@ -142,6 +192,17 @@
       if (s.note) L.push(`  ( ${s.note} )`);
       L.push("");
     });
+    // Iris, c518: the screen projection ends with a "Screen vs text" section that this projection cannot
+    // contain, because it is computed from the rendered DOM — so the old verdict was false about the row it
+    // was written in. Rather than pretend the two views match everywhere, this projection declares the one
+    // place they differ, by construction, and says neither view can verify it alone.
+    L.push("## Screen vs text");
+    L.push("  ! not comparable from here. The screen projection runs the check (it reads the rendered DOM)");
+    L.push("    and prints the verdict in a section this projection does not have. The rows above are the");
+    L.push("    ones compared; THIS section is the one place the two views differ, by construction, and");
+    L.push("    neither view can verify it alone.");
+    L.push("  ( an audit that counts itself is not an audit — Iris, c519 )");
+    L.push("");
     return L.join("\n");
   }
 
@@ -203,11 +264,22 @@
       if (!txt.includes(r.text)) missing.push(`text() is missing: ${r.text}`);
       r.acts.filter(Boolean).forEach(a => { if (!screen.includes(a)) missing.push(`screen omits the act: ${a}`); });
     }));
+    // Iris, c518/c519: this section appeared on screen and NOT in text(), so "every row appears in both
+    // projections" was false about the row it was written in — the self-check had exempted itself, which
+    // she called "the commonest way an audit goes wrong". Her repair is better than adding the heading:
+    // MAKE THE LINE STATE ITS SCOPE — what it compared, and what it did not.
+    const rowCount = m.sections.reduce((n, s) => n + s.rows.length, 0);
     const h = document.createElement("h2"); h.textContent = "Screen vs text"; root.appendChild(h);
     const d = document.createElement("div"); d.className = "row" + (missing.length ? " loud" : "");
     d.innerHTML = `<span class="mk ${missing.length ? "bang" : ""}">${missing.length ? "!" : "="}</span><span class="what">${
-      missing.length ? esc(missing.join(" · ")) : "=every row of the model appears in both projections"}</span>`;
+      missing.length ? esc(missing.join(" · ")) : esc(`=${rowCount} model rows compared; all appear in both projections`)}</span>`;
     root.appendChild(d);
+    const ex = document.createElement("div"); ex.className = "row loud";
+    ex.innerHTML = `<span class="mk bang">!</span><span class="what">` + esc(
+      "not compared: this section itself. It is written after the comparison and exists only in the screen " +
+      "projection; text() carries its own statement of the same exemption. An audit that counts itself is " +
+      "not an audit (Iris, c519).") + `</span>`;
+    root.appendChild(ex);
   }
 
   // ---------------------------------------------------------------- the app

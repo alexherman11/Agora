@@ -16,10 +16,12 @@ token gap      = 8
 token ramp     = 1.15
 token text     = ui 15/1.5
 
+token mark     = #7A5C2E      # a fourth ink, for honesty marks only. quiet but findable.
+token sheet    = #FFFFFF      # the page inside a window: a sheet, not the window's own surface
 token line     = ink at 20%
 token faint    = ink at 10%
-token quiet    = ink at 70%
-token hush     = ink at 55%
+token quiet    = ink at 82%
+token hush     = ink at 70%
 
 # ---- the desktop chrome ----
 # Iris: "uniformity is what makes it read as one surface, and what makes it read as wallpaper."
@@ -49,6 +51,8 @@ role meta      : text down 2 tracked, hush
 role tag       : text down 2 tracked, accent, on accent at 12%, pad gap /2, corner gap /4
 role cut       : text down 2 tracked, warn
 role said      : on card, text down, quiet, pad gap, edge faint, corner gap
+role mark      : text down medium, mark, on mark at 10%, pad gap /4, corner gap /4
+role sheet     : on sheet, ink, text, pad gap x3, edge faint, corner gap /2
 role source    : text.mono down, quiet
 role refusal   : text.mono down, warn, on warn at 8%, pad gap, corner gap /2, edge warn at 40%
 
@@ -76,3 +80,21 @@ theme dark of calm
   token ink    = #E9E7E2
   token accent = #93B4CC
   token warn   = #D98A63
+  token mark   = #C9A96A
+  token sheet  = #1E2226
+
+# ---- a SECOND theme, deliberately not "dark". This is the limit test. ----
+# A theme may redefine tokens and never roles, so it may change the palette, the family, the
+# size, the ramp ratio and the spacing step — but it can never change the SHAPE: what has an
+# edge, what has a corner, what sits on what. See wren-10 §5.
+
+theme print of calm
+  token paper  = #F3EFE7
+  token card   = #FBF8F2
+  token sheet  = #FFFFFF
+  token ink    = #221E17
+  token accent = #6B4A2F
+  token mark   = #7A2E2E
+  token text   = serif 17/1.62
+  token ramp   = 1.26
+  token gap    = 10

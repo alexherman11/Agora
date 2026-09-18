@@ -39,7 +39,7 @@ def _num(i):
 def record(desk, line, actor, before_ids, events_before):
     """Called after every dispatched line. In a worktree, remember the lines that changed the world."""
     wt = getattr(desk, "_wt", None)
-    if wt is None or wt.get("merged"):
+    if wt is None:
         return
     w = desk.world
     head = line.strip().split(" ", 1)[0].lower()
@@ -115,8 +115,11 @@ def handle(line, session, desk, actor):
                 out.append("  ! = the worktree also names this thing; merge will refuse there if someone else did it")
             return "\n".join(out), desk
         if sub == "merge":
-            if "merged" in wt:
-                raise ValueError(f"worktree {name} was already merged at event {wt['merged']}")
+            done = wt.get("merged_n", 0)                        # Moss lost work to a merge that closed the worktree for good:
+            todo = wt["journal"][done:]                         # a worktree stays open, and merge takes what is new since last time
+            if not todo:
+                raise ValueError(f"nothing to merge from {name}: " + ("no commands there yet" if not done else f"all {done} command(s) are already here")
+                                 + f". Work in {session}@{name}, then merge again")
             trial = pickle.loads(pickle.dumps(desk))
             w = trial.world
             keep = (trial.seen, trial.open, trial.last_event_seen, w.me)
@@ -127,10 +130,19 @@ def handle(line, session, desk, actor):
             for j in wt["journal"]:
                 for nid in w.nodes:
                     idx[(j["by"], nid)] = wt["base_events"]     # "since you saw it" means since the fork
-            mapping, first = {}, len(w.events)
-            for k, j in enumerate(wt["journal"], 1):
+            mapping, first = dict(wt.get("mapping", {})), len(w.events)      # ids renamed by an earlier merge stay renamed
+            for k, j in enumerate(todo, done + 1):
                 cmd = ID.sub(lambda m: mapping.get(m.group(1), m.group(1)), j["line"])
                 w.me = j["by"]
+                # Lark: the fence asks "changed since YOU saw it", and lets you through when you were both hands.
+                # A merge must ask "changed since the FORK saw it", whoever did it.
+                named = set(ID.findall(cmd))
+                for e in w.events[wt["base_events"]:first]:
+                    subj = (w.nodes.get(e["target"]) or {}).get("subject")
+                    if not e.get("undone") and e.get("merged") != name and e["verb"] not in ("create", "comment") and (e["target"] in named or subj in named):
+                        return (f"refused: merge of {name} stopped at command {k} of {len(wt['journal'])}; nothing was applied\n"
+                                f"  {j['by']}: {cmd}\n  {e['target']} changed here since the fork ({e['id']} {e['verb']} by {e['by']})\n"
+                                f"  worktree diff {name} shows both sides; redo that step in the worktree or here by hand"), desk
                 before = ids_of(trial)
                 r = trial.dispatch("desk", {"line": cmd})
                 text = r.get("text") or ""
@@ -142,12 +154,16 @@ def handle(line, session, desk, actor):
                 made = sorted(ids_of(trial) - before, key=_num)
                 mapping.update(dict(zip(j["created"], made)))
             trial.seen, trial.open, trial.last_event_seen, w.me = keep
+            for e in w.events[first:]:
+                e["merged"] = name                              # a merge is a bulk act; it should not wear ordinary clothes
             wt["merged"] = len(w.events)
+            wt["merged_n"] = len(wt["journal"])
+            wt["mapping"] = mapping
             _fork_path(session, name).write_bytes(pickle.dumps(fork))
             evs = w.events[first:]
             span = f"{evs[0]['id']}..{evs[-1]['id']}" if evs else "no events"
             renamed = " ".join(f"{a}→{b}" for a, b in mapping.items() if a != b)
-            return (f"ok merged {name}: {len(wt['journal'])} command(s) replayed as {span}, each signed by who made it"
+            return (f"ok merged {name}: {len(todo)} command(s) replayed as {span}, each signed by who made it"
                     + (f"\n  ids renamed on the way in: {renamed}" if renamed else "")
                     + "\n  each is an ordinary event: undo works on them one command at a time"), trial
         raise ValueError("worktree fork|diff|merge <name>, or worktree alone to list")

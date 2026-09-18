@@ -864,6 +864,15 @@ class DeskKnife(DeskMoo):
             self.vars = self.vars or {}
             self.vars[name] = self._resolve(val)
             return f"ok ${name} = {self.vars[name]}"
+        if cmd == "scene":
+            # the same tree the painter draws, printed: what is shown, where, and what each gesture would do
+            import scene
+            if not arg.strip():
+                raise Refusal("scene <lens name>. A lens is a note tagged lens; help scene")
+            try:
+                return scene.scene_for(self, arg.strip())[1]
+            except scene.LensRefusal as e:
+                raise Refusal(str(e))
         if cmd == "clock":
             return self.cmd_clock(arg)
         if cmd == "scripts":
@@ -915,6 +924,10 @@ class DeskKnife(DeskMoo):
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
   with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)""",
+        "scene": """scene <lens>: print the scene a lens makes of the world right now. The painter in the browser draws the very
+  same tree, so this is what the other person sees: each part, its words, its role, its place, and the desk
+  command each gesture would send. A lens is a note tagged lens; its text is the description (grammar: the
+  docstring of scene.py). Edit a lens with rewrite like any note; the picture follows.""",
         "worktree": """worktree: work apart from a shared desk, then come back as commands.
   worktree fork <name>    copy this world into <session>@<name>; enter it as its own session
   worktree                list them (inside one: where it came from and how much is journalled)

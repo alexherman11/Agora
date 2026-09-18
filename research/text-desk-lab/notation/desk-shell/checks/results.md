@@ -198,6 +198,13 @@ went from 0 failures to 26 — the desktop got more text, and the new text is qu
 (718.67, 44.17, 72.83, 22.5) — one `calc(…/3)` or a 3-column division is generating every one of them.
 It is a single fix in Wren's file that would turn a whole check green.
 
+> **! Retracted at pass 12.** The sentence above is wrong and was wrong in every pass that contains it.
+> `devicePixelRatio` on this screen is **1.5**, and 1/1.5 = 0.6667: the 0.667 remainders are the
+> compositor snapping CSS pixels to device pixels, not a `calc(…/3)` in anyone's file. Wren caught it
+> (`a554`). I inferred a cause from a pattern and published it as a measurement, and never checked the
+> one line that would have told me. The check has been corrected — see "Pass 12" — and it is left
+> visible here rather than edited away.
+
 ## What the instrument got wrong, and when
 
 **Pass 2, first attempt.** The script reported **4 pass** against the blank page: `type-scale`
@@ -222,6 +229,131 @@ excluded from every leaf query.
 Three instrument defects in nine passes, all of them the same family as the defects I report in the
 apps: a measurement that was true about something other than what it claimed to be about.
 
+---
+
+# Round five — seven more checks, and the renderer probed from outside
+
+Alex's question this round: *how are we rendering, and what are the limits?* Checks 11–18 exist to
+answer it from the outside, with numbers. They needed a running system rather than a picture.
+
+| check | asks | fails when |
+|---|---|---|
+| `token-reach` | does one declared token reach every zone | any zone paints text in a colour that is not a `:root` token |
+| `focus-visible` | can a keyboard user see where they are | focusing a control does not change its paint |
+| `motion` | does anything move | zero transition/animation declarations |
+| `window-management` | the affordances ordinary windows have | any of move / resize / minimise / maximise / close missing |
+| `scroll-and-selection` | the two things a redraw usually breaks | text that cannot be selected, scrollers with no bar |
+| `text-rendering` | families, baselines, figures | text on sub-pixel baselines, numeric columns without tabular figures |
+| `density` | how much of the desktop is doing anything | informational, never fails |
+
+Plus a two-phase **redraw probe** (`armProbe` / `readProbe`), which is not a check because it writes
+to the world. It is run in a worktree.
+
+## Pass 10 — 14:36:48 — round-five baseline
+
+1280x800 light — 323 nodes — **2 pass / 5 fail / 3 open**. Unchanged from pass 9: 12 sizes,
+min 3.62:1 with 26 below AA, grid 1/15, 3 clipped, `honesty-loudness` slipped back to 1 quiet mark.
+
+## Pass 11 — 14:41:22 — after the builders' round-five push
+
+1280x800 light — 298 nodes — **4 pass / 9 fail / 4 open** (nine failures because there are now
+seventeen checks, not because it got worse; see the trend).
+
+| check | | result |
+|---|---|---|
+| `type-scale` | FAIL | `=` **7 sizes** (was 12): 11/11.5/12/13/14/15/23; one fractional, 11.5, and only in Together. By zone: bar 2, dock 2, said 1, **Notes 3**, Together 6 |
+| `contrast-min` | FAIL | `=` min 3.62:1, 33 below AA |
+| `honesty-loudness` | PASS | `=` 11 marks, 0 quieter than what they qualify |
+| `grid-8` | FAIL | `=` **5/12** (was 1/15) |
+| `clipped-unsaid` | FAIL | `=` 2 |
+| `token-reach` | **PASS** | `=` **10 colour tokens; 6/6 zones use only them** |
+| `focus-visible` | FAIL | `=` focusing the first control does not change its paint, and **no `:focus` rule exists in any stylesheet**; 56/56 focusable controls have `outline:none` |
+| `motion` | FAIL | `=` **0** transition/animation declarations, no reduced-motion rule |
+| `window-management` | FAIL | `=` minimise 0/2, maximise 0/2; cascade step 24px |
+| `scroll-and-selection` | FAIL | `=` 2 scrollable regions, 2 blocks of text that cannot be selected |
+| `text-rendering` | FAIL | `=` 2 families (Inter, ui-monospace); **87 of 130 text runs on a sub-pixel baseline** |
+| `density` | ? | `=` 2 windows over 75% of the stage; occupied band 488px of 696px |
+| `dock-clearance`, `named-controls` | PASS | `=` 56/56 controls named |
+
+`=` The **`said` panel has moved off the bar** — it is now a right-hand panel at (752,48) 520x680,
+and `overBar` is null. That was the loudest problem of round four and it is fixed. `=` It now
+overlaps the two open windows by 16x464 and 48x464 instead, so the Together window's close button
+sits underneath it. `=` The dock lists **Notes, Together, said** — the **Editor is no longer in the
+dock**. `=` Bar 40px, dock 64px at y=736, windows at 48,64 and 80,88, all 720x464: the shell's own
+geometry is now entirely on the 8px grid. Every remaining `grid-8` failure is inside a window.
+
+## The redraw probe — what a text-substrate renderer costs you
+
+Run in `desktop@iris-probe`, a worktree, at 14:38–14:40. Each round: arm the page, make one
+`do create` from a terminal, read the page back.
+
+| what was held | survived a redraw? | evidence |
+|---|---|---|
+| scroll position | **yes** | 140 → 140; the scroller is the desk/body, which is never replaced |
+| caret + keyboard focus **in the Editor** | **yes** | `document.activeElement` unchanged, caret offset 12 → 12, text node identity preserved |
+| text selection **in the Editor's page** | **yes** | node still in document |
+| text selection **in a Notes card** | **NO** | `"3 near each other "` → `""` |
+
+`=` And the mechanism, measured rather than guessed: after the redraw the element I had selected in
+was **detached from the document** — `document.contains(node)` went `true` → `false`. Notes rebuilds
+its subtree on every world event; the Editor patches in place.
+
+`~` So the limit is not "the renderer loses your place". It is that **each app chooses, and two of
+them chose differently**, and the one that replaces its subtree silently destroys any selection held
+in it — including a selection held by a *reader* when *somebody else* acts. In ordinary desktop
+software, another person editing another document does not deselect your text. This is the clearest
+answer I have to "what are the limits": the limit is per-app, it is invisible until someone else
+moves, and there is no rule in the style language or in `OWNERS.md` that says which behaviour is
+correct.
+
+## Trend, passes 1 → 11
+
+| check | p1 | p3 | p7 | p10 | p11 |
+|---|---|---|---|---|---|
+| `type-scale` | 6 | 12 (4 frac) | 12 (4 frac) | 12 (4 frac) | **7 (1 frac)** |
+| `contrast-min` below AA | 0 | 25 | 26 | 26 | 33 |
+| `honesty-loudness` | ? | 1 quiet | **0** | 1 quiet | **0** |
+| `grid-8` | 1/10 | 1/15 | 1/15 | 1/15 | **5/12** |
+| `clipped-unsaid` | 1 | 3 | 3 | 3 | **2** |
+| `said` over bar | — | 470x48 | 516x48 | 516x48 | **none** |
+| `token-reach` | — | — | — | — | **6/6 PASS** |
+| `named-controls` | 4/4 | 48/48 | 45/45 | 47/47 | 56/56 |
+
+**Better, and substantially.** Type sizes 12 → 7, and Notes went from nine sizes to three. The grid
+went 1/15 → 5/12 and the whole shell is now on it. The `said` panel came off the bar. `token-reach`
+passes outright: ten colour tokens, six zones, no strays — colour cohesion is now a measured fact
+rather than an opinion, which is the first time anything Alex asked for has been.
+
+**Worse.** `contrast-min` 26 → 33 below AA. The desktop keeps growing text and the new text keeps
+arriving quieter than the old. This is the only metric that has moved the wrong way every single pass.
+
+**Newly visible, because nobody was measuring it before.** No `:focus` rule anywhere; nothing moves;
+no minimise or maximise; 87 of 130 text runs sit on sub-pixel baselines.
+
+## Pass 12 — 14:44:29 @1.5x — the grid check, made fair
+
+`=` 492 nodes — **4 pass / 10 fail / 3 open**.
+
+Wren's `a554` was right: `grid-8` could not go green on this screen no matter what anyone wrote,
+because `devicePixelRatio` is 1.5 and the compositor lands things on multiples of 0.667. I had been
+reporting that as a layout bug since pass 1.
+
+`=` The check now converts to **device pixels** before testing: a value that does not land on a device
+pixel fails as genuinely fractional; otherwise the tolerance is 1/dPR. `=` Every pass header now
+records the ratio, so each geometry claim states the condition it is true under — Wren's own round-one
+rule about measurements of renderings, applied to me a round late.
+
+`=` Result on the same screen, same moment: **grid-8 goes 5/12 → 8/19.**
+
+`=` What survives the fair test is still real, and this is the part Wren did not have: remainders of
+**0.083, 0.26, 0.5, 0.708, 0.156** are not multiples of 1/1.5 and no compositor produced them. They sit
+on `windowname` (y=73.08, w=42.26, h=22.5) and the dock items (x=549.708, w=52.156, 71.146) — things
+sized by their text rather than by the ramp. And `width=718.67` is 1.33px off the nearest multiple of 8,
+which fails the fair test too.
+
+`=` `contrast-min` is now **57 below AA** at 492 nodes, against 33 at 298. The one metric that has moved
+the wrong way on every pass continues to.
+
 ## Does it read as calm, normal desktop software yet?
 
 `~` Mine, by hand, at pass 9. **Nearly, in the windows. Not yet, in the shell.**
@@ -243,6 +375,24 @@ The shell is what breaks it, and it is three specific things, all measurable:
    false as a fact rather than as an opinion.
 
 None of the three is deep. The apps are further along than the frame they sit in.
+
+### Revised at pass 11 (round five)
+
+`~` **The frame has caught up.** Of the three things I named at pass 9, two are fixed: the `said`
+panel is off the bar, and the shell's own geometry is entirely on the 8px grid. The third, cohesion,
+is half fixed — colour passes outright, type went 12 sizes to 7.
+
+What now stops it being ordinary desktop software is no longer composition. It is the four things a
+desktop does that this one does not: `=` **no visible keyboard focus anywhere** (no `:focus` rule at
+all, 56 controls with `outline:none`); `=` **nothing moves** (0 transitions — every state change is
+an instant repaint, so a window opening and a window being replaced look identical); `=` **no
+minimise or maximise**, so windows can only cascade and be closed; `=` **87 of 130 text runs on
+sub-pixel baselines**, which is why the type reads slightly soft next to native chrome.
+
+`~` Those are ordinary omissions, not deep ones — but they are the difference between "a very good
+web page about a desktop" and "a desktop". The one that is *not* ordinary, and the one I would fix
+first, is the redraw destroying a selection in a rebuilt subtree, because it is the only defect here
+that another person's action inflicts on you.
 
 **Known limits of the eyes, carried from round three.** Screenshots come back scaled 0.625x, so
 fine detail needs a smaller viewport rather than a zoom; screenshots time out roughly one call in

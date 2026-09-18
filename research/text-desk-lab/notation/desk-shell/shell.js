@@ -14,13 +14,31 @@ const Shell = (() => {
   const stage = document.getElementById("stage"), dock = document.getElementById("dock"),
         bar = document.getElementById("bar"), said = document.getElementById("said");
   const wins = new Map();     // appearance id (or "view:<n>") -> window record
-  let z = 1, viewOnly = 0, styleSrc = "", lastRefusal = null, theme = "", sourceRev = 0;
-  const R = n => Desk.style.role(n);
+  let z = 1, viewOnly = 0, styleSrc = "", lastRefusal = null, theme = "", sourceRev = 0, snapOn = false;
+  const R = n => (typeof Style === "undefined" ? "" : Desk.style.role(n));
 
   // ---------- style ----------
+  // A missing part subtracts itself and says so; it never stops the boot (Lark, a474; Iris, a467,
+  // where `Style is not defined` left a blank white page that declared nothing). Everything below
+  // this line runs whether or not the style exists.
+  function bootSays(msg) {
+    let el = document.getElementById("boot");
+    if (!el) { el = document.createElement("div"); el.id = "boot"; document.body.prepend(el); }
+    el.innerHTML = `<span>${esc(msg)}</span>`;
+  }
   async function loadStyle() {
-    styleSrc = await (await fetch("style/calm.style")).text();
-    apply(styleSrc);
+    // ?style=off simulates the failure on purpose, so the guard is testable rather than hoped for.
+    if (new URLSearchParams(location.search).get("style") === "off") {
+      bootSays("style is off by request (?style=off): everything below is unstyled, and every app still works. this is the boot guard, on purpose.");
+      return;
+    }
+    if (typeof Style === "undefined") {
+      bootSays("style is not loaded: everything below is unstyled, and the apps still work. (Style is not defined — style/style.js did not run)");
+      return;
+    }
+    try { styleSrc = await (await fetch("style/calm.style?t=" + Date.now())).text(); }
+    catch (e) { bootSays("style/calm.style could not be fetched: everything below is unstyled. (" + e.message + ")"); return; }
+    if (!apply(styleSrc)) bootSays("the style did not parse, so none of it is installed: everything below is unstyled. open the style panel for the refusal.");
   }
   function apply(src) {
     try { Style.install(src, theme); lastRefusal = null; styleSrc = src; sourceRev++; }
@@ -49,6 +67,8 @@ const Shell = (() => {
     el.querySelector(".sub").className = "sub " + R("meta");
     el.querySelector(".sub").textContent = ctx.node ? ctx.node.id : "not in the world";
     const w = { key, app, ctx, el, body: el.querySelector(".body"), face: el.querySelector(".astext-face"), showing: "body" };
+    w.body.dataset.owner = app.id;                      // so Style.reach can say WHO drew an off-ramp size
+    el.dataset.owner = app.id;
     el.addEventListener("mousedown", () => { el.style.zIndex = ++z; paintBar(); });
     el.querySelector(".close").onclick = async (e) => {
       e.stopPropagation();
@@ -107,7 +127,10 @@ const Shell = (() => {
 
   function place() {
     const n = wins.size;
-    return { x: 48 + (n % 5) * 34, y: 24 + (n % 5) * 30, w: Math.min(720, stage.clientWidth - 120), h: Math.min(460, stage.clientHeight - 100) };
+    const g = (Style && Style.token && Style.token("gap")) || 8;           // the cascade is on the grid too
+    const snap8 = v => Math.round(v / g) * g;
+    return { x: snap8(48 + (n % 5) * g * 4), y: snap8(24 + (n % 5) * g * 3),
+             w: snap8(Math.min(720, stage.clientWidth - g * 15)), h: snap8(Math.min(464, stage.clientHeight - g * 12)) };
   }
 
   function drag(w) {
@@ -172,7 +195,7 @@ const Shell = (() => {
     stage.classList.toggle("hasoff", off > 0);
     bar.className = R("bar");
     bar.innerHTML =
-      `<span>${esc(Desk.session)}</span><span>·</span><span>you are ${esc(Desk.actor)}</span>
+      `<span>${esc(Desk.session)}</span>${snap.worktree ? `<span class="alarm"><span>worktree ${esc(snap.worktree)} — not the base world</span></span>` : ""}<span>·</span><span>you are ${esc(Desk.actor)}</span>
        <span>·</span><span>${esc(snap.clock && snap.clock.today || "no clock")}</span>
        <span>·</span><span>${wins.size} window${wins.size === 1 ? "" : "s"} open</span>
        ${viewOnly ? `<span class="alarm"><span>${viewOnly} not in the world</span></span>` : ""}
@@ -180,7 +203,8 @@ const Shell = (() => {
        ${others.map(o => `<span>·</span><span>${esc(o)}</span>`).join("")}
        ${Desk.offline ? `<span>·</span><span class="${R("cut")}">! server away — this picture is stale</span>` : ""}
        <span class="grow"></span><span class="${R("meta")}">world @${snap.events_total}</span>
-       <button class="tb ${R("tool")}" data-a="theme">${theme === "dark" ? "light" : "dark"}</button>
+       <button class="tb ${R("tool")}" data-a="theme">theme: ${theme || "calm"}</button>
+       <button class="tb ${R(snapOn ? "tool.on" : "tool")}" data-a="snap">snap to ramp${snapOn ? " (on)" : ""}</button>
        <button class="tb ${R("tool")}" data-a="style">style</button>
        <button class="tb ${R("tool")}" data-a="astext">desktop as text</button>`;
     bar.querySelectorAll(".tb").forEach(b => b.onclick = () => barAction(b.dataset.a));
@@ -199,7 +223,12 @@ const Shell = (() => {
   }
 
   function barAction(a) {
-    if (a === "theme") { theme = theme === "dark" ? "" : "dark"; apply(styleSrc); paintAll(); return; }
+    if (a === "theme") {
+      const names = ["", ...Object.keys((Style.style && Style.style.themes) || {})];
+      theme = names[(names.indexOf(theme) + 1) % names.length];
+      apply(styleSrc); if (snapOn) Style.snap(true); paintAll(); return;
+    }
+    if (a === "snap") { snapOn = !snapOn; Style.snap(snapOn); paintBar(); paintSaid(); return; }
     if (a === "style") { openPanel("style"); return; }
     if (a === "astext") { openPanel("astext"); return; }
   }
@@ -212,7 +241,7 @@ const Shell = (() => {
     if (said.classList.contains("hidden")) return;
     said.className = R("said");
     const head = `<div class="row" style="gap:var(--t-gap)">
-        ${["said", "style", "astext"].map(p => `<button data-p="${p}" class="${R(p === panel ? "tool.on" : "tool")}">${p === "astext" ? "desktop as text" : p}</button>`).join("")}
+        ${["said", "style", "reach", "astext"].map(p => `<button data-p="${p}" class="${R(p === panel ? "tool.on" : "tool")}">${p === "astext" ? "desktop as text" : p === "reach" ? "style reach" : p}</button>`).join("")}
         <span class="grow"></span><button data-p="close" class="${R("tool")}">close</button></div>`;
     let body = "";
     if (panel === "said") {
@@ -227,6 +256,8 @@ const Shell = (() => {
            <div class="row" style="gap:var(--t-gap);margin-top:var(--t-gap)">
              <button id="styleapply" class="${R("tool.on")}">apply</button>
              <span class="${R("meta")}">tokens are the only place a colour or a number may appear. try <code>on #eeeeee</code> or <code>pad 17px</code>.</span></div>`;
+    } else if (panel === "reach") {
+      body = `<pre class="${R("source")}" style="white-space:pre-wrap">${esc(reachText())}</pre>`;
     } else {
       body = `<pre class="${R("source")}" style="white-space:pre-wrap">${esc(desktopAsText())}</pre>`;
     }
@@ -236,6 +267,31 @@ const Shell = (() => {
     });
     const ed = said.querySelector("#styleed");
     if (ed) { ed.value = styleSrc; said.querySelector("#styleapply").onclick = () => { if (apply(ed.value)) paintAll(); else paintSaid(); }; }
+  }
+
+  // ---------- how far the one style actually reaches ----------
+  // An honesty mark for the style itself. A shared style is not enforced by existing; it is enforced
+  // by being the only thing that works, and nothing stops an app writing its own px in its own file.
+  function reachText() {
+    if (typeof Style === "undefined") return "style is not loaded; there is nothing to reach.";
+    const r = Style.reach(document.body);
+    const out = [];
+    out.push(`the ramp, from calm.style: ${r.steps.map(s => `${s.step >= 0 ? "+" : ""}${s.step}=${s.px}px`).join("  ")}`);
+    out.push(`  text = ${Style.token("text").size}/${Style.token("text").leading}, ramp = ${Style.token("ramp")}, theme = ${theme || "calm"}`);
+    out.push("");
+    if (!r.offenders.length) out.push("= every type size on this desktop is a step of the ramp.");
+    else {
+      out.push(`! ${r.offenders.reduce((a, b) => a + b.count, 0)} element(s) are OFF the ramp, in ${new Set(r.offenders.map(o => o.where.split(" @")[0])).size} zone(s):`);
+      r.offenders.forEach(o => out.push(`    ${o.where.padEnd(24)} ${o.count} element(s)`));
+      out.push("");
+      out.push("the style language reaches a role a file names. it does not reach a px an app writes");
+      out.push("in its own stylesheet, and it has no way to refuse one. press SNAP TO RAMP in the bar");
+      out.push("to force every size to its nearest step: the difference you see is the exact distance");
+      out.push("between a style that is available and a style that is binding. (wren-10 section 4)");
+    }
+    out.push("");
+    out.push(`snap to ramp is ${snapOn ? "ON — sizes below are forced, not authored" : "off"}.`);
+    return out.join("\n");
   }
 
   // ---------- the whole desktop, in text ----------

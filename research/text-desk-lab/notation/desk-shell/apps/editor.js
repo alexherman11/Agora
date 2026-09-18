@@ -13,11 +13,12 @@
 //   2. a comment cannot name the passage it is about. Every comment is shown "? unanchored" rather than
 //      guessed at. Nothing here fakes an anchor in JavaScript.
 (() => {
+ try {
   const CSS = `
   .ed{display:grid;grid-template-columns:184px minmax(0,1fr) 248px;height:100%;background:var(--surface);
       font:14px/1.5 var(--font);color:var(--ink)}
   .ed-rail{border-right:1px solid var(--line);padding:14px 10px;overflow:auto}
-  .ed-rail h3{margin:0 0 8px;font:500 11px/1.4 var(--font);color:var(--quiet);letter-spacing:.04em;
+  .ed-rail h3{margin:0 0 8px;font:500 12px/1.4 var(--font);color:var(--quiet);letter-spacing:.04em;
       text-transform:uppercase}
   .ed-docs{margin:0 0 16px;padding:0 0 14px;border-bottom:1px solid var(--line)}
   .ed-doc,.ed-sec{display:grid;grid-template-columns:14px 1fr auto;gap:6px;align-items:baseline;
@@ -27,8 +28,8 @@
   .ed-sec[data-here=reading]{color:var(--ink)}
   .ed-sec .m{color:var(--accent);font:12px/1.4 ui-monospace,Consolas,monospace}
   .ed-sec .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ed-sec .w{font-size:11px;color:var(--quiet);font-variant-numeric:tabular-nums}
-  .ed-where{margin-top:10px;font-size:11px;line-height:1.6;color:var(--quiet)}
+  .ed-sec .w{font-size:12px;color:var(--quiet);font-variant-numeric:tabular-nums}
+  .ed-where{margin-top:10px;font-size:12px;line-height:1.6;color:var(--quiet)}
   .ed-page{overflow:auto;padding:0 0 120px}
   .ed-sheet{max-width:640px;margin:0 auto;padding:40px 44px}
   .ed-title{font:500 26px/1.25 var(--font);margin:0 0 4px;outline:0}
@@ -41,10 +42,10 @@
   .ed-margin{border-left:1px solid var(--line);padding:14px 12px;overflow:auto}
   .ed-card{border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;margin:0 0 8px;
       background:var(--paper)}
-  .ed-card .who{font-size:11px;color:var(--quiet);display:flex;gap:6px;align-items:baseline}
+  .ed-card .who{font-size:12px;color:var(--quiet);display:flex;gap:6px;align-items:baseline}
   .ed-card .body{margin:4px 0 6px;white-space:pre-wrap}
   .ed-card.resolved{opacity:.55}
-  .ed-mark{font:11px/1.4 ui-monospace,Consolas,monospace;color:var(--quiet)}
+  .ed-mark{font:12px/1.5 ui-monospace,Consolas,monospace;color:var(--mark,var(--ink));opacity:.85}
   .ed-btn{border:0;background:transparent;color:var(--quiet);font:inherit;font-size:12px;padding:3px 7px;
       border-radius:6px;cursor:pointer}
   .ed-btn:hover{background:var(--paper);color:var(--ink)}
@@ -57,6 +58,14 @@
   .ed-fence code{font:12px ui-monospace,Consolas,monospace;color:var(--quiet)}
   .ed-fence .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
   .ed-empty{padding:40px 44px;color:var(--quiet)}
+  .ed-read{white-space:pre-wrap;margin:0 0 4px}
+  .ed-read strong{font-weight:620}
+  .ed-read em{font-style:italic}
+  .ed-read code{font:14px ui-monospace,Consolas,monospace;background:var(--paper);
+      border-radius:3px;padding:0 3px}
+  .ed-read ul{margin:6px 0;padding-left:20px}
+  .ed-read li{margin:2px 0}
+  .ed-read li.task{list-style:none;margin-left:-20px}
   `;
   if (!document.getElementById("ed-css")) {
     const s = document.createElement("style"); s.id = "ed-css"; s.textContent = CSS; document.head.appendChild(s);
@@ -88,13 +97,39 @@
   const docsInWorld = () => Object.values(Desk.snapshot.nodes)
     .filter(n => n.type === "appearance" && Desk.subject(n.subject)?.kind === "doc");
 
+  // The four inline characters the studio agreed (Wren, wren-02): *strong* /slant/ `mono` and "- " bullets,
+  // plus the desk's own "- [ ]" checklists. Rendering them is a RENDERING, never state: the text is the
+  // document, and you can only type in the text view. That boundary is the honest answer to "rich text".
+  function render(body) {
+    const out = [];
+    let list = null;
+    const NL = String.fromCharCode(10);
+    for (const raw of String(body || "").split(NL)) {
+      const task = /^-\s\[([ xX])\]\s?(.*)$/.exec(raw);
+      const bullet = /^-\s+(.*)$/.exec(raw);
+      if (task || bullet) {
+        if (!list) { list = []; out.push(list); }
+        list.push(task ? { task: true, done: task[1] !== " ", t: task[2] } : { t: bullet[1] });
+      } else { list = null; out.push({ p: raw }); }
+    }
+    const inline = t => esc(t)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/(^|\W)\*([^*]+)\*/g, "$1<strong>$2</strong>")
+      .replace(/(^|\W)\/([^\/]+)\/(?=\W|$)/g, "$1<em>$2</em>");
+    return out.map(x => Array.isArray(x)
+      ? "<ul>" + x.map(i => `<li class="${i.task ? "task" : ""}">`
+          + (i.task ? (i.done ? "☑ " : "☐ ") : "") + inline(i.t) + "</li>").join("") + "</ul>"
+      : inline(x.p)).join(NL);
+  }
+
   // ---- per-window state (ctx) ---------------------------------------------------------------------
   let lastDrawn = null;   // if the shell calls text() without the ctx it opened with, answer about the window
   const LONE = {};        // that is actually on screen rather than inventing an empty one
   function state(ctx) {
     if (!ctx || typeof ctx !== "object") ctx = lastDrawn || LONE;
     if (!ctx.ed) ctx.ed = { id: null, secs: null, base: "", rev: null, caret: null, reading: 0,
-                            shown: [0, 0], unsettled: false, lastKey: 0, timer: null, fence: null, note: null };
+                            shown: [0, 0], unsettled: false, lastKey: 0, timer: null, fence: null, note: null,
+                            view: "text", sel: null };
     return ctx.ed;
   }
   function load(st, id) {
@@ -138,7 +173,9 @@
 
   // ---- drawing --------------------------------------------------------------------------------------
   function status(host, st) {
-    const el = host.querySelector(".ed-status"); if (!el || !st.id) return;
+    // write into the bar's first span, never the bar itself: the bar also holds the view toggle,
+    // and setting textContent on it would silently delete the control.
+    const el = host.querySelector(".ed-status > span"); if (!el || !st.id) return;
     const s = Desk.subject(Desk.node(st.id).subject); if (!s) return;
     const sec = st.secs[st.caret];
     const bits = [`${st.id} · rev ${s.rev}`,
@@ -147,7 +184,7 @@
         : `settled`,
       st.note || ""];
     const other = otherTouch.get(st.id);
-    if (other) bits.push(`~${other.by}: ${other.verb} here, ${ago(other.seen)} ago`);
+    if (other) bits.push(`${other.measured ? "=" : "~"}${other.by}: ${other.verb} here, ${ago(other.seen)} ago`);
     el.textContent = bits.filter(Boolean).join("   ·   ");
   }
   const secName = s => !s ? "(nowhere)" : s.name === null ? "the opening" : "§" + s.i + " " + s.name;
@@ -157,7 +194,10 @@
     for (const e of events || []) {
       if (!seenAt.has(e.id)) seenAt.set(e.id, Date.now());
       if (e.by === Desk.actor) continue;
-      for (const c of e.changed || []) otherTouch.set(c, { by: e.by, verb: e.verb, seen: seenAt.get(e.id) });
+      // events now carry `at` (wall time from the desk), so elapsed time is MEASURED, not observed.
+      const at = e.at ? Date.parse(e.at) : null;
+      for (const c of e.changed || [])
+        otherTouch.set(c, { by: e.by, verb: e.verb, seen: at || seenAt.get(e.id), measured: !!at });
     }
   }
 
@@ -208,7 +248,16 @@
     rail.append(where);
 
     // --- the page ------------------------------------------------------------------------------------
-    const bar = document.createElement("div"); bar.className = "ed-status"; mid.append(bar);
+    const bar = document.createElement("div"); bar.className = "ed-status";
+    const vt = document.createElement("button"); vt.className = "ed-btn";
+    vt.style.marginLeft = "auto";
+    vt.textContent = st.view === "page" ? "edit the text" : "read as a page";
+    vt.title = st.view === "page" ? "back to the text, which is the document"
+                                  : "render *strong* /slant/ `mono` and - bullets; not editable";
+    vt.onclick = async () => { if (st.unsettled) await settle(st, host, ctx, "changing view");
+                               st.view = st.view === "page" ? "text" : "page"; draw(host, ctx); };
+    mid.append(bar);
+    bar.append(document.createElement("span"), vt);
     if (st.fence) mid.append(fenceBar(st, host, ctx));
     const sheet = document.createElement("div"); sheet.className = "ed-sheet";
     const h1 = document.createElement("h1"); h1.className = "ed-title"; h1.textContent = subj.title;
@@ -230,7 +279,11 @@
         h.onfocus = () => { st.caret = s.i; outlineTick(host, st); };
         wrap.append(h);
       }
-      const b = document.createElement("div"); b.className = "ed-body";
+      const b = document.createElement("div");
+      if (st.view === "page") {
+        b.className = "ed-read"; b.innerHTML = render(s.body); wrap.append(b); sheet.append(wrap); return;
+      }
+      b.className = "ed-body";
       b.contentEditable = "plaintext-only"; b.spellcheck = false; b.textContent = s.body;
       b.oninput = () => { s.body = b.textContent; s.words = words(b.textContent);
                           st.caret = s.i;   // typing is proof the caret is here, even if focus never fired
@@ -238,6 +291,18 @@
       b.onfocus = () => { if (st.caret !== s.i && st.unsettled) settle(st, host, ctx, "the caret leaving a section");
                           st.caret = s.i; outlineTick(host, st); };
       b.onblur = () => { if (st.unsettled) settle(st, host, ctx, "leaving the text"); };
+      const track = () => {
+        const sel = document.getSelection();
+        if (!sel || !sel.anchorNode || !b.contains(sel.anchorNode)) return;
+        const r = sel.getRangeAt(0);
+        const pre = r.cloneRange(); pre.selectNodeContents(b); pre.setEnd(r.startContainer, r.startOffset);
+        const start = pre.toString().length, text = r.toString();
+        st.sel = { sec: s.i, start, end: start + text.length, quote: text.slice(0, 40) };
+        st.caret = s.i; const w = host.querySelector(".ed-where");
+        if (w) w.textContent = `reading ${secName(st.secs[st.reading])} · caret ${secName(st.secs[st.caret])}`
+          + ` char ${start}` + (text ? `, ${text.length} selected` : "");
+      };
+      b.addEventListener("keyup", track); b.addEventListener("mouseup", track); b.addEventListener("focus", track);
       b.onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                              e.preventDefault(); settle(st, host, ctx, "you asked"); } };
       wrap.append(b);
@@ -260,7 +325,7 @@
 
     // --- the margin ----------------------------------------------------------------------------------
     const mh = document.createElement("h3"); mh.textContent = "margin"; mh.className = "";
-    mh.style.cssText = "margin:0 0 8px;font:500 11px/1.4 var(--font);color:var(--quiet);"
+    mh.style.cssText = "margin:0 0 8px;font:500 12px/1.4 var(--font);color:var(--quiet);"
       + "letter-spacing:.04em;text-transform:uppercase";
     marg.append(mh);
     const cs = subj.comments || [];
@@ -294,9 +359,29 @@
     marg.append(add);
     const gap = document.createElement("p"); gap.className = "ed-mark";
     gap.style.marginTop = "14px";
-    gap.textContent = "! a settle rewrites the WHOLE document: the desk has no section-scoped rewrite yet. "
-      + "Both gaps are filed as to-jeff notes on the studio desk.";
+    const cost = compose(st.secs).length;
+    gap.textContent = `! a settle rewrites the WHOLE document. One typo here sends `
+      + `${cost.toLocaleString()} characters and the receipt echoes them back, so one word costs about `
+      + `${(cost * 2 / 1000).toFixed(1)}k either way. The desk has no section-scoped rewrite yet; `
+      + `filed to-jeff.`;
     marg.append(gap);
+    const sid = Desk.node(st.id).subject;
+    const linked = ((Desk.snapshot.links || []).filter(l => l.from === sid || l.to === sid)
+      .map(l => (l.from === sid ? l.to : l.from))
+      .map(i => Desk.snapshot.subjects[i]).filter(Boolean));
+    const pics = linked.filter(x => x.kind === "image");
+    if (linked.length) {
+      const lh = document.createElement("p"); lh.className = "ed-mark"; lh.style.marginTop = "14px";
+      lh.textContent = `? ${linked.length} linked subject(s)`
+        + (pics.length ? `, ${pics.length} of them images` : "")
+        + " — the desk can link a document to a thing but cannot place it IN the text, "
+        + "so none of these has a position on the page.";
+      marg.append(lh);
+      linked.forEach(x => { const d = document.createElement("div"); d.className = "ed-card";
+        d.innerHTML = `<div class="who">${x.kind} ${x.id}</div>`;
+        const t = document.createElement("div"); t.className = "body"; t.textContent = x.title; d.append(t);
+        marg.append(d); });
+    }
 
     host.append(rail, mid, marg);
     status(host, st);
@@ -366,18 +451,28 @@
     out.push(`read ${st.id} "${s.title}" · rev ${s.rev} · ${words(s.text)}w · `
            + `${plural(headings(secs), "section")} · ${plural((s.comments || []).length, "comment")}, ${open} open`);
     const t = otherTouch.get(st.id);
-    if (t) out.push(`  ~${t.by}: ${t.verb} here, ${ago(t.seen)} ago (seen by this page; the desk's clock`
-                  + ` is day-granular, so this is an observation, not a desk fact)`);
+    if (t) out.push(t.measured
+      ? `  =${t.by}: ${t.verb} here, ${ago(t.seen)} ago (the desk's own wall time on the event)`
+      : `  ~${t.by}: ${t.verb} here, ${ago(t.seen)} ago (seen by this page, not timed by the desk)`);
     const [a, b] = st.shown;
     out.push(`  = you are ${Desk.actor}; the page shows ${a === b ? secName(secs[a])
       : secName(secs[a]) + " .. " + secName(secs[b])}`
       + (a > 0 ? `, ${a} above` : "") + (b < secs.length - 1 ? `, ${secs.length - 1 - b} below` : "")
       + ` (measured from the scroll box)`);
-    out.push(`  = caret ${st.caret === null ? "nowhere — nobody is typing in this window" : secName(secs[st.caret])}`);
+    out.push(`  = caret ${st.caret === null ? "nowhere — nobody is typing in this window" : secName(secs[st.caret])}`
+      + (st.sel ? ` char ${st.sel.start}` + (st.sel.end > st.sel.start
+          ? `, selection ${st.sel.start}-${st.sel.end} "${st.sel.quote}"` : "") : ""));
+    out.push(`  = view: ${st.view === "page" ? "rendered page (*strong* /slant/ `mono` and - bullets drawn;"
+      + " not editable — the text below is the document)" : "the text itself, editable"}`);
     if (st.unsettled) out.push(`  = unsettled draft in ${secName(secs[st.caret])}: `
       + `${words(secs[st.caret] ? secs[st.caret].body : "")}w, last key ~${ago(st.lastKey)} ago, `
-      + `settles after ${SETTLE_MS / 1000}s of quiet or on leaving`);
+      + `settles after ${SETTLE_MS / 1000}s of quiet or on leaving. `
+      + `The text below is the LAST SETTLED revision (rev ${s.rev}), not what is on the screen.`);
     if (st.fence) out.push(`  ! REFUSED at the last settle: ${st.fence.err} — your draft is held, not lost`);
+    const all = docsInWorld();
+    if (all.length > 1) out.push(`  = ${all.length} documents in this world; a rail on the left lists them `
+      + `and this one is current: ` + all.map(x => `${x.id} "${Desk.title(x.id)}"`
+        + (x.id === st.id ? " (open)" : "")).join(", "));
     out.push("  outline:");
     secs.forEach(x => out.push(`    ${st.reading === x.i ? "▸" : " "}${st.caret === x.i ? "|" : " "} `
       + `#${x.i} ${x.name === null ? "(opening)" : x.name}  ${x.words}w`));
@@ -430,4 +525,18 @@
     },
     text: asText,
   });
+ } catch (e) {
+  // The app failed to build. It still appears, and says why, rather than subtracting itself in silence.
+  const why = `! the editor failed to load: ${e && e.message}`;
+  try {
+    Desk.registerApp({
+      id: "editor", title: "Editor", glyph: "¶",
+      open: host => { host.style.padding = "24px"; host.textContent = why
+        + " — the desktop is running without it; nothing you do here changes the world."; },
+      text: () => why + String.fromCharCode(10)
+        + "  = no document is open, because this app did not build."
+    });
+  } catch (_) { /* Desk itself is gone; the shell will say so */ }
+  console.error("[editor]", e);
+ }
 })();

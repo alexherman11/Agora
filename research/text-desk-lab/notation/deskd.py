@@ -99,6 +99,15 @@ class Handler(SimpleHTTPRequestHandler):
                 snap["outline"] = desk.outline(desk.world.root, 2, deep=True)
                 desk.seen, desk.last_event_seen = seen, header
             return self._json(snap)
+        if u.path == "/api/scene":
+            import scene
+            with Session(q.get("session", "desktop"), q.get("as")) as desk:
+                try:
+                    sc, text = scene.scene_for(desk, q.get("lens", ""))
+                    out = {"scene": sc, "text": text, "events_total": len(desk.world.events)}
+                except scene.LensRefusal as e:
+                    out = {"refused": str(e), "events_total": len(desk.world.events)}
+            return self._json(out)
         if u.path == "/api/events":
             since = int(q.get("since", 0))
             with Session(q.get("session", "desktop"), q.get("as")) as desk:

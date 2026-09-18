@@ -214,13 +214,62 @@ const Style = (() => {
       const lk = lookOf({ as: name }, st, T, { nodes: {} });
       out += `.r-${name.replace(/\./g, "_")}{${decl(lk.css)}}\n`;
     }
+    // The ramp, named, so an app can say a size instead of inventing one:
+    //   font-size: var(--t-size-0)   is `text`;  --t-size--1 is `text down`;  --t-size-2 is `text up 2`.
+    ramp().forEach(({ step, px }) => { out = out.replace(/^:root\{/, `:root{--t-size-${step}:${px}px;`); });
     if (!sheet) { sheet = document.createElement("style"); sheet.id = "one-style"; document.head.appendChild(sheet); }
     sheet.textContent = out;
     return st;
   }
 
+  // ---- the ramp, and how far it actually reaches ----
+  function ramp() {
+    const t = tokens && tokens.text, r = tokens && tokens.ramp;
+    if (!t || t.type !== "text") return [];
+    const ratio = r && r.type === "length" ? r.value : 1.15;
+    return [-3, -2, -1, 0, 1, 2, 3].map(step => ({ step, px: Math.round(t.size * Math.pow(ratio, step)) }));
+  }
+
+  // Every element on the page whose type size is NOT a step of the ramp, and who drew it.
+  // This is the honesty mark for the style itself: a shared style is not enforced by existing.
+  function reach(root = document.body) {
+    const steps = new Set(ramp().map(s => s.px));
+    const bad = new Map();
+    root.querySelectorAll("*").forEach(el => {
+      if (/^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|HEAD|META|LINK|TITLE)$/.test(el.tagName)) return;
+      if (!el.textContent || !el.textContent.trim()) return;
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      if (steps.has(Math.round(px * 100) / 100) || steps.has(Math.round(px))) return;
+      const owner = (el.closest("[data-owner]") || {}).dataset ? el.closest("[data-owner]").dataset.owner : "shell";
+      const key = owner + " @ " + (Math.round(px * 100) / 100) + "px";
+      bad.set(key, (bad.get(key) || 0) + 1);
+    });
+    const steps2 = ramp();
+    return { steps: steps2, offenders: [...bad.entries()].map(([k, n]) => ({ where: k, count: n })).sort((a, b) => b.count - a.count) };
+  }
+
+  // Snap every off-ramp size to the nearest step. Deliberately a TOGGLE: the difference between
+  // on and off is the measure of how far the style language reaches on its own. See wren-10 §4.
+  let snapped = [];
+  function snap(on, root = document.body) {
+    snapped.forEach(el => el.style.removeProperty("font-size"));
+    snapped = [];
+    if (!on) return 0;
+    const steps = ramp();
+    if (!steps.length) return 0;
+    root.querySelectorAll("*").forEach(el => {
+      if (/^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT)$/.test(el.tagName)) return;
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      if (steps.some(s => s.px === Math.round(px)) && Number.isInteger(px)) return;
+      const near = steps.reduce((a, b) => Math.abs(b.px - px) < Math.abs(a.px - px) ? b : a);
+      el.style.setProperty("font-size", near.px + "px", "important");
+      snapped.push(el);
+    });
+    return snapped.length;
+  }
+
   return {
-    Refusal, parse, install,
+    Refusal, parse, install, ramp, reach, snap,
     get style() { return current; },
     get tokens() { return tokens; },
     get theme() { return themeName; },

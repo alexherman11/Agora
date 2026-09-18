@@ -89,7 +89,23 @@ function big(s) {                                  // WCAG "large text"
   const px = parseFloat(s.fontSize), w = parseInt(s.fontWeight) || 400;
   return px >= 24 || (px >= 18.66 && w >= 700);
 }
-const onGrid = v => Math.abs(v - Math.round(v / PX) * PX) < 0.75;
+// Grid testing, corrected 2026-09-18 after Wren's a554, which was right.
+// I reported for eleven passes that the grid misses "land on thirds, so something divides
+// by 3". They land on thirds because devicePixelRatio here is 1.5, and 1/1.5 = 0.667: the
+// compositor snapping CSS pixels to device pixels. No author can fix that, so the check
+// could not go green on my screen no matter what anyone wrote. That is an unfair check.
+// It now measures in DEVICE pixels, and the stamp records the ratio it measured at.
+//
+// Wren was not right about all of it: remainders of 0.083, 0.26, 0.5, 0.708 and 0.156 are
+// not multiples of 1/1.5, and those are real. They come from content-measured widths and
+// half-pixel heights, and they are still reported.
+const DPR = () => window.devicePixelRatio || 1;
+const onGrid = v => {
+  const d = DPR();
+  const dev = v * d, snapped = Math.round(dev);
+  if (Math.abs(dev - snapped) > 0.02) return false;   // not even on a device pixel: genuinely fractional
+  return Math.abs(v - Math.round(v / PX) * PX) < (1 / d) + 0.02;
+};
 const round = v => Math.round(v * 100) / 100;
 
 // ---------------------------------------------------------------- error capture
@@ -391,6 +407,231 @@ check('named-controls', () => {
   };
 });
 
+// ================================================================ round five
+// Alex's question: how are we rendering, and what are the limits? These checks ask what
+// this renderer visibly fails to do that ordinary desktop software does. They are the
+// ones that needed a running system rather than a picture.
+
+// 11 — does one style token reach every zone?
+// The round-four finding was four type scales, one per app. The measurable form of
+// "cohesive" is: the tokens are declared once, and every zone's colours come from them.
+check('token-reach', () => {
+  const root = getComputedStyle(document.documentElement);
+  const names = [...document.styleSheets].flatMap(s => { try { return [...s.cssRules]; } catch (e) { return []; } })
+    .flatMap(r => (r.style ? [...r.style] : []))
+    .filter(p => p.startsWith('--'));
+  const tokens = {};
+  [...new Set(names)].forEach(n => { const v = root.getPropertyValue(n).trim(); if (v) tokens[n] = hex(v) || v; });
+  const palette = new Set(Object.values(tokens).filter(v => /^#/.test(v)));
+  if (!palette.size) return { mark: '?', ok: null, value: 'no colour tokens found on :root', detail: 'extent: the whole style language' };
+  const rows = Object.entries(zones()).map(([k, v]) => {
+    let inPal = 0, out = [];
+    [...v.querySelectorAll('*')].forEach(e => {
+      if (e.children.length || INVISIBLE.test(e.tagName) || !(e.textContent || '').trim()) return;
+      const c = hex(getComputedStyle(e).color);
+      if (palette.has(c)) inPal++; else out.push(c);
+    });
+    const n = inPal + out.length;
+    return n ? { k, pct: Math.round(100 * inPal / n), n, stray: [...new Set(out)].slice(0, 3) } : null;
+  }).filter(Boolean);
+  const bad = rows.filter(r => r.pct < 100);
+  return {
+    mark: '=', ok: bad.length === 0,
+    value: palette.size + ' colour tokens; ' + (rows.length - bad.length) + '/' + rows.length + ' zones use only them',
+    detail: bad.map(r => `${r.k} ${r.pct}% of ${r.n} (stray ${r.stray.join(',')})`).join('; ')
+  };
+});
+
+// 12 — THE question for a renderer that redraws a window from text.
+// Ordinary desktop software does not lose your place. This measures whether a re-render
+// destroys scroll position, text selection, the caret, or keyboard focus. It is
+// deliberately destructive, so it only runs when explicitly asked (run({probe:true}))
+// and it says so.
+// It runs in two phases because the redraw must be provoked from OUTSIDE the page —
+// `window.Desk` is not exposed, and, more to the point, the case that matters is the
+// real one: somebody else changes the world while you are reading.
+//
+//   1. in the page:   const m = await import('/checks/checks.js'); m.armProbe('Notes')
+//   2. in a terminal: python explore.py <session>@<worktree> --as iris
+//                     do create f05 kind=note title="probe"
+//   3. in the page:   m.readProbe()
+//
+// Always do this in a worktree. It writes to the world.
+export function armProbe(winName) {
+  const wins = [...document.querySelectorAll('.r-window,[class*=window]')].filter(w => w.getBoundingClientRect().width > 120);
+  const win = winName ? wins.find(w => new RegExp(winName, 'i').test(
+    ((w.querySelector('[class*=windowname],[class*=name],[class*=title]') || {}).textContent || ''))) : wins[0];
+  if (!win) return { armed: false, why: 'no window matching ' + winName };
+  const scroller = [...document.querySelectorAll('*')].find(e => e.scrollHeight > e.clientHeight + 40 && e.clientHeight > 80);
+  if (scroller) scroller.scrollTop = 140;
+  const el = [...win.querySelectorAll('*')].find(e => !e.children.length && (e.textContent || '').trim().length > 30);
+  let sel = null;
+  if (el && el.firstChild) {
+    const r = document.createRange(); r.setStart(el.firstChild, 0); r.setEnd(el.firstChild, 18);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    sel = String(getSelection());
+  }
+  const ed = win.querySelector('[contenteditable],textarea,input[type=text]');
+  if (ed) { ed.focus(); if (ed.firstChild) { const r = document.createRange(); r.setStart(ed.firstChild, Math.min(12, ed.firstChild.length)); r.collapse(true); } }
+  window.__irisProbe = {
+    at: new Date().toTimeString().slice(0, 8), win: winName || 'first',
+    scroller, scrollTop: scroller ? scroller.scrollTop : null,
+    el, node: el && el.firstChild, sel,
+    ed, active: document.activeElement,
+    nodes: document.querySelectorAll('*').length, textLen: document.body.innerText.length
+  };
+  return { armed: true, at: window.__irisProbe.at, window: winName || 'first', selection: sel, scrollTop: window.__irisProbe.scrollTop };
+}
+
+export function readProbe() {
+  const P = window.__irisProbe;
+  if (!P) return { error: 'not armed' };
+  const sel = getSelection();
+  return {
+    at: new Date().toTimeString().slice(0, 8), armedAt: P.at, window: P.win, href: location.href,
+    redrew: document.querySelectorAll('*').length !== P.nodes || document.body.innerText.length !== P.textLen,
+    nodesBefore: P.nodes, nodesAfter: document.querySelectorAll('*').length,
+    // the whole question, in three lines:
+    subtreeReplaced: P.node ? !document.contains(P.node) : null,
+    selectionSurvived: P.sel ? String(sel) === P.sel : null,
+    scrollSurvived: P.scroller ? Math.abs(P.scroller.scrollTop - P.scrollTop) < 8 : null,
+    caretSurvived: P.ed ? document.activeElement === P.ed : null,
+    selectionBefore: P.sel, selectionAfter: String(sel).slice(0, 24)
+  };
+}
+
+// 13 — keyboard focus. Ordinary desktop software shows you where you are.
+check('focus-visible', () => {
+  const els = [...document.querySelectorAll('button,[role=button],a[href],input,select,textarea,[tabindex]')]
+    .filter(e => e.getBoundingClientRect().width > 0);
+  if (!els.length) return { mark: '?', ok: null, value: 'no focusable controls', detail: '' };
+  let rule = false, outlineNone = 0;
+  [...document.styleSheets].forEach(s => {
+    try { [...s.cssRules].forEach(r => { if (r.selectorText && /:focus/.test(r.selectorText)) rule = true; }); } catch (e) { }
+  });
+  els.forEach(e => { const s = getComputedStyle(e); if (s.outlineStyle === 'none' || parseFloat(s.outlineWidth) === 0) outlineNone++; });
+  // does focusing actually change anything visible?
+  const probe = els[0], before = getComputedStyle(probe).outlineWidth + '|' + getComputedStyle(probe).boxShadow;
+  probe.focus();
+  const after = getComputedStyle(probe).outlineWidth + '|' + getComputedStyle(probe).boxShadow;
+  probe.blur();
+  // The verdict is the PAINT, not the rule. A :focus rule that changes nothing is the
+  // same false pass I keep reporting in other people's screens; it caught me here too.
+  return {
+    mark: '=', ok: before !== after,
+    value: 'focusing the first control ' + (before !== after ? 'changes' : 'does NOT change') + ' its paint' +
+      (rule ? ' (a :focus rule exists, so the rule is there and does not bite)' : ' (and no :focus rule exists at all)'),
+    detail: els.length + ' focusable controls, ' + outlineNone + ' with outline:none at rest. ' +
+      'Keyboard users cannot see where they are.'
+  };
+});
+
+// 14 — motion. A desktop with no transitions reads as a document that reloads.
+check('motion', () => {
+  let n = 0, props = new Set();
+  [...document.styleSheets].forEach(s => {
+    try {
+      [...s.cssRules].forEach(r => {
+        if (r.type === 7) { n++; props.add('@keyframes ' + r.name); return; }
+        if (!r.style) return;
+        const t = r.style.transition || r.style.transitionProperty;
+        if (t && t !== 'all 0s ease 0s') { n++; props.add(t.split(' ')[0]); }
+        if (r.style.animationName && r.style.animationName !== 'none') { n++; props.add('animation'); }
+      });
+    } catch (e) { }
+  });
+  let reduced = false;
+  [...document.styleSheets].forEach(s => { try { [...s.cssRules].forEach(r => { if (r.conditionText && /prefers-reduced-motion/.test(r.conditionText)) reduced = true; }); } catch (e) { } });
+  return {
+    mark: '=', ok: n > 0,
+    value: n + ' transition/animation declarations' + (reduced ? ', reduced-motion honoured' : ', no reduced-motion rule'),
+    detail: n ? [...props].slice(0, 8).join(', ') : 'nothing on this desktop moves: every state change is an instant repaint'
+  };
+});
+
+// 15 — window management, as ordinary desktop software has it.
+check('window-management', () => {
+  const wins = [...document.querySelectorAll('.r-window,[class*=window]')].filter(w => w.getBoundingClientRect().width > 120);
+  if (!wins.length) return { mark: '?', ok: null, value: 'no windows open', detail: 'extent: cannot judge' };
+  const has = {
+    resize: 0, minimise: 0, maximise: 0, close: 0, drag: 0
+  };
+  wins.forEach(w => {
+    const txt = [...w.querySelectorAll('button,[role=button]')].map(b => (b.getAttribute('aria-label') || b.textContent || '').toLowerCase()).join(' ');
+    if (/close|×|✕/.test(txt)) has.close++;
+    if (/minimi|collapse|fold|–|_/.test(txt)) has.minimise++;
+    if (/maximi|full|expand|zoom/.test(txt)) has.maximise++;
+    if (w.querySelector('[class*=resiz],[class*=grip],[class*=handle]') || getComputedStyle(w).resize !== 'none') has.resize++;
+    const tb = w.querySelector('[class*=titlebar]');
+    if (tb && /grab|move|pointer/.test(getComputedStyle(tb).cursor)) has.drag++;
+  });
+  // cascade: how much of each window is visible
+  const offsets = wins.map(w => w.getBoundingClientRect()).sort((a, b) => a.top - b.top);
+  const step = offsets.length > 1 ? Math.round(offsets[1].top - offsets[0].top) : null;
+  const missing = Object.entries(has).filter(([k, v]) => v < wins.length).map(([k, v]) => `${k} ${v}/${wins.length}`);
+  return {
+    mark: '=', ok: missing.length === 0,
+    value: wins.length + ' windows; missing affordances: ' + (missing.join(', ') || 'none') +
+      (step != null ? '; cascade step ' + step + 'px' : ''),
+    detail: 'ordinary desktop software offers move, resize, minimise, maximise, close and z-order on every window'
+  };
+});
+
+// 16 — scrolling and selection, the two things a redraw usually breaks.
+check('scroll-and-selection', () => {
+  const scrollers = [...document.querySelectorAll('*')].filter(e => e.scrollHeight > e.clientHeight + 8 && e.clientHeight > 40);
+  const noSelect = [...document.querySelectorAll('body *')].filter(e => {
+    const s = getComputedStyle(e);
+    return (s.userSelect === 'none' || s.webkitUserSelect === 'none') && (e.textContent || '').trim().length > 20;
+  });
+  const hiddenBars = scrollers.filter(e => getComputedStyle(e).scrollbarWidth === 'none' ||
+    getComputedStyle(e).overflowY === 'hidden');
+  return {
+    mark: '=', ok: noSelect.length === 0 && hiddenBars.length === 0,
+    value: scrollers.length + ' scrollable regions; ' + noSelect.length + ' blocks of text cannot be selected; ' +
+      hiddenBars.length + ' scroll with no visible bar',
+    detail: scrollers.slice(0, 4).map(e => String(e.className || e.tagName).slice(0, 16) +
+      ' ' + e.clientHeight + '/' + e.scrollHeight).join(' | ')
+  };
+});
+
+// 17 — text rendering: the things a text-shaped renderer gets wrong.
+check('text-rendering', () => {
+  const ls = leaves();
+  const subpixel = ls.filter(e => { const r = e.getBoundingClientRect(); return Math.abs(r.top - Math.round(r.top)) > 0.15; });
+  // columns of digits that are not tabular
+  const numeric = ls.filter(e => /^[\s\d.,:x×+-]+$/.test((e.textContent || '').trim()) && (e.textContent || '').trim().length > 1);
+  const nonTabular = numeric.filter(e => !/tabular|lining/.test(getComputedStyle(e).fontVariantNumeric));
+  const fams = new Set(ls.map(e => getComputedStyle(e).fontFamily.split(',')[0].replace(/["']/g, '')));
+  const smoothing = getComputedStyle(document.body).webkitFontSmoothing;
+  return {
+    mark: '=', ok: subpixel.length === 0 && nonTabular.length === 0,
+    value: fams.size + ' families (' + [...fams].slice(0, 4).join(', ') + '); ' +
+      subpixel.length + '/' + ls.length + ' text runs on a sub-pixel baseline; ' +
+      nonTabular.length + ' numeric runs without tabular figures',
+    detail: 'font-smoothing: ' + (smoothing || 'auto') +
+      '. Sub-pixel baselines make text shimmer as a window moves; non-tabular digits make numeric columns ragged.'
+  };
+});
+
+// 18 — density: how much of the desktop is doing anything.
+check('density', () => {
+  const stage = document.getElementById('stage') || document.body;
+  const sr = stage.getBoundingClientRect();
+  const wins = [...document.querySelectorAll('.r-window,[class*=window]')].filter(w => w.getBoundingClientRect().width > 120);
+  let used = 0, low = Infinity, high = 0;
+  wins.forEach(w => { const r = w.getBoundingClientRect(); used += r.width * r.height; low = Math.min(low, r.top); high = Math.max(high, r.bottom); });
+  const stageArea = sr.width * sr.height;
+  const band = wins.length ? Math.round(high - low) : 0;
+  const ls = leaves().filter(e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; });
+  return {
+    mark: '=', ok: null,
+    value: wins.length + ' windows over ' + Math.round(100 * used / stageArea) + '% of the stage (overlap counted twice); ' +
+      'occupied band ' + band + 'px of ' + Math.round(sr.height) + 'px; ' + ls.length + ' visible text runs',
+    detail: 'informational. Ordinary desktop software fills the space it is given or admits it is empty.'
+  };
+});
+
 // ================================================================ runner
 
 export function run() {
@@ -399,6 +640,8 @@ export function run() {
     href: location.href,
     at: new Date().toTimeString().slice(0, 8),
     viewport: innerWidth + 'x' + innerHeight,
+    dpr: DPR(),                 // every geometry claim below is true only at this ratio
+
     scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
     nodes: document.querySelectorAll('*').length
   };
@@ -434,7 +677,7 @@ export function md(pass) {
   const r = run();
   const line = x => `| \`${x.id}\` | ${x.ok === true ? 'PASS' : x.ok === false ? 'FAIL' : '?'} | ${x.mark} ${x.value} | ${x.detail.replace(/\|/g, '/')} |`;
   return [
-    `### Pass ${pass || '?'} — ${r.stamp.at} — ${r.stamp.title} — ${r.stamp.viewport} ${r.stamp.scheme} — ${r.stamp.nodes} nodes`,
+    `### Pass ${pass || '?'} — ${r.stamp.at} — ${r.stamp.title} — ${r.stamp.viewport} @${r.stamp.dpr}x ${r.stamp.scheme} — ${r.stamp.nodes} nodes`,
     ``,
     `${r.score}. \`${r.stamp.href}\``,
     ``,
