@@ -468,7 +468,8 @@ class DeskKnife(DeskMoo):
             how = f" by rule {via.split()[1]}" if via and via.startswith("rule ") else (f" via {via}" if via else "")
             cause = f" (because of {e['cause']})" if e.get("cause") else ""
             done = " (undone)" if e.get("undone") else ""
-            out.append(f"  {e['id']} {e['verb']} {self._fmt_args(e.get('args') or {})}".rstrip() + f" · {who}{how}{cause}{done}")
+            args = {k: (v if len(str(v)) <= 120 else str(v)[:117] + "…") for k, v in (e.get("args") or {}).items()}   # a fold, declared
+            out.append(f"  {e['id']} {e['verb']} {self._fmt_args(args)}".rstrip() + f" · {who}{how}{cause}{done}")
         # what would happen next: rules whose selection this thing matches but has not been handled by
         pending = []
         for r in self.rules or []:

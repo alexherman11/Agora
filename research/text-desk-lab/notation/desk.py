@@ -409,8 +409,11 @@ class Desk:
             if n["type"] == "surface":
                 kids = self.world.children(nid)
                 if kids and (force_open or deep or nid in self.open):
-                    for k in kids:
+                    cap = 16 if deep else None   # a deep look folds a long panel; the fold says how to see the rest
+                    for k in kids[:cap]:
                         walk(k["id"], depth + 1, False)
+                    if cap and len(kids) > cap:
+                        lines.append(("  " * (depth + 1)) + f"(… {len(kids) - cap} more in {nid}; look {nid} :2 lists one line each)")
                 elif kids:
                     lines[-1] += f"  (open {nid} to see inside)"
 
