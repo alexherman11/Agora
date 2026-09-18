@@ -96,7 +96,51 @@ def build_home4(variant):
     return desk
 
 
+def build_home5(variant):
+    """Session 2: the desk with its trial-inbox rule pair removed and the harness comments restored from the run
+    reports (an export cannot carry another actor's comments). The model must build the pair with a negated term."""
+    import json
+    from pathlib import Path
+    desk = build_home(variant, "home-s2.desk.txt")
+    w = desk.world
+    desk.rules = [r for r in desk.rules if "comments:open" not in r["sel"]]
+    runs = Path(__file__).resolve().parent / "runs"
+    for sid, sub in w.subjects.items():
+        label = (sub.get("props") or {}).get("label")
+        rep_path = runs / str(label) / "report.json"
+        if sub["kind"] == "trial" and label and rep_path.exists():
+            reply = (json.loads(rep_path.read_text(encoding="utf-8")).get("reply") or "").strip()
+            if reply and not sub.get("comments"):
+                w.add_comment(sid, "harness", reply[:600], "harness")
+    desk.today = w.today = "2026-09-28"
+    w.events.clear()
+    desk.seen.clear()
+    desk.open = {w.root}
+    desk.last_event_seen = 0
+    desk._rule_notes = None
+    for r in desk.rules or []:
+        if not r.get("on"):
+            try:
+                r["done"].update(desk._parse_selection(r["sel"])[0])
+            except Exception:
+                pass
+    by_title = {sub["title"]: sid for sid, sub in w.subjects.items()}
+    surfaces = {n["title"]: n["id"] for n in w.nodes.values() if n["type"] == "surface"}
+    desk.ids.update({"target": by_title["harbor check (launched by Sol in home3)"], "today": surfaces["Today"],
+                     "trials": surfaces["Trials"],
+                     "other": next(sid for sid, sub in w.subjects.items() if sub["kind"] == "trial" and sub["title"] == "big recheck")})
+    return desk
+
+
 TASKS = {
+    "home5": (
+        "This is Claude's own desk; trials of other models run from it and the harness leaves each result as a "
+        "comment on the trial. Make the Today panel an inbox for them: a trial with an open comment belongs in "
+        "Today, and once its comment is resolved it belongs back in the Trials panel, now and from now on, without "
+        "anyone moving it by hand. Then read the comment on the trial 'harbor check (launched by Sol in home3)', "
+        "resolve it with a one-line reply, and tell me where that trial is now. help rules and help selections "
+        "explain the desk's automation. Do not move anything by hand."
+    ),
     "home4": (
         "This is Claude's own desk; trials of other models run from it and their results come back as props on "
         "each trial. Two things. (1) Among the finished trials, which one cost the most calls per check it passed "
@@ -166,6 +210,8 @@ def build(task, variant="outline"):
         return build_home(variant)
     if task == "home2":
         return build_home2(variant)
+    if task == "home5":
+        return build_home5(variant)
     if task == "home4":
         return build_home4(variant)
     if task == "home3":
@@ -264,6 +310,38 @@ def assess(task, desk):
         moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
         out["nothing_moved_by_hand"] = not moves
         out["nothing_lost"] = all(w.appearances_of(s) for s in ids["original_subjects"])
+        out["pass"] = all(v for k, v in out.items())
+        return out
+    if task == "home5":
+        import moo
+        rules = [r for r in (desk.rules or []) if not r.get("on") and r["verb"] == "move"]
+        def into(r):
+            try:
+                return desk._resolve(r["kv"].get("into", ""), allow_subject=False)
+            except Exception:
+                return None
+        inbox = [r for r in rules if "comments:open" in r["sel"] and not "-comments:open" in r["sel"] and into(r) == ids["today"]]
+        outbox = [r for r in rules if "-comments:open" in r["sel"] and into(r) == ids["trials"]]
+        out["inbox_rule"] = bool(inbox)
+        out["outbox_rule_negated"] = bool(outbox)
+        t = w.subjects[ids["target"]]
+        cs = t.get("comments") or []
+        out["target_resolved"] = bool(cs) and all(c["resolved"] for c in cs)
+        out["target_answered"] = any(c["replies"] for c in cs)
+        host = w.appearances_of(ids["target"])[0]
+        out["target_back_in_trials"] = w.nodes[host]["parent"] == ids["trials"]
+        reply = (getattr(desk, "reply_text", "") or "").lower()
+        out["reply_says_trials"] = "trials" in reply
+        # does the inbox work from now on? a new harness comment arrives on another trial
+        other = w.appearances_of(ids["other"])[0]
+        try:
+            w.add_comment(ids["other"], "harness", "probe: a new result", "harness")
+            desk._run_rules(cause=None)
+        except Exception:
+            pass
+        out["new_comment_moves_to_today"] = w.nodes[other]["parent"] == ids["today"]
+        moves = [e for e in w.events if e["verb"] == "move" and e["by"] == "jeff" and not str(e.get("via", "")).startswith("rule ")]
+        out["nothing_moved_by_hand"] = not moves
         out["pass"] = all(v for k, v in out.items())
         return out
     if task == "home4":
