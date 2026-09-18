@@ -256,3 +256,18 @@ The next useful question is narrower than choosing a replication protocol:
 **what immutable operation envelope and adapter language can express Agora's
 first mixed-version facet while remaining small enough for the verb boundary and
 replay model to verify?**
+
+## 18 September follow-up: automation narrows the envelope
+
+The [[automation-rules-and-external-effects-review]] applies this question to
+the text-desk fixture's new rules, scripts, and external trial launcher. It
+proposes a small typed firing envelope with a stable operation identity, local
+adoption, authenticated cause, exact resolved targets, typed arguments, read
+dependencies, an effect plan, budgets, and an idempotency identity. Bounded
+adapters remain read projections; they do not translate or dispatch external
+effects. Ambiguous operations remain proposals or read-only.
+
+This is a refinement of the proposal, not an implemented format. The static
+fixture review also found that launch dispatch precedes event recording and that
+grouped undo is not preflighted around non-undoable effects. No runtime case was
+executed.

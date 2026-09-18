@@ -59,7 +59,7 @@ Documents are arranged by how much they win, not by topic. The authoritative map
 | `research/graph-memory/` | memory for a world of objects; start at [[operating-system-memory]] |
 | `research/language-interface/` | [[conversational-capabilities|Conversational interfaces to Agora capabilities]]: small language adapters, grounded discovery and invocation, research precedents, and a proposed evaluation |
 | `research/holistic-review/` | [[holistic-assessment-2026-09-04]], baseline probes, and implementation validation |
-| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], [[m1-choke-point-review]], [[executable-admission-and-preview-review]], [[local-adoption-and-executable-identity]], and [[shared-state-version-compatibility]], follow-ons and implementation reviews for the security model |
+| `research/security/` | [[scoped-collaboration]], [[composed-export-model]], [[m1-choke-point-review]], [[executable-admission-and-preview-review]], [[local-adoption-and-executable-identity]], [[shared-state-version-compatibility]], and [[automation-rules-and-external-effects-review]], follow-ons and implementation reviews for the security model |
 
 ## Conventions
 

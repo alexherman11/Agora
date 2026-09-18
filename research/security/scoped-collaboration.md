@@ -132,6 +132,16 @@ read-only capabilities. Code rollback keeps the current data head and never runs
 an implicit down-migration. This too is a proposal; no mixed-version Agora
 experiment has run.
 
+The 18 September [[automation-rules-and-external-effects-review]] follow-up
+examines the text-desk research fixture's rules, scripts, and trial launcher.
+The fixture is useful evidence that a small automation language is usable, but
+it deliberately has no authority model. The review separates shared rule claims,
+local adoption, concrete firings, and brokered external effects. It also finds
+that the fixture dispatches a process before recording its event and that causal
+undo is not preflighted around irreversible effects. These are static findings
+in an independent research fixture, not Agora implementation findings; no test
+or effect was run.
+
 Compare whole-application isolation with smaller independent components. Measure denied effects, unintended disclosure, retained user work, recovery, review effort, and user interruptions. More components may reduce authority per component but increase dependency and compatibility complexity.
 
-Acceptance tests T21–T24 in [[Security|Security Model]] cover the earlier scenarios. T25 extends the same precision to ordinary OS actions. Preview/adoption cases PA-1–PA-7 are in [[executable-admission-and-preview-review]], LA-1–LA-12 cover local adoption and update identity, and SV-1–SV-12 cover mixed-version state. None was run by the security review. Compartment granularity, adoption protocol, the first operation envelope and adapter language, exact wire protocols, and confidentiality enforcement remain open.
+Acceptance tests T21–T24 in [[Security|Security Model]] cover the earlier scenarios. T25 extends the same precision to ordinary OS actions. Preview/adoption cases PA-1–PA-7 are in [[executable-admission-and-preview-review]], LA-1–LA-12 cover local adoption and update identity, SV-1–SV-12 cover mixed-version state, and AR-1–AR-12 cover standing automation and external effects. None was run by the security review. Compartment granularity, adoption protocol, the first operation envelope, broker protocol, exact wire protocols, and confidentiality enforcement remain open.

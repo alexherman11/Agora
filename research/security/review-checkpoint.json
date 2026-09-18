@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
-  "review_date": "2026-09-15",
-  "captured_at_utc": "2026-09-15T17:09:42.0358800Z",
+  "review_date": "2026-09-18",
+  "captured_at_utc": "2026-09-18T17:10:52.0664052Z",
   "workspace": "C:/Projects/Agora",
   "review_type": "Ongoing Git-based static security review",
   "git_repository_present": true,
-  "head_commit": "39ae665554629502c87be8b4b0788b6bedb0e217",
+  "head_commit": "9cc8a7331f2261b09f27fff060902bdbaa542311",
   "branch": "docs",
   "implementation_tests_run_by_this_review": false,
   "sources": [
@@ -175,11 +175,11 @@
   "artifacts": [
     {
       "path": "docs/Start Here.md",
-      "sha256": "BC2AFA596C0DF2E1F872CD60741093569064C01AFB78572E627AB95AE40BF6DE"
+      "sha256": "FCA31196A738AF625B586040A88AA6A2304B2291BE447F236D4977B8639BB4B0"
     },
     {
       "path": "research/security/scoped-collaboration.md",
-      "sha256": "BA945B1D13BB5D018C722F3977A269ABFDCDA5FE56C7B5E3122A068F65D0ABDF"
+      "sha256": "9D35BACBD26C25D9A382A045883C9AAA468656EA927ED3031CB4C92A1324B723"
     },
     {
       "path": "research/security/composed-export-model.md",
@@ -199,7 +199,11 @@
     },
     {
       "path": "research/security/shared-state-version-compatibility.md",
-      "sha256": "804C34C1864560547E07BBE24842D6AEF311D1892242DBA0516A1816F82C83C6"
+      "sha256": "423688E105500F625C3A9B3398F93A12811DD4BBA1AB1898C3D344DB83DD7074"
+    },
+    {
+      "path": "research/security/automation-rules-and-external-effects-review.md",
+      "sha256": "5D7BE8A5C7A95F837805F164F5BFFCF4E3DEA5C910B16100D042B118EF569223"
     }
   ],
   "coverage_limits": [
@@ -209,7 +213,7 @@
     "Working-tree and stash state is recorded per run; unrelated pre-existing changes and untracked material were not read or modified.",
     "Source fingerprints and a commit identify observed versions; they are not security attestations."
   ],
-  "next_question": "What immutable operation envelope and adapter language can express Agora's first mixed-version facet while remaining small enough for the verb boundary and replay model to verify?",
+  "next_question": "Should Agora's first standing automation contract permit only reversible local operations, with every external effect remaining a separately brokered proposal until crash-safe intent and receipt semantics are implemented?",
   "automation_setup": {
     "recorded_at_utc": "2026-08-31T19:22:38.8446109Z",
     "automation_id": "agora-security-review",
@@ -548,6 +552,87 @@
       ],
       "evidence_state": "Static review, design reasoning, and targeted primary-source research only. No repository code, project test, hook, build, package, model call, account, credential, private world, untracked research material, or external service was executed or read. Prior security-only work was selectively restored from an existing stash; unrelated stash content remained untouched. No implementation change or independent runtime evidence was produced.",
       "artifact": "research/security/shared-state-version-compatibility.md",
+      "implementation_tests_run": false
+    },
+    {
+      "review_date": "2026-09-18",
+      "captured_at_utc": "2026-09-18T17:10:52.0664052Z",
+      "trigger": "agora-security-review heartbeat",
+      "git_repository_present": true,
+      "head_commit": "9cc8a7331f2261b09f27fff060902bdbaa542311",
+      "previous_head_commit": "39ae665554629502c87be8b4b0788b6bedb0e217",
+      "branch": "docs",
+      "working_tree_at_start": "One pre-existing uncommitted change was present in research/text-desk-lab/notation/tasks.py. Its focused diff was inspected only to understand the new fixture and was left untouched.",
+      "change_scope": "Twenty-two commits were present since the prior reviewed head. No changed paths existed under kernel/, shell/, jeff/, or tests/. Review focused on the committed text-desk rules, scripts, external trial launcher, causal undo, and their implications for the existing security proposals. Bulk run evidence, transcripts, unrelated research, and the rest of the 22-commit delta were not reviewed.",
+      "investigation": "Whether shared rules and scripts can safely turn future collaborative events into world mutations or external effects",
+      "result": "Keep four records separate: a shared rule or script is a claim; local adoption grants only a pinned, bounded automation principal; each firing produces a concrete typed operation envelope and is rechecked at the verb boundary; each external effect goes through a durable intent and receipt broker that replay and undo cannot dispatch. The text-desk fixture is usable research but deliberately has no authority model. Its launch dispatches before its event is recorded, and grouped undo is not preflighted around non-undoable effects.",
+      "findings": [
+        {
+          "id": "AR-A1",
+          "gate": "Before shared rules or scripts can execute",
+          "status": "Static research-fixture finding and design proposal",
+          "summary": "Rules accept the general verb registry, may run stored scripts, bypass the stale-read fence as the desk's own hands, and use ambient actor identity. Shared rule definitions must not carry authority; a non-portable adoption record and current per-firing check must bind trigger class, operations, targets, budgets, and effect policy.",
+          "locations": ["research/text-desk-lab/notation/desk_knife.py:352", "research/text-desk-lab/notation/desk_knife.py:386", "research/text-desk-lab/notation/desk.py:689", "research/text-desk-lab/notation/world.py:352"]
+        },
+        {
+          "id": "AR-A2",
+          "gate": "Before a rule may watch future collaborative state",
+          "status": "Design proposal",
+          "summary": "A dynamic selection or event subscription is future authority unless local adoption bounds its enclosing surface, predicate, authenticated producer, payload fields, resolved occurrences, and resource budget. Trigger data provides values and causality, never authority."
+        },
+        {
+          "id": "AR-E1",
+          "gate": "Before any external-effect verb is exposed",
+          "status": "Static research-fixture finding",
+          "summary": "The trial launcher calls subprocess.Popen before updating world state or appending its launch event. A crash can therefore leave an unrecorded action and retry ambiguity. External effects need a stable intent recorded before dispatch, broker idempotency, explicit outcome-unknown state, and replay exclusion.",
+          "locations": ["research/text-desk-lab/notation/harness.py:47", "research/text-desk-lab/notation/harness.py:48", "research/text-desk-lab/notation/harness.py:50", "research/text-desk-lab/notation/harness.py:55"]
+        },
+        {
+          "id": "AR-U1",
+          "gate": "Before scripts or rules combine local mutations and external effects",
+          "status": "Static research-fixture finding",
+          "summary": "Grouped causal undo applies inverses in reverse order without preflight, while World.undo refuses external events. A script that launches and then mutates local state can be partly undone before refusal. Compensation must be planned before mutation, remain atomic for local inverses, and retain external receipts.",
+          "locations": ["research/text-desk-lab/notation/desk.py:653", "research/text-desk-lab/notation/desk.py:673", "research/text-desk-lab/notation/desk.py:677", "research/text-desk-lab/notation/world.py:688", "research/text-desk-lab/notation/world.py:699"]
+        },
+        {
+          "id": "AR-L1",
+          "gate": "Before unattended standing automation",
+          "status": "Static research-fixture finding and design proposal",
+          "summary": "Three cascade passes and mutable done/cursor state bound prototype work but do not create a durable paused conflict or cross-replica firing identity. Use a per-cause-chain budget and stable deduplication identity; never retry an external effect because a rule is reevaluated.",
+          "locations": ["research/text-desk-lab/notation/desk_knife.py:621", "research/text-desk-lab/notation/desk_knife.py:626", "research/text-desk-lab/notation/desk_knife.py:631", "research/text-desk-lab/notation/desk_knife.py:657"]
+        },
+        {
+          "id": "AR-D1",
+          "gate": "Before automation consumes external or model-produced results",
+          "status": "Design proposal",
+          "summary": "Authenticated schema-validated outcome fields may trigger bounded operations, but imported reply and transcript prose remains attributed untrusted data and cannot become commands, grants, identity, or publication authority.",
+          "locations": ["research/text-desk-lab/notation/harness.py:73", "research/text-desk-lab/notation/harness.py:79", "research/text-desk-lab/notation/harness.py:83", "research/text-desk-lab/notation/harness.py:89"]
+        }
+      ],
+      "reviewed_sources": [
+        {"path": "AGENTS.md", "sha256": "C67AB0D0DE7F7AE0AAC2FFE0DA43F4AD48B59BEEB6EBA681B9509BB4CD8539D5", "coverage": "Full applicable project instructions from the workspace and supplied heartbeat context."},
+        {"path": "docs/Start Here.md", "sha256": "FCA31196A738AF625B586040A88AA6A2304B2291BE447F236D4977B8639BB4B0", "coverage": "Full read and focused security research-index update."},
+        {"path": "docs/Agora Spec.md", "sha256": "6F2C0519CF9B98EF6471568FCDC297482FDE3E27DC86E8C933D66BD93F4309A0", "coverage": "Hash and Git-change comparison only; content was not re-reviewed."},
+        {"path": "docs/Reference/Objects and Facets.md", "sha256": "03EA4F4157AAD6C6CF166A030F525363F19D76D2574F6B9D6A81EE8BAB161F85", "coverage": "Hash comparison only against the prior reviewed version; unchanged."},
+        {"path": "docs/Reference/Security.md", "sha256": "31EEB16CB1D5A44D927252670857435B03553BAC47F6842F67FF47A028502B90", "coverage": "Hash comparison against the prior reviewed security contract; unchanged."},
+        {"path": "docs/Reference/Security Addendum.md", "sha256": "826A9622EA771D1EC9816F3AA9952DD70CAF4944A50541D36A760AFB5CBCBB96", "coverage": "Hash comparison against the prior reviewed addendum; unchanged."},
+        {"path": "research/security/scoped-collaboration.md", "sha256": "9D35BACBD26C25D9A382A045883C9AAA468656EA927ED3031CB4C92A1324B723", "coverage": "Targeted read of adoption, dynamic views, external effects, version histories, and open questions; focused follow-up added."},
+        {"path": "research/security/shared-state-version-compatibility.md", "sha256": "423688E105500F625C3A9B3398F93A12811DD4BBA1AB1898C3D344DB83DD7074", "coverage": "Full prior proposal used to refine the operation envelope; focused follow-up added."},
+        {"path": "research/text-desk-lab/EXPERIMENT.md", "sha256": "1E2A28EEF673698FACAEF30C79C193AE54414EFD8F985A77F3D27F4221FCE475", "coverage": "Targeted read of experiment purpose and evidence limits."},
+        {"path": "research/text-desk-lab/DESIGN-REFERENCES.md", "sha256": "EE2C7716C072EB09C92FEEFFF24D2735651336006F51D9A9CDAA14BC61CF4FB6", "coverage": "Targeted read of the fixture design references; not independently researched in this run."},
+        {"path": "research/text-desk-lab/notation/REPORT.md", "sha256": "E65A2B3928C65DC7A93CFF0FE2EF2880353258D0945BE9C805AC037D95E3EA74", "coverage": "Targeted read of authorization limits, automation semantics, trial effects, results, and open issues."},
+        {"path": "research/text-desk-lab/notation/NOTES.md", "sha256": "52F4E0D25BA9288E74D8D00ADDB26976A2212C30E33B5C8F0CF8D6942C884BCE", "coverage": "Targeted read of rule/script/clock development and trial-launch sessions; bulk chronological notes were not fully audited."},
+        {"path": "research/text-desk-lab/notation/FRICTION.md", "sha256": "D9B818CF3F81706C6BD22A0855850C6DAF3BEF3F0D0D0F0FEF6856E61182ECE5", "coverage": "Targeted read of automation and trial friction; not a full historical audit."},
+        {"path": "research/text-desk-lab/notation/desk.py", "sha256": "3BE0B5879051EC1D7230E34176CD322F481805E2ADDE6B4A49C36B71FD058148", "coverage": "Targeted static read of dispatch, causal undo, actor defaults, and rule fence bypass."},
+        {"path": "research/text-desk-lab/notation/desk_knife.py", "sha256": "05026643AB694027CE81A0FF9FA679F8F455F9CC82B92A0D9ED39F732D3CC9F8", "coverage": "Targeted static read of rule parsing, firing, cascade bound, scripts, substitution, export, and help contracts."},
+        {"path": "research/text-desk-lab/notation/harness.py", "sha256": "518D7CCC30FF5240011D8686DC9CC9A9258C32815A08337D6C56BE4F057FBEFB", "coverage": "Full static read of launch and sync."},
+        {"path": "research/text-desk-lab/notation/world.py", "sha256": "B311C5FB0E5BF2C43BB8278CBBA257BB4B1A3AD33CB980881DB00485A4337D19", "coverage": "Targeted static read of event creation, actor defaults, revision fencing, mutation, and undo."},
+        {"path": "research/text-desk-lab/notation/knife.py", "sha256": "44D5B01048CDA063EA8F2D35EDF7448E10D63B51758DF1B08E40F69EBD927194", "coverage": "Targeted static read of general registry construction and selection surface."},
+        {"path": "research/text-desk-lab/notation/moo.py", "sha256": "79DE508AF4039D83BE843C46361347F988938186DFB86E57F4F5CD6D279E9485", "coverage": "Targeted static read of verb registration and dispatch."},
+        {"path": "research/security/automation-rules-and-external-effects-review.md", "sha256": "5D7BE8A5C7A95F837805F164F5BFFCF4E3DEA5C910B16100D042B118EF569223", "coverage": "New focused advisory artifact; proposal and static fixture findings only."}
+      ],
+      "evidence_state": "Static Git comparison and source reasoning only. No repository code, project test, hook, build, package, model call, trial, process launch, external effect, account, credential, private world, run report, transcript, or production resource was executed or read. No primary-source web research was needed for this bounded follow-up. Existing model-run summaries establish small-fixture usability only and are not security evidence.",
+      "artifact": "research/security/automation-rules-and-external-effects-review.md",
       "implementation_tests_run": false
     }
   ],
