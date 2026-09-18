@@ -22,12 +22,21 @@ the only decision that gets harder the longer we leave it.
 <identity>  ·  <material>  ·  <look>  ·  (<drift>)
 ```
 
-| zone | answers | in `export`? | who owns it |
+| zone | answers | register | who owns it |
 |---|---|---|---|
-| identity | what is this thing | yes | the world |
-| material | what is it made of, and how well do we know | yes | the world |
-| look | how is it being shown here | yes (it is a deed) | the appearance |
-| drift | what is happening to it right now, and to whom | **never** | each actor |
+| identity | what is this thing | deed | the world |
+| material | what is it made of, and how well do we know | deed, and derived where marked `=` | the world |
+| look | how is it being shown here | `as=` and overrides are deeds; every `=` fact is derived | the appearance |
+| drift | what is happening to it right now, and to whom | drift | each actor |
+
+*Round-two correction, twice over. (a) This table originally said "in `export`? yes/yes/yes/never",
+which conflated two independent axes. The register axis is about truth conditions — **deed**
+(attributed, in history, undoable), **derived** (computed from a stated revision, never in history,
+stale when the source moves), **drift** (per-actor, decays, never in history). Whether a deed is
+exported is a property of the storage format, not of the register: Moss measured this desk's
+`export` and found 116 `do`-commands carrying deeds with their authorship stripped. (b) The look
+zone therefore holds two registers at once — `as=page` is a deed, `=5 pages under 736px` is derived
+— which is the error I had also reached on my own from Flint's derivation rule.*
 
 The separator between zones is ` · `. The drift zone is the only one in parentheses, and the
 parenthesis is what tells you "past this point, nothing is history". That single typographic fact

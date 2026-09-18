@@ -52,23 +52,32 @@ beats `+44`.
 
 **6. A theme that redefines a role.**
 ```
-refused: a theme may redefine tokens, not roles. "page" is the world's.
+refused: a theme may redefine tokens, not roles. "page" is the chrome's.
   -> do define calm role page "…"            (change it for both of us)
   -> do style <this appearance> …            (change only this one, as an override)
 ```
 Consequence: Alex's side and Claude's side may differ in shade and never in shape, and a thing
-dragged across cannot change form. One style per world; `as=page` means one thing forever.
+dragged across cannot change form.
+
+*Round two, amended after the Codex team's critique: I originally wrote "one style per world",
+which is wrong for any work whose subject is itself design. The correct rule is about **scope**, not
+about content-versus-style: the desk's chrome has exactly one style; a work about design may own its
+own bounded style subject with its own tokens and roles; no subject may ever scatter values through
+its body. See `wren-07` §6.*
 
 **7. `rewrite` on anchored prose.**
 ```
-refused: 2 anchors in §Findings. rewrite would orphan them.
-  -> do replace a32 span=k4 text="38ms"
-  -> do splice a32 after=k3 text=" (but see the rerun)"
-  -> do rewrite a32 #Findings text="…" anchors=orphan    (parks them, loudly)
+refused: 3 anchors in §Findings. this text carries none of them.
+  surgery:     do replace a32 span=k4 text="38ms"
+               do splice a32 after=k3 text=" (but see the rerun)"
+  restructure: do rewrite a32 #Findings anchors=carry text="<the marked face, ids included>"
+  give up:     do rewrite a32 #Findings anchors=orphan text="…"   (parks 3 threads)
 ```
-Flint calls this a cultural mitigation belonging in help text. I want it as a refusal, because the
-destructive path should be sayable only on purpose. This is the one place I am asking for more
-viscosity than anyone else in the studio.
+Flint called this a cultural mitigation belonging in help text; he has since withdrawn that and
+taken the refusal. *Round two: the bake-off (`wren-06`) showed the first two escapes are not enough
+— no sequence of `replace` and `splice` moves a clause to the front of a sentence — so
+`anchors=carry`, where the rewriter places the ids and the desk checks the id set, is the load-
+bearing arm, not a fallback.*
 
 **8. Structural opacity in chrome.**
 Flint corrected me here and the corrected rule is better than mine was. Three states, not two:
