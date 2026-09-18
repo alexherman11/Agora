@@ -153,7 +153,7 @@ def parse(src):
         if not colon or not re.fullmatch(r"[\w-]+", name):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
-                "of": None, "over": None, "each": None, "at": None, "on": []}
+                "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if p in LAYOUTS:
@@ -175,6 +175,8 @@ def parse(src):
                 node["over"] = val[1:]
             elif p == "at item":
                 node["at"] = "item"
+            elif word == "lens" and re.fullmatch(r"[\w$.-]+", val):
+                node["lens"] = val
             elif word == "on":
                 g, do, cmd = val.partition(" do ")
                 if g not in GESTURES or not do or not cmd.strip():
@@ -241,11 +243,10 @@ def _ctx_for(w, nid):
             "_tags": list(s.get("tags") or [])}
 
 
-def build(desk, src, depth=0):
+def build(desk, src, stack=(), count=None):
     root, parts = parse(src)
     w = desk.world
-
-    count = [0]
+    count = count if count is not None else [0]
 
     def make(node, ctx, key, parent_layout="free"):
         if node["at"] == "item" and parent_layout != "free":
@@ -256,6 +257,8 @@ def build(desk, src, depth=0):
         if node["at"] == "item" and ctx.get("item") in w.nodes:
             n = w.nodes[ctx["item"]]
             out["box"] = [n["x"], n["y"], n["w"], n["h"]]
+            # Lark: "can he see this?" The world already knows (offscreen-part, spills-parent, 43% hidden by f52); the scene threw it away.
+            out["facts"] = [f for f in w.relations(ctx["item"]) if f != "clear"]
         if node["text"] is not None:
             out["text"] = _fill(node["text"], {k: v for k, v in ctx.items() if k != "n"} if node["each"] else ctx)   # a repeat words its own count
         safe = {k: (_cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
@@ -290,11 +293,26 @@ def build(desk, src, depth=0):
             out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
             if out["text"] is not None:                         # Flint bug 4: the count existed and could not be put into words
                 out["text"] = out["text"].replace("$n", str(out["n"]))
+        if node["lens"]:
+            inner = _fill(node["lens"], ctx)
+            if inner.lower() in stack:
+                raise LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
+            sub = build(desk, find_lens(desk, inner)["text"], stack + (inner.lower(),), count)
+            sub["key"] = f"{key}/lens:{inner}"
+            _rekey(sub, sub["key"])
+            out["kids"].append(sub)
+            out["lens"] = inner
         for kid in node["kids"]:
             out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", ""))), f"{key}/{kid['name']}", node["layout"]))
         return out
 
     return make(parts[root], {}, root)
+
+
+def _rekey(n, prefix):
+    for k in n["kids"]:
+        k["key"] = prefix + "/" + k["key"]
+        _rekey(k, prefix)
 
 
 def to_text(scene, name, who, at):
@@ -320,8 +338,12 @@ def to_text(scene, name, who, at):
             bits.append(f"[{n['role']}]")
         if n["layout"]:
             bits.append(n["layout"])
+        if n.get("lens"):
+            bits.append(f"· lens {n['lens']}")
         if n["box"]:
             bits.append(f"at {n['box'][0]},{n['box'][1]} {n['box'][2]}x{n['box'][3]}")
+        if n.get("facts"):
+            bits.append("= " + ", ".join(n["facts"]))
         if "n" in n:
             bits.append(f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}")
         for a in n["acts"]:
@@ -344,6 +366,20 @@ def find_lens(desk, name):
 
 
 def scene_for(desk, name):
+    """Astra: an invalid lens was stored before it was validated, and the view went blank. A lens that stops compiling
+    now keeps showing its last version that did, and says so first, in both printers."""
     s = find_lens(desk, name)
-    sc = build(desk, s["text"])
-    return sc, to_text(sc, s["title"], desk.world.me, len(desk.world.events))
+    good = getattr(desk, "_lens_good", None)
+    if good is None:
+        good = desk._lens_good = {}
+    try:
+        sc = build(desk, s["text"], (s["title"].lower(),))
+        good[s["id"]] = s["text"]
+        return sc, to_text(sc, s["title"], desk.world.me, len(desk.world.events))
+    except LensRefusal as e:
+        if s["id"] not in good:
+            raise
+        sc = build(desk, good[s["id"]])
+        sc["broken"] = str(e)
+        text = to_text(sc, s["title"], desk.world.me, len(desk.world.events))
+        return sc, f"! lens {s['title']} no longer compiles: {e}\n! showing the last version that did. Fix it with rewrite, or undo.\n" + text

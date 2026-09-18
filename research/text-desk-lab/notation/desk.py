@@ -738,7 +738,9 @@ class Desk:
         if len(done) > 1:
             what = f"{len(done)} steps of {ev['via']}" if ev.get("via") else f"{eid} and {len(caused)} rule consequence(s)"
             return f"ok {r['event']}: reverted {done[-1]}..{done[0]} ({what})"
-        return f"ok {r['event']}: reverted {eid}"
+        # Jeff lost a lens to this: a refused command, then a bare undo, which reverted something minutes older and said only its number
+        said = f"{ev['verb']} {ev['target']}" + (f" {self._fmt_args(ev.get('args'))}" if ev.get("args") else "")
+        return f"ok {r['event']}: reverted {eid}, which was: {said[:160]}" + (f"  (made {ev['at'][11:16]})" if ev.get("at") else "")
 
     def cmd_do(self, verb, target, kv):
         if not verb or not target:
