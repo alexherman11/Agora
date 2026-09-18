@@ -39,10 +39,10 @@
       if (a.on === "edit") {
         el.contentEditable = "plaintext-only";
         el.addEventListener("focus", () => { busy = true; });
-        el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } if (e.key === "Escape") { el.textContent = n.text; el.blur(); } });
+        el.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); } if (e.key === "Escape") { el.textContent = n.text; el.blur(); } });
         el.addEventListener("blur", () => {
           // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
-          const v = el.textContent.trim().replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          const v = el.textContent.trim().replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
           if (v && v !== n.text) send(looked(n.item, a.line.replace("$value", v))); else busy = false;
         });
       }

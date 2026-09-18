@@ -864,6 +864,12 @@ class DeskKnife(DeskMoo):
             self.vars = self.vars or {}
             self.vars[name] = self._resolve(val)
             return f"ok ${name} = {self.vars[name]}"
+        if cmd == "rows":
+            import scene
+            try:
+                return scene.rows_text(self, arg.strip())
+            except scene.LensRefusal as e:
+                raise Refusal(str(e))
         if cmd == "scene":
             # the same tree the painter draws, printed: what is shown, where, and what each gesture would do
             import scene

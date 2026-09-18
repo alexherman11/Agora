@@ -50,6 +50,7 @@ class Session:
                 time.sleep(0.05)
         desk = pickle.loads(self.path.read_bytes()) if self.path.exists() else explore.fresh()
         desk.world.me = self.actor
+        desk._session = self.name
         per = getattr(desk, "_per", None) or {}
         if self.actor in per:
             desk.seen, desk.open, desk.last_event_seen = per[self.actor]
@@ -139,7 +140,9 @@ class Handler(SimpleHTTPRequestHandler):
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably
             events = [e["id"] for e in desk.world.events[n0:]]
         text = r.get("text") or ""
-        refused = r.get("error") or (text if text.startswith("ERR") else None)     # Rook: a parse failure came back as error=null
+        # Rook: a parse failure came back as error=null. And a refusal in the second step of `look x; do y` hid in the text.
+        bad = [l for l in text.splitlines() if l.startswith("ERR")]
+        refused = r.get("error") or (bad[0] if bad else None)
         self._json({"text": r.get("text"), "error": refused, "events_total": total, "line": line,
                     "as": (body.get("as") or "alex"), "created": created, "events": events})
 

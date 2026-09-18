@@ -688,7 +688,12 @@ class Desk:
             for e in evs)
 
     def _fmt_args(self, args):
-        return " ".join(f"{k}={v!r}" if " " in str(v) else f"{k}={v}" for k, v in (args or {}).items())
+        def one(k, v):
+            v = str(v)
+            if len(v) > 200:     # Moss: the receipt echoed the whole document back. Say its size; `read` has the rest.
+                return f"{k}=<{len(v.split())} words, {len(v.splitlines())} lines, begins {v[:40]!r}>"
+            return f"{k}={v!r}" if " " in v else f"{k}={v}"
+        return " ".join(one(k, v) for k, v in (args or {}).items())
 
     def cmd_undo(self, eid):
         if not eid:

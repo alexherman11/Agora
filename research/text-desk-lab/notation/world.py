@@ -307,7 +307,7 @@ class World:
     TEXT_VERBS = {
         "append": "line=<str>  (adds a line at the end; edits the subject, so every appearance changes)",
         "retitle": "title=<str>",
-        "rewrite": "text=<str>  (replaces all the text; write \\n between lines)",
+        "rewrite": "text=<str> [section=<heading>]  (replaces all the text, or only the body of one ## section; write \\n between lines)",
     }
 
     def verbs_for(self, nid):
@@ -655,7 +655,18 @@ class World:
             args = {"title": args.get("title", args.get("text", ""))}
             verb = "edit"
         elif verb == "rewrite":
-            args = {"text": args.get("text", args.get("line", ""))}
+            new = str(args.get("text", args.get("line", "")))
+            if args.get("section"):
+                # Moss: 1.2 KB to read a document, 49 KB to change one word in it. A change may be as small as a section.
+                want = str(args["section"]).lstrip("# ").strip().lower()
+                secs = self.sections(s["text"])
+                hits = [k for k, (h, _) in enumerate(secs) if (h or "(before the first heading)").lower() == want]
+                if len(hits) != 1:
+                    heads = ", ".join(repr(h) for h, _ in secs if h) or "none"
+                    raise Refusal(f"rewrite section={args['section']!r}: {'no such section' if not hits else 'more than one section has that heading'}. Sections here: {heads}")
+                secs[hits[0]] = (secs[hits[0]][0], new.strip("\n"))
+                new = "\n\n".join((f"## {h}\n" if h else "") + b for h, b in secs)
+            args = {"text": new}
             verb = "edit"
         if verb == "edit":
             if not any(k in args for k in ("title", "text", "append")):

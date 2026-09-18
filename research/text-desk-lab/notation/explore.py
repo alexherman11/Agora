@@ -87,6 +87,7 @@ def main():
     # --as <name>: a visitor works under their own name for this visit (events say by <name>); the owner is jeff
     me = desk.world.me = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
     # what has been seen, what is open and the since-your-last-look mark belong to each person, not to the session
+    desk._session = name
     per = getattr(desk, "_per", None) or {}
     if me in per:
         desk.seen, desk.open, desk.last_event_seen = per[me]

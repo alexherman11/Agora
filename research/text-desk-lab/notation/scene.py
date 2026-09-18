@@ -39,6 +39,73 @@ class LensRefusal(Exception):
     pass
 
 
+# ---- rows: parts of the world that are not appearances, made repeatable ------------------------------------
+# Moss, Lark and Wren hit one wall from three sides: a lens repeats over a selection, and sections, comments,
+# actors, events and worktrees were not selectable. Each source below is a fact the desk already printed
+# somewhere; here it gets named fields. `rows <source>` prints the same rows in the desk, so a lens never sees
+# anything the terminal cannot.
+SOURCES = {
+    "sections": ("sections:<id>", ("item", "heading", "words", "text", "index")),
+    "comments": ("comments:<id>", ("item", "cid", "by", "text", "state")),
+    "actors": ("actors", ("name", "acts", "last", "verb", "target", "read", "behind")),
+    "events": ("events", ("eid", "verb", "target", "by", "at", "merged")),
+    "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
+}
+NAMES = NAMES + tuple(f for _, fs in SOURCES.values() for f in fs)
+
+
+def rows(desk, source, session=None):
+    """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection)."""
+    w = desk.world
+    head, _, arg = source.strip().partition(":")
+    if head not in SOURCES or (head in ("sections", "comments")) != bool(arg):
+        return None
+    if arg:
+        nid = desk._resolve(arg)
+        s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)
+        if s is None:
+            raise LensRefusal(f"{source}: {arg} has no content to take {head} from")
+    if head == "sections":
+        return [{"item": nid, "heading": h or "(before the first heading)", "words": len(b.split()), "text": b, "index": k}
+                for k, (h, b) in enumerate(w.sections(s["text"]), 1)]
+    if head == "comments":
+        return [{"item": nid, "cid": c["id"], "by": c["by"], "text": c["text"], "state": "resolved" if c["resolved"] else "open"}
+                for c in s.get("comments", [])]
+    if head == "events":
+        return [{"eid": e["id"], "verb": e["verb"], "target": e["target"], "by": e["by"], "at": e.get("at", e.get("day", "")),
+                 "merged": e.get("merged", "")} for e in w.events[-20:]][::-1]
+    if head == "actors":
+        out, total = {}, len(w.events)
+        for e in w.events:
+            r = out.setdefault(e["by"], {"name": e["by"], "acts": 0, "read": "", "behind": ""})
+            r.update(acts=r["acts"] + 1, last=e.get("at", e.get("day", "")), verb=e["verb"], target=e["target"])
+        for a, v in (getattr(desk, "_per", None) or {}).items():
+            r = out.setdefault(a, {"name": a, "acts": 0, "last": "", "verb": "", "target": ""})
+            r.update(read=v[2], behind=total - v[2])
+        return sorted(out.values(), key=lambda r: r.get("last") or "", reverse=True)
+    if head == "worktrees":
+        import pickle
+        import worktree
+        base = (session or getattr(desk, "_session", "") or "").split("@")[0]
+        out = []
+        for p in sorted(worktree.SESSIONS.glob(f"{base}@*.pickle")) if base else []:
+            wt = getattr(pickle.loads(p.read_bytes()), "_wt", None) or {}
+            out.append({"name": p.stem.split("@", 1)[1], "by": wt.get("by", ""), "commands": len(wt.get("journal", [])),
+                        "merged": wt.get("merged_n", 0), "behind": len(w.events) - wt.get("base_events", 0)})
+        return out
+
+
+def rows_text(desk, source):
+    rs = rows(desk, source)
+    if rs is None:
+        raise LensRefusal("rows <source>. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
+    fields = SOURCES[source.partition(":")[0]][1]
+    lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
+    for r in rs:
+        lines.append("  " + " · ".join(f"{f}={str(r.get(f, ''))[:60]!r}" if " " in str(r.get(f, "")) else f"{f}={str(r.get(f, ''))[:60]}" for f in fields if f != "text" or len(fields) < 6))
+    return "\n".join(lines)
+
+
 def parse(src):
     """-> (root_name, parts) where parts[name] = node {name, props, kids}"""
     parts, stack, root = {}, [], None
@@ -75,7 +142,12 @@ def parse(src):
                 g, do, cmd = val.partition(" do ")
                 if g not in GESTURES or not do or not cmd.strip():
                     raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>`; got {p!r}")
-                node["on"].append({"on": g, "line": cmd.strip()})
+                cmd = cmd.strip()
+                # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
+                # unless it begins with one of the desk's own reading or session commands.
+                if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
+                    cmd = "do " + cmd
+                node["on"].append({"on": g, "line": cmd})
             else:
                 raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {', '.join(LAYOUTS)}, role, text, clamp, "
                                   f"of <selection>, over $field, each <part>, at item, on <gesture> do <command>")
@@ -138,9 +210,12 @@ def build(desk, src, depth=0):
         if node["each"]:
             each = parts[node["each"]]
             if node["of"]:
-                sel = desk._parse_selection(_fill(node["of"], ctx))
-                ids = sel[0] if sel else []
                 out["of"] = node["of"]
+                rs = rows(desk, _fill(node["of"], ctx))
+                for k, r in enumerate(rs or []):
+                    out["kids"].append(make(each, dict(ctx, **r), f"{key}/{r.get('cid') or r.get('eid') or r.get('name') or k}", node["layout"]))
+                sel = desk._parse_selection(_fill(node["of"], ctx)) if rs is None else None
+                ids = sel[0] if sel else []
                 for i in ids:
                     out["kids"].append(make(each, _ctx_for(w, i), f"{key}/{i}", node["layout"]))
             else:
