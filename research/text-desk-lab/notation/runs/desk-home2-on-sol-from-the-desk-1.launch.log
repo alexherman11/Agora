@@ -1,9 +1,0 @@
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 1, "name": "desk", "line": "look", "error": null}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 2, "name": "desk", "line": "help rules; help scripts", "error": null}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 3, "name": "desk", "line": "look f49; look f69; help selections; help clock", "error": null}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 4, "name": "desk", "line": "today", "error": "unknown command 'today'; try help"}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 5, "name": "desk", "line": "rule when in:f49,age>3 do move into=f69 now=1", "error": null}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 6, "name": "desk", "line": "script morning = clock $1; look f67; look f54", "error": null}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 7, "name": "desk", "line": "run morning 2026-10-01", "error": null}
-{"trial": "desk-home2-on-sol-from-the-desk-1", "call": 8, "name": "desk", "line": "rules; scripts; look f49; look f69", "error": null}
-{"finished": "desk-home2-on-sol-from-the-desk-1", "assessment": {"sweep_rule_exists": true, "sweep_rule_uses_3_days": true, "done_swept_now": true, "morning_script_exists": true, "morning_sets_clock_from_arg": true, "morning_shows_overdue_and_today": true, "clock_is_2026_10_01": true, "nothing_moved_by_hand": true, "nothing_lost": true, "pass": true}, "calls": 8, "refusals": 1, "seconds": 32.8, "error": null}

@@ -119,17 +119,17 @@ The notation lab ran 47 Terra trials over nine rounds. They produced the line no
 
 | Material | Location |
 |---|---|
-| Design vault (retired) | `C:/Projects/Agora4/docs/`, duplicate in `C:/Projects/Agora/docs/` |
+| Design vault (retired) | `C:/Projects/Agora4/research/archive/docs-vault-2026-09/`, duplicate in `C:/Projects/Agora/docs/` |
 | Original vault commits | `f7cdc90`, `5a8468e`; branch `master`, tag `pre-weave/docs` |
 | Spine attempt (uncommitted) | `C:/Projects/Agora/attempt1/` |
 | Milestone One and extensions | branch `codex/agora2-checkpoint-20260906` (`df9a149`); tags `pre-weave/docs`, `pre-weave/docs-final`; uncommitted copies in `C:/Projects/Agora/{kernel,jeff,shell,component_runtime}` |
-| Validation reports | `C:/Projects/Agora4/research/holistic-review/` |
-| Agora3 | branch `Agora3` (`7be2540`); checkout `C:/Projects/Agora3`; `research/local-snapshots/agora3-build/` |
+| Validation reports | `C:/Projects/Agora4/research/archive/holistic-review/` |
+| Agora3 | branch `Agora3` (`7be2540`); checkout `C:/Projects/Agora3`; `research/archive/local-snapshots/agora3-build/` |
 | Agora4 runtime | branch `agora4` (`c9ab3d8`), merged into `main`; `archive/agora4-before-recovery`, `archive/agora4-docs-restoration`, `experiment/native-applications`; source under `C:/Projects/Agora4/src/` |
 | Parallel work and WIP | `codex/parallel-worldline`; `codex/wip-*` branches |
 | Private worlds (not in git) | `C:/Projects/Agora/worlds/` (`parallel-desk` is JEFF0's live desk) |
 | Presentation experiment, authored examples | `C:/Projects/Agora4/experiments/`, `examples/` |
-| Labs | `C:/Projects/Agora4/research/` (arrangement-lab, tessera-lab, language-interface, security, graph-memory, reviews) |
+| Labs | `C:/Projects/Agora4/research/archive/` (arrangement-lab, tessera-lab, language-interface, security, graph-memory, the reviews, text-desk-lab-v1); tessera evidence and notation trial runs parked in `C:/Projects/Agora/research-archive/` |
 | Shared visual desk | branch `research/shared-visual-desk`; rounds 7 and 8 uncommitted on 23 September |
 
 ## Related documents

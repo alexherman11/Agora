@@ -164,7 +164,7 @@ Which file for which change: a new verb goes in `moo.py` (and `world.py` if it n
 
 ## Evidence and limits
 
-**Automated checks.** `test_scene.py` runs four tests, all passing today, covering lens admission only. Nothing automated covers `world.py`, verbs, the fence, undo, worktrees or the server. The parent lab's sixteen tests exercise an earlier desk, not this code. `desk-shell/checks/` needs a live page and a running server. Model trials (`run.py`) depend on a transport and a Codex binary outside this repository.
+**Automated checks.** `test_scene.py` runs four tests, all passing today, covering lens admission only. Nothing automated covers `world.py`, verbs, the fence, undo, worktrees or the server. The first text desk's sixteen tests (now under `research/archive/text-desk-lab-v1/`) exercise an earlier desk, not this code. `desk-shell/checks/` needs a live page and a running server. Model trials (`run.py`) depend on a transport and a Codex binary outside this repository.
 
 **Verified live, 18 September.** The lens painter painted 38 of 38 scene nodes and 200 of 200 for the desktop lens, with declared boxes exact to the pixel and every type size on the ramp. A reader's selection survived another actor's act. Rook reproduced nineteen shell and app defects, listed in `desk-shell/checks/rook-bugs.md`; most remain open or unverified.
 
