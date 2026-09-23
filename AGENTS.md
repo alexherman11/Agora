@@ -1,10 +1,14 @@
-# Agora3 development guide
+# Agora development guide
 
-Agora3 is a fresh implementation of a programmable computing environment.
-Read [Start Here](docs/Start%20Here.md), [Constitution](docs/Constitution.md),
-[Design Commitments](docs/Design%20Commitments.md), [Agora Spec](docs/Agora%20Spec.md),
-the relevant reference material, and
-[Implementation Status](docs/Implementation%20Status.md) before domain work.
+Agora is a programmable computing environment. The current documentation is the
+five files in `docs/`: read [Agora](docs/Agora.md) for the vision,
+[Dynamic Desk](docs/Dynamic%20Desk.md) for the design and its open questions,
+[Current Implementation](docs/Current%20Implementation.md) for what exists and
+where the code is, and [Previous Work](docs/Previous%20Work.md) for the earlier
+architectures. The active code is the text desk under
+`research/text-desk-lab/notation/`. The native runtime under `src/` is retained,
+not active; the sections below that describe its boundaries still apply to it.
+The retired design vault is archived under `research/archive/docs-vault-2026-09/`.
 
 ## Working agreement
 
