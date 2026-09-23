@@ -555,7 +555,8 @@ class World:
             self._bump(target)
             ev = self._event(verb, target, args, {"delete": aid, "delete_subject": sid}, actor)
             r = {"ok": True, "event": ev["id"], "changed": [target, aid], "created": aid,
-                 "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in props.items()) if props else "")}
+                 "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in props.items()) if props else "")
+                         + ("; x= y= w= h= place a thing, they are not props (do prop " + aid + " y=... for a prop)" if {"x", "y", "w", "h"} & set(args) else "")}
             if n["layout"] == "free" and not free:
                 r["note"] += f"; no free space, it covers things: move it or tile {target}"
             return r

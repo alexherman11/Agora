@@ -509,7 +509,8 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         if the_state not in ("live",) and not the_state.startswith("->"):
             return out          # empty or ambiguous: printed, gestures off, nothing under it
         for dname, interp, ins in node["derive"]:
-            dctx = dict(ctx.get("_props") or {}, **ctx)       # Juniper: `day-n $trip.start $tripday` could not read the thing's own prop
+            dctx = dict(ctx.get("_props") or {})
+            dctx.update(ctx)                                     # Juniper: `day-n $trip.start $tripday` could not read the thing's own prop
             vals = [_fill(x, dctx, track) if x.startswith("$") else x for x in ins]
             res, err = INTERPS[interp][1](vals)
             out.setdefault("derived", []).append({"name": dname, "interp": interp, "inputs": vals,
@@ -526,7 +527,10 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         if node["text"] is not None:
             pv = dict(ctx.get("_props") or {})
             missing = [p for p in node["props"] if p not in pv and p not in ctx]
-            fill_ctx = dict({p: "" for p in missing}, **pv, **{k: v for k, v in ctx.items() if k != "n"} if node["each"] else dict(ctx))
+            # Juniper: a prop named n (or any built-in name) crashed the compiler here. Built-ins win; the prop is still readable as $it or a frame.
+            fill_ctx = {p: "" for p in missing}
+            fill_ctx.update(pv)
+            fill_ctx.update({k: v for k, v in ctx.items() if k != "n"} if node["each"] else ctx)
             out["text"] = _fill(node["text"], fill_ctx, track)   # a repeat words its own count
             if node["props"]:
                 out["read"] = {p: pv.get(p) for p in node["props"] if p in pv}      # what the lens read from the thing

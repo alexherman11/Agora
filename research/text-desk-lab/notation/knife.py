@@ -98,6 +98,8 @@ def parse_selection(w, token):
             k, eq, v = t[5:].partition("=")
             if not k:
                 raise Refusal("prop:k=v, or prop:k alone for things that have k")
+            if eq and not v:      # Juniper, Pike: prop:year= matched everything that has a year, silently
+                raise Refusal(f"prop:{k}= has no value; say prop:{k}=<value>, or prop:{k} alone for things that have {k}")
 
             def okp(nid, k=k, v=v, eq=eq):
                 n = w.nodes[nid]

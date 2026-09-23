@@ -6,7 +6,7 @@ New commands: examine id, help [verb], verbs id (by origin). `do` goes through t
 import shlex
 
 import moo
-from desk import Desk, HELP, unescape_value
+from desk import Desk, HELP, aspects_of, unescape_value
 from world import Refusal
 
 HELP_MOO = HELP.replace(
@@ -205,11 +205,10 @@ class DeskMoo(Desk):
         if seen is None:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))
-        hit = name not in ("create", "comment") and self._touched_by_others(nid)   # the appearance's rev alone misses edits made through a sibling
-        if not hit and seen != cur and getattr(self, "_window", "") and name not in ("create", "comment"):
-            # Juniper's step 11: two windows of one person. A windowed reader is judged on what it saw, whoever acted since.
-            last = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
-            hit = last[-1] if last else {"id": "?", "verb": "?", "by": w.me, "target": nid}
+        # Sable's spec 1, first test: the fence is keyed by (subject, aspect). A windowed reader (Juniper's step 11) is
+        # judged on what it saw, whoever acted since; an unwindowed one is excused its own deeds.
+        mine = aspects_of(name, kv)
+        hit = name not in ("create", "comment") and self._touched_by_others(nid, mine, others_only=not getattr(self, "_window", ""))
         if hit:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
             raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {hit['by']}); look at it again before acting")
@@ -221,10 +220,13 @@ class DeskMoo(Desk):
             if ev is not None:
                 ev.setdefault("changed", []).extend(r.get("changed", []))
                 ev["via"] = name
+                ev["window"] = getattr(self, "_window", "") or ""     # which of this actor's windows acted (Sable: the observer)
         self._after_mutation()
-        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result: the receipt is a look
-            if c in w.nodes or c in w.subjects:
-                self._mark_seen(c)
+        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result of what YOU touched; the scan for others' deeds still
+            if c in w.nodes:                        # starts at your last real look, and it is keyed by aspect (Sable's spec 1)
+                self.seen[c] = w.nodes[c]["rev"]
+            elif c in w.subjects:
+                self.seen[c] = w.subjects[c]["rev"]
         evs = r.get("events") or ([r["event"]] if r.get("event") else [])
         head = f"ok {name} {nid} {self._fmt_args(kv)}".rstrip()
         if note:
@@ -247,10 +249,14 @@ class DeskMoo(Desk):
             out += f"\n  {r['note']}"
         for c in r.get("changed", []):
             if c in w.nodes and c != nid:
-                self._mark_seen(c)   # your own change; the receipt is the look
+                self._mark_rev(c)    # your own change; the receipt shows the revision, not the other aspects
         if nid in w.nodes:
-            self._mark_seen(nid)
-            out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
+            self._mark_rev(nid)
+            self._receipt = True
+            try:
+                out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
+            finally:
+                self._receipt = False
             if w.nodes[nid]["type"] == "surface" and v.level >= 2:
                 out += "\n" + "\n".join("  " + self.line(k["id"], 1) for k in w.children(nid))
         out += self._nudge(name, nid, kv)

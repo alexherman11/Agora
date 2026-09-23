@@ -30,6 +30,33 @@ HELP = """commands (one per call):
 ids: f.. surface, a.. appearance, s.. subject, e.. event. quote values with spaces."""
 
 
+def aspects_of(verb, args):
+    """The aspects a deed touches, as Sable's spec 1 names them: prop:<k>, title, text, due, tags, place.
+    None means everything (a verb this table does not know)."""
+    a = args or {}
+    if verb == "prop":
+        return {f"prop:{k}" for k in a if k not in ("at", "_by", "remove")} | {f"prop:{k.strip()}" for k in str(a.get("remove", "")).split(",") if k.strip()}
+    if verb in ("retitle", "rename"):
+        return {"title"}
+    if verb == "edit":
+        return {k for k in ("title", "text", "due") if k in a} or None
+    if verb in ("rewrite", "append", "check", "uncheck", "split", "seal", "unseal"):
+        return {"text"}
+    if verb == "due":
+        return {"due"}
+    if verb in ("tag", "untag"):
+        return {"tags"}
+    if verb in ("move", "resize", "place", "tile", "untile", "stack", "fold", "unfold", "sort", "tidy", "gather", "swap",
+                "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop"):
+        return {"place"}
+    return None
+
+
+def aspects_meet(a, b):
+    """Do two aspect sets overlap? Either side unknown (None) counts as everything."""
+    return a is None or b is None or bool(a & b)
+
+
 def unescape_value(v):
     """A k=v value after shlex: an unescaped \\n is a newline; \\\\ is one literal backslash (so \\\\n stays literal)."""
     return re.sub(r"(?<!\\)\\n", "\n", v).replace("\\\\", "\\").replace("\\$", "$")
@@ -264,31 +291,49 @@ class Desk:
             raise Refusal(f"{ident!r} names {len(hits)} things: {', '.join(hits)}; use an id")
         raise Refusal(f"no such id {ident!r} (ids look like f02, a05, s03; use look or find)")
 
-    def _touched_by_others(self, nid):
-        """Has another actor's deed named this thing, its subject, or (for a surface) its membership since I last saw it?
+    def _touched_by_others(self, nid, fields=None, others_only=True):
+        """Has a deed named this thing, its subject, or (for a surface) its membership since I last saw it, on an ASPECT
+        my act is about to touch? Sable's spec 1: the fence is keyed by (referent, aspect), so a write to prop:surface
+        does not block a write to prop:beds. `fields` is what my act touches (None = everything). `others_only` skips my
+        own deeds, which a receipt already showed me; a windowed reader passes False and is judged on what it saw.
         Geometry that moved because a sibling reflowed is not a reason to refuse."""
         w = self.world
-        since = (getattr(self, "_seen_idx", None) or {}).get((w.me, nid), 0)
+        idx = getattr(self, "_seen_idx", None) or {}
+        since = idx.get((self._observer(), nid), idx.get((w.me, nid), 0))
         n = w.nodes.get(nid)
         names = {nid} | ({n["subject"]} if n and n.get("subject") else set())
         subj = n.get("subject") if n else None
+        mywin = getattr(self, "_window", "") or ""
         for e in w.events[since:]:
-            if e["by"] == w.me or e.get("undone"):
-                continue
-            if e["target"] in names:
-                return e
+            if e.get("undone") or (e["by"] == w.me and (others_only or e.get("window", "") == mywin)):
+                continue                      # my own deeds from this window are already on my receipts
+            hit = e["target"] in names
             # Sable: an edit through a sibling appearance changes what I am looking at; the event lists the subject as changed
-            if subj and subj in (e.get("changed") or []) and e["verb"] not in ("place", "remove"):
-                return e
-            if n and n["type"] == "surface" and e["verb"] in ("sort", "tile", "untile", "remove", "move") and nid in (e.get("changed") or []):
+            hit = hit or (subj and subj in (e.get("changed") or []) and e["verb"] not in ("place", "remove"))
+            hit = hit or (n and n["type"] == "surface" and e["verb"] in ("sort", "tile", "untile", "remove", "move") and nid in (e.get("changed") or []))
+            if hit and aspects_meet(fields, aspects_of(e.get("via") or e["verb"], e.get("args"))):
                 return e
         return None
 
+    def _observer(self):
+        win = getattr(self, "_window", "") or ""
+        return self.world.me + ("/" + win if win else "")
+
+    def _mark_rev(self, nid):
+        """A receipt shows the result of what I touched, so the revision is seen; but it is not a look, so the scan for
+        other observers' deeds on other aspects still starts at my last real look (Sable's spec 1; Juniper's two windows)."""
+        if nid in self.world.nodes:
+            self.seen[nid] = self.world.nodes[nid]["rev"]
+        elif nid in self.world.subjects:
+            self.seen[nid] = self.world.subjects[nid]["rev"]
+
     def _mark_seen(self, nid):
+        if getattr(self, "_receipt", False):      # a receipt printing a line is not a look (see _mark_rev)
+            return self._mark_rev(nid)
         idx = getattr(self, "_seen_idx", None)
         if idx is None:
             idx = self._seen_idx = {}
-        idx[(self.world.me, nid)] = len(self.world.events)
+        idx[(self._observer(), nid)] = len(self.world.events)     # Sable: "who saw what" is the observer, actor plus window
         if nid in self.world.nodes:
             self.seen[nid] = self.world.nodes[nid]["rev"]
         elif nid in self.world.subjects:
@@ -777,9 +822,11 @@ class Desk:
                 pass
             w.events[-1].setdefault("changed", []).append(c)
         self._after_mutation()
-        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result
-            if c in w.nodes or c in w.subjects:
-                self._mark_seen(c)
+        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result of what you touched
+            if c in w.nodes:
+                self.seen[c] = w.nodes[c]["rev"]
+            elif c in w.subjects:
+                self.seen[c] = w.subjects[c]["rev"]
         out = f"ok {r['event']}: {verb} {nid} {self._fmt_args(kv)}".rstrip()
         if r.get("created"):
             out += f" → created {r['created']}"
@@ -790,10 +837,14 @@ class Desk:
             out += "\n  now: " + self.line(r["created"], 1) + self.position_note(r["created"])
         for c in r.get("changed", []):
             if c in w.nodes and c != nid:
-                self._mark_seen(c)   # your own change; the receipt is the look
+                self._mark_rev(c)    # your own change; the receipt shows the revision, not the other aspects
         if nid in w.nodes:
-            self._mark_seen(nid)
-            out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
+            self._mark_rev(nid)
+            self._receipt = True
+            try:
+                out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
+            finally:
+                self._receipt = False
         return out
 
     def position_note(self, nid):

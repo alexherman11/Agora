@@ -18,6 +18,7 @@ Nothing here holds a lock while anyone thinks. A fork costs one pickle copy.
 """
 
 import pickle
+from desk import aspects_of, aspects_meet
 import re
 from pathlib import Path
 
@@ -25,6 +26,27 @@ HERE = Path(__file__).resolve().parent
 SESSIONS = HERE / "sessions"
 ID = re.compile(r"(?<![\w$.])([afs]\d+)\b")
 JOURNALLED = ("rule ", "script ", "clock ")     # change the desk without making a world event
+
+
+def _aspects_of_line(cmd):
+    """The aspects one journaled command line touches (Sable's spec 1: merge conflicts are per (referent, aspect))."""
+    import shlex
+    out = set()
+    for seg in cmd.split(";"):              # a journaled line may be `look :3; do prop a06 beds=20`
+        try:
+            words = shlex.split(seg.strip())
+        except ValueError:
+            return None
+        if not words or words[0].lower() in ("look", "read", "examine", "find", "where", "verbs", "pivot", "history", "help", "open", "close", "scene", "rows", "table"):
+            continue
+        if len(words) < 2 or words[0].lower() != "do":
+            return None
+        kv = dict(w.partition("=")[::2] for w in words[2:] if "=" in w)
+        a = aspects_of(words[1].lower(), kv)
+        if a is None:
+            return None
+        out |= a
+    return out
 
 
 def _kin(w, ids):
@@ -149,9 +171,11 @@ def handle(line, session, desk, actor):
                 # Lark: the fence asks "changed since YOU saw it", and lets you through when you were both hands.
                 # A merge must ask "changed since the FORK saw it", whoever did it.
                 named = _kin(w, set(ID.findall(cmd)))
+                mine = _aspects_of_line(cmd)
                 for e in w.events[wt["base_events"]:first]:
                     subj = (w.nodes.get(e["target"]) or {}).get("subject")
-                    if not e.get("undone") and e.get("merged") != name and e["verb"] not in ("create", "comment") and (e["target"] in named or subj in named):
+                    if not e.get("undone") and e.get("merged") != name and e["verb"] not in ("create", "comment") and (e["target"] in named or subj in named) \
+                            and aspects_meet(mine, aspects_of(e.get("via") or e["verb"], e.get("args"))):
                         return (f"refused: merge of {name} stopped at command {k} of {len(wt['journal'])}; nothing was applied\n"
                                 f"  {j['by']}: {cmd}\n  {e['target']} changed here since the fork ({e['id']} {e['verb']} by {e['by']})\n"
                                 f"  worktree diff {name} shows both sides; redo that step in the worktree or here by hand"), desk
