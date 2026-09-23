@@ -32,7 +32,9 @@ def test_refusals():
     refused("root : column, role no-such-role", "no role")
     refused("root : column, on drop do link $item to=$other", "on <click|edit|drag>")
     refused("root : column, width 300", "cannot say")
-    refused("root : column\n  a : text $me", "no value $me")
+    # $me is not refused any more: a name outside NAMES is a prop of the thing, printed (no me) when it lacks it (Juniper, Pike)
+    _, parts = scene.parse("root : column\n  a : text $me")
+    assert parts["root"]["kids"][0]["props"] == ["me"]
     refused("root : column, of kind:note", "say what with `each")
 
 

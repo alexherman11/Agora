@@ -27,6 +27,18 @@ ID = re.compile(r"(?<![\w$.])([afs]\d+)\b")
 JOURNALLED = ("rule ", "script ", "clock ")     # change the desk without making a world event
 
 
+def _kin(w, ids):
+    """Sable's lost update: a command names a06, the base edited the same subject through a05. The fence must see
+    through appearances to the subject and back out to every appearance of it."""
+    out = set(ids)
+    for i in list(ids):
+        subj = (w.nodes.get(i) or {}).get("subject") or (i if i in w.subjects else None)
+        if subj:
+            out.add(subj)
+            out |= {nid for nid, n in w.nodes.items() if n.get("subject") == subj}
+    return out
+
+
 def ids_of(desk):
     w = desk.world
     return set(w.nodes) | set(w.subjects)
@@ -101,7 +113,7 @@ def handle(line, session, desk, actor):
         fork = _load(session, name)
         wt = fork._wt
         if sub == "diff":
-            named = {m for j in wt["journal"] for m in ID.findall(j["line"])}
+            named = _kin(desk.world, {m for j in wt["journal"] for m in ID.findall(j["line"])})
             out = [f"worktree {name} · forked at event {wt['base_events']} by {wt['by']}" + (" · merged" if wt.get("merged") else ""),
                    f"there ({len(wt['journal'])} command(s)):"]
             out += [f"  + {j['by']}: {j['line']}" + (f"   (made {' '.join(j['created'])})" if j["created"] else "") for j in wt["journal"]] or ["  nothing yet"]
@@ -136,7 +148,7 @@ def handle(line, session, desk, actor):
                 w.me = j["by"]
                 # Lark: the fence asks "changed since YOU saw it", and lets you through when you were both hands.
                 # A merge must ask "changed since the FORK saw it", whoever did it.
-                named = set(ID.findall(cmd))
+                named = _kin(w, set(ID.findall(cmd)))
                 for e in w.events[wt["base_events"]:first]:
                     subj = (w.nodes.get(e["target"]) or {}).get("subject")
                     if not e.get("undone") and e.get("merged") != name and e["verb"] not in ("create", "comment") and (e["target"] in named or subj in named):

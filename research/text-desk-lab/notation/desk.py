@@ -271,14 +271,18 @@ class Desk:
         since = (getattr(self, "_seen_idx", None) or {}).get((w.me, nid), 0)
         n = w.nodes.get(nid)
         names = {nid} | ({n["subject"]} if n and n.get("subject") else set())
+        subj = n.get("subject") if n else None
         for e in w.events[since:]:
             if e["by"] == w.me or e.get("undone"):
                 continue
             if e["target"] in names:
-                return True
+                return e
+            # Sable: an edit through a sibling appearance changes what I am looking at; the event lists the subject as changed
+            if subj and subj in (e.get("changed") or []) and e["verb"] not in ("place", "remove"):
+                return e
             if n and n["type"] == "surface" and e["verb"] in ("sort", "tile", "untile", "remove", "move") and nid in (e.get("changed") or []):
-                return True
-        return False
+                return e
+        return None
 
     def _mark_seen(self, nid):
         idx = getattr(self, "_seen_idx", None)

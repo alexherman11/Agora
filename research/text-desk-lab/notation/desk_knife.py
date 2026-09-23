@@ -899,10 +899,14 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
-            positional = [unescape_value(a) for a in argv[1:] if "=" not in a or a.startswith("?")]   # titles carry escapes too
+            # Juniper: `do prop prop:day=2026-10-10 tripday=1` lost its target, because the selection carries an =. A word that
+            # begins with a selection term is the target, = or not.
+            SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links):|^-?(due|age)[<>]|^[?]")
+            is_target = lambda a: "=" not in a or a.startswith("?") or bool(SEL.match(a))
+            positional = [unescape_value(a) for a in argv[1:] if is_target(a)]   # titles carry escapes too
             kv = {}
             for a in argv[1:]:
-                if "=" in a and not a.startswith("?"):
+                if "=" in a and not is_target(a):
                     k, _, v = a.partition("=")
                     kv[k] = unescape_value(v)
             return self.cmd_do_knife(verb, positional, kv)

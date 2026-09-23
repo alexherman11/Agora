@@ -15,12 +15,16 @@ An unindented name defines a part; the first one is the root.
 
     column | row | free          how children are laid out (the same three words surfaces use)
     role <name>                  the look, by a role from the style file. A lens never names a colour or a size.
-    text <template>              words, with $title $text $kind $due $tags $id $item $it $n and any field of a row
-                                 source. Quote it to keep commas and hashes: text "Hello, world # literally"
+    text <template>              words, with $title $text $kind $due $tags $id $item $it $n, any field of a row
+                                 source, and any prop of the thing ($place): the scene prints what it read and
+                                 marks a missing prop (no place). Quote it to keep commas and hashes: text "a, b # c"
     clamp <N>                    on words: at most N lines (printed as ~, the painter clamps wrapped lines).
                                  on a repeat: at most N instances; both printers say how many are left
-    of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas), or over a row
-                                 source: sections:<id> comments:<id> actors events worktrees (`rows <source>` prints them)
+    of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas), over ids named
+                                 one by one (of a04,s09: an appearance, or a subject wherever it appears; the scene
+                                 prints each one's state: unplaced, gone), or over a row source: sections:<id>
+                                 comments:<id> actors events worktrees (`rows <source>` prints them). An empty
+                                 repeat prints (empty); it never looks like a full one
     over $tags                   repeat over a list field of the current thing; $it is each value
     each <part>                  what to instantiate for each repeated thing; $n is the count, on and under the repeat
     at item                      take x,y,w,h from the thing's own appearance in the world (parent must be free)
@@ -165,7 +169,7 @@ def parse(src):
         if not colon or not re.fullmatch(r"[\w-]+", name):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
-                "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None}
+                "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": []}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if p in LAYOUTS:
@@ -176,9 +180,9 @@ def parse(src):
                 node[word] = val
             elif word == "text" and val:
                 node["text"] = val.strip('"')
-                for v in re.findall(r"\$(\w+)", node["text"]):
-                    if v not in NAMES:      # Lark: $me printed as its own name, identically in both printers. Agreement is not truth.
-                        raise LensRefusal(f"line {n}: no value ${v}. A lens can name: {' '.join('$' + x for x in NAMES)}")
+                # Juniper, Pike: a lens could not read a thing's own prop ($place). Any name outside NAMES is a prop; the
+                # scene prints what it read and marks (no place) when the thing lacks it. Lark's $me now prints (no me): honest.
+                node["props"] = [v for v in re.findall(r"\$(\w+)", node["text"]) if v not in NAMES]
             elif word == "clamp" and val.isdigit():
                 node["clamp"] = int(val)
             elif word == "of" and val:
@@ -257,15 +261,51 @@ def _fill(tpl, ctx):
     return re.sub(r"\$(\w+)", lambda m: str(ctx[m.group(1)]) if m.group(1) in ctx else m.group(0), tpl)
 
 
-def _ctx_for(w, nid):
-    n = w.nodes[nid]
-    s = w.subjects.get(n.get("subject")) or {}
-    return {"item": nid, "id": n.get("subject") or nid, "title": s.get("title", n.get("title", "")), "text": s.get("text", ""),
-            "kind": s.get("kind", n["type"]), "due": s.get("due") or "", "tags": " ".join(s.get("tags") or []),
-            "_tags": list(s.get("tags") or [])}
+def _ctx_for(w, nid, state=None):
+    """The values a lens may print for one thing. An appearance id, or a subject id (then item is its first appearance,
+    or None when unplaced: Pike found a lens could not name the durable thing at all)."""
+    if nid not in w.nodes and nid not in w.subjects:          # named in a lens, gone from the world: the scene says so
+        return {"item": None, "id": nid, "title": "", "text": "", "kind": "", "due": "", "tags": "", "_tags": [], "_props": {},
+                "_state": state or "gone"}
+    if nid in w.subjects and nid not in w.nodes:
+        s, apps = w.subjects[nid], w.appearances_of(nid)
+        n = w.nodes[apps[0]] if apps else {"type": s.get("kind", "note")}
+        item = apps[0] if apps else None
+    else:
+        n = w.nodes[nid]
+        s = w.subjects.get(n.get("subject")) or {}
+        item = nid
+    ctx = {"item": item, "id": n.get("subject") or nid, "title": s.get("title", n.get("title", "")), "text": s.get("text", ""),
+           "kind": s.get("kind", n["type"]), "due": s.get("due") or "", "tags": " ".join(s.get("tags") or []),
+           "_tags": list(s.get("tags") or []), "_props": dict(s.get("props") or {})}
+    if state:
+        ctx["_state"] = state
+    return ctx
 
 
-def build(desk, src, stack=(), count=None, props=None):
+_ID = re.compile(r"^[afs]\d+$")
+
+
+def _named(w, sel):
+    """`of a04,s09`: ids named one by one. -> list of (id, state) or None when `sel` is not a list of ids.
+    An appearance id is itself; a subject id is each of its appearances (occurrences), or the subject unplaced;
+    a missing id is gone. Pike: `of a04,a06` emptied entirely when a04 was removed; each id now answers alone."""
+    terms = [t for t in re.split(r"[,\s]+", sel.strip()) if t]
+    if not terms or not all(_ID.match(t) for t in terms):
+        return None
+    out = []
+    for t in terms:
+        if t in w.nodes:
+            out.append((t, "live"))
+        elif t in w.subjects:
+            apps = w.appearances_of(t)
+            out += [(a, "live") for a in apps] or [(t, "unplaced")]
+        else:
+            out.append((t, "gone"))
+    return out
+
+
+def build(desk, src, stack=(), count=None, props=None, closure=None):
     root, parts = parse(src)
     w = desk.world
     props = props or {}
@@ -306,11 +346,27 @@ def build(desk, src, stack=(), count=None, props=None):
             # Lark: "can he see this?" The world already knows (offscreen-part, spills-parent, 43% hidden by f52); the scene threw it away.
             out["facts"] = [f for f in w.relations(ctx["item"]) if f != "clear"]
         if node["text"] is not None:
-            out["text"] = _fill(node["text"], {k: v for k, v in ctx.items() if k != "n"} if node["each"] else ctx)   # a repeat words its own count
+            pv = dict(ctx.get("_props") or {})
+            missing = [p for p in node["props"] if p not in pv and p not in ctx]
+            fill_ctx = dict({p: "" for p in missing}, **pv, **{k: v for k, v in ctx.items() if k != "n"} if node["each"] else dict(ctx))
+            out["text"] = _fill(node["text"], fill_ctx)   # a repeat words its own count
+            if node["props"]:
+                out["read"] = {p: pv.get(p) for p in node["props"] if p in pv}      # what the lens read from the thing
+            if missing:
+                out["missing"] = missing                                             # printed (no place); the painter shows nothing there
+        if ctx.get("_state") and ctx["_state"] != "live":
+            out["state"] = ctx["_state"]
         safe = {k: (_cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
-        out["acts"] = [{"on": a["on"], "line": _fill(a["line"], safe)} for a in node["on"]]
+        out["id"] = ctx.get("id")
+        # a thing that is gone or unplaced has no appearance to act on: no gesture is offered, and the text says why
+        out["acts"] = [] if (node["on"] and ctx.get("_state") in ("gone", "unplaced")) else [{"on": a["on"], "line": _fill(a["line"], safe)} for a in node["on"]]
         if ctx.get("item") in w.nodes and out["acts"]:
-            out["rev"] = w.nodes[ctx["item"]]["rev"]      # Astra: a gesture acts on the generation that was observed, not on a fresh look
+            out["rev"] = w.nodes[ctx["item"]]["rev"]
+            # Astra (bridge c31, c42): fields they had to join server-side, now stated. Coordinates are px in the parent.
+            nd = w.nodes[ctx["item"]]
+            sj = w.subjects.get(nd.get("subject") or "")
+            out["bind"] = {"subject": nd.get("subject"), "subject_rev": sj["rev"] if sj else None, "parent": nd["parent"],
+                           "parent_rev": w.nodes[nd["parent"]]["rev"] if nd["parent"] in w.nodes else None, "units": "px in parent"}      # Astra: a gesture acts on the generation that was observed, not on a fresh look
         count[0] += 1
         if count[0] > BUDGET:
             raise LensRefusal(f"this lens makes more than {BUDGET} scene nodes. Put `clamp N` on the repeat (line {node['line']}); the text will say how many are left")
@@ -318,16 +374,26 @@ def build(desk, src, stack=(), count=None, props=None):
             each = parts[node["each"]]
             if node["of"]:
                 out["of"] = node["of"]
-                rs = rows(desk, _fill(node["of"], ctx))
+                sel_text = _fill(node["of"], ctx)
+                rs = rows(desk, sel_text)
                 keep = node["clamp"] or 10 ** 9       # Flint: clamp N on a repeat; 305 things put 305 nodes in both printers
                 total = len(rs) if rs is not None else None
                 for k, r in enumerate((rs or [])[:keep]):
-                    out["kids"].append(make(each, dict(ctx, **r), f"{key}/{r.get('cid') or r.get('eid') or r.get('name') or k}", node["layout"]))
-                sel = desk._parse_selection(_fill(node["of"], ctx)) if rs is None else None
-                ids = sel[0] if sel else []
-                total = len(ids) if total is None else total
-                for i in ids[:keep]:
-                    out["kids"].append(make(each, _ctx_for(w, i), f"{key}/{i}", node["layout"]))
+                    # Pike: sections and tags were keyed by position, so an insert retargeted every draft below it. Key by what it is.
+                    okey = r.get("cid") or r.get("eid") or r.get("name") or (_slug(r["heading"]) if "heading" in r else k)
+                    out["kids"].append(make(each, dict(ctx, **r), f"{key}/{okey}", node["layout"]))
+                named = _named(w, sel_text) if rs is None else None
+                if named is not None:
+                    total = len(named)
+                    for i, st in named[:keep]:
+                        out["kids"].append(make(each, _ctx_for(w, i, st), f"{key}/{i}", node["layout"]))
+                    out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
+                else:
+                    sel = desk._parse_selection(sel_text) if rs is None else None
+                    ids = sel[0] if sel else []
+                    total = len(ids) if total is None else total
+                    for i in ids[:keep]:
+                        out["kids"].append(make(each, _ctx_for(w, i), f"{key}/{i}", node["layout"]))
                 if total > keep:
                     out["cut"] = total - keep
                     out["kids"].append({"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
@@ -335,7 +401,16 @@ def build(desk, src, stack=(), count=None, props=None):
                                         "clamp": None, "acts": [], "kids": []})
             else:
                 for k, v in enumerate(ctx.get("_" + node["over"], [])):
-                    out["kids"].append(make(each, dict(ctx, it=v), f"{key}/{k}", node["layout"]))
+                    out["kids"].append(make(each, dict(ctx, it=v), f"{key}/{_slug(str(v))}", node["layout"]))
+            # the same thing twice in one repeat gave two identical keys (Pike); an occurrence is (thing, ordinal here)
+            seen_keys = {}
+            for kid in out["kids"]:
+                c = seen_keys.get(kid["key"], 0) + 1
+                seen_keys[kid["key"]] = c
+                if c > 1:
+                    old = kid["key"]
+                    kid["key"] = f"{old}#{c}"
+                    _reprefix(kid, old, kid["key"])
             out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
             for k, kid in enumerate(out["kids"][:out["n"]]):
                 spread_of(node, k, kid)
@@ -345,7 +420,7 @@ def build(desk, src, stack=(), count=None, props=None):
             inner = _fill(node["lens"], ctx)
             if inner.lower() in stack:
                 raise LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
-            sub = build(desk, find_lens(desk, inner)["text"], stack + (inner.lower(),), count)
+            sub = _compile(desk, find_lens(desk, inner), stack + (inner.lower(),), count, closure if closure is not None else [])
             sub["key"] = f"{key}/lens:{inner}"
             _rekey(sub, sub["key"])
             out["kids"].append(sub)
@@ -363,6 +438,17 @@ def _rekey(n, prefix):
         _rekey(k, prefix)
 
 
+def _reprefix(n, old, new):
+    for k in n["kids"]:
+        if k["key"].startswith(old + "/"):
+            k["key"] = new + k["key"][len(old):]
+        _reprefix(k, old, new)
+
+
+def _slug(s):
+    return re.sub(r"[^\w-]+", "-", str(s).strip().lower()).strip("-")[:40] or "-"
+
+
 def to_text(scene, name, who, at):
     lines = [f"scene {name} · for {who} · world @{at}"]
     views = scene.get("views") or {}
@@ -378,6 +464,8 @@ def to_text(scene, name, who, at):
             return
         if n.get("item"):
             bits.append(n["item"])
+        elif n.get("id"):
+            bits.append(n["id"])
         if n["text"] is not None:
             # Lark: fidelity is a property of a printer, not of a tree. This printer says every cut it makes.
             t = n["text"].split("\n")
@@ -400,8 +488,18 @@ def to_text(scene, name, who, at):
             bits.append(f"at {n['box'][0]},{n['box'][1]} {n['box'][2]}x{n['box'][3]}" + (f" ({n['placed']}, not its place in the world)" if n.get("placed") else ""))
         if n.get("facts"):
             bits.append("= " + ", ".join(n["facts"]))
+        if n.get("read"):
+            bits.append("· read " + " ".join(f"{k}={v}" for k, v in n["read"].items()))
+        if n.get("missing"):
+            bits.append("(" + ", ".join(f"no {m}" for m in n["missing"]) + ")")
+        if n.get("state"):
+            bits.append(f"({n['state']})")
         if "n" in n:
             bits.append(f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}")
+            if n["n"] == 0:
+                bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
+            if n.get("states"):
+                bits.append("(" + ", ".join(n["states"]) + ")")
         for a in n["acts"]:
             bits.append(f"· {a['on']}: {a['line']}")
         for a, v in views.items():
@@ -417,36 +515,65 @@ def to_text(scene, name, who, at):
 
 def find_lens(desk, name):
     w = desk.world
-    for s in w.subjects.values():
-        if "lens" in (s.get("tags") or []) and s["title"].lower() == name.lower():
-            return s
+    hits = [s for s in w.subjects.values() if "lens" in (s.get("tags") or []) and s["title"].lower() == name.lower()]
+    if len(hits) > 1:        # a removed lens leaves its subject behind, unplaced; the placed one is the one meant
+        placed = [s for s in hits if w.appearances_of(s["id"])]
+        hits = placed if len(placed) == 1 else hits
+    if len(hits) > 1:        # Pike: two lenses with one title, the first silently won
+        raise LensRefusal(f"{len(hits)} lenses are titled {name!r} ({', '.join(s['id'] for s in hits)}); retitle one so the name means one thing")
+    if hits:
+        return hits[0]
     have = [s["title"] for s in w.subjects.values() if "lens" in (s.get("tags") or [])]
     raise LensRefusal(f"no lens {name!r}. A lens is a note tagged lens whose text is the description. Lenses here: {', '.join(have) or 'none'}")
 
 
-def scene_for(desk, name):
-    """Astra: an invalid lens was stored before it was validated, and the view went blank. A lens that stops compiling
-    now keeps showing its last version that did, and says so first, in both printers."""
-    s = find_lens(desk, name)
+def _compile(desk, s, stack, count, closure):
+    """One lens to a scene, recording in `closure` exactly which definition was used. A lens that does not compile is
+    shown in its last version that did (Astra: also when it is an INNER lens), and the closure says so."""
     good = getattr(desk, "_lens_good", None)
     if good is None:
         good = desk._lens_good = {}
+    entry = {"lens": s["title"], "id": s["id"], "rev": s["rev"], "status": "current"}
+    closure.append(entry)
+    mark = len(closure)
     try:
-        sc = build(desk, s["text"], (s["title"].lower(),), props=s.get("props") or {})
-        good[s["id"]] = s["text"]
-        # Astra: a revision on a node does not say which DEFINITION gave the gesture its meaning. The scene names its
-        # lens and that lens's revision; a gesture painted under an older definition is refused, not reinterpreted.
-        sc["def"] = {"lens": s["title"], "id": s["id"], "rev": s["rev"]}
-        # Iris, Lark: the scene says what is intended, the paint knows what happened. Painters report back; the reports are
-        # observations (~), per viewer, never world facts: which parts were cut by the clamp, which are out of their view.
-        sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
-        text = to_text(sc, s["title"], desk.world.me, len(desk.world.events))
-        return sc, text
-        return sc, to_text(sc, s["title"], desk.world.me, len(desk.world.events))
+        sc = build(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure)
+        good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
+        return sc
     except LensRefusal as e:
-        if s["id"] not in good:
+        g = good.get(s["id"])
+        g = {"text": g, "rev": None} if isinstance(g, str) else g
+        if not g:
             raise
-        sc = build(desk, good[s["id"]])
-        sc["broken"] = str(e)
-        text = to_text(sc, s["title"], desk.world.me, len(desk.world.events))
-        return sc, f"! lens {s['title']} no longer compiles: {e}\n! showing the last version that did. Fix it with rewrite, or undo.\n" + text
+        del closure[mark:]
+        entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e))
+        sc = build(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure)
+        sc["broken"] = f"lens {s['title']}: {e}"
+        return sc
+
+
+def _identity():
+    import hashlib
+    here = pathlib.Path(__file__).resolve().parent
+    h = lambda f: hashlib.sha256(f.read_bytes()).hexdigest()[:12] if f.exists() else None
+    return {"compiler": h(here / "scene.py"), "style": h(here / "desk-shell" / "style" / "calm.style")}
+
+
+def scene_for(desk, name):
+    """-> (scene, text). scene["def"] is the requested definition, the effective transitive closure with each member's
+    status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
+    whose whole closure is current; a fallback frame is for reading."""
+    s = find_lens(desk, name)
+    closure = []
+    sc = _compile(desk, s, (s["title"].lower(),), [0], closure)
+    at = len(desk.world.events)
+    fallen = [c for c in closure if c["status"] == "fallback"]
+    sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
+                     frame=f"{at}:" + ".".join(f"{c['id']}r{c['rev']}" for c in closure), **_identity())
+    # Iris, Lark: painters report back what only they know; per viewer, printed as ~, never world facts.
+    sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
+    text = to_text(sc, s["title"], desk.world.me, at)
+    if fallen:
+        head = "".join(f"! lens {c['lens']} no longer compiles: {c['refusal']}\n" for c in fallen)
+        text = head + "! showing the last version that did; gestures are off until it compiles. Fix it with rewrite, or undo.\n" + text
+    return sc, text

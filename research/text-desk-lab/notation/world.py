@@ -494,10 +494,11 @@ class World:
         elif verb == "create":
             known = {"kind", "title", "text", "due", "tags", "layout", "query", "cols", "by", "desc", "as", "x", "y", "w", "h", "at"}
             stray = [k for k in args if k not in known]
-            if stray:
-                raise Refusal(f"create does not take {', '.join(k + '=' for k in stray)}; it takes kind= title= text= due= tags= "
-                              f"(layout= for a surface; query= cols= for a view). Properties are set afterwards: do prop <id> k=v")
             kind = args.get("kind", "note")
+            if stray and kind in ("surface", "view"):
+                raise Refusal(f"create does not take {', '.join(k + '=' for k in stray)} for a {kind}; it takes kind= title= "
+                              f"(layout= for a surface; query= cols= for a view)")
+            props = {k: str(args[k]) for k in stray}      # Juniper: an item with a date and a place is one command, not two
             if kind not in ("note", "task", "chat", "image", "doc", "trial", "surface", "view"):
                 raise Refusal("kind= must be note, task, chat, image, doc, trial, surface or view")
             title = args.get("title")
@@ -544,6 +545,7 @@ class World:
             if due and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(due)):
                 raise Refusal("due= must be YYYY-MM-DD")
             sid = self.add_subject(kind, str(title), str(args.get("text", "")), [t for t in str(args.get("tags", "")).split(",") if t], due)
+            self.subjects[sid]["props"].update(props)
             cw, ch = max(120, min(300, n["w"] - 16)), max(80, min(160, n["h"] - 16))   # never larger than the parent
             x, y, free = self.free_spot(target, cw, ch)
             aid = self.place(sid, target, x, y, cw, ch)
@@ -553,7 +555,7 @@ class World:
             self._bump(target)
             ev = self._event(verb, target, args, {"delete": aid, "delete_subject": sid}, actor)
             r = {"ok": True, "event": ev["id"], "changed": [target, aid], "created": aid,
-                 "note": f"new {kind} {sid} placed as {aid}"}
+                 "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in props.items()) if props else "")}
             if n["layout"] == "free" and not free:
                 r["note"] += f"; no free space, it covers things: move it or tile {target}"
             return r

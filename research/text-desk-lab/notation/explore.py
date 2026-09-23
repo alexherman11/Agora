@@ -161,8 +161,16 @@ def main():
         before, n0 = worktree.ids_of(desk), len(desk.world.events)
         r = desk.dispatch("desk", {"line": line})
         worktree.record(desk, line, me, before, n0)
-        print(r.get("text") or ("ERR " + r["error"]))
+        text = r.get("text") or ("ERR " + r["error"])
+        print(text)
         print()
+        if r.get("error") or text.startswith("ERR") or "\nERR" in text:
+            rest = [l for l in sys.stdin if l.strip() and not l.startswith("#")]
+            if rest:
+                # Sable and Juniper: after a refused create, the next line ran against the previous $item. A refusal ends the batch.
+                print(f"stopped: {len(rest)} later line(s) not run because this one was refused ($item and $new still name the last thing made)")
+                print()
+            break
     per[me] = (desk.seen, desk.open, desk.last_event_seen)
     path.write_bytes(pickle.dumps(desk))
 

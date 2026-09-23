@@ -205,8 +205,10 @@ class DeskMoo(Desk):
         if seen is None:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))
-        if seen != cur and name not in ("create", "comment") and self._touched_by_others(nid):
-            raise Refusal(f"stale: {nid} changed since you last saw it; look at it again before acting")
+        hit = name not in ("create", "comment") and self._touched_by_others(nid)   # the appearance's rev alone misses edits made through a sibling
+        if hit:
+            via = f" through {hit['target']}" if hit["target"] != nid else ""
+            raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {hit['by']}); look at it again before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         v = moo.REGISTRY[name]
         r = v.run(w, nid, kv)

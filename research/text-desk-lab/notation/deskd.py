@@ -144,6 +144,14 @@ class Handler(SimpleHTTPRequestHandler):
             ob = body.get("observed") or {}
             d = ob.get("def") or {}
             cur = desk.world.subjects.get(d.get("id"))
+            if d and d.get("status") == "fallback":
+                return self._json({"text": None, "error": f"refused: this view is showing a fallback of lens {d.get('lens')} because the current one does not compile; "
+                                   "it is for reading. Nothing was done.", "events_total": len(desk.world.events), "line": line})
+            for c in d.get("closure") or []:      # every definition the frame was built from must still be the current one
+                now = desk.world.subjects.get(c.get("id"))
+                if now is None or now["rev"] != c.get("rev"):
+                    d, cur = c, now
+                    break
             if d and (cur is None or cur["rev"] != d.get("rev")):
                 return self._json({"text": None, "error": f"refused: lens {d.get('lens')} changed since this was painted "
                                    f"(you saw revision {d.get('rev')}, it is now {cur['rev'] if cur else 'gone'}); the gesture may no longer mean what it said. "
@@ -151,6 +159,14 @@ class Handler(SimpleHTTPRequestHandler):
             if ob.get("item") in desk.world.nodes and isinstance(ob.get("rev"), int):
                 # Astra: a gesture acts on the generation its maker SAW. The painter used to prefix `look item;`, which
                 # turned stale pixels into fresh permission. Now the act carries what was observed and the fence judges that.
+                now = desk.world.nodes[ob["item"]]["rev"]
+                if now != ob["rev"]:
+                    # Pike: the item fence exempted the actor's own edits, so one person with two windows was unprotected.
+                    # A painted gesture is judged on what was painted, whoever changed it since.
+                    last = [e for e in desk.world.events if e["target"] == ob["item"] or ob["item"] in (e.get("changed") or [])]
+                    who = f" ({last[-1]['id']} {last[-1]['verb']} by {last[-1]['by']})" if last else ""
+                    return self._json({"text": None, "error": f"refused: {ob['item']} changed since this was painted (you saw revision {ob['rev']}, "
+                                       f"it is now {now}{who}); nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
                 desk.seen[ob["item"]] = ob["rev"]
                 idx = getattr(desk, "_seen_idx", None)
                 if idx is None:
