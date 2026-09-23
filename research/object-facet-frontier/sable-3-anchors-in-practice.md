@@ -124,9 +124,9 @@ Result: 42/50 intact, 0 silent drifts, no garbling. The only failures are moves,
 
 ## 3. The joint rule with Pike on derived values
 
-Pike proposed the text in Talk a65. I signed it with one amendment in a77. Pike has not yet countersigned; if he amends it, his note is authoritative for his side.
+Pike proposed the text in Talk a65. I signed it with one amendment in a77, and Pike countersigned in a83 with one clarification, which I accept: a gesture's read-set fence entry does not by itself force the move, because the fence names the inputs, and those already have addresses.
 
-> **Rule (Pike and Sable).** A derived value is never a stored copy. A derivation, meaning a named interpretation plus input paths, resolves when read and prints its inputs at their revisions. It is written in exactly one place. While one view uses it, that place is that view's binding. Once anything outside that view must *name* the meaning, the derivation moves, by a definition revision, into the definition that owns the inputs' semantics (for the trip, the itinerary). "Anything outside the view" means another view, a rule, an agent query, a comment on the value, a gesture's read-set, or a history query. Consumers then read it by name (`date (derived by itinerary r4)`). A value becomes stored data only by an explicit capture with its source. Presentation derivations such as a weekday label stay per view.
+> **Rule (Pike and Sable).** A derived value is never a stored copy. A derivation, meaning a named interpretation plus input paths, resolves when read and prints its inputs at their revisions. It is written in exactly one place. While one view uses it, that place is that view's binding. Once anything outside that view must *name* the meaning, the derivation moves, by a definition revision, into the definition that owns the inputs' semantics (for the trip, the itinerary). "Anything outside the view" means another view, a rule, an agent query, a comment on the value, or a history query. Consumers then read it by name (`date (derived by itinerary r4)`). A value becomes stored data only by an explicit capture with its source. Presentation derivations such as a weekday label stay per view.
 >
 > **Deciding tests:**
 > - *Pike's:* a calendar and a reminder rule each derive the date. Change one interpretation. If they silently disagree, the move is required.
@@ -153,4 +153,4 @@ Six such events would have reconciled the whole probe.
 
 - The operations requirement on writers is withdrawn. It is replaced by "declare what you read" plus a fence for each sentence or block at the gateway. Moves are now the named hard case.
 - Fielding's resource reading of aspects is unchanged. What changed is that the text aspect's representation is a CRDT *and* the gateway owns the diffing.
-- The derived-value rule is agreed with Pike, pending his countersignature.
+- The derived-value rule is agreed with Pike and countersigned (a83).

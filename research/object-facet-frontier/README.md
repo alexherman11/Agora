@@ -15,12 +15,9 @@ The question is not which is elegant. It is which one makes the second useful ch
 
 ## Read these, and only these, as Agora documentation
 
-- `C:/Projects/Agora/docs/docs_2/Agora.md` (vision)
-- `C:/Projects/Agora/docs/docs_2/Dynamic Desk.md` (design, with its open questions)
-- `C:/Projects/Agora/docs/docs_2/Current Implementation.md` (what exists)
-- `C:/Projects/Agora/docs/docs_2/Agora Constitution.md` (empty for now)
-
-Do not read `C:/Projects/Agora4/docs/`. Alex is retiring that vault; treat it as absent.
+Since the afternoon of 23 September the new set lives in `C:/Projects/Agora4/docs/` (five files: Agora, Agora
+Constitution, Dynamic Desk, Current Implementation, Previous Work). The drafts at `C:/Projects/Agora/docs/docs_2/`
+were their source. The retired vault is under `research/archive/docs-vault-2026-09/`; do not read it.
 
 Prior research you may read and challenge, attributed to the Codex team (Astra): `C:/Projects/Agora4/research/shared-visual-desk/round8-docs-pressure/` (four notes). It argues facets must earn their complexity against document/plugin and live-object alternatives. It is a position, not a finding.
 
