@@ -54,7 +54,6 @@ def parse_selection(w, token):
     for t in terms:
         # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
         if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):
-            from world import Refusal
             raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]

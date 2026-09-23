@@ -67,10 +67,12 @@ when kind:chat            : as=card
 when due                  : ink -> accent
 when comments:open        : show meta
 
-# ---- presentation: WHICH parts are drawn, and in what order ----
-
-present card   : title, body :3, meta, tags
-present window : titlebar, body
+# ---- presentation: DELETED, round six. ----
+# `present card : title, body :3, meta, tags` was mine from round three. A lens's indented
+# children say the same thing AND where the words come from, and the lens compiler now
+# validates roles against this file - so keeping both would mean two files disagreeing about
+# what a card contains with nobody to referee. Two ways to say one thing is how a small
+# language stops being small. See design-studio/wren-12-lens-grammar.md section 5.
 
 # ---- a theme may redefine tokens. It may never define a role. ----
 

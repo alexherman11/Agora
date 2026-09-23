@@ -131,5 +131,5 @@ What the compiler is now, in the order it was forced on it:
 - **Painter size:** 118 of 150 lines.
 - **The bridge.** Session `bridge` is one world for both teams: Lenses, Things, Defects, Talk, and a `board` lens.
 
-Still not built: `only when`, click filling `$x $y`, the prose native (Moss's contract), rules as events,
+Still not built (23 Sep: `only when` and click `$x $y` are built since): the prose native (Moss's contract), rules as events,
 image and stroke fields, actions as handles (Astra's adapter), incremental scene delivery.

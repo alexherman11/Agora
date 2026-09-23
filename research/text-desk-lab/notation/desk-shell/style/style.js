@@ -52,22 +52,28 @@ const Style = (() => {
           [`role ${what} : ...                 (change it for everyone, as a deed they will see)`,
            `do style <this appearance> ...     (change only this one, as an override)`]);
       }
-      if (/^(role|when|present)\s/.test(s)) {
+      // `present` was REMOVED in round six. A removed word is refused, not ignored: a word silently
+      // accepted that does nothing is worse than one that never existed. wren-12 section 5.
+      if (/^present\s/.test(s)) throw new Refusal(n, "`present` was removed. A lens says which parts are drawn, and where each part's words come from.",
+        ["in the lens:   card : column, role card",
+         "                 title : text $title, role title",
+         "                 body  : text $text, clamp 3, role body",
+         "see design-studio/wren-12-lens-grammar.md section 5"]);
+      if (/^(role|when)\s/.test(s)) {
         const at = s.lastIndexOf(" : ");
         const kw = s.split(/\s+/)[0];
         if (at < 0) throw new Refusal(n, `a ${kw} line needs " : " with spaces before its properties.`,
           [`${kw} <name> : <property>, <property>`, `(an unspaced colon belongs to a selection, as in kind:note)`]);
         const head = s.slice(0, at).replace(/^\w+\s+/, "").trim(), body = s.slice(at + 3).trim();
         theme = null;
-        if (kw !== "present") check(n, body);
+        check(n, body);
         const props = body.split(",").map(x => x.trim()).filter(Boolean);
         if (kw === "role") out.roles[head] = { props, line: n };
-        else if (kw === "when") out.clauses.push({ sel: head, props, line: n });
-        else out.presents[head] = { parts: props, line: n };
+        else out.clauses.push({ sel: head, props, line: n });
         return;
       }
-      throw new Refusal(n, `not a token, role, clause, present or theme line: "${s}"`,
-        [`token <name> = <value>`, `role <name> : <props>`, `when <selection> : <props>`, `present <role> : <parts>`]);
+      throw new Refusal(n, `not a token, role, clause or theme line: "${s}"`,
+        [`token <name> = <value>`, `role <name> : <props>`, `when <selection> : <props>`, `theme <name> of <style>`]);
     });
     return out;
   }

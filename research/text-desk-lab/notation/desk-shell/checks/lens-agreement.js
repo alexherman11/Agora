@@ -24,7 +24,12 @@
 // scene" stop being inferences and become set difference. Nothing else in this file was
 // weakened by the old join, but those two were the whole point.
 
-const ROLE_CLASS = r => 'r-' + r;
+// The painter sanitises a role into a class name: `card.plain` becomes `r-card_plain`.
+// My first version of this check used `'r-' + role` verbatim and reported `card.plain` as
+// an UNRESOLVED role on the desktop lens. It resolves perfectly; the class exists and the
+// rule exists. A false failure, and my fifth this week — the same family every time: a
+// measurement true about something other than what it claimed to be about.
+const ROLE_CLASS = r => 'r-' + String(r).replace(/[^\w-]/g, '_');
 
 function flatten(node, out = [], depth = 0) {
   out.push({ node, depth });
@@ -154,8 +159,8 @@ export async function run(session = 'lens', as = 'iris', lens = 'notes') {
   // These are the measured facts only the browser has. They are the candidates for flowing
   // back to the scene as `~` observations.
   const measured = [];
-  paintNodes.forEach(({ el }) => {
-    if (el.children.length) return;
+  [...byKey.values()].forEach(el => {
+    if (el.querySelector('[data-key]')) return;
     const cs = getComputedStyle(el), r = el.getBoundingClientRect();
     const clamped = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
     const overflow = el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2;
@@ -163,6 +168,7 @@ export async function run(session = 'lens', as = 'iris', lens = 'notes') {
     const offscreen = r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth;
     if (clamped || overflow || offscreen || lines > 1) {
       measured.push({
+        key: el.getAttribute('data-key'),
         cls: [...el.classList].join('.').slice(0, 20),
         text: (el.textContent || '').trim().slice(0, 20),
         lines, clamped: !!clamped, overflow, offscreen
