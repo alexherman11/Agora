@@ -11,7 +11,9 @@ Round three, 23 September 2026. Proposal for Jeff to implement; not a decision.
 ### What the lens says
 
 ```
-day  : column, role sheet, as day, on drop item do prop $carried tripday=$day.n
+cal  : row, the tag:trip as trip
+  days : row, derive days = days-from $trip.start $trip.end, over $days as day, each day
+day  : column, role sheet, on drop item do prop $carried tripday=$day.n
   h     : role heading, derive wd = weekday $day.date, text "$wd $day.date"
   items : column, of parts:$trip.item,prop:tripday=$day.n, each item
 item : role card, carry
@@ -20,7 +22,7 @@ item : role card, carry
 
 - **`carry`** goes on a part whose frame is a world thing. It says only that this part can be picked up. It has no command.
 - **`on drop item do <command>`** goes on the receiver. It names which carried *part* it accepts (`item`), using the lens's own part names.
-- **`$carried`** is filled with the carried part's item id, and **`$carried.field`** with its fields. The receiver's own frames (`$day.n`, `$trip.start`) are filled at compile time, like any other gesture line.
+- **`$carried`** is filled with the carried part's item id, and **`$carried.field`** with its fields. The receiver's own frames (`$day.n`, `$trip.start`) are filled at compile time, like any other gesture line. `as day` sits on the repeat, as Juniper found it must in H2.
 
 ### The trip case: move an item to the next day
 
@@ -100,6 +102,8 @@ If the trip moved while the card was in the air, the drop is refused and the vie
 
 **What lens.js does.** It copies `reads` unchanged into `observed.reads` with every gesture, beside the existing `item`, `rev`, `at` and `def.closure`. It adds `carried: {subject, rev}` for a drop. It never re-reads the world on the user's behalf.
 
+**Who is observing.** Observations are keyed by `(actor, view)`. The view is the painter's frame id, or the terminal session id. Two windows under one actor name are therefore two observers (Juniper's lost edit, section 5b).
+
 **What deskd checks,** before dispatching and whoever the actor is:
 - For each entry, find events after the scene's `at` whose target resolves to that subject and whose touched fields meet `props`. The touched fields come from a fixed table:
   - `prop` → its keys;
@@ -139,9 +143,31 @@ This is Embark's implicit `location` schema made listable: who depends on a name
 
 ## 5. Where a derived value lives: the rule Sable and I agree on
 
-*(Joint paragraph; pending Sable's signature in Talk, a65. See below.)*
+Sable signed with an amendment in a77, and I countersigned in a83. Signed by Sable and Pike:
 
-PENDING
+> A derived value is never a stored copy. A derivation (a named interpretation plus input paths) resolves at read time and prints its inputs@rev. It is written in exactly one place. While one view uses it, it is a binding in that view. Once anything outside that view must *name* it (another view, a rule, a comment on the value, a history query), it moves by a definition revision into the definition that owns the inputs' semantics (here the itinerary). Consumers then read it by name, printed as `date (derived by itinerary r4)`. It becomes stored data only by an explicit capture that records its source. Presentation labels (a weekday) stay per view, however many views show them. A gesture's read-set fence entry does not by itself force the move, because it names the inputs, and those already have addresses.
+>
+> Tests that would show the rule wrong or necessary:
+> 1. **Sable's:** comment on day 2's date, then change the interpretation. The comment must show the new value and say it changed.
+> 2. **Juniper's (a73):** the move is forced when two consumers disagree and neither prints why.
+
+What this settles: my round-two "in the binding always" was too strong for anything that needs an address. Sable's "two consumers" was too weak, because a comment is a consumer that is not a view. The trigger we agreed on is *being named from outside*.
+
+## 5b. From Juniper's H2 run (a73, juniper-2) [read; Juniper ran it]
+
+Juniper ran all 11 steps with the landed words and 0 repairs. Her split by binding supports the round-one position:
+
+| Binding | Repairs | Silent misses |
+|---|---|---|
+| Literal | 2 | 8 |
+| Copied day props | 11 | 11 |
+| Relative / identity | 0 | 0 |
+
+The run turned up three things this contract must absorb:
+
+1. **A derive cannot read the current thing's own prop without naming the frame** (`as stop`). Fix: in `derive` inputs, a bare `$tripday` reads the current frame, exactly as `text` does.
+2. **Under capture, rows still print `read trip s02 start=2026-10-10`.** That provenance is false. A captured input must print `captured start=2026-10-10 from trip s02`, never `read`, and it is excluded from `reads` (section 3).
+3. **Two windows under one actor name lost an edit.** In Juniper's case, B's rewrite was silently overwritten by A's stale rewrite. Painted gestures are already fenced whoever moved the item (Jeff, a47). The terminal path is not. The fence has to be **per view**: observations keyed by `(actor, view)`, where a view is a painter frame or a terminal session, so a second window is a second observer.
 
 ## 6. What would change my mind
 

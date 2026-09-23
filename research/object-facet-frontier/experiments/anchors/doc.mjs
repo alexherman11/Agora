@@ -122,7 +122,7 @@ export const REVISIONS = [
 // Run (c): one agent-style rewrite of the seed that keeps the meaning and changes about 30% of the words.
 export const REWRITE = `# Oak Park autumn work day
 
-The garden club's autumn work day is on Saturday 18 October, and we start at nine by the Elm Street gate. We are expecting about twenty volunteers, and the city has agreed to send a skip for green waste. Parking on Elm Street costs nothing before ten.
+The garden club's autumn work day is on Saturday 18 October, and we start at nine by the Elm Street gate. We are expecting about twenty volunteers, and the city has agreed to send a skip for green waste. You can park free on Elm Street until ten.
 
 ## Why this year matters
 
@@ -132,7 +132,7 @@ Standing water also killed most of the garlic in bed three. The east path sits o
 
 ## What to bring
 
-Please bring gloves, a trowel and a hot drink, since the east path floods and it will be a cold morning. The club will provide spades, two wheelbarrows and a first aid kit. If you own loppers, please bring them; the hedge along the picnic lawn has to be cut back before it swallows the tables.
+Please bring gloves, a trowel and a hot drink, since the east path floods and it will be a cold morning. Spades, two wheelbarrows and a first aid kit come from the club. If you own loppers, please bring them; the hedge along the picnic lawn has to be cut back before it swallows the tables.
 
 ## Tasks
 
@@ -144,9 +144,9 @@ Please bring gloves, a trowel and a hot drink, since the east path floods and it
 
 ## After the work
 
-Soup will be served at the picnic tables at about one. The running club has offered to carry gravel on the way back from their Saturday run, which should save us an hour. Anyone staying on can help Maria sort out the seed library in the shed.
+Around one we will eat soup together at the picnic tables. The running club has offered to carry gravel on the way back from their Saturday run, which should save us an hour. If you want to stay longer, Maria could use help sorting the seed library in the shed.
 
-Please reply to this note if you can come, and tell us which task you would prefer. Newcomers are very welcome; no experience is needed, just a willingness to get muddy.
+If you can make it, reply here and tell us which task you would prefer. Newcomers are very welcome; no experience is needed, just a willingness to get muddy.
 `;
 
 export const REWRITE_EXPECT = {

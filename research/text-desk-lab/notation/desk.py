@@ -777,6 +777,9 @@ class Desk:
                 pass
             w.events[-1].setdefault("changed", []).append(c)
         self._after_mutation()
+        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result
+            if c in w.nodes or c in w.subjects:
+                self._mark_seen(c)
         out = f"ok {r['event']}: {verb} {nid} {self._fmt_args(kv)}".rstrip()
         if r.get("created"):
             out += f" → created {r['created']}"

@@ -361,11 +361,13 @@ def _fill(tpl, ctx, track=None):
                 return m.group(0)
             v = f.get(b) if (b in f and not b.startswith("_")) else (f.get("_props") or {}).get(b)
             if track is not None:
-                track["frames"].add(a)
+                cap = b in (f.get("_captured_fields") or ())
+                if not cap:
+                    track["frames"].add(a)          # a captured value is not a read of the world: it stays out of the fence
                 if v is None:
                     track["missing"].add(f"{a}.{b}")
                 else:
-                    track["reads"][f"{a}.{b}"] = v
+                    track["reads"][f"{a}.{b}"] = f"{v} (captured)" if cap else v
             return "" if v is None else str(v)
         return str(ctx[a]) if a in ctx else m.group(0)
 
@@ -485,6 +487,7 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                     # Pike W7: a captured value is used instead of the live one, and the scene says whether they still agree
                     live = tc.get(k) if (k in tc and not k.startswith("_")) else (tc.get("_props") or {}).get(k)
                     tc.setdefault("_captured", []).append((k, v, live))
+                    tc.setdefault("_captured_fields", set()).add(k)      # Juniper: rows printed `read trip start=<captured>`, a false provenance
                     if k in tc and not k.startswith("_"):
                         tc[k] = v
                     else:
@@ -506,7 +509,8 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         if the_state not in ("live",) and not the_state.startswith("->"):
             return out          # empty or ambiguous: printed, gestures off, nothing under it
         for dname, interp, ins in node["derive"]:
-            vals = [_fill(x, ctx, track) if x.startswith("$") else x for x in ins]
+            dctx = dict(ctx.get("_props") or {}, **ctx)       # Juniper: `day-n $trip.start $tripday` could not read the thing's own prop
+            vals = [_fill(x, dctx, track) if x.startswith("$") else x for x in ins]
             res, err = INTERPS[interp][1](vals)
             out.setdefault("derived", []).append({"name": dname, "interp": interp, "inputs": vals,
                                                   "result": (f"{len(res)} rows" if isinstance(res, list) else res), "error": err})

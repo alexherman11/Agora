@@ -23,12 +23,33 @@ All three were run to step 11. There was no deskd, so the CLI ran source from di
 
 | | R records | D document | H hybrid |
 |---|---|---|---|
-| M1 writes, steps 2–10 (plus the shared seed: 1) | 43 (+1 refused) | 17 | 27 |
-| M2 repairs | **13** (steps 4 and 9: 6 and 7) | **1** (step 5) | **0** |
-| M3 wrong outputs | **19**: 15 silent, 4 silent 0-of | 2: 1 silent, 1 visible | **0** |
+| M1 writes, steps 2–10 (plus the shared seed: 1) | 43 (+1 refused) | 17 | 27 (H2: 29) |
+| M2 repairs | **13** (steps 4 and 9: 6 and 7) | **1** (step 5) | **0** (H2: 0) |
+| M3 wrong outputs | **19**: 15 silent, 4 silent 0-of | 2: 1 silent, 1 visible | **0** (H2: 0) |
 | M4 wrong-target | 1 (step 11a) | 2 (step 5 append; step 11a) | 1 (step 11a) |
-| M5 places stating the dates / disagreeing | 12 / 0 | 3 / 0 | 2 / 0 |
-| n/e (not expressible) | alternatives; the relative lens cannot print a date | itinerary table; "what is open"; comment on an item; alternatives | alternatives; the day 2 date; dates in the itinerary |
+| M5 places stating the dates / disagreeing | 12 / 0 | 3 / 0 | 2 / 0 (H2: 3 / 0; every displayed date is derived) |
+| n/e (not expressible) | alternatives; the relative lens cannot print a date | itinerary table; "what is open"; comment on an item; alternatives | alternatives; the day 2 date; dates in the itinerary (H2: alternatives only) |
+
+**H2, rerun with Pike's words [ran].** Jeff landed Pike's binding words mid-round: `the <selection> as <frame>`, `$frame.prop`, `derive … = days-from | day-n`, `capture`, and `parts:`/`part-of:`. I forked `frontier-trip@H2` from the same seed and ran all 11 steps.
+
+- The trip doc carries `start=` and `end=`. Items are created with `tripday=` and linked `to=a03 as=part-of`.
+- The calendar is `the prop:role=trip as trip`, then `derive days = days-from $trip.start $trip.end, over $days`. Each column lists `of parts:$trip.item,prop:tripday=$it.n`.
+- The itinerary is a lens: `of parts:$trip.item as stop`, with `derive date = day-n $trip.start $stop.tripday` on each row.
+
+Results:
+
+- **M1:** 29 writes. That includes 1 authoring retry: `day-n $trip.start $tripday` printed `(uninterpretable: … got '$tripday')`, because a derive cannot read the current thing's own prop unnamed, so I named the repeat frame `as stop`.
+- **M2:** 0 repairs. **M3:** 0 wrong outputs. **M4:** 1 (step 11a). **M5:** 3 stored date statements (start, end, prose), 0 disagreeing. **n/e:** alternatives only.
+- **Every printed date is derived and prints its inputs**, for example `date = day-n(2026-10-17, 2) = 2026-10-18 · read trip s02 start=2026-10-17; stop s10 tripday=2`.
+- **Moving the trip is 1 command** for both calendar columns and all 6 itinerary rows. Both moves were right on first check.
+
+**Capture test (Pike's divergence question, outside the script).** I set `capture start=2026-10-10` on the itinerary, then moved the trip to 24 October.
+
+- The calendar followed.
+- The itinerary's frame line printed `captured start=2026-10-10 (now 2026-10-24: differs)`, so the disagreement is visible.
+- But each row still printed `read trip s02 start=2026-10-10`. That provenance line is false: it was captured, not read.
+
+I reverted both writes with undo (e31, e32).
 
 **H carries steps 4, 7 and 9 with zero repairs:**
 
@@ -103,7 +124,9 @@ The same run in R, D and H, with identical outcomes:
 
 The fence is per actor name. The CLI has no notion of a window, so one person is not protected from themselves. D pays more for this [imagined]: its unit is the whole doc, so under (b) two windows editing *different* lines would also be refused, and under (a) one would silently overwrite the other.
 
-## What H still needs: the lens lines I wanted [ran as refusal or absence; the output is proposed]
+## What H still needed before Pike's words (items 1–3 are now met in H2 by `derive days-from`, `day-n` and named frames; 4 is fixed: the scene prints `parts:a03` filled)
+
+The lens lines I wanted [ran as refusal or absence; the output is proposed]
 
 1. **Day 2's date.** I wanted `head : text "Day 2, $start+1d", role heading`. It should print `head a03 "Day 2, 2026-10-11" [heading] · read start=2026-10-10 · start+1d`. Today the only honest line is `text "Day 2"`. Pike's named transform (`day-after`) would do the same job if it prints what it computed.
 2. **Group, instead of one part per day.** With one part per day, a third day means a lens edit. I wanted:
@@ -157,7 +180,7 @@ That is the same convergence as round 1: A's text facet becomes C's document.
 ## What the run says about the substrate
 
 1. **Copies are the cost.** R's 13 repairs and 19 wrong outputs all trace to the date being *copied* into items and lens literals. D and H state it once. Identity plus a relationship (H) beat both a pure query over copies (R) and pure containment (D).
-2. **H is where records and documents meet.** The reasoning stays in a document, the parts have identity, membership is a link, and the view binds to the whole by id and reads through it. That is Sable's referent with aspects, and also Embark's outline node with mentions. What H lacks is not storage. It lacks three lens words: an outer-context read, group or range, and a named date transform.
+2. **H is where records and documents meet.** The reasoning stays in a document, the parts have identity, membership is a link, and the view binds to the whole by id and reads through it. That is Sable's referent with aspects, and also Embark's outline node with mentions. What H lacks is not storage. It lacks three lens words: an outer-context read, group or range, and a named date transform. With Pike's words landed, H2 has all three and ran the script with 0 repairs, 0 wrong outputs and every date derived. The remaining gaps are alternatives as a relation, per-window fencing, and provenance under capture.
 3. **Silence is the bridge's worst defect, even after Jeff's fixes.** Every miss in this run was silent. The one visible thing, D's preamble column, was not a date.
 
 **What would change my mind.**
@@ -174,4 +197,7 @@ That is the same convergence as round 1: A's text facet becomes C's document.
 - The scene prints `links:$item` unfilled.
 - Same-actor two-window edits are accepted and lose data.
 - `append` cannot target a section, and a comment cannot name a line.
+- In H2, a `derive` cannot read the current thing's own prop unless its repeat is named (`as stop`). Under `capture`, rows print `read trip … start=<captured>`, which is a false provenance.
+- Pike's `on drag` onto a day column was not needed for these steps. Gestures were not exercised: the CLI cannot send them.
+- Sable asked whether H can test an agent rewriting whole text over anchored comments. It cannot: desk comments have no anchors, so there is nothing to lose. That test needs a text-anchor word first.
 - Worktree forks taken after a refused create are empty. I deleted my two empty fork pickles and forked again.

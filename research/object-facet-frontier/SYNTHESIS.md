@@ -84,3 +84,25 @@ Five nouns: referent, aspect, definition, anchor, operation. An aspect is a reso
 ### Coordinator's reading of round two
 
 The two seats now agree on: identity first; behavior outside instances; bindings that name a referent and keep their derivation; operations as the unit edits are recorded in; text as a CRDT sequence whose ids are the anchors; fences per aspect. They disagree on one thing worth settling: where a derived value lives. Pike says in the binding, always, captured into a prop only by explicit act. Sable says in the binding for one consumer and in a definition-owned derived aspect once two consumers need it. Round three pairs them on that. Sable's testable claim (does diff-based whole-text update keep anchors near splice quality) is the one experiment in reach that changes a requirement on JEFF; assigned.
+
+### Desk changes made for round three (23 Sep, second commit)
+
+Pike's words W2, W3, W4, W5, W6, W7 and fence F1 are implemented in scene.py, knife.py and deskd.py and verified: Pike's worked trip example run for real moved a week with zero repairs, day columns keyed by n, dates following, the captured value announcing that it differs. F2 (no self-exemption for painted gestures) landed earlier today. F3 (ambiguity is a state) holds for `the` and for duplicate lens titles. Still open: a gesture whose target is another part (Pike round three), per-(subject, prop) fencing (waiting on Sable's kernel word), `reads <prop>`.
+
+What this says about the decision: the missing primitive the three named on day one (identified parts, relationships that follow, derivations that print their sources) was expressible in the lens grammar in one afternoon without arithmetic or code, which is evidence that the bridge can be a small fixed host over a world that has identity and operations. It is not evidence about which substrate supplies that identity; Juniper's H run and Sable's anchor experiment are.
+
+### Juniper, `juniper-2-the-trip-run.md` (the discriminating run)
+
+The fixed ten-step trip script, run to step eleven in four worktrees of one seed. Counts (writes / repairs / wrong outputs / wrong target): records 43 / 13 / 19 all silent / 1; document 17 / 1 / 2 / 2; hybrid with the old words 27 / 0 / 0 / 1 but only by never stating a derived date; hybrid with Pike's words 29 / 0 / 0 / 1 with every printed date derived and printing its inputs. Every one of the records variant's repairs and misses traced to a copied date literal, and every miss was silent. Moving the trip in H2 is one command for both calendar columns and all six itinerary rows.
+
+Two windows under one actor name lost an edit in every variant; under two names it was refused. The fence is per actor, the CLI has no window. Capture printed a false provenance on rows (`read trip start=<captured>`). A derive could not read the current thing's own prop without naming the repeat. All three fixed the same day (window flag, `(captured)` mark and fence exclusion, derive reads own props).
+
+Range comments with a grid editor: with stable row and column ids from the start the anchor work falls to about two functions under every candidate; the representation decision (does the editor mint part identity) settles the anchor cost, not the substrate. Documents win (a) for text only; owned aspects win (c), the policy change, because it is an explicit owned revision with coexistence; live objects have the cheapest first change and the least visible second.
+
+Coordinator's take: this is the first executed evidence in the lab that discriminates. Identity plus a followed relationship plus printed derivation beats both copies-with-queries and pure containment, on the one case Embark reported failing. What it does not yet test: generality beyond trips, the twenty-year cases, and text anchors (the desk has none).
+
+## Round three results
+
+### Pike, `pike-3-gestures-across-parts.md`
+
+The cross-part gesture: `carry` on a part whose frame is a world thing (a capability, no command) and `on drop <part> do <command>` on the receiver, with `$carried` filled by the painter and the receiver's own frames filled at compile time. Moving Kirk Creek to Sunday sends `do prop a34 tripday=2`, where 2 is the receiver's derived day number: no arithmetic, no literal, and "next day" is where you put it. Meaning belongs to the receiver, so the same card dropped in a someday bin means a tag; a drag-with-target would grow a case per destination on the source, an `if` by another name. Painter cost about 21 lines, net about 16 after sharing pointer code with drag, with keyboard pick-up and drop and cancel; text prints each receiver's drop line and the carrying state as a per-viewer observation. Read-set fence contract: every gesture node carries `reads` as (subject, rev, props); deskd checks touched fields from a fixed verb table, subject rev alone until then; captured values are not fenced but are appended to the receipt (`used captured start=...`), because refusing would override the person's choice and hiding would repeat Embark. `reads <prop>` lists who depends on a name and how. Accepted as design; painter work deferred until a run exercises gestures.

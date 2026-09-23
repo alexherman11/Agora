@@ -206,6 +206,10 @@ class DeskMoo(Desk):
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))
         hit = name not in ("create", "comment") and self._touched_by_others(nid)   # the appearance's rev alone misses edits made through a sibling
+        if not hit and seen != cur and getattr(self, "_window", "") and name not in ("create", "comment"):
+            # Juniper's step 11: two windows of one person. A windowed reader is judged on what it saw, whoever acted since.
+            last = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
+            hit = last[-1] if last else {"id": "?", "verb": "?", "by": w.me, "target": nid}
         if hit:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
             raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {hit['by']}); look at it again before acting")
@@ -218,6 +222,9 @@ class DeskMoo(Desk):
                 ev.setdefault("changed", []).extend(r.get("changed", []))
                 ev["via"] = name
         self._after_mutation()
+        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result: the receipt is a look
+            if c in w.nodes or c in w.subjects:
+                self._mark_seen(c)
         evs = r.get("events") or ([r["event"]] if r.get("event") else [])
         head = f"ok {name} {nid} {self._fmt_args(kv)}".rstrip()
         if note:

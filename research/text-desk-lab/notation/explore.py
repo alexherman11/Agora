@@ -59,11 +59,14 @@ def via_deskd(name, me, lines):
 def main():
     name = sys.argv[1]
     SESSIONS.mkdir(exist_ok=True)
-    if not [a for a in sys.argv[2:] if a.startswith("--") and a != "--as"]:
+    # --window <name>: Juniper's step 11. Two windows of one person are two readers; each keeps its own "what I saw",
+    # so the second refuses a stale edit instead of overwriting the first. Events still say the same actor.
+    window = sys.argv[sys.argv.index("--window") + 1] if "--window" in sys.argv[:-1] else ""
+    if not [a for a in sys.argv[2:] if a.startswith("--") and a not in ("--as", "--window")]:
         lines = [l.rstrip("\n") for l in sys.stdin]
         lines = [l for l in lines if l.strip() and not l.startswith("#")]
         who = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
-        if not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines):
+        if not window and not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines):
             return
         import io
         sys.stdin = io.StringIO("\n".join(lines) + "\n")
@@ -88,13 +91,15 @@ def main():
     me = desk.world.me = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
     # what has been seen, what is open and the since-your-last-look mark belong to each person, not to the session
     desk._session = name
+    slot = me + ("/" + window if window else "")       # the reader's slot: one person, one window
     per = getattr(desk, "_per", None) or {}
-    if me in per:
-        desk.seen, desk.open, desk.last_event_seen = per[me]
+    if slot in per:
+        desk.seen, desk.open, desk.last_event_seen = per[slot]
     elif me != "jeff":
         desk.seen, desk.open, desk.last_event_seen = {}, {desk.world.root}, len(desk.world.events)
-    per[me] = (desk.seen, desk.open, desk.last_event_seen)
+    per[slot] = (desk.seen, desk.open, desk.last_event_seen)
     desk._per = per
+    desk._window = window
     if "--dump" in sys.argv:
         print(json.dumps(desk.snapshot(), indent=1))
         return
@@ -171,7 +176,7 @@ def main():
                 print(f"stopped: {len(rest)} later line(s) not run because this one was refused ($item and $new still name the last thing made)")
                 print()
             break
-    per[me] = (desk.seen, desk.open, desk.last_event_seen)
+    per[slot] = (desk.seen, desk.open, desk.last_event_seen)
     path.write_bytes(pickle.dumps(desk))
 
 
