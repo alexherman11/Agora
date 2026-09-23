@@ -119,7 +119,7 @@ The notation lab ran 47 Terra trials over nine rounds. They produced the line no
 
 | Material | Location |
 |---|---|
-| Design vault (retired) | `C:/Projects/Agora4/research/archive/docs-vault-2026-09/`, duplicate in `C:/Projects/Agora/docs/` |
+| Design vault (retired) | `C:/Projects/Agora4/research/archive/docs-vault-2026-09/`; the Obsidian copy is `C:/Projects/Agora/docs/archive/docs-vault-2026-09/` |
 | Original vault commits | `f7cdc90`, `5a8468e`; branch `master`, tag `pre-weave/docs` |
 | Spine attempt (uncommitted) | `C:/Projects/Agora/attempt1/` |
 | Milestone One and extensions | branch `codex/agora2-checkpoint-20260906` (`df9a149`); tags `pre-weave/docs`, `pre-weave/docs-final`; uncommitted copies in `C:/Projects/Agora/{kernel,jeff,shell,component_runtime}` |
