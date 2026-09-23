@@ -50,14 +50,14 @@ def parse_selection(w, token):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
-    KNOWN = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:")
+    KNOWN = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:")
     for t in terms:
         # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
         if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):
             raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
-    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:")) or t == "hidden" for t in terms + neg):
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:")) or t == "hidden" for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -146,8 +146,20 @@ def parse_selection(w, token):
                 raise Refusal("links: needs an appearance or subject id")
             linked = {l["to"] if l["from"] == src else l["from"] for l in w.links_of(src)}
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in linked]
+        elif t.startswith(("parts:", "part-of:")):
+            # Pike: links: is untyped and undirected. `do link a20 to=a30 as=part-of` says a20 is part of a30:
+            # parts:a30 finds a20; part-of:a20 finds a30. One kind, one direction, usable in find and in a lens.
+            key = "parts:" if t.startswith("parts:") else "part-of:"
+            src = w.subject_of(t[len(key):])
+            if not src:
+                raise Refusal(f"{key} needs an appearance or subject id")
+            if key == "parts:":
+                linked = {l["from"] for l in w.links_of(src) if l["kind"] == "part-of" and l["to"] == src}
+            else:
+                linked = {l["to"] for l in w.links_of(src) if l["kind"] == "part-of" and l["from"] == src}
+            cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in linked]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id>; -term leaves out")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id>; -term leaves out")
     for n in neg:
         r = parse_selection(w, n)
         if r is None:

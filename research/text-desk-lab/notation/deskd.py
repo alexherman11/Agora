@@ -168,6 +168,14 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({"text": None, "error": f"refused: {ob['item']} changed since this was painted (you saw revision {ob['rev']}, "
                                        f"it is now {now}{who}); nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
                 desk.seen[ob["item"]] = ob["rev"]
+            for sid, rev in (ob.get("reads") or []):
+                # Pike F1: a gesture is judged on every value its line was built from, not only the clicked item.
+                # Juniper's stale "move to Sun": the item and the lens were unchanged, the trip's start had moved.
+                cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
+                if cur is None or cur["rev"] != rev:
+                    return self._json({"text": None, "error": f"refused: a value this gesture was built from has changed: {sid} (you saw revision {rev}, "
+                                       f"it is now {cur['rev'] if cur else 'gone'}); nothing was done. The view will repaint.",
+                                       "events_total": len(desk.world.events), "line": line})
                 idx = getattr(desk, "_seen_idx", None)
                 if idx is None:
                     idx = desk._seen_idx = {}

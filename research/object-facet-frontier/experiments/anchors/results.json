@@ -1,0 +1,2374 @@
+{
+ "automerge": "3.5.0",
+ "seq": [
+  {
+   "rev": "R1 insert a sentence",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink, because the east path floods and the morning will be cold."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R2 delete a clause (inside c3)",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Replace the washer on the tap by the gate"
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R3 reorder two list items (delete + insert)",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the ",
+       "overlap": 0.13
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R4 retitle a heading",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the ",
+       "overlap": 0.13
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip under the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city now says it will only repair the standpipe if we clear the drain first, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R5 rewrite one paragraph (c2, start of c5)",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Saturday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Saturday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "the drip at the ",
+       "overlap": 0.43
+      },
+      "mark": {
+       "cls": "partial",
+       "got": "the drip at the base",
+       "overlap": 0.54
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the ",
+       "overlap": 0.13
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R6 replace the commented word (Saturday 18 -> Sunday 19)",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Sunday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Sunday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "the drip at the ",
+       "overlap": 0.43
+      },
+      "mark": {
+       "cls": "partial",
+       "got": "the drip at the base",
+       "overlap": 0.54
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the ",
+       "overlap": 0.13
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R7 insert a new section",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Sunday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Sunday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "the drip at the ",
+       "overlap": 0.43
+      },
+      "mark": {
+       "cls": "partial",
+       "got": "the drip at the base",
+       "overlap": 0.54
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the ",
+       "overlap": 0.13
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate\n- Clear the drain beside the standpipe",
+       "overlap": 0.11
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R8 edit the list item in place, add an item",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Sunday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Sunday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "the drip at the ",
+       "overlap": 0.43
+      },
+      "mark": {
+       "cls": "partial",
+       "got": "the drip at the base",
+       "overlap": 0.54
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the ",
+       "overlap": 0.28
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job.\n\nWe also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": "\n\nWe also lost most of the garlic in bed three to standing water.",
+       "overlap": 0.41
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R9 merge two paragraphs (inside c5)",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Sunday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Sunday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "the drip at the ",
+       "overlap": 0.43
+      },
+      "mark": {
+       "cls": "partial",
+       "got": "the drip at the base",
+       "overlap": 0.54
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and something warm to drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the ",
+       "overlap": 0.28
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "elsewhere",
+       "got": "\n\n",
+       "overlap": 0
+      },
+      "mark": {
+       "cls": "elsewhere",
+       "got": "\n\n",
+       "overlap": 0
+      }
+     }
+    }
+   }
+  },
+  {
+   "rev": "R10 tidy: volunteers -> helpers everywhere; shorten c3",
+   "cells": {
+    "op": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and a hot drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and a hot drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "ut": {
+     "c1": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Sunday"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Sunday"
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "the drip at the base of the standpipe"
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and a hot drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and a hot drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "wd": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "drifted",
+       "got": "the drip at the ",
+       "overlap": 0.43
+      },
+      "mark": {
+       "cls": "partial",
+       "got": "the drip at the base",
+       "overlap": 0.54
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and a hot drink."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "Bring gloves, a trowel and a hot drink."
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the ",
+       "overlap": 0.28
+      },
+      "mark": {
+       "cls": "drifted",
+       "got": " the gate and lag the pipe\n- Clear the drain beside the standpipe",
+       "overlap": 0.25
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      },
+      "mark": {
+       "cls": "intact",
+       "got": "The city will only repair the standpipe once we clear the drain, so the drain is our first job. We also lost most of the garlic in bed three to standing water."
+      }
+     }
+    },
+    "pr": {
+     "c1": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c2": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c3": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c4": {
+      "cursor": {
+       "cls": "collapsed",
+       "got": ""
+      },
+      "mark": {
+       "cls": "collapsed",
+       "got": ""
+      }
+     },
+     "c5": {
+      "cursor": {
+       "cls": "elsewhere",
+       "got": "\n\n",
+       "overlap": 0
+      },
+      "mark": {
+       "cls": "elsewhere",
+       "got": "\n\n",
+       "overlap": 0
+      }
+     }
+    }
+   }
+  }
+ ],
+ "rewrite": {
+  "stats": {
+   "oldWords": 353,
+   "newWords": 350,
+   "keptInOrder": 263,
+   "changedShareOfOld": 0.255,
+   "newShareOfNew": 0.249
+  },
+  "res": {
+   "ut": {
+    "c1": {
+     "cursor": {
+      "cls": "intact",
+      "got": "Saturday"
+     },
+     "mark": {
+      "cls": "intact",
+      "got": "Saturday"
+     }
+    },
+    "c2": {
+     "cursor": {
+      "cls": "partial",
+      "got": "ter, and the leaking standpipe",
+      "overlap": 0.7
+     },
+     "mark": {
+      "cls": "partial",
+      "got": "ter, and the leaking standpipe",
+      "overlap": 0.7
+     }
+    },
+    "c3": {
+     "cursor": {
+      "cls": "partial",
+      "got": "ring gloves, a trowel and a hot drink, since the east path floods and it will be a cold morning.",
+      "overlap": 0.92
+     },
+     "mark": {
+      "cls": "partial",
+      "got": "ring gloves, a trowel and a hot drink, since the east path floods and it will be a cold morning.",
+      "overlap": 0.92
+     }
+    },
+    "c4": {
+     "cursor": {
+      "cls": "partial",
+      "got": "a new washer on the tap by the gate",
+      "overlap": 0.9
+     },
+     "mark": {
+      "cls": "partial",
+      "got": "a new washer on the tap by the gate",
+      "overlap": 0.9
+     }
+    },
+    "c5": {
+     "cursor": {
+      "cls": "partial",
+      "got": "he city, the standpipe will only be repaired once the drain is clear, which makes the drain our first job.\n\nStanding water also killed most of the garlic in bed three.",
+      "overlap": 0.92
+     },
+     "mark": {
+      "cls": "partial",
+      "got": "he city, the standpipe will only be repaired once the drain is clear, which makes the drain our first job.\n\nStanding water also killed most of the garlic in bed three.",
+      "overlap": 0.92
+     }
+    }
+   },
+   "wd": {
+    "c1": {
+     "cursor": {
+      "cls": "intact",
+      "got": "Saturday"
+     },
+     "mark": {
+      "cls": "intact",
+      "got": "Saturday"
+     }
+    },
+    "c2": {
+     "cursor": {
+      "cls": "intact",
+      "got": "the leaking standpipe"
+     },
+     "mark": {
+      "cls": "intact",
+      "got": "the leaking standpipe"
+     }
+    },
+    "c3": {
+     "cursor": {
+      "cls": "partial",
+      "got": " gloves, a trowel and a hot drink, since the east path floods and it will be a cold morning.",
+      "overlap": 0.88
+     },
+     "mark": {
+      "cls": "partial",
+      "got": " gloves, a trowel and a hot drink, since the east path floods and it will be a cold morning.",
+      "overlap": 0.88
+     }
+    },
+    "c4": {
+     "cursor": {
+      "cls": "partial",
+      "got": " new washer on the tap by the gate",
+      "overlap": 0.87
+     },
+     "mark": {
+      "cls": "partial",
+      "got": " new washer on the tap by the gate",
+      "overlap": 0.87
+     }
+    },
+    "c5": {
+     "cursor": {
+      "cls": "partial",
+      "got": " city, the standpipe will only be repaired once the drain is clear, which makes the drain our first job.\n\nStanding water also killed most of the garlic in bed three.",
+      "overlap": 0.91
+     },
+     "mark": {
+      "cls": "partial",
+      "got": " city, the standpipe will only be repaired once the drain is clear, which makes the drain our first job.\n\nStanding water also killed most of the garlic in bed three.",
+      "overlap": 0.91
+     }
+    }
+   },
+   "pr": {
+    "c1": {
+     "cursor": {
+      "cls": "collapsed",
+      "got": ""
+     },
+     "mark": {
+      "cls": "collapsed",
+      "got": ""
+     }
+    },
+    "c2": {
+     "cursor": {
+      "cls": "collapsed",
+      "got": ""
+     },
+     "mark": {
+      "cls": "collapsed",
+      "got": ""
+     }
+    },
+    "c3": {
+     "cursor": {
+      "cls": "collapsed",
+      "got": ""
+     },
+     "mark": {
+      "cls": "collapsed",
+      "got": ""
+     }
+    },
+    "c4": {
+     "cursor": {
+      "cls": "collapsed",
+      "got": ""
+     },
+     "mark": {
+      "cls": "collapsed",
+      "got": ""
+     }
+    },
+    "c5": {
+     "cursor": {
+      "cls": "drifted",
+      "got": "\n\n",
+      "overlap": 0.01
+     },
+     "mark": {
+      "cls": "drifted",
+      "got": "\n\nStanding water also killed most of the garlic in bed three. The east path sits on the lowest ground in the park, and after heavy rain it stays flooded near the bottom for days. We cannot raise the path ourselves, but we can dig a shallow trench beside the beds and fill it with gravel.",
+      "overlap": 0.15
+     }
+    }
+   }
+  }
+ }
+}

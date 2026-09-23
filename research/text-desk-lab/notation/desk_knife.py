@@ -790,7 +790,7 @@ class DeskKnife(DeskMoo):
                 raise Refusal("today is unset; clock YYYY-MM-DD sets it")
             token = token.replace("today", self.today)
         for t in re.split(r",", token):
-            for key in ("in:", "also:", "links:"):
+            for key in ("in:", "also:", "links:", "parts:", "part-of:"):
                 if t.startswith(key) and t[len(key):] not in self.world.nodes and t[len(key):] not in self.world.subjects:
                     t = key + self._resolve(t[len(key):].strip('"'))
             out.append(t)
@@ -901,7 +901,7 @@ class DeskKnife(DeskMoo):
             verb = argv[0].lower()
             # Juniper: `do prop prop:day=2026-10-10 tripday=1` lost its target, because the selection carries an =. A word that
             # begins with a selection term is the target, = or not.
-            SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links):|^-?(due|age)[<>]|^[?]")
+            SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of):|^-?(due|age)[<>]|^[?]")
             is_target = lambda a: "=" not in a or a.startswith("?") or bool(SEL.match(a))
             positional = [unescape_value(a) for a in argv[1:] if is_target(a)]   # titles carry escapes too
             kv = {}

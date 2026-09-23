@@ -15,7 +15,7 @@
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line) {
-    const observed = { item: n.item, rev: n.rev, at: sceneAt, def };
+    const observed = { item: n.item, rev: n.rev, at: sceneAt, def, reads: n.reads };
     const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json();
     const t = r.text || r.error || "";
     if (r.error || t.startsWith("ERR")) said.textContent = "refused: " + t + "\n\n" + said.textContent;

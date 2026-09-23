@@ -1,6 +1,6 @@
 # The trip script: a fixed run of Embark's case
 
-Round two, Juniper, 23 September 2026. This is a rerunnable procedure. Anyone on the team should be able to run it and get the same counts. The results are in `juniper-2-the-trip-run.md`.
+Round two, Juniper, 23 September 2026. This is a rerunnable procedure. Anyone on the team should be able to run it and get the same counts. The results are in `juniper-2-the-trip-run.md`. The text below is the script **as run**: three lines were corrected while running on 23 September, and each correction is marked *as-run*.
 
 ## Setup
 
@@ -50,7 +50,10 @@ Along the way the script adds:
 
 ## Step 1: seed (base session, run once)
 
+*As-run:* a fresh desk refuses `create` until you have looked, so `look` comes first. Target writes: 1.
+
 ```
+look
 do create f01 kind=doc title="Big Sur trip" text="Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday."
 ```
 
@@ -58,13 +61,13 @@ Then, in `frontier-trip`, run `worktree fork R` and `worktree fork D`, one per c
 
 ## R: records (session `frontier-trip@R`)
 
-The trip doc carries the start date as `due` and `role=trip`. Items are notes tagged `trip`, with `day=` (absolute) and `tripday=` (relative).
+The trip doc carries the start date as the prop `start=` and `role=trip`. *As-run:* `do due` is refused on a doc ("due does not apply to a03"; due applies only to tasks and notes), so `start=` replaces it, and the relative lens cannot print a date. Items are notes tagged `trip`, with `day=` (absolute) and `tripday=` (relative).
 
 **Step 2: dates and items.** Target writes: all 12 lines.
 
 ```
 do prop "Big Sur trip" role=trip
-do due "Big Sur trip" on=2026-10-10
+do prop "Big Sur trip" start=2026-10-10
 do create f01 kind=note title="McWay Falls" text="short walk, best at sunset" tags=trip
 do prop "McWay Falls" day=2026-10-10 tripday=1
 do create f01 kind=note title="Night on the coast" text="Kirk Creek if a site is free, else a motel in Cambria" tags=trip
@@ -82,7 +85,7 @@ do prop "Bixby Bridge stop" day=2026-10-11 tripday=2
 ```
 do create f01 kind=view title="Itinerary" query=tag:trip cols=day,tripday,title,uncertain by=day
 do create f01 kind=note title="cal literal" tags=lens text="cal : row\n  d1 : column, role sheet\n    head : text \"Sat Oct 10\", role heading\n    items : column, of tag:trip,prop:day=2026-10-10, each entry\n  d2 : column, role sheet\n    head : text \"Sun Oct 11\", role heading\n    items : column, of tag:trip,prop:day=2026-10-11, each entry\nentry : column, role card\n  what : text \"$title\"\n  open : text \"open question\", role tag, only when prop:uncertain"
-do create f01 kind=note title="cal relative" tags=lens text="cal : row, of prop:role=trip, each trip\ntrip : row\n  d1 : column, role sheet\n    head : text \"Day 1, trip starts $due\", role heading\n    items : column, of tag:trip,prop:tripday=1, each entry\n  d2 : column, role sheet\n    head : text \"Day 2\", role heading\n    items : column, of tag:trip,prop:tripday=2, each entry\nentry : column, role card\n  what : text \"$title\"\n  open : text \"open question\", role tag, only when prop:uncertain"
+do create f01 kind=note title="cal relative" tags=lens text="cal : row\n  d1 : column, role sheet\n    head : text \"Day 1\", role heading\n    items : column, of tag:trip,prop:tripday=1, each entry\n  d2 : column, role sheet\n    head : text \"Day 2\", role heading\n    items : column, of tag:trip,prop:tripday=2, each entry\nentry : column, role card\n  what : text \"$title\"\n  open : text \"open question\", role tag, only when prop:uncertain"
 ```
 
 Checks (the same after every later step; the expected content changes as the plan does):
@@ -100,7 +103,7 @@ scene cal relative
 **Step 4: move the trip one week.** Target writes: 2, the date and one reasoning line.
 
 ```
-do due "Big Sur trip" on=2026-10-17
+do prop "Big Sur trip" start=2026-10-17
 do append "Big Sur trip" line="Moved a week: Kirk Creek is full on the 10th."
 ```
 
@@ -147,7 +150,7 @@ Check with `examine "Night on the coast"`. It should show the two options *as al
 **Step 9: move back.** Target writes: 2.
 
 ```
-do due "Big Sur trip" on=2026-10-10
+do prop "Big Sur trip" start=2026-10-10
 do append "Big Sur trip" line="Moved back: a site opened up on the 10th."
 ```
 
@@ -221,10 +224,39 @@ The "what is open" query cannot be expressed (n/e). Checks: the scene and `read`
 
 **Step 11.** As in R, with the doc as the item. Both windows rewrite the whole doc: window B adds " (trail reopened)" to the hike line, and window A adds " bring layers".
 
-## H: hybrid (session `frontier-trip@H`; waits for Jeff's words)
+## H: hybrid (session `frontier-trip@H`, forked from the seed after Jeff's words landed)
 
-- The reasoning stays in the doc.
-- Items are notes linked `part-of` the doc and carry *only* `tripday=`.
-- The calendar binds to the trip by identity (`of <trip id>`) and reads its date.
+- The reasoning stays in the doc, which carries `start=`.
+- Items are notes created *with* `tripday=`, one command each, and linked `part-of` the trip. They carry no tag and no date.
+- Membership is a relationship: `links:<trip>`, which selects both link directions.
+- The calendar binds to the trip by identity (`of a03`) and reads `$start`. The inner repeats follow `links:$item`.
 
-The exact lines will be written once `$prop`, `of <id>`, `create` with props and `do prop` on a selection have landed. The steps, checks and measures are unchanged.
+**Step 2.** Target writes: 11. The block below shows the first item; repeat the pair for Night on the coast (1), Ewoldsen hike (2), Lunch with Sam at Nepenthe (2) and Bixby Bridge stop (2).
+
+```
+do prop "Big Sur trip" role=trip start=2026-10-10
+do create f01 kind=note title="McWay Falls" text="short walk, best at sunset" tripday=1
+do link "McWay Falls" "Big Sur trip" as=part-of
+```
+
+**Step 3.** Target writes: 2.
+
+```
+do create f01 kind=view title="Itinerary" query=links:a03 cols=tripday,title,uncertain by=tripday
+do create f01 kind=note title="cal trip" tags=lens text="cal : row, of a03, each trip\ntrip : row\n  d1 : column, role sheet\n    head : text \"Day 1, $start\", role heading\n    items : column, of links:$item,prop:tripday=1, each entry\n  d2 : column, role sheet\n    head : text \"Day 2\", role heading\n    items : column, of links:$item,prop:tripday=2, each entry\nentry : column, role card\n  what : text \"$title\"\n  open : text \"open: $uncertain\", role tag, only when prop:uncertain"
+```
+
+Checks: `look <Itinerary id> :3` and `scene cal trip`.
+
+**Steps 4 and 9.** Target writes: 2, namely `do prop "Big Sur trip" start=<date>` and the reasoning `append`.
+
+**Step 5.** Target writes: 2.
+
+```
+do create f01 kind=note title="Pfeiffer Beach" text="purple sand, afternoon" tripday=1
+do link "Pfeiffer Beach" "Big Sur trip" as=part-of
+```
+
+**Steps 6, 7, 8, 10 and 11.** As in R, except that step 10 removes only `"cal trip"`.
+
+**The H lines I wanted but could not write:** see `juniper-2-the-trip-run.md`, section "What H still needs".

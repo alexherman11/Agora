@@ -36,6 +36,15 @@ def test_refusals():
     _, parts = scene.parse("root : column\n  a : text $me")
     assert parts["root"]["kids"][0]["props"] == ["me"]
     refused("root : column, of kind:note", "say what with `each")
+    # Pike's binding words (round two of the object/facet frontier)
+    refused("root : column, the tag:trip, each x\nx : text a", "names exactly one thing")
+    refused("root : column, the tag:trip as title", "shadow a built-in")
+    refused("root : column, as trip", "needs `the`, `of` or `over`")
+    refused("root : column, derive d = plus $a $b", "no interpretation")
+    refused("root : column, derive d = day-n $a", "takes 2 input(s)")
+    refused("root : column, capture start=1", "no `the`")
+    _, parts = scene.parse("root : column, the tag:trip as trip\n  h : derive d = day-n $trip.start 2, text $d")
+    assert parts["root"]["as"] == "trip" and parts["root"]["kids"][0]["derive"] == [("d", "day-n", ["$trip.start", "2"])]
 
 
 def test_command_values_keep_their_quotes():
