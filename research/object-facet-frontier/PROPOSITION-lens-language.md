@@ -2,11 +2,11 @@
 
 A proposition for Alex from the object/facet frontier, round six. 24 September 2026.
 
-Written by Jeff from the three round-six notes: Sable (`sable-6-right-side.md`, the properties as a formal statement and the behavior language), Pike (`pike-6-compiler-and-painter.md`, the compiler and painter, the case on `if` and nesting, the growth measures) and Juniper (`juniper-6-attacks-and-budget.md`, attacks on the properties, an audit of the prototype, the household budget). The brief was `HANDOFF-lens-language.md`, written by the session that taught POSITION v2 to Alex and recorded his reactions. Where the three disagreed, the disagreement is shown and named. Cross-challenges between the three ran by message and in the desk's Talk column (a136 to a144), and each amended their note where they changed position.
+Written by Jeff from the three round-six notes: Sable (`sable-6-right-side.md`, the properties as a formal statement and the behavior language), Pike (`pike-6-compiler-and-painter.md`, the compiler and painter, the case on `if` and nesting, the growth measures) and Juniper (`juniper-6-attacks-and-budget.md`, attacks on the properties, an audit of the prototype, the household budget). The brief was `HANDOFF-lens-language.md`, written by the session that taught POSITION v2 to Alex and recorded Alex's reactions. Where the three disagreed, the disagreement is shown and named. Cross-challenges between the three ran by message and in the desk's Talk column (a136 to a144), and each amended their note where they changed position.
 
 Labels, as in POSITION: **[ran]** was executed in the desk or over the source, and the number printed is quoted; **[source]** was read in `scene.py` (796 lines) or `lens.js` (123 lines); **[design]** is a proposal that has not been run.
 
-This document teaches the concepts first, then gives the evidence, then the two-part proposition Alex asked for, then his decisions.
+This document teaches the concepts first, then gives the evidence, then the two-part proposition Alex asked for, then the decisions that are Alex's.
 
 ---
 
@@ -47,7 +47,7 @@ Every node in the scene records which aspects it read, at which revision. The pr
 
 The read-set is not only honesty. Sable's point, which Pike accepted, is that one read list does three jobs: it is what the text printer prints, it is what a gesture's fence carries, and it is what an incremental compiler uses to rebuild only the nodes whose inputs moved. That is the runtime half of "sublinear", beside the source-code half in section 4.
 
-The handoff's "everything prints" and "no hidden state" both fold into this one property. Hidden state is exactly what makes the perturbation test fail. And Juniper showed "everything prints" is not a property at all: a lens can print fourteen lines of true-looking absence and no Mondays (her A5), and a derive can print its inputs perfectly and mean the wrong thing (her A2, `day-n $a.start $a.week`, week six treated as day six). The checkable form is: the printed reads equal the recorded read-set, and there is no silent value.
+The handoff's "everything prints" and "no hidden state" both fold into this one property. Hidden state is exactly what makes the perturbation test fail. And Juniper showed "everything prints" is not a property at all: a lens can print fourteen lines of true-looking absence and no Mondays (Juniper's A5), and a derive can print its inputs perfectly and mean the wrong thing (Juniper's A2, `day-n $a.start $a.week`, week six treated as day six). The checkable form is: the printed reads equal the recorded read-set, and there is no silent value.
 
 ### 2.4 Names and scopes, written down
 
@@ -70,7 +70,7 @@ reserved   title text kind due tags id item it count me today session
 - **N5.** `$item` is the occurrence, the appearance a gesture acts on. `$id` is the referent. `$it` is a frame, never a thing.
 - **N6.** Every reference resolves at check time to a let, a frame, a thing field or a host fact. Prop reads resolve at evaluation and print `(no x)` when missing. Sable accepted this on one condition: a missing prop is a third state, not false. A test on a missing prop must print `(absent: no x)`, never a wrong reason like `(absent: not $wd=Mon)`.
 
-Sable's property behind these is total name resolution: every name resolves at compile time to exactly one thing, unresolved and shadowed names are refused, and the refusal vocabulary is generated from the same table as the grammar. **[ran]** His probe 7: `if` is refused today with a list of eleven allowed words that omits seven the grammar has. A refusal text kept by hand is a second grammar, and it drifts. Juniper added that selection syntax needs the same stage: `prop:to>date` is accepted today and matches nothing.
+Sable's property behind these is total name resolution: every name resolves at compile time to exactly one thing, unresolved and shadowed names are refused, and the refusal vocabulary is generated from the same table as the grammar. **[ran]** Sable's probe 7: `if` is refused today with a list of eleven allowed words that omits seven the grammar has. A refusal text kept by hand is a second grammar, and it drifts. Juniper added that selection syntax needs the same stage: `prop:to>date` is accepted today and matches nothing.
 
 ### 2.5 The compiler as stages, so a word is a table entry
 
@@ -136,12 +136,12 @@ The rule, in the wording Sable and Pike both signed: **nesting is allowed and th
 
 ### 2.8 Effects are proposals, and a proposal is the whole cascade
 
-The lens cannot write. A gesture's `do` line is the only effect, and it goes through the desk's gateway, attributed, fenced on what the gesture read, undoable. The handoff had that as property two. Sable showed it is not enough. **[ran]** His probe 4: `do prop a122 beds=6; do prop a999 x=1` applied the first half and refused the second. **[ran]** I reproduced it in a scratch session: `beds=6` became event e2, then `no such id 'a999'`. A two-command gesture has exactly that shape. The missing word was *atomic*.
+The lens cannot write. A gesture's `do` line is the only effect, and it goes through the desk's gateway, attributed, fenced on what the gesture read, undoable. The handoff had that as property two. Sable showed it is not enough. **[ran]** Sable's probe 4: `do prop a122 beds=6; do prop a999 x=1` applied the first half and refused the second. **[ran]** I reproduced it in a scratch session: `beds=6` became event e2, then `no such id 'a999'`. A two-command gesture has exactly that shape. The missing word was *atomic*.
 
 The proposed semantics are Astra's, from the Codex team's evaluator, with Sable's changes:
 
 - A gesture or a rule action yields one proposal: operation rows that all read from one input state, applied whole or not at all, undone as one batch. Preview is free: the rows print as `(referent, aspect): before -> after` before anything applies.
-- The guard is the read-set fence at (referent, aspect), not Astra's whole-state fingerprint, which her own spec admits over-blocks.
+- The guard is the read-set fence at (referent, aspect), not Astra's whole-state fingerprint, which Astra's own spec admits over-blocks.
 - Mints get placeholders (`$new.1`), so "create, then place it" is one proposal without a sequential read.
 - Equal writes coalesce, unequal writes to one address refuse the whole proposal. That is exactly Sable's round-four merge rule, so gestures, rules and worktree merges share one conflict rule.
 - **The proposal is the whole cascade.** This came from Juniper's A4 (section 2.9). A script expands in the preview; rules run to a fixpoint of at most three passes, and each pass prints; the gesture carries every pass's reads plus the revision of every definition that fired; at apply, the gateway recomputes and refuses if anything moved. A rule's write on a thing the gesture never named is fenced because the preview promised to write it. This depends on rules being world data, so they have revisions.
@@ -151,15 +151,15 @@ The cost is read-your-own-write inside one gesture. A gesture that must see a va
 
 ### 2.9 Definitions are world data, and today most are not
 
-A lens is a note: versioned, forkable, undone with the same verbs. That is the handoff's property five and it holds. Sable generalised it: every definition that can change a scene or an effect must be a referent whose code changes only by operations. Then he tested it. **[ran]** His probe 9: `script sprobe = look f18` left history unchanged. **[ran]** I reproduced it. Rules, scripts, the clock and the style file are definitions outside history.
+A lens is a note: versioned, forkable, undone with the same verbs. That is the handoff's property five and it holds. Sable generalised it: every definition that can change a scene or an effect must be a referent whose code changes only by operations. Then Sable tested it. **[ran]** Probe 9: `script sprobe = look f18` left history unchanged. **[ran]** I reproduced it. Rules, scripts, the clock and the style file are definitions outside history.
 
-Juniper then showed why this is the finding of the round. **[ran]** Her A4: a script `tidy` that tags, retitles and sets a prop, a rule `on tag do prop Beta week=99`, and a gesture `on click do run tidy $item`. The scene printed only `click: run tidy a03`. Running it made four events. One was `prop a05 week=99 via rule r1`, on Beta, a thing the gesture never named, so the gesture's fence never covered it. The script and the rule made no events when defined. Every effect went through the gateway, attributed and undoable, and the scene still could not say what the click would do.
+Juniper then showed why this is the finding of the round. **[ran]** Juniper's A4: a script `tidy` that tags, retitles and sets a prop, a rule `on tag do prop Beta week=99`, and a gesture `on click do run tidy $item`. The scene printed only `click: run tidy a03`. Running it made four events. One was `prop a05 week=99 via rule r1`, on Beta, a thing the gesture never named, so the gesture's fence never covered it. The script and the rule made no events when defined. Every effect went through the gateway, attributed and undoable, and the scene still could not say what the click would do.
 
 That is the worse-JavaScript route in the prototype today. The program has not gone into the lens. It has gone beside it, into global definitions the note cannot show. Juniper's recommendation, which I have taken into the build order: forbid gestures from calling scripts or rules now, until proposals preview their full effect including the cascade.
 
 ### 2.10 Bounded, and honest about it
 
-Evaluation terminates: no recursion in `define`, no loops other than a repeat over a finite source, a node budget. Sable's addition: every cap prints as `n of N`. **[ran]** His probe 8: `of events` prints `20 of events` while the world holds 76; the cap is silent. **[ran]** Juniper's F3: a year view of 365 days by 5 parts was refused over the 1500-node budget, and the last-good fallback did not engage because the fallback build starts with the failed attempt's count. A bound should degrade, not refuse a lens that was working. Pike's split: the check stage refuses at write time only what the lens text alone makes wrong (unresolved names, a value test used as a selection, a branching gesture line, recursion). Bounds that depend on data degrade: the compiler clamps the repeat nearest the budget and prints `days (showing 1-292 of 365 · node budget 1500)`. Juniper's warning stands: a lens can pass check at write time and exceed the budget later as the world grows, so the clamp is not optional.
+Evaluation terminates: no recursion in `define`, no loops other than a repeat over a finite source, a node budget. Sable's addition: every cap prints as `n of N`. **[ran]** Sable's probe 8: `of events` prints `20 of events` while the world holds 76; the cap is silent. **[ran]** Juniper's F3: a year view of 365 days by 5 parts was refused over the 1500-node budget, and the last-good fallback did not engage because the fallback build starts with the failed attempt's count. A bound should degrade, not refuse a lens that was working. Pike's split: the check stage refuses at write time only what the lens text alone makes wrong (unresolved names, a value test used as a selection, a branching gesture line, recursion). Bounds that depend on data degrade: the compiler clamps the repeat nearest the budget and prints `days (showing 1-292 of 365 · node budget 1500)`. Juniper's warning stands: a lens can pass check at write time and exceed the budget later as the world grows, so the clamp is not optional.
 
 ### 2.11 Per-viewer state
 
@@ -173,11 +173,11 @@ POSITION 2.8a named this as an open kernel item. **[ran]** Juniper's budget hit 
 
 Sable's shape needs no new noun. An aspect may have a sequence representation; text is one, and a timeline is another: segments `{from, value}`, each an anchor with element identity. The one-sentence kernel change: an aspect's representation may be a sequence with element identity, and the fence may key on (referent, aspect, anchor). Two people editing different segments of `pace` do not conflict. `at <date>` is library: Pike lowers it to a `bind one` over the segments where the date falls, which gets the binding states for free, so a gap prints `(empty)` and an overlap prints `(ambiguous)`. A repeat over a timeline needs one general change to row sources that sections will need too once text has anchors: rows keyed by the segment's own id, a read-set entry per segment plus the segment list, and ordering by valid time. Valid time (`pace at 2026-11-03`, what applies on that date) and transaction time (`pace@e40`, what we had said by then) stay distinct, and together answer the bitemporal question.
 
-**[ran]** Juniper checked the shape against the budget. It survives: Casey leaving becomes one write that closes her segment; the rent rise is one added segment; the October statement derives with `at` October dates and the captured-statement wrong disappears. Two things must be declared in the timeline's definition, because both changed her numbers: the end convention (an exclusive end makes Casey absent on the 15th, a one-day slip, and a missing end must mean open-ended or Ana and Ben vanish from every day), and the split policy (per-day among those present gives Casey 425.81; person-days gives 514.29).
+**[ran]** Juniper checked the shape against the budget. It survives: Casey leaving becomes one write that closes Casey's segment; the rent rise is one added segment; the October statement derives with `at` October dates and the captured-statement wrong disappears. Two things must be declared in the timeline's definition, because both changed Juniper's numbers: the end convention (an exclusive end makes Casey absent on the 15th, a one-day slip, and a missing end must mean open-ended or Ana and Ben vanish from every day), and the split policy (per-day among those present gives Casey 425.81; person-days gives 514.29).
 
 ### 2.13 Quantities need more than printed inputs
 
-This is the concept the round added that nobody had before. **[ran]** Juniper's budget: with every input printed correctly, the three shares summed to 2640.01 against a total of 2640. A penny, silent, in arithmetic that printed perfectly. Printing inputs is what makes a date trustworthy. A derivation over a whole also needs a conservation check: that the parts sum to the whole, with the rounding rule and where the remainder went. Her proposed print:
+This is the concept the round added that nobody had before. **[ran]** Juniper's budget: with every input printed correctly, the three shares summed to 2640.01 against a total of 2640. A penny, silent, in arithmetic that printed perfectly. Printing inputs is what makes a date trustworthy. A derivation over a whole also needs a conservation check: that the parts sum to the whole, with the rounding rule and where the remainder went. Juniper's proposed print:
 
 ```
 share.Casey = 2640 x 15 / 77 = 514.2857 -> 514.29 (round half-up, cents)
@@ -234,7 +234,7 @@ Seven words, 605 lines, about 86 per word. Checks that pass today: the compiler 
 
 What the properties wrongly refuse: per-viewer view state (F1); a 13-month lease, `days-from` refusing spans over a year (F2); a plain year view, refused over the node budget with the fallback dead (F3); effects that are not world writes, such as copying three amounts to the clipboard or opening the landlord's portal (F4).
 
-Her audit of the prototype against the eight, by line: the `worktrees` row source calls `pickle.loads` on other sessions' files during compilation, which is a read outside the world and code execution; the painter posts observations straight into desk memory; painter behaviour the scene never states (an empty edit silently dropped, a drag clamped at zero, `$x` filled with `String.replace` so only the first occurrence is replaced); per-actor read positions feeding the `actors` rows; lenses bound by title, not referent; row sources and interpretations as host code per feature.
+Juniper's audit of the prototype against the eight, by line: the `worktrees` row source calls `pickle.loads` on other sessions' files during compilation, which is a read outside the world and code execution; the painter posts observations straight into desk memory; painter behaviour the scene never states (an empty edit silently dropped, a drag clamped at zero, `$x` filled with `String.replace` so only the first occurrence is replaced); per-actor read positions feeding the `actors` rows; lenses bound by title, not referent; row sources and interpretations as host code per feature.
 
 Past Sable's probes, three more breaks: a negative read (tagging outside the printed reads moved the scene); a `look` with no event changing another viewer's `of actors` scene; `prop:to>date` accepted and matching nothing.
 
@@ -285,10 +285,10 @@ What became of the handoff's eight: "pure" is L1 plus L2 (purity without determi
 | C3 | places a new word touches | parse, make, printer, and the painter for seven words | a new word needs a printer or painter edit |
 | C4 | print covers paint | passes for fields; keys unprinted | any painted field or element with no text counterpart |
 | C5 | hidden compiler state | 1 | any state that changes output and is not derivable from world plus printed viewer facts |
-| C6 | painted elements per scene node | 1.0 | a part paints more than three without a printed summary |
+| C6 | painted elements per scene node | 1.0 by static count; the browser count has not been run | a part paints more than three without a printed summary, or a native paints one node as many elements |
 | C7 | the painter knows no app | 0 | 1 or more |
 | C8 | core words per new task | trip 7; three tasks 7 plus 4 | more than one in five new everyday tasks needs a core change rather than a library define |
-| C9 | lens against the code it replaces | notes lens 11 lines against 523 of JavaScript | a lens longer than a fifth of what it replaces |
+| C9 | lens against the code it replaces | notes lens 11 lines against 523 of JavaScript; Wren's desktop 16 against 356 | a lens longer than a fifth of what it replaces, or a word whose print is longer than its paint (Wren's rule) |
 | C10 | evaluation terminates and is bounded | node budget 1500; no recursion | any lens that loops or recurses past the check |
 
 C1 to C3 are the direct test of "not linearly". They are measured per commit by `experiments/growth/measure.py`, so the trend is visible, and they should flatten after staging.
