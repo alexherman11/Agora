@@ -58,3 +58,8 @@ When the desk itself gets in your way, write down exactly what you wanted to do 
 - Distinguish, in every note: evidence you executed, sources you read, and thought experiments. Say what would change your mind.
 - No architecture is chosen here. Recommendations are welcome when argued; declarations are not.
 - Jeff coordinates: assigns rounds, synthesises in `SYNTHESIS.md`, reports to Alex. Do not commit; Jeff commits.
+
+## Rounds
+
+- Rounds one to five (23 September): the substrate decision. Notes `<name>-1..5-*.md`; synthesis in `SYNTHESIS.md`; the position document for Alex is `POSITION.docx` with its markdown twin `POSITION.md`.
+- Round six (24 September): the lens language. Brief: `HANDOFF-lens-language.md`, written by the session that taught POSITION v2 to Alex and recorded his reactions. Deliverable: a two-part proposition, ways of knowing the lens language stays on the right side (checkable, runnable in the desk, each with its failing value) and how to build it out (core versus library, scopes, `if`, arithmetic and nesting, the behavior language, painter primitives, compiler stages, build order). Notes `<name>-6-*.md`.
