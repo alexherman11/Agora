@@ -66,7 +66,7 @@ What each stage owns:
 
 **Core versus library.**
 
-- **Core** is fixed: the six IR kinds, the operator table (arithmetic, comparison, date arithmetic with units, one aggregate `running`), the selection language (the desk's own), and the row sources.
+- **Core** is fixed: the six IR kinds; the operator table, which is per value type and not per domain (arithmetic, comparison, date arithmetic with units, `weekday`, `round`, and the aggregates `running` and `split`); the selection language (the desk's own); and the row sources that expose kernel nouns (section 10).
 - **Library** is written in lens, in notes tagged `lib`: `define day-n(date, n) = date + days(n - 1)`. The same applies to `days-from`, `week-of`, `spread`, and later `every`, `pick`, and shapes such as bars and arrows.
 
 When a library word is used, the scene prints `day-n(2026-10-10, 2) = 2026-10-11 · lib day-n r2`, with its steps when asked. Most future growth should land in the library, where it costs the compiler nothing.
@@ -87,7 +87,7 @@ reserved   title text kind due tags id item it count me today session
 
 - **R1.** A `derive` or `as` may not shadow a visible name. The refusal names the earlier binder and its line. (Today we get "that name is taken" without saying by what.)
 - **R2.** A prop whose name is reserved is read as `$props.<name>`. This was the Python keyword-argument crash on a prop named `n` that lost four writes; it becomes a rule instead of a crash.
-- **R3.** `$count` is the size of the nearest `bind many`, and `$x.count` is the size of a named one. **`$n` is retired**, because it collides with the prop `n` and with the row field `$it.n`. It gets one alias period that prints a note.
+- **R3.** `$count` is the size of the nearest enclosing `bind many`, including inside its own instances (Juniper's A6: `"$n days here"` painted " days here"), and `$x.count` is the size of a named one. **`$n` is retired**, because it collides with the prop `n` and with the row field `$it.n`. It gets one alias period that prints a note.
 - **R4.** `as` names what its part binds: on `bind one`, the thing; on `bind many`, *each instance*; on a part that binds nothing, it is refused. [ran, round four] I wrote `over $days, as day` and the compiler named the *trip*, printing `(no day.date on s31)`. It was visible, but the meaning was not what anyone would guess.
 - **R5.** `$item` is the occurrence handle, the appearance a gesture acts on. `$id` is the referent. `$it` is a frame, never a thing. (That was my `$item` against `$it` confusion in round two.)
 - **R6.** Every reference resolves at check time to a let, a frame, a thing field or a host fact. The one exception is prop reads, which resolve at evaluation and print `(no x)` when missing.
@@ -245,3 +245,38 @@ What lenses give that JavaScript does not:
 - ordering by valid time.
 
 Sections will need the same once text has anchors. So this is one general change to row sources, not a timeline special case.
+
+## 10. Folding in Juniper 6
+
+**Row sources.** I withdraw "the row sources are core". Core row sources are only those that expose **kernel nouns**:
+- things (selections);
+- the element-identified parts of an aspect: text blocks by anchor once text has anchors, timeline segments, list elements;
+- operations (today's `events`, with an honest `n of N`, not a silent last 20);
+- observers (today's `actors`).
+
+The rest become library `define`s that transform core rows:
+- `sections` groups text blocks under `##` headings. That is the document app's convention, not the host's.
+- `comments:<id>` becomes a typed relation term, like `parts:`.
+
+A row source *can* be written in lens exactly when it is a filter, group or map over core rows. It cannot when it needs a new kind of world access, because that is a new kernel noun.
+
+`worktrees` currently loads other sessions' pickles during compilation. That breaks purity (R1) and the read set (R3). Instead, forks and merges become operations in the base world, and each worktree is a referent with aspects (name, by, journal size) kept by the worktree commands through the gateway. The compiler never opens another session.
+
+**Bounds degrade, refusals are static.** The check stage **refuses** only what the definition alone makes wrong: an unresolved or shadowed name, a value test used as a selection, a branching gesture line, recursion. Those refusals happen at write time. Bounds that depend on **data** (node budget, span length, as in F2 and F3) **degrade**: the compiler clamps the repeat nearest the budget and prints `days (showing 1–292 of 365 · node budget 1500)`. The F3 fallback failure is a bug of shared state: each compile attempt needs its own count.
+
+**The lint is the check stage.** Juniper's lint list maps onto the checker, not onto my C1–C10. My measures are about the host; hers are about lenses. Both are needed. One table-driven checker runs at write time, and on `check <lens|all>` in the desk, with two severities:
+
+| Juniper's lint | Severity | Why |
+|---|---|---|
+| shadowed frames | refuse | R1 |
+| value tests in `only when` | refuse until value guards exist, then legal | step 5 |
+| `$` filling empty without a marked absence | refuse | R6 |
+| gestures that run scripts or trigger rules | warn | effect not visible in the line (until R5 and proposals) |
+| title bindings | warn | a name pointer (round one) |
+| derives lowering past 8 steps | warn | mine |
+
+A separate lint tool would be a second grammar, which is Sable's probe 7 again.
+
+**Conservation.** This is a core operator producing a `let` whose value is rows, not a new IR kind: `derive shares = split $total by $days rounding cents remainder largest`. The operator itself prints the parts, the rounding rule, the sum check and where the remainder went. It is core rather than library because the sum guarantee has to be the operator's, not each author's.
+
+**Per-viewer state (F1).** A declared viewer variable, `view tab = bills`. It is read through lookup level 4 (host and viewer facts), so it is an input V, printed as `~ alex: tab=bills`. It is written by an `act` whose target is the viewer store, not the gateway, so it is not journaled. The painter keeps the variables and sends them with each scene request (about 5 lines). R2 and R3 hold because V is an explicit, printed input. Juniper's check 5 (two viewers, one lens) is its test.

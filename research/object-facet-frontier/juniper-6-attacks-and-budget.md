@@ -56,13 +56,13 @@ That is a program with mutable state, built from nothing but props and gestures.
 
 Every effect went through the gateway, attributed and undoable, yet the scene could not say what the click would do. **This is the worse-JavaScript route in the prototype today.** The code has not gone into the lens. It has gone beside it, into global definitions outside history.
 
-**A5. Noise that hides the signal.**
+**A5. Noise that hides the signal.** This is the same finding as Sable's probe 5; I count it once.
 
 `only when $wd=Mon` over 14 days was accepted. It printed `(absent: not $wd=Mon)` 14 times, Mondays included (the part's own `derive wd` is not yet visible to its own `only when`).
 
 "Everything prints" produced 14 lines of true-looking absence and no Mondays.
 
-**A6. A silent empty value.**
+**A6. A silent empty value.** This is distinct from Sable's probe 6, where a prop `n` shadowed `$n`. Here, no prop is involved.
 
 In the budget, `d : text "$n days here"` under a 15-row repeat painted `" days here"` fifteen times.
 
@@ -179,9 +179,100 @@ From these runs, four things, each with a condition.
 
 In the order the budget and the attacks demand:
 
-1. Fix the four silent paths: `$n` in instances, fallback count reset, refusal of `only when` value tests (or a real `where`), and refusal of frame shadowing.
+1. Fix the silent paths:
+   - `$n` in instances;
+   - the fallback count reset;
+   - refusal of `only when` value tests (or a real `where`);
+   - refusal of frame shadowing;
+   - refusal of `prop:k>v` (§7).
 2. `where` on repeats with printed tests, and **coalesce as the first `if`** (it prints its branch).
 3. Printed arithmetic, lowered to named steps, with rounding and a conservation check.
 4. Valid-time segments, with a word that picks the segment in force.
 5. A per-viewer state word: printed, not journaled.
 6. Gestures may call only versioned definitions whose effect is previewed.
+
+## 7. Against Sable's R1–R8, and the timeline shape for the budget [ran unless marked]
+
+Sable's five probes are not repeated here. These go past them.
+
+**R3 perturbation test, broken by a negative read.**
+
+The setup:
+
+- The lens is `x : column, of tag:t, each r` with `r : text "$title"`. It printed `2 of tag:t` (Alpha, Beta), and no read line names Gamma.
+- `do tag Gamma add=t` (e19) changes an aspect of a thing that is **not in the printed reads**.
+- The next scene is `3 of tag:t` with Gamma added.
+
+So the perturbation test fails for every query, not because of a bug but by construction. A query reads the tags of *every candidate*, including those it rejects. `the prop:role=house` is the same: another note gaining `role=house` turns the frame `(ambiguous)`.
+
+**[proposal]** R3 needs a second kind of read: a **predicate read**, `(selection text, candidate set)@world`, printed on the repeat header. The fence must then refuse a gesture if the membership changed, not only if a member did.
+
+The cost is real. A fence on `tag:t` conflicts with *every* tag write in the world, which is Astra's over-blocking fingerprint arriving by another road. The two workable options are an index keyed by predicate, or an accepted over-block that is printed.
+
+**R2 determinism, broken by a look.**
+
+- Lens: `of actors`, printing `$name read to $read, behind $behind`.
+- It printed `ben read to 6, behind 15` at `world @21`.
+- Ben then ran only `look`. No event was appended; `history` still ends at e21.
+- Juniper's next `scene who` at the **same** `world @21` printed `ben read to 21, behind 0`, and Juniper's own line moved too.
+
+The scene is not a function of (L, W, V) unless V includes *other viewers'* read positions (`desk._per`, `scene.py:141`). Viewing a scene also changes the next one: the viewer's own read position moves.
+
+**[proposal]** Either looks become world facts (events), or the `actors` source moves into V and prints as `~` per-viewer drift.
+
+**R6 total resolution, three more silent paths.**
+
+- **A1 (§1).** A user frame silently shadows a user frame. This is not the built-in collision Sable probed.
+- **A comparison inside a selection.** `of prop:role=member,prop:to>$it.date` was **accepted** and printed `0 of prop:role=member,prop:to>2026-10-14 (empty)` on every day. The parser read `to>2026-10-14` as a prop *key* and checked that it was present. A misspelled operator therefore became a silent empty, which is the worst failure in POSITION 2.1's table, and R6's resolve stage must cover selection syntax as well as `$` names.
+- **R7, fallback.** The refusal kills the fallback (§1, F3). R7 should say a cap never disables last-good.
+
+**R1 purity.** It holds for writes. But the `worktrees` source `pickle.loads` other sessions' files during compilation (`scene.py:147–153`). That is a read outside W and V, and it executes whatever those pickles contain. R1 should say "reads only through the accessor", not only "appends no operation".
+
+### The timeline shape against the household budget
+
+The shape: rent and membership are timeline aspects (dated segments with element identity), each share is a derivation over overlapping segments, and `at <date>` is library.
+
+**It survives the housemate leaving mid-month, and it exposes a decision my hand arithmetic made silently.**
+
+- Membership is three segments: Ana `from 2026-01-01`, Ben `from 2026-01-01`, Casey `from 2026-01-01 to 2026-10-15`.
+- The natural derivation over overlapping segments is **per day**: each day's cost (the rent segment in force `at` that day, plus the other bills, divided by the days in the month) is split among the members present that day.
+- The same mechanism also handles a rent rise on the 15th of a month, without a separate word.
+
+It gives a different answer from my step-4 hand copies [computed, python]:
+
+| Policy | Casey | Ana, Ben each | Sum after rounding |
+|---|---|---|---|
+| Person-days (what I stored by hand) | 2640 × 15/77 = 514.29 | 1062.86 | 2640.01 |
+| Per-day split among those present (what the timeline derivation says) | 15 × (2640/31)/3 = 425.81 | 1107.10 | 2640.01 |
+
+The difference is 88.48 on Casey's bill. Both are defensible:
+
+- Person-days: everyone pays the same rate per day lived.
+- Per-day split: the ones who stay carry the whole flat after Casey goes.
+
+**This is a policy, and it must be a named, printed choice** (`split per-day` or `split per-person-day`). It should not be an accident of whichever formula an author typed. A JavaScript app would have picked one silently too. The lens's advantage exists only if the policy prints.
+
+Both policies also leave the penny, so the conservation check from §3 is needed whichever wins.
+
+**What the desk could not do [ran].** Deciding "present on this day" needs `from ≤ date ≤ to` with a missing `to` meaning open-ended. Today that is not expressible: the comparison is the silent empty above, and Ana's open segment has no `to`. With `at` and interval overlap as library, over a timeline aspect, it would be.
+
+### Does "a proposal cannot read its own write" block any budget step? [imagined, step by step]
+
+**No.** Every step reads the pre-state and writes independent rows:
+
+- **Casey leaves.** One write: close her segment (`to=2026-10-15`). Shares are derived.
+- **Rent rises.** One write: add the segment `{from 2026-11-01, 2550}`. If segments store `to`, a second, independent write closes the old one. It reads the old segment's id from the pre-state, not from its own write.
+- **Dana replaces Casey.** Mint Dana, then add Dana's segment referring to `$new.1`. Sable's mint placeholders cover this.
+- **Close October.** Capture three shares as a stored statement. Each capture reads derived values from the pre-state.
+- **Add a bill.** Mint plus link, one proposal.
+
+The only near-miss is **"settle the penny"**: write an adjustment row so that the stored statement sums to the total. It reads the three rounded shares (derived, pre-state) and writes one adjustment. No read-your-own-write is needed, provided the rounding and conservation check live in the derivation and not in a second gesture.
+
+So the budget does not need read-your-own-write. It does need, in order:
+
+- interval comparison with open ends;
+- `at` over a timeline;
+- a sum over a repeat;
+- `×` and `÷` with rounding;
+- a named split policy;
+- the conservation check.

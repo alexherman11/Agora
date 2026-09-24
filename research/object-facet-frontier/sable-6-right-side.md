@@ -30,12 +30,12 @@ The properties below are what "not a worse JavaScript" means. JavaScript's defin
 
 | # | Property | Kernel tie | Enforced by | Executable check | Violation seen today |
 |---|---|---|---|---|---|
-| R1 | **Purity.** E appends no operation | operation | the compiler holds a read-only view | event count unchanged across `scene` | none (probe 1) |
+| R1 | **Purity.** E appends no operation *and reads only through the accessor, W and V* (amended, §6) | operation | the compiler holds a read-only view | event count unchanged across `scene` | none (probe 1) |
 | R2 | **Determinism.** Same (L@rev, W, V) gives the same S | definition revision | the compiler; no clock, random or iteration-order reads except through V | two builds are byte-identical | none (probe 1) |
 | R3 | **Read-set soundness.** E records `R(S) ⊆ {(r,a)@rev} ∪ V`. For every W′ that agrees with W on R(S), `E(L,W′,V) = S`. Each node prints its part of R | aspect, revision | the compiler reads the world only through an accessor that logs every read | perturbation: change an aspect outside R and nothing moves; inside R and exactly the nodes that list it move | partial: probes 2 and 3 pass, but built-in reads (`$title`) and shadowed props (probe 6) are not printed |
-| R4 | **Effects are proposals.** A gesture or a rule action yields one proposal: operation rows all read from one input state, fenced on R, applied whole or not at all, undone as one batch | operation, fence | the gateway | a batch whose second step refuses leaves no trace | **yes**: probe 4 applied half, and probe 10's gesture has the same shape |
+| R4 | **Effects are proposals** (amended, §6: the whole rule cascade, plus named viewer effects). A gesture or a rule action yields one proposal: operation rows all read from one input state, fenced on R, applied whole or not at all, undone as one batch | operation, fence | the gateway | a batch whose second step refuses leaves no trace | **yes**: probe 4 applied half, and probe 10's gesture has the same shape |
 | R5 | **Definitions are world data.** Every definition that can change a scene or an effect (lens, rule, script, clock, style, interpretation list) is a referent whose code changes only by operations | definition | the gateway: no desk attribute outside the world | defining anything appends an event; undo reverts it | **yes**: probe 9. `calm.style` is a file with no events (Current Implementation) |
-| R6 | **Total name resolution.** Every name resolves at compile time to exactly one of: a built-in, a frame, a derive, a host fact, or a printed prop read. Unresolved or shadowed names are refused. The refusal vocabulary is generated from the same table as the grammar | anchor (a name is an anchor in the code aspect) | a resolve stage in the compiler | a corpus of undefined, shadowed and misspelled names, each refused, never rendered | **yes**: probes 5, 6 and 7 |
+| R6 | **Total name resolution** (amended, §6: prop reads at evaluation, absence as a third state, selection syntax included). Every name resolves at compile time to exactly one of: a built-in, a frame, a derive, a host fact, or a printed prop read. Unresolved or shadowed names are refused. The refusal vocabulary is generated from the same table as the grammar | anchor (a name is an anchor in the code aspect) | a resolve stage in the compiler | a corpus of undefined, shadowed and misspelled names, each refused, never rendered | **yes**: probes 5, 6 and 7 |
 | R7 | **Bounded and honest evaluation.** A node budget and an operation budget, and every cap prints as `n of N` | none | the compiler | a pathological lens is refused naming the budget; a capped repeat says how many are hidden | **yes**: probe 8 |
 | R8 | **The host is independent of applications.** The painter and the compiler contain no kind, application or domain name; growth is sublinear per word | none | a test, plus Pike's growth measure | grep the painter for kinds; count lines added per word over git history | Pike's seat |
 
@@ -122,13 +122,53 @@ Each desk verb becomes a function from (arguments, input state) to operation row
 
 **(1) Ways of knowing we are on the right side.** These are the R1–R8 checks above. Each is a desk command sequence that can run as a test, with its failure condition stated. Today three fail (R4, R5 and R6), R3 and R7 fail in part, and R1 and R2 pass. A worse JavaScript would show up as failures of these checks, not as a line count.
 
-**(2) Build order, kernel side:**
-1. The read-set accessor (R3). It is the prerequisite for printing, for the gesture fence and for incremental compiling.
-2. The resolve stage, with the refusal vocabulary generated from the grammar (R6).
-3. Proposals replacing `;` (R4).
-4. Rules, scripts, clock and style as world data (R5).
-5. The timeline representation and `at`, as library, tested on the household budget.
+**(2) Build order.** This is the merged order, proposed to Pike (amended after Pike 6 §8; it replaces my five-step list).
+1. **Freeze the present.** Take golden prints of every lab lens, including f120, and turn the R1–R8 checks into a test suite. The current failures are recorded as expected failures.
+2. **The read-set accessor (R3).** It logs `(r, a)@rev` and membership (predicate) reads, and it is the evaluator's only way to the world (R1 as amended). The perturbation test runs green.
+3. **The resolve stage and a table-driven parse (R6).** It generates the refusal text, retires `$n`, treats absence as a third state, and covers selection syntax.
+4. **Proposals replacing `;` (R4), at the gateway.** This runs on a parallel track to steps 2 and 3, and must land before any new gesture. It covers the whole cascade and shares the coalesce-or-refuse rule with partial merge.
+5. **Stages by IR kind, and expressions in `derive`.** Units, a total `if` with a dynamic read-set, nesting lowered to printed steps, and `check`. Timeline, `at` and allocation are the first library entries. The deciding test is the household budget.
+6. **Definitions as world data (R5), and the library.** Rules, scripts, clock and style become world data. Behavior definitions sit on the same IR. `from <lens>` for reuse.
+7. **The painter.** Continuity and carry/drop (as proposals) first, then `path`, `image` and `grid`, with one chart lens as the test.
 
 With R3 and R6 in place, `if` and arithmetic can enter safely.
 
 The probe lenses remain in f120 for anyone who wants to re-run them.
+
+## 6. Amendments after Pike 6 and Juniper 6
+
+**R1, amended: purity includes reads.** Juniper found that the `worktrees` row source runs `pickle.loads` on other sessions' files during compilation (`scene.py:147–153`). That is an R1 violation: an ambient read outside W and V, which also executes code. It is not an R3 violation. R3 is the detector, because the scene changes while W is unchanged. R1 now reads: "E appends no operation, and reads only through the accessor."
+
+Juniper's R2 finding has the same cause. The `actors` source reads *other viewers'* read positions. Either those become world facts, or the source prints them as per-viewer drift.
+
+**R4, amended: a proposal is the whole cascade.** Juniper's A4: a gesture ran `run tidy $item`, and a rule then wrote to Beta, which the gesture never named. Under R4:
+- The script expands in the preview.
+- Rules are evaluated to a fixpoint (three passes at most). Each pass is a nested proposal, printed: `click: run tidy a03 → 3 rows on a03; then rule r1 → 1 row on a05`.
+- The gesture carries the union of every pass's read-set, **plus the revision of every definition that fired** (script tidy, rule r1).
+- At apply, the gateway recomputes the cascade. If the rows or any read moved, it refuses and re-previews.
+
+So Beta is fenced because the preview promised to write to it. This needs R5: a rule with no revision cannot be fenced.
+
+**R4, amended: viewer effects (Juniper F4).** A proposal may carry rows of a second kind: named viewer effects from a closed host list (`copy`, `open`, `download`). They print in the preview with their exact payload, as in `copy "1062.85, 1062.85, 514.29"`. They are marked external like `launch`, have no inverse, and are never replayed. They are inside R4 and outside the world's state.
+
+**V, made precise: per-viewer state (Juniper F1).** A tab, a sort or a collapsed section is an aspect *owned by the viewer*, with viewer-only visibility. Its operations go in the viewer's own log: undoable, never merged, never exported. It is in V, and it cannot become hidden state for four reasons:
+1. It is in R(S) and prints as `~` lines.
+2. Only gestures write it, through the gateway, never the painter directly.
+3. Rules and other viewers' scenes cannot read it. Only an explicit capture copies it into the world.
+4. `view <lens>` lists it, and it can be reset.
+
+Juniper's A3, per-viewer state in props on the lens note, is the violation this replaces.
+
+**Conservation (Juniper's penny).** This is a mechanism plus library, not a property.
+- **Mechanism:** `check <expr> = <expr>` in the pure language. It prints `check 1062.85 + 1062.85 + 514.29 = 2640 ✓`, or `! check failed: 2640.01 ≠ 2640`, visibly and without refusing.
+- **Library:** allocation words (`split <whole> by <policy>`) always print their check and a named remainder rule.
+- **The policy must be named** (`per-day` or `per-person-day`, from Juniper §7). A property cannot demand this, because the compiler cannot know what counts as "a whole". The library can.
+
+**R6, amended after Pike 6 and Juniper 6.**
+- Prop reads may resolve at evaluation, provided a missing prop prints `(no x)` and absence is a third state. A test on a missing prop prints `(absent: no x)`, never "false".
+- Selection syntax is in scope. `prop:to>$it.date`, read as a key, was a silent empty.
+
+**Nesting, in the proposition's wording (agreed with Pike).**
+- Nesting is allowed. The printer lowers it to steps.
+- A step named with `let` has a stable key `(definition, part path, name)`, and may be captured, commented or queried.
+- An unnamed step prints under a position label (`dd.3`) for reading only. Any reference to it from outside is refused with "name it first".
