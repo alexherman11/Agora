@@ -273,7 +273,7 @@ Each is stated with the options, what the evidence says, and what the lab recomm
 
 ### 8.1 Quantities in the visual layer: closed list, printed arithmetic, or an expression language
 
-The closed list of named interpretations was Pike’s proposal in round two, made against Astra’s and Wren’s bet on a bounded pure evaluator with declared reads. Pike set two triggers for abandoning it; the three-task run hit one of them within hours. Options:
+The closed list of named interpretations was Pike’s proposal in round two, made against Astra’s bet on a bounded pure evaluator with declared reads (the Codex team’s program.mjs; Wren argued the opposite in wren-11: no expression language, ever). Pike set two triggers for abandoning it; the three-task run hit one of them within hours. Options:
 
 - Keep the closed list and grow it by structural words only (recurrence, filter, pick, comparisons). Carries time structure; does not carry quantities; every budget or pace task needs a domain word.
 - Printed arithmetic under the growth rules. Plus, minus, times, divide and one aggregate (a running sum), each result printed with its inputs, no if, no hidden state. Juniper’s recommendation. Cheap; the danger is a second syntax nobody can read once nested.
