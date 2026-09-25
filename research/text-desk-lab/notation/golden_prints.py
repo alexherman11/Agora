@@ -4,6 +4,10 @@ the staged-compiler refactor (Jeff). Usage: python golden_prints.py <out dir>; d
 import sys, pathlib, shutil, re
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import deskd, scene
+import os
+if os.environ.get("USE_IR"):
+    import lens_ir
+    scene.scene_for = lens_ir.scene_for      # the staged pipeline in place of the old evaluator
 S = pathlib.Path(__file__).resolve().parent / "sessions"
 out = pathlib.Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
 n_l = n_s = 0

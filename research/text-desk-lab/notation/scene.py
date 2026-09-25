@@ -1131,9 +1131,16 @@ def _identity():
 
 
 def scene_for(desk, name):
-    """-> (scene, text). scene["def"] is the requested definition, the effective transitive closure with each member's
+    """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
+    accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
-    whose whole closure is current; a fallback frame is for reading."""
+    whose whole closure is current; a fallback frame is for reading. The old evaluator below (build) stays for one
+    stage as the reference the goldens were made with; Juniper's check judged the switch at 82 same."""
+    import lens_ir
+    return lens_ir.scene_for(desk, name)
+
+
+def scene_for_old(desk, name):
     s = find_lens(desk, name)
     closure = []
     sc = _compile(desk, s, (s["title"].lower(),), [0], closure)
