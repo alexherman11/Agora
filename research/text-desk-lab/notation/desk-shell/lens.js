@@ -12,17 +12,18 @@
   Style.install(await (await fetch("style/calm.style")).text(), q.get("theme") || undefined);
 
   let last = "", sceneAt = 0, def = null, text = "", notice = "", hold = null, repainting = false;
-  // Pike (continuity run 1): a refused edit's words vanished, or stayed on screen looking saved. Now they stay where
-  // they were typed, marked unsent, until the person sends them again (Enter) or drops them (Escape). Per viewer, never the world.
-  const drafts = new Map(), show = () => { said.textContent = (notice ? notice + "\n\n" : "") + text; };
+  // Pike (run 1), Juniper c347 (7): typed words stay where typed, marked unsent, until sent (Enter) or dropped (Escape),
+  // even across a closed tab. localStorage stands in for the viewer store (this browser only); never the world.
+  const store = `lens-drafts:${session}:${who}:${lens}`, drafts = new Map((() => { try { return JSON.parse(localStorage.getItem(store)) || []; } catch { return []; } })());
+  const show = () => { said.textContent = (notice ? notice + "\n\n" : "") + text; try { localStorage.setItem(store, JSON.stringify([...drafts])); } catch {} };
+  if (drafts.size) notice = `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed (Enter sends, Escape drops)`;
   const mark = (el, d) => { el.classList.toggle(Style.roleClass("mark"), !!d); if (d) el.dataset.unsent = d.why; else delete el.dataset.unsent; };
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft) {
     const observed = { item: n.item, rev: n.rev, at: sceneAt, def: n.def, defpart: n.defpart, reads: n.reads };   // Jeff (a308): per part and per aspect
     const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json();
-    const t = r.text || r.error || "";
-    hold = null;
+    const t = r.text || r.error || ""; hold = null;
     if (r.error || t.startsWith("ERR")) {
       // Pike (run 1): this refusal used to be overwritten by the repaint below (6 of 7 unseen); it stays until the next gesture.
       notice = (draft !== undefined ? `unsent: "${draft}" (Enter sends it again, Escape drops it)\n` : "") + "refused: " + t;
@@ -51,16 +52,14 @@
       }
     }
     const el = document.createElement("div");
-    el._n = n;
-    if (n.absent) el.hidden = true;
+    el._n = n; el.hidden = !!n.absent;
     next.set(n.key, { el, sig });
     el.dataset.key = n.key;      // Iris: with the key on the paint, agreement is a join, not two trees walked side by side
     if (n.role) el.className = Style.roleClass(n.role);
     if (n.layout) el.classList.add("l-" + n.layout);
     if (n.box) { el.classList.add("boxed"); Object.assign(el.style, { left: n.box[0] + "px", top: n.box[1] + "px", width: n.box[2] + "px", height: n.box[3] + "px" }); }
     if (n.text !== null) {
-      const d = drafts.get(n.key);
-      if (d && d.text === n.text) drafts.delete(n.key);
+      const d = drafts.get(n.key); if (d && d.text === n.text) drafts.delete(n.key);
       el.textContent = drafts.has(n.key) ? d.text : n.text;
       mark(el, drafts.get(n.key));
       if (n.clamp) { el.classList.add("clamp"); el.style.webkitLineClamp = n.clamp; }
@@ -73,12 +72,15 @@
       });
       if (a.on === "edit") {
         el.contentEditable = "plaintext-only"; el.addEventListener("focus", () => { if (!repainting) hold = n.key; });
+        // a kept draft remembers what it was typed against, so sending it after a reload is fenced on that, not on today's paint
+        el.addEventListener("input", () => { const m = el._n, seen = (drafts.get(n.key) || {}).seen || { key: m.key, item: m.item, rev: m.rev, def: m.def, defpart: m.defpart, reads: m.reads };
+          drafts.set(n.key, { text: el.textContent, why: "typed here, not sent", seen }); show(); });
         el.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); }
           if (e.key === "Escape") { drafts.delete(n.key); mark(el, null); el.textContent = el._n.text; notice = ""; show(); el.blur(); } });
         el.addEventListener("blur", () => { if (repainting) return;      // a repaint moved it; the person is still editing it
           // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
           const raw = el.textContent.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
-          if (raw && raw !== el._n.text) send(el._n, a.line.replace("$value", () => v), raw); else hold = null;
+          if (raw !== (el._n.text || "").trim()) send((drafts.get(n.key) || {}).seen || el._n, a.line.replace("$value", () => v), raw); else { hold = null; drafts.delete(n.key); show(); }
         });
       }
       if (a.on === "drag" && n.box) {
@@ -106,8 +108,7 @@
         el.addEventListener("blur", () => { if (m0 && !repainting) put(false); });
       }
     }
-    for (const k of n.kids) el.appendChild(make(k));
-    return el;
+    for (const k of n.kids) el.appendChild(make(k)); return el;
   }
 
   // Pike (run 1, Alex's workspace): the whole page froze while any part was being edited, so a finished task did not
@@ -145,6 +146,5 @@
   }
   let scrolling; paint.addEventListener("scroll", () => { clearTimeout(scrolling); scrolling = setTimeout(report, 400); });
 
-  await refresh();
-  setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
+  await refresh(); setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
 })();

@@ -485,6 +485,84 @@ S.S14 = { what: "Alex's workspace: type in the chat while a background task fini
       pass: taskSeen && focusKept && delivered && moved.length === 0 };
   } };
 
+S.S15 = { what: "clear a title to nothing and press Enter (Juniper c347, moment 2)", expect: "sent: delivered, or refused with the refusal shown; never an empty title on screen that the world does not have",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const el = await tab.find(`/${ids.kirk}/t`);
+    await tab.click(el.x, el.y); await tab.selectAll(); await tab.key("Backspace", "Backspace", 8); await tab.enter();
+    await sleep(2500);
+    const world = await titleOf(ids.kirk), d = await tab.lastDo(), said = await tab.said();
+    const shown = await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${ids.kirk}/t'));
+      return e ? { text: e.textContent, unsent: !!e.dataset.unsent } : null; })()`);
+    await tab.close();
+    const refused = d && d.error ? d.error.slice(0, 200) : null, refusalShown = !!refused && said.includes("refused:");
+    const phantom = !!shown && shown.text !== world && !shown.unsent;
+    return { sent: d && d.line, world, shown, refused, refusalShown, phantom, pass: !!d && !phantom && (!refused || refusalShown) };
+  } };
+
+S.S16 = { what: "a reader's place in a long list while another actor inserts rows above it (Juniper c347, moment 9)", expect: "the card being read stays where it was on screen",
+  async run(ids) {
+    for (let i = 0; i < 24; i++) await act("fixture", `look ${ids.trip_f}; do create ${ids.trip_f} kind=note title="Stop ${i}" tags=stop`);
+    const list = ["list : column, role sheet", `  items : column, of in:${ids.trip_f}, each item`, "item : role card", "  t : role title, text $title"].join("\\n");
+    const r = await act("fixture", `look ${ids.lens_f}; do create ${ids.lens_f} kind=note title=list tags=lens text="${list}"`);
+    if (r.error) throw new Error(r.error);
+    const tab = await Tab.open(lensUrl("list")); await tab.painted(20);
+    const target = "Stop 15";
+    const at = () => tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.textContent === ${JSON.stringify(target)});
+      return e ? Math.round(e.getBoundingClientRect().top) : null; })()`);
+    await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.textContent === ${JSON.stringify(target)});
+      const p = document.getElementById('paint'); p.scrollTop += e.getBoundingClientRect().top - p.getBoundingClientRect().top - 100; })()`);
+    const y0 = await at();
+    const first = (await act("observer", `find tag:stop`)).text.match(/(a\d+) note/)[1];
+    for (const t of ["Pfeiffer Beach", "Nepenthe"]) {
+      const c = await act("other", `look ${ids.trip_f}; do create ${ids.trip_f} kind=note title="${t}" tags=stop`);
+      await act("other", `look ${c.created.at(-1)}; look ${first}; do move ${c.created.at(-1)} before=${first}`);
+    }
+    await sleep(3500);
+    const y1 = await at(), inserted = await tab.pageHas("Nepenthe");
+    await tab.close();
+    return { target, y0, y1, inserted, pass: inserted && y0 !== null && Math.abs(y1 - y0) <= 2 };
+  } };
+
+S.S17 = { what: "coming back: half a title typed, the tab closed, a new tab opened (Juniper c347, moment 7)", expect: "the words are shown where they were typed, marked unsent, and Enter sends them",
+  async run(ids) {
+    let tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.kirk), draft = "Kirk Creek, site 4 (ask about";
+    await beginEdit(tab, ids.kirk, draft);
+    await tab.close(); await sleep(1000);
+    const afterClose = await titleOf(ids.kirk);
+    tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const shown = await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${ids.kirk}/t'));
+      return e ? { text: e.textContent, unsent: e.dataset.unsent || null } : null; })()`);
+    const said = (await tab.said()).split("\n")[0];
+    const el = await tab.find(`/${ids.kirk}/t`);
+    await tab.click(el.x, el.y); await tab.key("End", "End", 35); await tab.type(" late arrival)"); await tab.enter(); await sleep(2500);
+    const world = await titleOf(ids.kirk);
+    await tab.close();
+    const kept = !!shown && shown.text === draft && !!shown.unsent;
+    return { before, afterClose, shown, said, world, kept, pass: kept && world === draft + " late arrival)" };
+  } };
+
+S.S18 = { what: "coming back after someone else retitled the card while the tab was closed", expect: "the kept draft is fenced on what it was typed against: refused and shown first, then sent on a second Enter",
+  async run(ids) {
+    let tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const draft = "McWay Falls at sunset";
+    await beginEdit(tab, ids.mcway, draft);
+    await tab.close(); await sleep(1000);
+    await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="McWay Falls (trail closed)"`);
+    tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    let el = await tab.find(`/${ids.mcway}/t`);
+    await tab.click(el.x, el.y); await tab.enter(); await sleep(2500);
+    const first = await tab.lastDo(), said = await tab.said(), mid = await titleOf(ids.mcway);
+    el = await tab.find(`/${ids.mcway}/t`);
+    await tab.click(el.x, el.y); await tab.enter(); await sleep(2500);
+    const world = await titleOf(ids.mcway);
+    await tab.close();
+    const refused = first && first.error ? first.error.slice(0, 160) : null;
+    return { refused, refusalShown: !!refused && said.includes("refused:"), mid, world,
+      pass: !!refused && said.includes("refused:") && mid === "McWay Falls (trail closed)" && world === draft };
+  } };
+
 // Juniper's three classes (a313), so the suite's runner can count these beside its CLI readers:
 // holds; wrong and silent (the person is not told: a lost draft, a phantom, an unseen refusal, a selection or a
 // newer fact quietly gone); wrong but visible (the gap is plain on screen: no Tab stop, no word for it, a refusal shown).
