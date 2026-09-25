@@ -66,24 +66,6 @@ def same_part(desk, dp):
         return False
 
 
-def rules_blocking(desk, line):
-    """Why a painted gesture line may not be applied yet: it runs a script, or a rule could fire on it. Returns a
-    sentence naming the script or rule, or None. Juniper A4: a click ran `tidy`, and rule r1 wrote Beta, a thing the
-    click never named and the fence never covered; the scene had printed only `click: run tidy a03`."""
-    words = line.strip().split()
-    if not words:
-        return None
-    if words[0].lower() == "run":
-        return f"this gesture runs the script {words[1] if len(words) > 1 else '?'}"
-    verb = words[1].lower() if words[0].lower() == "do" and len(words) > 1 else words[0].lower()
-    for r in (getattr(desk, "rules", None) or []):
-        if r.get("on") and r["on"] == verb:
-            return f"rule {r['id']} fires on every {verb} and would act beyond what this gesture names"
-        if not r.get("on"):
-            return f"rule {r['id']} (when {r.get('sel')}) may fire on what this gesture changes"
-    return None
-
-
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
@@ -247,11 +229,6 @@ class Handler(SimpleHTTPRequestHandler):
                 if idx is None:
                     idx = desk._seen_idx = {}
                 idx[(sess.actor, ob["item"])] = int(ob.get("at", 0))
-            why = rules_blocking(desk, line)
-            if why:
-                return self._json({"text": None, "error": f"refused: {why}; nothing was done. Until a proposal previews the whole "
-                                   "cascade, a painted gesture may not run a script or fire a rule (build step 1c)",
-                                   "events_total": len(desk.world.events), "line": line})
             # Pike a361/c368: a drop carries the thing in hand and the receiver it lands on; both are fenced, then $carried fills
             car, rcv = ob.get("carried") or {}, ob.get("receiver") or {}
             if car.get("item") in desk.world.nodes and isinstance(car.get("rev"), int):
