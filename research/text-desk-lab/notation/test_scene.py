@@ -160,6 +160,23 @@ def test_carry_and_drop_shape():
         tmp.unlink(missing_ok=True)
 
 
+def test_resolve_judges_frames_before_evaluation():
+    src = chr(10).join(["root : column, of tag:trip as trip, each day", "day : text \"$trip.start\"", "loose : text \"$nobody.start\""])
+    root, parts = scene.parse(src)
+    scene.resolve(root, parts)                       # `loose` is not reachable from the root: not judged
+    src2 = chr(10).join(["root : column, of tag:trip as trip, each day", "day : column, each z", "z : text \"$nobody.start\""])
+    root, parts = scene.parse(src2)
+    try:
+        scene.resolve(root, parts)
+        raise AssertionError("an unknown frame was admitted")
+    except scene.LensRefusal as e:
+        assert "$nobody.start: no part above this one is named `as nobody`" in str(e) and "frames in scope: it, trip" in str(e)
+    root, parts = scene.parse(chr(10).join(["root : column, of tag:t as a, each c, derive d = weekday $today", "c : text \"$d $a.title $beds $me\""]))
+    scopes = scene.resolve(root, parts)
+    sc = scopes[id(parts["c"])]
+    assert [scene.classify(x, sc) for x in ("d", "a", "beds", "me", "title", "it")] == ["let", "frame", "prop", "host", "field", "frame"]
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"

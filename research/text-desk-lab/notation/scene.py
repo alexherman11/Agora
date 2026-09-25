@@ -410,6 +410,72 @@ def parse(src):
     return root, parts
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Stage 2, resolve. Every $name in a lens is classified before anything is evaluated: a thing's field, a host fact, a
+# gesture fact, a let (derive) named above, a frame named above with `as`, or a prop read (which resolves at evaluation
+# and prints its absence). A `$frame.field` whose frame is not in scope is refused here, for every part reachable from
+# the root, so an untaken branch is not an unexercised program (Sable R6; Pike's rules N1 to N6, round six).
+# ---------------------------------------------------------------------------------------------------------------------
+HOST = ("me", "today", "session")
+GESTURE_FACTS = ("value", "x", "y", "carried")
+
+
+def _refs_of(node):
+    """Every $name and $frame.field this part's own words use, with the word they sit in."""
+    out = []
+    srcs = [("text", node["text"] or ""), ("only", node["only"] or ""), ("of", node["of"] or ""), ("the", node["the"] or ""),
+            ("lens", node["lens"] or "")]
+    srcs += [("derive", x) for _, _, ins in node["derive"] for x in ins]
+    srcs += [("on", a["line"]) for a in node["on"]]
+    for word, text in srcs:
+        for a, b in _VAR.findall(text):
+            out.append((word, a, b))
+    return out
+
+
+def resolve(root, parts):
+    """-> {id(node): {"frames": set, "lets": set}} for every part reachable from the root, walking kids and `each`.
+    Refuses a `$frame.field` whose frame no part above names, and a bare `$frame` used as a value."""
+    scopes = {}
+
+    def visit(node, frames, lets, trail):
+        frames, lets = set(frames), set(lets)
+        if node["as"]:
+            frames.add(node["as"])
+        if node["of"] or node["over"]:
+            frames.add("it")
+        for dname, _i, _ins in node["derive"]:
+            lets.add(dname)
+        scopes[id(node)] = {"frames": frames, "lets": lets}
+        for word, a, b in _refs_of(node):
+            if b:
+                if a not in frames and a != "it":
+                    raise LensRefusal(f"line {node['line']}: ${a}.{b}: no part above this one is named `as {a}`"
+                                      + (f" (frames in scope: {', '.join(sorted(frames))})" if frames else " (no frames in scope)"))
+        for kid in node["kids"]:
+            visit(kid, frames, lets, trail)
+        if node["each"] and node["each"] not in trail:
+            visit(parts[node["each"]], frames, lets, trail + [node["each"]])
+
+    visit(parts[root], set(), set(), [root])
+    return scopes
+
+
+def classify(name, scope):
+    """What a bare $name means in a scope: field | host | gesture | let | frame | prop."""
+    if name in ("title", "text", "kind", "due", "tags", "id", "item", "n", "count"):
+        return "field"
+    if name in HOST:
+        return "host"
+    if name in GESTURE_FACTS:
+        return "gesture"
+    if name in scope["lets"]:
+        return "let"
+    if name in scope["frames"]:
+        return "frame"
+    return "prop"
+
+
 def _walk(node):
     yield node
     for k in node["kids"]:
@@ -609,6 +675,7 @@ def _named(w, sel):
 
 def build(desk, src, stack=(), count=None, props=None, closure=None):
     root, parts = parse(src)
+    resolve(root, parts)          # stage 2: names are judged before any part is evaluated
     w = desk.world
     props = props or {}
 
