@@ -38,7 +38,8 @@ def touched_aspects(w, sid, seen, now, fields):
     """Did any of `fields` (aspects, as desk.aspects_of names them) change on `sid` between revision `seen` and `now`?
     Pike a308: a retitle used to refuse a gesture that had only read a prop. Until Sable's journal records one row per
     (thing, aspect), the events touching the thing are taken from the end, one per revision step."""
-    hits = [e for e in w.events if not e.get("undone") and (e["target"] == sid or sid in (e.get("changed") or []))]
+    names = {sid} if isinstance(sid, str) else set(sid)        # a thing, or an appearance with its subject
+    hits = [e for e in w.events if not e.get("undone") and (e["target"] in names or names & set(e.get("changed") or []))]
     step = max(0, int(now) - int(seen))
     recent = hits[-step:] if 0 < step <= len(hits) else hits
     return any(aspects_meet(set(fields), aspects_of(e.get("via") or e["verb"], e.get("args"))) for e in recent)
@@ -206,7 +207,17 @@ class Handler(SimpleHTTPRequestHandler):
                 # Astra: a gesture acts on the generation its maker SAW. The painter used to prefix `look item;`, which
                 # turned stale pixels into fresh permission. Now the act carries what was observed and the fence judges that.
                 now = desk.world.nodes[ob["item"]]["rev"]
-                if now != ob["rev"]:
+                nd = desk.world.nodes[ob["item"]]
+                names = {ob["item"]} | ({nd["subject"]} if nd.get("subject") else set())
+                fields = set()
+                for entry in (ob.get("reads") or []):
+                    sid, _rev, fl = (list(entry) + [None, None])[:3]
+                    if sid in names and fl:
+                        fields |= set(fl)
+                # Pike rerun (S5): the whole-item check ran before the reads had a say, so a title edit was refused because
+                # another actor set a prop the lens never shows. The item is judged on the aspects the gesture read; the
+                # whole revision only fences a gesture that read nothing.
+                if now != ob["rev"] and not (fields and not touched_aspects(desk.world, names, ob["rev"], now, fields)):
                     # Pike: the item fence exempted the actor's own edits, so one person with two windows was unprotected.
                     # A painted gesture is judged on what was painted, whoever changed it since.
                     last = [e for e in desk.world.events if e["target"] == ob["item"] or ob["item"] in (e.get("changed") or [])]

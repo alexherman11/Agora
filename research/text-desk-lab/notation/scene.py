@@ -859,7 +859,7 @@ def scene_for(desk, name):
     at = len(desk.world.events)
     fallen = [c for c in closure if c["status"] == "fallback"]
     sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
-                     frame=f"{at}:" + ".".join(f"{c['id']}r{c['rev']}" for c in closure), **_identity())
+                     frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **_identity())      # Pike report 1, item 4: the event count made every event remake the root; observed.at carries it
     # Iris, Lark: painters report back what only they know; per viewer, printed as ~, never world facts.
     sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
     text = to_text(sc, s["title"], desk.world.me, at)

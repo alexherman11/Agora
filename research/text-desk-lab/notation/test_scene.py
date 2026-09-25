@@ -88,6 +88,10 @@ def test_a_read_is_judged_by_aspect():
     w.events.append({"target": "a1", "changed": ["s1"], "verb": "prop", "args": {"beds": "3"}})
     assert deskd.touched_aspects(w, "s1", 1, 3, ["prop:beds"])
     assert not deskd.touched_aspects(w, "s1", 2, 3, ["title"])
+    # Pike S5: the clicked appearance and its subject are judged together, on the aspects read
+    w.events.append({"target": "a1", "changed": ["s1"], "verb": "prop", "args": {"place": "x"}})
+    assert not deskd.touched_aspects(w, {"a1", "s1"}, 3, 4, ["title", "prop:beds"])
+    assert deskd.touched_aspects(w, {"a1", "s1"}, 3, 4, ["prop:place"])
 
 
 def test_command_values_keep_their_quotes():
