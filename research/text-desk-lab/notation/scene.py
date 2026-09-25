@@ -179,7 +179,7 @@ def parse(src):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "capture": {}}
+                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip()}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if p in LAYOUTS:
@@ -374,9 +374,54 @@ def _fill(tpl, ctx, track=None):
                 else:
                     track["reads"][f"{a}.{b}"] = f"{v} (captured)" if cap else v
             return "" if v is None else str(v)
+        if a in ctx and track is not None:
+            track.setdefault("own", set()).add(a)
         return str(ctx[a]) if a in ctx else m.group(0)
 
     return _VAR.sub(rep, tpl)
+
+
+def _binds(node):
+    return bool(node["the"] or node["of"] or node["over"] or node["as"] or node["derive"] or node["capture"] or node["only"] or node["each"])
+
+
+def _chain_hash(chain):
+    """Pike a308: the identity of one part is its own line plus the lines above it that bind its frame (the, of, over,
+    as, derive, capture, only, each). An edit anywhere else in the lens does not change it, so a gesture painted
+    under this part is still meaningful and need not be refused."""
+    import hashlib
+    lines = [n["src"] for n in chain[:-1] if _binds(n)] + [chain[-1]["src"]]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()[:12]
+
+
+def defpart_hash(src, path):
+    """Recompute a gesture node's part hash from a lens text and the node's part path (root/repeat/card). The path
+    steps into a kid by name, or through `each` into the named part. None when the path no longer exists."""
+    root, parts = parse(src)
+    names = path.split("/")
+    if names[0] not in parts:
+        return None
+    node, chain = parts[names[0]], [parts[names[0]]]
+    for name in names[1:]:
+        kid = next((k for k in node["kids"] if k["name"] == name), None)
+        if kid is None and node["each"] == name:
+            kid = parts[name]
+        if kid is None:
+            return None
+        node = kid
+        chain.append(node)
+    return _chain_hash(chain)
+
+
+_ASPECT_NAMES = ("title", "text", "due", "tags")
+
+
+def _aspect_of_field(f):
+    if f in _ASPECT_NAMES:
+        return f
+    if f in NAMES or f in ("value", "x", "y", "n", "count"):
+        return None
+    return f"prop:{f}"
 
 
 def _rev_of(w, i):
@@ -461,7 +506,8 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         kid["placed"] = "spread"          # computed presentation, not the thing's durable position: no drag, nothing written back
     count = count if count is not None else [0]
 
-    def make(node, ctx, key, parent_layout="free"):
+    def make(node, ctx, key, parent_layout="free", chain=()):
+        chain = chain + (node,)
         if node["at"] == "item" and parent_layout != "free":
             raise LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
                               f"its parent is {parent_layout or 'unlaid'}. Make the parent free, or drop `at item`")
@@ -557,12 +603,25 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
             out["missing"] = sorted(set(out.get("missing") or []) | {f"{m} on {frames[m.split('.')[0]].get('id')}" for m in track["missing"]})
         if out["acts"]:
             # Pike F1: what a gesture was built from. The item's subject and every frame its words or derives read.
+            # Pike a308: at the grain of the aspect, so a retitle does not refuse a gesture that only read a prop.
             reads = {}
             sj = (w.nodes.get(ctx.get("item") or "") or {}).get("subject")
+            fields = {}
+            for f in track.get("own", ()):
+                a = _aspect_of_field(f)
+                if a and sj:
+                    fields.setdefault(sj, set()).add(a)
+            for k in track["reads"]:
+                fr, _, fld = k.partition(".")
+                fid = frames.get(fr, {}).get("id")
+                a = _aspect_of_field(fld)
+                if fid and a:
+                    fields.setdefault(fid, set()).add(a)
             for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames]:
                 if i and _rev_of(w, i) is not None:
                     reads[i] = _rev_of(w, i)
-            out["reads"] = sorted(reads.items())
+            out["reads"] = [[i, r, sorted(fields.get(i) or [])] for i, r in sorted(reads.items())]
+            out["defpart"] = {"path": "/".join(n["name"] for n in chain), "hash": _chain_hash(chain)}
         if ctx.get("item") in w.nodes and out["acts"]:
             out["rev"] = w.nodes[ctx["item"]]["rev"]
             # Astra (bridge c31, c42): fields they had to join server-side, now stated. Coordinates are px in the parent.
@@ -584,19 +643,19 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                 for k, r in enumerate((rs or [])[:keep]):
                     # Pike: sections and tags were keyed by position, so an insert retargeted every draft below it. Key by what it is.
                     okey = r.get("cid") or r.get("eid") or r.get("name") or (_slug(r["heading"]) if "heading" in r else k)
-                    out["kids"].append(make(each, _inst(ctx, node, dict(ctx, **r)), f"{key}/{okey}", node["layout"]))
+                    out["kids"].append(make(each, _inst(ctx, node, dict(ctx, **r)), f"{key}/{okey}", node["layout"], chain))
                 named = _named(w, sel_text) if rs is None else None
                 if named is not None:
                     total = len(named)
                     for i, st in named[:keep]:
-                        out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i, st)), f"{key}/{i}", node["layout"]))
+                        out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i, st)), f"{key}/{i}", node["layout"], chain))
                     out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                 else:
                     sel = desk._parse_selection(sel_text) if rs is None else None
                     ids = sel[0] if sel else []
                     total = len(ids) if total is None else total
                     for i in ids[:keep]:
-                        out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i)), f"{key}/{i}", node["layout"]))
+                        out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i)), f"{key}/{i}", node["layout"], chain))
                 if total > keep:
                     out["cut"] = total - keep
                     out["kids"].append({"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
@@ -607,9 +666,9 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                     if isinstance(v, dict):         # rows from a derive (days-from): $it.n $it.date, keyed by n
                         ictx = _inst(ctx, node, dict(ctx, it=str(v.get("date", v.get("n", "")))))
                         ictx["_frames"] = dict(ictx["_frames"], it=v)
-                        out["kids"].append(make(each, ictx, f"{key}/{_slug(str(v.get('n', k)))}", node["layout"]))
+                        out["kids"].append(make(each, ictx, f"{key}/{_slug(str(v.get('n', k)))}", node["layout"], chain))
                     else:
-                        out["kids"].append(make(each, _inst(ctx, node, dict(ctx, it=v)), f"{key}/{_slug(str(v))}", node["layout"]))
+                        out["kids"].append(make(each, _inst(ctx, node, dict(ctx, it=v)), f"{key}/{_slug(str(v))}", node["layout"], chain))
             # the same thing twice in one repeat gave two identical keys (Pike); an occurrence is (thing, ordinal here)
             seen_keys = {}
             for kid in out["kids"]:
@@ -634,7 +693,7 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
             out["kids"].append(sub)
             out["lens"] = inner
         for kid in node["kids"]:
-            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", ""))), f"{key}/{kid['name']}", node["layout"]))
+            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", ""))), f"{key}/{kid['name']}", node["layout"], chain))
         return out
 
     return make(parts[root], {}, root)
@@ -758,8 +817,16 @@ def _compile(desk, s, stack, count, closure):
     entry = {"lens": s["title"], "id": s["id"], "rev": s["rev"], "status": "current"}
     closure.append(entry)
     mark = len(closure)
+
+    def stamp(node):
+        dp = node.get("defpart")
+        if dp is not None and "lens" not in dp:
+            dp["lens"], dp["id"] = s["title"], s["id"]
+        for k in node.get("kids") or []:
+            stamp(k)
     try:
         sc = build(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure)
+        stamp(sc)
         good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
         return sc
     except LensRefusal as e:
@@ -770,6 +837,7 @@ def _compile(desk, s, stack, count, closure):
         del closure[mark:]
         entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e))
         sc = build(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure)
+        stamp(sc)
         sc["broken"] = f"lens {s['title']}: {e}"
         return sc
 

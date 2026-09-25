@@ -67,6 +67,29 @@ def test_a_painted_gesture_that_could_fire_a_rule_is_refused():
     assert "rule r2 (when kind:task,due<2026-09-19)" in deskd.rules_blocking(d, "do move a05 into=f02")
 
 
+def test_a_part_keeps_its_identity_when_the_lens_changes_elsewhere():
+    # Pike a308: fence per part, not per lens
+    src = "root : column, of tag:day as day, each card\ncard : text \"$title $beds\", on click do prop $item beds=1\nfoot : text bye"
+    h = scene.defpart_hash(src, "root/card")
+    assert h and h == scene.defpart_hash(src.replace("text bye", "text goodbye"), "root/card")
+    assert h != scene.defpart_hash(src.replace("of tag:day", "of tag:night"), "root/card")
+    assert h != scene.defpart_hash(src.replace("beds=1", "beds=2"), "root/card")
+    assert scene.defpart_hash(src, "root/nowhere") is None
+    assert scene._aspect_of_field("title") == "title" and scene._aspect_of_field("beds") == "prop:beds"
+    assert scene._aspect_of_field("id") is None and scene._aspect_of_field("x") is None
+
+
+def test_a_read_is_judged_by_aspect():
+    import deskd
+    class W: pass
+    w = W(); w.events = [{"target": "s1", "verb": "retitle", "args": {"title": "B"}}]
+    assert deskd.touched_aspects(w, "s1", 1, 2, ["title"])
+    assert not deskd.touched_aspects(w, "s1", 1, 2, ["prop:beds"])
+    w.events.append({"target": "a1", "changed": ["s1"], "verb": "prop", "args": {"beds": "3"}})
+    assert deskd.touched_aspects(w, "s1", 1, 3, ["prop:beds"])
+    assert not deskd.touched_aspects(w, "s1", 2, 3, ["title"])
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"

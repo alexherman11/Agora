@@ -23,12 +23,39 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import scene
+from desk import aspects_of, aspects_meet
+
 import explore
 import worktree
 
 HERE = Path(__file__).resolve().parent
 SESSIONS = HERE / "sessions"
 STATIC = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else HERE / "desk-shell"
+
+
+def touched_aspects(w, sid, seen, now, fields):
+    """Did any of `fields` (aspects, as desk.aspects_of names them) change on `sid` between revision `seen` and `now`?
+    Pike a308: a retitle used to refuse a gesture that had only read a prop. Until Sable's journal records one row per
+    (thing, aspect), the events touching the thing are taken from the end, one per revision step."""
+    hits = [e for e in w.events if not e.get("undone") and (e["target"] == sid or sid in (e.get("changed") or []))]
+    step = max(0, int(now) - int(seen))
+    recent = hits[-step:] if 0 < step <= len(hits) else hits
+    return any(aspects_meet(set(fields), aspects_of(e.get("via") or e["verb"], e.get("args"))) for e in recent)
+
+
+def same_part(desk, dp):
+    """A gesture carries the identity of the part that painted it: lens id, part path and the hash of the lines that
+    bind it. If the lens changed elsewhere, the part is the same and the gesture still means what it said."""
+    if not (dp and dp.get("id") and dp.get("path") and dp.get("hash")):
+        return False
+    lens = desk.world.subjects.get(dp["id"])
+    if lens is None:
+        return False
+    try:
+        return scene.defpart_hash(lens.get("text") or "", dp["path"]) == dp["hash"]
+    except scene.LensRefusal:
+        return False
 
 
 def rules_blocking(desk, line):
@@ -165,12 +192,13 @@ class Handler(SimpleHTTPRequestHandler):
             if d and d.get("status") == "fallback":
                 return self._json({"text": None, "error": f"refused: this view is showing a fallback of lens {d.get('lens')} because the current one does not compile; "
                                    "it is for reading. Nothing was done.", "events_total": len(desk.world.events), "line": line})
+            part_ok = same_part(desk, ob.get("defpart"))     # Pike a308: judged per part, not per lens
             for c in d.get("closure") or []:      # every definition the frame was built from must still be the current one
                 now = desk.world.subjects.get(c.get("id"))
                 if now is None or now["rev"] != c.get("rev"):
                     d, cur = c, now
                     break
-            if d and (cur is None or cur["rev"] != d.get("rev")):
+            if d and not part_ok and (cur is None or cur["rev"] != d.get("rev")):
                 return self._json({"text": None, "error": f"refused: lens {d.get('lens')} changed since this was painted "
                                    f"(you saw revision {d.get('rev')}, it is now {cur['rev'] if cur else 'gone'}); the gesture may no longer mean what it said. "
                                    f"Nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
@@ -186,10 +214,13 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({"text": None, "error": f"refused: {ob['item']} changed since this was painted (you saw revision {ob['rev']}, "
                                        f"it is now {now}{who}); nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
                 desk.seen[ob["item"]] = ob["rev"]
-            for sid, rev in (ob.get("reads") or []):
+            for entry in (ob.get("reads") or []):
                 # Pike F1: a gesture is judged on every value its line was built from, not only the clicked item.
                 # Juniper's stale "move to Sun": the item and the lens were unchanged, the trip's start had moved.
+                sid, rev, fields = (list(entry) + [None, None])[:3]
                 cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
+                if cur is not None and cur["rev"] != rev and fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields):
+                    continue              # it moved, but on an aspect this gesture never read
                 if cur is None or cur["rev"] != rev:
                     return self._json({"text": None, "error": f"refused: a value this gesture was built from has changed: {sid} (you saw revision {rev}, "
                                        f"it is now {cur['rev'] if cur else 'gone'}); nothing was done. The view will repaint.",
