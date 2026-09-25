@@ -6,6 +6,7 @@
 
 An instrument, not a gate: it always exits 0. Each scenario says `holds` (the desk already does what the journal
 model wants), `breaks` (it does something else) or `hidden` (a fact the pickle keeps and no record carries).
+The J scenarios run the same moments against journal.py, the prototype; their status is `journal`.
 Everything runs on in-memory desks or in a temporary directory: no shared session is read or written.
 """
 
@@ -548,11 +549,211 @@ def s11():
            "the actor is a field of the batch, set once by the gateway from the caller, never an argument a verb may drop or store")
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# The same moments against journal.py, the prototype (not wired into the desk). Status `journal` = what it did.
+
+def jnew(name):
+    import journal
+    return journal.Journal(Path(scratch("j")) / f"{name}.jsonl", fsync=True)
+
+
+def thing(j, actor, kind, title, text="", parent="root"):
+    import journal
+    g = journal.gid()
+    j.commit(actor, actor, f"create {kind} {title}", [(g, "kind", kind), (g, "title", title), (g, "text", text), (g, "place", [parent, 0])])
+    return g
+
+
+@scenario("J2", "prototype: a crash in the middle of a line")
+def j2():
+    import journal
+    j = jnew("crash")
+    for i in range(3):
+        thing(j, "alex", "note", f"N{i}")
+    with open(j.path, "ab") as f:
+        f.write(b'{"v":1,"seq":4,"actor":"alex","ops":[{"target":["x","title"],"bef')   # the process died here
+    k = journal.Journal(j.path)
+    stood = k.head
+    seq = thing(k, "alex", "note", "after the crash") and k.head
+    lines = j.path.read_text(encoding="utf-8").splitlines()
+    ok = k.torn > 0 and seq == 4 and all(json.loads(line) for line in lines)
+    report("J2", j2.title, "journal" if ok else "error",
+           "Three notes acknowledged, then the process dies while writing the fourth line.",
+           [f"reopened: {stood} batches stand, {k.torn} torn byte(s) dropped; the next batch is seq {seq}; every line parses: {ok}"],
+           "as designed: acknowledged means on disk; only the unacknowledged tail is lost")
+
+
+@scenario("J3", "prototype: the long fork, merged by ops")
+def j3():
+    import journal
+    base = jnew("base")
+    names = journal.Aliases()
+    plan = thing(base, "alex", "note", "Trip plan", "day 1")
+    budget = thing(base, "alex", "note", "Budget")
+    names.mint("a", plan), names.mint("a", budget)
+    fork, F = journal.fork(base, base.path.with_name("base@trip.jsonl"))
+    fnames = names.fork()
+    hotels = thing(fork, "alex", "note", "Hotels")
+    h_there = fnames.mint("a", hotels)
+    fork.commit("alex", "alex", "append plan", [(plan, "text", f"day 1\nday 2: see {h_there}")], reads=[[plan, ["text"], F]])
+    fork.commit("alex", "alex", "prop budget currency", [(budget, "prop:currency", "EUR")])
+    fork.commit("alex", "alex", "retitle plan", [(plan, "title", "Lisbon trip")])
+    flights = thing(base, "jeff", "note", "Flights")
+    f_here = names.mint("a", flights)
+    base.commit("jeff", "jeff", "prop budget total", [(budget, "prop:total", "900")])
+    base.commit("jeff", "jeff", "retitle plan", [(plan, "title", "Trip plan (Lisbon)")])
+    m1 = journal.merge(base, fork, F, "trip", "alex")
+    h_here = names.adopt(hotels, h_there)
+    title_held = [h for h in m1["held"] if h["target"][1] == "title"]
+    journal.resolve(base, title_held[0], "keep", "alex") if title_held else None
+    fork.commit("alex", "alex", "append hotels", [(hotels, "text", "Alfama, two nights")])
+    m2 = journal.merge(base, fork, F, "trip", "alex")
+    # an import from outside the family collides on a short id; the guard refuses a write by the old alias
+    other = journal.Aliases()
+    stranger = journal.gid()
+    other.mint("a", journal.gid()), other.mint("a", journal.gid()), other.mint("a", stranger)
+    memory = {"a03": other.resolve("a03")}          # alex read a03 over there: his viewer store remembers the gid
+    moved = names.adopt(stranger, "a03")
+    try:
+        names.resolve("a03", memory["a03"])
+        guard = "a03 resolved (wrong)"
+    except journal.Refusal as e:
+        guard = f"refused: {e.why}"
+    report("J3", j3.title, "journal",
+           "The same trip fork: Hotels, a line in the plan, a currency, a title; at home Flights, a total and another title.",
+           [f"merge 1: {m1['clean']} clean landed at seq {m1['seq']}, {m1['agreed']} agreed, {len(m1['held'])} held: "
+            + "; ".join(f"{h['target'][1]} here {h['here']!r} ({h['by_here']}) vs there {h['there']!r} ({h['by_there']})" for h in m1["held"]),
+            f"Hotels is {h_there} there and {h_here} here (the fork's block); Flights is {f_here}; the plan reads {base.value(plan, 'text')!r}",
+            f"budget: currency={base.value(budget, 'prop:currency')} total={base.value(budget, 'prop:total')}; title kept as {base.value(plan, 'title')!r}",
+            f"merge 2: {m2['clean']} clean (only the new line; nothing replayed), Hotels reads {base.value(hotels, 'text')!r}",
+            f"a thing imported from another world was a03 there; here a03 is Flights, so it arrives as {moved}; alex, who read a03 there, types a03 here: {guard}"],
+           "as designed; one thing to argue: the family block makes fork ids four digits (a1000), which is honest but longer")
+
+
+@scenario("J5", "prototype: undo per aspect")
+def j5():
+    j = jnew("undo")
+    n = thing(j, "alex", "note", "Essay", "first line")
+    s_col = j.commit("alex", "alex", "prop color", [(n, "prop:color", "green")])
+    s_tit = j.commit("alex", "alex", "retitle", [(n, "title", "Essay draft")])
+    j.commit("jeff", "jeff", "append", [(n, "text", "first line\nagent: two sources found")])
+    out = []
+    for s in (s_col, s_tit):
+        try:
+            seq, notes = j.undo(s, "alex", "alex")
+            out.append(f"undo seq {s}: ok as seq {seq}")
+        except Exception as e:
+            out.append(f"undo seq {s}: refused: {e}")
+    j.commit("jeff", "jeff", "append", [(n, "text", "first line\nagent: two sources found\nagent: three")])
+    s_txt = j.head
+    j.commit("alex", "alex", "rewrite", [(n, "text", "a new first line")])
+    try:
+        j.undo(s_txt, "jeff", "jeff")
+        out.append("undo the agent's append after alex's rewrite: ok (wrong)")
+    except Exception as e:
+        out.append(f"undo the agent's append after alex's rewrite: refused: {e}")
+    report("J5", j5.title, "journal",
+           "Colour, title, then an agent's line of text; Alex undoes colour and title. Then the agent's append is overwritten and he tries to undo it.",
+           out + [f"now: title {j.value(n, 'title')!r}, color {j.value(n, 'prop:color')!r}"],
+           "as designed: the text line does not block props or title; a real conflict names the blocker and offers the forward write")
+
+
+@scenario("J6", "prototype: a script edited on both sides of a fork")
+def j6():
+    import journal
+    base = jnew("defs")
+    script = journal.gid()
+    base.commit("alex", "alex", "script morning = look", [(script, "kind", "script"), (script, "title", "morning"), (script, "code", "look")])
+    fork, F = journal.fork(base, base.path.with_name("defs@x.jsonl"))
+    fork.commit("alex", "alex", "script morning = find tag:urgent", [(script, "code", "find tag:urgent")])
+    base.commit("jeff", "jeff", "script morning = look Inbox", [(script, "code", "look Inbox")])
+    m = journal.merge(base, fork, F, "x", "alex")
+    report("J6", j6.title, "journal",
+           "The morning script, edited in a fork by Alex and at home by the agent.",
+           [f"merge: {m['clean']} clean, {len(m['held'])} held: " + "; ".join(f"{h['target'][1]}: here {h['here']!r} vs there {h['there']!r}" for h in m["held"]),
+            f"the script still reads {base.value(script, 'code')!r} until someone takes, keeps or sets"],
+           "as designed: a definition is a referent with a code aspect, so the conflict is held, not silent")
+
+
+@scenario("J9", "prototype: a refused batch keeps its number, and says who")
+def j9():
+    import journal
+    j = jnew("batch")
+    casey = thing(j, "ana", "note", "Casey")
+    try:
+        j.commit("ana", "ana", "Casey owes 514.29", [(casey, "prop:owe", "514.29"), (casey, "prop:owe", "514.2857", "rule r3")])
+        why, rseq = "committed (wrong)", None
+    except journal.Refusal as e:
+        why, rseq = e.why, e.seq
+    nxt = thing(j, "ana", "note", "Other") and j.head
+    report("J9", j9.title, "journal",
+           "Ana types Casey's share while rule r3 computes it in the same batch (Juniper c346, 1). Then she makes another note.",
+           [f"refused as seq {rseq}: {why}", f"the next batch is seq {nxt}; seq {rseq} is a refusal line with no ops: {not j.line(rseq)['ops']}",
+            f"the refusal line holds no values: {'514' not in json.dumps(j.line(rseq))}; it reads {j.line(rseq)['refused']['why']!r}"],
+           "as designed; the refused values belong in Ana's viewer store (Pike's side), the fact of the refusal in the journal")
+
+
+@scenario("J10", "prototype: an undo is a change the fence sees")
+def j10():
+    import journal
+    j = jnew("fence")
+    n = thing(j, "alex", "note", "Call", "call Sam at 5")
+    s = j.commit("wren", "wren", "rewrite", [(n, "text", "call Sam at 3")])
+    seen = j.head
+    j.commit("ben", "ben", "statement", [(journal.gid(), "text", "Sam at 3")], reads=[[n, ["text"], seen]])
+    _, notes = j.undo(s, "wren", "wren")
+    try:
+        j.commit("alex", "alex", "rewrite", [(n, "text", "call Sam at 3, bring the forms")], reads=[[n, ["text"], seen]])
+        r = "accepted (wrong)"
+    except journal.Refusal as e:
+        r = f"refused: {e.why}"
+    report("J10", j10.title, "journal",
+           "Wren changes the call to 3; Alex and Ben read it (Ben's statement copies it); Wren undoes; Alex adds to what he read.",
+           [f"wren's undo notes: {notes}", f"Alex's rewrite: {r}"],
+           "as designed: the undo is inverse ops, so the read is stale exactly; the undo is not blocked by Ben's read, it says so")
+
+
+
+@scenario("J8", "prototype: Alex types in a document while an agent appends to it (text as hunks)")
+def j8():
+    import journal
+    j = jnew("doc")
+    doc = journal.gid()
+    ops, _ = journal.text_ops(j, doc, "## Intro\nold intro\n## Notes\n- first")
+    j.commit("alex", "alex/main", "create Essay", [(doc, "kind", "note"), (doc, "title", "Essay")] + ops)
+    seen = j.head                                    # Alex's editor shows the text as of here, and he starts typing
+    for i in range(3):
+        ops, reads = journal.text_ops(j, doc, journal.text(j, doc) + f"\n- agent: source {i + 1}")
+        j.commit("jeff", "jeff", f"append source {i + 1}", ops, reads)
+    mine = "## Intro\nA new intro, typed while the agent worked.\n## Notes\n- first"
+    ops, reads = journal.text_ops(j, doc, mine, seen)
+    try:
+        r = f"ok as seq {j.commit('alex', 'alex/main', 'rewrite Intro', ops, reads)}, {len(ops)} op(s) on hunks Alex saw"
+    except journal.Refusal as e:
+        r = f"refused: {e.why}"
+    both = journal.text(j, doc)
+    # now the agent and Alex both edit the Intro line, from the same view
+    seen2 = j.head
+    ops, reads = journal.text_ops(j, doc, both.replace("A new intro", "An agent's intro"), seen2)
+    j.commit("jeff", "jeff", "edit intro", ops, reads)
+    ops, reads = journal.text_ops(j, doc, both.replace("A new intro", "Alex's second intro"), seen2)
+    try:
+        j.commit("alex", "alex/main", "edit intro again", ops, reads)
+        r2 = "accepted (wrong)"
+    except journal.Refusal as e:
+        r2 = f"refused: {e.why[:110]}"
+    report("J8", j8.title, "journal",
+           "Alex's four-region workspace again: the agent appends three sources under Notes while Alex rewrites the Intro from the text he saw.",
+           [f"Alex's rewrite, diffed against what he saw: {r}", "the document now reads: " + " | ".join(both.split("\n")),
+            f"the same line written by both, from the same view: {r2}"],
+           "as designed: hunks are aspects, so a person and a background writer meet only where they touch the same hunk")
+
+
 def main():
     out = sys.argv[sys.argv.index("--json") + 1] if "--json" in sys.argv[:-1] else None
     here = Path.cwd()
     keep = worktree.SESSIONS
-    for fn in (s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11):
+    for fn in (s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, j2, j3, j5, j6, j8, j9, j10):
         try:
             fn()
         except Exception:
