@@ -150,6 +150,26 @@ def test_a_frame_may_not_shadow_one_above_and_count_is_defined_inside_instances(
     finally:
         tmp.unlink(missing_ok=True)
 
+def test_only_when_takes_a_value_test_and_prints_it():
+    import deskd
+    tmp = _scratch("_test_guard")
+    try:
+        with deskd.Session("_test_guard", "jeff") as desk:
+            src = chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds > 5'])
+            sc = scene.build(desk, src)
+            shown = [k for k in sc["kids"] if not k.get("absent")]
+            absent = [k for k in sc["kids"] if k.get("absent")]
+            assert len(shown) == 1 and shown[0]["test"] == "$beds is 6 > 5"
+            assert len(absent) == 1 and absent[0]["why"] == "no beds"
+            src = chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds = 7'])
+            sc = scene.build(desk, src)
+            assert [k.get("why") for k in sc["kids"]] == ["$beds is 6, not = 7", "no beds"]
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "(absent: $beds is 6, not = 7)" in text and "(absent: no beds)" in text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"

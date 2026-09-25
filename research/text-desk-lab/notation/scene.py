@@ -32,6 +32,8 @@ An unindented name defines a part; the first one is the root.
                                  lens note itself: do prop <lens> spacing=210. Computed presentation, never written back
     lens <name>                  place another lens here. A lens may not contain itself
     only when <selection>        the part exists only if the current thing (or anything) matches; the text prints the absence
+    only when $x <op> value      a value test (= != < > <= >=) on a field, prop, frame field or derive of this part, judged
+                                 after its derives; prints its inputs; a missing value is absence (no x), not false
     the <selection>              exactly one thing becomes the current thing here; the text prints which (-> s31 (a32)),
                                  or (empty), or (ambiguous: a32, a50) with nothing built under it and gestures off
     as <name>                    name this part's thing as a frame; parts below read it as $name.title $name.start
@@ -349,6 +351,16 @@ def _week_of(vals):
 INTERPS = {"day-n": (("date", "n"), _day_n), "days-from": (("start", "end"), _days_from),
            "weekday": (("date",), _weekday), "week-of": (("date",), _week_of)}
 _VAR = re.compile(r"\$(\w+)(?:\.(\w+))?")
+# Pike (round six, `if`): a structural test on a value. `only when $wd = Mon`, `only when $beds > 5`, `only when $a.due < $today`.
+_VALUE_TEST = re.compile(r"(\$[\w.-]+)\s*(=|!=|<=|>=|<|>)\s*(\$[\w.-]+|\"[^\"]*\"|\S+)")
+
+
+def _compare(left, op, right):
+    try:
+        a, b = float(left), float(right)
+    except (TypeError, ValueError):
+        a, b = str(left), str(right)
+    return {"=": a == b, "!=": a != b, "<": a < b, ">": a > b, "<=": a <= b, ">=": a >= b}[op]
 
 
 def _fill(tpl, ctx, track=None):
@@ -515,7 +527,8 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         if node["at"] == "item" and parent_layout != "free":
             raise LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
                               f"its parent is {parent_layout or 'unlaid'}. Make the parent free, or drop `at item`")
-        if node["only"]:
+        vtest = _VALUE_TEST.fullmatch(node["only"].strip()) if node["only"] else None
+        if node["only"] and not vtest:
             sel = desk._parse_selection(_fill(node["only"], ctx))
             ids = sel[0] if sel else []
             if not ((ctx.get("item") in ids) if ctx.get("item") else bool(ids)):
@@ -574,6 +587,21 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                 ctx["_" + dname] = res
             else:
                 ctx[dname] = res or ""
+        if vtest:
+            # Sable probe 5, Juniper A5: `only when $wd=Mon` was accepted as a selection and printed a wrong reason on every
+            # day. It is a value test, judged after this part's derives so its own `derive wd` is visible; it prints its
+            # inputs, and a missing value is absence, not false (Sable's R6 condition).
+            ref, op, rhs = vtest.group(1), vtest.group(2), vtest.group(3).strip('"')
+            vctx = dict(ctx.get("_props") or {})
+            vctx.update(ctx)
+            left = _fill(ref, vctx, track)
+            right = _fill(rhs, vctx, track) if rhs.startswith("$") else rhs
+            gone = [x for x, v in ((ref, left), (rhs, right)) if x.startswith("$") and (v == x or v == "")]
+            if gone or not _compare(left, op, right):
+                out.update(text=None, acts=[], kids=[], absent=node["only"],
+                           why=(f"no {gone[0].lstrip('$')}" if gone else f"{ref} is {left}, not {op} {right}"))
+                return out
+            out["test"] = f"{ref} is {left} {op} {right}"
         if node["at"] == "item" and ctx.get("item") in w.nodes:
             n = w.nodes[ctx["item"]]
             out["box"] = [n["x"], n["y"], n["w"], n["h"]]
@@ -737,7 +765,8 @@ def to_text(scene, name, who, at):
     def pr(n, d, pkey=None):
         bits = [n["part"]]
         if n.get("absent"):
-            lines.append("  " * d + f"{n['part']} {n.get('item') or ''} (absent: not {n['absent']})".replace("  (", " ("))
+            why = n.get("why") or f"not {n['absent']}"
+            lines.append("  " * d + f"{n['part']} {n.get('item') or ''} (absent: {why})".replace("  (", " ("))
             return
         if n.get("item"):
             bits.append(n["item"])
@@ -791,6 +820,8 @@ def to_text(scene, name, who, at):
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):
                 bits.append("(" + ", ".join(n["states"]) + ")")
+        if n.get("test"):
+            bits.append(f"· only when {n['test']}")
         for a in n["acts"]:
             bits.append(f"· {a['on']}: {a['line']}")
         for a, v in views.items():
