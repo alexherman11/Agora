@@ -166,4 +166,133 @@ ref : text "$title", role meta, on click do ‹view› open=$item
 
 The first two are the same finding as Pike's report 1 and Sable's S8, seen from inside an app: **the fence is honest because it judges data, and a lens is honest in text. The pixels become dishonest wherever a gesture writes a bigger thing than it is drawn on.**
 
-Next here: a document, a chat with code and diagrams, and an image, in that order.
+## A document
+
+### What runs today [ran]
+
+The lens is an outline rail, a page of sections, and a margin of comments:
+
+```
+doc : row, the kind:doc,title:Flat as d
+  rail : column, role sheet, of sections:$d.item, each out
+  page : column, role sheet
+    title : text "$d.title", role heading, on edit do retitle $d.item title="$value"
+    secs : column, of sections:$d.item, each sec
+    add : text "Comment", role tool, on edit do comment $d.item line="$value"
+  margin : column, of comments:$d.item, each c
+out : text "$heading", role meta
+sec : column
+  h : text "$heading", role heading
+  b : text "$text", role body, on edit do rewrite $item text="$value"
+c : column, role card
+  who : text "$by", role meta
+  t : text "$text"
+  r : text "Resolve", role tool, on click do resolve $cid, only when $state = open
+```
+
+It compiles and prints well. It has the notes app's section-edit trap: every paragraph prints `edit: do rewrite a03`. It also has three problems of its own.
+
+- **A comment has no anchor.** My comment on the Bills paragraph has to say "Bills:" in its own words. The margin cannot draw it beside Bills, and when the paragraph moves or is renamed, nothing follows it. In round two, range comments were the discriminator (a21/E2). This is where a person meets them.
+- **A comment has no time and no reply.** The Lounge threads by prose convention ("Pike, to Juniper (c347)").
+- The outline rail lists "(before the first heading)".
+
+### As it should read [imagined]
+
+```
+doc : row ‹widths 1:4:2›, the ‹$viewer.open› as d
+  rail : column, of sections:$d.item, each out
+  page : column, role sheet
+    secs : column, of sections:$d.item, each sec
+  margin : column, of comments:$d.item, each c, ‹beside $c.anchor›
+out : text "$heading", role meta, on click do ‹view scroll=$key›
+sec : column
+  h : text "$heading", role heading, ‹on edit do retitle-section $key title="$value"›
+  b : ‹prose› "$text", ‹on edit do rewrite-section $key text="$value"›, ‹on select do comment-draft anchor=$range›
+c : column, role card
+  who : text "$by · ‹$at as relative›", role meta
+  t : text "$text"
+  replies : column, of comments:‹$cid›, each c
+  r : text "Resolve", role tool, on click do resolve $cid, only when $state = open
+```
+
+- **Needs said:** section-scoped edits (the text gateway), comment anchors that follow text (a range becomes `anchor=$range`), comment time and reply-to, and scroll position as viewer state.
+- **Needs drawn:**
+  - a margin whose cards align with their anchors: one part's y taken from another part's y, a relation the painter has no word for;
+  - a text selection that a gesture can read (`$range`);
+  - scroll-to;
+  - prose editing where typing settles into the world without a send key. This is Moss's "typing that settles", and it is where whole-value text and the fence meet (Sable's S8).
+
+## A chat with code and diagrams (the middle of Alex's workspace)
+
+### What runs today [ran]
+
+A chat is a kind whose text holds one line per message, "Speaker: words". The lens can show the whole text and an input:
+
+```
+c : column, role sheet, the kind:chat as ch
+  msgs : text "$ch.text", role body
+  say : text "Message", role card.plain, on edit do append $ch.item line="$value"
+```
+
+Findings:
+
+1. **Messages are not things.** There is no row source for them, so a lens cannot repeat over messages to give each one its speaker, time, code block or diagram. A message with code runs over several lines, and only its first line carries the speaker.
+2. **The speaker is text, and two rules in world.py decide it** [read; world.py lines 698–702]:
+   - An unsigned line appended by `jeff` or `alex` is signed "Alex:". So JEFF's own messages are signed as Alex, while the event says `by jeff`.
+   - Any line that starts with a word and a colon counts as already signed. So I appended "Jeff: The columns are content-sized…" as juniper, and it reads as Jeff's [ran].
+
+   This is a patch around identity, not a solution, and I am naming it as Jeff asked. The speaker must be the event's actor.
+3. **The text printer breaks its own format on multi-line reads** [ran]. The line `msgs a03 "…" · read ch s02 text=Alex: why…` carries the chat's raw newlines, so the print's next lines start with "Jeff: The columns…" at column zero. Any reader of the print that goes by indentation mis-parses it, the suite's included. Reads should be cut or escaped as the text itself is (" / ").
+4. **Code and diagrams:** the fenced block prints as raw backticks. The style has a mono role (`source`), but a lens cannot assign it to part of a message. There is no diagram primitive. Pike's S14 found the same thing in the browser.
+
+### As it should read [imagined]
+
+```
+chat : column, the ‹$viewer.open› as ch
+  msgs : column, of ‹messages›:$ch.item, each m, ‹stick to end›
+  say : ‹input› "Message", ‹multi-line›, ‹on submit› do ‹say› $ch.item text="$value"
+m : column, role card.plain
+  who : text "$by · ‹$at as relative›", role meta
+  parts : column, of ‹blocks›:$m.id, each blk
+blk : column
+  p : ‹prose› "$text", only when $kind = prose
+  code : text "$text", role source, ‹keep spaces›, only when $kind = code
+  fig : ‹diagram› "$text", only when $kind = diagram
+```
+
+- **Needs said:** messages as rows or things, with `by` taken from the event and `at` from the clock; blocks inside a message (prose, code, diagram) as a row source with a kind; and a `say` verb that signs with the actor.
+- **Needs drawn:**
+  - a list that sticks to its end while new messages arrive, which is also the "background task finishes while I type" moment;
+  - a multi-line input;
+  - monospace with preserved spacing (S14 says indentation survives today);
+  - a diagram primitive. Its text print must say what the diagram says, because an agent reads the print, not the picture.
+
+## An image
+
+### What runs today [ran]
+
+An image is a title and a line of text. There are no pixels anywhere in the world, and the painter has no image primitive. The lens prints `pic a03 "McWay Falls at sunset" [title]`, and that is all that can be drawn. After creation the caption cannot be edited: the image's verbs are retitle, fold, comment, link, prop, tag and the placement verbs, with no rewrite or append.
+
+### As it should read [imagined]
+
+```
+photos : ‹grid›, of kind:image, ‹sort taken desc›, each ph
+ph : column, role card, on click do ‹view› open=$item
+  pic : ‹image› $item, ‹fit cover›, ‹ratio 4:3›
+  cap : text "$text", role body, on edit do ‹caption› $item text="$value"
+```
+
+- **Needs said:** an image's content as a reference to stored bytes. This is Sable's blob indirection (c326), which also makes erasure possible. It also needs dimensions and a taken date as fields, and an editable caption.
+- **Needs drawn:** an image primitive with fit and aspect ratio, and a grid layout (row and column wrap today). The text printer must say what the painter shows: `pic a03 [image 1200x800, 4:3 cover, alt: "Waterfall onto the beach"]`, so that the print stays a complete account of the screen.
+
+## Across the five
+
+| App | Reads well in text | Can be drawn as a person expects | Main thing missing |
+|---|---|---|---|
+| Tasks | yes, with two silent wrongs (Today, the week) | partly: no input, no check control, done vanishes | date terms, sort, host names that bind |
+| Notes | yes | no: the open note cannot be chosen, and a section edit rewrites everything | viewer state, section edits |
+| Document | yes | no: comments float, and typing needs a send | anchors, section edits, settling |
+| Chat | no: messages are one text, and multi-line reads break the print | no | messages as things, the speaker as the actor |
+| Image | yes, but it says almost nothing | no: no pixels exist | stored content, an image primitive |
+
+Every app needs viewer state, and every app with text needs edits scoped to what is drawn. Those two belong in the staged compiler's IR before any more painter words, because a lens that reads well and cannot be drawn honestly is always one of the two.
