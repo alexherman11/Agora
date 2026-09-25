@@ -116,6 +116,18 @@ Evaluation is depth-first and in pre-order. Siblings go in declaration order and
   ```
 
   and `deps` comes from the IR's dependency edges, not from whatever a tracker happened to see.
+
+  **Amended [ran], the same night:** add the **binds on its chain**. That means the membership read `(q, S)` of every `bind one` above the act, and for every `bind many` above it, the instance's membership condition: `t`'s aspects that `q`'s terms name, or the membership read when `q` has no current thing. The corrected formula:
+
+  ```
+  R_g = reads(deps(line)) ∪ reads(deps(guards on its chain)) ∪ reads(binds on its chain) ∪ {occurs(t)}
+  ```
+
+  - **Evidence.** `experiments/soundness/soundness.py` builds worlds from the suite and from Juniper 7's two apps as they run today. It applies 900 single edits by another actor and watches every painted gesture. There were **21 unsound cases, all of these two kinds.** The line never changed; the gesture **disappeared** while its fence reads were untouched.
+    - A task's `owner` changed, so it left `of kind:task,prop:owner=juniper,...`. Its retitle and check gestures were gone, but their reads were `[[s02, title]]` only.
+    - A second note matching `title:Charter` made `the kind:note,title:Charter` ambiguous, and every gesture under it vanished.
+  - **Harm.** deskd would accept such a gesture [read, deskd.py 178-230: it checks the item and the reads, never the chain's membership]. "Mark done" would land on a task that is no longer the person's.
+  - **Tightness.** 36 of 62 touched trials left the gesture unchanged. Mostly these are reads with an empty aspect list, which the fence treats as "everything".
 - An act's effect is a **proposal**. The gateway runs the line and its cascade and returns rows (jeff-1, sable-7). The compiler does not preview effects; it guarantees the line.
 - An act may target only a **held** aspect (§3.3).
 

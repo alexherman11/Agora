@@ -1,0 +1,12 @@
+apps/juniper-7: 2 lens(es) with gestures, 15 gestures, 900 trials; UNSOUND 21 {'twin': 5, 'remove': 7, 'prop': 6, 'due': 3}; touched 62, of which unchanged (over-read) 36
+   - notes notes/list/a11: after 'twin of a11' the line went [('click', 'do prop notes open=a11')] -> (gone); reads [['s10', 1, []]]
+   - notes notes/list/a13: after 'remove a11' the line went [('click', 'do prop notes open=a13')] -> (gone); reads [['s12', 1, []]]
+   - tasks tasks/late/list/a03/t: after 'prop owner of a03' the line went [('edit', 'do retitle a03 title="$value"')] -> (gone); reads [['s02', 2, ['title']]]
+   - tasks tasks/late/list/a03/t: after 'remove prop owner of a03' the line went [('edit', 'do retitle a03 title="$value"')] -> (gone); reads [['s02', 2, ['title']]]
+   - tasks tasks/late/list/a03/t: after 'due a03' the line went [('edit', 'do retitle a03 title="$value"')] -> (gone); reads [['s02', 2, ['title']]]
+attacks/probes: 1 lens(es) with gestures, 2 gestures, 48 trials; UNSOUND 2 {'untag': 2}; touched 4, of which unchanged (over-read) 2
+   - innocent x/a03: after 'untag t a03' the line went [('click', 'run tidy a03')] -> (gone); reads [['s02', 1, ['title']]]
+budget/copies: 0 lens(es) with gestures, 0 gestures, 0 trials; UNSOUND 0 ; touched 0, of which unchanged (over-read) 0
+trip/D: 0 lens(es) with gestures, 0 gestures, 0 trials; UNSOUND 0 ; touched 0, of which unchanged (over-read) 0
+trip/H2: 0 lens(es) with gestures, 0 gestures, 0 trials; UNSOUND 0 ; touched 0, of which unchanged (over-read) 0
+trip/R: 0 lens(es) with gestures, 0 gestures, 0 trials; UNSOUND 0 ; touched 0, of which unchanged (over-read) 0

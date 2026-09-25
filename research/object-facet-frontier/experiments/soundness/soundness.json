@@ -1,0 +1,529 @@
+{
+ "apps/juniper-7": {
+  "lenses": 2,
+  "gestures": 15,
+  "trials": 900,
+  "unsound": [
+   {
+    "lens": "notes",
+    "key": "notes/list/a11",
+    "edit": "twin of a11",
+    "reads": [
+     [
+      "s10",
+      1,
+      []
+     ]
+    ],
+    "was": [
+     [
+      "click",
+      "do prop notes open=a11"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "notes",
+    "key": "notes/list/a13",
+    "edit": "twin of a11",
+    "reads": [
+     [
+      "s12",
+      1,
+      []
+     ]
+    ],
+    "was": [
+     [
+      "click",
+      "do prop notes open=a13"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "notes",
+    "key": "notes/page/t",
+    "edit": "twin of a11",
+    "reads": [
+     [
+      "s10",
+      1,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a11 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "notes",
+    "key": "notes/page/secs/aim/b",
+    "edit": "twin of a11",
+    "reads": [
+     [
+      "s10",
+      1,
+      [
+       "text"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do rewrite a11 text=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "notes",
+    "key": "notes/page/secs/plan/b",
+    "edit": "twin of a11",
+    "reads": [
+     [
+      "s10",
+      1,
+      [
+       "text"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do rewrite a11 text=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "notes",
+    "key": "notes/list/a13",
+    "edit": "remove a11",
+    "reads": [
+     [
+      "s12",
+      1,
+      []
+     ]
+    ],
+    "was": [
+     [
+      "click",
+      "do prop notes open=a13"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/late/list/a03/t",
+    "edit": "prop owner of a03",
+    "reads": [
+     [
+      "s02",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a03 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/late/list/a03/d",
+    "edit": "prop owner of a03",
+    "reads": [
+     [
+      "s02",
+      2,
+      [
+       "due"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do due a03 on=$value"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/late/list/a03/t",
+    "edit": "remove prop owner of a03",
+    "reads": [
+     [
+      "s02",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a03 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/late/list/a03/d",
+    "edit": "remove prop owner of a03",
+    "reads": [
+     [
+      "s02",
+      2,
+      [
+       "due"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do due a03 on=$value"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/late/list/a03/t",
+    "edit": "due a03",
+    "reads": [
+     [
+      "s02",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a03 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a05/t",
+    "edit": "prop owner of a05",
+    "reads": [
+     [
+      "s04",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a05 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a05/d",
+    "edit": "prop owner of a05",
+    "reads": [
+     [
+      "s04",
+      2,
+      [
+       "due"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do due a05 on=$value"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a05/t",
+    "edit": "remove prop owner of a05",
+    "reads": [
+     [
+      "s04",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a05 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a05/d",
+    "edit": "remove prop owner of a05",
+    "reads": [
+     [
+      "s04",
+      2,
+      [
+       "due"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do due a05 on=$value"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a05/t",
+    "edit": "due a05",
+    "reads": [
+     [
+      "s04",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a05 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a07/t",
+    "edit": "prop owner of a07",
+    "reads": [
+     [
+      "s06",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a07 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a07/d",
+    "edit": "prop owner of a07",
+    "reads": [
+     [
+      "s06",
+      2,
+      [
+       "due"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do due a07 on=$value"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a07/t",
+    "edit": "remove prop owner of a07",
+    "reads": [
+     [
+      "s06",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a07 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a07/d",
+    "edit": "remove prop owner of a07",
+    "reads": [
+     [
+      "s06",
+      2,
+      [
+       "due"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do due a07 on=$value"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "tasks",
+    "key": "tasks/now/list/a07/t",
+    "edit": "due a07",
+    "reads": [
+     [
+      "s06",
+      2,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "edit",
+      "do retitle a07 title=\"$value\""
+     ]
+    ],
+    "now": "(gone)"
+   }
+  ],
+  "overread": 36,
+  "touched": 62
+ },
+ "attacks/probes": {
+  "lenses": 1,
+  "gestures": 2,
+  "trials": 48,
+  "unsound": [
+   {
+    "lens": "innocent",
+    "key": "x/a03",
+    "edit": "untag t a03",
+    "reads": [
+     [
+      "s02",
+      1,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "click",
+      "run tidy a03"
+     ]
+    ],
+    "now": "(gone)"
+   },
+   {
+    "lens": "innocent",
+    "key": "x/a05",
+    "edit": "untag t a05",
+    "reads": [
+     [
+      "s04",
+      1,
+      [
+       "title"
+      ]
+     ]
+    ],
+    "was": [
+     [
+      "click",
+      "run tidy a05"
+     ]
+    ],
+    "now": "(gone)"
+   }
+  ],
+  "overread": 2,
+  "touched": 4
+ },
+ "budget/copies": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
+ "trip/D": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
+ "trip/H2": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
+ "trip/R": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ }
+}
