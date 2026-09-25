@@ -656,6 +656,10 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                     total = len(ids) if total is None else total
                     for i in ids[:keep]:
                         out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i)), f"{key}/{i}", node["layout"], chain))
+                # Juniper (round six, past Sable's probes): tagging a thing outside the printed reads moved the scene, because
+                # the repeat had read "the set matching tag:day" and recorded nothing. A membership read is a read.
+                got = [k["item"] or k["key"] for k in out["kids"]]
+                out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 if total > keep:
                     out["cut"] = total - keep
                     out["kids"].append({"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,

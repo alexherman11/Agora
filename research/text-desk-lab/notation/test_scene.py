@@ -94,6 +94,19 @@ def test_a_read_is_judged_by_aspect():
     assert deskd.touched_aspects(w, {"a1", "s1"}, 3, 4, ["prop:place"])
 
 
+def test_a_repeat_records_its_membership_read():
+    import deskd, shutil, pathlib
+    src, tmp = pathlib.Path("sessions/frontier-jeff-probe.pickle"), pathlib.Path("sessions/_test_probe.pickle")
+    shutil.copy(src, tmp)          # a Session saves on exit; the committed scratch session must not change from a test
+    try:
+        with deskd.Session("_test_probe", "jeff") as desk:
+            sc, _ = scene.scene_for(desk, "beds-lens")
+    finally:
+        tmp.unlink(missing_ok=True)
+    m = sc["members"]
+    assert m["of"] == "kind:note" and m["n"] == len(m["ids"]) == len(sc["kids"]) and isinstance(m["at"], int)
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"
