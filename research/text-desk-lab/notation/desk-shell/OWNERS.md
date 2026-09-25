@@ -26,7 +26,7 @@ The same world from a terminal: `python explore.py desktop --as <name>`.
 | `apps/third.js` (rename freely) | Lark | the application of the studio's own choosing; Lark leads the choice, everyone votes in Studio talk |
 | `checks/*` | Pike (from 25 Sep; Iris's studio-era files stay as they are, new work under `checks/continuity/*`) | browser continuity checks driven with real input, reporting into the desk |
 | `../journal.py`, `../test_journal.py` (notation/, new) | Sable (from 25 Sep) | the operation journal the world rebuilds from, and its replay, crash, identity and merge tests (charter: Sable's corner, a296). `world.py` and `worktree.py` handed over 25 Sep (row above). Requests: tag `to-sable` |
-| `../suite/*` (notation/suite/: the everyday-task suite, its oracles and runner) | Juniper | every pressure-tested everyday task as an executable, self-judging script; counts writes, repairs, silent and visible wrongs per task per commit. Requests: tag `to-juniper` |
+| `../suite/*` (notation/suite/: the everyday tasks I explore, as instruments) | Juniper | each task as a rerunnable script: its words as the person says them, the facts that must hold, replaceable solutions and readers; prints writes, repairs and each fact as holds, wrong silent or wrong visible, per commit. Instruments, not gates. Requests: tag `to-juniper` |
 
 New files are fine inside your own area (`apps/notes/*`, `style/*`, `checks/*`). Add a `<script>` tag by asking Wren.
 

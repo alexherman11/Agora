@@ -1,0 +1,449 @@
+== step 3 · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-10, 2026-10-11) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-10" [heading]
+        items a03 column · 2 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-11" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 3 · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 5 of parts:a03
+      row a05 row · date = day-n(2026-10-10, 1) = 2026-10-10 · key a05
+        d a05 "2026-10-10"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-10, 1) = 2026-10-10 · key a08
+        d a08 "2026-10-10"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-10, 2) = 2026-10-11 · key a11
+        d a11 "2026-10-11"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-10, 2) = 2026-10-11 · key a14
+        d a14 "2026-10-11"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-10, 2) = 2026-10-11 · key a17
+        d a17 "2026-10-11"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+
+== step 4 · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-17, 2026-10-18) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-17" [heading]
+        items a03 column · 2 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-18" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 4 · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 5 of parts:a03
+      row a05 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a05
+        d a05 "2026-10-17"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a08
+        d a08 "2026-10-17"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a11
+        d a11 "2026-10-18"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a14
+        d a14 "2026-10-18"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a17
+        d a17 "2026-10-18"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+
+== step 5 · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-17, 2026-10-18) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-17" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+          entry a24 [card] column · key a24
+            what a24 "Pfeiffer Beach"
+            open a24 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-18" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 5 · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a05
+        d a05 "2026-10-17"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a08
+        d a08 "2026-10-17"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a11
+        d a11 "2026-10-18"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a14
+        d a14 "2026-10-18"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a17
+        d a17 "2026-10-18"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a24
+        d a24 "2026-10-17"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)
+
+== step 6a · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-17, 2026-10-18) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-17" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+          entry a24 [card] column · key a24
+            what a24 "Pfeiffer Beach"
+            open a24 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-18" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 "open: trail status" [tag]
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 6a · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a05
+        d a05 "2026-10-17"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a08
+        d a08 "2026-10-17"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a11
+        d a11 "2026-10-18"
+        t a11 "Ewoldsen hike"
+        u a11 "open: trail status"
+      row a14 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a14
+        d a14 "2026-10-18"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a17
+        d a17 "2026-10-18"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a24
+        d a24 "2026-10-17"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)
+
+== step 6b · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-17, 2026-10-18) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-17" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+          entry a24 [card] column · key a24
+            what a24 "Pfeiffer Beach"
+            open a24 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-18" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 6b · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a05
+        d a05 "2026-10-17"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a08
+        d a08 "2026-10-17"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a11
+        d a11 "2026-10-18"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a14
+        d a14 "2026-10-18"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a17
+        d a17 "2026-10-18"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a24
+        d a24 "2026-10-17"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)
+
+== step 7 · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-17, 2026-10-18) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-17" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+          entry a24 [card] column · key a24
+            what a24 "Pfeiffer Beach"
+            open a24 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-18" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 7 · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a05
+        d a05 "2026-10-17"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a08
+        d a08 "2026-10-17"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a11
+        d a11 "2026-10-18"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a14
+        d a14 "2026-10-18"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a17
+        d a17 "2026-10-18"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a24
+        d a24 "2026-10-17"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)
+
+== step 8 · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-17, 2026-10-18) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-17" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+          entry a24 [card] column · key a24
+            what a24 "Pfeiffer Beach"
+            open a24 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-18" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 8 · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a05
+        d a05 "2026-10-17"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a08
+        d a08 "2026-10-17"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a11
+        d a11 "2026-10-18"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a14
+        d a14 "2026-10-18"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-17, 2) = 2026-10-18 · key a17
+        d a17 "2026-10-18"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-17, 1) = 2026-10-17 · key a24
+        d a24 "2026-10-17"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)
+
+== step 9 · cal ==
+scene cal trip · for juniper · world @N
+  cal a03 row · the prop:role=trip -> s02 (a03) as trip
+    days a03 row · days = days-from(2026-10-10, 2026-10-11) = 2 rows · 2
+      day a03 [sheet] column · key 1
+        head a03 "Day 1, 2026-10-10" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=1
+          entry a05 [card] column · key a05
+            what a05 "McWay Falls"
+            open a05 (absent: not prop:uncertain)
+          entry a08 [card] column · key a08
+            what a08 "Night on the coast"
+            open a08 (absent: not prop:uncertain)
+          entry a24 [card] column · key a24
+            what a24 "Pfeiffer Beach"
+            open a24 (absent: not prop:uncertain)
+      day a03 [sheet] column · key 2
+        head a03 "Day 2, 2026-10-11" [heading]
+        items a03 column · 3 of parts:a03,prop:tripday=2
+          entry a11 [card] column · key a11
+            what a11 "Ewoldsen hike"
+            open a11 (absent: not prop:uncertain)
+          entry a14 [card] column · key a14
+            what a14 "Lunch with Sam at Nepenthe"
+            open a14 (absent: not prop:uncertain)
+          entry a17 [card] column · key a17
+            what a17 "Bixby Bridge stop"
+            open a17 (absent: not prop:uncertain)
+
+== step 9 · itinerary ==
+scene itinerary · for juniper · world @N
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-10, 1) = 2026-10-10 · key a05
+        d a05 "2026-10-10"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-10, 1) = 2026-10-10 · key a08
+        d a08 "2026-10-10"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-10, 2) = 2026-10-11 · key a11
+        d a11 "2026-10-11"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-10, 2) = 2026-10-11 · key a14
+        d a14 "2026-10-11"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-10, 2) = 2026-10-11 · key a17
+        d a17 "2026-10-11"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-10, 1) = 2026-10-10 · key a24
+        d a24 "2026-10-10"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)

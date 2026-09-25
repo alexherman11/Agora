@@ -1,0 +1,103 @@
+== step 3 · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday." [body]
+    day a03 [sheet] column · key sat-oct-10
+      head a03 "Sat Oct 10" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast" [body]
+    day a03 [sheet] column · key sun-oct-11
+      head a03 "Sun Oct 11" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 4 · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th." [body]
+    day a03 [sheet] column · key sat-oct-17
+      head a03 "Sat Oct 17" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast" [body]
+    day a03 [sheet] column · key sun-oct-18
+      head a03 "Sun Oct 18" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 5 · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th." [body]
+    day a03 [sheet] column · key sat-oct-17
+      head a03 "Sat Oct 17" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast / - Pfeiffer Beach, afternoon" [body]
+    day a03 [sheet] column · key sun-oct-18
+      head a03 "Sun Oct 18" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 6a · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th." [body]
+    day a03 [sheet] column · key sat-oct-17
+      head a03 "Sat Oct 17" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast / - Pfeiffer Beach, afternoon" [body]
+    day a03 [sheet] column · key sun-oct-18
+      head a03 "Sun Oct 18" [heading]
+      body a03 "- Ewoldsen hike, morning (? trail status) / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 6b · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th." [body]
+    day a03 [sheet] column · key sat-oct-17
+      head a03 "Sat Oct 17" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast / - Pfeiffer Beach, afternoon" [body]
+    day a03 [sheet] column · key sun-oct-18
+      head a03 "Sun Oct 18" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 7 · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th." [body]
+    day a03 [sheet] column · key sat-oct-17
+      head a03 "Sat Oct 17" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast / - Pfeiffer Beach, afternoon" [body]
+    day a03 [sheet] column · key sun-oct-18
+      head a03 "Sun Oct 18" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 8 · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th." [body]
+    day a03 [sheet] column · key sat-oct-17
+      head a03 "Sat Oct 17" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast /   - alt: Kirk Creek campsite, $35 /   - alt: Cambria motel, about $140 / - Pfeiffer Beach, afternoon" [body]
+    day a03 [sheet] column · key sun-oct-18
+      head a03 "Sun Oct 18" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
+
+== step 9 · cal ==
+scene cal sections · for juniper · world @N
+  cal row · 3 of sections:a03
+    day a03 [sheet] column · key before-the-first-heading
+      head a03 "(before the first heading)" [heading]
+      body a03 "Thinking Sat-Sun Oct 10-11, maybe the weekend after. Want McWay Falls, a hike, one night near the coast (Kirk Creek if a site is free, else Cambria). Sam can only do Sunday. / Moved a week: Kirk Creek is full on the 10th. / Moved back: a si" (=240 of 261 chars printed here; read a03 for all) [body]
+    day a03 [sheet] column · key sat-oct-10
+      head a03 "Sat Oct 10" [heading]
+      body a03 "- McWay Falls, evening / - Night on the coast /   - alt: Kirk Creek campsite, $35 /   - alt: Cambria motel, about $140 / - Pfeiffer Beach, afternoon" [body]
+    day a03 [sheet] column · key sun-oct-11
+      head a03 "Sun Oct 11" [heading]
+      body a03 "- Ewoldsen hike, morning / - Lunch with Sam at Nepenthe, noon / - Bixby Bridge stop" [body]
