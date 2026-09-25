@@ -77,10 +77,10 @@ async function fixture() {
   const cal = [
     "cal : row, the tag:trip as trip",
     "  days : row, derive days = days-from $trip.start $trip.end, over $days, each day",
-    "day : column, role sheet",
+    "day : column, role sheet, on drop item do prop $carried tripday=$it.n",
     "  h : role heading, derive wd = weekday $it.date, text \\\"$wd $it.date\\\"",
     "  items : column, of parts:$trip.item,prop:tripday=$it.n, each item",
-    "item : role card",
+    "item : role card, carry",
     "  t : role title, text $title, on edit do retitle $item title=\\\"$value\\\"",
     "  p : role meta, text $place",
   ].join("\\n");
@@ -433,10 +433,65 @@ S.S12 = { what: "the lens stops compiling while a person edits; then they edit a
     return { first: r1, second: r2, fallbackShown, pass: [r1, r2].every(r => r.refused && r.refusalShown && !r.draftLost && !r.phantom) };
   } };
 
-S.S13 = { what: "carry a card to another day (drop)", expect: "a carry/drop gesture exists",
-  async run() {
-    const t = await sceneText("cal");
-    return { note: "no drop word in the grammar; nothing to carry", pass: /drop/.test(t) };
+// which day column of the calendar lens a card is painted under, read from the scene the server serves
+async function dayOf(id) {
+  const r = await (await fetch(`${BASE}/api/scene?session=${SESSION}&as=observer&lens=cal`)).json();
+  let found = null;
+  const walk = n => { if (n.key.endsWith(`/${id}`)) found = n.key.split("/")[2]; (n.kids || []).forEach(walk); };
+  if (r.scene) walk(r.scene);
+  return found;
+}
+const dayCol = (tab, n) => tab.eval(`(() => { const e = document.querySelector('[data-key="cal/days/${n}"]'); if (!e) return null;
+  const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + Math.min(r.height - 10, 60) }; })()`);
+
+S.S13 = { what: "carry a card to another day with the pointer (drop)", expect: "the card lands on day 2 through the receiver's own line",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await dayOf(ids.kirk), card = await tab.find(`/items/${ids.kirk}`), to = await dayCol(tab, 2);
+    await tab.drag(card.x, card.y + 30, to.x, to.y, 10);
+    await sleep(2500);
+    const d = await tab.lastDo(), after = await dayOf(ids.kirk), said = await tab.said();
+    await tab.close();
+    return { before, after, sent: d && d.line, refused: d && d.error, refusalShown: !!(d && d.error) && said.includes("refused:"), pass: before === "1" && after === "2" };
+  } };
+
+S.S19 = { what: "carry a card to another day with keys only: Space, Tab to a day, Enter", expect: "the card lands on the day chosen",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await dayOf(ids.kirk);
+    let reached = false;
+    for (let i = 0; i < 30 && !reached; i++) {
+      await tab.key("Tab", "Tab", 9);
+      reached = (await tab.eval("document.activeElement.dataset.key || ''")).endsWith(`/items/${ids.kirk}`);
+    }
+    await tab.key(" ", "Space", 32);
+    let onDay = null;
+    for (let i = 0; i < 30 && onDay !== "cal/days/2"; i++) { await tab.key("Tab", "Tab", 9); onDay = await tab.eval("document.activeElement.dataset.key || ''"); }
+    await tab.enter(); await sleep(2500);
+    const d = await tab.lastDo(), after = await dayOf(ids.kirk), said = await tab.said();
+    await tab.close();
+    return { reached, onDay, before, after, sent: d && d.line, refused: d && d.error, refusalShown: !!(d && d.error) && said.includes("refused:"), pass: reached && after === "2" };
+  } };
+
+S.S20 = { what: "carry a card while another actor moves the trip a week (the day now means another date)", expect: "refused and shown; the card stays on day 1",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const card = await tab.find(`/items/${ids.kirk}`), to = await dayCol(tab, 2);
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: card.x, y: card.y + 30 });
+    await tab.send("Input.dispatchMouseEvent", { type: "mousePressed", x: card.x, y: card.y + 30, button: "left", buttons: 1, clickCount: 1 });
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: card.x + 20, y: card.y + 40, button: "left", buttons: 1 });
+    await tab.eval("document.querySelectorAll('[data-key]').forEach(e => { e.__old = 1; })");
+    await act("other", `look ${ids.trip}; do prop ${ids.trip} start=2026-10-17 end=2026-10-19`);
+    await sleep(2000);
+    const remade = await tab.eval("[...document.querySelectorAll('[data-key]')].filter(e => !e.__old).map(e => e.dataset.key).slice(0, 8)");
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: to.x, y: to.y, button: "left", buttons: 1 });
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: to.x, y: to.y, button: "left", buttons: 0, clickCount: 1 });
+    await sleep(2500);
+    const d = await tab.lastDo(), said = await tab.said(), after = await dayOf(ids.kirk);
+    const stuck = await tab.eval(`(document.querySelector('[data-carry]') || {style: {}}).style.transform || ""`);
+    await tab.close();
+    const refused = d && d.error ? d.error.slice(0, 200) : null;
+    return { remade, stuck, sent: d && d.line, refused, refusalShown: !!refused && said.includes("refused:"), after, pass: !!refused && said.includes("refused:") && after === "1" };
   } };
 
 S.S14 = { what: "Alex's workspace: type in the chat while a background task finishes and its column repaints",
@@ -600,7 +655,7 @@ async function main() {
     if (chrome) chrome.kill();
     deskd.kill();
     await sleep(500);
-    for (const name of Object.keys(S)) for (const ext of ["pickle", "lock"])      // the suite's worlds are scratch
+    if (!process.env.KEEP) for (const name of Object.keys(S)) for (const ext of ["pickle", "lock"])      // the suite's worlds are scratch (KEEP=1 keeps them)
       rmSync(join(NOTATION, "sessions", `${BASE_SESSION}-${name.toLowerCase()}.${ext}`), { force: true });
   }
   out.deskdStderr = deskdErr.slice(-4000);
