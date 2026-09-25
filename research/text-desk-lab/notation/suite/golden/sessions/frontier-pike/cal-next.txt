@@ -1,0 +1,7 @@
+scene cal-next · for golden · world @59
+  cal column
+    items column · 2 of tag:bigsur
+      it a34 [card] · key a34
+        t a34 "Kirk Creek camp at Kirk Creek" [title] · read place=Kirk Creek
+      it a36 [card] · key a36
+        t a36 "McWay Falls overlook at Julia Pfeiffer Burns" [title] · read place=Julia Pfeiffer Burns

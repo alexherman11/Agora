@@ -1,0 +1,8 @@
+scene before · for golden · world @51
+  box column
+    lit column · 1 of kind:task,due<2026-10-03
+      t a08 "Book canoe due 2026-10-02" [body] · key a08
+    anchor column · 1 of prop:anchor=start
+      a a25 [card] · key a25
+        name a25 "tasks due before Fri 3 Oct (2026-10-02)" [title]
+        list a25 column · 0 of kind:task,due<2026-10-02 (empty)

@@ -1,0 +1,4 @@
+scene p-gesture · for golden · world @336
+  root column
+    list · 1 of tag:probe
+      card a122 "Probe bed 6" · read beds=6 · click: do prop a122 beds=9; prop a122 color=red · key a122

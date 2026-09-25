@@ -1,0 +1,23 @@
+scene trip days · for golden · world @64
+  cal row
+    d1 [sheet] column
+      head "Day 1" [heading]
+      items column · 2 of tag:bigsur,prop:tripday=1
+        entry a06 [card] column · key a06
+          what a06 "McWay Falls at sunset"
+          open a06 (absent: not prop:uncertain)
+        entry a10 [card] column · key a10
+          what a10 "Night: Kirk Creek or Cambria"
+          open a10 "open question" [tag]
+    d2 [sheet] column
+      head "Day 2" [heading]
+      items column · 3 of tag:bigsur,prop:tripday=2
+        entry a08 [card] column · key a08
+          what a08 "Ewoldsen hike"
+          open a08 "open question" [tag]
+        entry a13 [card] column · key a13
+          what a13 "Sam joins"
+          open a13 (absent: not prop:uncertain)
+        entry a23 [card] column · key a23
+          what a23 "Bixby Bridge stop"
+          open a23 (absent: not prop:uncertain)

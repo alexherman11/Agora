@@ -1,0 +1,79 @@
+scene editor · for golden · world @128
+  window [window] column
+    bar [titlebar] row
+      name "Editor" [windowname]
+      hint "click any title or paragraph to change it · Enter to send" [meta]
+    docs column · 3 of kind:doc,in:Shared
+      doc a13 [card] column · key a13
+        title a13 "Welcome" [heading] · edit: do retitle a13 title="$value"
+        secs a13 column · 3 of sections:a13
+          sec a13 column · key before-the-first-heading
+            head a13 "(before the first heading) · 13 words" [meta]
+            body a13 "A shared page. This sentence has *strong* words, /slant/ words and `mono` bits." [body] · edit: do rewrite a13 section="(before the first heading)" text="$value"
+          sec a13 column · key what-this-is
+            head a13 "What this is · 25 words" [meta]
+            body a13 "A classic desktop whose every state is text. / - a bullet / - another bullet / - [ ] an unchecked task / - [x] a checked task" [body] · edit: do rewrite a13 section="What this is" text="$value"
+          sec a13 column · key how-to-change-it
+            head a13 "How to change it · 10 words" [meta]
+            body a13 "Edited through the lens. / With "quotes" and a C:\temp path." [body] · edit: do rewrite a13 section="How to change it" text="$value"
+        notes a13 column · 2 of comments:a13
+          note a13 "moss (open) Is 'classic desktop' the right phrase here, or should it say 'ordinary'?" [meta] · key c23
+          note a13 "moss (open) drafted in the fork" [meta] · key c40
+      doc a25 [card] column · key a25
+        title a25 "Welcome" [heading] · edit: do retitle a25 title="$value"
+        secs a25 column · 3 of sections:a25
+          sec a25 column · key before-the-first-heading
+            head a25 "(before the first heading) · 13 words" [meta]
+            body a25 "A shared page. This sentence has *strong* words, /slant/ words and `mono` bits." [body] · edit: do rewrite a25 section="(before the first heading)" text="$value"
+          sec a25 column · key what-this-is
+            head a25 "What this is · 25 words" [meta]
+            body a25 "A classic desktop whose every state is text. / - a bullet / - another bullet / - [ ] an unchecked task / - [x] a checked task" [body] · edit: do rewrite a25 section="What this is" text="$value"
+          sec a25 column · key how-to-change-it
+            head a25 "How to change it · 10 words" [meta]
+            body a25 "Edited through the lens. / With "quotes" and a C:\temp path." [body] · edit: do rewrite a25 section="How to change it" text="$value"
+        notes a25 column · 2 of comments:a25
+          note a25 "moss (open) Is 'classic desktop' the right phrase here, or should it say 'ordinary'?" [meta] · key c23
+          note a25 "moss (open) drafted in the fork" [meta] · key c40
+      doc a39 [card] column · key a39
+        title a39 "Long" [heading] · edit: do retitle a39 title="$value"
+        secs a39 column · 13 of sections:a39
+          sec a39 column · key before-the-first-heading
+            head a39 "(before the first heading) · 13 words" [meta]
+            body a39 "A long document, generated to find where the substrate stops. One word added." [body] · edit: do rewrite a39 section="(before the first heading)" text="$value"
+          sec a39 column · key section-1-the-mudflat-notes
+            head a39 "Section 1: the mudflat notes · 341 words" [meta]
+            body a39 "Moor bank harbour ebb mudflat slack shoal spring harbour channel lantern harbour ebb reed reed ebb rope ebb mudflat reed harbour spring slack rope spring harbour spring spring bank harbour rope harbour mudflat moor drift reed moor mudflat s" (=240 of 2067 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 1: the mudflat notes" text="$value"
+          sec a39 column · key section-2-the-keel-notes
+            head a39 "Section 2: the keel notes · 331 words" [meta]
+            body a39 "Slack mudflat harbour rope lantern keel harbour slack channel heron mudflat tide ebb heron current neap channel neap channel lantern keel heron channel mudflat silt channel rope channel keel mudflat lantern heron moor reed slack bank heron " (=240 of 2000 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 2: the keel notes" text="$value"
+          sec a39 column · key section-3-the-harbour-notes
+            head a39 "Section 3: the harbour notes · 293 words" [meta]
+            body a39 "Shoal rope silt silt bank tide jetty tide silt heron bank drift moor reed shoal bank current slack current tide current current bank slack lantern tide drift keel shoal ebb bank bank spring ebb shoal reed keel harbour. /  / Slack harbour dr" (=240 of 1761 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 3: the harbour notes" text="$value"
+          sec a39 column · key section-4-the-lantern-notes
+            head a39 "Section 4: the lantern notes · 327 words" [meta]
+            body a39 "Ebb harbour keel lantern ebb neap current shoal keel current neap harbour keel current keel drift tide neap ebb tide rope slack silt heron bank keel reed silt moor silt jetty tide drift moor neap rope current current heron shoal neap ebb ch" (=240 of 1954 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 4: the lantern notes" text="$value"
+          sec a39 column · key section-5-the-keel-notes
+            head a39 "Section 5: the keel notes · 338 words" [meta]
+            body a39 "Bank jetty keel current bank jetty keel slack channel harbour shoal heron mudflat channel spring slack keel mudflat bank shoal keel bank shoal spring moor shoal current ebb heron rope jetty neap harbour drift channel keel drift spring curre" (=240 of 2076 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 5: the keel notes" text="$value"
+          sec a39 column · key section-6-the-keel-notes
+            head a39 "Section 6: the keel notes · 366 words" [meta]
+            body a39 "Slack jetty slack lantern bank moor moor drift drift reed keel lantern slack slack keel lantern bank heron harbour tide bank reed rope channel drift heron tide moor keel neap bank tide rope reed spring spring reed rope spring rope jetty sla" (=240 of 2202 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 6: the keel notes" text="$value"
+          sec a39 column · key section-7-the-rope-notes
+            head a39 "Section 7: the rope notes · 305 words" [meta]
+            body a39 "Harbour tide harbour tide neap ebb bank drift drift neap jetty silt neap harbour current shoal spring heron silt jetty moor slack shoal jetty reed silt bank heron keel spring current drift keel harbour neap neap. /  / Neap tide moor neap dr" (=240 of 1858 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 7: the rope notes" text="$value"
+          sec a39 column · key section-8-the-channel-notes
+            head a39 "Section 8: the channel notes · 336 words" [meta]
+            body a39 "Jetty lantern neap ebb ebb neap silt keel jetty lantern moor neap lantern spring drift lantern tide ebb channel reed harbour channel shoal current drift silt ebb tide reed silt moor keel rope jetty spring shoal harbour jetty shoal spring ne" (=240 of 2046 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 8: the channel notes" text="$value"
+          sec a39 column · key section-9-the-lantern-notes
+            head a39 "Section 9: the lantern notes · 320 words" [meta]
+            body a39 "Slack reed shoal channel bank mudflat spring moor lantern reed silt bank heron neap spring current channel ebb jetty shoal current shoal ebb drift channel jetty slack drift current channel reed jetty channel drift channel lantern channel la" (=240 of 1953 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 9: the lantern notes" text="$value"
+          sec a39 column · key section-10-the-silt-notes
+            head a39 "Section 10: the silt notes · 367 words" [meta]
+            body a39 "Mudflat keel jetty mudflat jetty rope mudflat keel rope harbour jetty shoal shoal reed ebb lantern drift moor moor silt silt rope rope tide channel heron moor shoal drift moor moor spring spring rope current slack. /  / Reed jetty moor neap" (=240 of 2242 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 10: the silt notes" text="$value"
+          sec a39 column · key section-11-the-jetty-notes
+            head a39 "Section 11: the jetty notes · 314 words" [meta]
+            body a39 "Rope tide rope heron neap harbour moor moor keel bank keel ebb channel keel shoal spring spring channel spring moor harbour mudflat slack lantern reed spring slack shoal drift rope moor ebb drift current shoal channel rope shoal mudflat ban" (=240 of 1915 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 11: the jetty notes" text="$value"
+          sec a39 column · key section-12-the-lantern-notes
+            head a39 "Section 12: the lantern notes · 338 words" [meta]
+            body a39 "Mudflat moor mudflat channel slack channel shoal silt ebb shoal lantern rope ebb keel jetty tide keel keel ebb harbour lantern channel harbour reed mudflat shoal keel tide current harbour heron mudflat drift mudflat current reed keel bank r" (=240 of 2085 chars printed here; read a39 for all) [body] · edit: do rewrite a39 section="Section 12: the lantern notes" text="$value"
+        notes a39 column · 0 of comments:a39 (empty)

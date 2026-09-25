@@ -1,0 +1,11 @@
+scene plan days · for golden · world @64
+  cal row · 3 of sections:a25
+    day a25 [sheet] column · key before-the-first-heading
+      head a25 "(before the first heading)" [heading]
+      body a25 "Thinking the first weekend, maybe the one after. Kirk Creek if a site is free, else Cambria. Moved to the 17th: Kirk Creek had nothing on the 10th." [body]
+    day a25 [sheet] column · key sat-oct-17
+      head a25 "Sat Oct 17" [heading]
+      body a25 "- McWay Falls at sunset / - Night: Kirk Creek or Cambria (? availability)" [body]
+    day a25 [sheet] column · key sun-oct-18
+      head a25 "Sun Oct 18" [heading]
+      body a25 "- Ewoldsen hike (? trail status) / - Sam joins at Nepenthe, noon / - Bixby Bridge stop / - Cambria dinner?" [body]

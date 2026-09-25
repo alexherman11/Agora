@@ -1,0 +1,3 @@
+scene fri · for golden · world @59
+  box column
+    hits column · 0 of title:Friday (empty)

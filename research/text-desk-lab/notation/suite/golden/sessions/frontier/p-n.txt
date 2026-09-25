@@ -1,0 +1,4 @@
+scene p-n · for golden · world @336
+  root column
+    list · 1 of tag:probe
+      card a122 "n is 7" · key a122

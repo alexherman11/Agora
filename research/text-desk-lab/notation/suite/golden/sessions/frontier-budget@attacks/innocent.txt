@@ -1,0 +1,5 @@
+scene innocent · for golden · world @24
+  x column · 3 of tag:t
+    r a03 "(done) Alpha" · click: run tidy a03 · key a03
+    r a05 "Beta" · click: run tidy a05 · key a05
+    r a23 "Gamma" · click: run tidy a23 · key a23

@@ -1,0 +1,115 @@
+rev 7731e64
+
+bridge · pickle cc62b9b3e4be · 3 lens(es)
+  board.txt · board
+  spacing.txt · spacing
+  spacing-wish.txt · spacing-wish · ERR line 4: a lens cannot say 'position x=clamp(20 + index * spacing,0,440) y=30'. It can 
+desktop · pickle 18a70490a7bc · 0 lens(es)
+frontier-budget · pickle d792704b3b7f · 0 lens(es)
+frontier-budget@attacks · pickle 085f25297b7e · 11 lens(es)
+  due-by-week.txt · due by week
+  innocent.txt · innocent
+  lease.txt · lease
+  members.txt · members
+  mondays.txt · mondays
+  present.txt · present
+  shadow.txt · shadow · ERR line 2: `as a` would shadow the frame `as a` named above this part; choose another fra
+  tabs.txt · tabs
+  title-frame.txt · title frame · ERR line 1: `as title` would shadow a built-in name; choose another frame name
+  who.txt · who
+  year.txt · year · ERR this lens makes more than 1500 scene nodes. Put `clamp N` on the repeat (line 1); the 
+frontier-budget@budget · pickle 8d6101341cc8 · 2 lens(es)
+  split.txt · split
+  split-october.txt · split october
+frontier-jeff-probe · pickle 16854f186c9d · 1 lens(es)
+  beds-lens.txt · beds-lens
+frontier-juniper · pickle b215f964d761 · 3 lens(es)
+  plan-days.txt · plan days
+  trip-calendar.txt · trip calendar
+  trip-days.txt · trip days
+frontier-pike · pickle 864c5005133b · 12 lens(es)
+  before.txt · before
+  cal.txt · cal
+  cal-next.txt · cal-next
+  cal-today.txt · cal-today
+  fri.txt · fri
+  host.txt · host · ERR 2 lenses are titled 'outline' (s18, s26); retitle one so the name means one thing
+  outline.txt · outline · ERR 2 lenses are titled 'outline' (s18, s26); retitle one so the name means one thing
+  pin.txt · pin
+  plan.txt · plan
+  reading.txt · reading
+  reading-embed.txt · reading-embed
+  twice.txt · twice
+frontier-pike@lensdev · pickle 64c9b7c0fefb · 10 lens(es)
+  before.txt · before
+  cal.txt · cal
+  cal-next.txt · cal-next
+  cal-today.txt · cal-today
+  fri.txt · fri
+  host.txt · host · ERR 2 lenses are titled 'outline' (s18, s26); retitle one so the name means one thing
+  outline.txt · outline · ERR 2 lenses are titled 'outline' (s18, s26); retitle one so the name means one thing
+  pin.txt · pin
+  plan.txt · plan
+  twice.txt · twice
+frontier-sable · pickle e0618ee0c028 · 0 lens(es)
+frontier-sable@beds · pickle 1d353125732f · 0 lens(es)
+frontier-sable@beds2 · pickle 2b726d43eba6 · 0 lens(es)
+frontier-sable@drift-a · pickle 9434b6400f46 · 0 lens(es)
+frontier-sable@drift-b · pickle 90443dbc027d · 0 lens(es)
+frontier-sable@runners · pickle 31214d1a1088 · 0 lens(es)
+frontier-tasks · pickle 46bef18c73f9 · 0 lens(es)
+frontier-tasks@books · pickle 6ec70815a15e · 2 lens(es)
+  probe.txt · probe
+  reading-plan.txt · reading plan
+frontier-tasks@course · pickle 61114ca3dadc · 4 lens(es)
+  due-list.txt · due list
+  meetings.txt · meetings
+  probe.txt · probe
+  probe2.txt · probe2 · ERR line 2: no interpretation 'weeks-from'. The list is closed: day-n <date> <n>, days-fro
+frontier-tasks@garden · pickle f5425a7105ba · 1 lens(es)
+  rotation-grid.txt · rotation grid
+frontier-trip · pickle ed121a14b022 · 0 lens(es)
+frontier-trip@D · pickle 35a440e97dec · 1 lens(es)
+  cal-sections.txt · cal sections
+frontier-trip@H · pickle f11485084ea9 · 1 lens(es)
+  cal-trip.txt · cal trip
+frontier-trip@H2 · pickle 56504e6a3f80 · 2 lens(es)
+  cal-trip.txt · cal trip
+  itinerary.txt · itinerary
+frontier-trip@R · pickle 4de22ef0a44a · 2 lens(es)
+  cal-literal.txt · cal literal
+  cal-relative.txt · cal relative
+frontier · pickle 2322a696fb31 · 7 lens(es)
+  p-budget.txt · p-budget
+  p-gesture.txt · p-gesture
+  p-if.txt · p-if · ERR line 3: a lens cannot say 'if $beds'. It can say: column, row, free, carry, role <name
+  p-n.txt · p-n
+  p-only.txt · p-only
+  probe-1c.txt · probe-1c
+  probelens.txt · probelens
+home · pickle f29ab89c7a83 · 0 lens(es)
+home2 · pickle 15dcba3c0df1 · 0 lens(es)
+home3 · pickle a5882502e7da · 0 lens(es)
+lens · pickle ae797a290858 · 4 lens(es)
+  desktop.txt · desktop
+  editor.txt · editor
+  notes.txt · notes
+  together.txt · together
+play2 · pickle f04085531716 · 4 lens(es)
+  desktop.txt · desktop
+  editor.txt · editor
+  notes.txt · notes
+  together.txt · together
+studio · pickle 77eb9927bbeb · 12 lens(es)
+  i-refuse-spread-and-here-is-what-i-would-take-instead.txt · I refuse spread, and here is what I would take instead · ERR line 1: a part is `name : prop, prop`; got "Jeff's defence is good and I used the word
+  one-language-two-files-one-shared-word-and-the-reach-problem-is-already-solved.txt · One language, two files, one shared word - and the reach problem is already solved · ERR line 1: a part is `name : prop, prop`; got "Wren on the missing piece: design-studio/w
+  present-is-deleted-and-a-removed-word-must-be-refused-rather-than-ignored.txt · present is deleted, and a removed word must be refused rather than ignored · ERR line 1: a part is `name : prop, prop`; got 'Done in calm.style, and the parser now REF
+  retiring-present-from-calm-style-i-put-the-duplication-there-myself.txt · Retiring 'present' from calm.style: I put the duplication there myself · ERR line 1: a part is `name : prop, prop`; got "Concrete v0 change. 'present card : title,
+  the-desktop-as-a-lens-is-16-lines-and-the-dock-is-of-tag-lens.txt · The desktop as a lens is 16 lines, and the dock is 'of tag:lens' · ERR line 1: a part is `name : prop, prop`; got "I wrote bar, dock, stage and window frame 
+  the-desktop-lens-appears-in-its-own-dock-and-nothing-was-designed-to-make-that-true.txt · The desktop lens appears in its own dock, and nothing was designed to make that true · ERR line 1: a part is `name : prop, prop`; got "I wrote the subset of the desktop that v0 
+  the-lens-grammar-on-one-page-and-a-fourth-growth-rule.txt · The lens grammar on one page, and a fourth growth rule · ERR line 1: a part is `name : prop, prop`; got "design-studio/wren-12-lens-grammar.md: eve
+  to-iris-a-ratio-to-baseline-now-before-any-native-part-exists.txt · to iris: a ratio to baseline now, before any native part exists · ERR line 1: a part is `name : prop, prop`; got 'Wren. The thing I think most likely to sin
+  to-jeff-my-answers-to-your-eight-concerns-and-the-two-guards-i-trust-more-than-a-closed-vocabulary.txt · to jeff: my answers to your eight concerns, and the two guards I trust more than a closed vocabulary · ERR line 1: a part is `name : prop, prop`; got 'Full argument in wren-11 section 5. On the
+  to-jeff-six-words-for-the-lens-in-the-order-i-would-add-them-each-with-its-refusal.txt · to jeff: six words for the lens, in the order I would add them, each with its refusal · ERR line 1: a part is `name : prop, prop`; got "From writing the desktop as a lens (wren-1
+  to-jeff-the-desktop-as-a-lens-runs-in-13-lines-and-six-things-stop-it-replacing-shell-js.txt · to jeff: the desktop as a lens runs in 13 lines, and six things stop it replacing shell.js · ERR line 1: a part is `name : prop, prop`; got "In worktree lens@wren6: a screen surface, 
+  to-jeff-three-words-and-one-desk-verb-instead-of-spread.txt · to jeff: three words, and one desk verb instead of spread · ERR line 1: a part is `name : prop, prop`; got "1. $me, and 'of in:$me screen'. The blocke

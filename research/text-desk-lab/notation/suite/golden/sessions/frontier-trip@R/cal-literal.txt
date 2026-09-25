@@ -1,0 +1,26 @@
+scene cal literal · for golden · world @48
+  cal row
+    d1 [sheet] column
+      head "Sat Oct 10" [heading]
+      items column · 3 of tag:trip,prop:day=2026-10-10
+        entry a05 [card] column · key a05
+          what a05 "McWay Falls"
+          open a05 (absent: not prop:uncertain)
+        entry a07 [card] column · key a07
+          what a07 "Night on the coast"
+          open a07 (absent: not prop:uncertain)
+        entry a20 [card] column · key a20
+          what a20 "Pfeiffer Beach"
+          open a20 (absent: not prop:uncertain)
+    d2 [sheet] column
+      head "Sun Oct 11" [heading]
+      items column · 3 of tag:trip,prop:day=2026-10-11
+        entry a09 [card] column · key a09
+          what a09 "Ewoldsen hike"
+          open a09 (absent: not prop:uncertain)
+        entry a11 [card] column · key a11
+          what a11 "Lunch with Sam at Nepenthe"
+          open a11 (absent: not prop:uncertain)
+        entry a13 [card] column · key a13
+          what a13 "Bixby Bridge stop"
+          open a13 (absent: not prop:uncertain)

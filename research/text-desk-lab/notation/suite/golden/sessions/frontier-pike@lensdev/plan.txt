@@ -1,0 +1,9 @@
+scene plan · for golden · world @51
+  board [sheet] free
+    days free · 2 of tag:day
+      day a06 [card] at 300,8 300x160 = spills-parent, under a25 · drag: do move a06 to=$x,$y · key a06
+        name a06 "Saturday 4th" [title] · edit: do tag a06 add=$value
+        when a06 "due 2026-10-04" [meta]
+      day a25 [card] at 16,16 300x160 = spills-parent, covers a06, covers a10 · drag: do move a25 to=$x,$y · key a25
+        name a25 "Fri 3 Oct" [title] · edit: do tag a25 add=$value
+        when a25 "due 2026-10-02" [meta]

@@ -1,0 +1,9 @@
+scene reading plan · for golden · world @14
+  plan a03 column · the prop:role=club -> s02 (a03) as club
+    books a03 column as b · 3 of parts:a03,prop:role=book
+      row a05 row · key a05
+        t a05 "Piranesi, 272 pages, finish by meeting 2" · read pages=272 finish=2
+      row a08 row · key a08
+        t a08 "Klara and the Sun, 303 pages, finish by meeting 4" · read pages=303 finish=4
+      row a11 row · key a11
+        t a11 "Middlemarch, 880 pages, finish by meeting 9" · read pages=880 finish=9

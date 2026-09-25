@@ -1,0 +1,15 @@
+scene twice · for golden · world @51
+  box column
+    hits column · 2 of a25,a25
+      hit a25 "Fri 3 Oct" [card] · key a25
+      hit a25 "Fri 3 Oct" [card] · key a25#2
+    tg row · 2 of a25,a06
+      tagrow a25 row · key a25
+        ts a25 row · 2
+          tg1 a25 "plan" [tag] · key plan
+          tg1 a25 "day" [tag] · key day
+      tagrow a06 row · key a06
+        ts a06 row · 3
+          tg1 a06 "plan" [tag] · key plan
+          tg1 a06 "day" [tag] · key day
+          tg1 a06 "weekend" [tag] · key weekend

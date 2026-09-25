@@ -1,0 +1,31 @@
+scene trip calendar · for golden · world @64
+  cal row
+    sat [sheet] column
+      head "Sat Oct 10" [heading]
+      items column · 2 of prop:day=2026-10-10
+        entry a06 [card] column · click: examine a06 · key a06
+          what a06 "McWay Falls at sunset"
+          open a06 (absent: not prop:uncertain)
+          later a06 "move to Sun" [tool] · click: do prop a06 day=2026-10-11
+        entry a10 [card] column · click: examine a10 · key a10
+          what a10 "Night: Kirk Creek or Cambria"
+          open a10 "open question" [tag]
+          later a10 "move to Sun" [tool] · click: do prop a10 day=2026-10-11
+    sun [sheet] column
+      head "Sun Oct 11" [heading]
+      items column · 3 of prop:day=2026-10-11
+        entry a08 [card] column · click: examine a08 · key a08
+          what a08 "Ewoldsen hike"
+          open a08 "open question" [tag]
+          later a08 "move to Sun" [tool] · click: do prop a08 day=2026-10-11
+        entry a13 [card] column · click: examine a13 · key a13
+          what a13 "Sam joins"
+          open a13 (absent: not prop:uncertain)
+          later a13 "move to Sun" [tool] · click: do prop a13 day=2026-10-11
+        entry a23 [card] column · click: examine a23 · key a23
+          what a23 "Bixby Bridge stop"
+          open a23 (absent: not prop:uncertain)
+          later a23 "move to Sun" [tool] · click: do prop a23 day=2026-10-11
+    loose [sheet] column
+      head "not on a shown day" [heading]
+      items column · 0 of prop:day,-prop:day=2026-10-10,-prop:day=2026-10-11 (empty)

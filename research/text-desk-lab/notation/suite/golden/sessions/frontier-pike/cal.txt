@@ -1,0 +1,16 @@
+scene cal · for golden · world @59
+  cal a32 row · the tag:trip -> s31 (a32) as trip
+    days a32 row · days = days-from(2026-10-10, 2026-10-12) = 3 rows · read trip s31 start=2026-10-10 end=2026-10-12 · 3
+      day a32 [sheet] column · key 1
+        h a32 "Day 1 · Sat 2026-10-10" [heading] · wd = weekday(2026-10-10) = Sat · read it date=2026-10-10 n=1
+        items a32 column · 1 of parts:a32,prop:tripday=1
+          item a34 [card] · key a34
+            t a34 "Kirk Creek camp at Kirk Creek" [title] · read place=Kirk Creek · edit: do retitle a34 title="$value"
+      day a32 [sheet] column · key 2
+        h a32 "Day 2 · Sun 2026-10-11" [heading] · wd = weekday(2026-10-11) = Sun · read it date=2026-10-11 n=2
+        items a32 column · 1 of parts:a32,prop:tripday=2
+          item a36 [card] · key a36
+            t a36 "McWay Falls overlook at Julia Pfeiffer Burns" [title] · read place=Julia Pfeiffer Burns · edit: do retitle a36 title="$value"
+      day a32 [sheet] column · key 3
+        h a32 "Day 3 · Mon 2026-10-12" [heading] · wd = weekday(2026-10-12) = Mon · read it date=2026-10-12 n=3
+        items a32 column · 0 of parts:a32,prop:tripday=3 (empty)

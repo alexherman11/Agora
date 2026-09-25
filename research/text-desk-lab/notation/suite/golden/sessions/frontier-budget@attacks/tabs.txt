@@ -1,0 +1,6 @@
+scene tabs · for golden · world @24
+  x column
+    ta "Show A" [tool] · click: do prop tabs tab=a
+    tb "Show B" [tool] · click: do prop tabs tab=b
+    pa (absent: not tag:lens,prop:tab=a)
+    pb "Panel B: the budget"

@@ -1,0 +1,14 @@
+scene present · for golden · world @24
+  x column · days = days-from(2026-10-14, 2026-10-17) = 4 rows · 4
+    d row · key 1
+      day "2026-10-14:" · read it date=2026-10-14
+      who row · 0 of prop:role=member,prop:to>2026-10-14 (empty)
+    d row · key 2
+      day "2026-10-15:" · read it date=2026-10-15
+      who row · 0 of prop:role=member,prop:to>2026-10-15 (empty)
+    d row · key 3
+      day "2026-10-16:" · read it date=2026-10-16
+      who row · 0 of prop:role=member,prop:to>2026-10-16 (empty)
+    d row · key 4
+      day "2026-10-17:" · read it date=2026-10-17
+      who row · 0 of prop:role=member,prop:to>2026-10-17 (empty)

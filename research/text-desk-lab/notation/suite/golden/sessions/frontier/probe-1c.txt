@@ -1,0 +1,2 @@
+scene probe-1c · for golden · world @336
+  root "hi" column · click: run tidy $item

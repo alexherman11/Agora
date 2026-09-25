@@ -1,0 +1,19 @@
+scene split october · for golden · world @36
+  split a03 column · the prop:role=house -> s02 (a03) as h · captured month=2026-10-01 (now 2026-11-01: differs)
+    head a03 "Month from 2026-10-01" [heading] · read h month=2026-10-01 (captured)
+    bills a03 column as b · 4 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2550" · read amount=2550
+      bill a17 row · key a17
+        t a17 "Utilities 180" · read amount=180
+      bill a20 row · key a20
+        t a20 "Internet 60" · read amount=60
+      bill a27 row · key a27
+        t a27 "Cleaning 90" · read amount=90
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 1440" · read owe=1440
+      person a08 row · key a08
+        t a08 "Ben owes 1440" · read owe=1440
+      person a11 row · key a11
+        t a11 "Casey owes " (no owe)

@@ -1,0 +1,11 @@
+scene cal-today · for golden · world @51
+  cal column
+    items column · 2 of tag:bigsur
+      it a34 [card] · key a34
+        t a34 "Kirk Creek camp" [title]
+        trip a34 column · 1 of links:a34,tag:trip
+          tf a32 "part of Big Sur trip" [meta] · key a32
+      it a36 [card] · key a36
+        t a36 "McWay Falls" [title]
+        trip a36 column · 1 of links:a36,tag:trip
+          tf a32 "part of Big Sur trip" [meta] · key a32

@@ -1,0 +1,5 @@
+scene members · for golden · world @24
+  x column · 3 of tag:t
+    r a03 "(done) Alpha" · key a03
+    r a05 "Beta" · key a05
+    r a23 "Gamma" · key a23

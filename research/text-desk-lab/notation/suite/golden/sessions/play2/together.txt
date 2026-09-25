@@ -1,0 +1,79 @@
+scene together · for golden · world @128
+  window [window] column
+    bar [titlebar] row
+      name "Together" [windowname]
+    people column · 13 of actors
+      person [card.plain] row · key rook2
+        who "rook2" [title]
+        hands "last edit a11 at 2026-09-18T15:39:28" [body]
+        eyes "read to 127 · 1 behind" [meta]
+      person [card.plain] row · key rook
+        who "rook" [title]
+        hands "last edit a09 at 2026-09-18T15:37:26" [body]
+        eyes "read to 127 · 1 behind" [meta]
+      person [card.plain] row · key bob
+        who "bob" [title]
+        hands "last move a21 at 2026-09-18T15:28:20" [body]
+        eyes "read to 125 · 3 behind" [meta]
+      person [card.plain] row · key jeff
+        who "jeff" [title]
+        hands "last undo e123 at 2026-09-18T15:26:35" [body]
+        eyes "read to 126 · 2 behind" [meta]
+      person [card.plain] row · key alex
+        who "alex" [title]
+        hands "last edit a29 at 2026-09-18T15:23:38" [body]
+        eyes "read to 116 · 12 behind" [meta]
+      person [card.plain] row · key flint
+        who "flint" [title]
+        hands "last tag a11 at 2026-09-18T14:42:58" [body]
+        eyes "read to 105 · 23 behind" [meta]
+      person [card.plain] row · key moss
+        who "moss" [title]
+        hands "last edit a13 at 2026-09-18T14:41:56" [body]
+        eyes "read to 126 · 2 behind" [meta]
+      person [card.plain] row · key lark
+        who "lark" [title]
+        hands "last edit a17 at 2026-09-18T14:41:34" [body]
+        eyes "read to 105 · 23 behind" [meta]
+      person [card.plain] row · key larktwo
+        who "larktwo" [title]
+        hands "last create f03 at 2026-09-18T14:41:05" [body]
+        eyes "read to 73 · 55 behind" [meta]
+      person [card.plain] row · key wren
+        who "wren" [title]
+        hands "last edit a13 at 2026-09-18" [body]
+        eyes "read to 105 · 23 behind" [meta]
+      person [card.plain] row · key iris
+        who "iris" [title]
+        hands "last   at " [body]
+        eyes "read to 103 · 25 behind" [meta]
+      person [card.plain] row · key rookwatch
+        who "rookwatch" [title]
+        hands "last   at " [body]
+        eyes "read to 57 · 71 behind" [meta]
+      person [card.plain] row · key astra-liaison
+        who "astra-liaison" [title]
+        hands "last   at " [body]
+        eyes "read to 117 · 11 behind" [meta]
+    away column · 0 of worktrees (empty)
+    recent column · 20 of events
+      ev "e128 edit a11 by rook2 at 2026-09-18T15:39:28" [source] · key e128
+      ev "e127 edit a09 by rook at 2026-09-18T15:37:26" [source] · key e127
+      ev "e126 move a21 by bob at 2026-09-18T15:28:20" [source] · key e126
+      ev "e125 move a21 by bob at 2026-09-18T15:27:54" [source] · key e125
+      ev "e124 undo e123 by jeff at 2026-09-18T15:26:35" [source] · key e124
+      ev "e123 create f03 by jeff at 2026-09-18T15:26:27" [source] · key e123
+      ev "e122 create f03 by jeff at 2026-09-18T15:26:27" [source] · key e122
+      ev "e121 undo e120 by jeff at 2026-09-18T15:25:53" [source] · key e121
+      ev "e120 tag a29 by jeff at 2026-09-18T15:25:53" [source] · key e120
+      ev "e119 undo e118 by jeff at 2026-09-18T15:25:38" [source] · key e119
+      ev "e118 edit a60 by jeff at 2026-09-18T15:25:38" [source] · key e118
+      ev "e117 edit a29 by alex at 2026-09-18T15:23:38" [source] · key e117
+      ev "e116 edit a29 by bob at 2026-09-18T15:23:37" [source] · key e116
+      ev "e115 create f03 by jeff at 2026-09-18T15:22:57" [source] · key e115
+      ev "e114 edit a13 by alex at 2026-09-18T15:06:22" [source] · key e114
+      ev "e113 edit a13 by alex at 2026-09-18T15:05:27" [source] · key e113
+      ev "e112 create f03 by jeff at 2026-09-18T15:04:15" [source] · key e112
+      ev "e111 create f03 by jeff at 2026-09-18T15:04:15" [source] · key e111
+      ev "e110 undo e109 by jeff at 2026-09-18T15:03:12" [source] · key e110
+      ev "e109 edit a39 by jeff at 2026-09-18T15:03:12" [source] · key e109

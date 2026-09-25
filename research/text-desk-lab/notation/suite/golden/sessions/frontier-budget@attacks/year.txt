@@ -1,0 +1,1 @@
+ERR this lens makes more than 1500 scene nodes. Put `clamp N` on the repeat (line 1); the text will say how many are left

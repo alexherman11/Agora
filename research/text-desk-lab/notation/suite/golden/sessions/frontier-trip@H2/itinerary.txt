@@ -1,0 +1,27 @@
+scene itinerary · for golden · world @37
+  itin a03 column · the prop:role=trip -> s02 (a03) as trip
+    rows a03 column as stop · 6 of parts:a03
+      row a05 row · date = day-n(2026-10-10, 1) = 2026-10-10 · read trip s02 start=2026-10-10; stop s04 tripday=1 · key a05
+        d a05 "2026-10-10"
+        t a05 "McWay Falls"
+        u a05 (absent: not prop:uncertain)
+      row a08 row · date = day-n(2026-10-10, 1) = 2026-10-10 · read trip s02 start=2026-10-10; stop s07 tripday=1 · key a08
+        d a08 "2026-10-10"
+        t a08 "Night on the coast"
+        u a08 (absent: not prop:uncertain)
+      row a11 row · date = day-n(2026-10-10, 2) = 2026-10-11 · read trip s02 start=2026-10-10; stop s10 tripday=2 · key a11
+        d a11 "2026-10-11"
+        t a11 "Ewoldsen hike"
+        u a11 (absent: not prop:uncertain)
+      row a14 row · date = day-n(2026-10-10, 2) = 2026-10-11 · read trip s02 start=2026-10-10; stop s13 tripday=2 · key a14
+        d a14 "2026-10-11"
+        t a14 "Lunch with Sam at Nepenthe"
+        u a14 (absent: not prop:uncertain)
+      row a17 row · date = day-n(2026-10-10, 2) = 2026-10-11 · read trip s02 start=2026-10-10; stop s16 tripday=2 · key a17
+        d a17 "2026-10-11"
+        t a17 "Bixby Bridge stop"
+        u a17 (absent: not prop:uncertain)
+      row a24 row · date = day-n(2026-10-10, 1) = 2026-10-10 · read trip s02 start=2026-10-10; stop s23 tripday=1 · key a24
+        d a24 "2026-10-10"
+        t a24 "Pfeiffer Beach"
+        u a24 (absent: not prop:uncertain)

@@ -1,0 +1,4 @@
+scene beds-lens · for golden · world @4
+  root column as thing · 2 of kind:note
+    card a03 "Probe has 6 beds" · read beds=6 · click: do prop a03 beds=9 · key a03
+    card a05 "beds-lens has  beds" (no beds) · click: do prop a05 beds=9 · key a05

@@ -1,0 +1,6 @@
+scene pin · for golden · world @51
+  box column
+    hits column · 2 of s03,a36
+      hit a25 "Fri 3 Oct day " [card] (no tripday) · key a25
+      hit a36 "McWay Falls day 2" [card] · read tripday=2 · key a36
+    none column · 0 of title:Nowhere (empty)

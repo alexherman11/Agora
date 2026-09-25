@@ -1,0 +1,9 @@
+scene due list · for golden · world @20
+  list a03 column · the prop:role=term -> s02 (a03) as term
+    rows a03 column as a · 3 of parts:a03,prop:role=assignment
+      row a05 row · dd = day-n(2027-03-29, 17) = 2027-04-14 · wd = weekday(2027-04-14) = Wed · read term s02 start=2027-03-29; a s04 off=17 · key a05
+        t a05 "A1 parser, teaching week 3, due Wed 2027-04-14" · read week=3
+      row a08 row · dd = day-n(2027-03-29, 45) = 2027-05-12 · wd = weekday(2027-05-12) = Wed · read term s02 start=2027-03-29; a s07 off=45 · key a08
+        t a08 "A2 interpreter, teaching week 7, due Wed 2027-05-12" · read week=7
+      row a11 row · dd = day-n(2027-03-29, 66) = 2027-06-02 · wd = weekday(2027-06-02) = Wed · read term s02 start=2027-03-29; a s10 off=66 · key a11
+        t a11 "A3 type checker, teaching week 9, due Wed 2027-06-02" · read week=9

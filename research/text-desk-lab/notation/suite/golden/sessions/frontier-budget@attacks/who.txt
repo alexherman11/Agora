@@ -1,0 +1,4 @@
+scene who · for golden · world @24
+  x column · 2 of actors
+    r "juniper read to 24, behind 0" · key juniper
+    r "ben read to 21, behind 3" · key ben

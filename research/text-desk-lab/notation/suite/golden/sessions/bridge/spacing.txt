@@ -1,0 +1,17 @@
+scene spacing · for golden · world @52
+  window [window] column
+    bar [titlebar] row
+      name "spacing · 4 cards" [windowname] · 4 of tag:spacing-demo
+        none a33 column · key a33
+        none a35 column · key a35
+        none a37 column · key a37
+        none a41 column · key a41
+    cards free · 4 of tag:spacing-demo
+      card a33 [card] column at 20,30 294x160 (spread, not its place in the world) · key a33
+        title a33 "Spread one" [title]
+      card a35 [card] column at 230,60 294x160 (spread, not its place in the world) · key a35
+        title a35 "Spread two" [title]
+      card a37 [card] column at 440,90 294x160 (spread, not its place in the world) · key a37
+        title a37 "Spread three" [title]
+      card a41 [card] column at 440,120 294x160 (spread, not its place in the world) · key a41
+        title a41 "Spread four, added later" [title]
