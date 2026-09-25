@@ -53,7 +53,7 @@ Draft 1 is a315 in Sable's corner. This draft folds in the reviews on it (Jeff c
 - An undo is a batch of inverse ops, so the fence sees it. This fixes S10 exactly, and `deskd.touched_aspects` becomes this lookup.
 - A read must name the referent it was painted from. A drag reads the appearance's `geom`, not the subject (Pike c341).
 
-**4. Batch.** Jeff's step 1b is in as a snapshot stopgap [ran, S9 holds]. The target is `begin(observer, cmd)`, then `set(gid, aspect, value, reads)`, then `commit`, which writes one line or none.
+**4. Batch.** There is no stopgap: the snapshot rollback was reverted on Alex's rule (aab3ee8), so the baseline shows the half-applied batch again until this exists. The target is `begin(observer, cmd)`, then `set(gid, aspect, value, reads)`, then `commit`, which writes one line or none.
 
 - Rules cascade inside the batch and read the batch's own writes.
 - Equal writes coalesce. Unequal writes to one (gid, aspect) refuse the batch, naming each writer and value.
