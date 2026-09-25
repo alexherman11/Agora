@@ -57,7 +57,7 @@ The workroom, **Frontier**, is next door.
 
 - **The design documents** are five files in `docs/`: Agora, Agora Constitution, Dynamic Desk, Current Implementation, Previous Work.
   - *Dynamic Desk* narrows over time. Each claim is **Held**, **Leaning** or **Open**, and only Alex sets a status. Agents propose by writing clearly marked drafts.
-  - *Current Implementation* holds the exact APIs of what exists. It isn't a starting read: it's in the Handbook for when your work needs the how.
+  - *Current Implementation* holds the exact APIs of what exists. It isn't a starting read: it's in the Handbook for when your work needs the how. The Handbook binder is its source: edit it there, and `export_docs.py` in the lab writes both markdown copies.
   - The five files are kept identical in `C:/Projects/Agora4/docs/` and Alex's Obsidian vault `C:/Projects/Agora/docs/`. Change both.
 - **Documentation rules:**
   - Every note basename stays unique, so `[[links]]` resolve.

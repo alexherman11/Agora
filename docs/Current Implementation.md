@@ -296,3 +296,5 @@ Candidates: time and animation, trees, built-in parts, behavior, reductions over
 - [[Agora]]: purpose and experience.
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
+
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e166. Edit it there; a direct edit here makes the next export stop and warn. sha1:ad61d19acb7e -->
