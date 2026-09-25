@@ -150,6 +150,8 @@ class Handler(SimpleHTTPRequestHandler):
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 try:
                     sc, text = scene.scene_for(desk, q.get("lens", ""))
+                    if q.get("view") == "painter":      # Pike a494: key, paint, acts, fence, kids; the root keeps its def
+                        sc = dict(scene.painter_view(sc), **{"def": sc.get("def")})
                     out = {"scene": sc, "text": text, "events_total": len(desk.world.events)}
                 except scene.LensRefusal as e:
                     out = {"refused": str(e), "events_total": len(desk.world.events)}
@@ -202,6 +204,56 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"text": None, "error": f"refused: lens {d.get('lens')} changed since this was painted "
                                    f"(you saw revision {d.get('rev')}, it is now {cur['rev'] if cur else 'gone'}); the gesture may no longer mean what it said. "
                                    f"Nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
+            # Pike a361/c368: a drop carries the thing in hand and the receiver it lands on; both are fenced first, in the
+            # receiver's words (Pike a494: the person dropped on a day, so a stale trip is told as the day's), then $carried fills
+            car, rcv = ob.get("carried") or {}, ob.get("receiver") or {}
+            if car.get("item") in desk.world.nodes and isinstance(car.get("rev"), int):
+                cn = desk.world.nodes[car["item"]]
+                now_c, cnames = cn["rev"], {car["item"]} | ({cn["subject"]} if cn.get("subject") else set())
+                cf = set()
+                for entry in (car.get("reads") or []):
+                    sid, _r, fl = (list(entry) + [None, None])[:3]
+                    if sid in cnames and fl:
+                        cf |= set(fl)
+                if now_c != car["rev"] and not (cf and not touched_aspects(desk.world, cnames, car["rev"], now_c, cf)):
+                    return self._json({"text": None, "error": f"refused: the carried thing {car['item']} changed while it was in the air "
+                                       f"(you picked up revision {car['rev']}, it is now {now_c}); nothing was done. The view will repaint.",
+                                       "events_total": len(desk.world.events), "line": line})
+                desk.seen[car["item"]] = now_c          # judged as picked up: the drop's line may name it
+                idx = getattr(desk, "_seen_idx", None)
+                if idx is None:
+                    idx = desk._seen_idx = {}
+                idx[(sess.actor, car["item"])] = len(desk.world.events)
+            if rcv and rcv.get("item") in desk.world.nodes and isinstance(rcv.get("rev"), int):
+                rn = desk.world.nodes[rcv["item"]]
+                now_r, rnames = rn["rev"], {rcv["item"]} | ({rn["subject"]} if rn.get("subject") else set())
+                rf = set()
+                for entry in (rcv.get("reads") or []):
+                    sid, _r, fl = (list(entry) + [None, None])[:3]
+                    if sid in rnames and fl:
+                        rf |= set(fl)
+                if now_r != rcv["rev"] and not (rf and not touched_aspects(desk.world, rnames, rcv["rev"], now_r, rf)):
+                    return self._json({"text": None, "error": f"refused: the place this was dropped on no longer means what it did: {rcv['item']} "
+                                       f"(you saw revision {rcv['rev']}, it is now {now_r}); nothing was done. The view will repaint.",
+                                       "events_total": len(desk.world.events), "line": line})
+            for entry in (rcv.get("reads") or []):
+                sid, rev, fields = (list(entry) + [None, None])[:3]
+                if sid == "select":
+                    if not same_answer(desk, rev, fields)[0]:
+                        return self._json({"text": None, "error": f"refused: the place this was dropped on is no longer under what it was painted under "
+                                           f"(`{rev}` answers differently now); nothing was done. The view will repaint.",
+                                           "events_total": len(desk.world.events), "line": line})
+                    continue
+                cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
+                if cur is not None and cur["rev"] != rev and fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields):
+                    continue
+                if cur is None or cur["rev"] != rev:
+                    return self._json({"text": None, "error": f"refused: the place this was dropped on no longer means what it did: {sid} "
+                                       f"(you saw revision {rev}, it is now {cur['rev'] if cur else 'gone'}); nothing was done. The view will repaint.",
+                                       "events_total": len(desk.world.events), "line": line})
+            if rcv.get("defpart") and not same_part(desk, rcv.get("defpart")):
+                return self._json({"text": None, "error": "refused: the part this was dropped on changed in the lens since it was painted; "
+                                   "nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
             if ob.get("item") in desk.world.nodes and isinstance(ob.get("rev"), int):
                 # Astra: a gesture acts on the generation its maker SAW. The painter used to prefix `look item;`, which
                 # turned stale pixels into fresh permission. Now the act carries what was observed and the fence judges that.
@@ -255,38 +307,6 @@ class Handler(SimpleHTTPRequestHandler):
                 if idx is None:
                     idx = desk._seen_idx = {}
                 idx[(sess.actor, ob["item"])] = int(ob.get("at", 0))
-            # Pike a361/c368: a drop carries the thing in hand and the receiver it lands on; both are fenced, then $carried fills
-            car, rcv = ob.get("carried") or {}, ob.get("receiver") or {}
-            if car.get("item") in desk.world.nodes and isinstance(car.get("rev"), int):
-                cn = desk.world.nodes[car["item"]]
-                now_c, cnames = cn["rev"], {car["item"]} | ({cn["subject"]} if cn.get("subject") else set())
-                cf = set()
-                for entry in (car.get("reads") or []):
-                    sid, _r, fl = (list(entry) + [None, None])[:3]
-                    if sid in cnames and fl:
-                        cf |= set(fl)
-                if now_c != car["rev"] and not (cf and not touched_aspects(desk.world, cnames, car["rev"], now_c, cf)):
-                    return self._json({"text": None, "error": f"refused: the carried thing {car['item']} changed while it was in the air "
-                                       f"(you picked up revision {car['rev']}, it is now {now_c}); nothing was done. The view will repaint.",
-                                       "events_total": len(desk.world.events), "line": line})
-            for entry in (rcv.get("reads") or []):
-                sid, rev, fields = (list(entry) + [None, None])[:3]
-                if sid == "select":
-                    if not same_answer(desk, rev, fields)[0]:
-                        return self._json({"text": None, "error": f"refused: the place this was dropped on is no longer under what it was painted under "
-                                           f"(`{rev}` answers differently now); nothing was done. The view will repaint.",
-                                           "events_total": len(desk.world.events), "line": line})
-                    continue
-                cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
-                if cur is not None and cur["rev"] != rev and fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields):
-                    continue
-                if cur is None or cur["rev"] != rev:
-                    return self._json({"text": None, "error": f"refused: the place this was dropped on no longer means what it did: {sid} "
-                                       f"(you saw revision {rev}, it is now {cur['rev'] if cur else 'gone'}); nothing was done. The view will repaint.",
-                                       "events_total": len(desk.world.events), "line": line})
-            if rcv.get("defpart") and not same_part(desk, rcv.get("defpart")):
-                return self._json({"text": None, "error": "refused: the part this was dropped on changed in the lens since it was painted; "
-                                   "nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
             if car.get("item"):
                 line = line.replace("$carried", car["item"])
             if line.lower().split(" ")[0] == "worktree":

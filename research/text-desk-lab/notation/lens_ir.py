@@ -186,6 +186,16 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         frames = dict(ctx.get("_frames") or {})
         ctx["_frames"] = frames
         track = {"frames": set(), "reads": {}, "missing": set(), "bad": set()}
+
+        def frame_reads():
+            """This part's reads of frame fields so far, as fence entries: what its lets and bind were built from."""
+            fl = {}
+            for k in track["reads"]:
+                fr, _, fld = k.partition(".")
+                fid, a = frames.get(fr, {}).get("id"), S._aspect_of_field(fld)
+                if fid and a and S._rev_of(w, fid) is not None:
+                    fl.setdefault(fid, set()).add(a)
+            return [[i, S._rev_of(w, i), sorted(a)] for i, a in fl.items()]
         # --- bind one
         the_state = "live"
         b = node["bind"]
@@ -363,13 +373,14 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                                         "clamp": None, "acts": [], "kids": []})
             else:
                 rows_over = ctx.get("_" + b["over"], [])
+                dcb = cb + frame_reads()
                 for k, v in enumerate(rows_over):
                     if isinstance(v, dict):
                         ictx = S._inst(ctx, node["ast"], dict(ctx, it=str(v.get("date", v.get("n", ""))), count=len(rows_over)))
                         ictx["_frames"] = dict(ictx["_frames"], it=v)
-                        out["kids"].append(make(each, ictx, f"{key}/{S._slug(str(v.get('n', k)))}", em["layout"], chain, cb))
+                        out["kids"].append(make(each, ictx, f"{key}/{S._slug(str(v.get('n', k)))}", em["layout"], chain, dcb))
                     else:
-                        out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(ctx, it=v, count=len(rows_over))), f"{key}/{S._slug(str(v))}", em["layout"], chain, cb))
+                        out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(ctx, it=v, count=len(rows_over))), f"{key}/{S._slug(str(v))}", em["layout"], chain, dcb))
             seen_keys = {}
             for kid in out["kids"]:
                 c = seen_keys.get(kid["key"], 0) + 1
