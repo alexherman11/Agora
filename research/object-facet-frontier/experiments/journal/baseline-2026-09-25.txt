@@ -1,0 +1,92 @@
+S1  rebuild the desk from what was recorded   [breaks]
+  story:    Alex keeps groceries and a dentist task; a rule tags done tasks; the agent marks the task done; one append is undone. Can the desk be rebuilt from anything but the pickle?
+  observed: export replayed: 0 line(s) refused, 0 fingerprint line(s) differ
+  observed: command lines replayed: 0 line(s) differ, same ids: True
+  observed: events rerun as verbs: 3 failed (e4 edit: 'edit'; e6 edit: 'edit'; e7 undo: no event e6), 6 line(s) differ: - note 'Groceries' tags=[] due=None text='milk\neggs\nbread' props=[] comments=[]; - rule prop:status=done tag {'add': 'done'}; - script morning = look; - clock 2026-09-25
+  observed: events carrying an after-value: 0 of 9; rules, scripts and clock made 0 events
+  observed: the rule's tag is signed: e9 tag by jeff via 'rule r1' (the rule is alex's; jeff only set a status)
+  journal:  every batch carries its ops' before and after; replay assigns values and runs nothing, so the three routes collapse into one and definitions (rule, script, clock) are rows like any other
+
+S2  a crash after the desk said ok   [breaks]
+  story:    Alex types five lines into the CLI; the process dies after the desk printed ok twice. Then a session with work in it, the same crash. Then the save itself is cut short.
+  observed: run 1: exit 9, 2 ok printed, 0 thing(s) on disk afterwards (the CLI writes the pickle once, at the end)
+  observed: the lock was left behind: the next CLI run on that session waits up to 60 s for it
+  observed: run 3: exit 9, 2 ok printed, the disk still holds only ['Kept']
+  observed: the half-written pickle does not load (UnpicklingError): the whole session is gone, not just the last turn; no temp-file-and-rename in explore.py, deskd.py
+  journal:  a batch is one appended line, fsynced before the receipt prints (measured 0.86 ms median); an incomplete last line is an unacknowledged batch and is dropped, everything before it stands; the pickle becomes a cache stamped with an offset
+
+S3  a long-lived fork comes home   [breaks]
+  story:    Alex forks the desk to plan a trip: a new note, a line in the plan, a currency on the budget, a new title. At home the agent adds Flights (the id Hotels has in the fork), sets the budget total and retitles the plan too.
+  observed: merge 1: refused: merge of trip stopped at command 4 of 4; nothing was applied / alex: do retitle a03 title="Lisbon trip"   a03 changed here since the fork (e5 edit by jeff); 0 event(s) applied, so the clean changes waited on the one conflict
+  observed: merge 2 (after undo in the fork): ok merged trip: 3 command(s) replayed as e6..e8, each signed by who made it; ids renamed on the way in: s06→s08 a07→a09
+  observed: Hotels is a07 there and a09 here; Flights took a07; the plan's text now reads 'day 1\nday 2: see a09 for where we sleep'
+  observed: merge 3: ok merged trip: 1 command(s) replayed as e9..e9, each signed by who made it; Hotels here reads 'Alfama, two nights'
+  observed: budget props here: [('currency', 'EUR'), ('total', '900')] (prop:currency and prop:total are different aspects)
+  observed: read, not run: merge rewrites the fork's pickle (merged_n, mapping) without taking the fork's lock, and deskd is a ThreadingHTTPServer; a fork turn that loaded before a merge and saves after it drops merged_n, and the next merge replays merged commands
+  journal:  merge by ops: each (thing, aspect) op is clean, agreed or held; clean ones land now, a held title waits for take/keep/set; ids are global (time + random) with a short alias per world, printed '(a07 there, a09 here)', so prose and journal never need rewriting
+
+S4  one person, two windows   [half]
+  story:    Alex has the desk open on the laptop and the phone. The phone retitles the grocery list; the laptop, still showing the old title, retitles it too, then adds a line.
+  observed: phone: ok retitle a03 title='Groceries (Sat)'  [e2]
+  observed: laptop title: ERR stale: a03 changed since you last saw it (e2 edit by alex); look at it again before acting
+  observed: laptop append: ok append a03 line=bread  [e3]
+  observed: the refused title 'Shopping' is nowhere in the world or its events
+  journal:  the fence refuses on the same aspect and admits the other, as it should; the journal adds a refusal line (proposed rows, reads, why, who) so the laptop's 'Shopping' is recoverable instead of living only in a printed message
+
+S5  undo meets somebody else's unrelated change   [breaks]
+  story:    Alex colours his essay green and renames it; the background agent appends a line to its text; Alex takes back the colour, then the name.
+  observed: agent: ok append a03 line='agent: two sources found'  [e4]
+  observed: undo colour: ERR e2 is not the latest change to a03; e4 came after it. undo that first, or act on the current state   (after the header: !! since your last look: e4 edit a03 by jeff)
+  observed: undo name: ERR e3 is not the latest change to a03; e4 came after it. undo that first, or act on the current state
+  observed: bare undo: ERR e3 is not the latest change to a03; e4 came after it. undo that first, or act on the current state
+  journal:  undo is an inverse op per (thing, aspect), allowed while that aspect still holds the op's after; the agent's text line does not stand in the way of props or title
+
+S6  definitions are not in the history   [breaks]
+  story:    Alex writes a rule, a morning script and sets the clock, then says undo. Later he edits the morning script in a fork while the agent edits the same script at home.
+  observed: rule + script + clock made 0 event(s)
+  observed: undo after them: ok e2: reverted e1, which was: create f01 kind=note title=Inbox  (made 11:56) (Inbox was taken back instead)
+  observed: agent at home: ok script morning = look Inbox
+  observed: merge: ok merged defs: 1 command(s) replayed as no events, each signed by who made it; the script is now 'find tag:urgent'; the agent's version is gone and nothing said so
+  journal:  a definition is a referent with a code aspect: defining it is an op (undoable, attributed, fenced), and the two script edits are one held conflict on (morning, code)
+
+S7  what the pickle keeps that no record carries   [hidden]
+  story:    The same home desk. Which parts of the saved state change with no event at all, and does history stay as written?
+  observed: look: _cmd_no
+  observed: rule: _cmd_no, _rule_seq, rules
+  observed: script: _cmd_no, scripts
+  observed: clock: _cmd_no, today, world.today
+  observed: set: _cmd_no, vars
+  observed: undo rewrote old event(s) ['e10'] in place (the `undone` flag); merge does the same with `merged`
+  journal:  world facts and definitions are journal rows; per-viewer state (seen, open, windows, handles) is named viewer state on Pike's side, never mixed into one blob; the journal is append-only, and undone-ness is derived from later lines
+
+S8  Alex writes while a background task writes   [breaks]
+  story:    Alex's four-region workspace: he retitles his task and rewrites the essay's Intro while a background agent appends sources under Notes and marks the task running.
+  observed: agent appends: 3 of 3 landed
+  observed: task title (agent wrote status): ok retitle a05 title='Research sources'  [e7]   (after the header: !! since your last look: e3 edit a03 by jeff; e4 edit a03 by jeff; e5 edit a03 by jeff; e6 prop a05 by jeff)
+  observed: Intro rewrite (agent appended under Notes): ERR stale: a03 changed since you last saw it (e3 edit by jeff); look at it again before acting
+  observed: Alex's typed paragraph is nowhere after that
+  observed: after looking again, the rewrite: ok rewrite a03 section=Intro text='A new intro, typed while the agent worked.'  [e8]
+  observed: then the agent's next append: ERR stale: a03 changed since you last saw it (e8 edit by alex); look at it again before acting   (after the header: !! since your last look: e7 edit a05 by alex; e8 edit a03 by alex)
+  journal:  text is one aspect today; with anchored hunks (the qc experiment: 42 intact, 0 silent drifts) an Intro rewrite and a Notes append touch different anchors and both land; where they do meet, the refusal line keeps the paragraph
+
+S9  one call, two commands, half applied   [half]
+  story:    Alex files a note in one call: set a prop, then retitle (he mistypes the id). Then he makes another note, and later undoes the event number the first receipt showed him.
+  observed: [1] do prop a03 filed=yes / ok prop a03 filed=yes  [e2] / props now: filed=yes / now: a03 note "Inbox" · filed=yes · 0w  (1st of 1 in f01) / [2] do retitle a99 title=Filed / ERR no such id 'a99' (ids look like f02, a05, 
+  observed: events added: 0; props now {}
+  observed: the rolled-back receipt said e2; the next note (a05) became e2; undo e2: ok e3: reverted e2, which was: create f01 kind=note title=Other  (made 11:56)
+  journal:  a call is one batch: all rows commit in one appended line or none do (Jeff's step 1b, begin/apply/commit)
+
+S10  an undo is a change, but the fences do not see it   [breaks]
+  story:    Wren changes the call to 3; Alex reads it; Wren takes it back (5 again). Alex adds 'bring the forms' to what he read.
+  observed: wren's undo: ok e3: reverted e2, which was: edit a03 text='call Sam at 3'  (made 11:56)
+  observed: deskd.touched_aspects(text, rev 2 -> 3) = False (False = a painted gesture is accepted)
+  observed: Alex's rewrite: ok rewrite a03 text='call Sam at 3, bring the forms'  [e4]   (after the header: !! since your last look: e3 undo e2 by wren); the text is now 'call Sam at 3, bring the forms', so Wren's undo is silently reversed
+  journal:  an undo is a batch of inverse ops on (thing, aspect) rows; any read of that aspect before it is stale, exactly
+
+S11  who did it: another actor's write from the CLI   [breaks]
+  story:    Priya, from a terminal, creates a task, sets its status and tags it (explore.py's `!priya ...` line), while jeff owns the desk.
+  observed: events signed: [('create', 'jeff'), ('prop', 'priya'), ('tag', 'jeff')]
+  observed: the task's props: {'_by': 'priya', 'status': 'open'}
+  journal:  the actor is a field of the batch, set once by the gateway from the caller, never an argument a verb may drop or store
+
+tally: 8 breaks, 2 half, 1 hidden
