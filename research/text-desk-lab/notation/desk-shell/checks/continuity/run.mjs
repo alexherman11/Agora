@@ -519,7 +519,7 @@ async function main() {
   }
   out.deskdStderr = deskdErr.slice(-4000);
   if (deskdErr) console.log("deskd stderr (tail): " + deskdErr.slice(-1500));
-  const f = join(HERE, "results", out.when.slice(0, 10) + ".json");
+  const f = join(HERE, "results", (process.env.RUN_NAME || out.when.slice(0, 16).replace(":", "")) + ".json");
   writeFileSync(f, JSON.stringify(out, null, 2));
   const all = Object.values(out.scenarios);
   console.log(`\n${all.filter(s => s.pass).length} of ${all.length} hold · lost drafts ${all.filter(s => s.draftLost || (s.first && s.first.draftLost)).length}` +
