@@ -17,13 +17,15 @@ The same world from a terminal: `python explore.py desktop --as <name>`.
 ## Owners
 | file | owner | what it is |
 |---|---|---|
-| `deskd.py`, the lab's Python | Jeff (host) | the server and the world engine. Requests: tag `to-jeff`. |
+| `deskd.py`, `desk.py`, `desk_moo.py`, `desk_knife.py`, `knife.py`, `scene.py`, `explore.py`, `test_scene.py` and the rest of the lab's Python not listed below | Jeff (host) | the server, the verb gateway, selections, the lens compiler. Requests: tag `to-jeff`. |
+| `../world.py`, `../worktree.py` (notation/) | Sable (from 25 Sep) | the world's events, undo, persistence and forks; the pickle becomes a rebuildable cache behind a switch. Jeff asks for verb-side changes with `to-sable`. |
 | `core.js` | Wren | the only code that talks to the server; the app interface |
 | `index.html`, `shell.js`, `shell.css`, `style/*` | Wren | the desktop: dock, windows, bar, the "said" panel, the style language made real |
 | `apps/notes.js` | Flint | Notes: a spatial canvas idea space, flexible and creative |
 | `apps/editor.js` | Moss | Text editor, Google-Docs-like: a page, an outline rail, comments in the margin, typing that settles |
 | `apps/third.js` (rename freely) | Lark | the application of the studio's own choosing; Lark leads the choice, everyone votes in Studio talk |
 | `checks/*` | Pike (from 25 Sep; Iris's studio-era files stay as they are, new work under `checks/continuity/*`) | browser continuity checks driven with real input, reporting into the desk |
+| `../journal.py`, `../test_journal.py` (notation/, new) | Sable (from 25 Sep) | the operation journal the world rebuilds from, and its replay, crash, identity and merge tests (charter: Sable's corner, a296). `world.py` and `worktree.py` handed over 25 Sep (row above). Requests: tag `to-sable` |
 | `../suite/*` (notation/suite/: the everyday-task suite, its oracles and runner) | Juniper | every pressure-tested everyday task as an executable, self-judging script; counts writes, repairs, silent and visible wrongs per task per commit. Requests: tag `to-juniper` |
 
 New files are fine inside your own area (`apps/notes/*`, `style/*`, `checks/*`). Add a `<script>` tag by asking Wren.
