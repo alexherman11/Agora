@@ -177,6 +177,30 @@ def test_only_when_takes_a_value_test_and_prints_it():
         tmp.unlink(missing_ok=True)
 
 
+def test_carry_and_drop_shape():
+    refused("root : column, of kind:note, each c\nc : text a, carry, on drag do move $item x=$x", "cannot both `carry` and `on drag`")
+    refused("root : column, on drop c do move $carried into=$item", "no part named 'c' says `carry`")
+    refused("root : column, of kind:note, each c\nc : text a, carry, on drop c do prop $carried x=1; do prop $carried y=2", "one proposal")
+    _, parts = scene.parse("root : column, of kind:note, each c, on drop c do move $carried into=$item\nc : text a, carry")
+    assert parts["root"]["on"] == [{"on": "drop", "line": "do move $carried into=$item", "part": "c"}] and parts["c"]["carry"]
+    import deskd
+    tmp = _scratch("_test_carry")
+    try:
+        with deskd.Session("_test_carry", "jeff") as desk:
+            sc = scene.build(desk, chr(10).join(["root : column, of kind:note, each c, on drop c do move $carried into=f01", 'c : text "$title", carry']))
+            assert sc["acts"] == [{"on": "drop", "line": "do move $carried into=f01", "part": "c"}] and sc.get("defpart") and sc["reads"] == []
+            assert sc["kids"][0]["acts"] == [{"on": "carry"}] and sc["kids"][0]["rev"] is not None
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "· drop c: do move $carried into=f01" in text and "· carry" in text
+            try:
+                scene.build(desk, "root : column, carry")
+                raise AssertionError("carry on the root admitted")
+            except scene.LensRefusal as e:
+                assert "needs a world thing" in str(e)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"

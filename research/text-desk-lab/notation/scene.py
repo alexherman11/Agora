@@ -43,6 +43,8 @@ An unindented name defines a part; the first one is the root.
                                  week-of <date>); it prints its inputs and result; no + and no if
     capture <field>=<value>      use this value instead of following the frame's; prints (now X: differs) when the
                                  world has moved on. Following is the default and is never written down
+    carry                        this part's thing can be picked up (pointer or keys) and put down on a part that says `on drop`
+    on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
     on <gesture> do <command>    click | edit | drag. The command is a desk verb line (`do` is implied); the painter
                                  fills $x $y (drag, click) and $value (edit) at the moment of the gesture. A gesture
                                  carries the item revision and the lens revision it was painted under; stale is refused.
@@ -57,6 +59,7 @@ the pressure that builds against that wall is the research result.
 
 import pathlib
 import re
+from desk import split_batch
 
 LAYOUTS = ("column", "row", "free")
 GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
@@ -181,11 +184,13 @@ def parse(src):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip()}
+                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if p in LAYOUTS:
                 node["layout"] = p
+            elif p == "carry":
+                node["carry"] = True          # Pike a361/c368: carry on the thing, `on drop <part>` on the receiver
             elif word in ("role", "each") and re.fullmatch(r"[\w.-]+", val):
                 if word == "role" and known_roles is not None and val not in known_roles:
                     raise LensRefusal(f"line {n}: no role {val!r} in calm.style. Roles: {' '.join(sorted(known_roles))}")
@@ -244,9 +249,14 @@ def parse(src):
                 node["only"] = p[10:].strip()      # Wren, Flint: the desk's own selection decides; no if, no else
             elif word == "on":
                 g, do, cmd = val.partition(" do ")
-                if g not in GESTURES or not do or not cmd.strip():
-                    raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>`; got {p!r}")
+                drop_part = None
+                if g.startswith("drop "):
+                    drop_part, g = g[5:].strip(), "drop"
+                if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part):
+                    raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>` or `on drop <part> do <desk command>`; got {p!r}")
                 cmd = cmd.strip()
+                if g == "drop" and len(split_batch(cmd)) > 1:
+                    raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
                 if cmd.split(" ")[0] == "run":
                     # Juniper A4: `on click do run tidy $item` printed one line and made four events, one of them on a thing
                     # the click never named. Until a proposal previews the whole cascade, a gesture may not call a script.
@@ -256,7 +266,7 @@ def parse(src):
                 # unless it begins with one of the desk's own reading or session commands.
                 if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
                     cmd = "do " + cmd
-                node["on"].append({"on": g, "line": cmd})
+                node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {})})
             else:
                 raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {', '.join(LAYOUTS)}, role, text, clamp, "
                                   f"of <selection>, over $field, each <part>, at item, on <gesture> do <command>")
@@ -287,10 +297,15 @@ def parse(src):
             stack.append((indent, node))
     if not root:
         raise LensRefusal("an empty lens shows nothing; start with  window : column")
-    for p in parts.values():
-        for k in _walk(p):
-            if k["each"] and k["each"] not in parts:
-                raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
+    every = [k for p in parts.values() for k in _walk(p)]
+    for k in every:
+        if k["each"] and k["each"] not in parts:
+            raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
+        if k["carry"] and any(a["on"] == "drag" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: a part cannot both `carry` and `on drag`; a carried thing is put down by a drop")
+        for a in k["on"]:
+            if a["on"] == "drop" and not any(x["name"] == a["part"] and x["carry"] for x in every):
+                raise LensRefusal(f"line {k['line']}: `on drop {a['part']}`: no part named {a['part']!r} says `carry`")
 
     def reach(name, trail):
         if name in trail:
@@ -625,7 +640,13 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         out["id"] = ctx.get("id")
         # a thing that is gone or unplaced has no appearance to act on: no gesture is offered, and the text says why
         safe["_frames"] = {k: {kk: (_cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
-        out["acts"] = [] if (node["on"] and ctx.get("_state") in ("gone", "unplaced")) else [{"on": a["on"], "line": _fill(a["line"], safe, track)} for a in node["on"]]
+        acts = [] if (node["on"] and ctx.get("_state") in ("gone", "unplaced")) else [
+            {"on": a["on"], "line": _fill(a["line"], safe, track), **({"part": a["part"]} if a.get("part") else {})} for a in node["on"]]
+        if node["carry"]:
+            if not ctx.get("item"):
+                raise LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")
+            acts.append({"on": "carry"})          # no line: the drop's receiver says what happens
+        out["acts"] = acts
         if track["bad"]:
             raise LensRefusal(f"line {node['line']}: ${sorted(track['bad'])[0]}.field: no part above this one is named `as {sorted(track['bad'])[0]}`")
         if track["reads"]:
@@ -823,7 +844,7 @@ def to_text(scene, name, who, at):
         if n.get("test"):
             bits.append(f"· only when {n['test']}")
         for a in n["acts"]:
-            bits.append(f"· {a['on']}: {a['line']}")
+            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f": {a['line']}" if a.get("line") else ""))
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):
                 bits.append(f"~ {a}: {v['facts'][n['key']]}")
