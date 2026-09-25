@@ -142,10 +142,16 @@ class Desk:
                     if "error" in r:
                         error = True
                         if i > 0 and snap is not None:
+                            gone = self.world
+                            first = len(_pk.loads(snap).world.events) + 1
                             self.__dict__.clear()
                             self.__dict__.update(_pk.loads(snap).__dict__)
+                            # Sable's baseline (2): the snapshot carried the old counter, so a rolled-back e2 was reissued
+                            # and `undo e2` removed the wrong note. Identity is minted once: the numbers stay withdrawn.
+                            self.world.keep_event_numbers(gone)
+                            withdrawn = ", ".join(e["id"] for e in gone.events[first - 1:]) or "none"
                             outs.append(f"(nothing was done: the {i} earlier command(s) were rolled back because [{i + 1}] was refused; "
-                                        f"a batch applies whole or not at all)")
+                                        f"a batch applies whole or not at all; event id(s) {withdrawn} are withdrawn and will not be reused)")
                         if i < len(parts) - 1:
                             rest = parts[i + 1:]
                             outs.append(f"(stopped; {len(rest)} later command(s) not run. Not run: {'; '.join(rest)}. "

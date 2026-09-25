@@ -127,6 +127,8 @@ def test_a_batch_applies_whole_or_not_at_all():
             assert (sj.get("props") or {}).get("beds") != "7", "the rolled-back prop write survived"
             r = desk.dispatch("desk", {"line": "look; do prop a03 beds=7"})
             assert len(desk.world.events) == n0 + 1 and not r["batch_error"]
+            # Sable's baseline (2): the withdrawn id is never reissued
+            assert int(desk.world.events[-1]["id"][1:]) > n0 + 1, "a rolled-back event id was reused"
     finally:
         tmp.unlink(missing_ok=True)
 
