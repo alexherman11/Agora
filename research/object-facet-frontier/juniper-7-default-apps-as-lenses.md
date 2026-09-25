@@ -44,7 +44,18 @@ day : column
   list : column, of kind:task,...,due>$it.date, each task
 ```
 
-This prints the task due on the 28th under the 25th, 26th and 27th, and under the 28th prints `0 of … (empty)`. That is a silent wrong. `due>` is the only per-day comparison available, so "due on this day" cannot be said. `$today` does work inside a derive [ran]. The end of the week has to be a literal date.
+This prints the task due on the 28th under the 25th, 26th and 27th, and under the 28th prints `0 of … (empty)`. That is a silent wrong. `due>` is the only per-day comparison available, so "due on this day" cannot be said. 
+
+**`$today` in a lens is a trap [ran].** The week above seemed to work, but only because the command that wrote the lens expanded `$today` into the lens text. The stored lens says `days-from 2026-09-25 …`, and tomorrow it will still start from the 25th while printing as current. Escaping the word (`\$today`) keeps it in the lens, but then it does not bind: `end: (uninterpretable: day-n wants <date> <n>; got '$today' '8')`.
+
+The host names that scene.py classifies (`me`, `today`, `session`) did not evaluate anywhere I tried, at 7731e64 with Jeff's stages 1 and 2:
+
+- in text: `"me= today= session=" (no me, no today, no session)` (visible);
+- in `only when $due < $today`: `(absent: no today)` (visible);
+- in `of kind:task,prop:owner=$me`: `0 of … (empty)` (a silent 0-of);
+- in a derive: uninterpretable (visible).
+
+Chained derives do work [ran]: `derive end = day-n … 8, derive days = days-from … $end` gives eight rows.
 
 ### As it should read [imagined]
 
@@ -72,8 +83,8 @@ task : row, role card.plain, carry, on drop task do move $carried before=$item
 2. **Order:** `sort <field>`, and a manual order that a drop can write. Today a repeat lists things in desk order, and `sort` is refused as an unknown term.
 3. **Dates as a person says them:** `due=tomorrow` is refused ("must be YYYY-MM-DD"), both on create and on edit. A person types "fri". The interpretation must print what it resolved, for example `fri -> 2026-09-26`, as every derive already does.
 4. **Relative display:** "Today", "Tomorrow", "Mon 28". This is a derive (`relative <date>`), and it should print its inputs.
-5. **Chained derives:** the end of the week from today, as in `derive end = day-n $today 8` followed by `days-from $today $end`. I have not tried this yet; it is my next probe.
-6. **`$me` and `$here`:** a lens is someone's. Today mine says `owner=juniper` literally, and Alex cannot use it without editing it.
+5. **Chained derives:** these work [ran]. What they lack is a today that binds (item 6).
+6. **`$me`, `$today` and `$here` bound at evaluation, in every position:** text, `only when`, `of` and derive. A lens belongs to someone, and a lens about today is about every day it is opened. Today mine must say `owner=juniper` literally, and any date in it must be frozen. The command that writes a lens must also not expand `$today` inside the lens text: a lens describes later, it is not a command about now.
 7. **Statuses with meaning:** open and done at least. `waiting` needs a "who moves next" (Astra's a416, my c439).
 
 ### Needs drawn (painter)
