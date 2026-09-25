@@ -28,6 +28,7 @@ class World:
         self.last_created = None
         self.last_surface = None
         self._ids = 0   # plain int: pickles on every Python (itertools.count stopped pickling in 3.14)
+        self._eseq = 0  # the last event number ever issued; it never goes back, so an event id is never reused
         self.root = self.add_surface("desk", None, "free", 0, 0, *SCREEN)
 
     # ---- construction -------------------------------------------------
@@ -271,13 +272,27 @@ class World:
 
     def _event(self, verb, target, args, undo, actor=None, note=""):
         actor = actor or self.me
-        ev = {"id": f"e{len(self.events) + 1}", "verb": verb, "target": target,
+        self._eseq = self.next_event_number()
+        ev = {"id": f"e{self._eseq}", "verb": verb, "target": target,
               "args": deepcopy(args), "undo": undo, "note": note, "by": actor,
               "at": __import__("datetime").datetime.now().isoformat(timespec="seconds")}   # wall time; `day` stays the desk's clock
         if self.today:
             ev["day"] = self.today
         self.events.append(ev)
         return ev
+
+    def next_event_number(self):
+        """Event ids are minted once and never reused (Sable, for Jeff's step 1b): a rolled-back or refused batch leaves
+        a gap, never a second e2. A world pickled before the counter starts after the highest id it holds. A caller that
+        restores an older copy of the world must carry _eseq across (keep_event_numbers)."""
+        last = getattr(self, "_eseq", None)
+        if last is None:
+            last = max((int(e["id"][1:]) for e in self.events), default=0)
+        return last + 1
+
+    def keep_event_numbers(self, other):
+        """After restoring a snapshot, never issue again a number the discarded world already issued."""
+        self._eseq = max(getattr(self, "_eseq", 0) or 0, self.next_event_number() - 1, getattr(other, "_eseq", 0) or 0)
 
     def last_day(self, nid):
         """The clock day of the last event that touched this thing (or its subject), or None."""
