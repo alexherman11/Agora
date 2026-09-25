@@ -9,8 +9,8 @@
 //     node desk-shell/checks/continuity/run.mjs            (from research/text-desk-lab/notation)
 //     node desk-shell/checks/continuity/run.mjs S2 S3      (only these scenarios)
 //
-// It starts its own deskd on a private port and a scratch session `pike-continuity`, rebuilt for every scenario
-// and removed at the end. Chrome's profile lives in the OS temp directory.
+// It starts its own deskd on a private port and a scratch session per scenario (`pike-continuity-s1` ...),
+// all removed at the end. Chrome's profile lives in the OS temp directory.
 // Results: desk-shell/checks/continuity/results/<date>.json and a table on stdout.
 //
 // What each scenario records:
@@ -33,7 +33,8 @@ const NOTATION = resolve(HERE, "../../..");
 const PY = "C:/Projects/Agora4/.venv/Scripts/python.exe";
 const CHROME = ["C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
-const PORT = 8795, CDP_PORT = 9333, SESSION = "pike-continuity";
+const PORT = 8795, CDP_PORT = 9333, BASE_SESSION = "pike-continuity";
+let SESSION = BASE_SESSION;      // one scratch world per scenario: a closing tab's last request cannot touch the next world
 const BASE = `http://127.0.0.1:${PORT}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -58,7 +59,6 @@ async function whereOf(id) {
 }
 
 async function fixture() {
-  for (const f of [`${SESSION}.pickle`, `${SESSION}.lock`]) rmSync(join(NOTATION, "sessions", f), { force: true });
   const ids = {};
   const mk = async (line, name) => {
     const w = line.split(" "), looks = (w[1] === "link" ? [w[2], w[3]] : [w[2]]).map(t => `look ${t}; `).join("");
@@ -235,10 +235,11 @@ async function judgeEdit(tab, id, draft, before) {
   const d = await tab.lastDo();
   const sent = !!d && d.line.includes(draft);
   const refused = sent && d.error ? d.error.slice(0, 200) : null;
-  const refusalShown = !!refused && /^refused:/.test(said);
+  const refusalShown = !!refused && said.includes("refused:");
   const inWorld = world === draft;
   const onPage = await tab.pageHas(draft);
-  const saidMarksIt = said.split("\n")[0].includes(draft);   // is the draft shown as unsent anywhere?
+  const saidMarksIt = said.split("\n")[0].includes(draft) ||      // is the draft marked as unsent, in the panel or where it was typed?
+    await tab.eval(`[...document.querySelectorAll("[data-unsent]")].some(e => e.textContent.includes(${JSON.stringify(draft)}))`);
   return {
     sent, delivered: inWorld, refused, refusalShown, world, before,
     draftLost: !inWorld && !onPage,
@@ -267,8 +268,12 @@ S.S2 = { what: "edit while another actor retitles the same card", expect: "refus
     await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="McWay Falls (closed)"`);
     await tab.enter();
     const r = await judgeEdit(tab, ids.mcway, "McWay Falls overlook", before);
+    // resendable: the person reads the refusal, clicks their kept words and presses Enter again
+    const el = await tab.find(`/${ids.mcway}/t`);
+    if (el) { await tab.click(el.x, el.y); await tab.enter(); await sleep(2500); }
+    const resent = (await titleOf(ids.mcway)) === "McWay Falls overlook";
     await tab.close();
-    return { ...r, pass: !!r.refused && r.refusalShown && !r.draftLost && !r.phantom };
+    return { ...r, resent, pass: !!r.refused && r.refusalShown && !r.draftLost && !r.phantom && resent };
   } };
 
 S.S3 = { what: "edit while the lens changes in an unrelated part (the day heading)", expect: "delivered: the title's meaning did not change",
@@ -360,7 +365,7 @@ S.S8 = { what: "drag a card another actor moved after it was painted", expect: "
     const d = await tab.lastDo();
     await tab.close();
     const refused = d && d.error ? d.error.slice(0, 200) : null;
-    const refusalShown = !!refused && /^refused:/.test(said);
+    const refusalShown = !!refused && said.includes("refused:");
     const agrees = painted && world && painted[0] === world[0] && painted[1] === world[1];
     return { hit, at: [Math.round(el.x), Math.round(el.y)], sent: d && d.line, world, painted, refused, refusalShown, wrongTarget: !refused && (world[0] !== 600 || world[1] !== 300), pass: !!refused && refusalShown && agrees };
   } };
@@ -498,13 +503,15 @@ async function main() {
   const deskd = spawn(PY, ["deskd.py", String(PORT)], { cwd: NOTATION, stdio: ["ignore", "ignore", "pipe"] });
   let deskdErr = ""; deskd.stderr.on("data", d => { deskdErr += d; });
   for (let i = 0; i < 50; i++) { try { await fetch(`${BASE}/lens.html`); break; } catch { await sleep(200); } }
-  const out = { when: new Date().toISOString(), chrome: CHROME, session: SESSION, scenarios: {} };
+  const out = { when: new Date().toISOString(), chrome: CHROME, session: BASE_SESSION + "-<scenario>", scenarios: {} };
   try {
     const v = await startChrome();
     out.browser = v.Browser;
     const names = Object.keys(S).filter(k => !only.length || only.includes(k));
     for (const name of names) {
       let r;
+      SESSION = `${BASE_SESSION}-${name.toLowerCase()}`;
+      rmSync(join(NOTATION, "sessions", `${SESSION}.pickle`), { force: true });   // left by a run that crashed
       try { r = await S[name].run(await fixture()); }       // every scenario starts from the same world
       catch (e) { r = { error: String(e.message || e) + (e.cause ? " / " + e.cause.message : ""), pass: false }; }
       out.scenarios[name] = { what: S[name].what, expect: S[name].expect, verdict: verdict(r), ...r };
@@ -515,7 +522,8 @@ async function main() {
     if (chrome) chrome.kill();
     deskd.kill();
     await sleep(500);
-    for (const f of [`${SESSION}.pickle`, `${SESSION}.lock`]) rmSync(join(NOTATION, "sessions", f), { force: true });   // the suite's world is scratch
+    for (const name of Object.keys(S)) for (const ext of ["pickle", "lock"])      // the suite's worlds are scratch
+      rmSync(join(NOTATION, "sessions", `${BASE_SESSION}-${name.toLowerCase()}.${ext}`), { force: true });
   }
   out.deskdStderr = deskdErr.slice(-4000);
   if (deskdErr) console.log("deskd stderr (tail): " + deskdErr.slice(-1500));
