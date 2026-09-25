@@ -11,6 +11,7 @@ import json
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 import pickle
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,51 @@ from world import World
 
 HERE = Path(__file__).resolve().parent
 SESSIONS = HERE / "sessions"
+
+
+def _alive(pid):
+    """Is a process with this id still running? A lock whose holder died is stale at once, not after a minute."""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))   # PROCESS_QUERY_LIMITED_INFORMATION
+            if not h:
+                return False
+            ctypes.windll.kernel32.CloseHandle(h)
+            return True
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def take_lock(lock, tries=600, pause=0.1):
+    """Take a session's lock file, writing our pid into it. Sable's baseline (1): a killed holder left its lock behind
+    and the next run waited a minute; now a lock whose pid is gone is removed at once."""
+    import time
+    for _ in range(tries):
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            return
+        except FileExistsError:
+            try:
+                pid = lock.read_text().strip()
+            except OSError:
+                pid = ""
+            if (pid and not _alive(pid)) or time.time() - lock.stat().st_mtime > 60:
+                lock.unlink(missing_ok=True)   # a dead or crashed holder
+            time.sleep(pause)
+    raise SystemExit(f"could not take {lock.name} after {tries * pause:.0f}s; another run holds it")
+
+
+def save_desk(path, desk):
+    """Write the session atomically: to a temp file, then rename over the old one. Sable's baseline (1): a write killed
+    halfway left a pickle that would not load, and the whole session was lost."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(pickle.dumps(desk))
+    os.replace(tmp, path)
 
 
 def fresh():
@@ -72,16 +118,9 @@ def main():
         sys.stdin = io.StringIO("\n".join(lines) + "\n")
     path = SESSIONS / f"{name}.pickle"
     # several people may work one session at once: each invocation holds the session's lock from load to save
-    import atexit, os, time
+    import atexit
     lock = SESSIONS / f"{name}.lock"
-    for _ in range(600):
-        try:
-            os.close(os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
-            break
-        except FileExistsError:
-            if time.time() - lock.stat().st_mtime > 60:
-                lock.unlink(missing_ok=True)   # a crashed holder
-            time.sleep(0.1)
+    take_lock(lock)
     atexit.register(lambda: lock.unlink(missing_ok=True))
     if "--reset" in sys.argv or not path.exists():
         desk = fresh()
@@ -127,7 +166,7 @@ def main():
             print(f"script {name} = {body}")
         return
     if "--reset" in sys.argv and sys.stdin.isatty():
-        path.write_bytes(pickle.dumps(desk))
+        save_desk(path, desk)
         print("reset")
         return
     for raw in sys.stdin:
@@ -142,10 +181,16 @@ def main():
             kv = dict(a.partition("=")[::2] for a in rest)
             try:
                 import moo
-                if verb in moo.REGISTRY:   # registry verbs (prop, tag, due ...) carry the actor as _by
-                    r = moo.REGISTRY[verb].run(desk.world, target, dict(kv, _by=actor))
-                else:
-                    r = desk.world.apply(verb, target, None, kv, actor)
+                # Sable's baseline (4): create and tag were signed as the session owner and kept _by as a prop. The
+                # injected actor is the world's actor for the one act.
+                owner, desk.world.me = desk.world.me, actor
+                try:
+                    if verb in moo.REGISTRY:   # registry verbs (prop, tag, due ...) sign with the world's actor
+                        r = moo.REGISTRY[verb].run(desk.world, target, dict(kv))
+                    else:
+                        r = desk.world.apply(verb, target, None, kv, actor)
+                finally:
+                    desk.world.me = owner
                 desk._after_mutation()
                 print(f"({actor} did {verb} {target}: {r.get('note') or r.get('event')})")
                 desk._run_rules(cause=None)   # rules watch other actors' events too
@@ -177,7 +222,7 @@ def main():
                 print()
             break
     per[slot] = (desk.seen, desk.open, desk.last_event_seen)
-    path.write_bytes(pickle.dumps(desk))
+    save_desk(path, desk)
 
 
 if __name__ == "__main__":

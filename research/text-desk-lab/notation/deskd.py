@@ -39,10 +39,17 @@ def touched_aspects(w, sid, seen, now, fields):
     Pike a308: a retitle used to refuse a gesture that had only read a prop. Until Sable's journal records one row per
     (thing, aspect), the events touching the thing are taken from the end, one per revision step."""
     names = {sid} if isinstance(sid, str) else set(sid)        # a thing, or an appearance with its subject
-    hits = [e for e in w.events if not e.get("undone") and (e["target"] in names or names & set(e.get("changed") or []))]
+    by_id = {e["id"]: e for e in w.events}
+
+    def seen_as(e):
+        # Sable's baseline (3): an undo's target is an event id; it touches what the reverted event touched
+        return by_id.get(e["target"], e) if e["verb"] == "undo" else e
+
+    hits = [e for e in w.events if not e.get("undone")
+            and (seen_as(e)["target"] in names or names & set(seen_as(e).get("changed") or []))]
     step = max(0, int(now) - int(seen))
     recent = hits[-step:] if 0 < step <= len(hits) else hits
-    return any(aspects_meet(set(fields), aspects_of(e.get("via") or e["verb"], e.get("args"))) for e in recent)
+    return any(aspects_meet(set(fields), aspects_of(seen_as(e).get("via") or seen_as(e)["verb"], seen_as(e).get("args"))) for e in recent)
 
 
 def same_part(desk, dp):
@@ -86,14 +93,7 @@ class Session:
         self.lock = SESSIONS / f"{name}.lock"
 
     def __enter__(self):
-        for _ in range(600):
-            try:
-                os.close(os.open(str(self.lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
-                break
-            except FileExistsError:
-                if time.time() - self.lock.stat().st_mtime > 60:
-                    self.lock.unlink(missing_ok=True)
-                time.sleep(0.05)
+        explore.take_lock(self.lock, tries=1200, pause=0.05)
         desk = pickle.loads(self.path.read_bytes()) if self.path.exists() else explore.fresh()
         desk.world.me = self.actor
         desk._session = self.name
@@ -110,7 +110,7 @@ class Session:
         try:
             d = self.desk
             self.per[self.actor] = (d.seen, d.open, d.last_event_seen)
-            self.path.write_bytes(pickle.dumps(d))
+            explore.save_desk(self.path, d)
         finally:
             self.lock.unlink(missing_ok=True)
 

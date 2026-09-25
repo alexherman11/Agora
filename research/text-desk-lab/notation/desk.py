@@ -321,6 +321,16 @@ class Desk:
         for e in w.events[since:]:
             if e.get("undone") or (e["by"] == w.me and (others_only or e.get("window", "") == mywin)):
                 continue                      # my own deeds from this window are already on my receipts
+            if e["verb"] == "undo":
+                # Sable's baseline (3): an undo's target is an event id, so the fence never saw what it reverted. It
+                # touches what the reverted event touched, on the same aspects.
+                ue = next((x for x in w.events if x["id"] == e["target"]), None)
+                if ue is None:
+                    continue
+                if ue["target"] in names or (names & set(ue.get("changed") or [])):
+                    if aspects_meet(fields, aspects_of(ue.get("via") or ue["verb"], ue.get("args"))):
+                        return e
+                continue
             hit = e["target"] in names
             # Sable: an edit through a sibling appearance changes what I am looking at; the event lists the subject as changed
             hit = hit or (subj and subj in (e.get("changed") or []) and e["verb"] not in ("place", "remove"))

@@ -82,16 +82,21 @@ def test_a_part_keeps_its_identity_when_the_lens_changes_elsewhere():
 def test_a_read_is_judged_by_aspect():
     import deskd
     class W: pass
-    w = W(); w.events = [{"target": "s1", "verb": "retitle", "args": {"title": "B"}}]
+    w = W(); w.events = [{"id": "e1", "target": "s1", "verb": "retitle", "args": {"title": "B"}}]
     assert deskd.touched_aspects(w, "s1", 1, 2, ["title"])
     assert not deskd.touched_aspects(w, "s1", 1, 2, ["prop:beds"])
-    w.events.append({"target": "a1", "changed": ["s1"], "verb": "prop", "args": {"beds": "3"}})
+    w.events.append({"id": "e2", "target": "a1", "changed": ["s1"], "verb": "prop", "args": {"beds": "3"}})
     assert deskd.touched_aspects(w, "s1", 1, 3, ["prop:beds"])
     assert not deskd.touched_aspects(w, "s1", 2, 3, ["title"])
     # Pike S5: the clicked appearance and its subject are judged together, on the aspects read
-    w.events.append({"target": "a1", "changed": ["s1"], "verb": "prop", "args": {"place": "x"}})
+    w.events.append({"id": "e3", "target": "a1", "changed": ["s1"], "verb": "prop", "args": {"place": "x"}})
     assert not deskd.touched_aspects(w, {"a1", "s1"}, 3, 4, ["title", "prop:beds"])
     assert deskd.touched_aspects(w, {"a1", "s1"}, 3, 4, ["prop:place"])
+    # Sable's baseline (3): an undo of a retitle is a touch of the title
+    w.events = [{"id": "e1", "target": "s1", "verb": "retitle", "args": {"title": "B"}},
+                {"id": "e2", "target": "e1", "verb": "undo", "args": {}}]
+    assert deskd.touched_aspects(w, "s1", 2, 3, ["title"])
+    assert not deskd.touched_aspects(w, "s1", 2, 3, ["prop:beds"])
 
 
 def test_a_repeat_records_its_membership_read():
