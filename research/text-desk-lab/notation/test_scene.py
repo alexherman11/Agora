@@ -47,6 +47,26 @@ def test_refusals():
     assert parts["root"]["as"] == "trip" and parts["root"]["kids"][0]["derive"] == [("d", "day-n", ["$trip.start", "2"])]
 
 
+def test_a_gesture_may_not_run_a_script():
+    # build step 1c (Juniper A4): the scene must be able to say what a click will do
+    refused("root : column, text hi, on click do run tidy $item", "may not run a script")
+    _, parts = scene.parse("root : column, text hi, on click do prop $item done=1")
+    assert parts["root"]["on"] == [{"on": "click", "line": "do prop $item done=1"}]
+
+
+def test_a_painted_gesture_that_could_fire_a_rule_is_refused():
+    import deskd
+    class D: pass
+    d = D(); d.rules = []
+    assert deskd.rules_blocking(d, "do prop a05 week=1") is None
+    assert "runs the script tidy" in deskd.rules_blocking(d, "run tidy a05")
+    d.rules = [{"id": "r1", "on": "tag", "sel": "on tag"}]
+    assert deskd.rules_blocking(d, "do prop a05 week=1") is None
+    assert "rule r1 fires on every tag" in deskd.rules_blocking(d, "do tag a05 add=done")
+    d.rules = [{"id": "r2", "sel": "kind:task,due<2026-09-19"}]
+    assert "rule r2 (when kind:task,due<2026-09-19)" in deskd.rules_blocking(d, "do move a05 into=f02")
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"

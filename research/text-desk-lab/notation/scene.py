@@ -245,6 +245,11 @@ def parse(src):
                 if g not in GESTURES or not do or not cmd.strip():
                     raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>`; got {p!r}")
                 cmd = cmd.strip()
+                if cmd.split(" ")[0] == "run":
+                    # Juniper A4: `on click do run tidy $item` printed one line and made four events, one of them on a thing
+                    # the click never named. Until a proposal previews the whole cascade, a gesture may not call a script.
+                    raise LensRefusal(f"line {n}: a gesture may not run a script ({cmd!r}); the scene could not say what it "
+                                      f"would do. Write the desk commands in the gesture line, one meaning per gesture")
                 # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
                 # unless it begins with one of the desk's own reading or session commands.
                 if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
