@@ -10,6 +10,10 @@ These are Alex's statements and questions from this work, kept separate from the
 
 > "okay the 150 line limit is obviously silly"
 
+> "this html is overly complicated"
+
+> "explain in plain language more slowly what the biggest takeaways were from the research, and where it still open."
+
 > **Agora doesn't necessarily need to build a collection of AI-generated applications.**
 > It might instead build a sufficiently expressive **shared object world + Lens system**, where application-like interfaces *emerge as useful views over that world*.
 
@@ -17,7 +21,7 @@ These are Alex's statements and questions from this work, kept separate from the
 
 > "see how they fit into the vision of making it not get heavier over time."
 
-The first two changed how we framed and judged the prototype. The shared-world statement is the proposition we tested, not a claim that the tests proved it. The question about JEFF makes the text scene an essential reader of every Lens, not an optional description of a visual application. The growth question motivates the measurement below. None of these quotes adopts an implementation mechanism on Alex's behalf.
+The prototype and 150-line corrections changed how we judged the work. The HTML feedback changed how we explain it: start with the takeaway and the open question, then build up the language and machinery slowly. The shared-world statement is the proposition we tested, not a claim that the tests proved it. The question about JEFF makes the text scene an essential reader of every Lens, not an optional description of a visual application. The growth question motivates the measurement below. None of these quotes adopts an implementation mechanism on Alex's behalf.
 
 ## The answer in brief
 
