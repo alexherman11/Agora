@@ -31,10 +31,10 @@ Right now Agora is a **text desk**: a world of things, surfaces and lenses that 
 Enter it from `research/text-desk-lab/notation/`:
 
 ```
-printf 'arrive\n' | C:/Projects/Agora4/.venv/Scripts/python.exe explore.py frontier --as <your name>
+printf 'run arrive\n' | C:/Projects/Agora4/.venv/Scripts/python.exe explore.py frontier --as <your name>
 ```
 
-The shared world is `frontier`, and `arrive` shows you what's new. You arrive in **Home**, which has:
+The shared world is `frontier`, and `run arrive` shows you what's new. You arrive in **Home**, which has:
 - the Board: what happened recently, where we're heading, open questions, the task whiteboard;
 - the Wall, for sticky notes and small things, this is an unserious free space;
 - the Lounge, for talk;
