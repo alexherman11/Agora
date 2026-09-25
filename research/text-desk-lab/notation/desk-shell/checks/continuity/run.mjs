@@ -1,0 +1,529 @@
+// checks/continuity/run.mjs : an instrument for the painter-continuity exploration. Owner: Pike.
+// It is evidence for reports about what a real browser does to a scene under change; it is not a gate.
+//
+// Real input into the real painter (lens.html + lens.js) against a real deskd, while other actors change the
+// world and the lens underneath. Input is sent through the Chrome DevTools Protocol's Input domain (trusted
+// mouse, key and text events through the browser's input pipeline), in headless Chrome. That is automation,
+// not a person at a keyboard: IME, OS focus and physical timing are NOT covered.
+//
+//     node desk-shell/checks/continuity/run.mjs            (from research/text-desk-lab/notation)
+//     node desk-shell/checks/continuity/run.mjs S2 S3      (only these scenarios)
+//
+// It starts its own deskd on a private port and a scratch session `pike-continuity`, rebuilt for every scenario
+// and removed at the end. Chrome's profile lives in the OS temp directory.
+// Results: desk-shell/checks/continuity/results/<date>.json and a table on stdout.
+//
+// What each scenario records:
+//   delivered   the gesture reached the world as the command the scene printed
+//   refused     deskd refused it, and why (read from the painter's own /api/do response, recorded in the page)
+//   refusalShown the refusal is still on screen after the painter repaints (a refusal nobody sees is a silent drop)
+//   draftLost   the person typed something that is now neither in the world nor anywhere on the page
+//   phantom     the page shows text that is not in the world and not marked as unsent
+//   wrongTarget a write landed on something the gesture did not name
+//   pass        whether what I hoped for (`expect`) held; `verdict` sorts it as holds / wrong, silent / wrong, visible
+
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const NOTATION = resolve(HERE, "../../..");
+const PY = "C:/Projects/Agora4/.venv/Scripts/python.exe";
+const CHROME = ["C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
+const PORT = 8795, CDP_PORT = 9333, SESSION = "pike-continuity";
+const BASE = `http://127.0.0.1:${PORT}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------------------------------------------------------------- the world side: deskd over HTTP
+async function act(as, line) {
+  const r = await (await fetch(`${BASE}/api/do`, { method: "POST", body: JSON.stringify({ session: SESSION, as, line }) })).json();
+  return r;
+}
+async function sceneText(lens, as = "observer") {
+  const r = await (await fetch(`${BASE}/api/scene?session=${SESSION}&as=${as}&lens=${lens}`)).json();
+  return r.text || r.refused || "";
+}
+async function titleOf(id) {
+  const r = await act("observer", `read ${id}`);
+  const m = (r.text || "").match(/note "([^"]*)"/);
+  return m ? m[1] : null;
+}
+async function whereOf(id) {
+  const r = await act("observer", `where ${id}`);
+  const m = (r.text || "").match(/local (\d+),(\d+)/);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+
+async function fixture() {
+  for (const f of [`${SESSION}.pickle`, `${SESSION}.lock`]) rmSync(join(NOTATION, "sessions", f), { force: true });
+  const ids = {};
+  const mk = async (line, name) => {
+    const w = line.split(" "), looks = (w[1] === "link" ? [w[2], w[3]] : [w[2]]).map(t => `look ${t}; `).join("");
+    const r = await act("fixture", looks + line);
+    if (r.error) throw new Error(`fixture refused: ${line}\n${r.error}`);
+    if (name) ids[name] = r.created[r.created.length - 1];
+    return r;
+  };
+  await mk("do create f01 kind=surface title=Trip layout=free", "trip_f");
+  await mk(`do create ${ids.trip_f} kind=note title="Big Sur trip" tags=trip start=2026-10-10 end=2026-10-12`, "trip");
+  await mk(`do create ${ids.trip_f} kind=note title="Kirk Creek camp" tags=stop tripday=1 place="Kirk Creek"`, "kirk");
+  await mk(`do create ${ids.trip_f} kind=note title="McWay Falls" tags=stop tripday=2 place="Julia Pfeiffer Burns"`, "mcway");
+  await mk(`do link ${ids.kirk} ${ids.trip} as=part-of`);
+  await mk(`do link ${ids.mcway} ${ids.trip} as=part-of`);
+  await mk("do create f01 kind=surface title=Lenses layout=column", "lens_f");
+  const cal = [
+    "cal : row, the tag:trip as trip",
+    "  days : row, derive days = days-from $trip.start $trip.end, over $days, each day",
+    "day : column, role sheet",
+    "  h : role heading, derive wd = weekday $it.date, text \\\"$wd $it.date\\\"",
+    "  items : column, of parts:$trip.item,prop:tripday=$it.n, each item",
+    "item : role card",
+    "  t : role title, text $title, on edit do retitle $item title=\\\"$value\\\"",
+    "  p : role meta, text $place",
+  ].join("\\n");
+  await mk(`do create ${ids.lens_f} kind=note title=cal tags=lens text="${cal}"`, "cal");
+  const board = [
+    "board : free, role sheet",
+    `  cards : free, of in:${ids.trip_f}, each card`,
+    "card : role card, at item, on drag do move $item to=$x,$y",
+    "  t : role title, text $title",
+  ].join("\\n");
+  await mk(`do create ${ids.lens_f} kind=note title=board tags=lens text="${board}"`, "board");
+  ids.calText = cal;
+
+  // Alex's own workspace (named 25 Sep): a collapsed project bar, a chat column with code, a document column,
+  // background tasks. Acceptance: an edit in the chat while a task finishes loses nothing, moves nothing untouched.
+  await mk("do create f01 kind=surface title=Work layout=column", "work_f");
+  for (const p of ["Agora4", "Canvas", "Resume"]) await mk(`do create ${ids.work_f} kind=note title="${p}" tags=project`);
+  await mk(`do create ${ids.work_f} kind=note title="you" tags=chat text="Why does the fence refuse my edit?"`, "m1");
+  await mk(`do create ${ids.work_f} kind=note title="claude" tags=chat text="Because def is per lens:\\n\\n    if d.rev != cur.rev:\\n        refuse()\\n\\nany lens edit moves it."`, "m2");
+  await mk(`do create ${ids.work_f} kind=note title="draft" tags=chat text="(type here)"`, "draft");
+  await mk(`do create ${ids.work_f} kind=note title="Painter continuity" tags=doc text="Every gesture works in a real browser.\\nNothing a person typed is lost."`, "page");
+  await mk(`do create ${ids.work_f} kind=note title="run the suite" tags=bg`, "task1");
+  await mk(`do prop ${ids.task1} status=running`);
+  await mk(`do create ${ids.work_f} kind=note title="rebuild the index" tags=bg`, "task2");
+  await mk(`do prop ${ids.task2} status=queued`);
+  const work = [
+    "work : row, role sheet",
+    "  bar : column, role bar, of tag:project, each proj",
+    "  chat : column, of tag:chat, each msg",
+    "  doc : column, of tag:doc, each page",
+    "  tasks : column, of tag:bg, each task",
+    "proj : role meta, text $title",
+    "msg : role card",
+    "  who : role meta, text $title",
+    "  b : role body, text $text, on edit do rewrite $item text=\\\"$value\\\"",
+    "page : role card",
+    "  h : role heading, text $title",
+    "  b : role body, text $text",
+    "task : role card",
+    "  t : role title, text \\\"$title · $status\\\"",
+  ].join("\\n");
+  await mk(`do create ${ids.lens_f} kind=note title=work tags=lens text="${work}"`, "work");
+  return ids;
+}
+
+// ---------------------------------------------------------------- the person side: Chrome over CDP
+let chrome;
+async function startChrome() {
+  const prof = join(tmpdir(), "pike-continuity-chrome");
+  rmSync(prof, { recursive: true, force: true });
+  chrome = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${prof}`,
+    "--window-size=1400,900", "--no-first-run", "--no-default-browser-check", "about:blank"], { stdio: "ignore" });
+  for (let i = 0; i < 50; i++) {
+    try { return await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`)).json(); } catch { await sleep(200); }
+  }
+  throw new Error("Chrome did not open its debugging port");
+}
+
+class Tab {
+  static async open(url) {
+    const t = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?${encodeURIComponent(url)}`, { method: "PUT" })).json();
+    const tab = new Tab(t.webSocketDebuggerUrl, t.id);
+    await tab.ready;
+    await tab.send("Runtime.enable");
+    await tab.send("Page.enable");
+    return tab;
+  }
+  constructor(ws, id) {
+    this.id = id; this.n = 0; this.pending = new Map();
+    this.ws = new WebSocket(ws);
+    this.ready = new Promise(r => this.ws.addEventListener("open", r));
+    this.ws.addEventListener("message", e => {
+      const m = JSON.parse(e.data);
+      if (m.id && this.pending.has(m.id)) { this.pending.get(m.id)(m); this.pending.delete(m.id); }
+    });
+  }
+  send(method, params = {}) {
+    const id = ++this.n;
+    this.ws.send(JSON.stringify({ id, method, params }));
+    return new Promise(r => this.pending.set(id, r));
+  }
+  async eval(expr) {
+    const r = await this.send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true });
+    if (r.result && r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.text + " in " + expr);
+    return r.result && r.result.result ? r.result.result.value : undefined;
+  }
+  // the painter's own gestures, as deskd answered them (a refusal is recorded here even if the painter overwrites it)
+  async dos() { return this.eval("window.__do || []"); }
+  async lastDo() { const d = await this.dos(); return d[d.length - 1] || null; }
+  async painted(min = 1, ms = 8000) {
+    await this.eval(`if (!window.__do) { window.__do = []; const f = window.fetch;
+      window.fetch = async (u, o) => { const r = await f(u, o);
+        if (String(u).includes('/api/do')) { const j = await r.clone().json(); const b = JSON.parse(o.body);
+          window.__do.push({ line: b.line, observed: b.observed, error: j.error, text: j.text }); }
+        return r; }; }`);
+    for (let t = 0; t < ms; t += 200) {
+      if ((await this.eval("document.querySelectorAll('[data-key]').length")) >= min) return true;
+      await sleep(200);
+    }
+    return false;
+  }
+  // an element by the end of its scene key; returns its centre and text
+  async find(suffix) {
+    return this.eval(`(() => { const el = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith(${JSON.stringify(suffix)}));
+      if (!el) return null; el.scrollIntoView({ block: "nearest", inline: "nearest" });
+      const r = el.getBoundingClientRect(), p = document.getElementById("paint"), v = { right: p.getBoundingClientRect().left + p.clientWidth };
+      return { x: Math.max(r.x + 4, Math.min(r.x + r.width / 2, v.right - 8)), y: r.y + Math.min(r.height / 2, 12), text: el.textContent, key: el.dataset.key }; })()`);
+  }
+  async click(x, y, clickCount = 1) {
+    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+    await this.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount });
+    await this.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount });
+  }
+  async drag(x0, y0, x1, y1, steps = 8) {
+    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0, y: y0 });
+    await this.send("Input.dispatchMouseEvent", { type: "mousePressed", x: x0, y: y0, button: "left", buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= steps; i++) {
+      await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0 + (x1 - x0) * i / steps, y: y0 + (y1 - y0) * i / steps, button: "left", buttons: 1 });
+      await sleep(20);
+    }
+    await this.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x1, y: y1, button: "left", buttons: 0, clickCount: 1 });
+  }
+  async key(key, code, vk, modifiers = 0) {
+    await this.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code, windowsVirtualKeyCode: vk, modifiers });
+    await this.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: vk, modifiers });
+  }
+  async type(text) { await this.send("Input.insertText", { text }); }
+  async selectAll() { await this.key("a", "KeyA", 65, 2); }
+  async enter() { await this.key("Enter", "Enter", 13); }
+  async said() { return this.eval("document.getElementById('said').textContent"); }
+  async pageHas(s) { return this.eval(`document.body.innerText.includes(${JSON.stringify(s)})`); }
+  close() { this.ws.close(); return fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${this.id}`); }
+}
+
+const lensUrl = (lens, as = "alex") => `${BASE}/lens.html?session=${SESSION}&as=${as}&lens=${lens}`;
+
+// Type into a title and hold it (not yet sent). Returns the tab and the draft.
+async function beginEdit(tab, id, draft) {
+  const el = await tab.find(`/${id}/t`);
+  if (!el) throw new Error(`no painted title for ${id}`);
+  await tab.click(el.x, el.y);
+  await tab.selectAll();
+  await tab.type(draft);
+  return el;
+}
+
+// After an edit was sent: did it land, was it refused, is the draft lost, is a phantom on screen?
+async function judgeEdit(tab, id, draft, before) {
+  await sleep(2500);
+  const world = await titleOf(id);
+  const said = await tab.said();
+  const d = await tab.lastDo();
+  const sent = !!d && d.line.includes(draft);
+  const refused = sent && d.error ? d.error.slice(0, 200) : null;
+  const refusalShown = !!refused && /^refused:/.test(said);
+  const inWorld = world === draft;
+  const onPage = await tab.pageHas(draft);
+  const saidMarksIt = said.split("\n")[0].includes(draft);   // is the draft shown as unsent anywhere?
+  return {
+    sent, delivered: inWorld, refused, refusalShown, world, before,
+    draftLost: !inWorld && !onPage,
+    phantom: !inWorld && onPage && !saidMarksIt,
+  };
+}
+
+// ---------------------------------------------------------------- scenarios
+const S = {};
+
+S.S1 = { what: "plain edit of a card title, mouse and keys", expect: "delivered",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.kirk);
+    await beginEdit(tab, ids.kirk, "Kirk Creek campground"); await tab.enter();
+    const r = await judgeEdit(tab, ids.kirk, "Kirk Creek campground", before);
+    await tab.close();
+    return { ...r, pass: r.delivered };
+  } };
+
+S.S2 = { what: "edit while another actor retitles the same card", expect: "refused, draft kept and resendable",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.mcway);
+    await beginEdit(tab, ids.mcway, "McWay Falls overlook");
+    await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="McWay Falls (closed)"`);
+    await tab.enter();
+    const r = await judgeEdit(tab, ids.mcway, "McWay Falls overlook", before);
+    await tab.close();
+    return { ...r, pass: !!r.refused && r.refusalShown && !r.draftLost && !r.phantom };
+  } };
+
+S.S3 = { what: "edit while the lens changes in an unrelated part (the day heading)", expect: "delivered: the title's meaning did not change",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.kirk);
+    await beginEdit(tab, ids.kirk, "Kirk Creek (walk-in)");
+    const newText = ids.calText.replace("$wd $it.date", "Day $it.n · $wd $it.date");
+    await act("other", `read ${ids.cal}; do rewrite ${ids.cal} text="${newText}"`);
+    await tab.enter();
+    const r = await judgeEdit(tab, ids.kirk, "Kirk Creek (walk-in)", before);
+    await tab.close();
+    return { ...r, pass: r.delivered };
+  } };
+
+S.S4 = { what: "edit while another actor retitles a different card", expect: "delivered",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.kirk);
+    await beginEdit(tab, ids.kirk, "Kirk Creek (site 4)");
+    await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="McWay Falls"`);
+    await tab.enter();
+    const r = await judgeEdit(tab, ids.kirk, "Kirk Creek (site 4)", before);
+    await tab.close();
+    return { ...r, pass: r.delivered };
+  } };
+
+S.S5 = { what: "edit a title while another actor changes an unrelated prop of the same card (not shown)", expect: "delivered: the title's inputs did not change",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.kirk);
+    await beginEdit(tab, ids.kirk, "Kirk Creek (booked)");
+    await act("other", `look ${ids.kirk}; do prop ${ids.kirk} booking=confirmed`);
+    await tab.enter();
+    const r = await judgeEdit(tab, ids.kirk, "Kirk Creek (booked)", before);
+    await tab.close();
+    return { ...r, pass: r.delivered };
+  } };
+
+S.S6 = { what: "keyboard only: Tab to a card title, type, Enter", expect: "reachable and delivered",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.mcway);
+    let reached = null, presses = 0;
+    for (; presses < 30; presses++) {
+      await tab.key("Tab", "Tab", 9);
+      const k = await tab.eval("document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key || '' : ''");
+      if (k && k.endsWith(`/${ids.mcway}/t`)) { reached = k; break; }
+    }
+    if (!reached) { await tab.close(); return { reached: false, presses, pass: false, note: "no Tab stop reached the title" }; }
+    await tab.selectAll(); await tab.type("McWay Falls by keyboard"); await tab.enter();
+    const r = await judgeEdit(tab, ids.mcway, "McWay Falls by keyboard", before);
+    await tab.close();
+    return { ...r, reached: true, presses: presses + 1, pass: r.delivered };
+  } };
+
+S.S7 = { what: "drag a card on the free board", expect: "delivered: the world position follows",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("board")); await tab.painted(3);
+    const before = await whereOf(ids.kirk);
+    const el = await tab.find(`/cards/${ids.kirk}`);
+    await tab.drag(el.x, el.y, el.x + 120, el.y + 60);
+    await sleep(2500);
+    const after = await whereOf(ids.kirk);
+    const d = await tab.lastDo();
+    await tab.close();
+    const moved = before && after && (after[0] !== before[0] || after[1] !== before[1]);
+    return { before, after, sent: d && d.line, refused: d && d.error, delivered: moved, pass: moved };
+  } };
+
+S.S8 = { what: "drag a card another actor moved after it was painted", expect: "refused, card shows the world's position, nothing written",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("board")); await tab.painted(3);
+    const el = await tab.find(`/cards/${ids.mcway}`);
+    const hit = await tab.eval(`document.elementsFromPoint(${el.x}, ${el.y}).map(e => e.tagName + (e.id ? "#" + e.id : "") + (e.dataset.key ? "[" + e.dataset.key + "]" : ""))`);
+    // the person has the card in hand when the other actor moves it
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: el.x, y: el.y });
+    await tab.send("Input.dispatchMouseEvent", { type: "mousePressed", x: el.x, y: el.y, button: "left", buttons: 1, clickCount: 1 });
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: el.x + 20, y: el.y + 10, button: "left", buttons: 1 });
+    await act("other", `look ${ids.mcway}; do move ${ids.mcway} to=600,300`);
+    await sleep(2000);
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: el.x + 80, y: el.y + 40, button: "left", buttons: 1 });
+    await tab.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: el.x + 80, y: el.y + 40, button: "left", buttons: 0, clickCount: 1 });
+    await sleep(3200);
+    const world = await whereOf(ids.mcway);
+    const said = await tab.said();
+    const painted = await tab.eval(`(() => { const el = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/cards/${ids.mcway}'));
+      return el ? [parseInt(el.style.left), parseInt(el.style.top)] : null; })()`);
+    const d = await tab.lastDo();
+    await tab.close();
+    const refused = d && d.error ? d.error.slice(0, 200) : null;
+    const refusalShown = !!refused && /^refused:/.test(said);
+    const agrees = painted && world && painted[0] === world[0] && painted[1] === world[1];
+    return { hit, at: [Math.round(el.x), Math.round(el.y)], sent: d && d.line, world, painted, refused, refusalShown, wrongTarget: !refused && (world[0] !== 600 || world[1] !== 300), pass: !!refused && refusalShown && agrees };
+  } };
+
+S.S9 = { what: "keyboard only: move a card on the board", expect: "a keyboard path exists",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("board")); await tab.painted(3);
+    const before = await whereOf(ids.kirk);
+    let reached = false;
+    for (let i = 0; i < 20 && !reached; i++) {
+      await tab.key("Tab", "Tab", 9);
+      const k = await tab.eval("document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key || '' : ''");
+      reached = k.endsWith(`/cards/${ids.kirk}`);
+    }
+    if (reached) { for (let i = 0; i < 5; i++) await tab.key("ArrowRight", "ArrowRight", 39); await tab.enter(); await sleep(2500); }
+    const after = await whereOf(ids.kirk);
+    await tab.close();
+    const moved = before && after && (after[0] !== before[0] || after[1] !== before[1]);
+    return { reached, before, after, pass: reached && moved, note: reached ? "" : "the card is not a Tab stop" };
+  } };
+
+S.S10 = { what: "a reader's text selection in one card while another actor retitles a different card", expect: "selection survives",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const el = await tab.find(`/${ids.mcway}/p`);
+    await tab.click(el.x, el.y, 2);
+    const sel0 = await tab.eval("String(getSelection())");
+    await tab.eval("document.querySelectorAll('[data-key]').forEach(e => { e.__old = 1; })");
+    await act("other", `look ${ids.kirk}; do retitle ${ids.kirk} title="Kirk Creek"`);
+    await sleep(3500);
+    const sel1 = await tab.eval("String(getSelection())");
+    const remade = await tab.eval("[...document.querySelectorAll('[data-key]')].filter(e => !e.__old).map(e => e.dataset.key)");
+    await tab.close();
+    return { before: sel0, after: sel1, remade: remade.slice(0, 8), remadeCount: remade.length, pass: !!sel0 && sel0 === sel1 };
+  } };
+
+S.S11 = { what: "two windows, one person: edit in window 1 after window 2 changed the same title", expect: "refused, draft kept and resendable",
+  async run(ids) {
+    const w1 = await Tab.open(lensUrl("cal")); await w1.painted(5);
+    const w2 = await Tab.open(lensUrl("cal")); await w2.painted(5);
+    const before = await titleOf(ids.mcway);
+    await beginEdit(w1, ids.mcway, "McWay Falls (window one)");
+    await beginEdit(w2, ids.mcway, "McWay Falls (window two)"); await w2.enter(); await sleep(1500);
+    await w1.enter();
+    const r = await judgeEdit(w1, ids.mcway, "McWay Falls (window one)", before);
+    await w1.close(); await w2.close();
+    return { ...r, pass: !!r.refused && r.refusalShown && !r.draftLost && !r.phantom };
+  } };
+
+S.S12 = { what: "the lens stops compiling while a person edits; then they edit again on the fallback", expect: "first refused with the draft kept; second refused as a read-only fallback",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const before = await titleOf(ids.kirk);
+    await beginEdit(tab, ids.kirk, "Kirk Creek (first try)");
+    const broken = ids.calText + "\\nbad : role card, wobble";
+    await act("other", `read ${ids.cal}; do rewrite ${ids.cal} text="${broken}"`);
+    await tab.enter();
+    const r1 = await judgeEdit(tab, ids.kirk, "Kirk Creek (first try)", before);
+    await sleep(2000);
+    await beginEdit(tab, ids.kirk, "Kirk Creek (second try)"); await tab.enter();
+    const r2 = await judgeEdit(tab, ids.kirk, "Kirk Creek (second try)", before);
+    const fallbackShown = (await tab.said()).includes("no longer compiles");
+    await act("other", `read ${ids.cal}; do rewrite ${ids.cal} text="${ids.calText}"`);   // repair for later scenarios
+    await tab.close();
+    return { first: r1, second: r2, fallbackShown, pass: [r1, r2].every(r => r.refused && r.refusalShown && !r.draftLost && !r.phantom) };
+  } };
+
+S.S13 = { what: "carry a card to another day (drop)", expect: "a carry/drop gesture exists",
+  async run() {
+    const t = await sceneText("cal");
+    return { note: "no drop word in the grammar; nothing to carry", pass: /drop/.test(t) };
+  } };
+
+S.S14 = { what: "Alex's workspace: type in the chat while a background task finishes and its column repaints",
+  expect: "the task column shows the finish while he types; the draft, caret and every untouched element stay put; the message is delivered",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("work")); await tab.painted(10);
+    const geo = () => tab.eval(`Object.fromEntries([...document.querySelectorAll('[data-key]')].filter(e => !e.dataset.key.includes('/tasks'))
+      .map(e => { const r = e.getBoundingClientRect(); return [e.dataset.key, [Math.round(r.x), Math.round(r.y)]]; }))`);
+    const code = await tab.eval(`(() => { const el = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${ids.m2}/b'));
+      return el ? el.innerText : null; })()`);
+    const codeIndentPx = await tab.eval(`(() => { const el = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${ids.m2}/b'));
+      const t = el && el.firstChild; if (!t) return null; const i = t.data.indexOf("if d.rev"); const r = document.createRange();
+      r.setStart(t, i); r.setEnd(t, i + 1); const x = r.getBoundingClientRect().left; r.setStart(t, 0); r.setEnd(t, 1); return Math.round(x - r.getBoundingClientRect().left); })()`);
+    const codeKeepsIndent = !!code && code.includes("    if d.rev") && codeIndentPx > 8;
+    const g0 = await geo();
+    const el = await tab.find(`/${ids.draft}/b`);
+    await tab.click(el.x, el.y); await tab.selectAll();
+    await tab.type("Can the fence be per part");
+    await act("worker", `look ${ids.task1}; do prop ${ids.task1} status=done`);      // the background task finishes
+    await sleep(3500);                                                               // two refresh ticks
+    const taskSeen = await tab.pageHas("run the suite · done");
+    const focusKept = await tab.eval(`(document.activeElement.dataset.key || '').endsWith('/${ids.draft}/b')`);
+    await tab.type(" instead of per lens?");
+    const gTyping = await geo();
+    const draft = "Can the fence be per part instead of per lens?";
+    const typedWhole = await tab.eval(`document.activeElement.textContent`);
+    await tab.enter();
+    await sleep(2500);
+    const r = await act("observer", `read ${ids.draft}`);
+    const delivered = (r.text || "").includes(draft);
+    const g1 = await geo();
+    const moved = Object.keys(g0).filter(k => g1[k] && !k.includes(`/${ids.draft}/`) && (g0[k][0] !== g1[k][0] || g0[k][1] !== g1[k][1]));
+    const deltas = {};      // per region: the largest shift while typing, and after the send and repaint
+    for (const k of moved) {
+      const reg = k.split("/").slice(0, 2).join("/"), d = deltas[reg] || (deltas[reg] = { n: 0, typing: 0, after: 0 });
+      d.n++; d.typing = Math.max(d.typing, Math.abs(gTyping[k][0] - g0[k][0]) + Math.abs(gTyping[k][1] - g0[k][1]));
+      d.after = Math.max(d.after, Math.abs(g1[k][0] - g0[k][0]) + Math.abs(g1[k][1] - g0[k][1]));
+    }
+    const said = await tab.said();
+    const collapsible = await tab.eval(`!![...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.includes('/bar') && (e.onclick || e.getAttribute('aria-expanded')))`);
+    const d = await tab.lastDo();
+    await tab.close();
+    return { taskSeenWhileTyping: taskSeen, focusKept, typedWhole, delivered, sent: d && d.line, refused: d && d.error,
+      movedUntouched: deltas, movedCount: moved.length, codeKeepsIndent, codeIndentPx, barCollapses: collapsible,
+      draftLost: !delivered && !(typedWhole || "").includes(draft),
+      pass: taskSeen && focusKept && delivered && moved.length === 0 };
+  } };
+
+// Juniper's three classes (a313), so the suite's runner can count these beside its CLI readers:
+// holds; wrong and silent (the person is not told: a lost draft, a phantom, an unseen refusal, a selection or a
+// newer fact quietly gone); wrong but visible (the gap is plain on screen: no Tab stop, no word for it, a refusal shown).
+function verdict(r) {
+  if (r.pass) return "holds";
+  const parts = [r, r.first, r.second].filter(Boolean);
+  const silent = parts.some(p => p.draftLost || p.phantom || (p.refused && !p.refusalShown)) ||
+    (r.before && r.after === "") || r.taskSeenWhileTyping === false || r.movedCount > 0;
+  return r.error ? "harness error" : silent ? "wrong, silent" : "wrong, visible";
+}
+
+// ---------------------------------------------------------------- run
+async function main() {
+  const only = process.argv.slice(2);
+  mkdirSync(join(HERE, "results"), { recursive: true });
+  const deskd = spawn(PY, ["deskd.py", String(PORT)], { cwd: NOTATION, stdio: ["ignore", "ignore", "pipe"] });
+  let deskdErr = ""; deskd.stderr.on("data", d => { deskdErr += d; });
+  for (let i = 0; i < 50; i++) { try { await fetch(`${BASE}/lens.html`); break; } catch { await sleep(200); } }
+  const out = { when: new Date().toISOString(), chrome: CHROME, session: SESSION, scenarios: {} };
+  try {
+    const v = await startChrome();
+    out.browser = v.Browser;
+    const names = Object.keys(S).filter(k => !only.length || only.includes(k));
+    for (const name of names) {
+      let r;
+      try { r = await S[name].run(await fixture()); }       // every scenario starts from the same world
+      catch (e) { r = { error: String(e.message || e) + (e.cause ? " / " + e.cause.message : ""), pass: false }; }
+      out.scenarios[name] = { what: S[name].what, expect: S[name].expect, verdict: verdict(r), ...r };
+      const flag = verdict(r).padEnd(14);
+      console.log(`${name.padEnd(4)} ${flag}  ${S[name].what}\n      ${JSON.stringify(r)}`);
+    }
+  } finally {
+    if (chrome) chrome.kill();
+    deskd.kill();
+    await sleep(500);
+    for (const f of [`${SESSION}.pickle`, `${SESSION}.lock`]) rmSync(join(NOTATION, "sessions", f), { force: true });   // the suite's world is scratch
+  }
+  out.deskdStderr = deskdErr.slice(-4000);
+  if (deskdErr) console.log("deskd stderr (tail): " + deskdErr.slice(-1500));
+  const f = join(HERE, "results", out.when.slice(0, 10) + ".json");
+  writeFileSync(f, JSON.stringify(out, null, 2));
+  const all = Object.values(out.scenarios);
+  console.log(`\n${all.filter(s => s.pass).length} of ${all.length} hold · lost drafts ${all.filter(s => s.draftLost || (s.first && s.first.draftLost)).length}` +
+    ` · phantoms ${all.filter(s => s.phantom || (s.first && s.first.phantom)).length}` +
+    ` · refusals not shown ${all.flatMap(s => [s, s.first, s.second]).filter(s => s && s.refused && !s.refusalShown).length} · results ${f}`);
+}
+main().catch(e => { console.error(e); process.exit(1); });
