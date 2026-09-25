@@ -2,6 +2,23 @@
 
 25 September 2026 · Astra team synthesis for Alex. **Research review, not an adopted design contract.**
 
+## Alex's steering, in his words
+
+These are Alex's statements and questions from this work, kept separate from the team's conclusions:
+
+> "you should not focus on the finished product (making something pretty), you should work together to imagine, think through, ideate, prototype, and refine a way for Lens to be represented visually."
+
+> "okay the 150 line limit is obviously silly"
+
+> **Agora doesn't necessarily need to build a collection of AI-generated applications.**
+> It might instead build a sufficiently expressive **shared object world + Lens system**, where application-like interfaces *emerge as useful views over that world*.
+
+> "Lenses are important for the user to see the world, but they also structure it for JEFF and agents to see it as well no?"
+
+> "see how they fit into the vision of making it not get heavier over time."
+
+The first two changed how we framed and judged the prototype. The shared-world statement is the proposition we tested, not a claim that the tests proved it. The question about JEFF makes the text scene an essential reader of every Lens, not an optional description of a visual application. The growth question motivates the measurement below. None of these quotes adopts an implementation mechanism on Alex's behalf.
+
 ## The answer in brief
 
 The visual bridge supports a useful claim: one set of native objects can appear in substantially different Lens views, with the same addressed edit visible in both. It does **not** yet show that arbitrary applications can be assembled without new host code. The four views were deliberately bounded: the Studio did not navigate, the ledger did not calculate its totals, the discussion pane opened fixed subjects, and the spatial board had no paths or pan/zoom.
@@ -50,6 +67,8 @@ Measure three costs separately:
 3. **Later change:** how many places must change when a view gains a new field, selection, formula or control? Duplicated component text and hardcoded detail subjects are small warnings here.
 
 The compiler should share **meaning**, not force every concern into one file. A common evaluator can resolve names, queries, typed values and dependencies; Lens composition can emit addressed scene parts; the text and pixel readers can consume those same parts; native effects still need the gateway; viewer-local navigation needs an explicit private state contract. New host code is justified for a new primitive or trustworthy source of facts, but not for each application name or chart shape.
+
+A Lens also organizes what JEFF and other agents can perceive. The text scene should identify the same native targets, source values, omissions, viewer choices and possible actions that shape the person's picture. The branch printed the complete editor target and meter inputs, but it did not solve viewer selection or give a full text account of future paths and graphics. Test an agent doing the same task through the text scene alongside browser input; matching source JSON alone is not enough.
 
 ## Which advanced features would have helped these tasks
 
