@@ -14,8 +14,7 @@
   let last = "", sceneAt = 0, def = null, text = "", notice = "", hold = null, repainting = false;
   // Pike (continuity run 1): a refused edit's words vanished, or stayed on screen looking saved. Now they stay where
   // they were typed, marked unsent, until the person sends them again (Enter) or drops them (Escape). Per viewer, never the world.
-  const drafts = new Map();
-  const show = () => { said.textContent = (notice ? notice + "\n\n" : "") + text; };
+  const drafts = new Map(), show = () => { said.textContent = (notice ? notice + "\n\n" : "") + text; };
   const mark = (el, d) => { el.classList.toggle(Style.roleClass("mark"), !!d); if (d) el.dataset.unsent = d.why; else delete el.dataset.unsent; };
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
@@ -38,12 +37,10 @@
   // painted, not what a gesture carries (rev, reads, members, def move with every event); those are refreshed in place.
   let kept = new Map(), next = new Map();
   function make(n) {
-    const old = kept.get(n.key);
+    const old = kept.get(n.key); n.def = def;
     if (old && hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
-    n.def = def;
     const sig = JSON.stringify([n.role, n.layout, n.box, n.text, n.clamp, n.absent, n.acts, n.kids.map(k => k.key), drafts.get(n.key)]);
-    if (old && old.sig === sig) {
-      old.el._n = n;
+    if (old && old.sig === sig) { old.el._n = n;
       const els = n.kids.map(make), same = els.length === old.el.children.length && els.every((e, i) => old.el.children[i] === e);
       // a part with its own words cannot have its children swapped without losing the words: make it again
       if (same || n.text === null) {
@@ -75,30 +72,38 @@
         send(el._n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)));
       });
       if (a.on === "edit") {
-        el.contentEditable = "plaintext-only";
-        el.addEventListener("focus", () => { if (!repainting) hold = n.key; });
+        el.contentEditable = "plaintext-only"; el.addEventListener("focus", () => { if (!repainting) hold = n.key; });
         el.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); }
           if (e.key === "Escape") { drafts.delete(n.key); mark(el, null); el.textContent = el._n.text; notice = ""; show(); el.blur(); } });
-        el.addEventListener("blur", () => {
-          if (repainting) return;      // a repaint moved this element; the person is still editing it
+        el.addEventListener("blur", () => { if (repainting) return;      // a repaint moved it; the person is still editing it
           // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
           const raw = el.textContent.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
           if (raw && raw !== el._n.text) send(el._n, a.line.replace("$value", () => v), raw); else hold = null;
         });
       }
       if (a.on === "drag" && n.box) {
-        el.dataset.drag = "1";
+        // Pike (run 1, S9): only a pointer could move a card. It is a Tab stop now: arrows move it (Shift: bigger steps),
+        // Enter or leaving puts it down, Escape puts it back. Pointer and keys take, move and put through the same three steps.
+        el.dataset.drag = "1"; el.tabIndex = 0;
+        let m0 = null, x = 0, y = 0;
+        const to = (nx, ny) => { x = Math.max(0, Math.round(nx)); y = Math.max(0, Math.round(ny)); el.style.left = x + "px"; el.style.top = y + "px"; };
+        const take = () => { m0 = el._n; hold = n.key; x = m0.box[0]; y = m0.box[1]; };
+        const put = back => { const m = m0; m0 = null; if (back) to(m.box[0], m.box[1]);
+          if (!back && (x !== m.box[0] || y !== m.box[1])) send(m, a.line.replace("$x", x).replace("$y", y)); else hold = null; };
         el.addEventListener("pointerdown", e => {
           if (e.target.isContentEditable && e.target !== el) return;
-          const m0 = el._n; hold = n.key; el.setPointerCapture(e.pointerId);
-          const x0 = e.clientX, y0 = e.clientY; let x = m0.box[0], y = m0.box[1];
-          const move = m => { x = Math.max(0, m0.box[0] + m.clientX - x0); y = Math.max(0, m0.box[1] + m.clientY - y0); el.style.left = x + "px"; el.style.top = y + "px"; };
-          const up = () => {
-            el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up);
-            if (x !== m0.box[0] || y !== m0.box[1]) send(m0, a.line.replace("$x", Math.round(x)).replace("$y", Math.round(y))); else hold = null;
-          };
+          take(); el.setPointerCapture(e.pointerId);
+          const x0 = e.clientX - x, y0 = e.clientY - y, move = m => to(m.clientX - x0, m.clientY - y0);
+          const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); put(false); };
           el.addEventListener("pointermove", move); el.addEventListener("pointerup", up);
         });
+        el.addEventListener("keydown", e => {
+          const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key], step = e.shiftKey ? 40 : 8;
+          if (e.target !== el || !(d || m0)) return;
+          if (d) { e.preventDefault(); if (!m0) take(); to(x + d[0] * step, y + d[1] * step); }
+          if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); put(e.key === "Escape"); }
+        });
+        el.addEventListener("blur", () => { if (m0 && !repainting) put(false); });
       }
     }
     for (const k of n.kids) el.appendChild(make(k));
@@ -111,25 +116,20 @@
     const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}`)).json();
     const key = JSON.stringify(r.scene || r.refused);
     if (key === last && !force) return;
-    last = key;
-    sceneAt = r.events_total;
-    def = (r.scene && r.scene.def) || null;
+    last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || null;
     if (r.refused) { if (!hold) paint.replaceChildren(); text = "refused: " + r.refused; show(); return; }
     const ed = document.activeElement, s = getSelection(), sel = s.rangeCount ? [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset] : null;
-    repainting = true;
-    try {
+    repainting = true; try {
       next = new Map(); const root = make(r.scene); kept = next;
       if (paint.firstChild !== root) paint.replaceChildren(root);
       if (ed && ed !== document.body && ed.isConnected && document.activeElement !== ed) ed.focus();
       if (sel && sel[0].isConnected && sel[2].isConnected) s.setBaseAndExtent(...sel);
     } finally { repainting = false; }
-    text = r.text; show();
-    report();
+    text = r.text; show(); report();
   }
 
   // Iris, Lark: only the painter knows what happened. It says so: which clamps bit, what is out of this viewer's view.
-  let told = "";
-  function report() {
+  let told = ""; function report() {
     const vp = paint.getBoundingClientRect(), facts = {};
     for (const el of paint.querySelectorAll("[data-key]")) {
       const r = el.getBoundingClientRect(), f = [];
