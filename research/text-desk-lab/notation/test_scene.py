@@ -177,6 +177,23 @@ def test_resolve_judges_frames_before_evaluation():
     assert [scene.classify(x, sc) for x in ("d", "a", "beds", "me", "title", "it")] == ["let", "frame", "prop", "host", "field", "frame"]
 
 
+def test_emission_gives_the_painter_its_contract():
+    import deskd, json
+    tmp = _scratch("_test_emit")
+    try:
+        with deskd.Session("_test_emit", "jeff") as desk:
+            sc, _ = scene.scene_for(desk, "beds-lens")
+    finally:
+        tmp.unlink(missing_ok=True)
+    assert sc["paint"] == {"kind": "frame", "flow": "column"}
+    card = sc["kids"][0]
+    assert card["paint"]["kind"] == "text" and card["paint"]["text"].endswith("beds")
+    assert set(card["fence"]) >= {"item", "rev", "reads", "defpart"} and card["acts"][0]["on"] == "click"
+    pv = scene.painter_view(sc)
+    assert set(pv) == {"key", "paint", "acts", "kids", "part"} and set(pv["kids"][0]) == {"key", "paint", "acts", "kids", "fence", "part"}
+    assert "reads" not in json.dumps({k: v for k, v in pv["kids"][0].items() if k != "fence"})
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"

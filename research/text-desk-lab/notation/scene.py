@@ -1068,6 +1068,61 @@ def _compile(desk, s, stack, count, closure):
         return sc
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Stage 6, emission. Pike's node contract (pike-7 section 6): every node the painter receives is {key, paint, acts, fence,
+# kids}. `paint` is exactly what is drawn, and the painter's signature is paint plus the acts' shapes plus the kids' keys,
+# so an unrelated event no longer remakes an element. `fence` is opaque to the painter: sent back with a gesture, never
+# drawn, never compared. Provenance (the, derived, test, read, freads, frames, captured, members, states, missing, of,
+# cut) stays on the node for the printer and need not travel to the painter.
+# ---------------------------------------------------------------------------------------------------------------------
+PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views")
+
+
+def emit(node):
+    """Add `paint` and `fence` to a scene node and its kids, from the fields the evaluator produced. Idempotent."""
+    if node.get("absent"):
+        paint = {"kind": "text", "absent": True, "why": node.get("why") or f"not {node['absent']}", "text": None}
+    elif node.get("state") and node["state"] != "live" and not node.get("kids"):
+        paint = {"kind": "text", "state": node["state"], "text": node.get("text")}
+    elif node.get("layout"):
+        paint = {"kind": "frame", "flow": node["layout"]}
+    else:
+        paint = {"kind": "text", "text": node.get("text"), "wrap": "prose"}
+    if node.get("text") is not None and paint["kind"] == "frame":
+        paint["text"] = node["text"]           # a frame with words: kept until the frame/leaf split (pike-7 section 4)
+    if node.get("clamp") is not None:
+        paint["clamp"] = node["clamp"]
+    if node.get("role"):
+        paint["role"] = node["role"]
+    if node.get("box"):
+        paint["box"] = node["box"]
+        if node.get("placed"):
+            paint["placed_by"] = node["placed"]
+    if node.get("lens"):
+        paint["placed"] = {"lens": node["lens"]}
+    if node.get("role") == "cut":
+        paint["cut"] = True
+    node["paint"] = paint
+    if node.get("acts"):
+        fence = {k: node[k] for k in ("item", "rev", "reads", "defpart", "bind") if k in node}
+        if any(a.get("on") == "drop" for a in node["acts"]):
+            fence["key"] = node["key"]           # c368: a drop receiver's occurrence is part of what the drop means
+        node["fence"] = fence
+    for k in node.get("kids") or []:
+        emit(k)
+    return node
+
+
+def painter_view(node):
+    """The node as the painter should see it: key, paint, acts, fence, kids, and nothing else."""
+    out = {"key": node["key"], "paint": node.get("paint"), "acts": node.get("acts") or [], "kids": [painter_view(k) for k in node.get("kids") or []]}
+    if node.get("fence"):
+        out["fence"] = node["fence"]
+    if node.get("part"):
+        out["part"] = node["part"]
+    return out
+
+
 def _identity():
     import hashlib
     here = pathlib.Path(__file__).resolve().parent
@@ -1082,6 +1137,7 @@ def scene_for(desk, name):
     s = find_lens(desk, name)
     closure = []
     sc = _compile(desk, s, (s["title"].lower(),), [0], closure)
+    emit(sc)                      # stage 6: the painter's contract on every node
     at = len(desk.world.events)
     fallen = [c for c in closure if c["status"] == "fallback"]
     sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
