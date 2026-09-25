@@ -26,7 +26,7 @@ An unindented name defines a part; the first one is the root.
                                  comments:<id> actors events worktrees (`rows <source>` prints them). An empty
                                  repeat prints (empty); it never looks like a full one
     over $tags                   repeat over a list field of the current thing; $it is each value
-    each <part>                  what to instantiate for each repeated thing; $n is the count, on and under the repeat
+    each <part>                  what to instantiate for each repeated thing; $count is the count, on and under the repeat ($n still works on the repeat itself)
     at item                      take x,y,w,h from the thing's own appearance in the world (parent must be free)
     spread x <a> step <n|$prop> to <max>   place repeated parts along an axis (also y). $prop is a numeric prop of the
                                  lens note itself: do prop <lens> spacing=210. Computed presentation, never written back
@@ -58,7 +58,7 @@ import re
 
 LAYOUTS = ("column", "row", "free")
 GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
-NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n")
+NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count")
 
 
 class LensRefusal(Exception):
@@ -435,6 +435,10 @@ def _inst(ctx, node, ictx):
     ictx = dict(ictx)
     frames = dict(ctx.get("_frames") or {})
     if node["as"]:
+        if node["as"] in frames:
+            # Juniper A1 (Pike's rule N1): an inner `as a` silently replaced the outer one, and "Alpha under Alpha" printed
+            # under both rows. A frame may not shadow a frame named above it.
+            raise LensRefusal(f"line {node['line']}: `as {node['as']}` would shadow the frame `as {node['as']}` named above this part; choose another frame name")
         frames[node["as"]] = ictx
     ictx["_frames"] = frames
     return ictx
@@ -640,22 +644,23 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                 rs = rows(desk, sel_text)
                 keep = node["clamp"] or 10 ** 9       # Flint: clamp N on a repeat; 305 things put 305 nodes in both printers
                 total = len(rs) if rs is not None else None
+                cnt = min(total, keep) if total is not None else None
                 for k, r in enumerate((rs or [])[:keep]):
                     # Pike: sections and tags were keyed by position, so an insert retargeted every draft below it. Key by what it is.
                     okey = r.get("cid") or r.get("eid") or r.get("name") or (_slug(r["heading"]) if "heading" in r else k)
-                    out["kids"].append(make(each, _inst(ctx, node, dict(ctx, **r)), f"{key}/{okey}", node["layout"], chain))
+                    out["kids"].append(make(each, _inst(ctx, node, {**ctx, "count": cnt, **r}), f"{key}/{okey}", node["layout"], chain))
                 named = _named(w, sel_text) if rs is None else None
                 if named is not None:
                     total = len(named)
                     for i, st in named[:keep]:
-                        out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i, st)), f"{key}/{i}", node["layout"], chain))
+                        out["kids"].append(make(each, _inst(ctx, node, dict(_ctx_for(w, i, st), count=min(total, keep))), f"{key}/{i}", node["layout"], chain))
                     out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                 else:
                     sel = desk._parse_selection(sel_text) if rs is None else None
                     ids = sel[0] if sel else []
                     total = len(ids) if total is None else total
                     for i in ids[:keep]:
-                        out["kids"].append(make(each, _inst(ctx, node, _ctx_for(w, i)), f"{key}/{i}", node["layout"], chain))
+                        out["kids"].append(make(each, _inst(ctx, node, dict(_ctx_for(w, i), count=min(total, keep))), f"{key}/{i}", node["layout"], chain))
                 # Juniper (round six, past Sable's probes): tagging a thing outside the printed reads moved the scene, because
                 # the repeat had read "the set matching tag:day" and recorded nothing. A membership read is a read.
                 got = [k["item"] or k["key"] for k in out["kids"]]
@@ -666,13 +671,14 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                                         "text": f"{total - keep} more not shown (clamp {keep}); find {_fill(node['of'], ctx)} lists all {total}",
                                         "clamp": None, "acts": [], "kids": []})
             else:
-                for k, v in enumerate(ctx.get("_" + node["over"], [])):
+                rows_over = ctx.get("_" + node["over"], [])
+                for k, v in enumerate(rows_over):
                     if isinstance(v, dict):         # rows from a derive (days-from): $it.n $it.date, keyed by n
-                        ictx = _inst(ctx, node, dict(ctx, it=str(v.get("date", v.get("n", "")))))
+                        ictx = _inst(ctx, node, dict(ctx, it=str(v.get("date", v.get("n", ""))), count=len(rows_over)))
                         ictx["_frames"] = dict(ictx["_frames"], it=v)
                         out["kids"].append(make(each, ictx, f"{key}/{_slug(str(v.get('n', k)))}", node["layout"], chain))
                     else:
-                        out["kids"].append(make(each, _inst(ctx, node, dict(ctx, it=v)), f"{key}/{_slug(str(v))}", node["layout"], chain))
+                        out["kids"].append(make(each, _inst(ctx, node, dict(ctx, it=v, count=len(rows_over))), f"{key}/{_slug(str(v))}", node["layout"], chain))
             # the same thing twice in one repeat gave two identical keys (Pike); an occurrence is (thing, ordinal here)
             seen_keys = {}
             for kid in out["kids"]:
@@ -697,7 +703,7 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
             out["kids"].append(sub)
             out["lens"] = inner
         for kid in node["kids"]:
-            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", ""))), f"{key}/{kid['name']}", node["layout"], chain))
+            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("n", ctx.get("count", ""))), f"{key}/{kid['name']}", node["layout"], chain))
         return out
 
     return make(parts[root], {}, root)

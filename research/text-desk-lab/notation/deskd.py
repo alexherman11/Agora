@@ -224,7 +224,14 @@ class Handler(SimpleHTTPRequestHandler):
                     who = f" ({last[-1]['id']} {last[-1]['verb']} by {last[-1]['by']})" if last else ""
                     return self._json({"text": None, "error": f"refused: {ob['item']} changed since this was painted (you saw revision {ob['rev']}, "
                                        f"it is now {now}{who}); nothing was done. The view will repaint.", "events_total": len(desk.world.events), "line": line})
-                desk.seen[ob["item"]] = ob["rev"]
+                # Pike report 2 (S5): after the aspect fence accepts, the desk's own staleness check still saw the old
+                # revision; what was judged is now seen.
+                desk.seen[ob["item"]] = now if now != ob["rev"] else ob["rev"]
+                if now != ob["rev"]:
+                    idx = getattr(desk, "_seen_idx", None)
+                    if idx is None:
+                        idx = desk._seen_idx = {}
+                    idx[(sess.actor, ob["item"])] = len(desk.world.events)
             for entry in (ob.get("reads") or []):
                 # Pike F1: a gesture is judged on every value its line was built from, not only the clicked item.
                 # Juniper's stale "move to Sun": the item and the lens were unchanged, the trip's start had moved.

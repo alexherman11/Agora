@@ -126,6 +126,30 @@ def test_a_batch_applies_whole_or_not_at_all():
         tmp.unlink(missing_ok=True)
 
 
+def _scratch(name):
+    import shutil, pathlib
+    src, tmp = pathlib.Path("sessions/frontier-jeff-probe.pickle"), pathlib.Path(f"sessions/{name}.pickle")
+    shutil.copy(src, tmp)
+    return tmp
+
+
+def test_a_frame_may_not_shadow_one_above_and_count_is_defined_inside_instances():
+    import deskd
+    tmp = _scratch("_test_scope")
+    try:
+        with deskd.Session("_test_scope", "jeff") as desk:
+            shadow = chr(10).join(["x : column, of kind:note as a, each y", "y : column, of kind:note as a, each z", 'z : text "$a.title"'])
+            try:
+                scene.build(desk, shadow)
+                raise AssertionError("shadowing admitted")
+            except scene.LensRefusal as e:
+                assert "would shadow the frame `as a`" in str(e)
+            counted = chr(10).join(["root : column, of kind:note, each d", 'd : text "$count things here"'])
+            sc = scene.build(desk, counted)
+            assert [k["text"] for k in sc["kids"]] == ["2 things here", "2 things here"]
+    finally:
+        tmp.unlink(missing_ok=True)
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"
