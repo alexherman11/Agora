@@ -34,6 +34,13 @@ SESSIONS = HERE / "sessions"
 STATIC = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else HERE / "desk-shell"
 
 
+def _brief(answer, top=6):
+    if isinstance(answer, str):
+        return answer
+    ids = [x[0] if isinstance(x, (list, tuple)) else x for x in answer]
+    return "nothing" if not ids else ", ".join(ids[:top]) + (f" and {len(ids) - top} more" if len(ids) > top else "")
+
+
 def touched_aspects(w, sid, seen, now, fields):
     """Did any of `fields` (aspects, as desk.aspects_of names them) change on `sid` between revision `seen` and `now`?
     Pike a308: a retitle used to refuse a gesture that had only read a prop. Until Sable's journal records one row per
@@ -50,6 +57,16 @@ def touched_aspects(w, sid, seen, now, fields):
     step = max(0, int(now) - int(seen))
     recent = hits[-step:] if 0 < step <= len(hits) else hits
     return any(aspects_meet(set(fields), aspects_of(seen_as(e).get("via") or seen_as(e)["verb"], seen_as(e).get("args"))) for e in recent)
+
+
+def same_answer(desk, q, answer):
+    """A membership read (sable-8 amended): the selection `q` a gesture's chain bound, re-asked now. -> (same, now)."""
+    try:
+        named = scene._named(desk.world, q)
+        now = [list(x) for x in named] if named is not None else list((desk._parse_selection(q) or ([], ""))[0])
+    except Exception as e:                # the selection itself no longer parses (a title it named is gone)
+        return False, f"unanswerable: {e}"
+    return now == answer, now
 
 
 def same_part(desk, dp):
@@ -218,6 +235,15 @@ class Handler(SimpleHTTPRequestHandler):
                 # Pike F1: a gesture is judged on every value its line was built from, not only the clicked item.
                 # Juniper's stale "move to Sun": the item and the lens were unchanged, the trip's start had moved.
                 sid, rev, fields = (list(entry) + [None, None])[:3]
+                if sid == "select":
+                    # sable-8 amended: the chain's bind is a membership read; "mark done" must not land on a task that
+                    # left the person's list, and `the` must not act through a match that became ambiguous
+                    same, now = same_answer(desk, rev, fields)
+                    if not same:
+                        return self._json({"text": None, "error": f"refused: what this gesture was under has changed: `{rev}` "
+                                           f"answered {_brief(fields)} when it was painted and answers {_brief(now)} now; nothing was done. The view will repaint.",
+                                           "events_total": len(desk.world.events), "line": line})
+                    continue
                 cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
                 if cur is not None and cur["rev"] != rev and fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields):
                     continue              # it moved, but on an aspect this gesture never read
@@ -245,6 +271,12 @@ class Handler(SimpleHTTPRequestHandler):
                                        "events_total": len(desk.world.events), "line": line})
             for entry in (rcv.get("reads") or []):
                 sid, rev, fields = (list(entry) + [None, None])[:3]
+                if sid == "select":
+                    if not same_answer(desk, rev, fields)[0]:
+                        return self._json({"text": None, "error": f"refused: the place this was dropped on is no longer under what it was painted under "
+                                           f"(`{rev}` answers differently now); nothing was done. The view will repaint.",
+                                           "events_total": len(desk.world.events), "line": line})
+                    continue
                 cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
                 if cur is not None and cur["rev"] != rev and fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields):
                     continue

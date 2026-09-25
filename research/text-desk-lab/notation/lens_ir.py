@@ -63,6 +63,45 @@ class Accessor:
 # Stage 4, lower. A part becomes one IR node holding its operations in the fixed order, with dependency edges: the
 # $names each operation uses (Sable: R_g is derived from these, not from what a tracker happened to see).
 # ---------------------------------------------------------------------------------------------------------------------
+def term_aspects(q):
+    """The aspects of a member that selection `q`'s terms read (sable-8 amended R_g: a `bind many` instance is a member
+    while these hold). -> (subject aspects, appearance aspects). `kind` and `age` are not aspects any verb declares;
+    a kind change would go unfenced here, and age moves only with the clock."""
+    subj, app = set(), set()
+    for t in [x for x in re.split(r"[,\s]+", q.strip()) if x]:
+        t = t[1:] if t.startswith("-") else t
+        if t.startswith("tag:"):
+            subj.add("tags")
+        elif t.startswith("prop:"):
+            subj.add("prop:" + t[5:].split("=")[0])
+        elif t.startswith("title:"):
+            subj.add("title")
+        elif t.startswith("?"):
+            subj |= {"title", "text", "tags"}
+        elif t.startswith(("due<", "due>")):
+            subj.add("due")
+        elif t.startswith(("in:", "also:")) or t == "hidden":
+            app.add("place")
+        elif t.startswith(("comments:", "links:", "parts:", "part-of:")):
+            subj.add(t.split(":")[0])
+    return subj, app
+
+
+def _member_reads(w, i, q):
+    """The [id, rev, aspects] entries that say `i` is a member of select(q)."""
+    subj, app = term_aspects(q)
+    n = w.nodes.get(i)
+    sid = n.get("subject") if n else (i if i in w.subjects else None)
+    out = []
+    if subj and sid and sid in w.subjects:
+        out.append([sid, w.subjects[sid]["rev"], sorted(subj)])
+    if subj and not sid and n:
+        out.append([i, n["rev"], sorted(subj)])
+    if app and n:
+        out.append([i, n["rev"], sorted(app)])
+    return out
+
+
 def _deps(*texts):
     out = set()
     for t in texts:
@@ -105,7 +144,7 @@ def lower(root, parts):
 # Stage 5, evaluate. A transcription of scene.build's make(), with the world reached only through the accessor, the
 # fixed order within a part, host facts in Gamma, count as the true size, and one rule for guards.
 # ---------------------------------------------------------------------------------------------------------------------
-def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None):
+def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=()):
     root, parts = S.parse(src)
     S.resolve(root, parts)
     irs, root = lower(root, parts)
@@ -135,8 +174,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         return {"part": node["part"], "key": key, "role": None, "layout": None, "item": ctx.get("item"), "box": None,
                 "text": None, "clamp": None, "acts": [], "kids": [], "absent": node["guard"]["src"], **({"why": why} if why else {})}
 
-    def make(node, ctx, key, parent_layout="free", chain=()):
+    def make(node, ctx, key, parent_layout="free", chain=(), cb=()):
         chain = chain + (node["ast"],)
+        cb = list(cb)                      # sable-8 amended: R_g includes the binds on the gesture's chain
         em = node["emit"]
         if em["at"] == "item" and parent_layout != "free":
             raise S.LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
@@ -152,6 +192,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         if b and b["kind"] == "one":
             sel_text = S._fill(b["q"], ctx, track)
             named, ids = acc.select(sel_text)
+            # the membership read (q, S): the whole answer, since a new match anywhere turns live into ambiguous
+            cb.append(["select", sel_text, [list(x) for x in named] if named is not None else list(ids)])
             if named is not None:
                 ids = [i for i, st in named if st == "live"] or [i for i, st in named if st == "unplaced"]
             if len(ids) == 1:
@@ -267,7 +309,15 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames]:
                 if i and S._rev_of(w, i) is not None:
                     reads[i] = S._rev_of(w, i)
-            out["reads"] = [[i, r, sorted(fields.get(i) or [])] for i, r in sorted(reads.items())]
+            selects = []
+            for e in cb:
+                if e[0] == "select":
+                    if e not in selects:
+                        selects.append(e)
+                elif S._rev_of(w, e[0]) is not None:
+                    reads[e[0]] = S._rev_of(w, e[0])
+                    fields.setdefault(e[0], set()).update(e[2])
+            out["reads"] = [[i, r, sorted(fields.get(i) or [])] for i, r in sorted(reads.items())] + selects
             out["defpart"] = {"path": "/".join(n["name"] for n in chain), "hash": S._chain_hash(chain)}
         if ctx.get("item") in w.nodes and out["acts"]:
             out["rev"] = w.nodes[ctx["item"]]["rev"]
@@ -290,18 +340,20 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 if rs is not None:
                     for k, r in enumerate(rs[:keep]):
                         okey = r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
-                        out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, **r}), f"{key}/{okey}", em["layout"], chain))
+                        out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
+                    shown = [["select", sel_text, [list(x) for x in named[:keep]] if named is not None else list(ids[:keep])]] if b["clamp"] else []
                     if named is not None:
                         total = len(named)
                         for i, st in named[:keep]:
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total)), f"{key}/{i}", em["layout"], chain))
+                            mcb = cb + shown + ([[i, S._rev_of(w, i), []]] if st != "live" else _member_reads(w, i, sel_text))
+                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total)), f"{key}/{i}", em["layout"], chain, mcb))
                         out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                     else:
                         total = len(ids)
                         for i in ids[:keep]:
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total)), f"{key}/{i}", em["layout"], chain))
+                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total)), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
                 got = [k["item"] or k["key"] for k in out["kids"]]
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 if total > keep:
@@ -315,9 +367,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     if isinstance(v, dict):
                         ictx = S._inst(ctx, node["ast"], dict(ctx, it=str(v.get("date", v.get("n", ""))), count=len(rows_over)))
                         ictx["_frames"] = dict(ictx["_frames"], it=v)
-                        out["kids"].append(make(each, ictx, f"{key}/{S._slug(str(v.get('n', k)))}", em["layout"], chain))
+                        out["kids"].append(make(each, ictx, f"{key}/{S._slug(str(v.get('n', k)))}", em["layout"], chain, cb))
                     else:
-                        out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(ctx, it=v, count=len(rows_over))), f"{key}/{S._slug(str(v))}", em["layout"], chain))
+                        out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(ctx, it=v, count=len(rows_over))), f"{key}/{S._slug(str(v))}", em["layout"], chain, cb))
             seen_keys = {}
             for kid in out["kids"]:
                 c = seen_keys.get(kid["key"], 0) + 1
@@ -336,22 +388,22 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             inner = S._fill(node["place"], ctx)
             if inner.lower() in stack:
                 raise S.LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
-            sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc)
+            sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb)
             sub["key"] = f"{key}/lens:{inner}"
             S._rekey(sub, sub["key"])
             out["kids"].append(sub)
             out["lens"] = inner
         # --- fixed kids
         for kid in node["kids"]:
-            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("n", ctx.get("count", ""))), f"{key}/{kid['part']}", em["layout"], chain))
+            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("n", ctx.get("count", ""))), f"{key}/{kid['part']}", em["layout"], chain, cb))
         return out
 
-    sc = make(irs[root], {}, root)
+    sc = make(irs[root], {}, root, cb=cb)
     sc["R"] = list(acc.R)
     return sc
 
 
-def compile_lens(desk, s, stack, count, closure, acc=None):
+def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
     """One lens to a scene through the staged pipeline, recording the definition used; fallback as scene._compile does."""
     good = getattr(desk, "_lens_good", None)
     if good is None:
@@ -367,7 +419,7 @@ def compile_lens(desk, s, stack, count, closure, acc=None):
         for k in node.get("kids") or []:
             stamp(k)
     try:
-        sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc)
+        sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
         stamp(sc)
         good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
         return sc

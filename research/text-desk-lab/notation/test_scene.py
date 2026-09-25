@@ -136,6 +136,32 @@ def test_only_when_takes_a_value_test_and_prints_it():
         tmp.unlink(missing_ok=True)
 
 
+def test_binds_on_chain_are_reads():
+    """sable-8 amended: a gesture's fence includes the binds above it. `the` carries the membership read (q, S); an
+    instance carries the aspects its selection's terms name. Soundness instrument: 21 unsound of 900 before, 0 after."""
+    import deskd, lens_ir
+    assert lens_ir.term_aspects("kind:task,prop:owner=juniper,-prop:status=done,due<today,tag:x,in:f01") == ({"prop:owner", "prop:status", "due", "tags"}, {"place"})
+    tmp = _scratch("_test_binds")
+    try:
+        with deskd.Session("_test_binds", "jeff") as desk:
+            desk.repl("look"); desk.repl("do create f01 kind=note title=Charter text=one")
+            desk.repl("do create f01 kind=task title=Chore owner=jeff")
+            src = chr(10).join(["root : column, the kind:note,title:Charter, as ch", "  open : text \"$ch.title\", on click do prop $item open=1",
+                                "  chores : column, of kind:task,prop:owner=jeff, each c", "c : text \"$title\", on click do check $item"])
+            sc = lens_ir.evaluate(desk, src)
+            gest = sc["kids"][0]
+            sel = [e for e in gest["reads"] if e[0] == "select"]
+            assert sel and sel[0][1] == "kind:note,title:Charter" and len(sel[0][2]) == 1, gest["reads"]
+            chore = sc["kids"][1]["kids"][0]
+            assert any(e[0] != "select" and "prop:owner" in e[2] for e in chore["reads"]), chore["reads"]
+            assert deskd.same_answer(desk, sel[0][1], sel[0][2])[0]
+            desk.repl("do create f01 kind=note title=Charter text=two")
+            same, now = deskd.same_answer(desk, sel[0][1], sel[0][2])
+            assert not same and len(now) == 2
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_carry_and_drop_shape():
     refused("root : column, of kind:note, each c\nc : text a, carry, on drag do move $item x=$x", "cannot both `carry` and `on drag`")
     refused("root : column, on drop c do move $carried into=$item", "no part named 'c' says `carry`")

@@ -942,6 +942,12 @@ def to_text(scene, name, who, at):
         lines.append(f"  ~ {a} is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')} · painted world @{v.get('at')}"
                      + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}")
 
+    def rv(v, top=120):
+        """A read value on one line: newlines become ` / ` as in a body, and a long one is cut and says so (Juniper,
+        juniper-7: a chat's text in a read put lines at column zero and every indentation reader mis-parsed the print)."""
+        t = " / ".join(str(v).splitlines()) if isinstance(v, str) else v
+        return (t[:top] + f" (={top} of {len(t)} chars)") if isinstance(t, str) and len(t) > top else t
+
     def pr(n, d, pkey=None):
         bits = [n["part"]]
         if n.get("absent"):
@@ -983,13 +989,13 @@ def to_text(scene, name, who, at):
         for dv in n.get("derived") or []:
             bits.append(f"· {dv['name']} = {dv['interp']}({', '.join(dv['inputs'])}) = {dv['result']}" if not dv["error"] else f"· {dv['name']}: (uninterpretable: {dv['error']})")
         if n.get("read"):
-            bits.append("· read " + " ".join(f"{k}={v}" for k, v in n["read"].items()))
+            bits.append("· read " + " ".join(f"{k}={rv(v)}" for k, v in n["read"].items()))
         if n.get("freads"):
             byf = {}
             for k, v in n["freads"].items():
                 f, fld = k.split(".", 1)
                 byf.setdefault(f, []).append(f"{fld}={v}")
-            bits.append("· read " + "; ".join(f"{f} " + (f"{n.get('frames', {}).get(f)} " if n.get('frames', {}).get(f) else "") + " ".join(fs) for f, fs in byf.items()))
+            bits.append("· read " + "; ".join(f"{f} " + (f"{n.get('frames', {}).get(f)} " if n.get('frames', {}).get(f) else "") + " ".join(rv(x) for x in fs) for f, fs in byf.items()))
         if n.get("missing"):
             bits.append("(" + ", ".join(f"no {m}" for m in n["missing"]) + ")")
         if n.get("state"):

@@ -98,9 +98,20 @@ def perturbations(desk):
     return out
 
 
-def touches(reads, writes, desk):
+def touches(reads, writes, desk, after=None):
     w = desk.world
     for rid, _rev, aspects in reads:
+        if rid == "select":
+            # Jeff, after the amendment: a membership read (q, S) is touched when re-asking q in the edited world answers differently
+            q, answer = _rev, aspects
+            named = scene._named(after.world, q)
+            try:
+                now = [list(x) for x in named] if named is not None else list((after._parse_selection(q) or ([], ""))[0])
+            except Exception:
+                now = None
+            if now != answer:
+                return True
+            continue
         ids = {rid} | ({w.nodes[rid].get("subject")} if rid in w.nodes else set()) | set(w.appearances_of(rid) if rid in w.subjects else [])
         for wid, a in writes:
             if wid not in ids:
@@ -143,7 +154,7 @@ def check_world(label, run):
             for key, g in g0.items():
                 found["trials"] += 1
                 changed = g1.get(key, {}).get("acts") != g["acts"]
-                hit = touches(g["reads"], writes, base)
+                hit = touches(g["reads"], writes, base, r.desk)
                 found["touched"] += hit
                 if hit and not changed:
                     found["overread"] += 1
