@@ -4,6 +4,8 @@
     python suite/sessions.py --at <rev>      ... as committed at <rev>
     python suite/sessions.py --check         print again with the current compiler over the SAME worlds (the rev
                                              recorded in golden/sessions/INDEX.txt) and list what differs
+    python suite/sessions.py --rebase <session>/<lens> ...   accept an intended change: rewrite those prints with the
+                                             current compiler over the same worlds, and say so in INDEX.txt
 
 Worlds are read from git (`git show <rev>:.../sessions/<name>.pickle`), never from the working tree, so a
 session someone is using right now cannot move under the comparison, and nothing is written back. Each print is
@@ -133,9 +135,27 @@ def check():
         print(f"  new: {name}")
 
 
+def rebase(names):
+    idx = (OUT / "INDEX.txt").read_text(encoding="utf-8").splitlines()
+    rev = idx[0].split()[1]
+    found = prints_at(rev)
+    for name in names:
+        session, _, lens = name.partition("/")
+        hit = [(t, x) for t, x in found.get(session, {}).get("lenses", {}).items() if slug(t) == lens]
+        if not hit:
+            print(f"no lens {name} at {rev}")
+            continue
+        (OUT / session / f"{lens}.txt").write_text(hit[0][1] + "\n", encoding="utf-8", newline="\n")
+        idx.append(f"rebased {name} with the working-tree compiler at {git('rev-parse', '--short', 'HEAD')} (an intended change)")
+        print(f"rebased {name}")
+    (OUT / "INDEX.txt").write_text("\n".join(idx) + "\n", encoding="utf-8", newline="\n")
+
+
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if "--check" in sys.argv:
+    if "--rebase" in sys.argv:
+        rebase(sys.argv[sys.argv.index("--rebase") + 1:])
+    elif "--check" in sys.argv:
         check()
     else:
         write(sys.argv[sys.argv.index("--at") + 1] if "--at" in sys.argv[:-1] else "HEAD")

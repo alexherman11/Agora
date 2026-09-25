@@ -9,48 +9,48 @@ scene rotation grid · for golden · world @56
             plant a05 column · 1 of parts:a03,prop:role=planting,prop:bed=A,prop:year=2025
               p a17 row · key a17
                 f a17 "brassica" · read family=brassica
-            rest a05 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a05 (absent: not prop:role=bed,prop:rest=2025)
           cell a08 [card] column · key a08
             name a08 "B" · read bed s07 bed=B
             plant a08 column · 1 of parts:a03,prop:role=planting,prop:bed=B,prop:year=2025
               p a20 row · key a20
                 f a20 "legume" · read family=legume
-            rest a08 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a08 (absent: not prop:role=bed,prop:rest=2025)
           cell a11 [card] column · key a11
             name a11 "C" · read bed s10 bed=C
             plant a11 column · 1 of parts:a03,prop:role=planting,prop:bed=C,prop:year=2025
               p a23 row · key a23
                 f a23 "nightshade" · read family=nightshade
-            rest a11 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a11 (absent: not prop:role=bed,prop:rest=2025)
           cell a14 [card] column · key a14
             name a14 "D" · read bed s13 bed=D
             plant a14 column · 0 of parts:a03,prop:role=planting,prop:bed=D,prop:year=2025 (empty)
-            rest a14 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a14 (absent: not prop:role=bed,prop:rest=2025)
       row a62 row · key a62
         label a62 "2026" · read yr s61 year=2026
         beds a62 row as bed · 4 of parts:a03,prop:role=bed
           cell a05 [card] column · key a05
             name a05 "A" · read bed s04 bed=A
             plant a05 column · 0 of parts:a03,prop:role=planting,prop:bed=A,prop:year=2026 (empty)
-            rest a05 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a05 (absent: not prop:role=bed,prop:rest=2026)
           cell a08 [card] column · key a08
             name a08 "B" · read bed s07 bed=B
             plant a08 column · 1 of parts:a03,prop:role=planting,prop:bed=B,prop:year=2026
               p a26 row · key a26
                 f a26 "brassica" · read family=brassica
-            rest a08 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a08 (absent: not prop:role=bed,prop:rest=2026)
           cell a11 [card] column · key a11
             name a11 "C" · read bed s10 bed=C
             plant a11 column · 1 of parts:a03,prop:role=planting,prop:bed=C,prop:year=2026
               p a29 row · key a29
                 f a29 "legume" · read family=legume
-            rest a11 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a11 (absent: not prop:role=bed,prop:rest=2026)
           cell a14 [card] column · key a14
             name a14 "D" · read bed s13 bed=D
             plant a14 column · 1 of parts:a03,prop:role=planting,prop:bed=D,prop:year=2026
               p a32 row · key a32
                 f a32 "nightshade" · read family=nightshade
-            rest a14 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a14 (absent: not prop:role=bed,prop:rest=2026)
       row a65 row · key a65
         label a65 "2027" · read yr s64 year=2027
         beds a65 row as bed · 4 of parts:a03,prop:role=bed
@@ -59,23 +59,23 @@ scene rotation grid · for golden · world @56
             plant a05 column · 1 of parts:a03,prop:role=planting,prop:bed=A,prop:year=2027
               p a41 row · key a41
                 f a41 "nightshade" · read family=nightshade
-            rest a05 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a05 (absent: not prop:role=bed,prop:rest=2027)
           cell a08 [card] column · key a08
             name a08 "B" · read bed s07 bed=B
             plant a08 column · 0 of parts:a03,prop:role=planting,prop:bed=B,prop:year=2027 (empty)
-            rest a08 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a08 (absent: not prop:role=bed,prop:rest=2027)
           cell a11 [card] column · key a11
             name a11 "C" · read bed s10 bed=C
             plant a11 column · 1 of parts:a03,prop:role=planting,prop:bed=C,prop:year=2027
               p a35 row · key a35
                 f a35 "brassica" · read family=brassica
-            rest a11 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a11 (absent: not prop:role=bed,prop:rest=2027)
           cell a14 [card] column · key a14
             name a14 "D" · read bed s13 bed=D
             plant a14 column · 1 of parts:a03,prop:role=planting,prop:bed=D,prop:year=2027
               p a38 row · key a38
                 f a38 "legume" · read family=legume
-            rest a14 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a14 (absent: not prop:role=bed,prop:rest=2027)
       row a68 row · key a68
         label a68 "2028" · read yr s67 year=2028
         beds a68 row as bed · 4 of parts:a03,prop:role=bed
@@ -84,7 +84,7 @@ scene rotation grid · for golden · world @56
             plant a05 column · 1 of parts:a03,prop:role=planting,prop:bed=A,prop:year=2028
               p a47 row · key a47
                 f a47 "legume" · read family=legume
-            rest a05 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a05 (absent: not prop:role=bed,prop:rest=2028)
           cell a08 [card] column · key a08
             name a08 "B" · read bed s07 bed=B
             plant a08 column · 0 of parts:a03,prop:role=planting,prop:bed=B,prop:year=2028 (empty)
@@ -94,10 +94,10 @@ scene rotation grid · for golden · world @56
             plant a11 column · 1 of parts:a03,prop:role=planting,prop:bed=C,prop:year=2028
               p a50 row · key a50
                 f a50 "nightshade" · read family=nightshade
-            rest a11 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a11 (absent: not prop:role=bed,prop:rest=2028)
           cell a14 [card] column · key a14
             name a14 "D" · read bed s13 bed=D
             plant a14 column · 1 of parts:a03,prop:role=planting,prop:bed=D,prop:year=2028
               p a44 row · key a44
                 f a44 "brassica" · read family=brassica
-            rest a14 (absent: not prop:role=bed,prop:rest=$yr.year)
+            rest a14 (absent: not prop:role=bed,prop:rest=2028)

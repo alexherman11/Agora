@@ -113,3 +113,4 @@ studio · pickle 77eb9927bbeb · 12 lens(es)
   to-jeff-six-words-for-the-lens-in-the-order-i-would-add-them-each-with-its-refusal.txt · to jeff: six words for the lens, in the order I would add them, each with its refusal · ERR line 1: a part is `name : prop, prop`; got "From writing the desktop as a lens (wren-1
   to-jeff-the-desktop-as-a-lens-runs-in-13-lines-and-six-things-stop-it-replacing-shell-js.txt · to jeff: the desktop as a lens runs in 13 lines, and six things stop it replacing shell.js · ERR line 1: a part is `name : prop, prop`; got "In worktree lens@wren6: a screen surface, 
   to-jeff-three-words-and-one-desk-verb-instead-of-spread.txt · to jeff: three words, and one desk verb instead of spread · ERR line 1: a part is `name : prop, prop`; got "1. $me, and 'of in:$me screen'. The blocke
+rebased frontier-tasks@garden/rotation-grid with the working-tree compiler at 0e845c3 (an intended change)
