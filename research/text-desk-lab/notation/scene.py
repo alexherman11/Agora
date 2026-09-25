@@ -728,7 +728,7 @@ def to_text(scene, name, who, at):
         lines.append(f"  ~ {a} is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')} · painted world @{v.get('at')}"
                      + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}")
 
-    def pr(n, d):
+    def pr(n, d, pkey=None):
         bits = [n["part"]]
         if n.get("absent"):
             lines.append("  " * d + f"{n['part']} {n.get('item') or ''} (absent: not {n['absent']})".replace("  (", " ("))
@@ -790,9 +790,14 @@ def to_text(scene, name, who, at):
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):
                 bits.append(f"~ {a}: {v['facts'][n['key']]}")
+        # Juniper (key form, 25 Sep), Pike's C4 gap: the occurrence key was painted as data-key and never printed. The
+        # segment is the key below the parent's; a fixed part's segment is its own name and prints nothing.
+        seg = n["key"][len(pkey) + 1:] if pkey and n["key"].startswith(pkey + "/") else n["key"]
+        if seg != n["part"]:
+            bits.append(f"· key {seg}")
         lines.append("  " * d + " ".join(bits))
         for k in n["kids"]:
-            pr(k, d + 1)
+            pr(k, d + 1, n["key"])
 
     pr(scene, 1)
     return "\n".join(lines)
