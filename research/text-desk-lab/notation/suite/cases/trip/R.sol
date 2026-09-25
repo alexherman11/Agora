@@ -4,7 +4,7 @@
 # The recorded M1 counts steps 2-10, as the run did (step 11 was reported apart).
 # Line marks: T target write or read, R repair, @X window X. `check` runs every place's reader.
 # `place <name> <read>` starts reading an output; `unplace <name>` stops. The seed (step 1) is in task.py.
-recorded M1=43 M2=13 M3=19 M4=1
+recorded M1=43 M2=13 M3=19 M4=1 M5=12
 
 step 2
 T do prop "Big Sur trip" role=trip

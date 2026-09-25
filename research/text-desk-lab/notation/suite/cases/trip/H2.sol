@@ -1,7 +1,7 @@
 # The trip, solution H2 (hybrid, Pike's binding words), as run on 23 September in frontier-trip@H2.
 # The trip doc carries start= and end=; items are notes with tripday= linked part-of the trip; every shown date
 # is derived (days-from, day-n) from the trip's start. Marks as in R.sol; A = an authoring retry (a write, not a repair).
-recorded M1=29 M2=0 M3=0 M4=1
+recorded M1=29 M2=0 M3=0 M4=1 M5=3
 
 step 2
 T do prop "Big Sur trip" role=trip start=2026-10-10 end=2026-10-11

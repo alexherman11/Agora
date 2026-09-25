@@ -187,3 +187,35 @@ def judge(key, value, p):
     if value == "0-of":
         return "silent 0-of"
     return "silent"
+
+
+def audit(world, p):
+    """M5, the stated-date audit, at the end of the run. The unit: a stored statement of the trip's dates is a
+    prop or due holding a date, a date literal in a lens or view definition, or a line of text stating a date,
+    except lines that tell history ('Moved ...'). What a view or lens displays is not stored; M3 judges that.
+    -> list of (where, what, agrees)."""
+    days = {day(p, 1), day(p, 2)}
+    rows = []
+    for s in world.subjects.values():
+        title = s.get("title", "")
+        lens = "lens" in (s.get("tags") or [])
+        for k, v in sorted((s.get("props") or {}).items()):
+            if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+                want = {"start": day(p, 1), "end": day(p, 2)}.get(k) or (day(p, p["items"][title]) if title in p["items"] else None)
+                rows.append((f"{title} prop {k}", v, v == want))
+        if s.get("due"):
+            rows.append((f"{title} due", s["due"], s["due"] in days))
+        for line in (s.get("text") or "").split("\n"):
+            if line.startswith("Moved"):
+                continue
+            stated = [d for d in (date_in(line),) if d]
+            rng = re.search(r"\b(" + "|".join(MONTHS) + r")\s+(\d{1,2})-(\d{1,2})\b", line)
+            if rng:
+                stated = [dt.date(2026, MONTHS[rng.group(1)], int(rng.group(i))).isoformat() for i in (2, 3)]
+            if stated:
+                rows.append((f"{title} {'lens literal' if lens else 'text'}: {line.strip()[:50]}", " ".join(stated), set(stated) <= days))
+    for n in world.nodes.values():
+        q = " ".join(str(n.get(k) or "") for k in ("query", "cols"))
+        for d in re.findall(r"\d{4}-\d{2}-\d{2}", q):
+            rows.append((f"view {n.get('title')} definition", d, d in days))
+    return rows

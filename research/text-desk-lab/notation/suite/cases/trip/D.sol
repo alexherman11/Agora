@@ -3,7 +3,7 @@
 # Marks as in R.sol. The recorded M1 counts steps 2-10.
 # The recorded M4 of 2 counted the step 5 append twice, as a silent wrong and as a wrong target; the instrument
 # counts it once, as the silent wrong (Pfeiffer Beach on day 2). The other was step 11, now refused per window.
-recorded M1=17 M2=1 M3=2 M4=2
+recorded M1=17 M2=1 M3=2 M4=2 M5=3
 
 step 2
 T do append "Big Sur trip" line="## Sat Oct 10"

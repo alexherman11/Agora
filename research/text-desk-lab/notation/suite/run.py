@@ -103,6 +103,8 @@ def load_solution(path):
         elif line.startswith("place "):
             _, name, kind, what = line.split(" ", 3)
             step["ops"].append(("place", name, kind, what))
+        elif line.startswith("probe "):
+            step["ops"].append(("probe", line.split()[1]))
         elif line.startswith("unplace "):
             step["ops"].append(("unplace", line.split()[1]))
         elif line.startswith("fact "):
@@ -215,6 +217,16 @@ def run_solution(task, path, show=False):
                 places[op[1]] = (op[2], op[3])
             elif op[0] == "unplace":
                 places.pop(op[1], None)
+            elif op[0] == "probe":
+                verdict, note = task.probe(op[1], run)
+                if verdict == "holds":
+                    continue
+                if op[1] in task.M4_FACTS:
+                    st["m4"] += 1
+                    notes.append(f"M4 {op[1]}: {note}")
+                else:
+                    seen_wrong.setdefault(("probe", ("probe", op[1]), note), verdict)
+                    notes.append(f"{verdict} {op[1]}: {note}")
             elif op[0] == "fact":
                 _, name, cmd, shows = op
                 if cmd is None:
@@ -235,11 +247,15 @@ def run_solution(task, path, show=False):
                 continue
             st[KINDS[v]] += 1
             if show:
-                notes.append(f"{v}: {place} {key[0]} {key[1]} says {value}")
+                notes.append(f"{v}: {place} {key[0]} {' '.join(map(str, key[1:]))} says {value}")
         standing = ending
         for k in tot:
             tot[k] += st[k]
         rows.append((step["name"], st, notes))
+    if hasattr(task, "audit"):
+        found = task.audit(run.desk.world, plan)
+        tot["m5"] = (len(found), sum(1 for f in found if not f[2]))
+        rows.append(("M5", None, [f"{'agrees' if ok else 'DISAGREES'}: {where} = {what}" for where, what, ok in found]))
     return sol, rows, tot, "\n\n".join(prints) + "\n"
 
 
@@ -271,12 +287,18 @@ def main():
         cols = ("writes", "repairs", "silent", "zero", "visible", "ne", "m4", "refused", "left")
         print("  step  " + " ".join(f"{c.replace('zero', '0-of').replace('ne', 'n/e').replace('m4', 'M4'):>7}" for c in cols))
         for sname, st, notes in rows:
+            if st is None:
+                a, b = tot["m5"]
+                print(f"  M5    stated-date statements stored at the end: {a}, disagreeing: {b}")
+                for n in notes if show else []:
+                    print(f"          {n}")
+                continue
             print(f"  {sname:<5} " + " ".join(f"{st[c]:>7}" for c in cols))
             for n in notes:
                 print(f"          {n}")
         print("  all   " + " ".join(f"{tot[c]:>7}" for c in cols))
         m1 = sum(st["writes"] for sname, st, _ in rows if sname in getattr(task, "M1_STEPS", {sname}))
-        now = {"M1": m1, "M2": tot["repairs"], "M3": tot["silent"] + tot["zero"] + tot["visible"], "M4": tot["m4"]}
+        now = {"M1": m1, "M2": tot["repairs"], "M3": tot["silent"] + tot["zero"] + tot["visible"], "M4": tot["m4"], "M5": (tot.get("m5") or ("-",))[0]}
         rec = sol["recorded"]
         diff = [f"{k} {rec[k]} then, {now[k]} now" for k in rec if str(now.get(k)) != rec[k]]
         print("  against the recorded run: " + ("same" if not diff else "; ".join(diff)))

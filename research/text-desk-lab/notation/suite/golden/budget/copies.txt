@@ -1,0 +1,117 @@
+== step 3 · split ==
+scene split · for juniper · world @N
+  split a03 column · the prop:role=house -> s02 (a03) as h
+    head a03 "Month from 2026-10-01" [heading]
+    bills a03 column as b · 3 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2400, each pays 800"
+      bill a17 row · key a17
+        t a17 "Utilities 180, each pays 60"
+      bill a20 row · key a20
+        t a20 "Internet 60, each pays 20"
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 880"
+      person a08 row · key a08
+        t a08 "Ben owes 880"
+      person a11 row · key a11
+        t a11 "Casey owes 880"
+
+== step 4 · split ==
+scene split · for juniper · world @N
+  split a03 column · the prop:role=house -> s02 (a03) as h
+    head a03 "Month from 2026-10-01" [heading]
+    bills a03 column as b · 3 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2400"
+      bill a17 row · key a17
+        t a17 "Utilities 180"
+      bill a20 row · key a20
+        t a20 "Internet 60"
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 1062.86"
+      person a08 row · key a08
+        t a08 "Ben owes 1062.86"
+      person a11 row · key a11
+        t a11 "Casey owes 514.29"
+
+== step 5 · split ==
+scene split · for juniper · world @N
+  split a03 column · the prop:role=house -> s02 (a03) as h
+    head a03 "Month from 2026-11-01" [heading]
+    bills a03 column as b · 3 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2550"
+      bill a17 row · key a17
+        t a17 "Utilities 180"
+      bill a20 row · key a20
+        t a20 "Internet 60"
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 1395"
+      person a08 row · key a08
+        t a08 "Ben owes 1395"
+      person a11 row · key a11
+        t a11 "Casey owes " (no owe)
+
+== step 5 · october ==
+scene split october · for juniper · world @N
+  split a03 column · the prop:role=house -> s02 (a03) as h · captured month=2026-10-01 (now 2026-11-01: differs)
+    head a03 "Month from 2026-10-01" [heading]
+    bills a03 column as b · 3 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2550"
+      bill a17 row · key a17
+        t a17 "Utilities 180"
+      bill a20 row · key a20
+        t a20 "Internet 60"
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 1395"
+      person a08 row · key a08
+        t a08 "Ben owes 1395"
+      person a11 row · key a11
+        t a11 "Casey owes " (no owe)
+
+== step 6 · split ==
+scene split · for juniper · world @N
+  split a03 column · the prop:role=house -> s02 (a03) as h
+    head a03 "Month from 2026-11-01" [heading]
+    bills a03 column as b · 4 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2550"
+      bill a17 row · key a17
+        t a17 "Utilities 180"
+      bill a20 row · key a20
+        t a20 "Internet 60"
+      bill a27 row · key a27
+        t a27 "Cleaning 90"
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 1440"
+      person a08 row · key a08
+        t a08 "Ben owes 1440"
+      person a11 row · key a11
+        t a11 "Casey owes " (no owe)
+
+== step 6 · october ==
+scene split october · for juniper · world @N
+  split a03 column · the prop:role=house -> s02 (a03) as h · captured month=2026-10-01 (now 2026-11-01: differs)
+    head a03 "Month from 2026-10-01" [heading]
+    bills a03 column as b · 4 of parts:a03,prop:role=bill
+      bill a14 row · key a14
+        t a14 "Rent 2550"
+      bill a17 row · key a17
+        t a17 "Utilities 180"
+      bill a20 row · key a20
+        t a20 "Internet 60"
+      bill a27 row · key a27
+        t a27 "Cleaning 90"
+    people a03 column as p · 3 of parts:a03,prop:role=person
+      person a05 row · key a05
+        t a05 "Ana owes 1440"
+      person a08 row · key a08
+        t a08 "Ben owes 1440"
+      person a11 row · key a11
+        t a11 "Casey owes " (no owe)
