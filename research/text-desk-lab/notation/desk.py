@@ -119,6 +119,15 @@ class Desk:
             if len(parts) > 1:
                 outs, error = [], False
                 reads = 0
+                # Sable's R4, build step 1b: a batch applies whole or not at all. Probe 4 applied `prop beds=6` and then
+                # refused `prop a999`, leaving half a change with an ok receipt. Until the journal's begin/set/commit exists,
+                # the whole desk is snapshotted before the batch and restored if a later part is refused.
+                import pickle as _pk
+                try:
+                    snap = _pk.dumps(self)
+                except Exception as e:           # honest: say the batch is not atomic rather than pretend
+                    snap = None
+                    outs.append(f"(this batch is not atomic: could not snapshot the desk: {e})")
                 for i, part in enumerate(parts):
                     if self.read_cap and part.split()[0].lower() in ("read", "examine"):
                         reads += 1
@@ -132,6 +141,11 @@ class Desk:
                     outs.append(f"[{i + 1}] {part}\n{body}")
                     if "error" in r:
                         error = True
+                        if i > 0 and snap is not None:
+                            self.__dict__.clear()
+                            self.__dict__.update(_pk.loads(snap).__dict__)
+                            outs.append(f"(nothing was done: the {i} earlier command(s) were rolled back because [{i + 1}] was refused; "
+                                        f"a batch applies whole or not at all)")
                         if i < len(parts) - 1:
                             rest = parts[i + 1:]
                             outs.append(f"(stopped; {len(rest)} later command(s) not run. Not run: {'; '.join(rest)}. "

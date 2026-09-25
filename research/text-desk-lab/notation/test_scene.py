@@ -107,6 +107,25 @@ def test_a_repeat_records_its_membership_read():
     assert m["of"] == "kind:note" and m["n"] == len(m["ids"]) == len(sc["kids"]) and isinstance(m["at"], int)
 
 
+def test_a_batch_applies_whole_or_not_at_all():
+    import deskd, shutil, pathlib
+    src, tmp = pathlib.Path("sessions/frontier-jeff-probe.pickle"), pathlib.Path("sessions/_test_batch.pickle")
+    shutil.copy(src, tmp)
+    try:
+        with deskd.Session("_test_batch", "jeff") as desk:
+            n0 = len(desk.world.events)
+            desk.batch = True
+            r = desk.dispatch("desk", {"line": "look; do prop a03 beds=7; do prop a999 x=1"})
+            assert "rolled back" in r["text"] and r["batch_error"]
+            assert len(desk.world.events) == n0, "the refused batch left events behind"
+            sj = desk.world.subjects[desk.world.nodes["a03"]["subject"]]
+            assert (sj.get("props") or {}).get("beds") != "7", "the rolled-back prop write survived"
+            r = desk.dispatch("desk", {"line": "look; do prop a03 beds=7"})
+            assert len(desk.world.events) == n0 + 1 and not r["batch_error"]
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_command_values_keep_their_quotes():
     assert scene._cmd_value('She said "yes"') == 'She said \\"yes\\"'
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"
