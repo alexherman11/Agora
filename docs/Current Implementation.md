@@ -45,7 +45,7 @@ python test_scene.py        # the four lens-admission tests
 
 Editing a subject changes every appearance of it. Moving or removing one appearance touches only that appearance.
 
-**Observed revisions.** The desk remembers, per actor, the revision it last showed them of each thing. A change is refused in two cases: `you have not looked at a04 yet`, and `stale: a04 changed since you last saw it`, which names the event. Command lines carry no revision numbers. Your own changes never make you stale. Rules act without the fence. The fence coordinates honest actors; it is not access control.
+**Observed revisions.** The desk remembers, per observer, the revision it last showed them of each thing. An observer is an actor plus a window: `explore.py … --window <name>` gives one person two readers. A change is refused in two cases: `you have not looked at a04 yet`, and `stale: a04 changed since you last saw it`, which names the event. The check is keyed by (thing, aspect), where an aspect is one prop, the title, the text, the due date, the tags or the placement. So a change to one prop never blocks a change to another, and the same prop still refuses. Command lines carry no revision numbers. Your own changes from the same window never make you stale, but a change from your other window does. Rules act without the fence. The fence coordinates honest actors; it is not access control.
 
 **Undo.** `undo eN` reverts an event and records the reversal as a new event. A composed verb is undone as a whole, and a rule's consequences are undone with their cause. Only the latest change to a thing can be undone. An event marked external (`launch`) cannot be. There is no redo, and undo is not fenced.
 
@@ -66,8 +66,10 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 
 ```text
 kind:note|task  tag:x  in:f04  title:agenda  ?word+word  prop:status=done
-comments:open  links:a04  due<2026-09-20  age>7  hidden  also:a18  a20,a22  -tag:done
+comments:open  links:a04  parts:a30  part-of:a20  due<2026-09-20  age>7  hidden  also:a18  a20,a22  -tag:done
 ```
+
+`parts:` and `part-of:` follow only `part-of` links, in one direction.
 
 Terms joined with commas are ANDed. A target may also be one id, a unique quoted title, or a handle such as `$item` (the last created thing) or `$new` (the last created surface). An unknown term is refused with the list of known terms.
 
@@ -93,9 +95,13 @@ A **lens** is a subject tagged `lens` whose text is the definition. It is create
 |---|---|
 | `column` `row` `free` | Layout, the surfaces' own three words |
 | `role <name>` | Look, by a role from `calm.style`; an unknown role is refused with the list |
-| `text <template>` | Words; `$title $text $kind $due $tags $id $item $it $n` and row fields; quote to keep commas and hashes |
+| `text <template>` | Words; `$title $text $kind $due $tags $id $item $it $n`, row fields, any prop of the thing (`$place`, printed as `read place=…`, or `(no place)` when missing), and a named frame's fields (`$trip.start`); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines of text, or N repeats; both printers say how many are left |
-| `of <selection>` + `each <part>` | Repeat over a selection or a row source: `sections:<id>`, `comments:<id>`, `actors`, `events`, `worktrees` (`rows <source>` prints the same rows) |
+| `of <selection>` + `each <part>` | Repeat over a selection, over ids named one by one (`of a04,s09`, each printed with its state: unplaced, gone), or a row source: `sections:<id>`, `comments:<id>`, `actors`, `events`, `worktrees` (`rows <source>` prints the same rows). An empty repeat prints `(empty)` |
+| `the <selection>` | Exactly one thing becomes the current thing; prints which, or `(empty)`, or `(ambiguous: …)` with nothing built under it |
+| `as <name>` | Names this part's thing as a frame, read below as `$name.field`; on a repeat, each instance |
+| `derive <name> = <interpretation> <inputs>` | A named calculation from a closed list (`day-n`, `days-from`, `weekday`, `week-of`) that prints its inputs and result |
+| `capture <field>=<value>` | Use this value instead of following; prints `(now X: differs)` when the world has moved on |
 | `over $tags` | Repeat over a list field; `$it` is each value |
 | `at item` | The appearance's own world geometry; only under a `free` parent |
 | `spread x <a> step <n\|$prop> to <max>` | Computed placement by index; printed as `(spread, not its place in the world)`, never written back |
@@ -103,9 +109,9 @@ A **lens** is a subject tagged `lens` whose text is the definition. It is create
 | `only when <selection>` | The part exists only on a match; the text prints the absence |
 | `on click\|edit\|drag do <command>` | A gesture is a desk command; the painter fills `$x $y` or `$value` |
 
-There is no escape to HTML, CSS, script, arithmetic or conditionals. Anything else is refused with its line number. A scene has a budget of 1500 nodes.
+There is no escape to HTML, CSS, script, arithmetic or conditionals. Anything else is refused with its line number. A scene has a budget of 1500 nodes. (Round six proposes admitting arithmetic, `if` and nesting in printed form; see Under study.)
 
-**Bindings.** A gesture carries what was observed: the item's revision, the event index the scene was built at, and the lens's id and revision. The server refuses a gesture painted under an older lens revision, and sets the actor's seen revision to the painted one so the ordinary fence judges the item. The painter never looks again on the person's behalf.
+**Bindings.** A gesture carries what was observed: the item's revision, the event index the scene was built at, and the lens's id and revision. The server refuses a gesture painted under an older lens revision, and sets the actor's seen revision to the painted one so the ordinary fence judges the item. The painter never looks again on the person's behalf. A gesture also carries the revision of every thing whose value filled its line or fed its derivations, so it is refused if any of those moved. That is the read-set fence. A painted gesture is judged on what was painted, even against the actor's own later changes.
 
 **Facts and observations.** A placed part carries what the world knows, such as `= offscreen-part`. The painter reports what only it knows through `/api/observe`: viewport, `cut by the clamp`, `contents overflow the box`, `out of view`. The text printer shows these per viewer as `~` lines. They are observations, never events.
 
@@ -113,7 +119,7 @@ There is no escape to HTML, CSS, script, arithmetic or conditionals. Anything el
 
 **Style.** `desk-shell/style/calm.style` defines tokens (the only place a colour or number appears), roles built from tokens, `when <selection>` clauses and themes. A lens names roles; the style never names a lens. The style is a file outside the world: no desk command changes it, and it has no events or undo.
 
-**How the language grows.** From the design studio, argued positions rather than checks: a new word must be sayable in the desk's language; if the world or the style can carry something, the lens refuses it; a word must print as text, shorter than what it paints; a gesture exists only if the painter can do it; at the painter's line ceiling a word must be removed to add one.
+**How the language grows.** From the design studio, argued positions rather than checks: a new word must be sayable in the desk's language; if the world or the style can carry something, the lens refuses it; a word must print as text, shorter than what it paints; a gesture exists only if the painter can do it; at the painter's line ceiling a word must be removed to add one. Round six proposes replacing these rules, including "no if, no arithmetic" and the painter's line ceiling, with checkable properties. That is Alex's decision; see Under study. Alex has already set the direction: no cap on the compiler or the painter, but neither may grow linearly.
 
 A desktop of three lenses (`notes`, `editor`, `together`) exists in session `lens` as the ten-line lens `desktop`: 200 scene nodes, 200 painted. What stops it replacing the shell: no viewer identity in a lens, no lens chosen by the kind of thing shown, no stacking or focus, no resize gesture, no place for toggles.
 
@@ -143,18 +149,20 @@ Two paths paint the same world.
 
 | File | Lines | Responsibility |
 |---|---:|---|
-| `world.py` | 821 | Subjects, appearances, surfaces, links, comments, geometry, events, `apply`, `undo`, the revision fence |
-| `desk.py` | 892 | Outline notation, the seen fence, `;` batching, reading commands, `undo`, `do` |
-| `desk_moo.py` | 248 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
-| `desk_knife.py` | 1171 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics |
+| `world.py` | 824 | Subjects, appearances, surfaces, links, comments, geometry, events, `apply`, `undo`, the revision fence |
+| `desk.py` | 950 | Outline notation, the seen fence (per thing and aspect, per observer), `;` batching, reading commands, `undo`, `do` |
+| `desk_moo.py` | 263 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
+| `desk_knife.py` | 1175 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics |
 | `moo.py` | 534 | The verb registry: `@verb` declarations, kind inheritance, composed verbs, synonyms |
-| `knife.py` | 236 | The selection language and pair verbs |
-| `scene.py` | 452 | Lens grammar, compiler, text printer, row sources |
-| `worktree.py` | 171 | Fork, journal, diff, all-or-nothing replay merge |
-| `explore.py` | 171 | CLI: forward to deskd or run under the lock; per-actor state; `!actor` injection |
-| `deskd.py` | 184 | HTTP server and the gesture fence |
+| `knife.py` | 250 | The selection language and pair verbs |
+| `scene.py` | 796 | Lens grammar, compiler, text printer, row sources |
+| `worktree.py` | 207 | Fork, journal, diff, all-or-nothing replay merge |
+| `explore.py` | 184 | CLI: forward to deskd or run under the lock; per-observer state (`--window`); `!actor` injection |
+| `deskd.py` | 208 | HTTP server and the gesture fence |
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things; `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo |
-| `test_scene.py` | 51 | Four lens-admission tests |
+| `test_scene.py` | 62 | Four lens-admission tests |
+
+`scene.py` grew from 452 to 796 lines with the round-two binding words, about 86 lines per word counted from its first version (Pike, round six).
 | `desk-shell/lens.js`, `lens.html` | 154 | The generic painter |
 | `desk-shell/style/calm.style`, `style.js` | 391 | The style language and its compiler to CSS |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js` | 1921 | The windowed shell and its three apps |
@@ -172,7 +180,23 @@ Which file for which change: a new verb goes in `moo.py` (and `world.py` if it n
 
 **Fixed today.** A function-local import in `knife.py` turned seven selection refusals into crashes, and a CLI crash loses the whole invocation. Removed; the refusals now print.
 
+**Verified in scratch sessions, 23–24 September:**
+- The fence at (thing, aspect) grain: a change to one prop no longer blocks another; the same prop still refuses; a worktree merge applies when base and fork touched different props (Jeff).
+- Round six's probes, by Sable and Juniper, reproduced by Jeff where marked:
+  - two builds of one scene are byte-identical and add no event;
+  - a `;` batch half-applies (reproduced);
+  - `script` definitions make no event (reproduced);
+  - `only when $wd=Mon` is accepted and meaningless;
+  - a prop named `n` silently shadows the repeat count;
+  - the `if` refusal lists 11 words and omits 7 the grammar has;
+  - `of events` silently shows the last 20 of 76.
+
 **Open defects a builder will meet.**
+- The `worktrees` row source loads other sessions' pickle files during compilation.
+- A repeat over a selection doesn't record that it read the selection's membership, so tagging a thing can change a scene without any printed read.
+- `$n` is empty inside a repeat's instances.
+- `prop:to>date` is read as a prop name and matches nothing.
+- One viewer's `look` can change another viewer's `of actors` scene.
 - A scene served from the last-good fallback carries no lens revision, so gestures from it skip the lens fence, and it is rebuilt without the lens's props.
 - `export` does not replay: repeated placements make titles ambiguous, and props on unplaced subjects are dropped silently.
 - `!actor` injection signs events as the session's actor for every verb except `prop`, so `rule on … by=` never fires for them.
@@ -186,14 +210,86 @@ Which file for which change: a new verb goes in `moo.py` (and `world.py` if it n
 In priority order, from an attempt to describe a calendar in this framework.
 
 1. **No time type.** Kinds are a closed list, `due` is a date only, and props are strings compared by equality. Adding any of these needs Python.
-2. **A lens cannot read props.** `text $start` is refused; only the nine built-in names and row fields exist.
-3. **Placement cannot follow a value.** `spread` places by index; there is no arithmetic and no row source for days or hours.
+2. **A lens cannot read props.** `text $start` is refused; only the nine built-in names and row fields exist. *(Now fixed: `$start` and `$trip.start` read props and print what they read.)*
+3. **Placement cannot follow a value.** `spread` places by index; there is no arithmetic and no row source for days or hours. *(Partly eased: `derive … days-from` makes a row per day, and `day-n` computes a date. There is still no arithmetic.)*
 4. **Repeats cannot be ordered or headed.** `of` takes world order, and a repeat's own children print after its instances.
 5. **Gestures carry pixels and one field.** Nothing maps a position to a date, and no gesture creates a thing from input.
 6. **Two interfaces that do not meet.** The windowed shell and the lens painter are separate pages; a builder chooses bespoke JavaScript or a small grammar.
 7. **Text entry is whole-field and commits on blur** until the prose native is wired.
 8. **Definitions are not uniform.** Lenses are notes; rules, scripts, clock and style are not, so they have no history, undo or fork.
 9. **No durable store, no identity, no tests** for the command layer.
+
+## Under study
+
+Tentative mechanisms: designed or argued, not built, unless marked. Each names the commitment it serves. Sources are in `research/object-facet-frontier/`: POSITION v2, the round-six proposition, and the researchers' notes. Items marked **(decision N)** wait on Alex, numbered as in the round-six proposition; "POSITION 8.x" refers to POSITION v2's decisions.
+
+**For "extending gets cheaper" and "a view says why": the staged compiler.**
+- The compiler is split into stages: parse (a table of word shapes), resolve names, check, lower to six intermediate kinds (bind, let, guard, emit, act, place), evaluate through one logged door into the world, then print and paint by kind.
+- A new surface word becomes a table row plus a short lowering. A library word, written in lens with `define` in a note tagged `lib`, costs the compiler nothing.
+- Growth is measured per commit (checks C1–C3, `experiments/growth/measure.py`). The design is wrong if, after staging, the next five words cost more than 20 lines each.
+
+**For "a view says why" and "nothing is silently stale": the read-set.**
+- The evaluator reaches the world only through an accessor that logs every read, membership included.
+- One log feeds the printer, the gesture fence and incremental rebuilding.
+
+**For "readable, not walled": names and scopes.**
+- Written scope rules N1–N6: lookup runs innermost first through lets, frames, the thing, then the host.
+- No shadowing. `$count` replaces `$n`. `$item`, `$id` and `$it` are distinct.
+- Refusal text is generated from the grammar table.
+
+**For "readable, not walled": `if`, arithmetic and nesting (decision 1).**
+- They are admitted in printed form: a total `if` prints its test and the branch taken.
+- Nesting is lowered to named, printed steps. Anything referenced from outside must be named.
+- This replaces the growth rule "no if, no arithmetic" with the properties L1–L8, measures C1–C10 and tests T1–T7.
+- Alex's direction (24 Sep): think long-term about what the language needs, without walls too early.
+
+**For "one language" (decision 2).** One expression language in two contexts: reading in lenses, and proposing changes in gestures, rules and definitions. No separate evaluator.
+
+**For "whole or not at all", "see before it happens" and "no silent overwrites": proposals.**
+- A gesture or rule yields one proposal: operation rows from one input state, applied whole or not at all, previewed first.
+- A proposal includes any rules it sets off.
+- One conflict rule is shared by gestures, rules and merges.
+- In the interim, gestures may not call scripts or rules (decision 3).
+- Viewer effects such as the clipboard are named and never replayed (decision 4).
+
+**For "everything that changes behavior is visible".** Rules, scripts, the clock and the style become world data with history and undo. The hidden last-good cache is removed.
+
+**For "extending gets cheaper": the library.**
+- `define` in `lib` notes. Row sources are core only when they expose a kernel noun; `sections` becomes library.
+- Open questions: does a lens find a library word by name or by identity? What happens when two libraries define one name? How are words discovered? Who owns a word?
+
+**For "grows without walls too early": new intermediate kinds.** Not ruled out. A proposed bar before adding one:
+- two unrelated tasks need it;
+- it can't be lowered into the existing kinds;
+- every consumer states what it does with it;
+- it keeps the properties.
+
+Candidates: time and animation, trees, built-in parts, behavior, reductions over rows.
+
+**For "everyday quantities come out right": allocation (decision 6).**
+- The disagreement: a core `split` operator that always prints its sum check (Pike), or library words plus a `check` word (Sable).
+- The deciding test is the household budget: 36 writes, 9 repairs and 14 silent wrongs today.
+
+**For "true-when, not just written-when": timelines (decision 5).**
+- An aspect may be a sequence of dated segments, read with `at <date>`.
+- A missing end means open-ended, and the split policy is named.
+
+**For "your view settings are yours": the viewer store.** Per-viewer values (a tab, a sort order) are printed, read by lenses, written by gestures, and never journaled.
+
+**For "new things to show never need app code" and "nothing in progress is lost": the painter.**
+- The painter grows by primitives: frame, text run, path, image; press, edit, drag, carry, drop.
+- A refused gesture keeps the typed draft.
+
+**For "room for many meanings" and "meaning outlives code": owned aspects.**
+- Each piece of data has an owner and its own history.
+- Names can be related (same-as, narrower, distinct) and apply when both owners agree. Who may declare them is Alex's and the Constitution's (POSITION 8.4).
+
+**For "bring work back together": partial merge (POSITION 8.2).** Worktrees journal operations. A merge applies the clean parts and holds only the conflicts.
+
+**For "comments keep their place" and "work apart": text with element identity (POSITION 8.3).**
+- Anchored comments first.
+- Then the text gateway: a writer declares what it read, changed sentences are refused, clean ones get a character diff, and moves are recorded as moves.
+- A CRDT only if offline writing becomes near-term.
 
 ## Related documents
 
