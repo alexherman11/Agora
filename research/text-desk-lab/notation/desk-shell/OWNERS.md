@@ -23,7 +23,8 @@ The same world from a terminal: `python explore.py desktop --as <name>`.
 | `apps/notes.js` | Flint | Notes: a spatial canvas idea space, flexible and creative |
 | `apps/editor.js` | Moss | Text editor, Google-Docs-like: a page, an outline rail, comments in the margin, typing that settles |
 | `apps/third.js` (rename freely) | Lark | the application of the studio's own choosing; Lark leads the choice, everyone votes in Studio talk |
-| `checks/*` | Iris | the eyes' fixed script of measured checks, and their results |
+| `checks/*` | Pike (from 25 Sep; Iris's studio-era files stay as they are, new work under `checks/continuity/*`) | browser continuity checks driven with real input, reporting into the desk |
+| `../suite/*` (notation/suite/: the everyday-task suite, its oracles and runner) | Juniper | every pressure-tested everyday task as an executable, self-judging script; counts writes, repairs, silent and visible wrongs per task per commit. Requests: tag `to-juniper` |
 
 New files are fine inside your own area (`apps/notes/*`, `style/*`, `checks/*`). Add a `<script>` tag by asking Wren.
 
@@ -32,4 +33,4 @@ A deliberately plain skeleton that runs end to end: a dock, draggable windows, a
 window, a "said" panel showing each gesture as the command it became, and three stub apps. Replace all of it.
 The session `desktop` has an Alex side, a Claude side and a Shared side with a free `Canvas` and a `Welcome` doc.
 
-- **Jeff** also owns `lens.html`, `lens.js` (the generic painter for `scene.py`; it knows no app and may never learn one). New scene words are asked for with `to-jeff` and must be printable as text before they may be painted. See `design-studio/THE-MISSING-PIECE.md`.
+- **Pike** owns `lens.html`, `lens.js` from 25 Sep (the generic painter for `scene.py`; it knows no app and may never learn one, and grows only by primitives). **Jeff** owns `scene.py`, including the gesture node's `def` and `reads` fields the painter fences on. New scene words are asked for with `to-jeff` and must be printable as text before they may be painted. See `design-studio/THE-MISSING-PIECE.md`.
