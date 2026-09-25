@@ -68,6 +68,10 @@ def prints_at(rev):
         world.me = "golden"             # a reader of its own, as explore.py makes a visitor: no since-your-last-look banner
         desk.seen, desk.open, desk.last_event_seen = {}, {world.root}, len(world.events)
         desk._session, desk._window = session, ""
+        # Jeff (25 Sep): the wall clock leaked into the prints. A world printed at a revision is read at the date it
+        # recorded: following the wall clock would move today, run the day's rules and print an arrival line, none
+        # of which is the compiler's doing.
+        desk.follow = False
         for title in lens_titles(desk):
             try:
                 r = desk.dispatch("desk", {"line": f"scene {title}"})
