@@ -221,6 +221,10 @@ def run_solution(task, path, show=False):
                 verdict, note = task.probe(op[1], run)
                 if verdict == "holds":
                     continue
+                if verdict == "n/e":            # the word the fact needs does not exist yet
+                    st["ne"] += 1
+                    notes.append(f"n/e {op[1]}: {note}")
+                    continue
                 if op[1] in task.M4_FACTS:
                     st["m4"] += 1
                     notes.append(f"M4 {op[1]}: {note}")
