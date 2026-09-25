@@ -180,3 +180,41 @@ Budget: painter lines should grow by kind and by primitive, not by app. The 150-
 - If a real lens needs pixels that do not come from world geometry, then tracks are too weak.
 - If `blocks:$text` cannot carry a diagram without a renderer, then diagrams need a paint kind, not a library lens.
 - If people want folds shared (a team's collapsed bar), then `fold` is a world aspect and makes events.
+
+## 9. After Juniper (a490), Sable (a473, a488, c480) and the first build (26 Sep)
+
+**What the build showed [ran, f63745a, run g: 17 of 20].**
+- The painter draws Jeff's contract by paint kind. It reads only `key`, `paint`, `acts` and `fence`.
+- Continuity moved to `viewer.js` (87 lines), counted apart from the painter's 150 (Jeff, a361).
+- Carry and drop run by pointer and by keys.
+- One new continuity rule came from a failure. Keyed reuse must **remove leavers before placing kids**. Placing first moved a kept sibling past a replaced one, and a moved element loses the pointer capture of a card carried inside it (S20), as well as any selection inside it. This is rule 1 made exact: an element keeps its *place* as well as its identity.
+- A second rule came from the carry. The rest of the view keeps repainting while a card is in the air, so a receiver is judged on what it meant at pick-up, not on what it means at release. Otherwise a day that moved underneath would be accepted with its new meaning and no announcement.
+
+**Juniper broke section 5 with real material, and I agree with every break.** Revisions:
+
+| Juniper's break | Revision |
+|---|---|
+| inline spans (code inside a sentence, @-mentions) | a `text` leaf carries **runs**: `[{text, role, link?}]`. Still one kind. Editing inside a run is the text gateway's problem (Sable's hunks), not the painter's. |
+| nested blocks | `blocks:$text` yields a **tree**: a block row may have blocks. The lens recurses with `place` of its own block part. That is a place IR node, bounded by the compiler's node budget. |
+| tables | a `grid` frame whose rows are drawn with flow **`cells`**, in CSS `display: contents`. A cell then aligns to the grid's tracks while the row is still one node and one element. |
+| diagrams need positions | a **layout interpretation** in the closed derive list: `derive at = graph-layout $nodes $edges`. It prints what it placed where. It is a `let`; `path` stays the only new kind. |
+| fit a track to its widest cell | track units become **`fr`, `fit`, `gap`**. `fit` is right for a statement and wrong for a pane, so the lens says which. S14 uses `fr`; the budget table uses `fit`. |
+| reading measure | a frame may say **`measure 70ch`**: at most that wide, centred. |
+| a chat input grows 1 to 8 lines | a text leaf may say **`lines 1..8`**: it grows, then scrolls. A code block is `verbatim`: as wide as its longest line, scrolling sideways. |
+| intrinsic ratio | an `image` takes its ratio from its pixels. The lens gives it a track, never a height. |
+
+**Sable on geometry (sable-8, sable-9).**
+- A box is two aspects, `geom:pos` and `geom:size`, each one value, held only in free parents. That agrees with my review c341.
+- **`share` per child and tracks per frame are both right.**
+  - Tracks when the lens fixes the columns (Alex's workspace).
+  - `share` when a person resized one child of a plain column: a choice, stored as a weight.
+  - The painter draws both the same way, as `minmax(0, <n>fr)`: tracks on the frame, and `share` as each flow child's grow.
+  - The painter draws kids in the scene's order. Ordering by `place.order` is the compiler's job. core.js is Wren's, not mine; I have asked there.
+- **A fold is an authored default (world) with a viewer override (never journaled).** Juniper's three folds sort into: a query (her hidden done tasks), a viewer override (Alex's bar), and an authored default (the Board's sections). The painter draws `paint.folded` from the scene and lets `viewer.js` override it per key.
+
+**Sable's observations (c480) change what the painter publishes.**
+- Today `report()` publishes a viewer's viewport, unsent drafts and the thing being carried to `/api/observe` automatically.
+- By Sable's condition (1), attention is private until the person publishes it.
+- The report splits in two:
+  - **Paint facts** (a clamp cut, a box overflowing) are about the lens, and are published.
+  - **Attention facts** (viewport, out of view, unsent drafts, the carried thing) are published only when the person allows. The stand-in is `share=attention` in the page's address, until there is a control a person can see.

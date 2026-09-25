@@ -56,18 +56,21 @@ const Viewer = (session, who, lens, said) => {
       return true;
     },
     // Iris, Lark: only the painter knows what happened on this screen. It says so, as a viewer fact (~), never the world.
-    report(paint, at, extra) {
-      const vp = paint.getBoundingClientRect(), facts = { ...extra };
+    // Sable c480: attention is private until the person publishes it. Paint facts (a clamp cut, a box overflowing) are
+    // about the lens and always go; attention facts (viewport, out of view, unsent drafts, the thing carried) go only when
+    // the person allows it, for now by share=attention in the page's address, until there is a control they can see.
+    report(paint, at, extra, attention) {
+      const vp = paint.getBoundingClientRect(), facts = attention ? { ...extra } : {};
       for (const el of paint.querySelectorAll("[data-key]")) {
         const r = el.getBoundingClientRect(), f = [];
         if (el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1) f.push("cut by the clamp");
         if (el.classList.contains("boxed") && el.scrollHeight > el.clientHeight + 1) f.push("contents overflow the box");
-        if (el.classList.contains("boxed") && (r.bottom < vp.top || r.top > vp.bottom || r.right < vp.left || r.left > vp.right)) f.push("out of view");
-        if (el.dataset.unsent) f.push("unsent draft");
+        if (attention && el.classList.contains("boxed") && (r.bottom < vp.top || r.top > vp.bottom || r.right < vp.left || r.left > vp.right)) f.push("out of view");
+        if (attention && el.dataset.unsent) f.push("unsent draft");
         if (f.length) facts[el.dataset.key] = f.join(", ");
       }
-      const body = JSON.stringify({ session, as: who, lens, at, facts,
-        viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } });
+      const view = attention ? { viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } } : {};
+      const body = JSON.stringify({ session, as: who, lens, at, facts, ...view });
       if (body !== told) { told = body; fetch("/api/observe", { method: "POST", body }); }
     },
     // Pike (run 1, Alex's workspace): everything repaints but the part in hand; focus, caret and selection are put back
