@@ -170,10 +170,190 @@ def rows_text(desk, source):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Stage 1, parse. The surface words are a table: each row is the word, the shape a reader sees in a refusal, and the
+# setter that puts it on the part. The refusal vocabulary is printed from this table, so it cannot drift from the grammar
+# (Sable's probe 7: `if` was refused with a list of eleven words that omitted seven the grammar had). Pike, round six.
+# ---------------------------------------------------------------------------------------------------------------------
+
+def _w_layout(node, p, val, n, env):
+    node["layout"] = p
+
+
+def _w_carry(node, p, val, n, env):
+    node["carry"] = True          # Pike a361/c368: carry on the thing, `on drop <part>` on the receiver
+
+
+def _w_role(node, p, val, n, env):
+    if not re.fullmatch(r"[\w.-]+", val):
+        raise LensRefusal(f"line {n}: `role <name>`; got {p!r}")
+    if env["roles"] is not None and val not in env["roles"]:
+        raise LensRefusal(f"line {n}: no role {val!r} in calm.style. Roles: {' '.join(sorted(env['roles']))}")
+    node["role"] = val
+
+
+def _w_each(node, p, val, n, env):
+    if not re.fullmatch(r"[\w.-]+", val):
+        raise LensRefusal(f"line {n}: `each <part>`; got {p!r}")
+    node["each"] = val
+
+
+def _w_text(node, p, val, n, env):
+    if not val:
+        raise LensRefusal(f"line {n}: `text \"...\"`; got {p!r}")
+    node["text"] = val.strip('"')
+    # Juniper, Pike: a lens could not read a thing's own prop ($place). Any name outside NAMES is a prop; the
+    # scene prints what it read and marks (no place) when the thing lacks it. Lark's $me now prints (no me): honest.
+    node["props"] = [v for v, dot in re.findall(r"\$(\w+)(\.\w+)?", node["text"]) if not dot and v not in NAMES]
+
+
+def _w_clamp(node, p, val, n, env):
+    if not val.isdigit():
+        raise LensRefusal(f"line {n}: `clamp <number>`; got {p!r}")
+    node["clamp"] = int(val)
+
+
+def _w_of(node, p, val, n, env):
+    if not val:
+        raise LensRefusal(f"line {n}: `of <selection> [as <frame>]`; got {p!r}")
+    node["of"], _, asname = val.partition(" as ")          # `of parts:$trip.item as stop`
+    if asname:
+        node["as"] = asname.strip()
+
+
+def _w_over(node, p, val, n, env):
+    if not re.fullmatch(r"\$\w+", val):
+        raise LensRefusal(f"line {n}: `over $<rows> [as <frame>]`; got {p!r}")
+    node["over"] = val[1:]
+
+
+def _w_at(node, p, val, n, env):
+    if val != "item":
+        raise LensRefusal(f"line {n}: `at item`; got {p!r}")
+    node["at"] = "item"
+
+
+def _w_lens(node, p, val, n, env):
+    if not re.fullmatch(r"[\w$.-]+", val):
+        raise LensRefusal(f"line {n}: `lens <name>`; got {p!r}")
+    node["lens"] = val
+
+
+def _w_spread(node, p, val, n, env):
+    # Astra's challenge: x = clamp(20 + order * spacing, 0, 440). Not arithmetic in the lens: a layout word. The
+    # relationship is `spread`; the coefficient is a number or a $prop of the lens note, which is world data:
+    # `do prop <lens> spacing=210` changes every present and future placement, is an event, and can be undone.
+    m = re.fullmatch(r"(x|y) (-?\d+) step (\$?[\w.-]+) to (\d+)", val)
+    if not m:
+        raise LensRefusal(f"line {n}: `spread x <start> step <number or $prop of this lens> to <max>` (and the same for y); got {p!r}")
+    node.setdefault("spread", {})[m.group(1)] = (int(m.group(2)), m.group(3), int(m.group(4)))
+
+
+def _w_the(node, p, val, n, env):
+    if not val:
+        raise LensRefusal(f"line {n}: `the <selection> [as <frame>]`; got {p!r}")
+    node["the"], _, asname = val.partition(" as ")        # `the tag:trip as trip` reads as one phrase
+    if asname:
+        node["as"] = asname.strip()
+
+
+def _w_as(node, p, val, n, env):
+    if not re.fullmatch(r"\w+", val):
+        raise LensRefusal(f"line {n}: `as <frame>`; got {p!r}")
+    if val in NAMES or val in ("value", "x", "y") or node["as"]:
+        raise LensRefusal(f"line {n}: `as {val}` would shadow a built-in name; choose another frame name")
+    node["as"] = val
+
+
+def _w_derive(node, p, val, n, env):
+    m = re.fullmatch(r"(\w+) = ([\w-]+)((?: \S+)*)", val)
+    if not m:
+        raise LensRefusal(f"line {n}: `derive <name> = <interpretation> <inputs>`; got {p!r}")
+    dname, interp, ins = m.group(1), m.group(2), m.group(3).split()
+    if interp not in INTERPS:
+        raise LensRefusal(f"line {n}: no interpretation {interp!r}. The list is closed: " + ", ".join(f"{k} <{'> <'.join(v[0])}>" for k, v in INTERPS.items()))
+    if len(ins) != len(INTERPS[interp][0]):
+        raise LensRefusal(f"line {n}: {interp} takes {len(INTERPS[interp][0])} input(s): {' '.join(INTERPS[interp][0])}; got {len(ins)}")
+    if dname in NAMES or any(dname == d[0] for d in node["derive"]):
+        raise LensRefusal(f"line {n}: derive {dname}: that name is taken")
+    node["derive"].append((dname, interp, ins))
+
+
+def _w_capture(node, p, val, n, env):
+    m = re.fullmatch(r"(\w+)=(\S+)", val)
+    if not m:
+        raise LensRefusal(f"line {n}: `capture <field>=<value>`; got {p!r}")
+    node["capture"][m.group(1)] = m.group(2)
+
+
+def _w_only(node, p, val, n, env):
+    if not (val.startswith("when ") and val[5:].strip()):
+        raise LensRefusal(f"line {n}: `only when <selection>` or `only when $x <op> <value>`; got {p!r}")
+    node["only"] = val[5:].strip()      # Wren, Flint: the desk's own selection decides; a value test is judged after derives
+
+
+def _w_on(node, p, val, n, env):
+    g, do, cmd = val.partition(" do ")
+    drop_part = None
+    if g.startswith("drop "):
+        drop_part, g = g[5:].strip(), "drop"
+    if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part):
+        raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>` or `on drop <part> do <desk command>`; got {p!r}")
+    cmd = cmd.strip()
+    if g == "drop" and len(split_batch(cmd)) > 1:
+        raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
+    # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
+    # unless it begins with one of the desk's own reading or session commands.
+    if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
+        cmd = "do " + cmd
+    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {})})
+
+
+# word -> (shape as a reader sees it, setter). A layout word is its own name.
+WORDS = {
+    **{lay: (lay, _w_layout) for lay in LAYOUTS},
+    "carry": ("carry", _w_carry),
+    "role": ("role <name>", _w_role),
+    "text": ('text "..."', _w_text),
+    "clamp": ("clamp <n>", _w_clamp),
+    "the": ("the <selection> [as <frame>]", _w_the),
+    "of": ("of <selection> [as <frame>]", _w_of),
+    "over": ("over $<rows> [as <frame>]", _w_over),
+    "as": ("as <frame>", _w_as),
+    "each": ("each <part>", _w_each),
+    "at": ("at item", _w_at),
+    "only": ("only when <selection | $x <op> value>", _w_only),
+    "derive": ("derive <name> = <interpretation> <inputs>", _w_derive),
+    "capture": ("capture <field>=<value>", _w_capture),
+    "spread": ("spread x|y <start> step <n | $prop> to <max>", _w_spread),
+    "lens": ("lens <name>", _w_lens),
+    "on": ("on <gesture> do <command>", _w_on),
+}
+
+
+def vocabulary():
+    """What a lens can say, printed from the table. Every refusal that lists the words uses this."""
+    return ", ".join(shape for _, (shape, _f) in WORDS.items())
+
+
+def _check_part(node, n):
+    """Static checks on one part, after its words are read (stage 3 in miniature; the cross-part checks follow the loop)."""
+    if (node["of"] or node["over"]) and not node["each"]:
+        raise LensRefusal(f"line {n}: `of`/`over` repeats something; say what with `each <part>`")
+    if node["the"] and (node["each"] or node["of"] or node["over"]):
+        raise LensRefusal(f"line {n}: `the` names exactly one thing; it cannot repeat (drop `each`, `of` or `over`)")
+    if node["as"] and (node["as"] in NAMES or node["as"] in ("value", "x", "y")):
+        raise LensRefusal(f"line {n}: `as {node['as']}` would shadow a built-in name; choose another frame name")
+    if node["as"] and not (node["the"] or node["of"] or node["over"]):
+        raise LensRefusal(f"line {n}: `as {node['as']}` names the thing chosen here, so this part needs `the`, `of` or `over`")
+    if node["capture"] and not node["the"]:
+        raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
+
+
 def parse(src):
     """-> (root_name, parts) where parts[name] = node {name, props, kids}"""
     parts, stack, root = {}, [], None
-    known_roles = _roles()
+    env = {"roles": _roles()}
     for n, raw in enumerate(src.splitlines(), 1):
         line = _outside_quotes(raw, " # ")[0].rstrip()
         if not line.strip() or line.strip().startswith("#") or line.strip().startswith("lens "):
@@ -187,94 +367,11 @@ def parse(src):
                 "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
-            if p in LAYOUTS:
-                node["layout"] = p
-            elif p == "carry":
-                node["carry"] = True          # Pike a361/c368: carry on the thing, `on drop <part>` on the receiver
-            elif word in ("role", "each") and re.fullmatch(r"[\w.-]+", val):
-                if word == "role" and known_roles is not None and val not in known_roles:
-                    raise LensRefusal(f"line {n}: no role {val!r} in calm.style. Roles: {' '.join(sorted(known_roles))}")
-                node[word] = val
-            elif word == "text" and val:
-                node["text"] = val.strip('"')
-                # Juniper, Pike: a lens could not read a thing's own prop ($place). Any name outside NAMES is a prop; the
-                # scene prints what it read and marks (no place) when the thing lacks it. Lark's $me now prints (no me): honest.
-                node["props"] = [v for v, dot in re.findall(r"\$(\w+)(\.\w+)?", node["text"]) if not dot and v not in NAMES]
-            elif word == "clamp" and val.isdigit():
-                node["clamp"] = int(val)
-            elif word == "of" and val:
-                node["of"], _, asname = val.partition(" as ")          # `of parts:$trip.item as stop`
-                if asname:
-                    node["as"] = asname.strip()
-            elif word == "over" and re.fullmatch(r"\$\w+", val):
-                node["over"] = val[1:]
-            elif p == "at item":
-                node["at"] = "item"
-            elif word == "lens" and re.fullmatch(r"[\w$.-]+", val):
-                node["lens"] = val
-            elif word == "spread":
-                # Astra's challenge: x = clamp(20 + order * spacing, 0, 440). Not arithmetic in the lens: a layout word. The
-                # relationship is `spread`; the coefficient is a number or a $prop of the lens note, which is world data:
-                # `do prop <lens> spacing=210` changes every present and future placement, is an event, and can be undone.
-                m = re.fullmatch(r"(x|y) (-?\d+) step (\$?[\w.-]+) to (\d+)", val)
-                if not m:
-                    raise LensRefusal(f"line {n}: `spread x <start> step <number or $prop of this lens> to <max>` (and the same for y); got {p!r}")
-                node.setdefault("spread", {})[m.group(1)] = (int(m.group(2)), m.group(3), int(m.group(4)))
-            elif word == "the" and val:
-                node["the"], _, asname = val.partition(" as ")        # `the tag:trip as trip` reads as one phrase
-                if asname:
-                    node["as"] = asname.strip()
-            elif word == "as" and re.fullmatch(r"\w+", val):
-                if val in NAMES or val in ("value", "x", "y") or node["as"]:
-                    raise LensRefusal(f"line {n}: `as {val}` would shadow a built-in name; choose another frame name")
-                node["as"] = val
-            elif word == "derive":
-                m = re.fullmatch(r"(\w+) = ([\w-]+)((?: \S+)*)", val)
-                if not m:
-                    raise LensRefusal(f"line {n}: `derive <name> = <interpretation> <inputs>`; got {p!r}")
-                dname, interp, ins = m.group(1), m.group(2), m.group(3).split()
-                if interp not in INTERPS:
-                    raise LensRefusal(f"line {n}: no interpretation {interp!r}. The list is closed: " + ", ".join(f"{k} <{'> <'.join(v[0])}>" for k, v in INTERPS.items()))
-                if len(ins) != len(INTERPS[interp][0]):
-                    raise LensRefusal(f"line {n}: {interp} takes {len(INTERPS[interp][0])} input(s): {' '.join(INTERPS[interp][0])}; got {len(ins)}")
-                if dname in NAMES or any(dname == d[0] for d in node["derive"]):
-                    raise LensRefusal(f"line {n}: derive {dname}: that name is taken")
-                node["derive"].append((dname, interp, ins))
-            elif word == "capture":
-                m = re.fullmatch(r"(\w+)=(\S+)", val)
-                if not m:
-                    raise LensRefusal(f"line {n}: `capture <field>=<value>`; got {p!r}")
-                node["capture"][m.group(1)] = m.group(2)
-            elif p.startswith("only when ") and p[10:].strip():
-                node["only"] = p[10:].strip()      # Wren, Flint: the desk's own selection decides; no if, no else
-            elif word == "on":
-                g, do, cmd = val.partition(" do ")
-                drop_part = None
-                if g.startswith("drop "):
-                    drop_part, g = g[5:].strip(), "drop"
-                if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part):
-                    raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>` or `on drop <part> do <desk command>`; got {p!r}")
-                cmd = cmd.strip()
-                if g == "drop" and len(split_batch(cmd)) > 1:
-                    raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
-                # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
-                # unless it begins with one of the desk's own reading or session commands.
-                if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
-                    cmd = "do " + cmd
-                node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {})})
-            else:
-                raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {', '.join(LAYOUTS)}, role, text, clamp, "
-                                  f"of <selection>, over $field, each <part>, at item, on <gesture> do <command>")
-        if (node["of"] or node["over"]) and not node["each"]:
-            raise LensRefusal(f"line {n}: `of`/`over` repeats something; say what with `each <part>`")
-        if node["the"] and (node["each"] or node["of"] or node["over"]):
-            raise LensRefusal(f"line {n}: `the` names exactly one thing; it cannot repeat (drop `each`, `of` or `over`)")
-        if node["as"] and (node["as"] in NAMES or node["as"] in ("value", "x", "y")):
-            raise LensRefusal(f"line {n}: `as {node['as']}` would shadow a built-in name; choose another frame name")
-        if node["as"] and not (node["the"] or node["of"] or node["over"]):
-            raise LensRefusal(f"line {n}: `as {node['as']}` names the thing chosen here, so this part needs `the`, `of` or `over`")
-        if node["capture"] and not node["the"]:
-            raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
+            row = WORDS.get(word)
+            if row is None:
+                raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {vocabulary()}")
+            row[1](node, p, val, n, env)
+        _check_part(node, n)
         if indent == 0:
             if name in parts:
                 raise LensRefusal(f"line {n}: part {name!r} is already defined on line {parts[name]['line']}; one name, one part")
