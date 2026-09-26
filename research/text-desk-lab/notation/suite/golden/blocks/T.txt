@@ -1,0 +1,34 @@
+== step write · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way. / Guests staying more than three nights pay a share of utilities. / Cleaning is hired from November, 90 a month." [body]
+
+== step split · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. / Utilities and internet the same way. / Guests staying more than three nights pay a share of utilities. / Cleaning is hired from November, 90 a month." [body]
+
+== step move · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. / Utilities and internet the same way. / Cleaning is hired from November, 90 a month. / Guests staying more than three nights pay a share of utilities." [body]
+
+== step join · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way. / Cleaning is hired from November, 90 a month. / Guests staying more than three nights pay a share of utilities." [body]
+
+== step together · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way. / Cleaning is hired from November, 95 a month. / Guests staying more than four nights pay a share of utilities." [body]
+
+== step comment · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way. / Guests staying more than four nights pay a share of utilities. / Cleaning is hired from November, 95 a month." [body]
+
+== step find · doc ==
+scene house · for juniper · world @N
+  h a03 column · the kind:doc -> s02 (a03) as d
+    b a03 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way. / Guests staying more than four nights pay a share of utilities. / Cleaning is hired from November, 95 a month." [body]

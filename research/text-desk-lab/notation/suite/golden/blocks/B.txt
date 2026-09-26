@@ -1,0 +1,50 @@
+== step write · doc ==
+scene house · for juniper · world @N
+  h column · 3 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way." [body] · key a04
+    b a06 "Guests staying more than three nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 90 a month." [body] · key a08
+
+== step split · doc ==
+scene house · for juniper · world @N
+  h column · 4 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here." [body] · key a04
+    b a06 "Guests staying more than three nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 90 a month." [body] · key a08
+    b a12 "Utilities and internet the same way." [body] · key a12
+
+== step move · doc ==
+scene house · for juniper · world @N
+  h column · 4 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here." [body] · key a04
+    b a06 "Guests staying more than three nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 90 a month." [body] · key a08
+    b a12 "Utilities and internet the same way." [body] · key a12
+
+== step join · doc ==
+scene house · for juniper · world @N
+  h column · 3 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way." [body] · key a04
+    b a06 "Guests staying more than three nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 90 a month." [body] · key a08
+
+== step together · doc ==
+scene house · for juniper · world @N
+  h column · 3 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way." [body] · key a04
+    b a06 "Guests staying more than four nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 95 a month." [body] · key a08
+
+== step comment · doc ==
+scene house · for juniper · world @N
+  h column · 3 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way." [body] · key a04
+    b a06 "Guests staying more than four nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 95 a month." [body] · key a08
+
+== step find · doc ==
+scene house · for juniper · world @N
+  h column · 3 of in:f02
+    b a04 "Rent is split by the nights each of us sleeps here. Utilities and internet the same way." [body] · key a04
+    b a06 "Guests staying more than four nights pay a share of utilities." [body] · key a06
+    b a08 "Cleaning is hired from November, 95 a month." [body] · key a08

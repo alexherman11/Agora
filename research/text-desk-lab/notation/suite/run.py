@@ -115,10 +115,10 @@ def load_solution(path):
                 cmd, shows = rest.split(" shows ", 1)
                 step["ops"].append(("fact", name, cmd.strip(), shows.strip()))
         else:
-            m = re.match(r"([TRA])(?:@(\S+))? (.*)$", line)
+            m = re.match(r"([TRA])(?:~([\w-]+))?(?:@(\S+))? (.*)$", line)     # T~ben: another person; @B: a window
             if not m:
                 raise SystemExit(f"{path.name}: cannot read line: {line}")
-            step["ops"].append(("line", m.group(1), m.group(2) or "", m.group(3)))
+            step["ops"].append(("line", m.group(1), m.group(3) or "", m.group(4), m.group(2) or ""))
     return sol
 
 
@@ -204,8 +204,11 @@ def run_solution(task, path, show=False):
 
         for op in step["ops"]:
             if op[0] == "line":
-                _, mark, window, text = op
+                _, mark, window, text, actor = op
+                me = run.me
+                run.me = actor or me
                 out, refused = run.line(text, window)
+                run.me = me
                 if WRITE.match(text):
                     st["writes"] += 1
                     st["repairs"] += mark == "R"
