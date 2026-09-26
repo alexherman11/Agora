@@ -11,7 +11,14 @@
   /* layout mechanics only: no colour, no size, no font may appear here */
   html, body { margin: 0; height: 100%; }
   body { display: grid; grid-template-columns: 1fr minmax(0, 40%); }
+  body[data-inspector="off"] { display: block; }
+  body[data-inspector="off"] #said { display: none; }
   #paint, #said { overflow: auto; min-width: 0; }
+  #paint { height: 100%; }
+  /* the live refusal region (codex team, pike-8): announced to screen readers; shown when the inspector is off */
+  #status { position: fixed; inset: auto 1rem 1rem auto; z-index: 10; max-width: min(60ch, calc(100vw - 2rem));
+    max-height: 30vh; overflow: auto; white-space: pre-wrap; box-sizing: border-box; }
+  body[data-inspector="on"] #status { clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
   #said { white-space: pre; margin: 0; }
   .l-column { display: flex; flex-direction: column; }
   .l-row { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; }
@@ -26,6 +33,7 @@
 <body class="r-desk">
 <main id="paint"></main>
 <pre id="said" class="r-source"></pre>
+<div id="status" class="r-said" role="status" aria-live="polite" hidden></div>
 <script src="style/style.js"></script>
 <script src="viewer.js"></script>
 <script src="lens.js"></script>

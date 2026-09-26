@@ -1,6 +1,10 @@
 // lens.js : the generic painter, by paint kind. OWNER: Pike (OWNERS.md, 25 Sep).
-// LINE BUDGET (Wren's rule, counted apart from continuity since a361): 150 lines of vocabulary. Each new paint kind or
-// interaction primitive costs lines here; at the ceiling one must be removed to add one. viewer.js holds continuity.
+// LINE BUDGET (Wren's rule, counted apart from continuity since a361): 150 lines of vocabulary, a guard against growing
+// into a worse HTML. Under review: the codex team reports Alex rejected the cap [read: their BRIDGE-NOTES], and pike-8
+// proposes admission tests in its place (a general scene contract, an honest text account, one addressed action path,
+// preserved viewer state, performance, reuse across unlike tasks, not composable from existing kinds, semantics and
+// look only through paint.semantic and style roles). Until Alex decides, lines over 150 are named here: the send's
+// in-flight token and lost-answer handling (4 lines). viewer.js holds continuity.
 // It paints the scene's painter contract (pike-7 section 6: key, paint, acts, fence, kids) and sends gestures back as
 // desk command lines. It knows paint kinds, roles and interaction primitives, and nothing else: no app, no kind, no
 // colour, no size. `fence` is opaque: returned with a gesture, never drawn, never compared.
@@ -8,15 +12,19 @@
   const q = new URLSearchParams(location.search);
   const session = q.get("session") || "lens", who = q.get("as") || "alex", lens = q.get("lens") || "notes";
   const paint = document.getElementById("paint"), said = document.getElementById("said");
+  document.body.dataset.inspector = q.get("inspect") === "0" ? "off" : "on";   // codex team: inspect=0 gives the painter the full width
   Style.install(await (await fetch("style/calm.style")).text(), q.get("theme") || undefined);
-  const V = Viewer(session, who, lens, said);
+  const V = Viewer(session, who, lens, said, document.getElementById("status"));
   let last = "", sceneAt = 0, def = null;
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more) {
+    const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
     const observed = { ...(n.fence || {}), at: sceneAt, def, ...more };
-    const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json();
-    const t = r.text || r.error || ""; V.answered(n.key, r.error || t.startsWith("ERR") ? t : null, draft);
+    let r;
+    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json(); }
+    catch (e) { V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true); }
+    const t = r.text || r.error || ""; V.answered(n.key, r.error || t.startsWith("ERR") ? t : null, draft, token);
     await refresh(true);
   }
 
@@ -36,7 +44,7 @@
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
     if (p.text != null) {
-      el.textContent = V.words(n.key, p.text); V.mark(el, n.key);
+      el.textContent = V.words(n.key, p.text, n.fence); V.mark(el, n.key);
       if (p.wrap === "verbatim") el.classList.add("t-verbatim");
       if (p.clamp) { el.classList.add("clamp"); el.style.webkitLineClamp = p.clamp; }
     }
@@ -60,13 +68,13 @@
     el.addEventListener("input", () => V.typed(n.key, el.textContent, { key: n.key, fence: el._n.fence }));
     el.addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); }
-      if (e.key === "Escape") { V.drop(n.key); V.mark(el, n.key); el.textContent = el._n.paint.text; el.blur(); }
+      if (e.key === "Escape") { e.preventDefault(); if (!V.drop(n.key)) return; V.mark(el, n.key); el.textContent = el._n.paint.text; el.blur(); }
     });
     el.addEventListener("blur", () => {
       if (V.repainting) return;      // a repaint moved it; the person is still editing it
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.textContent.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
-      const seen = (V.drafts.get(n.key) || {}).seen || el._n;
+      const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
       if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v), raw); else { V.hold = null; V.drop(n.key); }
     });
   }

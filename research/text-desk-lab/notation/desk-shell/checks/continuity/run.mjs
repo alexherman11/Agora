@@ -155,7 +155,9 @@ class Tab {
     this.ws.addEventListener("message", e => {
       const m = JSON.parse(e.data);
       if (m.id && this.pending.has(m.id)) { this.pending.get(m.id)(m); this.pending.delete(m.id); }
+      if (m.method && this.events[m.method]) this.events[m.method](m.params);
     });
+    this.events = {};
   }
   send(method, params = {}) {
     const id = ++this.n;
@@ -268,12 +270,14 @@ S.S2 = { what: "edit while another actor retitles the same card", expect: "refus
     await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="McWay Falls (closed)"`);
     await tab.enter();
     const r = await judgeEdit(tab, ids.mcway, "McWay Falls overlook", before);
-    // resendable: the person reads the refusal, clicks their kept words and presses Enter again
+    // pike-8 section 3: the peer's words must be on screen before a resend may go (both sides), not only a refusal
+    const bothShown = (await tab.said()).split(NOTICE_END)[0].includes("McWay Falls (closed)");   // in the notice, not only in the scene print
+    // resendable: the person reads both sides, clicks their kept words and presses Enter again
     const el = await tab.find(`/${ids.mcway}/t`);
     if (el) { await tab.click(el.x, el.y); await tab.enter(); await sleep(2500); }
     const resent = (await titleOf(ids.mcway)) === "McWay Falls overlook";
     await tab.close();
-    return { ...r, resent, pass: !!r.refused && r.refusalShown && !r.draftLost && !r.phantom && resent };
+    return { ...r, bothShown, resent, pass: !!r.refused && r.refusalShown && bothShown && !r.draftLost && !r.phantom && resent };
   } };
 
 S.S3 = { what: "edit while the lens changes in an unrelated part (the day heading)", expect: "delivered: the title's meaning did not change",
@@ -482,7 +486,8 @@ S.S20 = { what: "carry a card while another actor moves the trip a week (the day
     await tab.send("Input.dispatchMouseEvent", { type: "mousePressed", x: card.x, y: card.y + 30, button: "left", buttons: 1, clickCount: 1 });
     await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: card.x + 20, y: card.y + 40, button: "left", buttons: 1 });
     await tab.eval("document.querySelectorAll('[data-key]').forEach(e => { e.__old = 1; })");
-    await act("other", `look ${ids.trip}; do prop ${ids.trip} start=2026-10-17 end=2026-10-19`);
+    const moved = await act("other", `look ${ids.trip}; do prop ${ids.trip} start=2026-10-17 end=2026-10-19`);
+    if (moved.error) throw new Error("the interfering move was refused: " + moved.error.slice(0, 160));
     await sleep(2000);
     const remade = await tab.eval("[...document.querySelectorAll('[data-key]')].filter(e => !e.__old).map(e => e.dataset.key).slice(0, 8)");
     await tab.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: to.x, y: to.y, button: "left", buttons: 1 });
@@ -609,14 +614,64 @@ S.S18 = { what: "coming back after someone else retitled the card while the tab 
     tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
     let el = await tab.find(`/${ids.mcway}/t`);
     await tab.click(el.x, el.y); await tab.enter(); await sleep(2500);
-    const first = await tab.lastDo(), said = await tab.said(), mid = await titleOf(ids.mcway);
+    const first = await tab.lastDo(), said = await tab.said(), mid = await titleOf(ids.mcway), bothShown = said.split(NOTICE_END)[0].includes("McWay Falls (trail closed)");
     el = await tab.find(`/${ids.mcway}/t`);
     await tab.click(el.x, el.y); await tab.enter(); await sleep(2500);
     const world = await titleOf(ids.mcway);
     await tab.close();
     const refused = first && first.error ? first.error.slice(0, 160) : null;
-    return { refused, refusalShown: !!refused && said.includes("refused:"), mid, world,
-      pass: !!refused && said.includes("refused:") && mid === "McWay Falls (trail closed)" && world === draft };
+    return { refused, refusalShown: !!refused && said.includes("refused:"), bothShown, mid, world,
+      pass: !!refused && said.includes("refused:") && bothShown && mid === "McWay Falls (trail closed)" && world === draft };
+  } };
+
+// a request held in the browser's network layer (CDP Fetch), to make an answer slow or lose it (codex team's cases)
+async function holdRequests(tab, stage) {
+  const paused = [];
+  tab.events["Fetch.requestPaused"] = p => paused.push(p);
+  await tab.send("Fetch.enable", { patterns: [{ urlPattern: "*/api/do*", requestStage: stage }] });
+  return paused;
+}
+const NOTICE_END = String.fromCharCode(10, 10);   // the notice ends at the first blank line of the inspector
+const titleEl = (tab, id) => tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${id}/t'));
+  return e ? { text: e.textContent, unsent: e.dataset.unsent || null } : null; })()`);
+
+S.S21 = { what: "typing more while the first save is still in flight (codex team's delayed answer, on a one-line title)", expect: "nothing typed is lost; the later words go out after the earlier ones, with nothing silent",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    await beginEdit(tab, ids.kirk, "Kirk A");
+    const paused = await holdRequests(tab, "Request");
+    await tab.enter(); await sleep(500);
+    const inFlight = paused.length;
+    let el = await tab.find(`/${ids.kirk}/t`);
+    await tab.click(el.x, el.y); await tab.key("End", "End", 35); await tab.type(" B");
+    const typedDuring = (await titleEl(tab, ids.kirk)).text;
+    await tab.send("Fetch.disable");
+    for (const p of paused) await tab.send("Fetch.continueRequest", { requestId: p.requestId });
+    await sleep(2500);
+    const afterFirst = await titleOf(ids.kirk), shown = await titleEl(tab, ids.kirk), said1 = (await tab.said()).split("\n")[0];
+    let tries = 0;
+    while ((await titleOf(ids.kirk)) !== "Kirk A B" && tries < 2) {
+      el = await tab.find(`/${ids.kirk}/t`); await tab.click(el.x, el.y); await tab.enter(); await sleep(2500); tries++;
+    }
+    const world = await titleOf(ids.kirk), dos = (await tab.dos()).map(d => [d.line, d.error ? d.error.slice(0, 90) : "ok"]);
+    await tab.close();
+    return { inFlight, typedDuring, afterFirst, shown, said1, tries, world, dos,
+      pass: inFlight === 1 && afterFirst === "Kirk A" && shown && shown.text === "Kirk A B" && world === "Kirk A B" };
+  } };
+
+S.S22 = { what: "the answer to a save is lost after the desk did it (codex team's unknown outcome)", expect: "no claim either way while unknown; once the view repaints and shows the words, nothing is marked unsent and nothing is resent",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    await beginEdit(tab, ids.kirk, "Kirk lost answer");
+    const paused = await holdRequests(tab, "Response");
+    await tab.enter(); await sleep(800);
+    await tab.send("Fetch.disable");
+    for (const p of paused) await tab.send("Fetch.failRequest", { requestId: p.requestId, errorReason: "ConnectionClosed" });
+    await sleep(3500);
+    const world = await titleOf(ids.kirk), shown = await titleEl(tab, ids.kirk), said = (await tab.said()).split("\n")[0], sends = (await tab.dos()).length;
+    await tab.close();
+    return { lost: paused.length, world, shown, said, sends,
+      pass: paused.length === 1 && world === "Kirk lost answer" && shown && shown.text === world && !shown.unsent && !/refused/.test(said) };
   } };
 
 // Juniper's three classes (a313), so the suite's runner can count these beside its CLI readers:
