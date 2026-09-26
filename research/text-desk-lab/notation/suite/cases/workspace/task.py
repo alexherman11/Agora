@@ -74,11 +74,28 @@ def probe(name, run):
             return "visible", "my paragraph edit was refused because JEFF appended a line: whole-value text (the text gateway case, c322)"
         return ("holds", "") if "appended by JEFF" in s["text"] else ("silent", "JEFF's appended line was lost")
     if name == "bar-collapsed-is-mine":
-        return "n/e", "no fold word: a collapsed bar cannot be said, so neither 'no event' nor 'not in Jeff's view' can be judged"
+        out, refused = run.line("scene workspace")
+        bar = next((l for l in out.splitlines() if l.strip().startswith("bar ")), "")
+        if refused or "fold" not in bar:
+            return "n/e", "no fold word: a collapsed bar cannot be said, so neither 'no event' nor 'not in Jeff's view' can be judged"
+        n0 = len(run.desk.world.events)
+        run.line("scene workspace")
+        # the text side can judge the authored fold and that printing it makes no event; the viewer's own fold and
+        # unfold (no event, not in JEFF's view) is the painter's, judged by Pike's browser reader
+        return ("holds", "") if "folded" in bar and len(run.desk.world.events) == n0 else ("silent", f"bar printed as {bar.strip()[:60]}")
     if name == "code-formatted":
         out, _ = run.line("scene workspace")
-        return ("n/e", "the chat prints its code as raw ``` lines; no blocks row source or verbatim role can be applied") \
-            if "```" in out else ("holds", "")
+        msgs = next((l for l in out.splitlines() if l.strip().startswith("msgs ")), "")
+        if "```" not in out:
+            return "holds", ""
+        if "verbatim" in msgs:
+            return "n/e", ("the chat is one text, so verbatim applies to all of it: the code keeps its spaces and the prose "
+                           "stops wrapping; formatting code inside a message needs blocks or runs")
+        return "n/e", "the chat prints its code as raw ``` lines; no blocks row source or verbatim role can be applied"
     if name == "columns-hold":
-        return "n/e", "no tracks: the row sizes its columns by content (Pike's S14 saw the document column slide 60-80 px)"
+        out, refused = run.line("scene workspace")
+        top = next((l for l in out.splitlines()[1:2]), "")
+        if refused or "grid" not in top:
+            return "n/e", "no tracks: the row sizes its columns by content (Pike's S14 saw the document column slide 60-80 px)"
+        return "holds", ""       # the text side sees declared tracks; whether pixels hold is Pike's S14
     raise KeyError(name)
