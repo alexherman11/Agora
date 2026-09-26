@@ -220,10 +220,7 @@ class Handler(SimpleHTTPRequestHandler):
                                        f"(you picked up revision {car['rev']}, it is now {now_c}); nothing was done. The view will repaint.",
                                        "events_total": len(desk.world.events), "line": line})
                 desk.seen[car["item"]] = now_c          # judged as picked up: the drop's line may name it
-                idx = getattr(desk, "_seen_idx", None)
-                if idx is None:
-                    idx = desk._seen_idx = {}
-                idx[(sess.actor, car["item"])] = len(desk.world.events)
+                desk._note_seen(car["item"], len(desk.world.events), sorted(cf) or None, obs=sess.actor)
             if rcv and rcv.get("item") in desk.world.nodes and isinstance(rcv.get("rev"), int):
                 rn = desk.world.nodes[rcv["item"]]
                 now_r, rnames = rn["rev"], {rcv["item"]} | ({rn["subject"]} if rn.get("subject") else set())
@@ -279,10 +276,7 @@ class Handler(SimpleHTTPRequestHandler):
                 # revision; what was judged is now seen.
                 desk.seen[ob["item"]] = now if now != ob["rev"] else ob["rev"]
                 if now != ob["rev"]:
-                    idx = getattr(desk, "_seen_idx", None)
-                    if idx is None:
-                        idx = desk._seen_idx = {}
-                    idx[(sess.actor, ob["item"])] = len(desk.world.events)
+                    desk._note_seen(ob["item"], len(desk.world.events), sorted(fields) or None, obs=sess.actor)
             for entry in (ob.get("reads") or []):
                 # Pike F1: a gesture is judged on every value its line was built from, not only the clicked item.
                 # Juniper's stale "move to Sun": the item and the lens were unchanged, the trip's start had moved.
@@ -303,10 +297,7 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({"text": None, "error": f"refused: a value this gesture was built from has changed: {sid} (you saw revision {rev}, "
                                        f"it is now {cur['rev'] if cur else 'gone'}); nothing was done. The view will repaint.",
                                        "events_total": len(desk.world.events), "line": line})
-                idx = getattr(desk, "_seen_idx", None)
-                if idx is None:
-                    idx = desk._seen_idx = {}
-                idx[(sess.actor, ob["item"])] = int(ob.get("at", 0))
+                desk._note_seen(ob["item"], int(ob.get("at", 0)), sorted(fields) if fields else None, obs=sess.actor)
             if car.get("item"):
                 line = line.replace("$carried", car["item"])
             if line.lower().split(" ")[0] == "worktree":

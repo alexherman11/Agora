@@ -298,13 +298,27 @@ class Desk:
         own deeds, which a receipt already showed me; a windowed reader passes False and is judged on what it saw.
         Geometry that moved because a sibling reflowed is not a reason to refuse."""
         w = self.world
-        idx = getattr(self, "_seen_idx", None) or {}
-        since = idx.get((self._observer(), nid), idx.get((w.me, nid), 0))
+        seen = self._seen_index(nid)
+        star = seen.get("*", 0)
+
+        def since_for(aspects):
+            # the earliest index among the aspects an event and my act share: unseen aspects were seen at 0
+            if aspects is None:
+                return min(seen.values()) if seen else 0
+            return min(max(seen.get(a, 0), star) for a in aspects) if aspects else star
+
+        def hits_since(e, k):
+            ea = aspects_of(e.get("via") or e["verb"], e.get("args"))
+            if not aspects_meet(fields, ea):
+                return False
+            rel = None if (fields is None and ea is None) else (fields & ea if (fields is not None and ea is not None) else (ea if fields is None else fields))
+            return k >= since_for(rel)
+        since = min(seen.values()) if seen else 0
         n = w.nodes.get(nid)
         names = {nid} | ({n["subject"]} if n and n.get("subject") else set())
         subj = n.get("subject") if n else None
         mywin = getattr(self, "_window", "") or ""
-        for e in w.events[since:]:
+        for k, e in enumerate(w.events[since:], since):
             if e.get("undone") or (e["by"] == w.me and (others_only or e.get("window", "") == mywin)):
                 continue                      # my own deeds from this window are already on my receipts
             if e["verb"] == "undo":
@@ -314,20 +328,44 @@ class Desk:
                 if ue is None:
                     continue
                 if ue["target"] in names or (names & set(ue.get("changed") or [])):
-                    if aspects_meet(fields, aspects_of(ue.get("via") or ue["verb"], ue.get("args"))):
+                    if hits_since(ue, k):
                         return e
                 continue
             hit = e["target"] in names
             # Sable: an edit through a sibling appearance changes what I am looking at; the event lists the subject as changed
             hit = hit or (subj and subj in (e.get("changed") or []) and e["verb"] not in ("place", "remove"))
             hit = hit or (n and n["type"] == "surface" and e["verb"] in ("sort", "tile", "untile", "remove", "move") and nid in (e.get("changed") or []))
-            if hit and aspects_meet(fields, aspects_of(e.get("via") or e["verb"], e.get("args"))):
+            if hit and hits_since(e, k):
                 return e
         return None
 
     def _observer(self):
         win = getattr(self, "_window", "") or ""
         return self.world.me + ("/" + win if win else "")
+
+    def _seen_index(self, nid, obs=None):
+        """{aspect: event index of the last print that showed it}; "*" is a print that showed everything (a verb's own
+        receipt, a rule's change). Older pickles hold one int, which was a whole look."""
+        idx = getattr(self, "_seen_idx", None) or {}
+        v = idx.get((obs or self._observer(), nid))
+        if v is None:
+            v = idx.get((self.world.me, nid))
+        if v is None:
+            return {}
+        return {"*": v} if isinstance(v, int) else dict(v)
+
+    def _note_seen(self, nid, at, aspects=None, obs=None):
+        """Juniper's first-line trap (attacks probe look-clears-the-fence, e04710b): a print reads only what it printed
+        whole. A look that showed a title and a word count has not read the text."""
+        idx = getattr(self, "_seen_idx", None)
+        if idx is None:
+            idx = self._seen_idx = {}
+        key = (obs or self._observer(), nid)
+        cur = idx.get(key)
+        cur = {"*": cur} if isinstance(cur, int) else dict(cur or {})
+        for a in (["*"] if aspects is None else aspects):
+            cur[a] = at
+        idx[key] = cur
 
     def _mark_rev(self, nid):
         """A receipt shows the result of what I touched, so the revision is seen; but it is not a look, so the scan for
@@ -337,13 +375,11 @@ class Desk:
         elif nid in self.world.subjects:
             self.seen[nid] = self.world.subjects[nid]["rev"]
 
-    def _mark_seen(self, nid):
+    def _mark_seen(self, nid, aspects=None):
+        """`aspects`: what this print showed whole (None: everything, which only a verb's own result or a rule may say)."""
         if getattr(self, "_receipt", False):      # a receipt printing a line is not a look (see _mark_rev)
             return self._mark_rev(nid)
-        idx = getattr(self, "_seen_idx", None)
-        if idx is None:
-            idx = self._seen_idx = {}
-        idx[(self._observer(), nid)] = len(self.world.events)     # Sable: "who saw what" is the observer, actor plus window
+        self._note_seen(nid, len(self.world.events), aspects)     # Sable: "who saw what" is the observer, actor plus window
         if nid in self.world.nodes:
             self.seen[nid] = self.world.nodes[nid]["rev"]
         elif nid in self.world.subjects:
@@ -386,7 +422,7 @@ class Desk:
     def line(self, nid, level=1):
         w = self.world
         n = w.nodes[nid]
-        self._mark_seen(nid)
+        self._mark_seen(nid, ["title", "place", "due", "tags"] + [f"prop:{k}" for k in (n.get("props") or {})])    # the outline line: not the text
         bits = []
         if n["type"] == "surface" and n["layout"] == "view":
             head = f"{nid} view \"{n['title']}\" of {n.get('query')}" + (f" as table {n['cols']}" if n.get("cols") else "")
@@ -413,7 +449,7 @@ class Desk:
                     bits.append(f"{spilled} past the {'bottom' if axis == 'h' else 'right edge'} (offscreen)")
         else:
             s = w.subjects[n["subject"]]
-            self._mark_seen(s["id"])
+            self._mark_seen(s["id"], ["title", "place", "due"] + [f"prop:{k}" for k in (s.get("props") or {})])    # a word count is not the text
             head = f"{nid} {s['kind']} \"{s['title']}\""
             geo = self._geom(nid)
             if geo:
@@ -607,8 +643,6 @@ class Desk:
             s = w.subjects[w.nodes[nid]["subject"]]
         else:
             raise Refusal(f"{nid} is a surface; look {nid} shows what is inside")
-        self._mark_seen(nid)
-        self._mark_seen(s["id"])
         apps = w.appearances_of(s["id"])
         head = f"{s['id']} {s['kind']} \"{s['title']}\" · appears at {', '.join(apps)}"
         if s["tags"]:
@@ -639,6 +673,10 @@ class Desk:
                 heading = next((l for l in reversed(cut) if l.startswith("## ")), None)   # the section the tail lines belong to
                 keep = [heading] if heading else []
                 body = "\n".join(keep + [f"(… {len(cut) - len(keep)} earlier line(s) folded; without tail= for all)"] + bl[-tail:])
+        whole = body == s["text"]          # a section outline, one section or a tail is a partial read: the text is not seen
+        shown = ["title", "tags", "due", "comments", "links"] + (["text"] if whole else [])
+        self._mark_seen(nid, shown)
+        self._mark_seen(s["id"], shown)
         out = f"{head}\n---\n{body}\n---"
         if s.get("comments"):
             out += "\ncomments:"
@@ -677,12 +715,12 @@ class Desk:
 
     def cmd_where(self, ident):
         nid = self._resolve(ident, allow_subject=False)
-        self._mark_seen(nid)
+        self._mark_seen(nid, ["place"])
         return f"{nid}: " + self._where_line(nid)
 
     def cmd_verbs(self, ident):
         nid = self._resolve(ident)
-        self._mark_seen(nid)
+        self._mark_seen(nid, [])          # verbs show what can be done, no value
         v = self.world.verbs_for(nid)
         return f"{nid} verbs:\n" + "\n".join(f"  {k} {sig}".rstrip() for k, sig in v.items())
 
