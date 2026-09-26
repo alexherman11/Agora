@@ -10,6 +10,7 @@ Juniper's golden prints judge the switch. Jeff owns this file (desk-shell/OWNERS
 import re
 
 import scene as S
+from desk import aspects_of, aspects_meet
 
 ABSENT = None          # printed (no x); a third value, distinct from "" and from false
 
@@ -51,6 +52,25 @@ class Accessor:
         s = S.find_lens(self.desk, name)
         self.R.append(("define", name, s["id"], s["rev"]))
         return s
+
+    def touched(self, r, aspect=None):
+        """The last event on thing `r` (its appearance or subject), or the last one that changed `aspect`; undone events
+        and undos are skipped (an undo is not a touch, as `age<` already says). -> {id, at, by} or None."""
+        w = self.w
+        n = w.nodes.get(r)
+        names = {r} | ({n["subject"]} if n and n.get("subject") else set()) | set(w.appearances_of(r) if r in w.subjects else [])
+        hit = None
+        for e in reversed(w.events):
+            if e.get("undone") or e["verb"] == "undo":
+                continue
+            if e["target"] not in names and not (names & set(e.get("changed") or [])):
+                continue
+            if aspect and not aspects_meet({aspect}, aspects_of(e.get("via") or e["verb"], e.get("args"))):
+                continue
+            hit = e
+            break
+        self.R.append(("touched", r, aspect, hit["id"] if hit else None))
+        return {"id": hit["id"], "verb": hit.get("via") or hit["verb"], "at": (hit.get("at") or "")[:16].replace("T", " "), "by": hit["by"]} if hit else None
 
     def host(self, f):
         v = {"me": self.w.me, "today": getattr(self.desk, "today", None) or getattr(self.w, "today", None),
@@ -187,12 +207,28 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         frames = dict(ctx.get("_frames") or {})
         ctx["_frames"] = frames
         track = {"frames": set(), "reads": {}, "missing": set(), "bad": set()}
+        # Juniper's freshness words: $touched, $touched.by, $changed.<field>, as host reads of the last event
+        asked = {d for group in node["deps"].values() for d in (group if isinstance(group, list) and group and isinstance(group[0], str) else sum(group, []) if isinstance(group, list) else [])}
+        rid = ctx.get("id") or ctx.get("item")
+        if rid and any(d == "touched" or d.startswith("touched.") or d.startswith("changed.") for d in asked):
+            t = acc.touched(rid)
+            ctx["touched"] = f"{t['id']} {t['verb']} · {t['at']}" if t else ""
+            frames["touched"] = dict(t or {}, id=(t or {}).get("id"))
+            ch = {}
+            for d in asked:
+                if d.startswith("changed."):
+                    f = d.split(".", 1)[1]
+                    c = acc.touched(rid, S._aspect_of_field(f) or f)
+                    ch[f] = f"{c['id']} {c['verb']} · {c['at']}" if c else None
+            frames["changed"] = ch
 
         def frame_reads():
             """This part's reads of frame fields so far, as fence entries: what its lets and bind were built from."""
             fl = {}
             for k in track["reads"]:
                 fr, _, fld = k.partition(".")
+                if fr in S.HOST_FRAMES:
+                    continue
                 fid, a = frames.get(fr, {}).get("id"), S._aspect_of_field(fld)
                 if fid and a and S._rev_of(w, fid) is not None:
                     fl.setdefault(fid, set()).add(a)
@@ -307,6 +343,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         fsh = {}
         for k in track["reads"]:
             fr, _, fld = k.partition(".")
+            if fr in S.HOST_FRAMES:
+                continue
             fid, a = frames.get(fr, {}).get("id"), S._aspect_of_field(fld)
             if fid and a:
                 fsh.setdefault(fid, set()).add(a)
@@ -314,7 +352,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["fshown"] = {i: sorted(a) for i, a in fsh.items()}
         if track["reads"]:
             out["freads"] = {k: v for k, v in track["reads"].items()}
-            out["frames"] = {f: frames[f].get("id") for f in track["frames"] if f in frames}
+            out["frames"] = {f: frames[f].get("id") for f in track["frames"] if f in frames and f not in S.HOST_FRAMES}
         if track["missing"]:
             out["missing"] = sorted(set(out.get("missing") or []) | {f"{m} on {frames[m.split('.')[0]].get('id')}" for m in track["missing"]})
         if out["acts"]:
@@ -326,11 +364,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     fields.setdefault(sj, set()).add(a)
             for k in track["reads"]:
                 fr, _, fld = k.partition(".")
+                if fr in S.HOST_FRAMES:
+                    continue                    # a freshness read is not fenced: a comment must not stale a card's gestures
                 fid = frames.get(fr, {}).get("id")
                 a = S._aspect_of_field(fld)
                 if fid and a:
                     fields.setdefault(fid, set()).add(a)
-            for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames]:
+            for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames and f not in S.HOST_FRAMES]:
                 if i and S._rev_of(w, i) is not None:
                     reads[i] = S._rev_of(w, i)
             selects = []

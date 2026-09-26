@@ -312,3 +312,29 @@ def test_paint_words_print_and_emit():
             assert "· fold" not in text
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def test_freshness_words_are_host_reads():
+    """Juniper: $touched is the last event on the thing, $changed.<field> the last that changed that aspect; a comment
+    refreshes the first and not the second; undo is not a touch; neither enters the gesture fence."""
+    import deskd, lens_ir
+    tmp = _scratch("_test_touched")
+    try:
+        with deskd.Session("_test_touched", "jeff") as desk:
+            desk.repl("look")
+            nid = desk.repl("do create f01 kind=task title=Suite status=doing").split("created ")[1].split()[0]
+            import re as _re
+            done = _re.search(r"\[(e\d+)\]", desk.repl("do prop " + nid + " status=done")).group(1)
+            cm = _re.search(r"\[(e\d+)\]", desk.repl("do comment " + nid + ' line="nice"')).group(1)
+            src = chr(10).join(["root : column, of kind:task, each t", 't : text "$title $changed.status / $touched / $touched.by", on click do check $item'])
+            sc = lens_ir.evaluate(desk, src)
+            t = sc["kids"][0]
+            assert t["text"].startswith("Suite " + done + " prop ·") and " comment ·" in t["text"] and t["text"].endswith("/ jeff"), t["text"]
+            assert all(e[0] != done and not str(e[0]).startswith("e") for e in t["reads"]), t["reads"]
+            assert not any(e[0] == "touched" and e[3] is None for e in sc["R"] if e[0] == "touched" and e[2] is None)
+            desk.repl("undo " + cm)
+            desk.repl("undo " + done)
+            sc2 = lens_ir.evaluate(desk, src)
+            assert "no changed.status" not in str(sc2) and done not in sc2["kids"][0]["text"], sc2["kids"][0]["text"]
+    finally:
+        tmp.unlink(missing_ok=True)

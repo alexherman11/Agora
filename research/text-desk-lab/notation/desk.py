@@ -46,6 +46,10 @@ def aspects_of(verb, args):
         return {"due"}
     if verb in ("tag", "untag"):
         return {"tags"}
+    if verb in ("comment", "reply", "resolve"):
+        return {"comments"}           # Juniper: a comment must not refresh a finish, nor stale a card's gestures
+    if verb in ("link", "unlink"):
+        return {"links"}
     if verb in ("move", "resize", "place", "tile", "untile", "stack", "fold", "unfold", "sort", "tidy", "gather", "swap",
                 "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop"):
         return {"place"}

@@ -497,7 +497,8 @@ def parse(src):
 # and prints its absence). A `$frame.field` whose frame is not in scope is refused here, for every part reachable from
 # the root, so an untaken branch is not an unexercised program (Sable R6; Pike's rules N1 to N6, round six).
 # ---------------------------------------------------------------------------------------------------------------------
-HOST = ("me", "today", "session")
+HOST = ("me", "today", "session", "touched")
+HOST_FRAMES = ("touched", "changed")      # Juniper: $touched (last event on the thing), $touched.by, $changed.<field>; host reads, never in a fence
 GESTURE_FACTS = ("value", "x", "y", "carried")
 
 
@@ -530,7 +531,7 @@ def resolve(root, parts):
         scopes[id(node)] = {"frames": frames, "lets": lets}
         for word, a, b in _refs_of(node):
             if b:
-                if a not in frames and a != "it":
+                if a not in frames and a != "it" and a not in HOST_FRAMES:
                     raise LensRefusal(f"line {node['line']}: ${a}.{b}: no part above this one is named `as {a}`"
                                       + (f" (frames in scope: {', '.join(sorted(frames))})" if frames else " (no frames in scope)"))
         for kid in node["kids"]:
