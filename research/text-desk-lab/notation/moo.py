@@ -366,9 +366,10 @@ def v_reveal(w, nid, a):
     steps = []
     if p["layout"] == "free":
         steps.append(("raise", nid, {}))
-        x, y = n["x"], n["y"]
-        nx = min(max(0, x), max(0, p["w"] - n["w"]))
-        ny = min(max(0, y), max(0, p["h"] - n["h"]))
+        x, y, bw, bh = w.box(nid)
+        _, _, pw, ph = w.box(n["parent"])
+        nx = min(max(0, x), max(0, pw - bw))
+        ny = min(max(0, y), max(0, ph - bh))
         if (nx, ny) != (x, y) and w.coords:
             steps.append(("move", nid, {"to": f"{nx},{ny}"}))
     if not steps:

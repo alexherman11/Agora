@@ -230,12 +230,13 @@ def group_around(w, ids, args):
     if spatial:
         # naming an arrangement must not destroy it: the group forms around its members, where they already are
         pad, head = 16, 28
-        x0 = min(w.nodes[i]["x"] for i in ids) - pad
-        y0 = min(w.nodes[i]["y"] for i in ids) - pad - head
-        x1 = max(w.nodes[i]["x"] + w.nodes[i]["w"] for i in ids) + pad
-        y1 = max(w.nodes[i]["y"] + w.nodes[i]["h"] for i in ids) + pad
+        box = {i: w.box(i) for i in ids}     # where each is drawn (held here: a free surface's children)
+        x0 = min(b[0] for b in box.values()) - pad
+        y0 = min(b[1] for b in box.values()) - pad - head
+        x1 = max(b[0] + b[2] for b in box.values()) + pad
+        y1 = max(b[1] + b[3] for b in box.values()) + pad
         x0, y0 = max(0, x0), max(0, y0)
-        rel = {i: (w.nodes[i]["x"] - x0, w.nodes[i]["y"] - y0) for i in ids}
+        rel = {i: (box[i][0] - x0, box[i][1] - y0) for i in ids}
     r0 = w.apply("group", parent, None, {"title": args.get("title", "group"), "as": lay})
     gid = r0["created"]
     if spatial:
