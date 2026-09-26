@@ -145,3 +145,37 @@ Under this design the siblings write nothing [imagined until built].
 4. **`between()`.** 2000 random insertions keep a strict order, and the longest key is 5 characters.
 
 What this does not show: the CLI's prints and the shell drawn from the model. That waits for the switch in `world.py`.
+
+## The switch in world.py, as patches (26 Sep)
+
+Jeff approved `world.box()` in knife's `group` and moo's clamp "as a derived read behind the sable-9 switch", and asked for the world.py changes as patch files for a quiet window. They are in `experiments/patches/`, with `after-landing.sh`, the runs to make once they land, and the numbers to expect:
+
+1. `1-chat-signed-by-writer.patch` (world.py). A chat line's speaker is the event's actor. A line signed with the actor's own name stays as written; any other line, unsigned or signed with someone else's name, is signed by its actor and keeps its words. This replaces two branches: JEFF's unsigned lines were signed "Alex:", and a visitor's "Name:" prefix was trusted whoever typed it.
+2. `2-sable9-switch.patch` (world.py). `DESK_GEOMETRY=choices` turns it on; off is the default, and off runs none of it. With the switch on:
+   - a flow child holds `order` (a `between()` key) and `share`;
+   - `children()` orders by `(order, id)` and `reflow()` weighs by `share`;
+   - create, move, resize, sort and tile write only those two;
+   - reflow derives `z` in a flow from order, since nothing overlaps there;
+   - leaving a flow, by a move into a free surface or by untile, drops `order` and `share`, and keeps the box, which becomes held.
+   
+   `box(nid)` is the one read of where a thing is drawn.
+3. `3-box-reads.patch` (knife.py, moo.py). `group_around` and `reveal` read boxes through `world.box()`. Both sites read children of free surfaces only, so nothing they do changes. `boxprobe.py` prints the same JSON before and after, with the switch off and on. The patch needs patch 2.
+
+**What the switch shows [ran, in a scratch copy of main 538cfd8 with the three patches].**
+
+- Off, every instrument prints what main prints:
+  - test_scene 19 passed;
+  - test_journal 9/1/1/1;
+  - the eight suite cases, their goldens, soundness (0 unsound in 13 cases) and golden_prints (46 lenses in 16 sessions);
+  - the exceptions are chat, whose M4 goes 2 → 0 as patch 1 intends, and the world.py hash line.
+- On:
+  - golden_prints are identical to off in all 46 lenses, and so are all the suite cases and soundness.
+  - The working copy writes 9 rows for create (was 31), 2 for move (23), 1 for resize (21), 5 for remove (25) and 1 for tidy (23). Tag with rule r2's move writes 4 (24).
+  - All 17 acts rebuild from their rows and from nothing.
+  - layout9's second-reflow drift goes from 3 acts in 60 to 0.
+  - S12 goes from breaks to half: 0 untouched siblings clash (was 4 on `geom:pos`). The 2 rows left are the fresh-id collision (a14, s13), which is the id question, not geometry.
+  - The pickle grows about 3% (169 → 174 kB at 204 subjects).
+
+**A correction to my own first rebuild [ran].** With the switch on, rows first failed to rebuild create, tag and move, and from nothing failed for every act. The only difference was `z` on flow children. I had marked it derived, but nothing derived it: create stamps `_next_z`, and legacy sort sets `i + 1`. Now reflow derives it. raise and lower are not offered in a flow (`verbs_for`), so no act writes it there.
+
+**Not shown.** No run touched the shell (lens.js and viewer.js), the live server, or a real session with the switch on. The first session to turn it on should be a private one.

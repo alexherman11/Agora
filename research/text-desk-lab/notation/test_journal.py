@@ -596,7 +596,9 @@ def s12():
     siblings = sorted({k.split(chr(31))[0] for k in sib_rows})
     aspects = sorted({k.split(chr(31))[1] for k in sib_rows})
     fresh_ids = sorted({k.split(chr(31))[0] for k in clash} - set(tasks))
-    report("S12", s12.title, "breaks" if clash else "holds",
+    on = bool(getattr(dk.w, "choices", False))
+    # the geometry question is the siblings; a collision on the two fresh ids is the id question (global ids), so it halves
+    report("S12", s12.title, "breaks" if sib_rows else ("half" if clash else "holds"),
            "A column of five tasks. Alex adds one at the bottom; at the same time the agent adds one and moves it to the top.",
            [f"Alex: {verdict(ra)}; agent: {verdict(rb)}",
             f"Alex's act writes {len(rows_a)} rows, the agent's {len(rows_b)}; {len(both)} (thing, aspect) rows are written by both, "
@@ -605,7 +607,8 @@ def s12():
             f"the rest clash because both new tasks were minted with the same ids ({', '.join(fresh_ids)}): per-world counters collide "
             "across concurrent copies, which global ids remove (sable-7 section 7)"],
            "sable-9: a flow child holds place = {parent, order key} and share, never a box. Alex writes his task's place, the "
-           "agent writes its task's place; the siblings' boxes are derived, so nothing clashes [imagined until sable-9 is built]")
+           "agent writes its task's place; the siblings' boxes are derived, so nothing clashes "
+           + ("[ran: DESK_GEOMETRY=choices]" if on else "[imagined here: run with DESK_GEOMETRY=choices once the sable-9 switch lands]"))
 
 
 # ---------------------------------------------------------------------------------------------------------------

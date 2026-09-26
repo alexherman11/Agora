@@ -30,10 +30,11 @@ import moo      # noqa: E402
 ABSENT = "<absent>"
 
 # ---- the projection: the desk as rows keyed (referent, aspect) ------------------------------------------------------
-NODE_GROUPS = {"x": "geom:pos", "y": "geom:pos", "w": "geom:size", "h": "geom:size", "parent": "place", "z": "place"}
+NODE_GROUPS = {"x": "geom:pos", "y": "geom:pos", "w": "geom:size", "h": "geom:size", "parent": "place", "z": "place", "order": "place"}
 UNKNOWN = set()
 SUBJECT_KNOWN = {"id", "rev", "kind", "title", "text", "tags", "due", "comments", "props"}
-NODE_KNOWN = {"id", "rev", "type", "subject", "parent", "x", "y", "w", "h", "z", "folded", "layout", "title", "props"}
+NODE_KNOWN = {"id", "rev", "type", "subject", "parent", "x", "y", "w", "h", "z", "folded", "layout", "title", "props", "order", "share"}
+DERIVED_IN_FLOW = ("x", "y", "w", "h", "z")      # sable-9 switch on: a flow child's box is the reflow cache, not a row
 
 
 def aspect_of_field(kind, key):
@@ -70,10 +71,12 @@ def project(d):
                         rows[(sid, f"comment:{c['id']}")] = json.loads(json.dumps(c))
                 else:
                     rows[(sid, k)] = v
+        choices = getattr(w, "choices", False)
         for nid, n in w.nodes.items():
             grouped = {}
+            in_flow = choices and (w.nodes.get(n.get("parent") or "") or {}).get("layout") in ("column", "row")
             for k, v in n.items():
-                if k in ("id", "rev"):
+                if k in ("id", "rev") or (in_flow and k in DERIVED_IN_FLOW):
                     continue
                 if k not in NODE_KNOWN:
                     UNKNOWN.add(f"node.{k}")
@@ -155,7 +158,7 @@ def apply_rows(d, delta):
                         n.setdefault("props", {})[a[5:]] = v
                 elif a in ("geom:pos", "geom:size", "place"):
                     for k in [k for k, grp in NODE_GROUPS.items() if grp == a]:
-                        if v == ABSENT:
+                        if v == ABSENT or k not in v:
                             n.pop(k, None)
                         else:
                             n[k] = v[k]
@@ -163,7 +166,7 @@ def apply_rows(d, delta):
                     n.pop(a, None)
                 else:
                     n[a] = v
-            if set(n) <= {"id", "rev"}:
+            if not (set(n) - {"id", "rev"} - (set(DERIVED_IN_FLOW) if getattr(w, "choices", False) else set())):
                 del w.nodes[g]
         elif g.startswith("l") and g[1:].isdigit():
             link = next((x for x in w.links if x["id"] == g), None)
@@ -206,6 +209,11 @@ def apply_rows(d, delta):
                 d.follow = aspects["follow"]
         else:
             UNKNOWN.add(f"referent {g}")
+    if getattr(w, "choices", False):
+        # sable-9: assigning rows is followed by deriving layout; flow children's boxes are recomputed, never assigned
+        for fid, n in list(w.nodes.items()):
+            if n["type"] == "surface" and (n.get("parent") is None or (w.nodes.get(n["parent"]) or {}).get("layout") == "free"):
+                w.reflow(fid)
 
 
 def canonical(d):

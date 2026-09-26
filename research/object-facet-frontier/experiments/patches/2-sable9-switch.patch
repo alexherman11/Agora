@@ -1,0 +1,222 @@
+--- a/research/text-desk-lab/notation/world.py
++++ b/research/text-desk-lab/notation/world.py
+@@ -12,6 +12,26 @@
+ import re
+ 
+ SCREEN = (1280, 800)
++ORDER_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
++
++
++def between(a, b):
++    """sable-9: an order key that sorts strictly between a and b (None = open end). Fractional indexing, base 36."""
++    a, out, i, tight = a or "", "", 0, b is not None
++    while True:
++        ca = ORDER_DIGITS.index(a[i]) if i < len(a) else 0
++        cb = ORDER_DIGITS.index(b[i]) if tight and i < len(b) else len(ORDER_DIGITS)
++        if cb - ca > 1:
++            return out + ORDER_DIGITS[(ca + cb) // 2]
++        out += ORDER_DIGITS[ca]
++        if tight and (i >= len(b) or ORDER_DIGITS[ca] != b[i]):
++            tight = False
++        i += 1
++
++
++def _geometry_choices_default():
++    import os
++    return os.environ.get("DESK_GEOMETRY", "") == "choices"
+ 
+ 
+ class Refusal(Exception):
+@@ -129,6 +149,8 @@
+             "x": x, "y": y, "w": w, "h": h, "z": self._next_z(parent),
+             "folded": folded, "rev": 1,
+         }
++        if self.choices and self._flow(parent):
++            self._join_flow(aid, parent)
+         self.reflow(parent)
+         return aid
+ 
+@@ -136,13 +158,83 @@
+         sib = [n["z"] for n in self.nodes.values() if n["parent"] == parent]
+         return (max(sib) + 1) if sib else 1
+ 
+-    # ---- queries ------------------------------------------------------
+-    def children(self, fid):
++    # ---- sable-9: geometry as choices (behind the switch) ----------------
++    # With `choices` on, a child of a column or row holds only choices: order (a fractional key: its place among its
++    # siblings) and share (its weight in the flow). Its x, y, w, h are still written by reflow, but as a cache of a
++    # derived layout, never as its own facts: children() orders by `order`, reflow() weighs by `share`, and a move or a
++    # resize in a flow changes one child's order or share. Children of a free surface keep x, y, w, h as held choices.
++    # Off (the default), nothing here runs and the world behaves exactly as before.
++    choices = _geometry_choices_default()
++
++    def _flow(self, fid):
++        return fid in self.nodes and self.nodes[fid].get("layout") in ("column", "row")
++
++    def _legacy_children(self, fid):
+         kids = [n for n in self.nodes.values() if n["parent"] == fid]
+         lay = self.nodes[fid]["layout"]
+         if lay == "free":
+-            return sorted(kids, key=lambda n: n["z"])
+-        return sorted(kids, key=lambda n: (n["y"], n["x"]) if lay == "column" else (n["x"], n["y"]))
++            return sorted(kids, key=lambda n: n.get("z", 0))
++        # a thing assigned from rows in a flow has no box until reflow derives one
++        return sorted(kids, key=lambda n: (n.get("y", 0), n.get("x", 0)) if lay == "column" else (n.get("x", 0), n.get("y", 0)))
++
++    def _axis(self, fid):
++        return "h" if self.nodes[fid]["layout"] == "column" else "w"
++
++    def _ensure_choices(self, fid):
++        """Give every child of flow `fid` an order and a share, from today's order and sizes, only where missing."""
++        last, axis = None, self._axis(fid)
++        for k in self.children(fid):
++            if k.get("order") is None or (last is not None and k["order"] <= last):
++                k["order"] = between(last, None)
++            last = k["order"]
++            if not k.get("share"):
++                k["share"] = max(1, k.get(axis, 1))
++
++    def _join_flow(self, nid, fid):
++        """A thing arriving in a flow goes after its last sibling, with the mean of its siblings' shares."""
++        n = self.nodes[nid]
++        n["order"], n["share"] = None, None
++        sib = [k for k in self.children(fid) if k["id"] != nid]
++        if sib:
++            self._ensure_choices(fid)
++            sib = [k for k in self.children(fid) if k["id"] != nid]
++        n["order"] = between(sib[-1]["order"] if sib else None, None)
++        shares = [k["share"] for k in sib if k.get("share")]
++        n["share"] = int(sum(shares) / len(shares)) if shares else max(1, n.get(self._axis(fid), 1))
++
++    def _reorder(self, fid, ids):
++        """Put `ids` in this order, changing the fewest order keys: keep the longest run already in order, re-key the rest."""
++        self._ensure_choices(fid)
++        keys = [self.nodes[i].get("order") for i in ids]
++        best, prev = [1] * len(ids), [-1] * len(ids)      # longest increasing subsequence of the existing keys
++        for j in range(len(ids)):
++            for i in range(j):
++                if keys[i] is not None and keys[j] is not None and keys[i] < keys[j] and best[i] + 1 > best[j]:
++                    best[j], prev[j] = best[i] + 1, i
++        keep = set()
++        j = max(range(len(ids)), key=lambda x: best[x]) if ids else -1
++        while j >= 0 and keys[j] is not None:
++            keep.add(j)
++            j = prev[j]
++        for j, i in enumerate(ids):
++            if j in keep:
++                continue
++            lo = self.nodes[ids[j - 1]]["order"] if j else None
++            hi = next((self.nodes[ids[x]]["order"] for x in range(j + 1, len(ids)) if x in keep), None)
++            self.nodes[i]["order"] = between(lo, hi)
++
++    def box(self, nid):
++        """The box a thing is drawn in: held for a child of a free surface, derived (the reflow cache) in a flow."""
++        n = self.nodes[nid]
++        return n["x"], n["y"], n["w"], n["h"]
++
++    # ---- queries ------------------------------------------------------
++    def children(self, fid):
++        if not (self.choices and self._flow(fid)):
++            return self._legacy_children(fid)
++        legacy = self._legacy_children(fid)
++        keyed = sorted((n for n in legacy if n.get("order") is not None), key=lambda n: (n["order"], n["id"]))
++        return keyed + [n for n in legacy if n.get("order") is None]
+ 
+     def title(self, node):
+         if node["type"] == "surface":
+@@ -221,6 +313,8 @@
+         f = self.nodes[fid]
+         if f["layout"] == "free":
+             return
++        if self.choices:
++            self._ensure_choices(fid)
+         kids = self.children(fid)
+         if not kids:
+             return
+@@ -228,7 +322,7 @@
+         n = len(kids)
+         axis = "h" if f["layout"] == "column" else "w"
+         total = f[axis] - gap * (n + 1)
+-        weights = [max(1, k[axis]) for k in kids]
++        weights = [max(1, (k.get("share") if self.choices else None) or k[axis]) for k in kids]
+         if self.equal_share:
+             weights = [1] * n
+         wsum = float(sum(weights))
+@@ -245,6 +339,9 @@
+             for k, sh in zip(kids, shares):
+                 k["x"], k["y"], k["w"], k["h"] = x, gap, sh, f["h"] - 2 * gap
+                 x += sh + gap
++        if self.choices:
++            for i, k in enumerate(kids):    # in a flow nothing overlaps: stacking is derived from order, like the box
++                k["z"] = i + 1
+         for k in kids:
+             if k["type"] == "surface":
+                 self.reflow(k["id"])
+@@ -260,6 +357,8 @@
+         sib = [k[axis] for k in self.children(p) if k["id"] != nid]
+         if sib:
+             n[axis] = int(sum(sib) / len(sib))
++        if self.choices:
++            self._join_flow(nid, p)
+ 
+     # ---- mutation -----------------------------------------------------
+     def _bump(self, nid):
+@@ -408,8 +507,12 @@
+                 d = self.nodes[dest]
+                 if d["layout"] == "free":
+                     n["x"], n["y"] = 16, 16
++                    if self.choices:
++                        n.pop("order", None), n.pop("share", None)   # a free surface holds boxes, not flow choices
+                 n["w"] = min(n["w"], d["w"] - 16)
+                 n["h"] = min(n["h"], d["h"] - 16)
++                if self.choices and self._flow(dest):
++                    self._join_flow(target, dest)
+                 if "at" in args:
+                     self._set_index(target, int(args["at"]))
+                 self.reflow(old)
+@@ -459,6 +562,9 @@
+             if w < 40 or h < 24:
+                 raise Refusal("too small")
+             n["w"], n["h"] = w, h
++            if self.choices and self._flow(n["parent"]):
++                self._ensure_choices(n["parent"])
++                n["share"] = h if self.nodes[n["parent"]]["layout"] == "column" else w
+             self.reflow(n["parent"])
+             if n["type"] == "surface":
+                 self.reflow(target)
+@@ -484,11 +590,24 @@
+                 raise Refusal("as= must be column or row")
+             if n["layout"] == lay:
+                 return {"ok": True, "event": None, "changed": [], "note": f"{target} is already a {lay}; nothing changed"}
++            was_free = n["layout"] == "free"
+             n["layout"] = lay
++            if self.choices:
++                # tiling is an arrangement a person chose: order from where things are now, share from their sizes
++                if was_free:
++                    for k in self.nodes.values():
++                        if k["parent"] == target:
++                            k["order"], k["share"] = None, None
++                self._ensure_choices(target)
+             self.reflow(target)
+             changed += [k["id"] for k in self.children(target)]
+         elif verb == "untile":
+             n["layout"] = "free"
++            if self.choices:
++                # untiling keeps where things are drawn: the derived boxes become held, the flow choices go
++                for k in self.nodes.values():
++                    if k["parent"] == target:
++                        k.pop("order", None), k.pop("share", None)
+         elif verb == "rename":
+             n["title"] = str(args.get("title", n["title"]))
+         elif verb == "group":
+@@ -815,6 +934,10 @@
+         return False
+ 
+     def _order(self, fid, ids):
++        if self.choices and self._flow(fid):
++            self._reorder(fid, ids)
++            self.reflow(fid)
++            return
+         f = self.nodes[fid]
+         for i, k in enumerate(ids):
+             if f["layout"] == "row":
