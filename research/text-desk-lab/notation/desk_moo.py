@@ -215,7 +215,7 @@ class DeskMoo(Desk):
         if hit:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
             who = "you, in your other window" if hit["by"] == self.world.me else hit["by"]
-            raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}); look at it again before acting")
+            raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}); {self._again(nid, mine)} before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         v = moo.REGISTRY[name]
         r = v.run(w, nid, kv)

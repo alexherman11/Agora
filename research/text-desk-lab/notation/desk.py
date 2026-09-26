@@ -398,9 +398,17 @@ class Desk:
                 return a
         return None
 
+    def _again(self, nid, aspects):
+        """The advice in a stale refusal names a print that would satisfy the rule: `look` never prints the text
+        (Sable, S10), so a text write is sent to `read`, and to `read :3` when the note is folded."""
+        if aspects is None or "text" in aspects:
+            return self._read_hint(nid, "text").replace(" shows it", "").replace(" shows all of it", "") + " again"
+        return "look at it again"
+
     def _read_hint(self, nid, aspect):
         s = self.world.subjects.get((self.world.nodes.get(nid) or {}).get("subject") or nid) or {}
-        folded = aspect == "text" and any(h for h, _ in self.world.sections(s.get("text") or ""))
+        t = s.get("text") or ""
+        folded = aspect == "text" and any(h for h, _ in self.world.sections(t)) and (len(t.split()) > 300 or t.count("\n") >= 40)
         return f"read {nid} :3 shows all of it" if folded else f"read {nid} shows it"
 
     def _mark_rev(self, nid, aspects=None):
@@ -694,11 +702,12 @@ class Desk:
         secs = w.sections(s["text"])
         named = [(h, b) for h, b in secs if h]
         body = s["text"]
-        if named and section is None and not full and not tail:   # tail= wants the end of the text, not its outline
+            # Juniper (trip D step 11): fold-as-budget is for long texts; a short sectioned plan prints whole, so reading it is reading it
+        if named and section is None and not full and not tail and (len(s["text"].split()) > 300 or s["text"].count("\n") >= 40):   # tail= wants the end of the text, not its outline
             # fold-as-budget for text: the outline of sections, each with its word count
             pre = next((b for h, b in secs if h is None), "")
             lines = ([pre] if pre else []) + [f"## {h}  ({len(b.split())}w)" for h, b in named]
-            body = "\n".join(lines) + f"\n(read {nid} #<n> or #<name> for one section, read {nid} :3 for all)"
+            body = "\n".join(lines) + f"\n(this is the outline, not the text: read {nid} :3 shows all of it, which replacing the text needs; read {nid} #<n> or #<name> for one section)"
         elif named and section is not None:
             pick = None
             if section.isdigit() and 1 <= int(section) <= len(named):
@@ -904,7 +913,7 @@ class Desk:
         if seen != cur:
             recent = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
             why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {recent[-1]['by']}" if recent else ""
-            raise Refusal(f"stale: {nid} changed since you last saw it{why}; look at it again before acting")
+            raise Refusal(f"stale: {nid} changed since you last saw it{why}; {self._again(nid, aspects_of(verb, kv))} before acting")
         blind = self._blind(nid, verb, kv)
         if blind:
             raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
