@@ -107,15 +107,15 @@ async function fixture() {
   await mk(`do create ${ids.work_f} kind=note title="rebuild the index" tags=bg`, "task2");
   await mk(`do prop ${ids.task2} status=queued`);
   const work = [
-    "work : row, role sheet",
-    "  bar : column, role bar, of tag:project, each proj",
-    "  chat : column, of tag:chat, each msg",
+    "work : grid 1 3 3 1, role sheet",      // pike-7 section 3, lowered in 5bb7f7f (S14 before run l drew a row)
+    "  bar : column, role bar, fold, of tag:project, each proj",
+    "  chat : column, scroll end, of tag:chat, each msg",
     "  doc : column, of tag:doc, each page",
     "  tasks : column, of tag:bg, each task",
     "proj : role meta, text $title",
     "msg : role card",
     "  who : role meta, text $title",
-    "  b : role body, text $text, on edit do rewrite $item text=\\\"$value\\\"",
+    "  b : role body, text $text, lines 1..8, on edit do rewrite $item text=\\\"$value\\\"",
     "page : role card",
     "  h : role heading, text $title",
     "  b : role body, text $text",
@@ -211,7 +211,12 @@ class Tab {
   }
   async type(text) { await this.send("Input.insertText", { text }); }
   async selectAll() { await this.key("a", "KeyA", 65, 2); }
-  async enter() { await this.key("Enter", "Enter", 13); }
+  // Enter as a keyboard sends it: keyDown carries the character, so an editor that does not take the key gets a new line
+  async enter() {
+    const r = String.fromCharCode(13);
+    await this.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: r, unmodifiedText: r });
+    await this.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+  }
   async said() { return this.eval("document.getElementById('said').textContent"); }
   async pageHas(s) { return this.eval(`document.body.innerText.includes(${JSON.stringify(s)})`); }
   close() { this.ws.close(); return fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${this.id}`); }
@@ -415,6 +420,7 @@ S.S11 = { what: "two windows, one person: edit in window 1 after window 2 change
     await beginEdit(w2, ids.mcway, "McWay Falls (window two)"); await w2.enter(); await sleep(1500);
     await w1.enter();
     const r = await judgeEdit(w1, ids.mcway, "McWay Falls (window one)", before);
+    r.w1dos = (await w1.dos()).map(d => [d.line, d.observed && d.observed.rev, d.error ? d.error.slice(0, 80) : "ok"]); r.w2dos = (await w2.dos()).map(d => [d.line, d.observed && d.observed.rev, d.error ? d.error.slice(0, 80) : "ok"]);
     await w1.close(); await w2.close();
     return { ...r, pass: !!r.refused && r.refusalShown && !r.draftLost && !r.phantom };
   } };
@@ -524,7 +530,7 @@ S.S14 = { what: "Alex's workspace: type in the chat while a background task fini
     const gTyping = await geo();
     const draft = "Can the fence be per part instead of per lens?";
     const typedWhole = await tab.eval(`document.activeElement.textContent`);
-    await tab.enter();
+    await tab.key("Enter", "Enter", 13, 2);      // lines 1..8: Ctrl+Enter sends; Enter would be a new line
     await sleep(2500);
     const r = await act("observer", `read ${ids.draft}`);
     const delivered = (r.text || "").includes(draft);
@@ -537,7 +543,8 @@ S.S14 = { what: "Alex's workspace: type in the chat while a background task fini
       d.after = Math.max(d.after, Math.abs(g1[k][0] - g0[k][0]) + Math.abs(g1[k][1] - g0[k][1]));
     }
     const said = await tab.said();
-    const collapsible = await tab.eval(`!![...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.includes('/bar') && (e.onclick || e.getAttribute('aria-expanded')))`);
+    const collapsible = await tab.eval(`!!document.querySelector('[data-key$="/bar"] > button[aria-expanded]')`);
+    if (process.env.SHOTS) writeFileSync(join(HERE, "results", `${process.env.RUN_NAME || "shot"}-S14.png`), Buffer.from((await tab.send("Page.captureScreenshot", { format: "png" })).result.data, "base64"));
     const d = await tab.lastDo();
     await tab.close();
     return { taskSeenWhileTyping: taskSeen, focusKept, typedWhole, delivered, sent: d && d.line, refused: d && d.error,
@@ -672,6 +679,132 @@ S.S22 = { what: "the answer to a save is lost after the desk did it (codex team'
     await tab.close();
     return { lost: paused.length, world, shown, said, sends,
       pass: paused.length === 1 && world === "Kirk lost answer" && shown && shown.text === world && !shown.unsent && !/refused/.test(said) };
+  } };
+
+S.S23 = { what: "full width (inspect=0): a refusal reaches the live status region when the inspector is hidden (codex team)", expect: "the refusal is visible in a role=status region, and the painter has the whole width",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal") + "&inspect=0"); await tab.painted(5);
+    const widths = await tab.eval("[document.getElementById('paint').clientWidth, window.innerWidth]");
+    await beginEdit(tab, ids.mcway, "McWay Falls, full width");
+    await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="McWay Falls (fog)"`);
+    await tab.enter(); await sleep(2500);
+    const st = await tab.eval(`(() => { const s = document.getElementById('status'); if (!s) return null; const r = s.getBoundingClientRect();
+      return { role: s.getAttribute('role'), live: s.getAttribute('aria-live'), hidden: s.hidden, text: s.textContent.slice(0, 800), w: Math.round(r.width) }; })()`);
+    await tab.close();
+    return { widths, status: st, pass: widths[0] >= widths[1] - 20 && !!st && st.role === "status" && !st.hidden && st.w > 0 && /refused/.test(st.text) && st.text.includes("McWay Falls (fog)") };
+  } };
+
+S.S24 = { what: "keyboard focus on a card that another actor removes (codex team's focus successor, generalised)", expect: "focus lands on a neighbour in the same view, not on the page's top",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("board")); await tab.painted(3);
+    let reached = false;
+    for (let i = 0; i < 20 && !reached; i++) {
+      await tab.key("Tab", "Tab", 9);
+      reached = (await tab.eval("document.activeElement.dataset.key || ''")).endsWith(`/cards/${ids.kirk}`);
+    }
+    const r = await act("other", `look ${ids.kirk}; do remove ${ids.kirk}`);
+    if (r.error) throw new Error("the interfering remove was refused: " + r.error.slice(0, 160));
+    await sleep(3500);
+    const after = await tab.eval("document.activeElement === document.body ? 'body' : (document.activeElement.dataset.key || document.activeElement.tagName)");
+    await tab.close();
+    return { reached, after, pass: reached && after !== "body" && after.startsWith("board") };
+  } };
+
+S.S25 = { what: "Alex's collapsed bar: folded by the lens, opened by him, kept across a reload and another person's act, never an event, never another viewer's", expect: "each of those holds",
+  async run(ids) {
+    const total = async () => (await (await fetch(`${BASE}/api/scene?session=${SESSION}&as=observer&lens=work`)).json()).events_total;
+    const barState = tab => tab.eval(`(() => { const b = document.querySelector('[data-key$="/bar"]'); if (!b) return null;
+      const h = b.querySelector(':scope > button[aria-expanded]'), items = [...b.children].filter(c => c.dataset.key);
+      return { folded: !!b.dataset.folded, expanded: h && h.getAttribute('aria-expanded'), visible: items.filter(c => c.offsetParent).length, w: Math.round(b.getBoundingClientRect().width) }; })()`);
+    const e0 = await total();
+    let tab = await Tab.open(lensUrl("work") + "&inspect=0"); await tab.painted(8);
+    const start = await barState(tab);
+    await tab.eval(`document.querySelector('[data-key$="/bar"] > button').focus()`);
+    await tab.key(" ", "Space", 32); await sleep(300);                       // a real control: Space opens it
+    const opened = await barState(tab);
+    await act("other", `find tag:project`).then(async r => { const id = r.text.match(/(a\d+) note/)[1]; await act("other", `look ${id}; do retitle ${id} title="Agora4 (renamed)"`); });
+    await sleep(3200);
+    const afterAct = await barState(tab);
+    await tab.close();
+    tab = await Tab.open(lensUrl("work") + "&inspect=0"); await tab.painted(8);
+    const reloaded = await barState(tab);
+    await tab.close();
+    const other = await Tab.open(lensUrl("work", "juniper") + "&inspect=0"); await other.painted(8);
+    const othersView = await barState(other);
+    await other.close();
+    const events = (await total()) - e0 - 1;                                  // minus the one retitle
+    return { start, opened, afterAct, reloaded, othersView, foldEvents: events,
+      pass: !!start && start.folded && start.visible === 0 && opened.expanded === "true" && opened.visible === 3 && afterAct.visible === 3
+        && reloaded.visible === 3 && othersView.folded && events === 0 };
+  } };
+
+S.S26 = { what: "Juniper's c359 sequence: a held title, a peer retitles it, Enter (refused), Enter again with no typing, then a letter and Enter", expect: "the peer's title is painted beside the kept words before the second Enter counts; no step overwrites words the person was not shown",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const mine = "McWay Falls, mine", theirs = "McWay Falls, theirs";
+    await beginEdit(tab, ids.mcway, mine);
+    await act("other", `look ${ids.mcway}; do retitle ${ids.mcway} title="${theirs}"`);
+    await tab.enter(); await sleep(2500);
+    const step1 = { world: await titleOf(ids.mcway), refused: !!(await tab.lastDo()).error };
+    const card = () => tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${ids.mcway}/t'));
+      return e ? { text: e.textContent, after: getComputedStyle(e, '::after').content, unsent: !!e.dataset.unsent } : null; })()`);
+    const beside = await card();
+    let el = await tab.find(`/${ids.mcway}/t`);
+    await tab.click(el.x, el.y); await tab.enter(); await sleep(2500);
+    const step2 = { world: await titleOf(ids.mcway), refused: !!(await tab.lastDo()).error };
+    el = await tab.find(`/${ids.mcway}/t`);
+    await tab.click(el.x, el.y); await tab.key("End", "End", 35); await tab.type("!"); await tab.enter(); await sleep(2500);
+    const step3 = { world: await titleOf(ids.mcway), refused: !!(await tab.lastDo()).error };
+    await tab.close();
+    const theirsBeside = !!beside && beside.text === mine && beside.after.includes(theirs);
+    return { step1, beside, theirsBeside, step2, step3,
+      pass: step1.refused && step1.world === theirs && theirsBeside && step2.world === mine && step3.world === mine + "!" };
+  } };
+
+S.S27 = { what: "the chat input with lines 1..8: Enter makes a new line, Ctrl+Enter sends both lines", expect: "one send, with both lines, only on Ctrl+Enter",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("work") + "&inspect=0"); await tab.painted(8);
+    const el = await tab.find(`/${ids.draft}/b`);
+    await tab.click(el.x, el.y); await tab.selectAll(); await tab.type("line one");
+    await tab.enter(); await tab.type("line two"); await sleep(400);
+    const sentAfterEnter = (await tab.dos()).length;
+    await tab.key("Enter", "Enter", 13, 2); await sleep(2500);
+    const d = await tab.lastDo(), r = await act("observer", `read ${ids.draft}`);
+    const lines = ((r.text || "").split("---")[1] || "").trim().split("\n");
+    await tab.close();
+    return { sentAfterEnter, sent: d && d.line, lines, pass: sentAfterEnter === 0 && lines[0] === "line one" && lines[1] === "line two" };
+  } };
+
+S.S28 = { what: "a message with a code run: click inside the code, type, send, and take it in hand again (Jeff and Juniper, 870ec2d)", expect: "runs while reading, source in hand, and the caret and a selection land on the same characters across the swap",
+  async run(ids) {
+    const src = "Try `do prop a31` first, then look.";
+    const c = await act("fixture", `look ${ids.work_f}; do create ${ids.work_f} kind=note title="you" tags=chat text="${src}"`);
+    const msg = c.created.at(-1);
+    const tab = await Tab.open(lensUrl("work") + "&inspect=0"); await tab.painted(8);
+    const drawn = await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${msg}/b')); const s = e && e.querySelector('span');
+      return e ? { text: e.textContent, code: s ? s.textContent : null, codeClass: s ? s.className : null } : null; })()`);
+    // 1. a click on the "p" of "prop", inside the code run, then one typed letter
+    const pt = await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${msg}/b')); const s = e.querySelector('span'); if (!s) return null;
+      const r = document.createRange(); r.setStart(s.firstChild, 3); r.setEnd(s.firstChild, 4); const b = r.getBoundingClientRect(); return { x: b.left + 1, y: b.top + b.height / 2 }; })()`);
+    if (!pt) return { drawn, pass: false, note: "no code run drawn" };
+    await tab.click(pt.x, pt.y);
+    const inHand = await tab.eval(`(() => { const s = getSelection(); return { text: document.activeElement.textContent, offset: s.anchorOffset }; })()`);
+    await tab.key("X", "KeyX", 88); await tab.type("X");      // a key that writes (the swap happens here), then its character
+    const typed = await tab.eval(`[document.activeElement.textContent, getSelection().anchorOffset]`);
+    await tab.key("Enter", "Enter", 13, 2); await sleep(2500);   // this message has lines 1..8: Ctrl+Enter sends
+    const r = await act("observer", `read ${msg}`), world = ((r.text || "").split("---")[1] || "").trim();
+    const again = await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${msg}/b')); const s = e && e.querySelector('span'); return s ? s.textContent : null; })()`);
+    // 2. a double-click selects "first" while reading; taking it in hand keeps the same selection on the source
+    const w = await tab.eval(`(() => { const e = [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key.endsWith('/${msg}/b'));
+      const t = [...e.childNodes].find(n => n.nodeType === 3 && n.data.includes('first')); if (!t) return null; const i = t.data.indexOf('first');
+      const r = document.createRange(); r.setStart(t, i + 1); r.setEnd(t, i + 2); const b = r.getBoundingClientRect(); return { x: b.left + 1, y: b.top + b.height / 2 }; })()`);
+    let sel = null;
+    if (w) { await tab.click(w.x, w.y, 2); await sleep(200); sel = await tab.eval(`[String(getSelection()), document.activeElement.textContent]`); }
+    await tab.close();
+    const expected = "Try `do Xprop a31` first, then look.";
+    return { drawn, inHand, typed, world, again, selection: sel,
+      pass: !!drawn && drawn.code === "do prop a31" && typed[0] === expected && world === expected
+        && inHand.offset === 3 && again === "do Xprop a31" && !!sel && sel[0].trim() === "first" };
   } };
 
 // Juniper's three classes (a313), so the suite's runner can count these beside its CLI readers:

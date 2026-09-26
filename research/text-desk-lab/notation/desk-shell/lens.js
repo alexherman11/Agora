@@ -35,7 +35,7 @@
     const old = kept.get(n.key), p = n.paint || {};
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
-    if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { next.set(n.key, old); return old.el; } }
+    if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { tracks(old.el); next.set(n.key, old); return old.el; } }
     const el = document.createElement("div");
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
     next.set(n.key, { el, sig }); if (p.why) el.dataset.why = p.why;
@@ -44,10 +44,17 @@
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
     if (p.text != null) {
-      el.textContent = V.words(n.key, p.text, n.fence); V.mark(el, n.key);
+      const words = V.words(n.key, p.text, n.fence);
+      if (p.runs && words === p.text) runs(el, p.runs); else el.textContent = words;
+      V.mark(el, n.key);
       if (p.wrap === "verbatim") el.classList.add("t-verbatim");
       if (p.clamp) { el.classList.add("clamp"); el.style.webkitLineClamp = p.clamp; }
     }
+    if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
+    if (p.kind === "frame") frames(el, n, p);
+    if (p.share != null) { el.style.flex = `${p.share} 1 0`; el.style.minWidth = el.style.minHeight = "0"; }   // a weight, as a track is
+    if (p.lines) { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
+    if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     for (const a of n.acts) {
       if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
         if (e.target !== el && a.line.includes("$x")) return;
@@ -60,14 +67,57 @@
       if (a.on === "drop") { el.dataset.drop = a.part; el._drop = a; }
     }
     for (const k of n.kids) el.appendChild(make(k));
+    if (p.tracks) tracks(el);
     return el;
   }
 
+  // pike-7 section 9, lowered by Jeff (5bb7f7f): a grid's tracks hold its direct children in fixed slots, and a folded
+  // child's track shrinks to its handle; gap, scroll and measure on any frame; fold is the lens's default, overridden by
+  // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
+  function frames(el, n, p) {
+    if (p.gap != null) el.style.gap = p.gap + "px";
+    if (p.scroll && p.scroll !== "none") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
+    if (!n.acts.some(a => a.on === "fold")) return;
+    const h = document.createElement("button"); h.type = "button"; h.className = Style.roleClass("tool");
+    h.setAttribute("aria-label", (p.fold && p.fold.label) || n.part || "section");
+    const dflt = p.fold ? p.fold.folded : !!p.folded;          // Jeff 75e39d8: fold is {folded, label}; 5bb7f7f emitted folded: true
+    const set = f => { el.dataset.folded = f ? "1" : ""; el.setAttribute("aria-expanded", String(!f)); h.textContent = f ? "▸" : "▾"; h.setAttribute("aria-expanded", String(!f)); if (el.parentElement) tracks(el.parentElement); };
+    h.addEventListener("click", () => { const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f); });
+    el.prepend(h); set(V.folded(n.key, dflt));
+  }
+  // paint.semantic (pike-8 section 4): what assistive technology is told, on the node's one element. A press leaf is a
+  // button: a Tab stop that Enter and Space activate (the codex team's finding: a clickable div is not a control).
+  function semantic(el, s) {
+    el.setAttribute("role", s.role);
+    if (s.label) el.setAttribute("aria-label", s.label);
+    for (const k of ["expanded", "value", "min", "max"]) if (s[k] != null) el.setAttribute(k === "expanded" ? "aria-expanded" : `aria-value${k === "value" ? "now" : k}`, String(s[k]));
+    if (s.role === "button") {
+      el.tabIndex = 0;
+      el.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); el.click(); } });
+    }
+  }
+  function tracks(el) {
+    const p = el._n && el._n.paint; if (!p || !p.tracks) return;
+    const kids = [...el.children].filter(c => c.dataset.key);
+    el.style.gridTemplateColumns = p.tracks.map((t, i) => kids[i] && kids[i].dataset.folded ? "auto" : t === "fit" ? "max-content" : /gap$/.test(t) ? `calc(${parseFloat(t)} * var(--t-gap))` : `minmax(0, ${t})`).join(" ");
+    kids.forEach((c, i) => { if (i < p.tracks.length) c.style.gridColumn = String(i + 1); });
+  }
+
   function edits(el, n, a) {
-    el.contentEditable = "plaintext-only"; el.addEventListener("focus", () => { if (!V.repainting) V.hold = n.key; });
+    el.contentEditable = "plaintext-only";
+    // Juniper a559 (870ec2d): a part with runs is read as runs and edited as its source, so what is written is what is
+    // drawn. Pike (S28): swapping on focus put the caret at the end, because focus comes before the click places it, and
+    // the delimiters appearing moved the words under the pointer. So the swap waits for the first change (a key that
+    // writes, a paste, a cut), and maps the caret and selection the browser has already placed to the same characters.
+    el.addEventListener("focus", () => { if (!V.repainting) V.hold = n.key; });
+    const toSource = () => { if (el._runs) source(el); };
+    el.addEventListener("keydown", e => { if (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || /^(Backspace|Delete|Enter)$/.test(e.key))) toSource(); });
+    el.addEventListener("paste", toSource); el.addEventListener("cut", toSource);
     el.addEventListener("input", () => V.typed(n.key, el.textContent, { key: n.key, fence: el._n.fence }));
     el.addEventListener("keydown", e => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); }
+      const pp = el._n.paint, multi = pp.commit ? pp.commit === "ctrl-enter" : !!pp.lines && (pp.lines[1] == null || pp.lines[1] > 1);   // emitted (75e39d8)
+      if (e.key === "Enter" && !e.shiftKey && (!multi || e.ctrlKey || e.metaKey)) { e.preventDefault(); el.blur(); }
       if (e.key === "Escape") { e.preventDefault(); if (!V.drop(n.key)) return; V.mark(el, n.key); el.textContent = el._n.paint.text; el.blur(); }
     });
     el.addEventListener("blur", () => {
@@ -75,8 +125,32 @@
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.textContent.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
-      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v), raw); else { V.hold = null; V.drop(n.key); }
+      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
+  }
+
+  // runs inside one text leaf: plain words as text, a code run in its role (a block run keeps its lines, verbatim)
+  function runs(el, rs) {
+    el._runs = rs;
+    el.replaceChildren(...rs.map(r => {
+      if (!r.role) return document.createTextNode(r.text);
+      const s = document.createElement(r.block ? "div" : "span"); s.className = Style.roleClass(r.role);
+      if (r.block) s.classList.add("t-verbatim");
+      s.textContent = r.text; return s;
+    }));
+  }
+  function source(el) {
+    const src = el._n.paint.text, rs = el._runs, kids = [...el.childNodes], sel = getSelection();
+    let pos = 0; const starts = rs.map(r => { const i = src.indexOf(r.text, pos); pos = i + r.text.length; return i; });
+    const map = (node, off) => {
+      if (node === el) return off >= kids.length ? src.length : starts[off];
+      const i = kids.findIndex(k => k === node || k.contains(node));
+      return i < 0 ? src.length : starts[i] + (node.nodeType === 3 ? off : 0);
+    };
+    const inside = sel.rangeCount && el.contains(sel.anchorNode) && el.contains(sel.focusNode);
+    const a = inside ? map(sel.anchorNode, sel.anchorOffset) : src.length, f = inside ? map(sel.focusNode, sel.focusOffset) : a;
+    el._runs = null; el.textContent = src;
+    const t = el.firstChild; if (t) sel.setBaseAndExtent(t, Math.min(a, src.length), t, Math.min(f, src.length));
   }
 
   // drag is geometry: $x $y in the free parent. Pointer and keys take, move and put through the same three steps (S9).

@@ -22,6 +22,12 @@
   #said { white-space: pre; margin: 0; }
   .l-column { display: flex; flex-direction: column; }
   .l-row { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; }
+  .l-grid { display: grid; align-items: start; }
+  .l-grid > [data-key] { min-width: 0; }
+  .l-cells { display: contents; }
+  [data-folded="1"] > [data-key] { display: none; }
+  [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */
+  [data-hint]:empty::before { content: attr(data-hint); color: var(--t-hush); }
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }
   .boxed { position: absolute; box-sizing: border-box; overflow: hidden; margin: 0; }
   .clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }

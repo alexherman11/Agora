@@ -18,8 +18,11 @@ const Viewer = (session, who, lens, said, status) => {
   for (const d of drafts.values()) if (!d.seen && !d.shown) d.why = unknownOrigin;
   let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed (Enter sends, Escape drops)` : "";
   let text = "", told = "";
+  const foldStore = `lens-folds:${session}:${who}:${lens}`;
+  let folds; try { folds = JSON.parse(localStorage.getItem(foldStore)) || {}; } catch { folds = {}; }
   const pending = new Map();      // key -> the draft generation in flight (codex team: a request in flight is viewer state)
-  const both = (key, d) => `refused: ${d.why}\nunsent, yours: "${d.text}"\nnow in the world: "${d.shown.text}"\nEnter sends yours over what is now there; Escape keeps it and drops yours`;
+  const refusal = why => (/^refused/.test(why) ? "" : "refused: ") + why;      // deskd's own sentences already begin so
+  const both = (key, d) => `${refusal(d.why)}\nunsent, yours: "${d.text}"\nnow in the world: "${d.shown.text}"\nEnter sends yours over what is now there; Escape keeps it and drops yours`;
   const v = {
     drafts, hold: null, repainting: false,
     // Pike (run 1): a refusal was written and then overwritten by the repaint (6 of 7 unseen). It stays until the next
@@ -44,7 +47,7 @@ const Viewer = (session, who, lens, said, status) => {
       const cur = drafts.get(key), newer = token && token.draft !== undefined && cur !== token.draft;
       if (!newer) v.hold = null;
       if (err) {
-        notice = "refused: " + err;
+        notice = refusal(err);
         // pike-8 section 3: a refused draft is kept, and the world's current value will be drawn beside it (both sides);
         // a resend is fenced on the value shown, never on a fresher one the person has not seen
         if (draft !== undefined && !newer) drafts.set(key, { text: draft, why: err.split("\n").pop(), refused: true, shown: null });
@@ -84,20 +87,26 @@ const Viewer = (session, who, lens, said, status) => {
       const d = drafts.get(key);
       el.classList.toggle(Style.roleClass("mark"), !!d);
       if (d) el.dataset.unsent = d.why; else delete el.dataset.unsent;
+      // Juniper c359: the other side is painted beside the kept words, not only in the notice, before a resend counts
+      if (d && d.refused && d.shown) el.dataset.now = d.shown.text; else delete el.dataset.now;
     },
     // rules 1 and 2 (Iris, Astra): keep an element whose paint did not change, placing only the kids that differ;
     // re-inserting an untouched sibling would drop the reader's selection inside it. A part with its own words
     // cannot have its children swapped without losing the words (until the frame/leaf split, pike-7 section 4).
     reuse(el, els, words) {
-      const same = els.length === el.children.length && els.every((e, i) => el.children[i] === e);
+      const keyed = () => [...el.children].filter(c => c.dataset.key);    // the painter's own chrome (a fold handle) is not a kid
+      const same = els.length === keyed().length && els.every((e, i) => keyed()[i] === e);
       if (!same && words) return false;
       // Pike (S20): remove the leavers first. Placing first moved a kept sibling past a replaced one, and a moved element
       // loses the pointer capture of a card being carried inside it (and a selection inside it).
       const want = new Set(els);
-      [...el.children].forEach(c => { if (!want.has(c)) c.remove(); });
-      els.forEach((e, i) => { if (el.children[i] !== e) el.insertBefore(e, el.children[i] || null); });
+      keyed().forEach(c => { if (!want.has(c)) c.remove(); });
+      els.forEach((e, i) => { const k = keyed(); if (k[i] !== e) el.insertBefore(e, k[i] || null); });
       return true;
     },
+    // a fold is the lens's default (paint.folded) with this viewer's override: never an event, never another viewer's
+    folded(key, dflt) { return key in folds ? folds[key] : !!dflt; },
+    fold(key, f) { folds[key] = f; try { localStorage.setItem(foldStore, JSON.stringify(folds)); } catch {} },
     // Iris, Lark: only the painter knows what happened on this screen. It says so, as a viewer fact (~), never the world.
     // Sable c480: attention is private until the person publishes it. Paint facts (a clamp cut, a box overflowing) are
     // about the lens and always go; attention facts (viewport, out of view, unsent drafts, the thing carried) go only when
@@ -110,6 +119,7 @@ const Viewer = (session, who, lens, said, status) => {
         if (el.classList.contains("boxed") && el.scrollHeight > el.clientHeight + 1) f.push("contents overflow the box");
         if (attention && el.classList.contains("boxed") && (r.bottom < vp.top || r.top > vp.bottom || r.right < vp.left || r.left > vp.right)) f.push("out of view");
         if (attention && el.dataset.unsent) f.push("unsent draft");
+        if (attention && el.dataset.folded) f.push("folded");
         if (f.length) facts[el.dataset.key] = f.join(", ");
       }
       const view = attention ? { viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } } : {};
@@ -123,6 +133,9 @@ const Viewer = (session, who, lens, said, status) => {
       // has its key, else to the one now at its place among its siblings, else to its parent; never to the page's top
       const fk = ed && ed.dataset && ed.dataset.key, up = fk && ed.parentElement, at = up ? [...up.children].indexOf(ed) : -1;
       const pk = up && up.dataset && up.dataset.key;
+      // scroll end (chat): a frame this viewer had at its end stays at its end; one never seen before starts there
+      const ends = new Set([...document.querySelectorAll('[data-scroll="end"]')].filter(e => e.scrollTop + e.clientHeight >= e.scrollHeight - 2).map(e => e.dataset.key));
+      const seenBefore = new Set([...document.querySelectorAll('[data-scroll="end"]')].map(e => e.dataset.key));
       v.repainting = true;
       try {
         draw();
@@ -132,6 +145,7 @@ const Viewer = (session, who, lens, said, status) => {
           const next = same || (parent && (parent.children[at] || parent.children[at - 1])) || parent;
           if (next) { if (!next.hasAttribute("tabindex") && !next.isContentEditable && !/^(BUTTON|A|INPUT|TEXTAREA)$/.test(next.tagName)) next.tabIndex = -1; next.focus(); }
         }
+        for (const e of document.querySelectorAll('[data-scroll="end"]')) if (ends.has(e.dataset.key) || !seenBefore.has(e.dataset.key)) e.scrollTop = e.scrollHeight;
         const moved = sel && (s.anchorNode !== sel[0] || s.anchorOffset !== sel[1] || s.focusNode !== sel[2] || s.focusOffset !== sel[3]);
         if (moved && sel[0].isConnected && sel[2].isConnected) s.setBaseAndExtent(...sel);   // only if the repaint moved it
       } finally { v.repainting = false; }
