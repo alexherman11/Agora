@@ -1,0 +1,23 @@
+(1) layout(convert(world)) against today's stored boxes
+- attacks/probes: 0 of 4 boxes differ, worst 0px
+- budget/copies: 0 of 11 boxes differ, worst 0px
+- chat/probes: 0 of 1 boxes differ, worst 0px
+- host/probes: 0 of 4 boxes differ, worst 0px
+- reads/probes: 0 of 1 boxes differ, worst 0px
+- trip/D: 0 of 2 boxes differ, worst 0px
+- trip/H2: 0 of 10 boxes differ, worst 0px
+- trip/R: 0 of 11 boxes differ, worst 0px
+- workspace/today: 0 of 9 boxes differ, worst 0px
+- workspace/tracks: 0 of 9 boxes differ, worst 0px
+- home walk (60 acts): 0 of 16 boxes differ, worst 0px
+(2) S12 on the model: Alex adds at the bottom of a column while the agent adds one and moves it to the top
+- Alex writes [('g-alex', 'place'), ('g-alex', 'share')]; the agent writes [('g-agent', 'place'), ('g-agent', 'share'), ('g-agent', 'place')]; rows written by both: none
+- merged by assigning both rows: column order ['g-agent', 'a04', 'a06', 'a08', 'a10', 'a12', 'g-alex']
+- the five untouched tasks' boxes are derived: 5 of 5 move on screen, and none of them was written
+(3) rows per act, model against today (today's numbers from experiments/journal/working_copy.txt)
+- move into another column: [('a06', 'place')]
+- move before a sibling: [('a10', 'place')]
+- resize in a column: [('a08', 'share')]
+- remove: [('a12', 'place')]
+(4) between(): 2000 random insertions keep a strict order
+- strictly ordered: True; longest key 5 chars

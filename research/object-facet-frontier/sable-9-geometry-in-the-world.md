@@ -136,3 +136,12 @@ So with `share` taken as each child's current size along the flow, deriving the 
 Under this design the siblings write nothing [imagined until built].
 
 **Next [imagined].** Build the conversion and the pure `layout()` as a standalone module first, like `journal.py`, and check it against every world above. Only then put the switch into `world.py`, in a quiet window, with Jeff's answer on `group` and the clamp.
+
+**The standalone model [ran, `experiments/geometry/geometry9.py`].** This model converts today's world to choices: `order` from today's order, `share` from size along the flow, and `pos`/`size` in free parents. It then derives every box with `reflow()`'s arithmetic.
+
+1. **Boxes against today's.** `layout(convert(world))` differs from today's stored boxes in **0 boxes** on each of the ten suite worlds and on the home walk: 0 of 16 after 60 acts.
+2. **S12 on the model.** Alex writes `[place, share]` of his task. The agent writes `[place, share, place]` of its task. No row is written by both. Assigning both gives the order `agent, T0..T4, alex`. The five untouched tasks' boxes all move on screen, and none of them was written.
+3. **Rows per act.** Each of these writes 1 row: move into another surface, move before a sibling, resize in a column (`share`), and remove. Today they write 23, 23, 21 and 25.
+4. **`between()`.** 2000 random insertions keep a strict order, and the longest key is 5 characters.
+
+What this does not show: the CLI's prints and the shell drawn from the model. That waits for the switch in `world.py`.
