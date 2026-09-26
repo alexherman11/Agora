@@ -10,7 +10,7 @@ scene editor · for golden · world @126
         secs a13 column · 3 of sections:a13
           sec a13 column · key before-the-first-heading
             head a13 "(before the first heading) · 13 words" [meta]
-            body a13 "A shared page. This sentence has *strong* words, /slant/ words and `mono` bits." [body] · edit: do rewrite a13 section="(before the first heading)" text="$value"
+            body a13 "A shared page. This sentence has *strong* words, /slant/ words and `mono` bits." [body] runs 1 code · edit: do rewrite a13 section="(before the first heading)" text="$value"
           sec a13 column · key what-this-is
             head a13 "What this is · 25 words" [meta]
             body a13 "A classic desktop whose every state is text. / - a bullet / - another bullet / - [ ] an unchecked task / - [x] a checked task" [body] · edit: do rewrite a13 section="What this is" text="$value"
@@ -25,7 +25,7 @@ scene editor · for golden · world @126
         secs a25 column · 3 of sections:a25
           sec a25 column · key before-the-first-heading
             head a25 "(before the first heading) · 13 words" [meta]
-            body a25 "A shared page. This sentence has *strong* words, /slant/ words and `mono` bits." [body] · edit: do rewrite a25 section="(before the first heading)" text="$value"
+            body a25 "A shared page. This sentence has *strong* words, /slant/ words and `mono` bits." [body] runs 1 code · edit: do rewrite a25 section="(before the first heading)" text="$value"
           sec a25 column · key what-this-is
             head a25 "What this is · 25 words" [meta]
             body a25 "A classic desktop whose every state is text. / - a bullet / - another bullet / - [ ] an unchecked task / - [x] a checked task" [body] · edit: do rewrite a25 section="What this is" text="$value"

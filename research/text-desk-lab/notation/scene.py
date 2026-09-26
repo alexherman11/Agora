@@ -62,7 +62,7 @@ import re
 from desk import split_batch
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "measure", "wrap", "lines", "share", "hint")   # pike-7 sections 6 and 9, lowered here
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "measure", "wrap", "lines", "share", "hint", "plain")   # pike-7 sections 6 and 9, lowered here
 GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count")
 
@@ -241,6 +241,29 @@ def _w_hint(node, p, val, n, env):
     node["hint"] = m.group(1)
 
 
+def _w_plain(node, p, val, n, env):
+    node["plain"] = True          # Juniper a559: no runs; backticks print as the characters they are
+
+
+_RUNS = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.S)
+
+
+def runs_of(text):
+    """Juniper a559: code spans and fences become runs at print, from this closed grammar, with no world effect; the
+    words stay the part's source, so the printer's text and the fence are unchanged. -> [{text, role?, block?}] or None."""
+    out, at = [], 0
+    for m in _RUNS.finditer(text or ""):
+        if m.start() > at:
+            out.append({"text": text[at:m.start()]})
+        out.append({"text": m.group(1), "role": "code", "block": True} if m.group(1) is not None else {"text": m.group(2), "role": "code"})
+        at = m.end()
+    if not out:
+        return None
+    if at < len(text):
+        out.append({"text": text[at:]})
+    return out
+
+
 def _w_share(node, p, val, n, env):
     if not re.fullmatch(r"\d+(\.\d+)?", val) or float(val) <= 0:
         raise LensRefusal(f"line {n}: `share <weight>` (this child's share of its column or row); got {p!r}")
@@ -388,6 +411,7 @@ WORDS = {
     "lines": ("lines <min>..<max>", _w_lines),
     "share": ("share <weight>", _w_share),
     "hint": ('hint "..."', _w_hint),
+    "plain": ("plain", _w_plain),
     "carry": ("carry", _w_carry),
     "role": ("role <name>", _w_role),
     "text": ('text "..."', _w_text),
@@ -441,7 +465,7 @@ def parse(src):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             row = WORDS.get(word)
@@ -1101,6 +1125,10 @@ def to_text(scene, name, who, at):
             bits.append(f"lines {n['lines'][0]}..{n['lines'][1] if n['lines'][1] is not None else ''}")
         if n.get("hint"):
             bits.append(f'hint "{n["hint"]}"')
+        if n.get("plain"):
+            bits.append("plain")
+        elif n.get("text") and runs_of(n["text"]):
+            bits.append(f"runs {sum(1 for r in runs_of(n['text']) if r.get('role'))} code")
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:
@@ -1252,6 +1280,10 @@ def emit(node):
             paint["lines"] = node["lines"]
         if node.get("hint"):
             paint["hint"] = node["hint"]
+        if not node.get("plain") and node.get("text"):
+            rs = runs_of(node["text"])
+            if rs:
+                paint["runs"] = rs            # the text stays the joined words; the fence and the printer do not change
         ons = {a.get("on") for a in (node.get("acts") or [])}
         if "edit" in ons:
             mx = (node.get("lines") or [1, 1])[1]

@@ -353,3 +353,17 @@ def test_day_or_time():
     assert f(["2026-09-21 09:00", "2026-09-25"]) == ("Mon 21", None)
     assert f(["2026-09-01", "2026-09-25"]) == ("2026-09-01", None)
     assert f(["soon", "2026-09-25"])[0] is None
+
+
+def test_code_runs_are_automatic_and_plain_opts_out():
+    t = "Because the card changed:\n```\nif seen != now: refuse()\n```\nsee `fence` above"
+    rs = scene.runs_of(t)
+    assert [r.get("role") for r in rs] == [None, "code", None, "code", None] and rs[1]["block"] and rs[3]["text"] == "fence"
+    assert scene.runs_of("no code here") is None
+    n = {"text": t, "acts": [], "kids": []}
+    scene.emit(n)
+    assert n["paint"]["runs"] == rs and n["paint"]["text"] == t
+    scene.emit({"text": t, "plain": True, "acts": [], "kids": []})
+    m = {"text": t, "plain": True, "acts": [], "kids": []}
+    scene.emit(m)
+    assert "runs" not in m["paint"]
