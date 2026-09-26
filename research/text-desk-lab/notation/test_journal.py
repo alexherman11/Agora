@@ -244,28 +244,36 @@ def s2():
     pk, lock = tmp / "scratch.pickle", tmp / "scratch.lock"
     code1, acked1 = go(["look"] + [f"do create f01 kind=note title=N{i}" for i in range(4)], 2)
     kept1 = len(pickle.loads(pk.read_bytes()).world.subjects) if pk.exists() else 0
-    lock_left = lock.exists()
-    lock.unlink(missing_ok=True)
+    # Is the session free after a crashed holder? Time the next acquisition (a lock FILE may exist under any protocol:
+    # the old sentinel reaps by pid, the lease keeps a persistent file whose byte lock the OS drops at the holder's death).
+    import time as _time
+    t0 = _time.perf_counter()
+    try:
+        lease = explore.take_lock(lock, tries=50, pause=0.1)
+        waited = f"the next run took the lock in {(_time.perf_counter() - t0) * 1000:.0f} ms"
+        if hasattr(explore, "release_lock") and lease is not None:
+            explore.release_lock(lease)
+        else:
+            lock.unlink(missing_ok=True)
+    except BaseException as x:          # SystemExit or TimeoutError after 5 s
+        waited = f"the next run could not take the lock within 5 s ({type(x).__name__})"
     go(["look", "do create f01 kind=note title=Kept"], 999)
     code3, acked3 = go(["look"] + [f"do create f01 kind=task title=T{i}" for i in range(3)], 2)
     kept3 = pickle.loads(pk.read_bytes()).world.subjects
-    lock.unlink(missing_ok=True)
-    # a torn save: deskd and explore write the pickle in place (write_bytes truncates, then writes); cut it half way
-    whole = pk.read_bytes()
-    pk.write_bytes(whole[: len(whole) // 2])
-    try:
-        pickle.loads(pk.read_bytes())
-        torn = "the half file still loaded"
-    except Exception as x:
-        torn = f"the half-written pickle does not load ({type(x).__name__}): the whole session is gone, not just the last turn"
-    inplace = [f for f in ("explore.py", "deskd.py") if "os.replace" not in (HERE / f).read_text(encoding="utf-8")]
+    # a torn save: is the pickle written to a temp file and renamed over the old one? [read: the save path's source]
+    import inspect
+    save = getattr(explore, "save_desk", None)
+    atomic = bool(save) and "os.replace" in inspect.getsource(save)
+    via = [f for f in ("explore.py", "deskd.py") if "save_desk(" in (HERE / f).read_text(encoding="utf-8")]
+    torn = (f"saves go through explore.save_desk (temp file, then os.replace) from {', '.join(via)}: a torn write leaves the old pickle whole"
+            if atomic else "the pickle is written in place: a save cut half way leaves a file that does not load")
     report("S2", s2.title, "breaks",
            "Alex types five lines into the CLI; the process dies after the desk printed ok twice. Then a session with work "
-           "in it, the same crash. Then the save itself is cut short.",
+           "in it, the same crash. Then: is a save cut short survivable?",
            [f"run 1: exit {code1}, {acked1} ok printed, {kept1} thing(s) on disk afterwards (the CLI writes the pickle once, at the end)",
-            f"the lock was {'left behind: the next CLI run on that session waits up to 60 s for it' if lock_left else 'removed'}",
+            f"after the crash, {waited}",
             f"run 3: exit {code3}, {acked3} ok printed, the disk still holds only {sorted(s['title'] for s in kept3.values())}",
-            torn + f"; no temp-file-and-rename in {', '.join(inplace) or 'none'}"],
+            torn],
            "a batch is one appended line, fsynced before the receipt prints (measured 0.86 ms median); an incomplete last line "
            "is an unacknowledged batch and is dropped, everything before it stands; the pickle becomes a cache stamped with an offset")
 
