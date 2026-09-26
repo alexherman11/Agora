@@ -54,6 +54,7 @@ role said      : on card, text down, quiet, pad gap, edge faint, corner gap
 role mark      : text down medium, mark, on mark at 10%, pad gap /4, corner gap /4
 role sheet     : on sheet, ink, text, pad gap x3, edge faint, corner gap /2
 role source    : text.mono down, quiet
+role code      : text.mono, ink, on paper at 60%     # a code run inside prose (Pike a561; Wren's file, added by Jeff in Wren's absence)
 role refusal   : text.mono down, warn, on warn at 8%, pad gap, corner gap /2, edge warn at 40%
 
 token text.mono = mono 15/1.5

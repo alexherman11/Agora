@@ -1079,7 +1079,10 @@ def to_text(scene, name, who, at):
     views = scene.get("views") or {}
     for a, v in views.items():
         vp = v.get("viewport") or {}
-        lines.append(f"  ~ {a} is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')} · painted world @{v.get('at')}"
+        # Pike a561: since 0477e78 a viewer publishes attention (viewport, scroll) only when they allow it; say so
+        where = (f"is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')}" if vp.get("w") is not None
+                 else "has this open; attention not shared")
+        lines.append(f"  ~ {a} {where} · painted world @{v.get('at')}"
                      + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}")
 
     def rv(v, top=120):
