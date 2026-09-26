@@ -129,7 +129,8 @@ def lower(root, parts):
               "lets": [{"name": d, "interp": i, "inputs": ins} for d, i, ins in node["derive"]],
               "guard": guard,
               "emit": {"layout": node["layout"], "role": node["role"], "text": node["text"], "clamp": node["clamp"],
-                       "at": node["at"], "spread": node.get("spread"), "props": node["props"]},
+                       "at": node["at"], "spread": node.get("spread"), "props": node["props"],
+                       **{k: node[k] for k in S.PAINT_WORDS if node.get(k) not in (None, False)}},
               "acts": [dict(a) for a in node["on"]],
               "place": node["lens"], "carry": node["carry"],
               "kids": [one(k) for k in node["kids"]],
@@ -224,6 +225,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 the_state = "empty" if not ids else "ambiguous: " + ", ".join(ids)
         out = {"part": node["part"], "key": key, "role": em["role"], "layout": em["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": em["clamp"], "acts": [], "kids": []}
+        out.update({k: em[k] for k in S.PAINT_WORDS if k in em})
         if b and b["kind"] == "one":
             out["the"] = (S._fill(b["q"], ctx), the_state)
         if b and b.get("as"):
@@ -298,6 +300,18 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         out["acts"] = acts
         if track["bad"]:
             raise S.LensRefusal(f"line {node['line']}: ${sorted(track['bad'])[0]}.field: no part above this one is named `as {sorted(track['bad'])[0]}`")
+        # what this node printed whole, for the command line's seen index (jeff-2): its own fields and the frame fields
+        own = sorted({a for f in track.get("own", ()) if (a := S._aspect_of_field(f))})
+        if own:
+            out["shown"] = own
+        fsh = {}
+        for k in track["reads"]:
+            fr, _, fld = k.partition(".")
+            fid, a = frames.get(fr, {}).get("id"), S._aspect_of_field(fld)
+            if fid and a:
+                fsh.setdefault(fid, set()).add(a)
+        if fsh:
+            out["fshown"] = {i: sorted(a) for i, a in fsh.items()}
         if track["reads"]:
             out["freads"] = {k: v for k, v in track["reads"].items()}
             out["frames"] = {f: frames[f].get("id") for f in track["frames"] if f in frames}
@@ -353,7 +367,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
-                    shown = [["select", sel_text, [list(x) for x in named[:keep]] if named is not None else list(ids[:keep])]] if b["clamp"] else []
+                    shown = [["select", sel_text, [list(x) for x in named[:keep]] if named is not None else list(ids[:keep]), keep]] if b["clamp"] else []
                     if named is not None:
                         total = len(named)
                         for i, st in named[:keep]:

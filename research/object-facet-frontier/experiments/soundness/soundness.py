@@ -100,16 +100,23 @@ def perturbations(desk):
 
 def touches(reads, writes, desk, after=None):
     w = desk.world
-    for rid, _rev, aspects in reads:
+    for entry in reads:
+        rid, _rev, aspects = entry[:3]
         if rid == "select":
-            # Jeff, after the amendment: a membership read (q, S) is touched when re-asking q in the edited world answers differently
-            q, answer = _rev, aspects
+            # Jeff, after the amendment: a membership read (q, S) is touched when re-asking q in the edited world answers
+            # differently; Sable (sable-10): a clamped repeat's answer is the shown prefix, and answers compare as sets
+            q, answer, keep = _rev, aspects, (entry[3] if len(entry) > 3 else None)
             named = scene._named(after.world, q)
             try:
                 now = [list(x) for x in named] if named is not None else list((after._parse_selection(q) or ([], ""))[0])
             except Exception:
                 now = None
-            if now != answer:
+            if now is None:
+                return True
+            if keep:
+                now = now[:keep]
+            key = lambda xs: {tuple(x) if isinstance(x, list) else x for x in xs}
+            if key(now) != key(answer):
                 return True
             continue
         ids = {rid} | ({w.nodes[rid].get("subject")} if rid in w.nodes else set()) | set(w.appearances_of(rid) if rid in w.subjects else [])

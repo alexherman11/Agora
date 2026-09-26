@@ -233,3 +233,82 @@ if __name__ == "__main__":
             n += 1
             print("ok", name)
     print(f"{n} passed")
+
+
+def test_a_print_reads_what_it_printed_whole():
+    """jeff-2: the seen index is per aspect. A look that printed a title and a word count has not read the text; a
+    rewrite after it is refused as blind; a read of the whole text admits it; a person's own write of an aspect counts."""
+    import deskd
+    tmp = _scratch("_test_reads")
+    try:
+        with deskd.Session("_test_reads", "jeff") as desk:
+            desk.repl("look")
+            out = desk.repl('do create f01 kind=note title=Bills text="Rent split by days here."')
+            nid = out.split("created ")[1].split()[0]
+            desk.repl("do prop " + nid + " owe=5")                          # own write: prop:owe is seen
+            desk.repl("do prop " + nid + " owe=6")
+            desk.world.me = "sable"
+            desk.repl("look")
+            try:
+                desk.repl("do rewrite " + nid + ' text="Rent by nights."')
+                raise AssertionError("a rewrite after a look that printed no text was admitted")
+            except Exception as e:
+                assert "have not seen " + nid + "'s text" in str(e), str(e)
+            desk.repl("read " + nid)
+            assert desk.repl("do rewrite " + nid + ' text="Rent by nights."').startswith("ok")
+            desk.world.me = "jeff"
+            assert desk.repl("do prop " + nid + " owe=7").startswith("ok")     # the outline line showed the prop
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_clamped_repeat_compares_the_shown_prefix():
+    """sable-10: a clamped repeat records the shown prefix; the fence compares only that, as a set."""
+    import deskd, lens_ir
+    tmp = _scratch("_test_clamp")
+    try:
+        with deskd.Session("_test_clamp", "jeff") as desk:
+            desk.repl("look")
+            for t in ("One", "Two", "Three"):
+                desk.repl("do create f01 kind=task title=" + t)
+            sc = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:task, clamp 2, each t", 't : text "$title", on click do check $item']))
+            sel = [e for e in sc["kids"][0]["reads"] if e[0] == "select"][0]
+            assert len(sel[2]) == 2 and sel[3] == 2
+            assert deskd.same_answer(desk, sel[1], sel[2], sel[3])[0]
+            desk.repl("do create f01 kind=task title=Four")
+            assert deskd.same_answer(desk, sel[1], sel[2], sel[3])[0]         # beyond the clamp: not shown, not read
+            desk.repl("do remove " + sel[2][0])
+            assert not deskd.same_answer(desk, sel[1], sel[2], sel[3])[0]
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_paint_words_print_and_emit():
+    """pike-7 sections 6 and 9, lowered: grid tracks, gap, scroll, fold, measure, verbatim, lines, share, hint."""
+    src = chr(10).join(["ws : grid 1 3 fit, gap 12", '  bar : column, fold, text "Projects"', "  chat : column, scroll end, measure 70ch",
+                        '    say : text "", lines 1..8, hint "Message"', '  page : column, share 2', '    code : text "x = 1", verbatim'])
+    root, parts = scene.parse(src)
+    by = {k["name"]: k for k in scene._walk(parts["ws"])}
+    assert by["ws"]["tracks"] == ["1fr", "3fr", "fit"] and by["bar"]["fold"] and by["say"]["lines"] == [1, 8]
+    refused("x : column, gap 4, verbatim", "text word")
+    refused("x : grid", "grid <tracks>")
+    refused('x : text "a", gap 4', "frame word")
+    import deskd, lens_ir
+    tmp = _scratch("_test_paint")
+    try:
+        with deskd.Session("_test_paint", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pv = scene.painter_view(sc)
+            assert pv["paint"]["tracks"] == ["1fr", "3fr", "fit"] and pv["paint"]["gap"] == 12
+            bar, chat, page = pv["kids"]
+            assert bar["paint"]["folded"] and bar["acts"] == [{"on": "fold"}] and "fence" not in bar
+            assert chat["paint"]["scroll"] == "end" and chat["paint"]["measure"] == "70ch"
+            assert chat["kids"][0]["paint"]["lines"] == [1, 8] and chat["kids"][0]["paint"]["hint"] == "Message"
+            assert page["paint"]["share"] == 2 and page["kids"][0]["paint"]["wrap"] == "verbatim"
+            text = scene.to_text(sc, "ws", "jeff", 0)
+            for w in ("grid 1fr 3fr fit", "gap 12", "folded", "scroll end", "measure 70ch", "lines 1..8", 'hint "Message"', "share 2", "verbatim"):
+                assert w in text, w
+            assert "· fold" not in text
+    finally:
+        tmp.unlink(missing_ok=True)

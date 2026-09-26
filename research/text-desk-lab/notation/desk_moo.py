@@ -208,6 +208,9 @@ class DeskMoo(Desk):
         # Sable's spec 1, first test: the fence is keyed by (subject, aspect). A windowed reader (Juniper's step 11) is
         # judged on what it saw, whoever acted since; an unwindowed one is excused its own deeds.
         mine = aspects_of(name, kv)
+        blind = self._blind(nid, name, kv)
+        if blind:
+            raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
         hit = name not in ("create", "comment") and self._touched_by_others(nid, mine, others_only=not getattr(self, "_window", ""))
         if hit:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
@@ -250,9 +253,9 @@ class DeskMoo(Desk):
             out += f"\n  {r['note']}"
         for c in r.get("changed", []):
             if c in w.nodes and c != nid:
-                self._mark_rev(c)    # your own change; the receipt shows the revision, not the other aspects
+                self._mark_rev(c, aspects_of(name, kv))    # your own change: the aspects you wrote are seen, the others are not
         if nid in w.nodes:
-            self._mark_rev(nid)
+            self._mark_rev(nid, aspects_of(name, kv))
             self._receipt = True
             try:
                 out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)

@@ -118,3 +118,5 @@ rebased lens/desktop with the working-tree compiler at 17591c1 (an intended chan
 rebased play2/desktop with the working-tree compiler at 17591c1 (an intended change)
 rebased studio/i-refuse-spread-and-here-is-what-i-would-take-instead with the working-tree compiler at 17591c1 (an intended change)
 the three rebases above drop only the wall-clock arrival line: prints are now read with the clock frozen at each world's recorded date (sessions.py, desk.follow = False)
+rebased bridge/spacing-wish with the working-tree compiler at 0b32eba (an intended change)
+rebased frontier/p-if with the working-tree compiler at 0b32eba (an intended change)

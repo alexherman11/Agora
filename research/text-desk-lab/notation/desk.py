@@ -313,7 +313,7 @@ class Desk:
                 return False
             rel = None if (fields is None and ea is None) else (fields & ea if (fields is not None and ea is not None) else (ea if fields is None else fields))
             return k >= since_for(rel)
-        since = min(seen.values()) if seen else 0
+        since = since_for(fields)          # an aspect never printed is judged from the beginning
         n = w.nodes.get(nid)
         names = {nid} | ({n["subject"]} if n and n.get("subject") else set())
         subj = n.get("subject") if n else None
@@ -347,12 +347,17 @@ class Desk:
         """{aspect: event index of the last print that showed it}; "*" is a print that showed everything (a verb's own
         receipt, a rule's change). Older pickles hold one int, which was a whole look."""
         idx = getattr(self, "_seen_idx", None) or {}
-        v = idx.get((obs or self._observer(), nid))
-        if v is None:
-            v = idx.get((self.world.me, nid))
-        if v is None:
-            return {}
-        return {"*": v} if isinstance(v, int) else dict(v)
+        n = self.world.nodes.get(nid)
+        out = {}
+        for name in [nid] + ([n["subject"]] if n and n.get("subject") else []):    # a print of the appearance or of its subject
+            v = idx.get((obs or self._observer(), name))
+            if v is None:
+                v = idx.get((self.world.me, name))
+            if v is None:
+                continue
+            for a, k in ({"*": v} if isinstance(v, int) else v).items():
+                out[a] = max(out.get(a, 0), k)
+        return out
 
     def _note_seen(self, nid, at, aspects=None, obs=None):
         """Juniper's first-line trap (attacks probe look-clears-the-fence, e04710b): a print reads only what it printed
@@ -367,9 +372,43 @@ class Desk:
             cur[a] = at
         idx[key] = cur
 
-    def _mark_rev(self, nid):
+    REPLACING = ("rewrite", "retitle", "rename", "edit", "due", "prop", "untag")
+
+    def _blind(self, nid, verb, kv):
+        """The aspect this act would replace without ever having had it printed, or None. Adding (tag, append, comment,
+        check) carries no claim about the old value; replacing does. A rule is the desk's own hands."""
+        if verb not in self.REPLACING or getattr(self, "_in_rules", False):
+            return None
+        seen = self._seen_index(nid)
+        if "*" in seen:
+            return None
+        w = self.world
+        n = w.nodes.get(nid)
+        s = w.subjects.get(n["subject"]) if n and n.get("subject") else w.subjects.get(nid)
+        if s is None:
+            return None
+        for a in sorted(aspects_of(verb, kv) or ()):
+            if a in seen:
+                continue
+            k = a.partition(":")[2]
+            valued = {"text": bool(s.get("text")), "title": True, "due": bool(s.get("due")), "tags": bool(s.get("tags"))}.get(a)
+            if valued is None:
+                valued = a.startswith("prop:") and k in (s.get("props") or {})
+            if valued:
+                return a
+        return None
+
+    def _read_hint(self, nid, aspect):
+        s = self.world.subjects.get((self.world.nodes.get(nid) or {}).get("subject") or nid) or {}
+        folded = aspect == "text" and any(h for h, _ in self.world.sections(s.get("text") or ""))
+        return f"read {nid} :3 shows all of it" if folded else f"read {nid} shows it"
+
+    def _mark_rev(self, nid, aspects=None):
         """A receipt shows the result of what I touched, so the revision is seen; but it is not a look, so the scan for
-        other observers' deeds on other aspects still starts at my last real look (Sable's spec 1; Juniper's two windows)."""
+        other observers' deeds on other aspects still starts at my last real look (Sable's spec 1; Juniper's two windows).
+        The aspects I wrote I have seen (a person may change the start date they set): None marks everything, as a
+        verb the aspect table does not know touches everything."""
+        self._note_seen(nid, len(self.world.events), None if aspects is None else sorted(aspects))
         if nid in self.world.nodes:
             self.seen[nid] = self.world.nodes[nid]["rev"]
         elif nid in self.world.subjects:
@@ -422,7 +461,7 @@ class Desk:
     def line(self, nid, level=1):
         w = self.world
         n = w.nodes[nid]
-        self._mark_seen(nid, ["title", "place", "due", "tags"] + [f"prop:{k}" for k in (n.get("props") or {})])    # the outline line: not the text
+        self._mark_seen(nid, ["title", "place", "due"] + [f"prop:{k}" for k in (n.get("props") or {})])    # the outline line: not the text, not the tags
         bits = []
         if n["type"] == "surface" and n["layout"] == "view":
             head = f"{nid} view \"{n['title']}\" of {n.get('query')}" + (f" as table {n['cols']}" if n.get("cols") else "")
@@ -866,6 +905,9 @@ class Desk:
             recent = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
             why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {recent[-1]['by']}" if recent else ""
             raise Refusal(f"stale: {nid} changed since you last saw it{why}; look at it again before acting")
+        blind = self._blind(nid, verb, kv)
+        if blind:
+            raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         r = w.apply(verb, nid, None, kv)
         for c in r.get("changed", []):
@@ -874,6 +916,7 @@ class Desk:
             w.events[-1].setdefault("changed", []).append(c)
         self._after_mutation()
         for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result of what you touched
+            self._note_seen(c, len(w.events), sorted(aspects_of(verb, kv)) if aspects_of(verb, kv) is not None else None)
             if c in w.nodes:
                 self.seen[c] = w.nodes[c]["rev"]
             elif c in w.subjects:
@@ -888,9 +931,9 @@ class Desk:
             out += "\n  now: " + self.line(r["created"], 1) + self.position_note(r["created"])
         for c in r.get("changed", []):
             if c in w.nodes and c != nid:
-                self._mark_rev(c)    # your own change; the receipt shows the revision, not the other aspects
+                self._mark_rev(c, aspects_of(verb, kv))    # your own change: the aspects you wrote are seen, the others are not
         if nid in w.nodes:
-            self._mark_rev(nid)
+            self._mark_rev(nid, aspects_of(verb, kv))
             self._receipt = True
             try:
                 out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)

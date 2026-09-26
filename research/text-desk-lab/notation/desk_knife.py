@@ -329,6 +329,12 @@ class DeskKnife(DeskMoo):
                 d = w.last_day(i)
                 return str(w.days_between(d, self.today)) if d and self.today else ""
             return str(((s or {}).get("props") or {}).get(c, ""))
+        shown = [{"title": "title", "tags": "tags", "due": "due", "in": "place"}.get(c, None if c in ("id", "kind", "words", "age") else f"prop:{c}") for c in cols]
+        shown = [a for a in shown if a]
+        for i in ids:                       # Juniper (reads case): a table that printed status has shown status
+            self._mark_seen(i, shown)
+            if w.nodes[i].get("subject"):
+                self._mark_seen(w.nodes[i]["subject"], shown)
         rows = [[i] + [cell(i, c) for c in cols] for i in ids]
         if by:
             if by not in cols:
@@ -876,9 +882,24 @@ class DeskKnife(DeskMoo):
             if not arg.strip():
                 raise Refusal("scene <lens name>. A lens is a note tagged lens; help scene")
             try:
-                return scene.scene_for(self, arg.strip())[1]
+                sc, text = scene.scene_for(self, arg.strip())
             except scene.LensRefusal as e:
                 raise Refusal(str(e))
+            w = self.world
+
+            def walk(n):
+                # Juniper (reads case): a lens print that showed a status has shown it; each node says what it printed
+                if n.get("item") in w.nodes and n.get("shown"):
+                    self._mark_seen(n["item"], n["shown"])
+                    if w.nodes[n["item"]].get("subject"):
+                        self._mark_seen(w.nodes[n["item"]]["subject"], n["shown"])
+                for fid, asp in (n.get("fshown") or {}).items():
+                    if fid in w.nodes or fid in w.subjects:
+                        self._mark_seen(fid, asp)
+                for k in n.get("kids") or []:
+                    walk(k)
+            walk(sc)
+            return text
         if cmd == "clock":
             return self.cmd_clock(arg)
         if cmd == "scripts":

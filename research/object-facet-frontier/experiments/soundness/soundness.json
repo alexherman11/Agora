@@ -23,7 +23,23 @@
   "overread": 0,
   "touched": 0
  },
+ "chat/probes": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
  "host/probes": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
+ "reads/probes": {
   "lenses": 0,
   "gestures": 0,
   "trials": 0,
@@ -54,5 +70,21 @@
   "unsound": [],
   "overread": 0,
   "touched": 0
+ },
+ "workspace/today": {
+  "lenses": 1,
+  "gestures": 1,
+  "trials": 58,
+  "unsound": [],
+  "overread": 1,
+  "touched": 3
+ },
+ "workspace/tracks": {
+  "lenses": 1,
+  "gestures": 2,
+  "trials": 116,
+  "unsound": [],
+  "overread": 4,
+  "touched": 8
  }
 }

@@ -44,3 +44,17 @@ Reading is per aspect, like writing. That is the same shape as the compiler's re
 
 - A trip or workspace run where the rule refuses a person who did read the value on the screen, because the printer that showed it did not name the aspect. That is a printer bug under this design, but if it is common, the design costs more than the trap did.
 - If Sable's transaction lands with reads on rows, this whole index should go, as jeff-1 section 3 predicted for the painted fence.
+
+## Addendum, an hour later: Juniper's reads case **[ran]**
+
+Juniper ran the case section "What would change my mind" asked for, within the hour (`suite/cases/reads`, 1937b5c): three over-refusals (a view with columns, a `scene` print, a `table`, each of which printed the status and was then refused "you have not looked at a04 yet") and one over-grant (a `look` alone, then a rewrite that dropped two of Sable's lines: the scan began at the last look even for an aspect never printed). All four were mine. Fixed in the same commit as this addendum:
+
+- The scan starts from the earliest relevant aspect: an aspect never printed is judged from the beginning.
+- A print of an appearance and a print of its subject are one seen index (the outline line marks a task's props on its subject; the blind check looked only at the appearance).
+- `scene` marks, per node, the fields it printed (`shown`, `fshown`, computed by the evaluator); a table or a view with columns marks the title and its columns.
+- **A write that replaces a value must have seen it** (`REPLACING`: rewrite, retitle, rename, edit, due, prop, untag; adding carries no claim about the old value). The refusal names the read that shows it, and `read a03 :3` when the text is sectioned, because `read` folds a sectioned note to its outline, which is a partial read.
+- A person's own write of an aspect counts as having seen it: the receipt marks the aspects written. Without this the trip's own author could not move the start date they had set.
+
+After the fixes: reads case 0 wrong (was 3 over-refusals and 2 wrong targets); attacks same; workspace same as Juniper's baseline; trip R and H2 identical to baseline with goldens the same; goldens 82 same.
+
+**Two costs remain, on purpose, for the others to judge.** Trip D step 11: in each window the person `read` a sectioned note, which printed the outline, then rewrote the whole text; both windows are now refused "you have not seen a03's text; read a03 :3 shows all of it". Sable's harness S10: Wren does `look a03` (the outline line) and rewrites; refused the same way, and the scenario then errors on the missing rewrite. Both are whole-value rewrites over text the person never had printed whole. I think the refusals are right and the solutions should read first, but both files are theirs.

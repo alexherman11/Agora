@@ -61,7 +61,8 @@ import pathlib
 import re
 from desk import split_batch
 
-LAYOUTS = ("column", "row", "free")
+LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "measure", "wrap", "lines", "share", "hint")   # pike-7 sections 6 and 9, lowered here
 GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count")
 
@@ -178,6 +179,68 @@ def rows_text(desk, source):
 
 def _w_layout(node, p, val, n, env):
     node["layout"] = p
+
+
+def _w_grid(node, p, val, n, env):
+    """`grid 1 3 3 1`, `grid 1fr fit 2fr`: tracks in fr (a bare number is fr) or fit (as wide as the widest cell)."""
+    toks = val.split()
+    tracks = []
+    for t in toks:
+        if t == "fit":
+            tracks.append("fit")
+        elif re.fullmatch(r"\d+(\.\d+)?(fr)?", t) and float(t.rstrip("fr")) > 0:
+            tracks.append(t if t.endswith("fr") else t + "fr")
+        else:
+            raise LensRefusal(f"line {n}: `grid <tracks>`: each track is a positive number of fr (1, 3fr) or fit; got {t!r}")
+    if not tracks:
+        raise LensRefusal(f"line {n}: `grid <tracks>`, for example `grid 1 3 3 1`; got {p!r}")
+    node["layout"], node["tracks"] = "grid", tracks
+
+
+def _w_gap(node, p, val, n, env):
+    if not val.isdigit():
+        raise LensRefusal(f"line {n}: `gap <px>`; got {p!r}")
+    node["gap"] = int(val)
+
+
+def _w_scroll(node, p, val, n, env):
+    if val not in ("none", "scroll", "end"):
+        raise LensRefusal(f"line {n}: `scroll none|scroll|end` (end keeps the newest in view); got {p!r}")
+    node["scroll"] = val
+
+
+def _w_fold(node, p, val, n, env):
+    node["fold"] = True           # an authored default: folded until a viewer unfolds it; the viewer's choice makes no event
+
+
+def _w_measure(node, p, val, n, env):
+    if not re.fullmatch(r"\d+ch", val):
+        raise LensRefusal(f"line {n}: `measure <n>ch` (at most that wide, centred); got {p!r}")
+    node["measure"] = val
+
+
+def _w_verbatim(node, p, val, n, env):
+    node["wrap"] = "verbatim"     # as wide as its longest line, scrolling sideways: code, tables of text
+
+
+def _w_lines(node, p, val, n, env):
+    m = re.fullmatch(r"(\d+)\.\.(\d+)", val)
+    if not m or int(m.group(1)) < 1 or int(m.group(2)) < int(m.group(1)):
+        raise LensRefusal(f"line {n}: `lines <min>..<max>` (grows, then scrolls); got {p!r}")
+    node["lines"] = [int(m.group(1)), int(m.group(2))]
+
+
+def _w_hint(node, p, val, n, env):
+    m = re.fullmatch(r'"([^"]*)"', val)
+    if not m or not m.group(1):
+        raise LensRefusal(f'line {n}: `hint "<words shown while the text is empty>"`; got {p!r}')
+    node["hint"] = m.group(1)
+
+
+def _w_share(node, p, val, n, env):
+    if not re.fullmatch(r"\d+(\.\d+)?", val) or float(val) <= 0:
+        raise LensRefusal(f"line {n}: `share <weight>` (this child's share of its column or row); got {p!r}")
+    node["share"] = float(val) if "." in val else int(val)
 
 
 def _w_carry(node, p, val, n, env):
@@ -312,6 +375,15 @@ def _w_on(node, p, val, n, env):
 # word -> (shape as a reader sees it, setter). A layout word is its own name.
 WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
+    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
+    "gap": ("gap <px>", _w_gap),
+    "scroll": ("scroll none|scroll|end", _w_scroll),
+    "fold": ("fold", _w_fold),
+    "measure": ("measure <n>ch", _w_measure),
+    "verbatim": ("verbatim", _w_verbatim),
+    "lines": ("lines <min>..<max>", _w_lines),
+    "share": ("share <weight>", _w_share),
+    "hint": ('hint "..."', _w_hint),
     "carry": ("carry", _w_carry),
     "role": ("role <name>", _w_role),
     "text": ('text "..."', _w_text),
@@ -364,7 +436,8 @@ def parse(src):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False}
+                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False,
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             row = WORDS.get(word)
@@ -391,6 +464,14 @@ def parse(src):
         raise LensRefusal("an empty lens shows nothing; start with  window : column")
     every = [k for p in parts.values() for k in _walk(p)]
     for k in every:
+        for wd in ("gap", "scroll", "fold", "measure"):
+            if k[wd] not in (None, False) and not k["layout"]:
+                raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
+        for wd in ("wrap", "lines", "hint"):
+            if k[wd] is not None and k["text"] is None:
+                raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
+        if k["layout"] == "grid" and not k["tracks"]:
+            raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["each"] and k["each"] not in parts:
             raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
         if k["carry"] and any(a["on"] == "drag" for a in k["on"]):
@@ -742,6 +823,7 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                 the_state = "empty" if not ids else "ambiguous: " + ", ".join(ids)
         out = {"part": node["name"], "key": key, "role": node["role"], "layout": node["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": node["clamp"], "acts": [], "kids": []}
+        out.update({k: node[k] for k in PAINT_WORDS if node.get(k) not in (None, False)})
         if node["the"]:
             out["the"] = (_fill(node["the"], ctx), the_state)
         if node["as"]:
@@ -973,7 +1055,18 @@ def to_text(scene, name, who, at):
         if n["role"]:
             bits.append(f"[{n['role']}]")
         if n["layout"]:
-            bits.append(n["layout"])
+            bits.append(n["layout"] + (" " + " ".join(n["tracks"]) if n.get("tracks") else ""))
+        for wd in ("gap", "scroll", "measure", "share"):
+            if n.get(wd) is not None:
+                bits.append(f"{wd} {n[wd]}")
+        if n.get("fold"):
+            bits.append("folded")
+        if n.get("wrap") == "verbatim":
+            bits.append("verbatim")
+        if n.get("lines"):
+            bits.append(f"lines {n['lines'][0]}..{n['lines'][1]}")
+        if n.get("hint"):
+            bits.append(f'hint "{n["hint"]}"')
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:
@@ -1009,6 +1102,8 @@ def to_text(scene, name, who, at):
         if n.get("test"):
             bits.append(f"· only when {n['test']}")
         for a in n["acts"]:
+            if a["on"] == "fold":
+                continue                    # the line already says folded; the fold act is the viewer's, with no line
             bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f": {a['line']}" if a.get("line") else ""))
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):
@@ -1108,8 +1203,28 @@ def emit(node):
         paint["placed"] = {"lens": node["lens"]}
     if node.get("role") == "cut":
         paint["cut"] = True
+    # pike-7 sections 6 and 9: tracks, gap, scroll, fold and measure on a frame; wrap and lines on text; share on any child
+    if paint["kind"] == "frame":
+        for k in ("tracks", "gap", "scroll", "measure"):
+            if node.get(k) is not None:
+                paint[k] = node[k]
+        if node.get("fold"):
+            paint["folded"] = True
+    elif paint["kind"] == "text" and not paint.get("absent"):
+        if node.get("wrap"):
+            paint["wrap"] = node["wrap"]
+        if node.get("lines"):
+            paint["lines"] = node["lines"]
+        if node.get("hint"):
+            paint["hint"] = node["hint"]
+    if node.get("share") is not None:
+        paint["share"] = node["share"]
     node["paint"] = paint
-    if node.get("acts"):
+    acts = list(node.get("acts") or [])
+    if node.get("fold") and not any(a.get("on") == "fold" for a in acts):
+        acts.append({"on": "fold"})            # no line, no fence: the viewer's own choice
+        node["acts"] = acts
+    if [a for a in acts if a.get("on") != "fold"]:
         fence = {k: node[k] for k in ("item", "rev", "reads", "defpart", "bind") if k in node}
         if any(a.get("on") == "drop" for a in node["acts"]):
             fence["key"] = node["key"]           # c368: a drop receiver's occurrence is part of what the drop means
