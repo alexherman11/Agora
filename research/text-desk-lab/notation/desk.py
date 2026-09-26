@@ -649,6 +649,9 @@ class Desk:
             head += f" · tags {','.join(s['tags'])}"
         if s.get("due"):
             head += f" · due {s['due']}"
+        props = s.get("props") or {}
+        if props:        # Astra awareness, Juniper (juniper-8 c): read hid a task's status and awaiting; it prints them, and so has read them
+            head += " · " + " ".join(f"{k}={v}" for k, v in props.items())
         secs = w.sections(s["text"])
         named = [(h, b) for h, b in secs if h]
         body = s["text"]
@@ -674,7 +677,7 @@ class Desk:
                 keep = [heading] if heading else []
                 body = "\n".join(keep + [f"(… {len(cut) - len(keep)} earlier line(s) folded; without tail= for all)"] + bl[-tail:])
         whole = body == s["text"]          # a section outline, one section or a tail is a partial read: the text is not seen
-        shown = ["title", "tags", "due", "comments", "links"] + (["text"] if whole else [])
+        shown = ["title", "tags", "due", "comments", "links"] + [f"prop:{k}" for k in props] + (["text"] if whole else [])
         self._mark_seen(nid, shown)
         self._mark_seen(s["id"], shown)
         out = f"{head}\n---\n{body}\n---"

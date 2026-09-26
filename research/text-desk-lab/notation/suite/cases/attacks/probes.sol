@@ -1,5 +1,5 @@
 # The attacks, typed as a person would meet them, in a fresh desk. Each probe is one open route.
-recorded M4=2
+recorded M4=1
 
 step a4
 T do create f01 kind=note title="Alpha" tags=t start=2026-10-01 week=6

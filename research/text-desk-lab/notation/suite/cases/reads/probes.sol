@@ -5,6 +5,7 @@ step shown
 probe view-is-a-read
 probe lens-is-a-read
 probe table-is-a-read
+probe read-shows-props
 
 step unseen
 probe blind-after-look

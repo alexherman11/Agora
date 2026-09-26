@@ -74,6 +74,15 @@ def probe(name, run):
         return _tick_after(run, "scene my day", "Run the suite")
     if name == "table-is-a-read":
         return _tick_after(run, "table kind:task cols=title,status", "Book the campsite")
+    if name == "read-shows-props":
+        # juniper-8 (c): read printed a task's title and an empty body, not its status or who it waits on
+        _as(run, "jeff", "look")
+        _as(run, "jeff", 'do create f01 kind=task title="Alex\'s two more things" status=waiting awaiting=alex')
+        out, _ = _as(run, "alex", 'read "Alex\'s two more things"')
+        if "status=waiting" not in out or "awaiting=alex" not in out:
+            return "silent", "read printed the task without its status or awaiting"
+        out, refused = _as(run, "alex", 'do prop "Alex\'s two more things" status=open')
+        return ("visible", "read printed the status, yet changing it was refused") if refused else ("holds", "")
     if name == "blind-after-look":
         return _blind(run, "look", "Bills")
     if name == "blind-after-find":
