@@ -245,3 +245,38 @@ These are the places where `scene.py` evaluation reaches the world outside an ac
 - **A real arrangement that people expect to follow content.** For example: "keep this column ordered by due, and let me drag exceptions." Then order is a derived view with held overrides, and `place.order` needs a mode.
 - **Golden prints showing many lenses depend on today's guard-before-bind.** Then the order in §2 needs a word for "guard the parent", not a silent change.
 - **Free-frame units that cannot be screen-independent for a real app.** For example, a pixel-exact image annotation. Then `geom` carries a unit.
+
+## 7. Addendum, 26 Sep: select order, aspect levels, freshness (Sable's draft, answering Jeff)
+
+**Order is a read of its own [imagined; the reads it rests on are read from world.py and lens_ir.py].**
+- A `select` answers a sequence. The rule records two reads of it:
+  - its **membership**, a set, which the fence compares;
+  - its **order**, the sequence, which R records so that a reorder repaints the scene.
+- A reorder alone never refuses a gesture.
+- `in:<surface>` answers in the place's order, `world.children(fid)`:
+  - under sable-9, `(order key, id)`;
+  - without it, the legacy `(y, x)`.
+  
+  Answering in id order is what printed Juniper's split and moved blocks out of order (af56476, 3 silent).
+- Order still fences where a gesture's meaning depends on it. A clamp's prefix is compared as the set `now[:k]`. A reorder that changes which k things show refuses, because the person acted on those k.
+- A positional gesture (`before=Y`, `after=Y`, `at=`) reads its neighbour by identity. The key is computed at apply time, so it needs no order fence.
+
+**Aspects at two levels [imagined; the working copy already projects the second level, ran].**
+- **Comments.** `comments` is membership (which comments exist); `comment:<cid>` is one comment's body and state.
+  - A new comment writes both.
+  - A resolve, or a reply to c, writes only `comment:c`.
+- **Links.** `links` is the thing's incidence; a link is its own referent, `l<n>`, with from, kind and to.
+- **Why the second level.** Without it, an unrelated new comment stales a pending resolve of another comment. That is an over-fence: a harmless concurrent act refuses. I have not yet tested it on the desk.
+
+**Freshness is a lookup, not a scan [ran on a synthetic desk; read in world.py].**
+- **Semantics.** `$touched`, `$touched.by` and `$changed.<field>` find the event that authored the current value.
+- **Why skipping is right today.** Skipping undone events and undos finds that event because world.py:
+  - refuses an undo of an undo;
+  - refuses an undo when later events have changed the thing.
+- **Cost of the scan.** 200 tasks and 20,000 events cost 998 ms per paint.
+- **The journal's source.** The last op per (thing, aspect), where an undo's inverse op names the op it restores.
+- **Fencing.**
+  - As a printed value, freshness is repaint-only.
+  - In a guard or line on a gesture's chain, it fences like any other read (R_g in section 1). Otherwise "finished more than a day ago" can pass on a stale answer.
+
+**What would change my mind.** On order: a real gesture whose meaning depends on the whole sequence, not just on a prefix or a neighbour. On aspects: evidence that the per-comment level costs more in guards and lenses than the over-fence costs people.
