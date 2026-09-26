@@ -179,6 +179,7 @@ def run_solution(task, path, show=False):
         if change:
             change(plan)
         seen_wrong = {}          # (place, statement, value) -> verdict: one wrong counted once per step
+        refused_lines = []
         st = dict(writes=0, repairs=0, silent=0, zero=0, visible=0, ne=0, m4=0, refused=0, left=0)
         notes = []
 
@@ -210,6 +211,7 @@ def run_solution(task, path, show=False):
                     st["repairs"] += mark == "R"
                 if refused:
                     st["refused"] += 1
+                    refused_lines.append(text)
                     notes.append(f"refused{'@' + window if window else ''}: {text[:60]} -> {out.splitlines()[0][:110]}")
             elif op[0] == "check":
                 check()
@@ -240,7 +242,11 @@ def run_solution(task, path, show=False):
                 out, refused = run.line(cmd)
                 if shows in out and not refused:
                     continue
-                if name in task.M4_FACTS:
+                if any(shows in line for line in refused_lines):
+                    # the words that should survive were never accepted: nothing was lost, but the person could not write
+                    seen_wrong.setdefault(("fact", ("fact", name), "never written"), "visible")
+                    notes.append(f"visible {name}: the write carrying '{shows}' was itself refused")
+                elif name in task.M4_FACTS:
                     st["m4"] += 1
                     notes.append(f"M4 {name}: '{shows}' is gone")
                 else:
