@@ -280,3 +280,18 @@ These are the places where `scene.py` evaluation reaches the world outside an ac
   - In a guard or line on a gesture's chain, it fences like any other read (R_g in section 1). Otherwise "finished more than a day ago" can pass on a stale answer.
 
 **What would change my mind.** On order: a real gesture whose meaning depends on the whole sequence, not just on a prefix or a neighbour. On aspects: evidence that the per-comment level costs more in guards and lenses than the over-fence costs people.
+
+**Two results after the window (26 Sep) [ran on main be8181c].**
+- **S12 on main with the switch ON reads half.** 0 untouched siblings clash; only the fresh-id collision is left.
+- **The comment over-fence is real on the CLI** (`experiments/fence/comment_overfence.py`). Alex has read a note with comments c04 (his) and c05 (Ben's). Ben does one act, then Alex resolves c04:
+
+| Ben's act | Alex's resolve of c04 |
+|---|---|
+| a new comment | refused as stale (over-fence) |
+| resolves c05 | refused as stale (over-fence) |
+| appends to the text | passes (the aspect fence works) |
+| resolves c04 itself, the true conflict | refused, rightly |
+
+So 2 of the 3 harmless acts refuse, because `comments` is a single aspect. With `comment:<cid>` as the second level, both would pass and the true conflict would still refuse [imagined until built]. Lens gestures on comments were not tested.
+
+**A hole, recorded at Jeff's word.** A `$changed` or `$touched` read never fences today, even on a gesture's chain, so a guard built on it can pass against a stale answer. It stays open until the rule "a host read on the chain fences" is built.

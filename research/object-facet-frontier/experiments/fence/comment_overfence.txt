@@ -1,0 +1,16 @@
+ben comments anew:
+  ben:  ok comment a03 line='and guests?'  [e4] → created c06
+  alex resolve c1: ERR !! since your last look: e4 comment s02 by ben | stale: a03 changed since you last saw it through s02 (e4 comment by ben); look at it again before acting
+  after: [('c04', False), ('c05', False), ('c06', False)]
+ben resolves the other comment:
+  ben:  ok resolve a03 id=c05  [e4]
+  alex resolve c1: ERR !! since your last look: e4 resolve a03 by ben | stale: a03 changed since you last saw it (e4 resolve by ben); look at it again before acting
+  after: [('c04', False), ('c05', True)]
+ben appends to the text:
+  ben:  ok append a03 line='no drums'  [e4]
+  alex resolve c1: !! since your last look: e4 edit a03 by ben | ok resolve a03 id=c04 line='fine, eleven'  [e5] |   c04 by alex resolved with reply "fine, eleven" |   now: a03 note "House rules" · 5w · 2 comments, 1 open  (1st of 1 in f01)
+  after: [('c04', True), ('c05', False)]
+ben resolves the same comment (true conflict):
+  ben:  ok resolve a03 id=c04 line=ok  [e4]
+  alex resolve c1: ERR !! since your last look: e4 resolve a03 by ben | stale: a03 changed since you last saw it (e4 resolve by ben); look at it again before acting
+  after: [('c04', True), ('c05', False)]
