@@ -70,7 +70,12 @@ class Accessor:
             hit = e
             break
         self.R.append(("touched", r, aspect, hit["id"] if hit else None))
-        return {"id": hit["id"], "verb": hit.get("via") or hit["verb"], "at": (hit.get("at") or "")[:16].replace("T", " "), "by": hit["by"]} if hit else None
+        if not hit:
+            return None
+        wall = (hit.get("at") or "")[:16].replace("T", " ")
+        # Juniper: the date is the event's desk-clock day, as `today` and `due` are; the time is the wall clock's
+        at = (f"{hit['day']} {wall[11:]}".strip() if hit.get("day") else wall)
+        return {"id": hit["id"], "verb": hit.get("via") or hit["verb"], "at": at, "by": hit["by"]}
 
     def host(self, f):
         v = {"me": self.w.me, "today": getattr(self.desk, "today", None) or getattr(self.w, "today", None),

@@ -621,7 +621,21 @@ def _when(vals, part):
     return (m.group(2) if part == "time" else m.group(1)), None
 
 
+def _day_or_time(vals):
+    """Juniper (day lens a496): `day-or-time <when> <today>`: the time alone when the day is today, `Mon 28` within a
+    week either way, else the date. Today is an input, so the read is visible; goldens freeze it per world."""
+    import re as _re
+    m = _re.search(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?", str(vals[0]))
+    d, today = (_date(m.group(1)) if m else None), _date(vals[1])
+    if not d or not today:
+        return None, f"day-or-time wants a date-time or a freshness value and today; got {vals[0]!r}, {vals[1]!r}"
+    if d == today:
+        return (m.group(2) or d.isoformat()), None
+    return (d.strftime("%a %d").replace(" 0", " ") if abs((d - today).days) <= 7 else d.isoformat()), None
+
+
 INTERPS = {"day-n": (("date", "n"), _day_n), "days-from": (("start", "end"), _days_from),
+           "day-or-time": (("when", "today"), _day_or_time),
            "weekday": (("date",), _weekday), "week-of": (("date",), _week_of),
            "time": (("when",), lambda v: _when(v, "time")), "date": (("when",), lambda v: _when(v, "date"))}
 _VAR = re.compile(r"\$(\w+)(?:\.(\w+))?")

@@ -345,3 +345,11 @@ def test_time_and_date_interpretations():
     assert scene.INTERPS["date"][1](["e412 prop · 2026-09-25 21:40"]) == ("2026-09-25", None)
     assert scene.INTERPS["date"][1](["2026-10-10"]) == ("2026-10-10", None)
     assert scene.INTERPS["time"][1](["2026-10-10"])[0] is None and scene.INTERPS["time"][1](["soon"])[0] is None
+
+
+def test_day_or_time():
+    f = scene.INTERPS["day-or-time"][1]
+    assert f(["e4 prop · 2026-09-25 21:40", "2026-09-25"]) == ("21:40", None)
+    assert f(["2026-09-21 09:00", "2026-09-25"]) == ("Mon 21", None)
+    assert f(["2026-09-01", "2026-09-25"]) == ("2026-09-01", None)
+    assert f(["soon", "2026-09-25"])[0] is None

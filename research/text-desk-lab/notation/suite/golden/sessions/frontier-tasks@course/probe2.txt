@@ -1,1 +1,1 @@
-ERR line 2: no interpretation 'weeks-from'. The list is closed: day-n <date> <n>, days-from <start> <end>, weekday <date>, week-of <date>, time <when>, date <when>
+ERR line 2: no interpretation 'weeks-from'. The list is closed: day-n <date> <n>, days-from <start> <end>, day-or-time <when> <today>, weekday <date>, week-of <date>, time <when>, date <when>
