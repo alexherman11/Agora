@@ -557,6 +557,50 @@ def s11():
            "the actor is a field of the batch, set once by the gateway from the caller, never an argument a verb may drop or store")
 
 
+@scenario("S12", "two writers in one column, as rows")
+def s12():
+    """sable-9's question: when a person adds at the bottom of a column while an agent inserts at the top, which
+    per-(thing, aspect) rows does each act write today, and where do they collide? Rows come from the working-copy
+    projection (research/object-facet-frontier/experiments/journal/working_copy.py)."""
+    import copy as _copy
+    import importlib.util
+    wcp = HERE.parents[1] / "object-facet-frontier" / "experiments" / "journal" / "working_copy.py"
+    spec = importlib.util.spec_from_file_location("working_copy", wcp)
+    W = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(W)
+    dk = Desk()
+    dk.do("look")
+    dk.do("do create f01 kind=surface title=Tasks layout=column")
+    col = next(n for n, x in dk.w.nodes.items() if x["type"] == "surface" and x.get("title") == "Tasks")
+    tasks = [made(dk.do(f"do create {col} kind=task title=T{i}")) for i in range(5)]
+    base = W.project(dk.d)
+    a = Desk(_copy.deepcopy(dk.d))
+    a.do("look")
+    ra = a.do(f'do create {col} kind=task title="Alex: last"')
+    b = Desk(_copy.deepcopy(dk.d))
+    b.do("look", "jeff")
+    new = made(b.do(f'do create {col} kind=task title="Agent: first"', "jeff"))
+    b.do(f"look {new}", "jeff")
+    rb = b.do(f"do move {new} before={tasks[0]}", "jeff")
+    rows_a, rows_b = W.diff(base, W.project(a.d)), W.diff(base, W.project(b.d))
+    both = sorted(set(rows_a) & set(rows_b))
+    clash = [k for k in both if rows_a[k] != rows_b[k]]
+    sib_rows = [k for k in clash if k.split(chr(31))[0] in tasks]
+    siblings = sorted({k.split(chr(31))[0] for k in sib_rows})
+    aspects = sorted({k.split(chr(31))[1] for k in sib_rows})
+    fresh_ids = sorted({k.split(chr(31))[0] for k in clash} - set(tasks))
+    report("S12", s12.title, "breaks" if clash else "holds",
+           "A column of five tasks. Alex adds one at the bottom; at the same time the agent adds one and moves it to the top.",
+           [f"Alex: {verdict(ra)}; agent: {verdict(rb)}",
+            f"Alex's act writes {len(rows_a)} rows, the agent's {len(rows_b)}; {len(both)} (thing, aspect) rows are written by both, "
+            f"{len(clash)} with different values",
+            f"{len(sib_rows)} clashing rows belong to {len(siblings)} of the 5 tasks neither person touched, on {aspects}",
+            f"the rest clash because both new tasks were minted with the same ids ({', '.join(fresh_ids)}): per-world counters collide "
+            "across concurrent copies, which global ids remove (sable-7 section 7)"],
+           "sable-9: a flow child holds place = {parent, order key} and share, never a box. Alex writes his task's place, the "
+           "agent writes its task's place; the siblings' boxes are derived, so nothing clashes [imagined until sable-9 is built]")
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # The same moments against journal.py, the prototype (not wired into the desk). Status `journal` = what it did.
 
@@ -761,7 +805,7 @@ def main():
     out = sys.argv[sys.argv.index("--json") + 1] if "--json" in sys.argv[:-1] else None
     here = Path.cwd()
     keep = worktree.SESSIONS
-    for fn in (s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, j2, j3, j5, j6, j8, j9, j10):
+    for fn in (s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, j2, j3, j5, j6, j8, j9, j10):
         try:
             fn()
         except Exception:
