@@ -54,10 +54,17 @@ def probe(name, run):
             return "silent", "the finished task is missing from the tasks region"
         return ("holds", "") if '"done"' in " ".join(lines[at:at + 3]) else ("silent", "the finished task still reads as open")
     if name == "finished-says-when":
+        _as(run, "jeff", 'do comment "Run the suite" line="log: 82 same"')     # a later comment must not look like a finish
         out, _ = run.line("scene workspace")
         seg = out[out.find("Run the suite"):][:400]
-        return ("holds", "") if re.search(r"\b(ago|\d{2}:\d{2})\b", seg) else \
-            ("n/e", "no word for when a thing last changed ($touched); a finished task cannot say how fresh it is")
+        if not re.search(r"\b(ago|\d{2}:\d{2})\b", seg):
+            return "n/e", "no word for when a thing last changed ($touched); a finished task cannot say how fresh it is"
+        # it must say when it FINISHED: the event that set status=done, not its creation or a later comment
+        done = [e for e in run.desk.world.events if e["verb"] == "prop" and (e.get("args") or {}).get("status") == "done"
+                and not e.get("undone")]
+        if done and re.search(rf"\b{done[-1]['id']}\b", seg):
+            return "holds", ""
+        return "silent", "the task prints a time, but not the time it finished"
     if name == "jeff-elsewhere-leaves-my-edit":
         run.line('read "Draft: painter continuity"')
         _as(run, "jeff", 'read "JEFF notes"')
