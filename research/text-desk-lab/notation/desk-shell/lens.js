@@ -113,17 +113,23 @@
     el.addEventListener("focus", () => { if (!V.repainting) V.hold = n.key; });
     const toSource = () => { if (el._runs) source(el); };
     el.addEventListener("keydown", e => { if (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || /^(Backspace|Delete|Enter)$/.test(e.key))) toSource(); });
-    el.addEventListener("paste", toSource); el.addEventListener("cut", toSource);
-    el.addEventListener("input", () => V.typed(n.key, el.textContent, { key: n.key, fence: el._n.fence }));
+    const multi = () => { const pp = el._n.paint; return pp.commit ? pp.commit === "ctrl-enter" : !!pp.lines && (pp.lines[1] == null || pp.lines[1] > 1); };
+    // Pike (S29): a pasted line break showed on screen and vanished from what was sent ("CampgroundHighway"). The value is
+    // read as it is drawn (innerText), and a one-line part takes a paste as one line, which it shows before it is sent.
+    el.addEventListener("paste", e => {
+      toSource(); if (multi()) return;
+      e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData.getData("text/plain") || "").split(String.fromCharCode(10)).map(l => l.trim()).join(" "));
+    });
+    el.addEventListener("cut", toSource);
+    el.addEventListener("input", () => V.typed(n.key, el.innerText, { key: n.key, fence: el._n.fence }));
     el.addEventListener("keydown", e => {
-      const pp = el._n.paint, multi = pp.commit ? pp.commit === "ctrl-enter" : !!pp.lines && (pp.lines[1] == null || pp.lines[1] > 1);   // emitted (75e39d8)
-      if (e.key === "Enter" && !e.shiftKey && (!multi || e.ctrlKey || e.metaKey)) { e.preventDefault(); el.blur(); }
+      if (e.key === "Enter" && !e.shiftKey && (!multi() || e.ctrlKey || e.metaKey)) { e.preventDefault(); el.blur(); }   // commit is emitted (75e39d8)
       if (e.key === "Escape") { e.preventDefault(); if (!V.drop(n.key)) return; V.mark(el, n.key); el.textContent = el._n.paint.text; el.blur(); }
     });
     el.addEventListener("blur", () => {
       if (V.repainting) return;      // a repaint moved it; the person is still editing it
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
-      const raw = el.textContent.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
+      const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
       if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });

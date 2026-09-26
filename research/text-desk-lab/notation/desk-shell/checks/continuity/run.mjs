@@ -807,6 +807,24 @@ S.S28 = { what: "a message with a code run: click inside the code, type, send, a
         && inHand.offset === 3 && again === "do Xprop a31" && !!sel && sel[0].trim() === "first" };
   } };
 
+S.S29 = { what: "paste a two-line address into a one-line title (Juniper c347, moment 8)", expect: "what is sent is what was on screen; a one-line title does not silently gain or lose a line",
+  async run(ids) {
+    const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
+    const el = await tab.find(`/${ids.kirk}/t`);
+    await tab.click(el.x, el.y); await tab.selectAll();
+    // a paste event carrying two lines (headless Chrome has no clipboard to paste from; the event is what the page sees).
+    // If the page does not take it, the browser's own paste is imitated with the same two lines.
+    await tab.eval(`(() => { const dt = new DataTransfer(); dt.setData("text/plain", "Kirk Creek Campground\\nHighway 1, Big Sur");
+      const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+      if (document.activeElement.dispatchEvent(ev)) document.execCommand("insertText", false, dt.getData("text/plain")); })()`);
+    const onScreen = await tab.eval("document.activeElement.innerText");
+    await tab.enter(); await sleep(2500);
+    const world = await titleOf(ids.kirk), shown = await titleEl(tab, ids.kirk), d = await tab.lastDo();
+    await tab.close();
+    const lines = s => (s || "").split("\n").length;
+    return { onScreen, sent: d && d.line, world, shown, pass: !!world && lines(onScreen) === lines(world) && world === (shown && shown.text) };
+  } };
+
 // Juniper's three classes (a313), so the suite's runner can count these beside its CLI readers:
 // holds; wrong and silent (the person is not told: a lost draft, a phantom, an unseen refusal, a selection or a
 // newer fact quietly gone); wrong but visible (the gap is plain on screen: no Tab stop, no word for it, a refusal shown).

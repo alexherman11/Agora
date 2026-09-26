@@ -181,7 +181,7 @@ Budget: painter lines should grow by kind and by primitive, not by app. The 150-
 - If `blocks:$text` cannot carry a diagram without a renderer, then diagrams need a paint kind, not a library lens.
 - If people want folds shared (a team's collapsed bar), then `fold` is a world aspect and makes events.
 
-## 9. After Juniper (a490), Sable (a473, a488, c480) and the first build (26 Sep)
+## 9. After Juniper (a490), Sable (a473, a488, c480) and the first build (25 Sep, evening; first dated 26 Sep in error)
 
 **What the build showed [ran, f63745a, run g: 17 of 20].**
 - The painter draws Jeff's contract by paint kind. It reads only `key`, `paint`, `acts` and `fence`.
