@@ -95,6 +95,9 @@ def probe(name, run):
         msgs = next((l for l in out.splitlines() if l.strip().startswith("msgs ")), "")
         if "```" not in out:
             return "holds", ""
+        if "runs" in msgs and " code" in msgs and "verbatim" not in msgs:
+            # the text side sees the code as a run inside prose that still wraps; whether it is drawn so is Pike's
+            return "holds", ""
         if "verbatim" in msgs:
             return "n/e", ("the chat is one text, so verbatim applies to all of it: the code keeps its spaces and the prose "
                            "stops wrapping; formatting code inside a message needs blocks or runs")
