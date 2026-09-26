@@ -15,6 +15,22 @@
   "overread": 4,
   "touched": 8
  },
+ "blocks/B": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
+ "blocks/T": {
+  "lenses": 0,
+  "gestures": 0,
+  "trials": 0,
+  "unsound": [],
+  "overread": 0,
+  "touched": 0
+ },
  "budget/copies": {
   "lenses": 0,
   "gestures": 0,
