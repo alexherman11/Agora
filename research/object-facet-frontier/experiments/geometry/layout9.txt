@@ -1,0 +1,17 @@
+SUITE WORLDS: flow boxes a second reflow moves (nothing else changed)
+- attacks/probes: 0 of 3 flow boxes move, worst 0px
+- budget/copies: 0 of 10 flow boxes move, worst 0px
+- chat/probes: 0 of 0 flow boxes move, worst 0px
+- host/probes: 0 of 3 flow boxes move, worst 0px
+- reads/probes: 0 of 0 flow boxes move, worst 0px
+- trip/D: 0 of 1 flow boxes move, worst 0px
+- trip/H2: 0 of 9 flow boxes move, worst 0px
+- trip/R: 0 of 10 flow boxes move, worst 0px
+- workspace/today: 0 of 8 flow boxes move, worst 0px
+- workspace/tracks: 0 of 8 flow boxes move, worst 0px
+HOME WALK: after each act, flow boxes a second reflow moves
+- 60 acts (60 ok); acts after which a second reflow moves boxes: 3
+    act 40 remove (ok): 2 of 9 boxes move, worst 1px
+    act 41 remove (ok): 2 of 8 boxes move, worst 1px
+    act 42 create (ok): 2 of 9 boxes move, worst 1px
+- at the end: 0 of 15 flow boxes move, worst 0px

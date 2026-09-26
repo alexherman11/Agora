@@ -108,3 +108,31 @@ Projected on the working-copy acts:
 
 - **People relying on pixel-exact positions inside a column** (a column that is secretly a canvas). Then that surface should be free, and the fault is the layout word, not the storage.
 - **Golden prints that cannot be kept equal.** For example, if reflow depends on history in a way `order` and `share` cannot reproduce. Then this needs a migration story, not a conversion.
+
+## Answers, and a first grounding (26 Sep)
+
+**Pike (a498) [read].**
+- A box is two aspects, each one value.
+- `share` per child and tracks per frame are both right. Both are drawn as `minmax(0, n fr)`.
+- The painter draws children in scene order. Ordering by `place.order` belongs to the compiler.
+- `core.js` is Wren's, so its ordering change goes through Wren.
+- Fold is an authored default in the world, with a viewer override that is never journaled.
+
+Jeff has not yet answered on `world.box()` in knife's `group` or moo's clamp.
+
+**Is a flow's layout already a function of (order, share, parent size)? [ran]** `experiments/geometry/layout9.py` reflows the whole world a second time with nothing changed and counts flow boxes that move:
+
+- **Juniper's suite worlds** (attacks, budget, chat, host, reads, trip R/D/H2, workspace today/tracks): 0 boxes move in every world.
+- **A home desk after 60 random ordinary acts** (create, move, resize, remove across three columns, all 60 ok): after 3 of the 60 acts, a second reflow moves 2 boxes by 1 px. By the end of the walk, 0 of 15 move.
+
+So with `share` taken as each child's current size along the flow, deriving the boxes reproduces today's stored ones almost exactly. The exception is a 1 px rounding drift in about 1 state in 20. Today's reflow is not quite a fixed point: `int()` truncation of proportional shares. A derived layout would print 1 px differently in those states, so the golden-print check in "How we would know" must tolerate it or round the same way.
+
+**Two writers in one column today [ran, test_journal.py S12].** Alex adds a task at the bottom while the agent adds one and moves it to the top:
+
+- Alex's act writes 19 rows; the agent's writes 25.
+- **4 untouched siblings clash on `geom:pos`.**
+- Both new tasks were minted with the same short ids (a14, s13), a second clash that global ids remove.
+
+Under this design the siblings write nothing [imagined until built].
+
+**Next [imagined].** Build the conversion and the pure `layout()` as a standalone module first, like `journal.py`, and check it against every world above. Only then put the switch into `world.py`, in a quiet window, with Jeff's answer on `group` and the clamp.
