@@ -51,3 +51,7 @@ Juniper's workspace case, Alex's four regions in these words: today.sol 2 hold, 
 - Viewer state (`view open`, a viewer frame in evaluation): Sable changed his mind toward a declared viewer frame read through the accessor; Juniper agrees; unimplemented and unowned.
 - The transaction (jeff-1) stays paused; Juniper's workspace and blocks cases both end at it: a paragraph edit under an append, a split as one batch.
 - The quiet window for world.py: Sable's chat-signing patch and the sable-9 switch, after Pike's next run reports.
+
+## Addendum: runs (870ec2d) **[ran]**
+
+Juniper's a559, from counts over her own writing (3,168 words of desk posts with 0 backticks and 49 bare ids; 5,716 words of markdown with 147 backtick spans), settles where runs come from: code spans and fences are automatic at print, from a closed grammar, with no world effect and a `plain` opt-out. `paint.runs` is `[{text, role: code, block?}, {text}, ...]`; `paint.text` stays the joined words, so the fence and the printer's words are unchanged, and the print adds `runs N code`. Runs are the structure of one leaf, not a derive. An editable part with runs is edited as its source; whether the painter can swap source and runs without the caret jumping is Pike's scenario to run. References (ids in prose) stay words until the gateway stores them at write time as identity with the alias as label, which is Embark's automatic linking done as one act and belongs with the transaction. Four golden lenses with a backtick span moved by the one phrase and were rebased.
