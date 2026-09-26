@@ -186,12 +186,12 @@ def _w_grid(node, p, val, n, env):
     toks = val.split()
     tracks = []
     for t in toks:
-        if t == "fit":
-            tracks.append("fit")
+        if t == "fit" or re.fullmatch(r"\d+gap", t):
+            tracks.append(t)
         elif re.fullmatch(r"\d+(\.\d+)?(fr)?", t) and float(t.rstrip("fr")) > 0:
             tracks.append(t if t.endswith("fr") else t + "fr")
         else:
-            raise LensRefusal(f"line {n}: `grid <tracks>`: each track is a positive number of fr (1, 3fr) or fit; got {t!r}")
+            raise LensRefusal(f"line {n}: `grid <tracks>`: each track is a positive number of fr (1, 3fr), fit, or a gap (12gap); got {t!r}")
     if not tracks:
         raise LensRefusal(f"line {n}: `grid <tracks>`, for example `grid 1 3 3 1`; got {p!r}")
     node["layout"], node["tracks"] = "grid", tracks
@@ -210,7 +210,11 @@ def _w_scroll(node, p, val, n, env):
 
 
 def _w_fold(node, p, val, n, env):
-    node["fold"] = True           # an authored default: folded until a viewer unfolds it; the viewer's choice makes no event
+    """`fold` or `fold "Projects"`: folded by default, until a viewer unfolds it (a choice that makes no event); the
+    label is the lens's words for the handle, else the part's text or name."""
+    if val and not re.fullmatch(r'"[^"]+"', val):
+        raise LensRefusal(f'line {n}: `fold` or `fold "<label for the handle>"`; got {p!r}')
+    node["fold"] = val.strip('"') if val else True
 
 
 def _w_measure(node, p, val, n, env):
@@ -224,10 +228,10 @@ def _w_verbatim(node, p, val, n, env):
 
 
 def _w_lines(node, p, val, n, env):
-    m = re.fullmatch(r"(\d+)\.\.(\d+)", val)
-    if not m or int(m.group(1)) < 1 or int(m.group(2)) < int(m.group(1)):
-        raise LensRefusal(f"line {n}: `lines <min>..<max>` (grows, then scrolls); got {p!r}")
-    node["lines"] = [int(m.group(1)), int(m.group(2))]
+    m = re.fullmatch(r"(\d+)\.\.(\d*)", val)
+    if not m or int(m.group(1)) < 1 or (m.group(2) and int(m.group(2)) < int(m.group(1))):
+        raise LensRefusal(f"line {n}: `lines <min>..<max>` (grows, then scrolls; `lines 3..` for no top); got {p!r}")
+    node["lines"] = [int(m.group(1)), int(m.group(2)) if m.group(2) else None]
 
 
 def _w_hint(node, p, val, n, env):
@@ -378,7 +382,7 @@ WORDS = {
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap <px>", _w_gap),
     "scroll": ("scroll none|scroll|end", _w_scroll),
-    "fold": ("fold", _w_fold),
+    "fold": ('fold ["<handle label>"]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
@@ -472,6 +476,8 @@ def parse(src):
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["layout"] == "grid" and not k["tracks"]:
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
+        if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: `on edit` on a clamped text: the person would replace words the clamp hides; drop the clamp, or edit through a part that shows the whole value")
         if k["each"] and k["each"] not in parts:
             raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
         if k["carry"] and any(a["on"] == "drag" for a in k["on"]):
@@ -603,8 +609,21 @@ def _week_of(vals):
 
 # Pike W6: named interpretations, a closed and budgeted list like the roles in calm.style. Each is pure over printed
 # inputs and total. There is no +, no if and no nesting; a new one is argued for and added by whoever owns the host.
+def _when(vals, part):
+    """Juniper: a freshness value (`e412 prop · 2026-09-25 21:40`, or a plain date or date-time) shown as its time or
+    its date alone, so a person's screen need not carry the event id and verb; provenance keeps the whole value."""
+    import re as _re
+    m = _re.search(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?", str(vals[0]))
+    if not m:
+        return None, f"{part} wants a date, a date-time or a freshness value; got {vals[0]!r}"
+    if part == "time" and not m.group(2):
+        return None, f"time wants a date-time or a freshness value; got {vals[0]!r}"
+    return (m.group(2) if part == "time" else m.group(1)), None
+
+
 INTERPS = {"day-n": (("date", "n"), _day_n), "days-from": (("start", "end"), _days_from),
-           "weekday": (("date",), _weekday), "week-of": (("date",), _week_of)}
+           "weekday": (("date",), _weekday), "week-of": (("date",), _week_of),
+           "time": (("when",), lambda v: _when(v, "time")), "date": (("when",), lambda v: _when(v, "date"))}
 _VAR = re.compile(r"\$(\w+)(?:\.(\w+))?")
 # Pike (round six, `if`): a structural test on a value. `only when $wd = Mon`, `only when $beds > 5`, `only when $a.due < $today`.
 _VALUE_TEST = re.compile(r"(\$[\w.-]+)\s*(=|!=|<=|>=|<|>)\s*(\$[\w.-]+|\"[^\"]*\"|\S+)")
@@ -1061,11 +1080,11 @@ def to_text(scene, name, who, at):
             if n.get(wd) is not None:
                 bits.append(f"{wd} {n[wd]}")
         if n.get("fold"):
-            bits.append("folded")
+            bits.append("folded" + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else ""))
         if n.get("wrap") == "verbatim":
             bits.append("verbatim")
         if n.get("lines"):
-            bits.append(f"lines {n['lines'][0]}..{n['lines'][1]}")
+            bits.append(f"lines {n['lines'][0]}..{n['lines'][1] if n['lines'][1] is not None else ''}")
         if n.get("hint"):
             bits.append(f'hint "{n["hint"]}"')
         if n.get("lens"):
@@ -1210,7 +1229,8 @@ def emit(node):
             if node.get(k) is not None:
                 paint[k] = node[k]
         if node.get("fold"):
-            paint["folded"] = True
+            paint["fold"] = {"folded": True, "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
+            paint["semantic"] = {"role": "group", "expanded": False}
     elif paint["kind"] == "text" and not paint.get("absent"):
         if node.get("wrap"):
             paint["wrap"] = node["wrap"]
@@ -1218,6 +1238,12 @@ def emit(node):
             paint["lines"] = node["lines"]
         if node.get("hint"):
             paint["hint"] = node["hint"]
+        ons = {a.get("on") for a in (node.get("acts") or [])}
+        if "edit" in ons:
+            mx = (node.get("lines") or [1, 1])[1]
+            paint["commit"] = "enter" if (not node.get("lines") or mx == 1) else "ctrl-enter"    # emitted, so the print can say which
+        if "click" in ons:
+            paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:
         paint["share"] = node["share"]
     node["paint"] = paint

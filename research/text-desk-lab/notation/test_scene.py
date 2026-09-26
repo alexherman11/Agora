@@ -302,7 +302,7 @@ def test_paint_words_print_and_emit():
             pv = scene.painter_view(sc)
             assert pv["paint"]["tracks"] == ["1fr", "3fr", "fit"] and pv["paint"]["gap"] == 12
             bar, chat, page = pv["kids"]
-            assert bar["paint"]["folded"] and bar["acts"] == [{"on": "fold"}] and "fence" not in bar
+            assert bar["paint"]["fold"] == {"folded": True, "label": "Projects"} and bar["acts"] == [{"on": "fold"}] and "fence" not in bar
             assert chat["paint"]["scroll"] == "end" and chat["paint"]["measure"] == "70ch"
             assert chat["kids"][0]["paint"]["lines"] == [1, 8] and chat["kids"][0]["paint"]["hint"] == "Message"
             assert page["paint"]["share"] == 2 and page["kids"][0]["paint"]["wrap"] == "verbatim"
@@ -338,3 +338,10 @@ def test_freshness_words_are_host_reads():
             assert "no changed.status" not in str(sc2) and done not in sc2["kids"][0]["text"], sc2["kids"][0]["text"]
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def test_time_and_date_interpretations():
+    assert scene.INTERPS["time"][1](["e412 prop · 2026-09-25 21:40"]) == ("21:40", None)
+    assert scene.INTERPS["date"][1](["e412 prop · 2026-09-25 21:40"]) == ("2026-09-25", None)
+    assert scene.INTERPS["date"][1](["2026-10-10"]) == ("2026-10-10", None)
+    assert scene.INTERPS["time"][1](["2026-10-10"])[0] is None and scene.INTERPS["time"][1](["soon"])[0] is None
