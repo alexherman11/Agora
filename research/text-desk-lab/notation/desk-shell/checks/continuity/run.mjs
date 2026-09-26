@@ -33,7 +33,7 @@ const NOTATION = resolve(HERE, "../../..");
 const PY = "C:/Projects/Agora4/.venv/Scripts/python.exe";
 const CHROME = ["C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
-const PORT = 8795, CDP_PORT = 9333, BASE_SESSION = "pike-continuity";
+const PORT = Number(process.env.PORT || 8871), CDP_PORT = 9333, BASE_SESSION = "pike-continuity";
 let SESSION = BASE_SESSION;      // one scratch world per scenario: a closing tab's last request cannot touch the next world
 const BASE = `http://127.0.0.1:${PORT}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -448,11 +448,12 @@ S.S13 = { what: "carry a card to another day with the pointer (drop)", expect: "
   async run(ids) {
     const tab = await Tab.open(lensUrl("cal")); await tab.painted(5);
     const before = await dayOf(ids.kirk), card = await tab.find(`/items/${ids.kirk}`), to = await dayCol(tab, 2);
+    if (!card || !to) return { card, to, keys: await tab.eval("[...document.querySelectorAll('[data-key]')].map(e => e.dataset.key).slice(0, 12)"), said: (await tab.said()).slice(0, 300), pass: false };
     await tab.drag(card.x, card.y + 30, to.x, to.y, 10);
     await sleep(2500);
     const d = await tab.lastDo(), after = await dayOf(ids.kirk), said = await tab.said();
     await tab.close();
-    return { before, after, sent: d && d.line, refused: d && d.error, refusalShown: !!(d && d.error) && said.includes("refused:"), pass: before === "1" && after === "2" };
+    return { before, after, sent: d && d.line, observed: process.env.DEBUG ? d && d.observed : undefined, refused: d && d.error, refusalShown: !!(d && d.error) && said.includes("refused:"), pass: before === "1" && after === "2" };
   } };
 
 S.S19 = { what: "carry a card to another day with keys only: Space, Tab to a day, Enter", expect: "the card lands on the day chosen",
@@ -633,9 +634,16 @@ function verdict(r) {
 async function main() {
   const only = process.argv.slice(2);
   mkdirSync(join(HERE, "results"), { recursive: true });
+  // Pike (run h): another deskd was already listening on this suite's old port 8795 with older code and its own worlds;
+  // on Windows a second server can bind the same port (SO_REUSEADDR), so the suite talked to it unknowingly.
+  // The port must be free before this deskd starts, and must be this deskd's.
+  const busy = await fetch(`${BASE}/lens.html`).then(() => true, () => false);
+  if (busy) throw new Error(`port ${PORT} already has a server; this suite needs its own deskd (set PORT=...)`);
   const deskd = spawn(PY, ["deskd.py", String(PORT)], { cwd: NOTATION, stdio: ["ignore", "ignore", "pipe"] });
+  let exited = false; deskd.on("exit", () => { exited = true; });
   let deskdErr = ""; deskd.stderr.on("data", d => { deskdErr += d; });
   for (let i = 0; i < 50; i++) { try { await fetch(`${BASE}/lens.html`); break; } catch { await sleep(200); } }
+  if (exited) throw new Error("this suite's deskd exited at start (see its stderr)");
   const out = { when: new Date().toISOString(), chrome: CHROME, session: BASE_SESSION + "-<scenario>", scenarios: {} };
   try {
     const v = await startChrome();
