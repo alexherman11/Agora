@@ -466,7 +466,7 @@ def s8():
     dk.do("look", "alex/main")
     doc = made(dk.do('do create f01 kind=note title=Essay text="## Intro\\nold intro\\n## Notes\\n- first"', "alex/main"))
     task = made(dk.do("do create f01 kind=task title=Research", "alex/main"))
-    dk.do(f"look {doc}", "alex/main")
+    dk.do(f"read {doc} :3", "alex/main")          # he has the essay open: its whole text is in front of him
     dk.do(f"look {task}", "alex/main")
     dk.do("look", "jeff")
     dk.do(f"look {doc}", "jeff")
@@ -476,7 +476,7 @@ def s8():
     t = dk.do(f'do retitle {task} title="Research sources"', "alex/main")
     r = dk.do(f'do rewrite {doc} section=Intro text="A new intro, typed while the agent worked."', "alex/main")
     kept = "typed while the agent worked" in json.dumps(dk.w.subjects) + json.dumps(dk.w.events)
-    dk.do(f"look {doc}", "alex/main")
+    dk.do(f"read {doc} :3", "alex/main")
     r2 = dk.do(f'do rewrite {doc} section=Intro text="A new intro, typed while the agent worked."', "alex/main")
     a = dk.do(f'do append {doc} line="- agent: source 4"', "jeff")
     report("S8", s8.title, "breaks" if refused(r) else "holds",
@@ -485,7 +485,7 @@ def s8():
            [f"agent appends: {sum(1 for x in ag if not refused(x))} of 3 landed",
             f"task title (agent wrote status): {verdict(t)}", f"Intro rewrite (agent appended under Notes): {verdict(r)}",
             f"Alex's typed paragraph is {'kept' if kept else 'nowhere'} after that",
-            f"after looking again, the rewrite: {verdict(r2)}", f"then the agent's next append: {verdict(a)}"],
+            f"after reading it again, the rewrite: {verdict(r2)}", f"then the agent's next append: {verdict(a)}"],
            "text is one aspect today; with anchored hunks (the qc experiment: 42 intact, 0 silent drifts) an Intro rewrite and a Notes "
            "append touch different anchors and both land; where they do meet, the refusal line keeps the paragraph")
 
@@ -499,6 +499,7 @@ def s9():
     k = len(dk.w.events)
     out = dk.do(f"do prop {n} filed=yes; do retitle a99 title=Filed")
     added = len(dk.w.events) - k
+    props_then = dict(subj(dk, n).get("props") or {})
     shown = re.findall(r"^ok .*\[(e\d+)\]", out, re.M)
     other = made(dk.do("do create f01 kind=note title=Other"))
     later = dk.w.events[-1]["id"]
@@ -508,7 +509,7 @@ def s9():
            "Alex files a note in one call: set a prop, then retitle (he mistypes the id). Then he makes another note, "
            "and later undoes the event number the first receipt showed him.",
            [" / ".join(l.strip() for l in out.splitlines() if l.strip())[:220],
-            f"events added: {added}; props now {subj(dk, n).get('props')}",
+            f"events added: {added}; props after the call {props_then}",
             f"the rolled-back receipt said {shown[0] if shown else '-'}; the next note ({other}) became {later}; undo {shown[0] if shown else '-'}: {verdict(u)}"],
            "a call is one batch: all rows commit in one appended line or none do (Jeff's step 1b, begin/apply/commit)")
 
@@ -521,9 +522,14 @@ def s10():
     sid = dk.w.nodes[n]["subject"]
     dk.do("look", "wren")
     dk.do(f"look {n}", "wren")
-    dk.do(f'do rewrite {n} text="call Sam at 3"', "wren")
-    ev = dk.w.events[-1]["id"]
-    dk.do(f"look {n}", "alex")
+    blind = dk.do(f'do rewrite {n} text="call Sam at 3"', "wren")     # an outline line shows no text: replacing it blind
+    dk.do(f"read {n}", "wren")
+    w1 = dk.do(f'do rewrite {n} text="call Sam at 3"', "wren")
+    ev = next((e["id"] for e in reversed(dk.w.events) if e["by"] == "wren" and e["verb"] == "edit"), None)
+    if ev is None:
+        report("S10", s10.title, "error", "", [f"wren's rewrite after reading: {verdict(w1)}"], "")
+        return
+    dk.do(f"read {n}", "alex")
     seen = dk.w.subjects[sid]["rev"]
     u = dk.do(f"undo {ev}", "wren")
     now = dk.w.subjects[sid]["rev"]
@@ -531,8 +537,9 @@ def s10():
     r = dk.do(f'do rewrite {n} text="call Sam at 3, bring the forms"', "alex")
     report("S10", s10.title, "breaks" if not refused(r) or not ta else "holds",
            "Wren changes the call to 3; Alex reads it; Wren takes it back (5 again). Alex adds 'bring the forms' to what he read.",
-           [f"wren's undo: {first(u)}", f"deskd.touched_aspects(text, rev {seen} -> {now}) = {ta} (False = a painted gesture is accepted)",
-            f"Alex's rewrite: {verdict(r)}; the text is now {subj(dk, n)['text']!r}, so Wren's undo is silently reversed"],
+           [f"wren's rewrite from the outline alone: {verdict(blind)}; after read: {verdict(w1)}", f"wren's undo: {first(u)}", f"deskd.touched_aspects(text, rev {seen} -> {now}) = {ta} (False = a painted gesture is accepted)",
+            f"Alex's rewrite: {verdict(r)}; the text is now {subj(dk, n)['text']!r}"
+            + ("" if refused(r) else ", so Wren's undo is silently reversed")],
            "an undo is a batch of inverse ops on (thing, aspect) rows; any read of that aspect before it is stale, exactly")
 
 
