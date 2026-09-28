@@ -309,10 +309,15 @@ class Desk:
             # the earliest index among the aspects an event and my act share: unseen aspects were seen at 0
             if aspects is None:
                 return min(seen.values()) if seen else 0
-            return min(max(seen.get(a, 0), star) for a in aspects) if aspects else star
+            # prop:* is a print that showed every prop, the absent ones too (absence is a value, R6): a prop that did
+            # not exist when it was printed was seen as absent there (F5)
+            return min(max(seen.get(a, 0), star, seen.get("prop:*", 0) if a.startswith("prop:") else 0)
+                       for a in aspects) if aspects else star
 
         def hits_since(e, k):
             ea = aspects_of(e.get("via") or e["verb"], e.get("args"))
+            if e["verb"] == "create" and e["target"] == nid:
+                ea = {"contents"}         # a thing made inside this surface changed what it holds, not its title or props (F5)
             if not aspects_meet(fields, ea):
                 return False
             rel = None if (fields is None and ea is None) else (fields & ea if (fields is not None and ea is not None) else (ea if fields is None else fields))
@@ -473,7 +478,7 @@ class Desk:
     def line(self, nid, level=1):
         w = self.world
         n = w.nodes[nid]
-        self._mark_seen(nid, ["title", "place", "due"] + [f"prop:{k}" for k in (n.get("props") or {})])    # the outline line: not the text, not the tags
+        self._mark_seen(nid, ["title", "place", "due", "prop:*"] + [f"prop:{k}" for k in (n.get("props") or {})])    # the outline line: not the text, not the tags; every prop, absent ones too
         bits = []
         if n["type"] == "surface" and n["layout"] == "view":
             head = f"{nid} view \"{n['title']}\" of {n.get('query')}" + (f" as table {n['cols']}" if n.get("cols") else "")
@@ -500,7 +505,7 @@ class Desk:
                     bits.append(f"{spilled} past the {'bottom' if axis == 'h' else 'right edge'} (offscreen)")
         else:
             s = w.subjects[n["subject"]]
-            self._mark_seen(s["id"], ["title", "place", "due"] + [f"prop:{k}" for k in (s.get("props") or {})])    # a word count is not the text
+            self._mark_seen(s["id"], ["title", "place", "due", "prop:*"] + [f"prop:{k}" for k in (s.get("props") or {})])    # a word count is not the text
             head = f"{nid} {s['kind']} \"{s['title']}\""
             geo = self._geom(nid)
             if geo:
@@ -729,7 +734,7 @@ class Desk:
                 keep = [heading] if heading else []
                 body = "\n".join(keep + [f"(… {len(cut) - len(keep)} earlier line(s) folded; without tail= for all)"] + bl[-tail:])
         whole = body == s["text"]          # a section outline, one section or a tail is a partial read: the text is not seen
-        shown = ["title", "tags", "due", "comments", "links"] + [f"prop:{k}" for k in props] + (["text"] if whole else [])
+        shown = ["title", "tags", "due", "comments", "links", "prop:*"] + [f"prop:{k}" for k in props] + (["text"] if whole else [])
         self._mark_seen(nid, shown)
         self._mark_seen(s["id"], shown)
         out = f"{head}\n---\n{body}\n---"
