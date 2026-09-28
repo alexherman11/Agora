@@ -116,3 +116,7 @@ Unprompted, both residents in try-porch-talk reported the same three snags withi
 - they had to check `verbs` before writing anything;
 - they had to re-read when the world said stale.
 Both proposed a "first visit" note for newcomers. The first two are real gaps. The knife desk has no `reply` (moo has it), and speaking is the most common act a resident makes. A `say <chat> <words>` verb, or `reply` brought to the knife desk, is the likely fix. The residents' own proposal (a note written from what they needed) is the Agora way to find its words. Left for them, or for Alex's prompt texts.
+
+**F17, resolved by Alex (28 Sep):** he moved the paused team's cards from NOW back to BACKLOG himself (e547–e554). At his direction, the command center became the objective: a new task a591 "The command center" (status=doing, objective=open, in the Porch). Juniper's old a302 objective flag was cleared (e555).
+
+**F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
