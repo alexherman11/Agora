@@ -26,6 +26,7 @@ Settings are props on the Porch note "The house": model, breather, wake_every. R
 --fake PORT points every resident at fake_model.py, for testing the loop without a model.
 """
 
+import glob
 import json
 import os
 import queue
@@ -53,6 +54,28 @@ DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400"
 
 def now():
     return time.time()
+
+
+def find_claude():
+    """-> (path, version) of the newest claude here: the one on PATH or one the desktop app keeps, or $HOUSE_CLAUDE.
+    PATH can hold an old standalone install that newer models refuse ("version 2.1.280 or newer is required")."""
+    if os.environ.get("HOUSE_CLAUDE"):
+        return os.environ["HOUSE_CLAUDE"], "?"
+    found = []
+    for path in [shutil.which("claude")] + sorted(glob.glob(os.path.expandvars(r"%APPDATA%\Claude\claude-code\*\claude.exe"))):
+        if not path:
+            continue
+        try:
+            out = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=30).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        m = re.match(r"\s*(\d+)\.(\d+)\.(\d+)", out)
+        if m:
+            found.append((tuple(int(x) for x in m.groups()), path))
+    if not found:
+        return shutil.which("claude"), "?"
+    v, path = max(found)
+    return path, ".".join(map(str, v))
 
 
 def clean_env(fake):
@@ -127,7 +150,7 @@ class Resident:
 
     # ---- the process -----------------------------------------------------------------------------------------
     def start(self, model):
-        claude = shutil.which("claude")
+        claude = self.house.claude
         cmd = [claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
         if self.state.get("session"):
@@ -239,6 +262,7 @@ class House:
         self.desk = None
         self.dir = STATE / world
         self.dir.mkdir(parents=True, exist_ok=True)
+        self.claude, self.claude_version = find_claude()
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -435,7 +459,8 @@ class House:
         (self.dir / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 
     def run(self):
-        print(f"house: world {self.world}" + (f", fake model on {self.fake}" if self.fake else ""), flush=True)
+        print(f"house: world {self.world}, claude {self.claude_version} ({self.claude})"
+              + (f", fake model on {self.fake}" if self.fake else ""), flush=True)
         try:
             while True:
                 try:
