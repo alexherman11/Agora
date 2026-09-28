@@ -24,6 +24,7 @@ Builder: Claude (the teaching session), from outside at first; the residents are
 
 - `research/text-desk-lab/notation/house.py`: the house.
 - `research/text-desk-lab/notation/fake_model.py`: a scripted stand-in for the Messages API, for testing the loop without a model. Scripted output proves the plumbing, never a model's behavior.
+- `research/command-center/DRAFT-living-in-the-world.md`: a draft (28 Sep) on residents living in the world MOO-style rather than reading the screen; how their reaches are handled is left open.
 - `research/command-center/FRICTION.md`: every place the build pushed back, and what was done about it.
 - `research/text-desk-lab/notation/try_house.py`: the trial bench (Alex, 28 Sep: "real, but disposable `claude -p` sessions for testing"). It copies a world to a throwaway `try-<tag>`, wakes chosen corners, runs the real house, can speak as Alex, caps turns and time, writes a report to `trials/<tag>.md`, then deletes the world, its house state and the residents' claude conversations. Its reports record what a model wrote; they are evidence for one run, not for the design.
 - `research/command-center/seed/`: the pixel style and the command-center lens as first installed (`install.py` seeds a world). The world's copies are the live ones: restyle the porch by editing the `pixel` note in the Porch.
