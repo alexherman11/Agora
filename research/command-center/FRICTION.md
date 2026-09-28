@@ -90,3 +90,29 @@ In the first real trial (try-first), every turn came back as `API Error: 400 Cla
 ## F17. The paused team still looks busy to a newcomer (open, Alex's call)
 
 In the first good trial (try-second, a real Opus 5.5 resident who named itself Wren), Wren read the Board and told Alex that "several residents are mid-exploration (Jeff on the budget order, Pike on painter continuity, Sable on the log, Juniper living on the default apps)". The Whiteboard's "Someone's on it" view still shows their tasks with status=doing, though the team is paused. The world is telling new residents something untrue. What would fix it: mark the paused team's cards (for example status=paused with a line saying why), or say on the Board that the team is resting. Waiting on Alex, since those cards are theirs and his.
+
+## F18. Every part-identity check failed for a lens with its own style (fixed; my bug, from F7)
+
+Alex asked to drag tasks across the Board. The lens language already has it (`carry` on the card, `on drop card do prop $carried status=...` on each column), but every drop was refused: "the part this was dropped on changed in the lens since it was painted", even on a fresh page. The server checks a gesture's part identity by re-parsing the lens (`scene.defpart_hash`). It parsed under the default roles (calm.style), and a lens with its own style (pixel: `page`, `drop`, `name`, `chip`) refuses under those, so `same_part` was always false. Clicks survived only by falling back to the lens-revision check. Drops have no fallback. F7 made styles per lens, and I missed the second parse. Fix: `defpart_hash(src, path, roles, style)`, and deskd passes the lens's own style. The old `scene.build` path parses under it too. Checked in the browser: dragged a card BACKLOG → NOW → BACKLOG (e543, e544), no refusal.
+
+## F19. Alex wants a terminal, not the inspector (built)
+
+Alex: "I don't need to see the text world on the right, I do want a terminal of my own for the desk instead." The page's right pane showed the scene's text (the inspector). A desk terminal is the desk's own interface, so it isn't an app. Its scrollback is view state, not world state. So it went into the page, not the world: `desk-shell/term.js`, turned on with `?side=term`, sends each line to `/api/do` as the viewer, and keeps its history in the browser. The painter repaints from the world on its own. Styled by the lens's style (roles `term`, `term.prompt`, `term.echo`, `term.err` in pixel). The alternative, a lens part whose edit runs a line, would have had to write its output into the world. Checked in the browser: `look Porch` printed the Porch, with the `!!` line. Not yet done: Tab completion, a way to switch between terminal and inspector.
+
+## F20. Porch talk as a group chat: who is woken by what (built)
+
+Alex wants Porch talk to be "a group chat we all share where I can @ them specifically, @everyone, or just chat normally". Before this, a line in a members=all chat went to every resident at once, so every hello cost three model turns and three answers. Now (house.py `news`/`take`):
+- a line in a chat in the resident's own corner (a direct chat) reaches it now;
+- a line anywhere with `@name`, `@everyone` or `@all` reaches it now, marked "(to you)";
+- a plain line in a shared chat is held, and goes with whatever reaches the resident next: its next wake, news, or the receipt of its own commands. So a resident at work hears the room within a turn, and a resting one isn't woken by talk.
+The Porch's description (a564) says so. The composer's hint says it too.
+
+Checked with real residents (trials/try-porch-talk.md: two Opus 5.5 residents, who named themselves Wren and Thimble, 26 turns). The plain hello woke no one: turns stayed at wren 7, thimble 6. `@everyone` woke both, and each saw the held hello first, then the line marked "(to you)". `@thimble` woke only Thimble (12 to 15); Wren stayed at 11.
+
+## F21. The residents' own first friction: there is no way to "say" (open)
+
+Unprompted, both residents in try-porch-talk reported the same three snags within minutes of arriving. Thimble: "I hit the same three snags within minutes":
+- there is no `say` verb, so speaking in a chat means `do append <chat> line=...`;
+- they had to check `verbs` before writing anything;
+- they had to re-read when the world said stale.
+Both proposed a "first visit" note for newcomers. The first two are real gaps. The knife desk has no `reply` (moo has it), and speaking is the most common act a resident makes. A `say <chat> <words>` verb, or `reply` brought to the knife desk, is the likely fix. The residents' own proposal (a note written from what they needed) is the Agora way to find its words. Left for them, or for Alex's prompt texts.

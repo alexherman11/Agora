@@ -799,10 +799,12 @@ def _chain_hash(chain):
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()[:12]
 
 
-def defpart_hash(src, path):
+def defpart_hash(src, path, roles=None, style=None):
     """Recompute a gesture node's part hash from a lens text and the node's part path (root/repeat/card). The path
-    steps into a kid by name, or through `each` into the named part. None when the path no longer exists."""
-    root, parts = parse(src)
+    steps into a kid by name, or through `each` into the named part. None when the path no longer exists. `roles` and
+    `style` are the lens's own (F7): parsed under the default roles, a lens with its own style refuses, and every
+    part-identity check failed (F18)."""
+    root, parts = parse(src, roles=roles, style=style)
     names = path.split("/")
     if names[0] not in parts:
         return None
@@ -896,10 +898,10 @@ def _named(w, sel):
 
 
 def build(desk, src, stack=(), count=None, props=None, closure=None):
-    root, parts = parse(src)
+    props = props or {}
+    root, parts = parse(src, roles=style_roles(desk, props.get("style")), style=props.get("style"))   # F7, F18
     resolve(root, parts)          # stage 2: names are judged before any part is evaluated
     w = desk.world
-    props = props or {}
 
     def spread_of(node, index, kid):
         sp, item = node.get("spread"), w.nodes.get(kid.get("item") or "")

@@ -83,7 +83,8 @@ def same_part(desk, dp):
     if lens is None:
         return False
     try:
-        return scene.defpart_hash(lens.get("text") or "", dp["path"]) == dp["hash"]
+        style = (lens.get("props") or {}).get("style")          # F18: the part is parsed under the lens's own style
+        return scene.defpart_hash(lens.get("text") or "", dp["path"], scene.style_roles(desk, style), style) == dp["hash"]
     except scene.LensRefusal:
         return False
 

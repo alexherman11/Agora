@@ -1,12 +1,14 @@
 """try_house: run the house for real on a throwaway copy of a world, then clean up everything it made.
 
     python try_house.py [--from frontier] [--corners f571,f576] [--model M] [--turns 12] [--minutes 8]
-                        [--say "a line from Alex" ...] [--keep] [--name tag]
+                        [--say "a line from Alex" ...] [--porch "a line in Porch talk" ...] [--keep] [--name tag]
 
 It copies sessions/<from>.pickle to a disposable world `try-<tag>`, wakes the chosen corners (default: the first
-resident corner) and lets the others rest, and runs house.py on it with real `claude -p` residents. Each --say line
-is appended as Alex to the first awake resident's own chat, one at a time, once that resident has been named, woken
-and gone quiet. The run ends when every awake resident is quiet and every line has been said and answered, or when
+resident corner) and lets the others rest, and runs house.py on it with real `claude -p` residents. The --say and
+--porch lines are said as Alex in the order given, one at a time, once every awake resident has been named, woken and
+gone quiet: --say in the first awake resident's own chat, --porch in Porch talk (the chat with members=all). {0}, {1}
+... in a line become the names the awake residents chose, so a line can say @{1}. Each resident's turn count when a
+line is said goes in the report, which is how you see who a line reached. The run ends when every awake resident is quiet and every line has been said and answered, or when
 the turn cap or the time limit is reached (these bound what a trial can cost).
 
 It writes a readable report to research/command-center/trials/<tag>.md: for each resident, what the house sent,
@@ -38,8 +40,8 @@ def arg(name, default=None):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv[:-1] else default
 
 
-def all_args(name):
-    return [sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == name]
+def all_args(*names):
+    return [(a, sys.argv[i + 1]) for i, a in enumerate(sys.argv[:-1]) if a in names]
 
 
 def desk(world, who, line):
@@ -60,7 +62,8 @@ def main():
     tag = arg("--name") or time.strftime("%m%d-%H%M%S")
     world = f"try-{tag}"
     cap, minutes = int(arg("--turns", "12")), float(arg("--minutes", "8"))
-    says = all_args("--say")
+    says = all_args("--say", "--porch")
+    log = []
     shutil.copyfile(HERE / "sessions" / f"{src}.pickle", HERE / "sessions" / f"{world}.pickle")
     w = export_docs.load(world).world
     corners = sorted(n["id"] for n in w.nodes.values()
@@ -72,6 +75,9 @@ def main():
     chat = next((s["id"] for s in w.subjects.values() if s["kind"] == "chat" and any(
         a.get("parent") == awake[0] for a in w.nodes.values() if a["type"] == "appearance" and a.get("subject") == s["id"])), None)
     chat_app = next((a["id"] for a in w.nodes.values() if a["type"] == "appearance" and a.get("subject") == chat), None)
+    porch = next((s["id"] for s in w.subjects.values() if s["kind"] == "chat"
+                  and "all" in str((s.get("props") or {}).get("members", "")).lower().split(",")), None)
+    porch_app = next((a["id"] for a in w.nodes.values() if a["type"] == "appearance" and a.get("subject") == porch), None)
 
     state = house.STATE / world
     print(f"trial {world}: awake {','.join(awake)}, cap {cap} turns, {minutes:g} min, {len(says)} line(s) to say")
@@ -100,34 +106,48 @@ def main():
                 ending = "a resident failed twice"
                 break
             if all(quiet(res.get(rid)) for rid in awake):
-                first = res.get(awake[0]) or {}
-                if said < len(says) and first.get("actor") and chat_app:
-                    print(f"  alex says: {says[said]}")
-                    desk(world, "alex", f"read {chat_app}; do append {chat_app} line={json.dumps(says[said])}")
+                names = [(res.get(rid) or {}).get("actor") for rid in awake]
+                if said < len(says) and all(names):
+                    kind, text = says[said]
+                    text = text.format(*names)
+                    where = chat_app if kind == "--say" else porch_app
+                    counts = ", ".join(f"{n} {(res.get(rid) or {}).get('turns', 0)}" for n, rid in zip(names, awake))
+                    print(f"  alex {'says' if kind == '--say' else 'in Porch talk'}: {text}   (turns: {counts})")
+                    log.append(f"- {time.strftime('%H:%M:%S')} {'own chat' if kind == '--say' else 'Porch talk'}: {text!r}; turns so far: {counts}")
+                    desk(world, "alex", f"read {where}; do append {where} line={json.dumps(text)}")
                     said += 1
                     time.sleep(6)                  # the house must see the line before quiet means answered
                     continue
                 if said == len(says):
                     ending = f"everyone quiet ({turns} turns)"
                     break
+    except KeyboardInterrupt:
+        ending = "interrupted"
     finally:
         proc.terminate()
         try:
             proc.wait(timeout=30)
         except subprocess.TimeoutExpired:
             proc.kill()
-    report = write_report(world, src, awake, ending, said, says)
+    final = {}
+    try:
+        final = json.loads((state / "house.json").read_text(encoding="utf-8")).get("residents") or {}
+    except (OSError, ValueError):
+        pass
+    log.append(f"- at the end, turns: " + ", ".join(f"{(final.get(rid) or {}).get('actor') or rid} {(final.get(rid) or {}).get('turns', 0)}" for rid in awake))
+    report = write_report(world, src, awake, ending, said, says, log)
     print(f"ended: {ending}\nreport: {report}")
     if "--keep" not in sys.argv:
         cleanup(world, awake, corners)
 
 
-def write_report(world, src, awake, ending, said, says):
+def write_report(world, src, awake, ending, said, says, log):
     REPORTS.mkdir(parents=True, exist_ok=True)
     w = export_docs.load(world).world
     out = [f"# House trial {world}", "",
            f"Copied from `{src}` at {time.strftime('%Y-%m-%d %H:%M')}. Awake: {', '.join(awake)}. Ended: {ending}. "
-           f"Alex said {said} of {len(says)} line(s). Real `claude -p` residents; this is a record of what they wrote.", ""]
+           f"Alex said {said} of {len(says)} line(s). Real `claude -p` residents; this is a record of what they wrote.", "",
+           "What Alex said, and each resident's turns at that moment:", ""] + log + [""]
     for rid in awake:
         props = (w.nodes.get(rid) or {}).get("props") or {}
         out += [f"## {rid}: {props.get('actor') or '(never named)'}", ""]

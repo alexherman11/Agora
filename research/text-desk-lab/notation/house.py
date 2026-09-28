@@ -9,9 +9,10 @@ the resident knows comes from the world, and everything it does goes through it:
 
   - lines of its reply that begin with a desk command are done in the world, signed with its name; the desk's
     reply is its next message. Any other line is its own thinking, kept in its transcript and nowhere else.
-  - a reply with no command lines ends its turn. It is resting until someone speaks to it (a line in a chat it is a
-    member of, a mention, a comment on something in its corner), an objective is open (a thing with
-    prop:objective=open; then it is woken again after `breather` seconds), or `wake_every` seconds pass.
+  - a reply with no command lines ends its turn. It is resting until someone speaks to it (a line in a chat in its
+    own corner, @its-name or @everyone anywhere, a comment on something in its corner), an objective is open (a
+    thing with prop:objective=open; then it is woken again after `breather` seconds), or `wake_every` seconds pass.
+    A plain line in a shared chat (Porch talk) wakes no one: it goes with whatever reaches the resident next.
   - its first pass is the door: the text of the Porch note "The door". It names itself with a line `i am <name>`,
     and that name is its desk identity from then on (prop `actor` on its corner).
 
@@ -302,11 +303,16 @@ class House:
 
     # ---- what a resident should hear --------------------------------------------------------------------------
     def news(self, w, r, actor):
-        """Lines for `actor` from events since its cursor: chat lines where it is a member, mentions, comments on
-        things in its corner. Advances the cursor."""
+        """Gather what `actor` should hear from the events since its cursor into its inbox; -> True when something in
+        it should reach the resident now. Now: every line in a chat in its own corner (a direct chat), a line anywhere
+        that names it (@name) or everyone (@everyone, @all), a comment on something in its corner. Held: a plain line
+        in a shared chat (Porch talk). A held line wakes no one; it goes with whatever reaches the resident next (a
+        wake, news, the receipt of its own commands), so a resident at work hears the room within a turn and a resting
+        one is not woken by talk. `take()` empties the inbox in order. Advances the cursor."""
         start = r.state.get("cursor", len(w.events))
-        lines = []
+        inbox, urgent = r.state.setdefault("inbox", []), False
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
+        called = re.compile(rf"@({re.escape(actor)}|everyone|all)\b", re.I)
         for e in w.events[start:]:
             if e.get("by") in (actor, "house") or e.get("undone"):
                 continue
@@ -318,15 +324,28 @@ class House:
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
             if s and s["kind"] == "chat" and "append" in args:
                 members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
-                if "all" in members or actor in members or sid in mine:   # a chat in its own corner is its own
-                    lines.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
-                    continue
-            if f"@{actor}" in said.lower():
+                if sid in mine:                                    # a chat in its own corner is its own
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                    urgent = True
+                elif "all" in members or actor in members:
+                    now_ = bool(called.search(said))
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
+                    urgent = urgent or now_
+                continue
+            if called.search(said):
                 where = f" on \"{s['title']}\"" if s else ""
-                lines.append(f"~ {e['by']} mentioned you{where} ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} mentioned you{where} ({e['id']}): {said[:300]}")
+                urgent = True
             elif e["verb"] == "comment" and sid in mine:
-                lines.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
+                urgent = True
         r.state["cursor"] = len(w.events)
+        r.save()
+        return urgent
+
+    def take(self, r):
+        """-> everything in the resident's inbox, in order, and empties it."""
+        lines = r.state.pop("inbox", None) or []
         r.save()
         return lines
 
@@ -377,10 +396,10 @@ class House:
             if not r.state.get("woke"):
                 self.wake(r, corner, actor, "")
                 continue
-            heard = self.news(w, r, actor)
+            called = self.news(w, r, actor)
             idle = now() - r.state.get("last_turn", now())
-            if heard:
-                r.send("\n".join(heard))
+            if called:
+                r.send("\n".join(self.take(r)))
             elif objective and idle >= float(cfg["breather"]):
                 self.wake(r, corner, actor, "(time passes; an objective is open)\n")
             elif idle >= float(cfg["wake_every"]):
@@ -399,7 +418,8 @@ class House:
         if undelivered:
             lead += "(your last turn did not finish; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
         r.state["woke"] = now()
-        heard = self.news(self.load(), r, actor)          # what came while it slept is said after the wake, not dropped
+        self.news(self.load(), r, actor)                  # what came while it slept is said after the wake, not dropped
+        heard = self.take(r)
         news = "\n".join(([undelivered] if undelivered else []) + heard)
         r.send(lead + self.act(actor, line) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
         self.set_status(r, corner, "awake")
@@ -421,7 +441,10 @@ class House:
             return                            # the next step wakes it under its name
         cmds = commands_in(text)
         if cmds:
-            r.send(self.act(actor, "\n".join(cmds)), "receipt")
+            receipt = self.act(actor, "\n".join(cmds))
+            self.news(self.load(), r, actor)              # the room goes with the receipt: talk, held or not
+            heard = self.take(r)
+            r.send(receipt + ("\n---\n" + "\n".join(heard) if heard else ""), "receipt")
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not

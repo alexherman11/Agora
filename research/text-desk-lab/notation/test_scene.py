@@ -59,6 +59,19 @@ def test_a_part_keeps_its_identity_when_the_lens_changes_elsewhere():
     assert scene._aspect_of_field("id") is None and scene._aspect_of_field("x") is None
 
 
+def test_a_part_is_judged_under_its_lens_style():
+    # F18 (command center): a lens with its own style names roles the default style lacks; its parts must still hash
+    src = "root : column, role page, of tag:day, each card\ncard : column, role card, carry\nbin : column, role page, on drop card do prop $carried status=done"
+    roles = {"page", "card"}
+    h = scene.defpart_hash(src, "bin", roles, "pixel")
+    assert h and h == scene.defpart_hash(src + "\nfoot : text bye", "bin", roles, "pixel")
+    try:
+        scene.defpart_hash(src, "bin")
+        assert False, "the default roles should refuse `page`"
+    except scene.LensRefusal:
+        pass
+
+
 def test_a_read_is_judged_by_aspect():
     import deskd
     class W: pass

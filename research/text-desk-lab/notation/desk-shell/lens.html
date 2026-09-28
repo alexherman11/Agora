@@ -13,6 +13,12 @@
   body { display: grid; grid-template-columns: 1fr minmax(0, 40%); }
   body[data-inspector="off"] { display: block; }
   body[data-inspector="off"] #said { display: none; }
+  /* ?side=term (term.js): a desk terminal where the inspector would be */
+  body[data-inspector="term"] #said { display: none; }
+  #term { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; box-sizing: border-box; }
+  #term .term-out { flex: 1; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #term .term-line { display: flex; align-items: baseline; }
+  #term input { flex: 1; min-width: 0; font: inherit; color: inherit; background: transparent; border: 0; outline: none; padding: 0; }
   #paint, #said { overflow: auto; min-width: 0; }
   #paint { height: 100%; }
   /* the live refusal region (codex team, pike-8): announced to screen readers; shown when the inspector is off */
@@ -43,5 +49,6 @@
 <script src="style/style.js"></script>
 <script src="viewer.js"></script>
 <script src="lens.js"></script>
+<script src="term.js"></script>
 </body>
 </html>

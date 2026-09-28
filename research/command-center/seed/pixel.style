@@ -10,6 +10,8 @@ token accent   = #2F6B4F
 token mark     = #B4561C
 token warn     = #A8323E
 token sheet    = #F6F8F3
+token glow     = #A8DDB5
+token alarm    = #F29B8F
 
 token gap      = 8
 token ramp     = 1.18
@@ -22,7 +24,8 @@ token faint    = ink at 25%
 token quiet    = ink at 85%
 token hush     = ink at 60%
 
-role desk      : on paper, ink, text, pad gap
+role desk      : on paper, ink, text
+role page      : on paper, ink, text, pad gap
 role bar       : on ink, paper, pad gap, between gap x2
 role title     : text.pixel up 2, paper
 role name      : text.pixel up, ink, space below gap /2
@@ -40,3 +43,8 @@ role said      : on card, text down, quiet, pad gap, edge line
 role source    : text.mono down, quiet
 role refusal   : text.mono down, warn, pad gap, edge warn
 role sheet     : on sheet, ink, text, pad gap x2, edge line
+role term      : on ink, paper, text.mono down, pad gap
+role term.prompt : glow
+role term.echo : glow
+role term.err  : alarm
+role drop      : edge faint, pad gap /2

@@ -1,4 +1,4 @@
-porch : column, role desk
+porch : column, role page
   top : row, role bar
     name : text "THE PORCH", role title
     asks : row, of kind:chat,unanswered:$me, each ask
@@ -12,18 +12,18 @@ porch : column, role desk
       h3 : text "PORCH TALK", role heading
       talk : column, the kind:chat,prop:members=all
         tmsgs : column, of messages:$id, scroll end, each m
-        tsay : text "", hint "say something on the porch", on edit do append $item line="$value"
+        tsay : text "", hint "say something · @name reaches one now · @everyone reaches all", on edit do append $item line="$value"
     right : column
       h4 : text "BOARD", role heading
       add : text "", hint "a new chunk of work", on edit do create Board kind=task title="$value" status=open
       cols : grid 1 1 1
-        open : column
+        open : column, role drop, on drop card do prop $carried status=open
           oh : text "BACKLOG", role meta
           ol : column, of kind:task,prop:status=open, each card
-        doing : column
+        doing : column, role drop, on drop card do prop $carried status=doing
           dh : text "NOW", role meta
           dl : column, of kind:task,prop:status=doing, each card
-        done : column
+        done : column, role drop, on drop card do prop $carried status=done
           xh : text "DONE", role meta
           xl : column, of kind:task,prop:status=done, clamp 6, each card
       h5 : text "THE WORLD", role heading
@@ -47,7 +47,7 @@ chat : column, role card.plain
 m : row, gap
   who : text "$who", role tag
   said : text "$said", role body
-card : column, role card.plain
+card : column, role card.plain, carry
   ct : text "$title", role body
   aim : text "objective", role mark, only when prop:objective=open
   go : text "[ start ]", role tool, on click do prop $item status=doing, only when prop:status=open
