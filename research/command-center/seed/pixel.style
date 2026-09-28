@@ -1,0 +1,42 @@
+# pixel: the porch's style. Clean and square, a little 8-bit. Restyle it here: every edit repaints the porch.
+
+font pixel = Silkscreen, monospace
+font plex = IBM Plex Mono, ui-monospace, monospace
+
+token paper    = #E6ECE2
+token card     = #F6F8F3
+token ink      = #1C2620
+token accent   = #2F6B4F
+token mark     = #B4561C
+token warn     = #A8323E
+token sheet    = #F6F8F3
+
+token gap      = 8
+token ramp     = 1.18
+token text     = plex 14/1.5
+token text.pixel = pixel 13/1.3
+token text.mono = plex 13/1.45
+
+token line     = ink at 70%
+token faint    = ink at 25%
+token quiet    = ink at 85%
+token hush     = ink at 60%
+
+role desk      : on paper, ink, text, pad gap
+role bar       : on ink, paper, pad gap, between gap x2
+role title     : text.pixel up 2, paper
+role name      : text.pixel up, ink, space below gap /2
+role chip      : text.pixel down, ink, on mark, pad gap /2
+role heading   : text.pixel, accent, space below gap, pad top gap
+role card      : on card, ink, text, pad gap x1.5, edge line, space below gap
+role card.plain : ink, text, pad gap, edge faint, space below gap /2
+role meta      : text down, hush
+role body      : text, quiet
+role tag       : text.pixel down, accent
+role tool      : text.pixel down, accent, pad gap /2
+role mark      : text.pixel down, mark, pad gap /2, edge mark
+role cut       : text down tracked, warn
+role said      : on card, text down, quiet, pad gap, edge line
+role source    : text.mono down, quiet
+role refusal   : text.mono down, warn, pad gap, edge warn
+role sheet     : on sheet, ink, text, pad gap x2, edge line

@@ -13,7 +13,14 @@
   const session = q.get("session") || "lens", who = q.get("as") || "alex", lens = q.get("lens") || "notes";
   const paint = document.getElementById("paint"), said = document.getElementById("said");
   document.body.dataset.inspector = q.get("inspect") === "0" ? "off" : "on";   // codex team: inspect=0 gives the painter the full width
-  Style.install(await (await fetch("style/calm.style")).text(), q.get("theme") || undefined);
+  // F7: the style is world data. The lens names it (def.style_name); the painter installs it from the world and again
+  // whenever its revision changes, so restyling is a desk edit and repaints live. calm, the seed file, until a lens says.
+  let styled = "";
+  async function restyle(name, rev) {
+    if (styled === name + "@" + rev) return;
+    const st = await (await fetch(`/api/style?session=${encodeURIComponent(session)}&name=${encodeURIComponent(name)}`)).json();
+    if (st.text != null) { try { Style.install(st.text, q.get("theme") || undefined); styled = name + "@" + rev; } catch (e) { V.show("style " + name + " refused: " + (e.message || e)); } }
+  }
   const V = Viewer(session, who, lens, said, document.getElementById("status"));
   let last = "", sceneAt = 0, def = null;
 
@@ -75,7 +82,7 @@
   // child's track shrinks to its handle; gap, scroll and measure on any frame; fold is the lens's default, overridden by
   // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
   function frames(el, n, p) {
-    if (p.gap != null) el.style.gap = p.gap + "px";
+    if (p.gap != null) el.style.gap = typeof p.gap === "number" ? p.gap + "px" : p.gap[0] === "/" ? `calc(var(--t-gap) / ${p.gap.slice(1)})` : `calc(${p.gap.slice(1)} * var(--t-gap))`;   // F10: steps of the style's gap
     if (p.scroll && p.scroll !== "none") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
     if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
     if (!n.acts.some(a => a.on === "fold")) return;
@@ -225,6 +232,7 @@
     const key = JSON.stringify(r.scene || r.refused);
     if (key === last && !force) return;
     last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null;
+    await restyle((def && def.style_name) || "calm", (def && def.style_rev) || "seed");
     if (r.refused) { if (!V.hold) paint.replaceChildren(); V.show("refused: " + r.refused); return; }
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
     V.show(r.text); report();

@@ -99,6 +99,39 @@ def _roles():
         return None
 
 
+# F7 (research/command-center): a style is world data. A note tagged `style` whose title is the style's name holds its
+# source, so it is edited, undone, forked and merged like anything else; a lens names its style with prop style=<name>.
+# The file desk-shell/style/<name>.style is only the seed for a world that has no such note.
+def find_style(desk, name):
+    w = desk.world
+    hits = [s for s in w.subjects.values() if "style" in (s.get("tags") or []) and s["title"].lower() == name.lower()]
+    placed = [s for s in hits if w.appearances_of(s["id"])]
+    return (placed or hits or [None])[0]
+
+
+def style_source(desk, name):
+    """-> {name, text, origin, rev} for a style by name, from the world, else from the seed file; None if neither."""
+    s = find_style(desk, name)
+    if s is not None:
+        return {"name": name, "text": s["text"], "origin": s["id"], "rev": f"{s['id']}r{s['rev']}"}
+    f = pathlib.Path(__file__).resolve().parent / "desk-shell" / "style" / f"{pathlib.Path(name).name}.style"
+    if f.exists():
+        import hashlib
+        text = f.read_text(encoding="utf-8")
+        return {"name": name, "text": text, "origin": "file", "rev": "file-" + hashlib.sha256(text.encode()).hexdigest()[:10]}
+    return None
+
+
+def style_roles(desk, name):
+    """The role names a lens may use under style `name`; None keeps the old behavior (calm.style, the file)."""
+    if not name:
+        return None
+    st = style_source(desk, name)
+    if st is None:
+        raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
+    return {l.split()[1] for l in st["text"].splitlines() if l.startswith("role ") and len(l.split()) > 1}
+
+
 def _cmd_value(v):
     """A value going inside a quoted desk command keeps its quotes and backslashes (Astra: `She said "yes"` lost them)."""
     return str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
@@ -115,16 +148,50 @@ SOURCES = {
     "actors": ("actors", ("name", "acts", "last", "verb", "target", "read", "behind")),
     "events": ("events", ("eid", "verb", "target", "by", "at", "merged")),
     "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
+    # the command center (research/command-center): a chat's lines, and what the house observes of its residents
+    "messages": ("messages:<id>", ("item", "who", "said", "index")),
+    "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh")),
 }
 NAMES = NAMES + tuple(f for _, fs in SOURCES.values() for f in fs)
+HOUSE_STATE = pathlib.Path(__file__).resolve().parent / "house-state"   # <world>/house.json, written by house.py
+
+
+def house_rows(desk, corner=None):
+    """What the house observes, read from its own state (not the world's history: an outside resource with observed
+    status). `fresh` says whether the house itself is alive: its heartbeat is written every two seconds, and a beat
+    older than 30 s is printed as `stale`, and then `doing` says the house stopped rather than repeating its last
+    observation as if it were current. Reading the clock here is a host read, like $today."""
+    import json
+    import time
+    try:
+        world = (getattr(desk, "_session", "") or "").split("@")[0]
+        st = json.loads((HOUSE_STATE / world / "house.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if st.get("world") != world:
+        return []
+    age = time.time() - float(st.get("beat") or 0)
+    fresh = "live" if age < 30 else f"stale {int(age // 60)}m" if age < 3600 else f"stale {int(age // 3600)}h"
+    out = []
+    for cid, r in sorted((st.get("residents") or {}).items()):
+        if corner and cid != corner:
+            continue
+        last = r.get("last_turn")
+        doing = (r.get("doing") or "?") if fresh == "live" else "house " + fresh.replace("stale", "stopped") + " ago"
+        out.append({"resident": r.get("actor") or "(at the door)", "corner": cid, "doing": doing,
+                    "turns": r.get("turns", 0), "since": time.strftime("%H:%M", time.localtime(last)) if last else "",
+                    "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh})
+    return out
 
 
 def rows(desk, source, session=None):
     """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection)."""
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head in ("sections", "comments")) != bool(arg):
-        return None
+    if head not in SOURCES or (head != "house" and (head in ("sections", "comments", "messages")) != bool(arg)):
+        return None      # sections, comments and messages need an id; house takes one or none; the rest take none
+    if head == "house":
+        return house_rows(desk, desk._resolve(arg) if arg else None)
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)
@@ -136,6 +203,13 @@ def rows(desk, source, session=None):
     if head == "comments":
         return [{"item": nid, "cid": c["id"], "by": c["by"], "text": c["text"], "state": "resolved" if c["resolved"] else "open"}
                 for c in s.get("comments", [])]
+    if head == "messages":
+        # a chat's lines: each is signed by its speaker (world.apply signs a chat line with its actor)
+        out = []
+        for k, line in enumerate((l for l in s["text"].splitlines() if l.strip()), 1):
+            m = re.match(r"^(\w[\w-]*):\s*(.*)$", line)
+            out.append({"item": nid, "who": m.group(1) if m else "", "said": m.group(2) if m else line, "index": k})
+        return out
     if head == "events":
         return [{"eid": e["id"], "verb": e["verb"], "target": e["target"], "by": e["by"], "at": e.get("at", e.get("day", "")),
                  "merged": e.get("merged", "")} for e in w.events[-20:]][::-1]
@@ -198,9 +272,16 @@ def _w_grid(node, p, val, n, env):
 
 
 def _w_gap(node, p, val, n, env):
-    if not val.isdigit():
-        raise LensRefusal(f"line {n}: `gap <px>`; got {p!r}")
-    node["gap"] = int(val)
+    # F10 (research/command-center): a lens names no size. `gap` is one step of the style's spacing scale, `gap x2` two,
+    # `gap /2` half, as tracks already say `12gap`. A bare number is the older pixel form, kept for the lenses using it.
+    v = val.strip()
+    if v.isdigit():
+        node["gap"] = int(v)
+        return
+    m = re.fullmatch(r"(?:([x/])\s*(\d+(?:\.\d+)?))?", v)
+    if not m:
+        raise LensRefusal(f"line {n}: `gap`, `gap x2` or `gap /2` (steps of the style's gap); got {p!r}")
+    node["gap"] = (m.group(1) or "x") + (m.group(2) or "1")
 
 
 def _w_scroll(node, p, val, n, env):
@@ -278,7 +359,7 @@ def _w_role(node, p, val, n, env):
     if not re.fullmatch(r"[\w.-]+", val):
         raise LensRefusal(f"line {n}: `role <name>`; got {p!r}")
     if env["roles"] is not None and val not in env["roles"]:
-        raise LensRefusal(f"line {n}: no role {val!r} in calm.style. Roles: {' '.join(sorted(env['roles']))}")
+        raise LensRefusal(f"line {n}: no role {val!r} in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
     node["role"] = val
 
 
@@ -403,7 +484,7 @@ def _w_on(node, p, val, n, env):
 WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
-    "gap": ("gap <px>", _w_gap),
+    "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end", _w_scroll),
     "fold": ('fold ["<handle label>"]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
@@ -450,10 +531,10 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
 
 
-def parse(src):
-    """-> (root_name, parts) where parts[name] = node {name, props, kids}"""
+def parse(src, roles=None, style=None):
+    """-> (root_name, parts) where parts[name] = node {name, props, kids}. `roles`: the lens's style's roles (F7)."""
     parts, stack, root = {}, [], None
-    env = {"roles": _roles()}
+    env = {"roles": roles if roles is not None else _roles(), "style": style}
     for n, raw in enumerate(src.splitlines(), 1):
         line = _outside_quotes(raw, " # ")[0].rstrip()
         if not line.strip() or line.strip().startswith("#") or line.strip().startswith("lens "):
@@ -784,7 +865,9 @@ def _ctx_for(w, nid, state=None):
         item = nid
     ctx = {"item": item, "id": n.get("subject") or nid, "title": s.get("title", n.get("title", "")), "text": s.get("text", ""),
            "kind": s.get("kind", n["type"]), "due": s.get("due") or "", "tags": " ".join(s.get("tags") or []),
-           "_tags": list(s.get("tags") or []), "_props": dict(s.get("props") or {})}
+           "_tags": list(s.get("tags") or []),
+           # F11: a surface's props live on the surface itself (a resident's corner carries status, want)
+           "_props": dict(s.get("props") or (n.get("props") if n.get("type") == "surface" else None) or {})}
     if state:
         ctx["_state"] = state
     return ctx

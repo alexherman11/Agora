@@ -5,7 +5,9 @@
 Point `claude -p` at it with ANTHROPIC_BASE_URL=http://127.0.0.1:<port>. Every POST to /v1/messages answers with
 the next scripted reply for the resident whose door it came through, streamed in the API's event format. A reply is
 chosen by the first rule whose `when` text appears in the latest user message (rules without `when` match anything);
-`reply` may contain {n} for a per-process turn count. Requests are recorded, bodies only, in fake-model-log.jsonl.
+`reply` may contain {n} for a per-process turn count. A rule with `status` (say 400) answers with that API error
+instead, its `reply` as the message; `times: N` lets a rule match only N times. Requests are recorded, bodies only,
+in fake-model-log.jsonl.
 
 This proves plumbing. It never shows what a model would do.
 """
@@ -39,10 +41,13 @@ def last_user_text(body):
 
 
 def choose(text):
+    """-> the first matching rule. A rule with `times` matches at most that many times."""
     for rule in SCRIPT:
-        if not rule.get("when") or rule["when"] in text:
-            return rule["reply"]
-    return "ok"
+        if (not rule.get("when") or rule["when"] in text) and rule.get("times", 1) > 0:
+            if "times" in rule:
+                rule["times"] -= 1
+            return rule
+    return {"reply": "ok"}
 
 
 class H(BaseHTTPRequestHandler):
@@ -55,7 +60,12 @@ class H(BaseHTTPRequestHandler):
             n = COUNT["n"]
             with LOG.open("a", encoding="utf-8") as f:
                 f.write(json.dumps({"n": n, "path": self.path, "body": body}) + "\n")
-        text = choose(last_user_text(body)).replace("{n}", str(n))
+        with LOCK:
+            rule = choose(last_user_text(body))
+        if rule.get("status"):                 # an API error, to test how a failure is handled
+            return self._json({"type": "error", "error": {"type": rule.get("error", "invalid_request_error"),
+                               "message": rule.get("reply", "scripted failure")}}, rule["status"])
+        text = rule.get("reply", "ok").replace("{n}", str(n))
         model = body.get("model", "claude-opus-5-5")
         if not body.get("stream"):
             return self._json({"id": f"msg_{n}", "type": "message", "role": "assistant", "model": model,
@@ -82,9 +92,9 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         self._json({"ok": True})
 
-    def _json(self, obj):
+    def _json(self, obj, status=200):
         raw = json.dumps(obj).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(raw)))
         self.end_headers()

@@ -180,10 +180,10 @@ def v_reply(w, nid, a):
     line = str(a.get("line", a.get("text", ""))).strip()
     if not line:
         raise Refusal("reply needs line=")
-    if not re.match(r"^\w+:", line):
-        line = "Alex: " + line
+    # F1: the chat signs a line with its actor (world.apply, Juniper a484); reply no longer signs it "Alex" for everyone,
+    # and what it answers is judged for the one replying
     sid = w.nodes[nid]["subject"]
-    pending = unanswered(w, sid)
+    pending = unanswered(w, sid, str(w.me or "alex").lower())
     r = _prim(w, "append", nid, {"line": line})
     r["note"] = ("answered: " + " | ".join(pending)) if pending else "no unanswered message; appended anyway"
     return r

@@ -28,7 +28,7 @@ const Style = (() => {
   const mix = (a, b, t) => { const A = hexToRgb(a), B = hexToRgb(b); return rgbToHex([0, 1, 2].map(i => A[i] * (1 - t) + B[i] * t)); };
 
   function parse(src) {
-    const out = { tokens: {}, tokenLine: {}, roles: {}, clauses: [], presents: {}, themes: {} };
+    const out = { tokens: {}, tokenLine: {}, roles: {}, clauses: [], presents: {}, themes: {}, fonts: {} };
     let theme = null;
     src.split(/\r?\n/).forEach((raw, i) => {
       const n = i + 1, indented = /^\s+\S/.test(raw);
@@ -40,6 +40,9 @@ const Style = (() => {
       if (!s) return;
       let m;
       if ((m = s.match(/^theme\s+(\S+)\s+of\s+(\S+)$/))) { theme = m[1]; out.themes[theme] = { of: m[2], tokens: {}, line: n }; return; }
+      // F8 (research/command-center): a style names its typefaces. `font pixel = Silkscreen, monospace` lets a text
+      // token say `pixel 16/1.4`; the first name is loaded from Google Fonts, the rest is the fallback stack.
+      if ((m = s.match(/^font\s+([\w-]+)\s*=\s*(.+)$/))) { theme = null; const [face, ...rest] = m[2].split(",").map(x => x.trim()).filter(Boolean); out.fonts[m[1]] = { face, fallback: rest.join(", ") || "sans-serif", line: n }; return; }
       if ((m = s.match(/^token\s+([\w.]+)\s*=\s*(.+)$/))) {
         if (theme && indented) out.themes[theme].tokens[m[1]] = m[2].trim();
         else { theme = null; out.tokens[m[1]] = m[2].trim(); out.tokenLine[m[1]] = n; }
@@ -72,8 +75,8 @@ const Style = (() => {
         else out.clauses.push({ sel: head, props, line: n });
         return;
       }
-      throw new Refusal(n, `not a token, role, clause or theme line: "${s}"`,
-        [`token <name> = <value>`, `role <name> : <props>`, `when <selection> : <props>`, `theme <name> of <style>`]);
+      throw new Refusal(n, `not a token, role, clause, font or theme line: "${s}"`,
+        [`token <name> = <value>`, `role <name> : <props>`, `when <selection> : <props>`, `font <name> = <Family>, <fallback>`, `theme <name> of <style>`]);
     });
     return out;
   }
@@ -162,7 +165,7 @@ const Style = (() => {
       let mr;
       if ((mr = p.match(/\bat\s+([\d.]+)\b/))) throw new Refusal(0, `"text at ${mr[1]}" is not a step. the type ramp has steps, like the spacing scale.`,
         ["text down            (one step smaller)", "text down 2          (two steps)", "text up", "token ramp = <n>     (the ratio between steps)"]);
-      const css = { "font-family": t.family === "mono" ? "ui-monospace, SFMono-Regular, Consolas, monospace" : t.family === "serif" ? "Georgia, 'Iowan Old Style', serif" : "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif", "line-height": t.leading };
+      const css = { "font-family": family(t.family), "line-height": t.leading };
       const ratio = T.ramp && T.ramp.type === "length" ? T.ramp.value : 1.15;
       let size = t.size, mm;
       if ((mm = p.match(/\bdown(?:\s+(\d+))?\b/))) size = t.size / Math.pow(ratio, parseInt(mm[1] || "1", 10));
@@ -201,12 +204,26 @@ const Style = (() => {
   }
 
   // ---- installation: tokens become custom properties, roles become classes ----
-  let current = null, tokens = null, sheet = null, themeName = "";
+  let current = null, tokens = null, sheet = null, themeName = "", FONTS = {};
+  const loaded = new Set();
+  function family(f) {
+    if (FONTS[f]) return `'${FONTS[f].face}', ${FONTS[f].fallback}`;
+    return f === "mono" ? "ui-monospace, SFMono-Regular, Consolas, monospace" : f === "serif" ? "Georgia, 'Iowan Old Style', serif" : "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  }
+  function loadFonts(fonts) {
+    Object.values(fonts).forEach(({ face }) => {
+      if (loaded.has(face) || typeof document === "undefined") return;
+      loaded.add(face);
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(face).replace(/%20/g, "+")}&display=swap`;
+      document.head.appendChild(l);
+    });
+  }
 
   function install(src, theme) {
     const st = parse(src);                       // throws Refusal; nothing is installed on a refusal,
     const T = resolveTokens(st, theme);          // so the last working look survives by construction.
-    current = st; tokens = T; themeName = theme || "";
+    current = st; tokens = T; themeName = theme || ""; FONTS = st.fonts || {}; loadFonts(FONTS);
     const decl = o => Object.entries(o).map(([k, v]) => `${k}:${v}`).join(";");
     const val = v => v.type === "colour" ? v.value : v.type === "length" ? v.value + "px" : v.type === "text" ? v.size + "px" : v.value;
     const vars = Object.entries(T).filter(([, v]) => v).flatMap(([k, v]) => [`--t-${k}:${val(v)}`, `--${k}:${val(v)}`]);
@@ -214,7 +231,7 @@ const Style = (() => {
     // same values, not a second palette: --surface is --card, --font is the one family, --radius is one corner.
     if (T.card) vars.push(`--surface:${T.card.value}`);
     if (T.gap) vars.push(`--radius:${T.gap.value}px`);
-    if (T.text) vars.push(`--font:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`);
+    if (T.text) vars.push(`--font:${family(T.text.family)}`);
     let out = ":root{" + vars.join(";") + "}\n";
     for (const name of Object.keys(st.roles)) {
       const lk = lookOf({ as: name }, st, T, { nodes: {} });

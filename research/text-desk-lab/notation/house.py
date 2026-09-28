@@ -17,8 +17,10 @@ the resident knows comes from the world, and everything it does goes through it:
 
 The house writes what it observes as actor `house`, only the coarse states and only when they change:
 `status=door|awake|asleep|error`. Whether a resident is mid-turn or resting changes every few seconds, so it lives in
-house-state/house.json (with liveness, turns and the time of the last turn), not in the world's history.
-Transcripts (every stream event, and every message the house sent) are house-state/<corner>/transcript.jsonl.
+house-state/<world>/house.json (with liveness, turns and the time of the last turn), not in the world's history.
+Transcripts (every stream event, and every message the house sent) are house-state/<world>/<corner>/transcript.jsonl.
+Everything is kept per world: two worlds can hold the same corner ids (a copy of a world does), and a resident must
+never resume another world's conversation.
 Settings are props on the Porch note "The house": model, breather, wake_every. Replay never wakes anyone.
 
 --fake PORT points every resident at fake_model.py, for testing the loop without a model.
@@ -104,7 +106,7 @@ class Resident:
 
     def __init__(self, house, rid):
         self.house, self.rid = house, rid
-        self.dir = STATE / rid
+        self.dir = house.dir / rid
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state_path = self.dir / "state.json"
         self.state = json.loads(self.state_path.read_text(encoding="utf-8")) if self.state_path.exists() else {}
@@ -113,6 +115,7 @@ class Resident:
         self.busy = False          # a message is out and its turn has not ended
         self.reply = []            # text of the turn in progress
         self.status = None         # last status written to the world
+        self.failed = False        # this process has already been judged failed (a result error, then its exit)
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
@@ -133,7 +136,7 @@ class Resident:
                                      stdout=subprocess.PIPE, stderr=open(self.dir / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1)
         threading.Thread(target=self._read, args=(self.proc,), daemon=True).start()
-        self.busy, self.reply = False, []
+        self.busy, self.reply, self.failed = False, [], False
         self.log("start", {"cmd": cmd[1:], "pid": self.proc.pid})
 
     def stop(self):
@@ -157,16 +160,30 @@ class Resident:
                 continue
             self.log("event", ev)
             self.events.put(ev)
-        self.events.put({"type": "exit", "code": proc.wait()})
+        code = proc.wait()
+        self.log("exit", {"code": code, "pid": proc.pid})
+        self.events.put({"type": "exit", "code": code})
 
-    def send(self, text):
-        self.log("sent", text)
-        msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
-        self.proc.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
-        self.proc.stdin.flush()
-        self.busy, self.reply = True, []
+    def send(self, text, kind="news", carry=None):
+        """`kind` is door, wake, news or receipt; `carry` is the part that must survive a lost conversation (news and
+        receipts: all of it; a wake: only the news it brought, since the wake itself is simply done again). What is
+        out is recorded before it is written, so a process that died under us (its failure may already be in the
+        queue) loses nothing: the pipe error is logged and the failure is judged from the process's own events."""
+        if carry is None and kind in ("news", "receipt"):
+            carry = text
         self.state["last_sent"] = now()
+        self.state["pending"] = {"kind": kind, "carry": carry or ""}      # cleared when its turn ends well
         self.save()
+        msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+        try:
+            self.proc.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
+            self.proc.stdin.flush()
+        except (OSError, ValueError, AttributeError) as e:      # a closed pipe, a closed file, no process
+            self.log("unsent", {"why": f"{type(e).__name__}: {e}", "kind": kind, "text": text})
+            self.busy = False
+            return
+        self.log("sent", text)
+        self.busy, self.reply = True, []
 
     def turns_ended(self):
         """Drain stream events; return the text of each turn that ended."""
@@ -185,10 +202,16 @@ class Resident:
                 for c in ev.get("message", {}).get("content", []):
                     if c.get("type") == "text":
                         self.reply.append(c["text"])
+            elif t == "result" and ev.get("is_error"):
+                self.busy = False
+                ended.append({"error": ev.get("subtype") or "error", "detail": str(ev.get("result") or "")[:300]})
+                self.reply = []
             elif t == "result":
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
                 self.state["last_turn"] = now()
+                for k in ("pending", "failures", "retry_at"):
+                    self.state.pop(k, None)
                 self.save()
                 ended.append("\n".join(self.reply))
                 self.reply = []
@@ -197,6 +220,16 @@ class Resident:
                 self.proc = None
                 ended.append(None)
 
+    def lost_conversation(self):
+        """Did the last start fail because `--resume` found no conversation? claude keeps a conversation under its
+        own folder, keyed by the working directory, so moving house-state (or clearing claude's folder) loses it."""
+        sid = self.state.get("session")
+        try:
+            tail = (self.dir / "stderr.log").read_text(encoding="utf-8", errors="replace")[-2000:]
+        except OSError:
+            return False
+        return bool(sid) and f"No conversation found with session ID: {sid}" in tail
+
 
 class House:
     def __init__(self, world, fake=None):
@@ -204,7 +237,8 @@ class House:
         self.residents = {}
         self.mtime = None
         self.desk = None
-        STATE.mkdir(exist_ok=True)
+        self.dir = STATE / world
+        self.dir.mkdir(parents=True, exist_ok=True)
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -301,6 +335,9 @@ class House:
                 self.set_status(r, corner, "asleep")
                 continue
             if not r.alive():
+                if r.state.get("retry_at", 0) > now():
+                    self.set_status(r, corner, "error")
+                    continue
                 r.start(props.get("model") or cfg["model"])
                 r.state.pop("woke", None)
             if r.busy:
@@ -308,7 +345,7 @@ class House:
             if not actor:
                 if not r.state.get("door_sent"):
                     door = self.note(w, "The door")
-                    r.send(door["text"] if door else "What is your name? Write: i am <name>")
+                    r.send(door["text"] if door else "What is your name? Write: i am <name>", "door")
                     r.state["door_sent"] = True
                     r.save()
                     self.set_status(r, corner, "door")
@@ -332,14 +369,20 @@ class House:
 
     def wake(self, r, corner, actor, lead):
         line = (corner.get("props") or {}).get("wake") or "run arrive"
+        if r.state.pop("lost", None):
+            lead = "(the house lost our earlier conversation; your soul and the world kept everything)\n" + lead
+        undelivered = r.state.pop("undelivered", "")
+        if undelivered:
+            lead += "(your last turn did not finish; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
         r.state["woke"] = now()
-        r.state["cursor"] = len(self.load().events)
-        r.send(lead + self.act(actor, line))
+        heard = self.news(self.load(), r, actor)          # what came while it slept is said after the wake, not dropped
+        news = "\n".join(([undelivered] if undelivered else []) + heard)
+        r.send(lead + self.act(actor, line) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
         self.set_status(r, corner, "awake")
 
     def after_turn(self, w, r, corner, actor, text):
-        if text is None:                       # the process ended
-            self.set_status(r, corner, "error")
+        if text is None or isinstance(text, dict):     # the process ended, or its turn failed
+            self.failed(r, corner, text)
             return
         if not actor:                          # at the door
             name = door_name(text)
@@ -347,22 +390,49 @@ class House:
             if not name or not NAME.match(name) or name in taken:
                 why = ("that name is taken" if name in taken else "that is not a name the desk can carry") if name else "I did not hear a name"
                 r.send(f"The door waits ({why}). Write your name on its own line: i am <name>. One word, lower case "
-                       f"letters, digits or -, 2 to 20 long.")
+                       f"letters, digits or -, 2 to 20 long.", "door")
                 return
             self.act("house", f"look {r.rid} :1; do prop {r.rid} actor={name}")
             r.log("named", name)
             return                            # the next step wakes it under its name
         cmds = commands_in(text)
         if cmds:
-            r.send(self.act(actor, "\n".join(cmds)))
+            r.send(self.act(actor, "\n".join(cmds)), "receipt")
+
+    def failed(self, r, corner, why):
+        """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not
+        a failure of the resident: the world holds its soul and its history, so it starts fresh from the world.
+        Anything else backs off, 1 min doubling to 1 h, so a broken resident never spins."""
+        if r.failed:
+            return
+        r.failed = True
+        if r.alive():
+            r.stop()
+        carry = (r.state.pop("pending", None) or {}).get("carry")
+        if carry:                                          # said again with the next wake, whatever the failure
+            r.state["undelivered"] = (r.state.get("undelivered", "") + "\n" + carry).strip("\n")
+        if not (corner.get("props") or {}).get("actor"):
+            r.state.pop("door_sent", None)                 # still at the door: the door is said again
+        if r.lost_conversation():
+            r.log("lost", {"session": r.state.pop("session", None)})
+            r.state["lost"] = True
+            r.save()
+            return
+        n = r.state.get("failures", 0) + 1
+        r.state["failures"], r.state["retry_at"] = n, now() + min(60 * 2 ** (n - 1), 3600)
+        r.log("failed", {"why": why, "failures": n, "retry_in": int(r.state["retry_at"] - now())})
+        r.save()
+        self.set_status(r, corner, "error")
 
     def beat(self, corners):
         out = {"pid": os.getpid(), "beat": now(), "world": self.world, "residents": {}}
         for rid, r in self.residents.items():
-            out["residents"][rid] = {"alive": r.alive(), "doing": "working" if r.busy else ("resting" if r.alive() else "stopped"),
+            out["residents"][rid] = {"actor": ((corners.get(rid) or {}).get("props") or {}).get("actor", ""),
+                                     "alive": r.alive(), "doing": "working" if r.busy else ("resting" if r.alive() else "stopped"),
                                      "turns": r.state.get("turns", 0), "last_turn": r.state.get("last_turn"),
-                                     "last_sent": r.state.get("last_sent"), "status": r.status}
-        (STATE / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+                                     "last_sent": r.state.get("last_sent"), "status": r.status,
+                                     "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at")}
+        (self.dir / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 
     def run(self):
         print(f"house: world {self.world}" + (f", fake model on {self.fake}" if self.fake else ""), flush=True)

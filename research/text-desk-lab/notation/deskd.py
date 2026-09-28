@@ -164,6 +164,12 @@ class Handler(SimpleHTTPRequestHandler):
                     out = {"refused": f"the lens compiler failed ({type(e).__name__}: {e}); this is a bug in scene.py, not in your lens",
                            "events_total": len(desk.world.events)}
             return self._json(out)
+        if u.path == "/api/style":
+            # F7: a style is world data (a note tagged style); the seed file answers only when the world has none
+            import scene
+            with Session(q.get("session", "desktop"), q.get("as")) as desk:
+                st = scene.style_source(desk, q.get("name") or "calm")
+            return self._json(st or {"refused": f"no style {q.get('name')!r}"})
         if u.path == "/api/events":
             since = int(q.get("since", 0))
             with Session(q.get("session", "desktop"), q.get("as")) as desk:

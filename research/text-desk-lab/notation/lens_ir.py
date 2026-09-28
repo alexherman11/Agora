@@ -171,12 +171,12 @@ def lower(root, parts):
 # fixed order within a part, host facts in Gamma, count as the true size, and one rule for guards.
 # ---------------------------------------------------------------------------------------------------------------------
 def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=()):
-    root, parts = S.parse(src)
+    props = props or {}
+    root, parts = S.parse(src, roles=S.style_roles(desk, props.get("style")), style=props.get("style"))   # F7: the lens's own style
     S.resolve(root, parts)
     irs, root = lower(root, parts)
     acc = acc or Accessor(desk)
     w = desk.world
-    props = props or {}
     count = count if count is not None else [0]
     host = {f: acc.host(f) for f in ("me", "today", "session")}
 
@@ -517,6 +517,10 @@ def scene_for(desk, name):
     fallen = [c for c in closure if c["status"] == "fallback"]
     sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
                      frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **S._identity())
+    name = (s.get("props") or {}).get("style")
+    if name:                                  # F7: which style paints this lens, and which revision of it
+        st = S.style_source(desk, name) or {}
+        sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
     sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
     text = S.to_text(sc, s["title"], desk.world.me, at)
     if fallen:

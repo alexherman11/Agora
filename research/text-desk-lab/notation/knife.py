@@ -50,14 +50,14 @@ def parse_selection(w, token):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
-    KNOWN = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:")
+    KNOWN = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "unanswered:")
     for t in terms:
         # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
         if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):
             raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
-    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:")) or t == "hidden" for t in terms + neg):
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "unanswered:")) or t == "hidden" for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -142,6 +142,16 @@ def parse_selection(w, token):
                 cs = w.subjects[n["subject"]]["comments"]
                 return any(not c["resolved"] for c in cs) if want == "open" else bool(cs)
             cands = [c for c in cands if okc(c)]
+        elif t.startswith("unanswered:"):
+            # a chat whose latest lines were said by someone else: waiting on this reader (the command center's inbox)
+            who = t[11:].lower()
+            if not who:
+                raise Refusal("unanswered:<name>, e.g. unanswered:alex")
+
+            def oku(nid, who=who):
+                n = w.nodes[nid]
+                return n["type"] == "appearance" and w.subjects[n["subject"]]["kind"] == "chat" and bool(moo.unanswered(w, n["subject"], who))
+            cands = [c for c in cands if oku(c)]
         elif t.startswith("links:"):
             src = w.subject_of(t[6:])
             if not src:
@@ -161,7 +171,7 @@ def parse_selection(w, token):
                 linked = {l["to"] for l in w.links_of(src) if l["kind"] == "part-of" and l["from"] == src}
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in linked]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id>; -term leaves out")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id> unanswered:<name>; -term leaves out")
     for n in neg:
         r = parse_selection(w, n)
         if r is None:
