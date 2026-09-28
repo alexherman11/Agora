@@ -1,10 +1,11 @@
 // term.js : a desk terminal beside any painted lens. OWNER: Claude (command center, 28 Sep; see OWNERS.md).
-// ?side=term puts it where the inspector would be. Every line is a desk command sent as the viewer through /api/do,
+// The right-hand pane is this terminal by default (Alex, 28 Sep); ?side=scene shows the scene's text there instead, and
+// ?inspect=0 gives the painter the full width. Every line is a desk command sent as the viewer through /api/do,
 // exactly what `explore.py <session> --as <who>` would do; the painter repaints from the world on its own. The
 // scrollback and the command history are view state (this page, this browser), never the world's.
 (() => {
   const q = new URLSearchParams(location.search);
-  if (q.get("side") !== "term") return;
+  if (q.get("inspect") === "0" || q.get("side") === "scene") return;
   const session = q.get("session") || "lens", who = q.get("as") || "alex";
   document.body.dataset.inspector = "term";
   const R = n => (window.Style ? Style.roleClass(n) : "r-" + n);

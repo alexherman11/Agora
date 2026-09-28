@@ -13,7 +13,7 @@
   body { display: grid; grid-template-columns: 1fr minmax(0, 40%); }
   body[data-inspector="off"] { display: block; }
   body[data-inspector="off"] #said { display: none; }
-  /* ?side=term (term.js): a desk terminal where the inspector would be */
+  /* term.js: the right-hand pane is a desk terminal by default; ?side=scene shows the scene text, ?inspect=0 neither */
   body[data-inspector="term"] #said { display: none; }
   #term { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; box-sizing: border-box; }
   #term .term-out { flex: 1; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
