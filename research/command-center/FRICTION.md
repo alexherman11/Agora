@@ -173,3 +173,23 @@ Alex (29 Sep): "lets scrap they pick their own names, we give them names and whe
 Checked with the fake model (ran; plumbing only): the welcome with the name on top of the first arrival, no `$me` left, an unnamed awake corner never started, and a compaction event making the next message (a receipt) begin with the welcome, once. Not yet seen: a real compaction.
 
 The world moved the same day (events e573 to e586, all claude, all undoable): Porch talk went into the Lounge as Lounge talk (a570), the Wall (f177) into the Lounge, a view Who's home (f609) into the Lounge, and Shop talk (a611, members=all) onto the Board for work. The command-center lens names both chats by id (the old `the kind:chat,prop:members=all` would now be ambiguous). The door note (a568) is Alex's draft with targeted changes; the Handbook's map (a198), "Wall, Lounge and Talk" (a209) and "First moves" (a202) say where things are now. The Porch keeps only the house's own things until the restructure (a593) decides.
+
+## F28. Current Implementation had drifted; the review's defects fixed (29 Sep, at Alex's word)
+
+*Current Implementation* had gone six days and 130-odd commits without an update. Four reviewers checked it against source and in scratch worlds, and it was rewritten in the Handbook binder (65f6e22). The review found real defects. Alex: "fix those bugs first and remove them from the defect list, also make a note in current implementation to keep it up to date". The fixes (241a545) touch paused owners' files: world.py, worktree.py (Sable's), knife.py, moo.py, desk.py, lens_ir.py and deskd.py.
+
+What the fixes cover:
+- tiled swap undo crashed (undo kind `reorder`);
+- a receipt marked everything seen, so a rewrite could drop unread text;
+- selection and rule events counted as touching every aspect (`event_aspects`);
+- stale advice pointed at `look` for tags;
+- a world verb's use is now undone whole;
+- undo snapshots for prop, tag and due were shallow (found while testing the verb fix);
+- worktree merge saw only targets named by id;
+- test_scene ran 14 of 21 tests;
+- deskd took any session name and any origin;
+- export_docs.load read unlocked and removed others' locks.
+
+Each fix was re-run against the case that reproduced it (ran). Health is green, 21 tests passed, 82 goldens are unchanged, and the nine suite cases and test_journal's tally are unchanged.
+
+To keep the document current: it now opens with a rule, a change updates its section in the same change. The worker protocol asks workers to keep the binder true, and the house exports and commits *Current Implementation* after a landing in frontier. The first test of that step committed an uncommitted export under a false label (reset before anything else happened); the step now commits only what its own export wrote.
