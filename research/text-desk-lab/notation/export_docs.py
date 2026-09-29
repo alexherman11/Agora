@@ -16,11 +16,9 @@ The world is loaded the way explore.py and deskd load it, under the session's lo
 """
 
 import hashlib
-import os
 import pickle
 import re
 import sys
-import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -34,15 +32,14 @@ STAMP = re.compile(r"\n*<!-- exported from the desk: .*? sha1:([0-9a-f]{12}) -->
 
 def load(session):
     """The saved desk, read under the same lock explore.py and deskd take from load to save."""
+    import explore
     lock = SESSIONS / f"{session}.lock"
-    for _ in range(600):
-        try:
-            os.close(os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
-            break
-        except FileExistsError:
-            if time.time() - lock.stat().st_mtime > 60:
-                lock.unlink(missing_ok=True)
-            time.sleep(0.1)
+    # explore's lock: pid-aware, and it gives up rather than read without it. Review 29 Sep: this loop read unlocked
+    # after 60 s and then removed a lock it had never taken, which could be another process's.
+    try:
+        explore.take_lock(lock)
+    except SystemExit as e:        # the house calls this every pass: a busy lock is a failed step, retried, not an exit
+        raise RuntimeError(str(e)) from None
     try:
         return pickle.loads((SESSIONS / f"{session}.pickle").read_bytes())
     finally:

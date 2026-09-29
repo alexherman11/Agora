@@ -17,6 +17,7 @@ makes must arrive here as a command line; there is no other way to change the wo
 import json
 import os
 import pickle
+import re
 import sys
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -24,7 +25,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import scene
-from desk import aspects_of, aspects_meet
+from desk import aspects_of, aspects_meet, event_aspects
 
 import explore
 import worktree
@@ -56,7 +57,7 @@ def touched_aspects(w, sid, seen, now, fields):
             and (seen_as(e)["target"] in names or names & set(seen_as(e).get("changed") or []))]
     step = max(0, int(now) - int(seen))
     recent = hits[-step:] if 0 < step <= len(hits) else hits
-    return any(aspects_meet(set(fields), aspects_of(seen_as(e).get("via") or seen_as(e)["verb"], seen_as(e).get("args"))) for e in recent)
+    return any(aspects_meet(set(fields), event_aspects(seen_as(e))) for e in recent)
 
 
 def same_answer(desk, q, answer, keep=None):
@@ -101,10 +102,20 @@ def _code_version():
 CODE_VERSION = _code_version()
 
 
+SESSION_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_@-]{0,63}$")    # frontier-x, a@b, try-t, _test_x: no . / \ or ..
+
+
+class BadRequest(ValueError):
+    pass
+
+
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
     def __init__(self, name, actor):
+        if not SESSION_NAME.match(str(name)):
+            # review 29 Sep: any string became a file path, `..` included, and was created and saved
+            raise BadRequest(f"no session named {str(name)[:80]!r}: a session name is letters, digits, _ @ - (at most 64; no . or slashes)")
         self.name, self.actor = name, (actor or "alex").lower()
         self.path = SESSIONS / f"{name}.pickle"
         self.lock = SESSIONS / f"{name}.lock"
@@ -148,7 +159,34 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _foreign(self):
+        """A request a page from another site sent. Browsers name the sender (Origin, Sec-Fetch-Site); deskd's own
+        pages are same-origin. Review 29 Sep: any web page could POST a command to /api/do. Local programs that send
+        neither header (explore.py, the house) are not browsers and are let through, as before: nothing authenticates."""
+        port = self.server.server_address[1]
+        origin = self.headers.get("Origin")
+        own = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+        return (origin is not None and origin not in own) or self.headers.get("Sec-Fetch-Site") == "cross-site"
+
     def do_GET(self):
+        if self.path.startswith("/api/") and self._foreign():
+            return self._json({"error": "deskd answers only its own pages"}, 403)
+        try:
+            return self._get()
+        except BadRequest as e:
+            return self._json({"error": str(e)}, 400)
+
+    def do_POST(self):
+        if self._foreign():
+            return self._json({"error": "deskd answers only its own pages"}, 403)
+        try:
+            return self._post()
+        except BadRequest as e:
+            return self._json({"error": str(e)}, 400)
+        except ValueError:
+            return self._json({"error": "the body must be JSON"}, 400)
+
+    def _get(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path == "/api/snapshot":
@@ -194,8 +232,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"events": evs, "total": total})
         return super().do_GET()
 
-    def do_POST(self):
+    def _post(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        if not isinstance(body, dict):
+            raise BadRequest("the body must be a JSON object")
         if urlparse(self.path).path == "/api/observe":
             # a painter reports what happened on its screen. Not an event, not undoable, not the world: a viewer's observation.
             with Session(body.get("session", "desktop"), body.get("as")) as desk:

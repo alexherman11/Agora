@@ -39,7 +39,7 @@ def aspects_of(verb, args):
     if verb in ("retitle", "rename"):
         return {"title"}
     if verb == "edit":
-        return {k for k in ("title", "text", "due") if k in a} or None
+        return {k for k in ("title", "text", "due") if k in a} | ({"text"} if "append" in a else set()) or None
     if verb in ("rewrite", "append", "check", "uncheck", "split", "seal", "unseal"):
         return {"text"}
     if verb == "due":
@@ -54,6 +54,18 @@ def aspects_of(verb, args):
                 "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop"):
         return {"place"}
     return None
+
+
+def event_aspects(e):
+    """The aspects a recorded event touched. `via` names the verb a person used when it is one (append, tidy);
+    an act through a selection ("tag in:f02") or by a rule ("rule r1") keeps its verb as the first word or not at
+    all, so the recorded primitive decides then (review 29 Sep: such events counted as touching everything)."""
+    via = str(e.get("via") or "").split(" ", 1)[0].lower()
+    if via and via != "rule":
+        a = aspects_of(via, e.get("args"))
+        if a is not None:
+            return a
+    return aspects_of(e["verb"], e.get("args"))
 
 
 def aspects_meet(a, b):
@@ -321,7 +333,7 @@ class Desk:
                        for a in aspects) if aspects else star
 
         def hits_since(e, k):
-            ea = aspects_of(e.get("via") or e["verb"], e.get("args"))
+            ea = event_aspects(e)
             if e["verb"] == "create" and e["target"] == nid:
                 ea = {"contents"}         # a thing made inside this surface changed what it holds, not its title or props (F5)
             if not aspects_meet(fields, ea):
@@ -418,6 +430,8 @@ class Desk:
         (Sable, S10), so a text write is sent to `read`, and to `read :3` when the note is folded."""
         if aspects is None or "text" in aspects:
             return self._read_hint(nid, "text").replace(" shows it", "").replace(" shows all of it", "") + " again"
+        if aspects & {"tags", "comments", "links"}:       # look's line never prints these; read does
+            return f"read {nid} again"
         return "look at it again"
 
     def _read_hint(self, nid, aspect):
@@ -440,7 +454,7 @@ class Desk:
     def _mark_seen(self, nid, aspects=None):
         """`aspects`: what this print showed whole (None: everything, which only a verb's own result or a rule may say)."""
         if getattr(self, "_receipt", False):      # a receipt printing a line is not a look (see _mark_rev)
-            return self._mark_rev(nid)
+            return      # the act already marked the aspects it wrote; marking * here let a later rewrite drop unread text
         self._note_seen(nid, len(self.world.events), aspects)     # Sable: "who saw what" is the observer, actor plus window
         if nid in self.world.nodes:
             self.seen[nid] = self.world.nodes[nid]["rev"]
@@ -873,7 +887,10 @@ class Desk:
             eid = ev["cause"]
             ev = next(e for e in self.world.events if e["id"] == eid)
         group = [ev]
-        if ev.get("via"):
+        if ev.get("verb_use"):
+            # a world verb's use is undone whole, all its steps (each step was its own command)
+            group = [e for e in self.world.events if e.get("verb_use") == ev["verb_use"] and not e.get("undone")]
+        elif ev.get("via"):
             # a composed verb (sort, move <selection>, group ...) is undone as a whole: its contiguous steps,
             # on both sides of the named one
             evs = self.world.events
@@ -900,7 +917,8 @@ class Desk:
                 self._mark_seen(k)   # an undo is your own change; what it touched stays seen
         self._after_mutation()
         if len(done) > 1:
-            what = f"{len(done)} steps of {ev['via']}" if ev.get("via") else f"{eid} and {len(caused)} rule consequence(s)"
+            what = (f"{len(done)} steps of the verb {ev.get('verb_run')}" if ev.get("verb_use")
+                    else f"{len(done)} steps of {ev['via']}" if ev.get("via") else f"{eid} and {len(caused)} rule consequence(s)")
             return f"ok {r['event']}: reverted {done[-1]}..{done[0]} ({what})"
         # Jeff lost a lens to this: a refused command, then a bare undo, which reverted something minutes older and said only its number
         said = f"{ev['verb']} {ev['target']}" + (f" {self._fmt_args(ev.get('args'))}" if ev.get("args") else "")

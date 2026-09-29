@@ -18,7 +18,7 @@ Nothing here holds a lock while anyone thinks. A fork costs one pickle copy.
 """
 
 import pickle
-from desk import aspects_of, aspects_meet
+from desk import aspects_of, aspects_meet, event_aspects
 import re
 from pathlib import Path
 
@@ -83,8 +83,13 @@ def record(desk, line, actor, before_ids, events_before):
             wt["journal"].pop(mine[-1])             # a bare undo takes back my latest command; so does the journal
             return
     if len(w.events) > events_before or line.strip().lower().startswith(JOURNALLED):
+        # what the line actually changed, by id: a command may name its target by title, a handle or a selection,
+        # and the merge must still see it (review 29 Sep: a title-named change merged over the base's and lost it)
+        made = w.events[events_before:]
+        touched = {e["target"] for e in made} | {c for e in made for c in (e.get("changed") or [])}
         wt["journal"].append({"line": line, "by": actor,
-                              "created": sorted(ids_of(desk) - before_ids, key=_num)})
+                              "created": sorted(ids_of(desk) - before_ids, key=_num),
+                              "touched": sorted((touched & before_ids), key=_num)})
 
 
 def _fork_path(base, name):
@@ -135,7 +140,7 @@ def handle(line, session, desk, actor):
         fork = _load(session, name)
         wt = fork._wt
         if sub == "diff":
-            named = _kin(desk.world, {m for j in wt["journal"] for m in ID.findall(j["line"])})
+            named = _kin(desk.world, {m for j in wt["journal"] for m in ID.findall(j["line"]) + j.get("touched", [])})
             out = [f"worktree {name} · forked at event {wt['base_events']} by {wt['by']}" + (" · merged" if wt.get("merged") else ""),
                    f"there ({len(wt['journal'])} command(s)):"]
             out += [f"  + {j['by']}: {j['line']}" + (f"   (made {' '.join(j['created'])})" if j["created"] else "") for j in wt["journal"]] or ["  nothing yet"]
@@ -170,12 +175,12 @@ def handle(line, session, desk, actor):
                 w.me = j["by"]
                 # Lark: the fence asks "changed since YOU saw it", and lets you through when you were both hands.
                 # A merge must ask "changed since the FORK saw it", whoever did it.
-                named = _kin(w, set(ID.findall(cmd)))
+                named = _kin(w, set(ID.findall(cmd)) | {mapping.get(t, t) for t in j.get("touched", [])})
                 mine = _aspects_of_line(cmd)
                 for e in w.events[wt["base_events"]:first]:
                     subj = (w.nodes.get(e["target"]) or {}).get("subject")
                     if not e.get("undone") and e.get("merged") != name and e["verb"] not in ("create", "comment") and (e["target"] in named or subj in named) \
-                            and aspects_meet(mine, aspects_of(e.get("via") or e["verb"], e.get("args"))):
+                            and aspects_meet(mine, event_aspects(e)):
                         return (f"refused: merge of {name} stopped at command {k} of {len(wt['journal'])}; nothing was applied\n"
                                 f"  {j['by']}: {cmd}\n  {e['target']} changed here since the fork ({e['id']} {e['verb']} by {e['by']})\n"
                                 f"  worktree diff {name} shows both sides; redo that step in the worktree or here by hand"), desk

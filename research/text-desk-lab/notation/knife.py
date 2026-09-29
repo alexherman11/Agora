@@ -209,12 +209,14 @@ def pair_verb(w, verb, a, b, args):
     if verb == "swap":
         if na["parent"] == nb["parent"] and w.nodes[na["parent"]]["layout"] != "free":
             kids = [k["id"] for k in w.children(na["parent"])]
+            before = list(kids)
             i, j = kids.index(a), kids.index(b)
             kids[i], kids[j] = kids[j], kids[i]
             w._order(na["parent"], kids)
             for k in (a, b, na["parent"]):
                 w._bump(k)
-            ev = w._event("swap", a, {"with": b}, {"restore": None})
+            ev = w._event("swap", a, {"with": b}, {"reorder": [na["parent"], before]})
+            ev["changed"] = [a, b, na["parent"]]
             return {"ok": True, "event": ev["id"], "events": [ev["id"]], "changed": [a, b, na["parent"]]}
         steps = [("move", a, {"to": f"{nb['x']},{nb['y']}"}), ("move", b, {"to": f"{na['x']},{na['y']}"})]
         if na["parent"] != nb["parent"]:

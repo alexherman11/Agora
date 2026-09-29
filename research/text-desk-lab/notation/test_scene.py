@@ -238,16 +238,6 @@ def test_command_values_keep_their_quotes():
     assert scene._cmd_value("C:\\temp") == "C:\\\\temp"
 
 
-if __name__ == "__main__":
-    n = 0
-    for name, fn in list(globals().items()):
-        if name.startswith("test_"):
-            fn()
-            n += 1
-            print("ok", name)
-    print(f"{n} passed")
-
-
 def test_a_print_reads_what_it_printed_whole():
     """jeff-2: the seen index is per aspect. A look that printed a title and a word count has not read the text; a
     rewrite after it is refused as blind; a read of the whole text admits it; a person's own write of an aspect counts."""
@@ -380,3 +370,13 @@ def test_code_runs_are_automatic_and_plain_opts_out():
     m = {"text": t, "plain": True, "acts": [], "kids": []}
     scene.emit(m)
     assert "runs" not in m["paint"]
+
+
+if __name__ == "__main__":
+    n = 0
+    for name, fn in list(globals().items()):
+        if name.startswith("test_"):
+            fn()
+            n += 1
+            print("ok", name)
+    print(f"{n} passed")

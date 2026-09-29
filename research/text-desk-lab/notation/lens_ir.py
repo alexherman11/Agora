@@ -10,7 +10,7 @@ Juniper's golden prints judge the switch. Jeff owns this file (desk-shell/OWNERS
 import re
 
 import scene as S
-from desk import aspects_of, aspects_meet
+from desk import aspects_of, aspects_meet, event_aspects
 
 ABSENT = None          # printed (no x); a third value, distinct from "" and from false
 
@@ -65,7 +65,7 @@ class Accessor:
                 continue
             if e["target"] not in names and not (names & set(e.get("changed") or [])):
                 continue
-            if aspect and not aspects_meet({aspect}, aspects_of(e.get("via") or e["verb"], e.get("args"))):
+            if aspect and not aspects_meet({aspect}, event_aspects(e)):
                 continue
             hit = e
             break

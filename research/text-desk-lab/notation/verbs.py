@@ -193,8 +193,10 @@ def run(desk, s, words, me, this=None):
     finally:
         desk._verb_depth = depth
     tag = f"{_names(s['title'])[0]} {w.appearances_of(s['id'])[0]}"
+    use = w.events[n0]["id"] if len(w.events) > n0 else None
     for e in w.events[n0:]:
         e.setdefault("verb_run", tag)        # provenance only: the fence still judges each step by its own verb
+        e["verb_use"] = use                  # one use, undone whole; a verb used inside another joins the outer use
     text = r["text"] if "text" in r else "ERR " + r["error"]
     return f"({tag}: {line})\n{text}"
 

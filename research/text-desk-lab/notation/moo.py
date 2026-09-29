@@ -13,6 +13,7 @@ Three ideas in one module:
 
 import difflib
 import re
+from copy import deepcopy
 
 from world import Refusal
 
@@ -430,7 +431,7 @@ def v_prop(w, nid, a):
         raise Refusal(f"no prop {', '.join(absent)} on {nid}; props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)"))
     if all(props.get(k) == str(v) for k, v in a.items()) and not [k for k in rem if k in props]:
         raise Refusal(f"{nid} already has " + " ".join(f"{k}={v}" for k, v in a.items()) + "; nothing to change")
-    before = dict(s, props=dict(props))
+    before = deepcopy(s)      # a whole copy: a shallow one shared tags and comments with later changes, and undo restored those
     for k in rem:
         props.pop(k, None)
     for k, v in a.items():
@@ -451,7 +452,7 @@ def v_tag(w, nid, a):
     rem = [t for t in str(a.get("remove", "")).split(",") if t.strip()]
     if not add and not rem:
         raise Refusal("tag needs add=a,b and/or remove=a,b")
-    before = dict(s, tags=list(s["tags"]))
+    before = deepcopy(s)      # (shared props: undoing a tag after a later prop brought the prop back)
     s["tags"] = [t for t in s["tags"] if t not in rem] + [t for t in add if t not in s["tags"]]
     s["rev"] += 1
     for x in w.appearances_of(s["id"]):
@@ -470,7 +471,7 @@ def v_due(w, nid, a):
         new = a.get("on")
         if not new or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", new):
             raise Refusal("due needs on=YYYY-MM-DD or clear=1")
-    before = dict(s)
+    before = deepcopy(s)
     s["due"] = new
     s["rev"] += 1
     for x in w.appearances_of(s["id"]):

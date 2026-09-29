@@ -1,6 +1,6 @@
 # Current Implementation
 
-**Reviewed 29 September 2026 · the text desk**
+**Reviewed 29 September 2026 · the text desk** (defects the review found were fixed the same day)
 
 The Dynamic Desk exists today as one prototype, the text desk, defined entirely in text:
 - a small world of things and placements;
@@ -18,6 +18,15 @@ It is independent of the earlier native runtime described in [[Previous Work]].
 Source: `C:/Projects/Agora4/research/text-desk-lab/notation/`. Paths below are relative to it. It is standard-library Python 3.12 and plain browser JavaScript, with no build step. This document describes the working tree on the date above.
 
 How it was checked: on 29 September, four reviewers checked every claim against source (**read**, with file and line) and in scratch worlds (**ran**). Where this document says a defect reproduces, it was reproduced that day. The desk is the source of this document: the Handbook binder *How the desk is built*, exported by `export_docs.py`.
+
+**Keep this current.** Before 29 September this document went six days and more than 130 commits without an update, and half of it had stopped being true. So:
+- A change that alters anything described here updates this document in the same change:
+  1. edit the section in the Handbook binder;
+  2. run `python export_docs.py`;
+  3. commit the export with the code.
+- A worker does this before it sets `commission=ready`. A defect fixed comes off the list under Evidence; a defect found goes on it.
+- When a section can't be kept exact, say so in it ("not re-checked since …") rather than leaving it to drift.
+- The date above says when the whole document was last checked. Recheck it whole when a stage of the project closes.
 
 ## Foundation and experiment
 
@@ -41,7 +50,7 @@ printf 'help\nlook\n' | DESKD=off python explore.py mine --as me
 python deskd.py 8780            # serves desk-shell/ and the JSON API on 127.0.0.1
 python keeper.py frontier --port 8794   # deskd and the house together, on the current code
 python health.py frontier       # the checks a landing must pass
-python test_scene.py            # lens tests (see Evidence: a script run executes 14 of 21)
+python test_scene.py            # 21 tests of lenses, gestures and the fence
 ```
 
 **The CLI.** `explore.py <session> --as <actor>` reads command lines from stdin and prints a receipt for each.
@@ -108,8 +117,9 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `examine` and `pivot` mark everything;
   - a table marks its columns;
   - `scene` marks what each node printed;
-  - your own receipt marks everything (see Evidence).
+  - your own act marks the aspects it wrote, and its receipt marks nothing more.
 - An aspect never printed is judged from event 0.
+- A recorded event is judged by the verb it carried out (`event_aspects` in `desk.py`), including one made through a selection or by a rule.
 - A change to one prop never blocks a change to another, and the same prop still refuses.
 - Your own changes from the same window never make you stale; a change from your other window does, and the refusal says so.
 - An undo counts as touching what it reverted.
@@ -125,7 +135,8 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - An event marked external (`launch`) cannot be undone.
 - There is no redo (an undo cannot be undone).
 - Undo is neither fenced nor limited to the author.
-- Undo kinds: `restore`, `restore_props`, `restore_subject`, `drop_comment`, `reopen`, `drop_link`, `restore_link`, `delete` (with `delete_subject`), `external`.
+- A world verb's use is undone whole, all its steps.
+- Undo kinds: `restore`, `restore_props`, `restore_subject` (a whole copy of the subject), `drop_comment`, `reopen`, `drop_link`, `restore_link`, `reorder` (a tiled swap), `delete` (with `delete_subject`), `external`.
 
 ## One language
 
@@ -212,7 +223,7 @@ Rule, script and clock definitions are desk attributes, not events. They have no
 **Worktrees.** `worktree fork <name>` copies the session into `<session>@<name>`, with a journal of the command lines made there, including `rule`, `script` and `clock` lines.
 - `worktree diff` shows those lines beside what the base did since (`!` = both touched it).
 - `merge` replays the journal on a trial copy of the base. It remaps created ids, signs each command by its author, and is all or nothing.
-- A command is refused when the base has changed an overlapping aspect of a target that the command names **by id**. The base's creates and comments are ignored.
+- A command is refused when the base has changed an overlapping aspect of anything the command touched. The journal records what a command touched by id as it ran, however the command named it (title, handle, selection or world verb). The base's creates and comments are ignored.
 - A worktree stays open after merging, and the next merge takes only new lines.
 
 ## World verbs
@@ -236,7 +247,7 @@ A verb anyone can make, with no Python (`verbs.py`, the first tier of live build
   - values are quoted automatically.
 - **Limits and provenance:** nesting stops at depth 5. Events are tagged `verb_run: "<word> <aid>"` and show in history as `(verb <word> <aid>)`. `examine` lists the verbs on a thing; `help <word>` describes the verbs you can reach.
 - **Misses:** a reach that nothing answers is appended to `reaches/<world>.jsonl` (not in git).
-- **Undo** reverts one step at a time, not the whole use (see Evidence).
+- **Undo** takes back the whole use, all its steps. Each event carries `verb_use`, and a verb used inside another joins the outer use. The receipt says `reverted e3..e4 (2 steps of the verb <word> <aid>)`.
 
 ## Lenses: one scene, two printers
 
@@ -389,17 +400,19 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 | anything else | GET: a static file from `desk-shell/`. POST: 404 |
 
 - The server is a `ThreadingHTTPServer` on 127.0.0.1. Replies are `no-store`.
+- deskd answers only its own pages: an `/api/` request whose `Origin` is not its own address, or that a browser marks `Sec-Fetch-Site: cross-site`, gets 403. Local programs that send neither header (the CLI, the house) are let through, as before.
+- A session name must match `^[A-Za-z0-9_][A-Za-z0-9_@-]{0,63}$` (no dots or slashes), else 400. A POST body that isn't a JSON object is 400.
 - Per-actor state is keyed by actor alone; the CLI keys it by actor and window.
 - A new actor starts with nothing seen, and `jeff` uses the session's own slot.
 - The shell polls `/api/events` every 1.5 s. The painter polls `/api/scene?view=painter` every 1.5 s and `/api/version` every 5 s, and reloads the page when the code changed, unless someone is typing or holding a part.
 
 **Sessions.** A session is one file, `sessions/<name>.pickle`, holding the whole Python desk: world, rules, scripts, clock, per-actor state, observations and the last-good lenses.
 - Every request that names a session, reads included, loads it under `sessions/<name>.lock`, acts, and saves it.
-- A request for an unknown session creates it. Session names are not validated.
+- A request for an unknown session with a valid name creates it.
 - The lock holds the holder's pid. A waiter removes a lock whose pid is dead or that is over 60 s old. It gives up after 60 s (`could not take … lock`) and never proceeds without the lock.
 - A save writes `<name>.pickle.tmp`, then renames it into place (`explore.save_desk`).
 - The CLI saves once at the end of an invocation.
-- Exception: `export_docs.load`, which the house, `health.py` and `try_house.py` use, runs its own loop. It writes no pid, reads without the lock after 60 s, and removes the lock afterwards even if it never took it (see Evidence).
+- `export_docs.load`, which the house, `health.py` and `try_house.py` use to read a world, takes the same lock. When it can't, it raises an error rather than exiting, so the house logs a failed step and tries again on its next pass.
 
 ## The browser
 
@@ -517,7 +530,7 @@ asked -> working -> (waiting <-> working) -> ready -> landing -> landed | revert
 claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob Grep mcp__desk__desk Bash(<r>:*) PowerShell(<r>:*) --mcp-config … --setting-sources "" --append-system-prompt <protocol>
 ```
   - `<r>` covers git status, diff, add, commit, log, show and rebase, `node --check`, and python.
-  - The protocol tells the worker to read AGENTS.md. It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
+  - The protocol tells the worker to read AGENTS.md and to keep *Current Implementation* true (see Landing). It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
 - The worker's desk tool (`desk_mcp.py`, as `worker-<cid>`) acts in the live world.
 - It talks through comments on its commission, and those comments come back to it as messages.
 - It says it is done by committing and setting `commission=ready`.
@@ -527,8 +540,9 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 2. Health is taken.
 3. `git merge --no-ff worker/<cid>` into whatever branch is checked out, with the subject `land <cid>: <title>`.
 4. Health is taken again. If it fails, or a lens that compiled before no longer does, the merge is reverted (`git revert -m 1`).
-5. The result is commented, the worktree removed and the branch deleted.
-6. A landed `.py` change asks the house to restart.
+5. In frontier, from the main checkout, *Current Implementation* is exported from its Handbook binder and committed if it changed. The protocol asks the worker to rewrite the sections its change affects before it sets `ready`.
+6. The result is commented, the worktree removed and the branch deleted.
+7. A landed `.py` change asks the house to restart.
 
 **The keeper** (`keeper.py [world] [--port 8794]`) runs deskd and the house (the house with `DESKD` pointing at that deskd, and `HOUSE_KEEPER=1`).
 - It restarts deskd whenever HEAD moves.
@@ -568,25 +582,25 @@ A refusing lens is listed but doesn't fail health.
 
 | File | Lines | Responsibility |
 |---|---:|---|
-| `world.py` | 965 | Subjects, appearances, surfaces, links, comments, geometry (and `DESK_GEOMETRY=choices`), events, `apply`, `undo`, chat signing |
-| `desk.py` | 1069 | Outline notation, the seen fence and its aspect table, the blind-replace check, `;` batching, reading commands, `undo`, `do`, the world-verb fallthrough |
+| `world.py` | 973 | Subjects, appearances, surfaces, links, comments, geometry (and `DESK_GEOMETRY=choices`), events, `apply`, `undo`, chat signing |
+| `desk.py` | 1087 | Outline notation, the seen fence and its aspect table, the blind-replace check, `;` batching, reading commands, `undo`, `do`, the world-verb fallthrough |
 | `desk_moo.py` | 267 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
 | `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
-| `moo.py` | 535 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
-| `knife.py` | 261 | The selection language (with `unanswered:`) and pair verbs |
-| `verbs.py` | 260 | World verbs: finding, filling, running, reaches |
+| `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
+| `knife.py` | 263 | The selection language (with `unanswered:`) and pair verbs |
+| `verbs.py` | 262 | World verbs: finding, filling, running, reaches |
 | `scene.py` | 1444 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
-| `worktree.py` | 207 | Fork, journal, diff, all-or-nothing replay merge |
+| `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
 | `explore.py` | 229 | CLI: forward to deskd or run under the pid lock; atomic save; `--window --dump --shape --reset`; `!actor` injection |
-| `deskd.py` | 355 | HTTP server and the gesture fence |
+| `deskd.py` | 395 | HTTP server, its origin and session-name checks, and the gesture fence |
 | `house.py` | 698 | Residents |
-| `workshop.py` | 311 | Commissions and workers |
+| `workshop.py` | 337 | Commissions and workers |
 | `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
 | `health.py` | 119 | The checks a landing must pass |
 | `try_house.py`, `try_worker.py`, `fake_model.py` | 463 | Trials and a fake model |
 | `desk_mcp.py` | 176 | The desk as an MCP tool |
-| `export_docs.py`, `handbook_docs.py`, `docs_sync.py` | 316 | The documents |
+| `export_docs.py`, `handbook_docs.py`, `docs_sync.py` | 313 | The documents |
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
@@ -615,14 +629,15 @@ Which file for which change:
 
 | Check | Result |
 |---|---|
-| `python health.py frontier` | python ok; scripts ok; test_scene 14 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.5 s |
-| `test_scene.py` | 21 tests, all pass when called. Its `__main__` block sits before the last 7, so `python test_scene.py` runs only 14 |
-| `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`. S11 drives an old code path and no longer describes the desk |
-| `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs |
+| `python health.py frontier` | python ok; scripts ok; test_scene 21 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.4 s |
+| `test_scene.py` | 21 passed |
+| `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`, the same before and after the fixes below. S11 drives an old code path and no longer describes the desk |
+| `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs, before and after the fixes |
 
 - `golden_prints.py` has no check mode (it writes); `suite/sessions.py --check` is the read-only comparison.
 - `desk-shell/checks/` needs a live page and server, and was not run.
 - Nothing automated covers deskd's HTTP layer, the house with a real model, or the browser.
+- The fixes below were each re-run against the case that reproduced them, in throwaway worlds and a throwaway deskd, and the command-center lens was painted in a browser after the origin check (177 nodes, and a same-origin POST answered 200).
 
 **Fixed since the last review:**
 - A repeat records its membership.
@@ -633,20 +648,26 @@ Which file for which change:
 - Saves are atomic.
 - The lock is pid-aware and never proceeds without it.
 
+**Fixed 29 Sep, found by the review:**
+- Undoing a tiled `swap` crashed the invocation. It now records the old order (`reorder`), and undo puts it back.
+- Your own receipt marked a thing fully seen, so a later `rewrite` could drop text you never read. The receipt now marks nothing beyond what you wrote (ran: a tag, then a rewrite, is refused with "you have not seen a04's text").
+- Events made through a selection or a rule counted as touching every aspect, so `do tag in:Box add=k` made an unrelated `append` stale. `event_aspects` now judges them by their verb, in the desk, deskd, the lens evaluator and worktree merge. An `append` counts as `text`.
+- For tags, comments and links, the stale advice said "look at it again", which doesn't print them. It now says `read`.
+- A multi-step world verb was undone one step at a time. The whole use is now undone.
+- Undo snapshots for `prop`, `tag` and `due` shared lists and dicts with the live subject. Undoing a tag after a later prop brought the prop back. They are now whole copies. This was found while testing the fix above.
+- A worktree merge saw conflicts only for targets named by id, so a title-named change merged over the base's and lost it. The journal now records what each command touched (ran: the same case is refused, and the base keeps its value).
+- `test_scene.py`'s runner sat before its last 7 tests, so a script run executed 14 of 21. It now runs all 21.
+- deskd took any session name, `..` included, and any origin (see Processes and state).
+- `export_docs.load` read without the lock after 60 s and then removed a lock it had never taken. It now uses the desk's lock (ran: with a live holder it raises and leaves the lock; with a dead holder's lock it loads).
+
 **Open defects a builder will meet** (reproduced 29 Sep unless marked read).
 
 *The fence and undo:*
-- Undoing a tiled `swap` crashes the invocation (`knife.py` records `restore: None`), and nothing is saved.
-- Your own receipt marks a thing fully seen, so after any act on it a `rewrite` passes the blind-replace check and drops text you never read.
-- Events made through a selection or a rule touch every aspect (their `via` isn't a verb). So `do tag in:Box add=k` makes an unrelated `append` stale.
 - A selection target skips the "not looked yet" refusal, and pair verbs never check staleness (read).
-- For a non-text aspect, the stale advice says "look at it again", but `look` doesn't print tags; `read` does.
-- A multi-step world verb is undone one step at a time.
 - Via deskd, the CLI does not stop at a refusal.
 - A `;` batch half-applies, and a `script` definition makes no event, so a bare `undo` reverts an older change.
 
 *Worktrees and export:*
-- A worktree merge detects conflicts only for targets named by id. The same prop changed in base and fork through a title merges silently, and the base's value is lost.
 - `export` does not replay: an unplaced subject and its props are dropped, and repeated placements make titles ambiguous.
 
 *Selections, lenses and help:*
@@ -667,8 +688,8 @@ Which file for which change:
 
 **Persistence and safety.**
 - The pickle is the database, with no journal and no format version. Loading it executes code, so a session file must be trusted.
-- Saves are atomic, but `export_docs.load` can read without the lock and remove another process's lock (read).
-- deskd binds to localhost and checks no origin or token. It accepts POST bodies without a content type and does not validate session names, `..` included (read). A page from another origin could send simple POSTs to `/api/do` (imagined, not tried).
+- Saves are atomic, and every reader takes the lock.
+- deskd binds to localhost and refuses requests from other sites' pages, but checks no token. Any local program can act as anyone.
 - Fences coordinate; nothing authenticates.
 - Workers are real `claude -p` processes with file and shell tools. Their branches are merged without human review, on standing trust, and only `sessions/` and `.env` are off limits.
 - The keeper can revert HEAD on its own.
@@ -771,4 +792,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e656. Edit it there; a direct edit here makes the next export stop and warn. sha1:e989014233bc -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e666. Edit it there; a direct edit here makes the next export stop and warn. sha1:7e66dbd0a976 -->

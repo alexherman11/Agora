@@ -20,7 +20,9 @@ commission:
   2. health is taken before, then the branch is merged (--no-ff, one commit per commission), then health again;
   3. the lenses that compiled before must still compile, and every check must pass, or the merge is reverted
      (git revert: history keeps both);
-  4. the result goes back as a comment and the worktree is removed.
+  4. in frontier, Current Implementation is exported from its Handbook binder (the worker keeps that true) and
+     committed if it changed;
+  5. the result goes back as a comment and the worktree is removed.
 Under keeper.py the new code takes effect at once: keeper restarts deskd when HEAD moves, and the house asks to be
 restarted once no resident is mid-turn.
 """
@@ -63,6 +65,11 @@ single commands only. `python` is the lab's interpreter, and the lab's scripts f
   python {notation}/health.py {world}-try
   python {notation}/suite/sessions.py --check
 Don't commit the -try world. If something you need is refused, say so on the commission rather than working around it.
+
+Keep the record true: docs/Current Implementation.md describes exactly what exists. If your change alters anything it
+says, rewrite that section in the live world's Handbook binder "How the desk is built" through the desk tool (read the
+note first; one note per section), and name the sections in your done comment. Don't edit the markdown file itself:
+the house exports it from the binder when your branch lands.
 
 Finishing: commit your change on your branch (git add the files you changed; git commit). Then, through the desk:
   do comment {task} line="done: what changed; what you ran and what it printed; what you did not check"
@@ -227,6 +234,24 @@ class Workshop:
         if not keep_branch:
             git("branch", "-D", wk.branch)
 
+    def export_docs(self, cid):
+        """After a landing, Current Implementation follows the binder the worker kept true (29 Sep: the document had
+        drifted for six days). Only for the shared world in the main checkout: a trial's copy must never write docs/."""
+        if self.house.world != "frontier" or REPO.resolve() != Path("C:/Projects/Agora4").resolve():
+            return ""
+        doc = "docs/Current Implementation.md"
+        r = subprocess.run([str(PY), "export_docs.py", self.house.world], cwd=HERE, capture_output=True, text=True,
+                           encoding="utf-8", env={**os.environ, "DESKD": "off"}, timeout=300)
+        mine = (REPO / doc).resolve()
+        wrote = any(l.startswith("wrote") and Path(l.split(None, 1)[1].strip()).resolve() == mine
+                    for l in (r.stdout or "").splitlines() if len(l.split(None, 1)) == 2)
+        if wrote:      # only what this export wrote: never someone's uncommitted edit (a test committed one, 29 Sep)
+            git("add", "--", doc)
+            git("commit", "-m", f"docs: Current Implementation after land {cid}", "--", doc)
+            return " Current Implementation exported from the Handbook and committed."
+        warn = [l for l in (r.stdout or "").splitlines() if l.startswith("WARNING")]
+        return " Current Implementation unchanged." + (f" {warn[0][:200]}" if warn else "")
+
     def land(self, w, cid, s, wk):
         """Between passes: merge, check, keep or revert. Every outcome is said on the commission."""
         self.set_state(cid, "landing")
@@ -263,7 +288,8 @@ class Workshop:
             return
         head = git("rev-parse", "--short", "HEAD").stdout.strip()
         self.set_state(cid, "landed", landed=head)
-        self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(after.get("text", "").splitlines())[:600])
+        self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(after.get("text", "").splitlines())[:600]
+                 + self.export_docs(cid))
         self.finish(cid, wk, keep_branch=False)
         if any(p.endswith(".py") for p in changed):
             self.restart_wanted = True

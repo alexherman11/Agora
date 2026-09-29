@@ -899,6 +899,14 @@ class World:
             self.links = [l for l in self.links if l["id"] != u["drop_link"]]
         elif "restore_link" in u:
             self.links.append(u["restore_link"])
+        elif "reorder" in u:           # a tiled swap: put the flow back in its old order
+            fid, order = u["reorder"]
+            if fid in self.nodes:
+                kids = [k["id"] for k in self.children(fid)]
+                order = [k for k in order if k in kids] + [k for k in kids if k not in order]
+                self._order(fid, order)
+                for k in [k for i, k in enumerate(order) if kids[i] != k] + [fid]:
+                    self._bump(k)
         elif "delete" in u:
             gone = self.nodes.pop(u["delete"], None)
             if gone and gone["parent"]:
