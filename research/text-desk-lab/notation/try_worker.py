@@ -125,7 +125,10 @@ def write_report(tag, cid, title, text, ending, thread, log, stat, wdir):
     tpath = wdir / "transcript.jsonl"
     if tpath.exists():
         for line in tpath.read_text(encoding="utf-8").splitlines():
-            e = json.loads(line)
+            try:
+                e = json.loads(line)
+            except ValueError:                 # a line cut short while the process was stopped
+                continue
             d = e["data"]
             at = time.strftime("%H:%M:%S", time.localtime(e["at"]))
             if e["kind"] == "sent":

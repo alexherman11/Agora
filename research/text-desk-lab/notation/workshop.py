@@ -117,10 +117,10 @@ class Workshop:
         return "alex"
 
     def say(self, cid, line):
-        self.house.act("house", f"read {cid}; do comment {cid} line={json.dumps(line)}")
+        self.house.act("house", f"read {cid}; do comment {cid} line={json.dumps(line, ensure_ascii=False)}")
 
     def set_state(self, cid, state, **more):
-        extra = "".join(f" {k}={json.dumps(str(v))}" for k, v in more.items())
+        extra = "".join(f" {k}={json.dumps(str(v), ensure_ascii=False)}" for k, v in more.items())
         self.house.act("house", f"look {cid} :1; do prop {cid} commission={state}{extra}")
 
     # ---- one pass ----------------------------------------------------------------------------------------------

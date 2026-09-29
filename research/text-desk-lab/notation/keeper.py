@@ -38,6 +38,7 @@ def git(*args):
 
 
 def start(args, env=None, name=""):
+    (HERE / "house-state").mkdir(exist_ok=True)      # a fresh checkout has none (it is not in git)
     out = open(HERE / "house-state" / f"{name}.out", "a", encoding="utf-8")
     return subprocess.Popen([PY, *args], cwd=HERE, env=env, stdout=out, stderr=subprocess.STDOUT)
 
