@@ -1,10 +1,23 @@
 # Current Implementation
 
-**Reviewed 23 September 2026 · the text desk**
+**Reviewed 29 September 2026 · the text desk**
 
-The Dynamic Desk exists today as one prototype: a desk defined entirely in text. A small world of things and placements, one command language that reads and changes it, and a lens compiler that turns short text definitions into scenes that an agent reads and a browser paints. It is independent of the earlier native runtime described in [[Previous Work]].
+The Dynamic Desk exists today as one prototype, the text desk, defined entirely in text:
+- a small world of things and placements;
+- one command language that reads and changes it;
+- world verbs, which anyone makes as notes;
+- a staged lens compiler that turns short text definitions into scenes, which an agent reads and a browser paints.
 
-Source: `C:/Projects/Agora4/research/text-desk-lab/notation/`. Paths below are relative to it. It is standard-library Python 3.12 and plain browser JavaScript with no build step. This document describes the working tree on the date above. Its claims were checked against source and in scratch sessions by six reviewers; the drafts they wrote are in `design-studio/docs/`.
+Around the desk:
+- the **house** runs resident agents that live in the world;
+- **workers** change the code in git worktrees, and the house lands their work after health checks;
+- the **keeper** keeps it all running on the current code.
+
+It is independent of the earlier native runtime described in [[Previous Work]].
+
+Source: `C:/Projects/Agora4/research/text-desk-lab/notation/`. Paths below are relative to it. It is standard-library Python 3.12 and plain browser JavaScript, with no build step. This document describes the working tree on the date above.
+
+How it was checked: on 29 September, four reviewers checked every claim against source (**read**, with file and line) and in scratch worlds (**ran**). Where this document says a defect reproduces, it was reproduced that day. The desk is the source of this document: the Handbook binder *How the desk is built*, exported by `export_docs.py`.
 
 ## Foundation and experiment
 
@@ -14,282 +27,743 @@ Everything here is prototype code. The left column is what later work should pre
 |---|---|
 | Subject, appearance and surface are distinct things | Pickle persistence and file locks |
 | Every change is a command line that records an undoable event | Worktree merge by replaying command lines |
-| Look before you act: a change is refused if you never looked, or if what you saw is stale | Rules and scripts stored outside the event log |
-| Verbs and selections are one language shared by every command | The lens vocabulary beyond its core words |
-| One scene, two printers: text and pixels come from the same tree | The hand-written application shell |
-| A lens is a note in the world, not code | `spread`, natives, the desktop made of lenses |
+| Look before you act, judged per thing and aspect | Rules, scripts and the clock stored outside the event log |
+| Verbs and selections are one language shared by every command | World verbs as text macros (no expression language yet) |
+| A lens, a style and a world verb are notes in the world, not code | The lens vocabulary beyond its core words; the hand-written windowed shell |
+| One scene, two printers: text and pixels come from the same tree | The house's relay (tool-less residents whose `>` lines are run for them) |
+| Code changes go through a worker, a worktree and health checks, and can be reverted | Landing without human review, on standing trust |
 
 ## Running it
 
 ```sh
 cd C:/Projects/Agora4/research/text-desk-lab/notation
 printf 'help\nlook\n' | DESKD=off python explore.py mine --as me
-python deskd.py 8780        # serves desk-shell/ and the JSON API on 127.0.0.1
-python test_scene.py        # the four lens-admission tests
+python deskd.py 8780            # serves desk-shell/ and the JSON API on 127.0.0.1
+python keeper.py frontier --port 8794   # deskd and the house together, on the current code
+python health.py frontier       # the checks a landing must pass
+python test_scene.py            # lens tests (see Evidence: a script run executes 14 of 21)
 ```
 
-- `explore.py <session> --as <actor>` reads command lines from stdin and prints a receipt for each. A new session name is an empty desk. `desktop`, `studio`, `bridge`, `lens` and `play2` are other people's live worlds; use your own name.
-- Without `DESKD=off`, each line is posted to a running `deskd` (default `http://127.0.0.1:8780`) and the file is the fallback. `deskd` imports Python once: restart it after any Python change.
-- The default actor is `jeff` on the CLI and `alex` on the server. Actor names are labels supplied by the caller.
-- Browser: `http://localhost:8780/lens.html?session=mine&as=me&lens=<lens>` for a lens, `/?session=mine&as=me` for the windowed shell.
+**The CLI.** `explore.py <session> --as <actor>` reads command lines from stdin and prints a receipt for each.
+- Blank lines and `#` lines are skipped.
+- A new session name is an empty desk.
+- A refused line stops the rest: `stopped: N later line(s) not run because this one was refused`.
+- Flags:
+  - `--window <name>` gives one actor a second reader;
+  - `--reset`;
+  - `--dump` prints a JSON snapshot, with rules, scripts and the clock;
+  - `--shape` prints the desk without ids.
+- The default actor is `jeff`. Actor names are lowercased labels that the caller supplies; nothing authenticates them.
+
+**Through deskd.** Without `DESKD=off`, each line is posted to a running deskd (default `http://127.0.0.1:8780`), and the file is the fallback.
+- Lines stay local (under the lock) when `--window` is given or when any line starts with `!`.
+- Through deskd, a refusal does not stop later lines. If deskd stops answering mid-run, the rest are not applied.
+- deskd imports Python once. Under the keeper it restarts whenever git HEAD moves; otherwise restart it after any Python change.
+
+**Worlds.**
+- The shared world is `frontier`. Private worlds are `frontier-<name>`, and worktree forks are `<world>@<name>`.
+- `desktop`, `studio`, `bridge`, `lens` and `play2` are older worlds from earlier rounds.
+- 34 pickles under `sessions/` are tracked in git.
+
+**Browser.**
+- A lens: `http://localhost:<port>/lens.html?session=<s>&as=<actor>&lens=<lens>`.
+  - Defaults: session `lens`, as `alex`, lens `notes`.
+  - `?side=scene` shows the scene text in the right pane, `?inspect=0` shows neither pane, `?theme=<name>` picks a theme, and `?share=attention` shares the viewer's attention.
+- The windowed shell: `/?session=<s>&as=<actor>`. Defaults: session `desktop`, as `alex`.
 
 ## The world
 
 | Concept | In code (`world.py`) |
 |---|---|
-| **Subject** `s..` | Content: `kind`, `title`, `text`, `tags`, `due`, `comments`, `props`, `rev`. Kinds are a closed list: note, task, chat, image, doc, trial, surface, view. Props are string values. |
-| **Appearance** `a..` | One placement of a subject: parent surface, `x y w h`, `z`, `folded`, `rev`. A subject may appear in several places. |
-| **Surface** `f..` | A container with layout `free`, `column` or `row`. A **view** is a surface whose contents are a selection, re-evaluated at every look. |
-| **Link** `l..` | A typed edge between subjects: `blocks`, `refers`, `answers`, `part-of`. |
-| **Event** `e..` | `verb target args undo by at`, plus `cmd`, `via`, `cause` and `undone`. Revisions live on things, not on events. |
+| **Subject** `s..` | Content: `id kind title text tags due comments props rev`. `create kind=` takes a closed list: note, task, chat, image, doc, trial, surface, view. The last two make surfaces, not subjects. Any other `k=v` at create becomes a prop (not on surfaces). Props are strings. |
+| **Appearance** `a..` | One placement of a subject: `parent x y w h z folded rev`, and optional `props` (`prop … at=appearance`). With `DESK_GEOMETRY=choices`, also `order` and `share`. A subject may appear in several places. |
+| **Surface** `f..` | A container with layout `free`, `column` or `row`, and props. A **view** is a surface with `layout: view`, a `query` and optional `cols by desc`, re-evaluated at every look. Surface prop `extent=WxH` bounds `spills-parent` on a free surface. |
+| **Link** `l..` | A typed edge between subjects: `blocks`, `refers` (the default), `answers`, `part-of`. Self-links, duplicates and links to surfaces are refused. |
+| **Comment** `c..` | `{id, by, text, resolved, replies[{by, text}]}` on a subject. `resolve` may reply. Undoing it reopens the comment and drops the last reply. |
+| **Event** `e..` | `id verb target args undo note by at day`. Some events also carry `changed cmd via window cause undone verb_run merged`. Ids come from a counter that never goes back (`_eseq`), so a refused or rolled-back step leaves a gap. |
 
 Editing a subject changes every appearance of it. Moving or removing one appearance touches only that appearance.
 
-**Observed revisions.** The desk remembers, per observer, the revision it last showed them of each thing. An observer is an actor plus a window: `explore.py … --window <name>` gives one person two readers. A change is refused in two cases: `you have not looked at a04 yet`, and `stale: a04 changed since you last saw it`, which names the event. The check is keyed by (thing, aspect), where an aspect is one prop, the title, the text, the due date, the tags or the placement. So a change to one prop never blocks a change to another, and the same prop still refuses. Command lines carry no revision numbers. Your own changes from the same window never make you stale, but a change from your other window does. Rules act without the fence. The fence coordinates honest actors; it is not access control.
+**Chats are signed.** An appended chat line is stored as `Actor: text` unless it already begins with the actor's own name. A line claiming another speaker is still prefixed with the real one (ran: `Bob: fake sig` became `Checker: Bob: fake sig`).
 
-**Undo.** `undo eN` reverts an event and records the reversal as a new event. A composed verb is undone as a whole, and a rule's consequences are undone with their cause. Only the latest change to a thing can be undone. An event marked external (`launch`) cannot be. There is no redo, and undo is not fenced.
+**Geometry.**
+- The screen is 1280×800.
+- The desk computes relations: `offscreen-part`, `spills-parent`, `covers X [fully]`, `under X [fully]`, and a hidden fraction.
+- Flows reflow with an 8-pixel gap and a 24-pixel minimum. Sizes are proportional unless `equal_share`, with equal shares on overflow.
+- `DESK_GEOMETRY=choices` (off by default, read at import): a flow child holds a fractional `order` key and a `share`, and its box is derived. `world.box()` is the one read of where a thing is drawn.
+
+**Observed revisions (the fence).** The desk remembers what it showed each observer. An observer is an actor plus a window.
+- It keeps two stores:
+  - `seen[id] = rev`;
+  - a seen index keyed by (observer, thing) → {aspect: event index}.
+- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect.
+- Three refusals:
+  - `you have not looked at a04 yet; look, examine or read it first`;
+  - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
+  - `you have not seen a04's text; read a04 shows it before you replace it`. This applies to the replacing verbs rewrite, retitle, rename, edit, due, prop and untag.
+- What counts as having seen something:
+  - an outline line marks title, place, due and props (not text or tags);
+  - `read` marks title, tags, due, comments, links, props, and the text only when the whole body printed;
+  - `where` marks place;
+  - `examine` and `pivot` mark everything;
+  - a table marks its columns;
+  - `scene` marks what each node printed;
+  - your own receipt marks everything (see Evidence).
+- An aspect never printed is judged from event 0.
+- A change to one prop never blocks a change to another, and the same prop still refuses.
+- Your own changes from the same window never make you stale; a change from your other window does, and the refusal says so.
+- An undo counts as touching what it reverted.
+- `create` and `comment` are never refused as stale.
+- A subject-id target (`sNN`) is judged by whole revision.
+- Rules act without the fence.
+- The fence coordinates honest actors; it is not access control.
+
+**Undo.** `undo eN` reverts an event and records the reversal as a new `undo` event. A bare `undo` reverts your own latest change that hasn't been undone.
+- A composed verb is undone whole: contiguous events with the same `via`, `cmd` and author, and no cause.
+- A rule's consequences are undone with their cause.
+- Only the latest change to a thing can be undone.
+- An event marked external (`launch`) cannot be undone.
+- There is no redo (an undo cannot be undone).
+- Undo is neither fenced nor limited to the author.
+- Undo kinds: `restore`, `restore_props`, `restore_subject`, `drop_comment`, `reopen`, `drop_link`, `restore_link`, `delete` (with `delete_subject`), `external`.
 
 ## One language
 
-`explore.py` on stdin, `POST /api/do` on the server and a gesture in the painter all carry the same kind of line. Several commands may be joined with `;`; they run in order and stop at the first refusal, and earlier steps are not rolled back.
+`explore.py` on stdin, `POST /api/do` on the server, a gesture in the painter, a resident's `>` line and a world verb's steps all carry the same kind of line.
+- Commands may be joined with `;` or newlines. They run in order and stop at the first refusal; earlier steps are not rolled back.
+- A call runs at most 4 `read` or `examine` commands; the rest are listed as not run.
+- A `script` line keeps its `;`.
 
 | Family | Commands |
 |---|---|
-| Reading | `look [id] [:1-:4]`, `read`, `examine`, `where`, `verbs`, `pivot`, `find`, `table`, `compare`, `history`, `why`, `rows`, `scene`, `export`, `help` |
-| Changing | `do <verb> <target> k=v`, `undo`; pair verbs `swap`, `beside`, `match` |
-| Defining | `rule`, `script` / `run`, `set` (handles), `clock` |
-| Branching | `worktree fork` / `diff` / `merge` |
+| Reading | `look [id] [:1-:4]`, `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts`, `vars`, `help` (`?`) |
+| Changing | `do <verb> <target> k=v`, `undo [eN]`; pair verbs `swap`, `beside`, `match`, `link`; world verbs (`<word> …`, `do <word> …`, `use <id> …`) |
+| Defining | `rule when … do …`, `rule on <verb> [by=] do …`, `rule drop rN`; `script <name> = …`, `script drop`, `run`; `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
+| Branching | `worktree`, `worktree fork\|diff\|merge <name>` |
+| External | `sync`, `launch` (harness; not run in review) |
 
-`examine` lists only the verbs that apply to a thing right now; `help <verb>` gives arguments and one example. The general verbs are `move place resize raise lower remove fold unfold create group tile untile rename sort append rewrite retitle check comment resolve tag prop due link unlink launch`. Primitives live in `World.apply`; a new primitive still needs Python.
+**Verbs.** `examine` lists only the verbs that apply to a thing right now; `help <verb>` gives the arguments and one example.
+- The verbs this desk does: `move place resize raise lower remove tile untile rename group create fold unfold append comment resolve check link unlink retitle rewrite sort prop tag due launch`.
+- The registry (`moo.py`) holds 34. The specialized ones (`split gather dedupe reveal reply tidy stack done`) are refused here, with `help` naming the alternative.
+- Synonyms such as `put` → move and `delete` → remove are accepted, and a near miss is matched at 0.75 similarity.
+- Kinds inherit verbs:
+  - surface → thing;
+  - note, task, chat, doc and trial → text → appearance → thing;
+  - image → appearance → thing.
+- Arguments:
+  - `move into=|before=|after=|to=x,y|by=dx,dy` (a selection form takes `one=1`);
+  - `create kind= title= [text= due= tags= layout= query= cols= by= desc=] [as=<handle>]`;
+  - `group title= as=` (or `do group <selection> as= title= [in=]`);
+  - `tile as=`;
+  - `sort by=due|title|kind [desc=1]`;
+  - `prop k=v … | remove=k [at=appearance]`;
+  - `tag add= remove=`;
+  - `due on= | clear=1`;
+  - `append line= [section=]`;
+  - `rewrite text= [section=]`;
+  - `retitle title=`;
+  - `check item=n`;
+  - `comment line=`;
+  - `resolve id=cNN [line=]`;
+  - `link to= as=`;
+  - `unlink id=lNN`;
+  - `resize to=WxH` (at least 40×24).
+- Most verbs go through `World.apply`. `prop`, `tag`, `due`, `launch` and the tiled `swap` write their events directly. A new primitive still needs Python; a composition does not (see World verbs).
 
-**Selections are the shared noun phrase.** The same grammar names a verb's target, a `find`, a view's `query=`, a rule's trigger and a lens's `of` and `only when`:
+**Selections are the shared noun phrase.** The same grammar names a verb's target, a `find`, a view's `query=`, a rule's trigger, and a lens's `of`, `the` and `only when`:
 
 ```text
-kind:note|task  tag:x  in:f04  title:agenda  ?word+word  prop:status=done
-comments:open  links:a04  parts:a30  part-of:a20  due<2026-09-20  age>7  hidden  also:a18  a20,a22  -tag:done
+kind:note|task  tag:x  in:f04  title:agenda  ?word+word  prop:status=done  prop:k
+comments:open  comments:any  links:a04  parts:a30  part-of:a20  unanswered:alex
+due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 ```
 
-`parts:` and `part-of:` follow only `part-of` links, in one direction.
+- Terms joined by commas or spaces are ANDed.
+- `parts:` and `part-of:` follow only `part-of` links, in one direction.
+- `in:`, `also:`, `links:`, `parts:` and `part-of:` accept a title or a `$handle`.
+- A target may also be one id, a unique quoted title, `desk`/`root`, or a handle:
+  - `$item`, the last created thing;
+  - `$new`, the last created surface, else the last created thing;
+  - `$<name>`, set by `set` or `create … as=`.
+- `$today` fills in any command; `\$today` stays literal.
+- An unknown `word:` term is refused with the list of known terms. `prop:k>v` is not a comparison: it is read as a prop name and matches nothing (see Evidence).
 
-Terms joined with commas are ANDed. A target may also be one id, a unique quoted title, or a handle such as `$item` (the last created thing) or `$new` (the last created surface). An unknown term is refused with the list of known terms.
+**Rules.**
+- `rule when <selection> do <verb> …` fires once on each thing that enters the selection; `now=1` includes current matches.
+- `rule on <verb> [by=<actor>] do …` fires on each such event. It ignores events made by rules, and it treats `edit` as append, retitle or rewrite.
+- Rules also run on clock changes and after `!` injections.
+- Rule events carry `via "rule rN"` and `cause`, and are signed by whoever's command set them off.
+- Cascades stop after three passes.
+- A rule is checked when defined: a bad term, a specialized verb and a missing script are refused, but a destination such as `into=` is not checked.
+- `why <id>` shows the events that placed a thing and the rule that would act on it next.
 
-**Rules, scripts, views.**
-- `rule when <selection> do <verb> …` fires once on each thing that enters the selection (`now=1` includes current matches). `rule on <verb> [by=<actor>] do …` fires on each such event. Cascades stop after three passes. `why <id>` shows which events placed a thing and which rule would act on it next.
-- `script <name> = <cmd>; <cmd>` with `$1 $2 $today`; `run <name> args`. A rule may run a script.
-- `do create <surface> kind=view title=X query=<selection>` makes a view; with `cols=` it is a table at every look.
+**Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $today`; run with `run <name> args`. Scripts are not validated when defined, and `$me` is not filled in a script (F2). A rule may run a script.
 
-Rule, script and clock definitions are desk attributes, not events: they have no author, do not appear in `history`, and cannot be undone. They are not validated when defined. A lens, by contrast, is an ordinary note. Definitions are not yet uniform.
+**Views.** `do create <surface> kind=view title=X query=<selection>` makes a view; with `cols=` (and `by=`, `desc=`) it prints as a table. You can't move a thing into a view, create inside one, or tile, group or sort one.
 
-**Worktrees.** `worktree fork <name>` copies the session into `<session>@<name>` with a journal of the command lines made there. `merge` replays the journal into the base, remaps created ids, signs each command by its author, and is all or nothing: a command whose target changed in the base since the fork, by anyone, refuses the whole merge. A worktree stays open after merging.
+**Clock.**
+- `clock` shows the desk's date.
+- `clock YYYY-MM-DD` and `clock now` set it.
+- `clock follow` tracks the wall date and reports the days that passed.
+- `age<N` and `age>N` need a clock.
+
+Rule, script and clock definitions are desk attributes, not events. They have no author, don't appear in `history`, and can't be undone, but a worktree carries them and a merge replays them. Lenses, styles and world verbs, by contrast, are ordinary notes.
+
+**Worktrees.** `worktree fork <name>` copies the session into `<session>@<name>`, with a journal of the command lines made there, including `rule`, `script` and `clock` lines.
+- `worktree diff` shows those lines beside what the base did since (`!` = both touched it).
+- `merge` replays the journal on a trial copy of the base. It remaps created ids, signs each command by its author, and is all or nothing.
+- A command is refused when the base has changed an overlapping aspect of a target that the command names **by id**. The base's creates and comments are ignored.
+- A worktree stays open after merging, and the next merge takes only new lines.
+
+## World verbs
+
+A verb anyone can make, with no Python (`verbs.py`, the first tier of live building).
+- **What it is:** a note tagged `verb` that is placed somewhere.
+  - Its title gives the word, with `|` between aliases (`handbook|hb`), matched regardless of case.
+  - Each text line not starting with `#` is a step; the `#` lines describe it.
+  - The steps are joined with `; ` and run as one batch, as the caller.
+- **Where it lives** (prop `on`):
+  - absent: carried by its author;
+  - `house`: everyone;
+  - an existing id: on that thing;
+  - any other word: that actor.
+- **Lookup:** carried by you, then on a thing named among the words, then the house. Two verbs at one level refuse and name both. It is tried only after the built-ins fail: when the first word is no command, or for `do <word>` when `<word>` isn't a built-in verb. `use <id> [words]` names a verb exactly, and refuses one that someone else carries.
+- **Blanks:**
+  - `$1 $2 …` refuse when there are too few words;
+  - `$1.title`;
+  - `$*` is every word after the verb, the target included (F24);
+  - `$me` is the caller and `$this` is the verb note;
+  - values are quoted automatically.
+- **Limits and provenance:** nesting stops at depth 5. Events are tagged `verb_run: "<word> <aid>"` and show in history as `(verb <word> <aid>)`. `examine` lists the verbs on a thing; `help <word>` describes the verbs you can reach.
+- **Misses:** a reach that nothing answers is appended to `reaches/<world>.jsonl` (not in git).
+- **Undo** reverts one step at a time, not the whole use (see Evidence).
 
 ## Lenses: one scene, two printers
 
 ```text
-world + lens note  ->  scene.build  ->  scene tree  ->  to_text   (scene <lens>: what an agent reads)
-                                                   ->  lens.js   (lens.html: what a person sees)
+lens note -> parse (WORDS table) -> resolve ($names) -> lower (IR) -> evaluate (Accessor, read log R)
+          -> emit (paint contract) -> to_text          (scene <lens>: what an agent reads)
+                                   -> painter_view -> lens.js   (lens.html: what a person sees)
 ```
 
-A **lens** is a subject tagged `lens` whose text is the definition. It is created, rewritten, undone, forked and merged like any note. Both printers read one tree, so screen and text cannot disagree about what is there, what it says, where it sits, or what a gesture sends. The `scene.py` docstring is the grammar reference. Each line reads `name : prop, prop`; indentation is containment; the first unindented part is the root.
+A **lens** is a subject tagged `lens` whose text is the definition. It is created, rewritten, undone, forked and merged like any note, and found by title regardless of case; two with one title are refused unless exactly one is placed. Each line reads `name : prop, prop`. Indentation is containment, and the first unindented part is the root. Lines starting with `lens ` or `#`, and trailing ` # ` comments, are skipped.
+
+**The stages.** `scene.scene_for` delegates to `lens_ir.scene_for`.
+1. **Parse:** `scene.parse`, driven by the `WORDS` table (word → shape, setter). The checks are folded in here. A refusal prints the whole vocabulary from the table.
+2. **Resolve:** `scene.resolve` classifies every `$name` in every reachable part (field, host, gesture, let, frame, prop) before anything runs, and refuses a frame not in scope.
+3. **Lower:** `lens_ir.lower` makes one node per part: `bind` (one | many), `lets`, `guard` (value | selection), `emit`, `acts`, `place`, plus `carry`, `kids` and `deps`.
+4. **Evaluate:** `lens_ir.evaluate` reads through an `Accessor` that logs each read into R (value, thing, select, rows, define, touched, host), in this order within a part: bind, lets, guard, emit, acts, instances, placed lens, fixed kids.
+5. **Compile:** `compile_lens` adds the definition closure (`def`: the lens's id and rev, `status` current or fallback, the style's name and rev) and handles the last-good fallback.
+6. **Emit:** `scene.emit` gives every node its `paint`, `acts` and `fence`. `painter_view` passes the painter only key, paint, acts, fence, kids and part.
+
+The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the reference the golden prints were made with.
+
+**Words** (the `WORDS` table and `INTERPS`; the `scene.py` docstring lags behind them):
 
 | Word | Meaning |
 |---|---|
-| `column` `row` `free` | Layout, the surfaces' own three words |
-| `role <name>` | Look, by a role from `calm.style`; an unknown role is refused with the list |
-| `text <template>` | Words; `$title $text $kind $due $tags $id $item $it $n`, row fields, any prop of the thing (`$place`, printed as `read place=…`, or `(no place)` when missing), and a named frame's fields (`$trip.start`); quote to keep commas and hashes |
-| `clamp <N>` | At most N lines of text, or N repeats; both printers say how many are left |
-| `of <selection>` + `each <part>` | Repeat over a selection, over ids named one by one (`of a04,s09`, each printed with its state: unplaced, gone), or a row source: `sections:<id>`, `comments:<id>`, `actors`, `events`, `worktrees` (`rows <source>` prints the same rows). An empty repeat prints `(empty)` |
-| `the <selection>` | Exactly one thing becomes the current thing; prints which, or `(empty)`, or `(ambiguous: …)` with nothing built under it |
-| `as <name>` | Names this part's thing as a frame, read below as `$name.field`; on a repeat, each instance |
-| `derive <name> = <interpretation> <inputs>` | A named calculation from a closed list (`day-n`, `days-from`, `weekday`, `week-of`) that prints its inputs and result |
-| `capture <field>=<value>` | Use this value instead of following; prints `(now X: differs)` when the world has moved on |
-| `over $tags` | Repeat over a list field; `$it` is each value |
-| `at item` | The appearance's own world geometry; only under a `free` parent |
-| `spread x <a> step <n\|$prop> to <max>` | Computed placement by index; printed as `(spread, not its place in the world)`, never written back |
-| `lens <name>` | Place another lens; a lens may not contain itself |
-| `only when <selection>` | The part exists only on a match; the text prints the absence |
-| `on click\|edit\|drag do <command>` | A gesture is a desk command; the painter fills `$x $y` or `$value` |
+| `column` `row` `free` `grid <tracks>` `cells` | Layout. Tracks are in `fr` or `fit`, and a track may be `<n>gap` |
+| `gap`, `scroll none\|scroll\|end`, `fold ["label"]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event; `plain` turns off code runs |
+| `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
+| `text <template>` | Words (template names below); quote to keep commas and hashes |
+| `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
+| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>`, `actors`, `events`, `worktrees`, `house[:<corner>]`. An empty repeat prints `(empty)` |
+| `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
+| `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
+| `over $<list>` | Repeat over a list field or derived rows; `$it` is each value |
+| `derive <name> = <interp> <inputs>` | A named calculation from a closed list: `day-n`, `days-from`, `day-or-time`, `weekday`, `week-of`, `time`, `date`. It prints its inputs and result |
+| `capture <field>=<value>` | Use this value instead of following; prints `(now X: differs)` when the world has moved on. Kept out of the fence |
+| `at item` | The appearance's own world geometry, only under a `free` parent |
+| `spread x <a> step <n\|$prop> to <max>` | Computed placement by index, printed as `(spread, not its place in the world)` |
+| `lens <name>` | Place another lens, whose name may be templated (`lens $kind`); a lens may not contain itself |
+| `only when <selection>` or `only when $x <op> v` | The part exists only on a match. A value test (`= != < > <= >=`) prints its inputs; a missing value counts as absent, not false |
+| `carry`, `on click\|edit\|drag do <command>`, `on drop <part> do <command>` | Gestures (see Gestures and their fence) |
 
-There is no escape to HTML, CSS, script, arithmetic or conditionals. Anything else is refused with its line number. A scene has a budget of 1500 nodes. (Round six proposes admitting arithmetic, `if` and nesting in printed form; see Under study.)
+**Template names.**
+- Fields: `$title $text $kind $due $tags $id $item $count`.
+  - `$count` is the size of the nearest repeat.
+  - `$n` survives only as a prop name.
+- Any prop of the thing: `$place` prints `read place=…`, or `(no place)` when missing.
+- Frame fields `$f.x` and lets.
+- `$it`, `$it.n`, `$it.date` from derived rows.
+- Host names `$me $today $session`.
+- Freshness names:
+  - `$touched`, the last event on the thing, and `$touched.id|verb|at|by`;
+  - `$changed.<field>`, the last event touching that field.
+  - These are logged in R but kept out of the fence and the seen index.
+- Gesture names `$value $x $y $carried`.
+- A `$name` that is neither in scope nor a prop prints verbatim, with no warning.
 
-**Bindings.** A gesture carries what was observed: the item's revision, the event index the scene was built at, and the lens's id and revision. The server refuses a gesture painted under an older lens revision, and sets the actor's seen revision to the painted one so the ordinary fence judges the item. The painter never looks again on the person's behalf. A gesture also carries the revision of every thing whose value filled its line or fed its derivations, so it is refused if any of those moved. That is the read-set fence. A painted gesture is judged on what was painted, even against the actor's own later changes.
+**What prints.** `to_text` prints each node with its facts:
+- an occurrence key segment (`· key …`);
+- `runs N code`, for code spans and fences, which become runs at print;
+- `(absent: why)`;
+- `· only when …`;
+- 240- and 120-character cuts.
 
-**Facts and observations.** A placed part carries what the world knows, such as `= offscreen-part`. The painter reports what only it knows through `/api/observe`: viewport, `cut by the clamp`, `contents overflow the box`, `out of view`. The text printer shows these per viewer as `~` lines. They are observations, never events.
+A scene has a budget of 1500 nodes. There is no escape to HTML, CSS or script, and no arithmetic or general `if`. Anything else is refused with its line number.
 
-**Resilience.** A lens that stops compiling keeps showing its last version that did, and says so first. The painter keeps unchanged elements by key, so a reader's selection survives another person's act. `lens.js` is 123 lines against a 150-line budget written in its header; it knows no app, kind, colour or size.
+**Resilience.** A lens that stops compiling keeps showing its last version that did, and says so first:
+```text
+! lens L2 no longer compiles … ! showing the last version that did; gestures are off until it compiles.
+```
+- The fallback is kept in `desk._lens_good`, in the pickle, and is named in `def`.
+- A lens refused for exceeding the node budget gets no fallback.
+- The scene is rebuilt in full on every request; there is no incremental rebuild.
 
-**Style.** `desk-shell/style/calm.style` defines tokens (the only place a colour or number appears), roles built from tokens, `when <selection>` clauses and themes. A lens names roles; the style never names a lens. The style is a file outside the world: no desk command changes it, and it has no events or undo.
+**Facts and observations.**
+- A placed part carries what the world knows, such as `= offscreen-part`.
+- The painter reports what only it knows through `/api/observe`, kept per actor in `desk._views`, never as events:
+  - `cut by the clamp` and `contents overflow the box` are always reported;
+  - viewport, `out of view`, unsent drafts, folds and the carried thing are reported only with `?share=attention`.
+- Without that, the text printer says the viewer `has this open; attention not shared`.
 
-**How the language grows.** From the design studio, argued positions rather than checks: a new word must be sayable in the desk's language; if the world or the style can carry something, the lens refuses it; a word must print as text, shorter than what it paints; a gesture exists only if the painter can do it; at the painter's line ceiling a word must be removed to add one. Round six proposes replacing these rules, including "no if, no arithmetic" and the painter's line ceiling, with checkable properties. That is Alex's decision; see Under study. Alex has already set the direction: no cap on the compiler or the painter, but neither may grow linearly.
+**How the language grows.** The growth rules from the design studio are argued positions, not checks. The painter's line ceiling is under review ("Alex rejected the cap", in `lens.js`'s header) and is already exceeded. Alex's direction: no cap on the compiler or the painter, but neither may grow linearly.
 
-A desktop of three lenses (`notes`, `editor`, `together`) exists in session `lens` as the ten-line lens `desktop`: 200 scene nodes, 200 painted. What stops it replacing the shell: no viewer identity in a lens, no lens chosen by the kind of thing shown, no stacking or focus, no resize gesture, no place for toggles.
+To add a lens word today:
+1. a `WORDS` row and setter in `scene.py`;
+2. its lowering and evaluation in `lens_ir.py`;
+3. `to_text` and `emit`;
+4. `lens.js`;
+5. `test_scene.py`;
+6. `suite/sessions.py --check`, then `--rebase` when the change is intended.
+
+A new paint word needs only a table row, because `PAINT_WORDS` passes it through.
+
+## Gestures and their fence
+
+A gesture is a desk command written in the lens, and `do` is implied unless the line starts with a reading command.
+- `click` fills `$x $y`.
+- `edit` fills `$value`. It commits on Enter or Ctrl-Enter (`paint.commit`); `on edit` on clamped text is refused.
+- `drag` fills `$x $y`, and is painted only on a node with a box.
+- `carry` marks a part that can be picked up.
+- `on drop <part> do <one command>` runs on the receiver. `$carried` is filled by deskd with the carried item's id.
+
+The painter fills only the first occurrence of each name. Click and edit lines may still batch with `;` and may `run` a script.
+
+**What a gesture carries.** Each painted gesture is sent with `observed`:
+- `item` and `rev`;
+- `reads`: `[thing, rev, aspects]` for every value that filled it or fed its derivations, and `["select", query, answer, keep]` for every membership it relied on, including the binds on its chain;
+- `defpart`: the part's lens, id, path and a hash of its binding lines;
+- `bind`;
+- `at`;
+- the whole `def` closure;
+- for a drop, `carried` and `receiver`.
+
+**What deskd checks** (`/api/do`, in order):
+1. A gesture from a fallback frame is refused: "it is for reading".
+2. Part identity: a gesture is admitted when its part still hashes the same, even if the lens changed elsewhere. It is refused only when the part changed and the lens moved. Every closure member is checked.
+3. For a drop: the carried thing ("changed while it was in the air"), then the receiver's revision, reads and part.
+4. The item, judged on the aspects its gesture read (`touched_aspects`). The refusal names the last event, its verb and its author. When the item is accepted, the actor's seen revision moves to the current one.
+5. Each read: a thing passes if only unread aspects moved; a selection must give the same answer, compared as a set, with a clamped repeat comparing its shown prefix.
+
+Every refusal ends with "nothing was done. The view will repaint." A painted gesture is judged on what was painted, even against the actor's own later changes, and the painter never looks again on the person's behalf.
+
+## Style
+
+A style is a note tagged `style` and titled with its name. It is edited, undone and forked like any note (F7).
+- A lens picks one with prop `style=<name>`.
+- `desk-shell/style/calm.style` is only the seed, used when the world has no note of that name.
+- The style defines:
+  - tokens, the only place a colour or number appears;
+  - roles built from tokens;
+  - `font <name> = Family, fallback` lines;
+  - `when <selection>` clauses;
+  - themes.
+- A lens names roles; the style never names a lens.
+- The painter fetches `/api/style` and restyles when the style's revision changes. `?theme=` picks a theme.
+- `when` clauses reach only the windowed shell.
+- A lens without `style=` has its roles checked against the file, while the painter paints `calm` from a world note of that name if one exists.
 
 ## Processes and state
 
 | Endpoint (`deskd.py`) | What it does |
 |---|---|
-| `GET /api/snapshot?session&as` | The world as JSON plus the actor's outline; rendering does not count as looking |
-| `GET /api/scene?session&as&lens` | `{scene, text}` or `{refused}` |
-| `GET /api/events?session&since` | Events after an index; the painter and shell poll every 1.5 s |
-| `POST /api/do` | `{session, as, line, observed?}` returns `{text, error, created, events}`; the first `ERR` line becomes `error` |
-| `POST /api/observe` | Painter reports, kept per actor; never refuses |
-| anything else | A static file from `desk-shell/` |
+| `GET /api/snapshot?session&as` | The world as JSON, plus `events_total`, `worktree`, `readers` and the actor's outline. Rendering does not count as looking |
+| `GET /api/scene?session&as&lens[&view=painter]` | `{scene, text, events_total}` or `{refused}`. `view=painter` sends `painter_view` with the root's `def`. A compiler crash is reported as a bug in scene.py, not in the lens |
+| `GET /api/style?session&as&name` | A style's source from the world, else the seed file (`name` defaults to `calm`) |
+| `GET /api/version` | `{code}`: git HEAD when deskd started. Loads no session |
+| `GET /api/events?session&since` | `{events, total}`, without undo records |
+| `POST /api/do` | `{session, as, line, observed?}` returns `{text, error, events_total, line, as, created, events}`. `error` is the first `ERR` line. An empty line is 400. `worktree …` lines go to worktree.py |
+| `POST /api/observe` | `{session, as, lens, at, viewport, facts}`, capped at 400 facts; returns `{ok, kept}` |
+| anything else | GET: a static file from `desk-shell/`. POST: 404 |
 
-A session is one file, `sessions/<name>.pickle`, holding the whole Python desk: world, rules, scripts, per-actor state, observations. Every server request, reads included, loads it under `sessions/<name>.lock`, acts, and rewrites it. A GET for an unknown session creates it. The lock is advisory: a waiter deletes a lock older than 60 s and proceeds without one after 30 s on the server or 60 s on the CLI. The CLI saves once at the end of an invocation.
+- The server is a `ThreadingHTTPServer` on 127.0.0.1. Replies are `no-store`.
+- Per-actor state is keyed by actor alone; the CLI keys it by actor and window.
+- A new actor starts with nothing seen, and `jeff` uses the session's own slot.
+- The shell polls `/api/events` every 1.5 s. The painter polls `/api/scene?view=painter` every 1.5 s and `/api/version` every 5 s, and reloads the page when the code changed, unless someone is typing or holding a part.
+
+**Sessions.** A session is one file, `sessions/<name>.pickle`, holding the whole Python desk: world, rules, scripts, clock, per-actor state, observations and the last-good lenses.
+- Every request that names a session, reads included, loads it under `sessions/<name>.lock`, acts, and saves it.
+- A request for an unknown session creates it. Session names are not validated.
+- The lock holds the holder's pid. A waiter removes a lock whose pid is dead or that is over 60 s old. It gives up after 60 s (`could not take … lock`) and never proceeds without the lock.
+- A save writes `<name>.pickle.tmp`, then renames it into place (`explore.save_desk`).
+- The CLI saves once at the end of an invocation.
+- Exception: `export_docs.load`, which the house, `health.py` and `try_house.py` use, runs its own loop. It writes no pid, reads without the lock after 60 s, and removes the lock afterwards even if it never took it (see Evidence).
 
 ## The browser
 
-Two paths paint the same world.
+Two pages paint the same world.
 
-- **Windowed shell** (`index.html`, `shell.js`, `core.js`, `apps/`): a dock, draggable windows, three hand-written apps (Notes, Editor, Together). Each app implements `text(ctx)`, what a text-only inhabitant reads for that window. Apps prefix `look <id>;` to their commands, so their gestures are not fenced against what was on screen. The style panel edits page memory only.
-- **Lens painter** (`lens.html`, `lens.js`): the generic painter described above, on its own page. It applies roles and tokens; `when` clauses reach only the shell.
+**The lens painter** (`lens.html`, which loads `style/style.js`, `viewer.js`, `lens.js` and `term.js`) is the generic painter.
+- It reads the paint contract (key, paint, acts, fence) and knows no app, kind, colour or size.
+- `lens.js` is 255 lines.
+- `viewer.js` (155) keeps continuity:
+  - unchanged elements are kept by key, so a reader's selection survives another person's act;
+  - drafts survive a refusal, a reload or a closed tab (localStorage `lens-drafts:…`), and so do folds;
+  - a refused draft is shown with both sides;
+  - it posts observations.
+- Also in the painter:
+  - cards move by keyboard;
+  - carry and drop work;
+  - code prints as runs;
+  - `paint.semantic` marks buttons and groups.
+- `term.js` (56) is a desk terminal in the right-hand pane by default. It sends lines to `/api/do` and keeps its history in localStorage.
 
-`desk-shell/natives/prose.js` is an 80-line prose editor with a settle law, written against a host contract (`{actor, send, publish}`) but loaded nowhere; the compiler refuses `native` and `settle`. `desk-shell/OWNERS.md` names one owner per file.
+**The windowed shell** (`index.html`, `shell.js`, `core.js`, `apps/`) has a dock, draggable windows, and three hand-written apps: Notes, Editor and Together (`apps/third.js`).
+- A window is an appearance on the `<actor> screen` surface:
+  - opening it is `do place`, then `do move` and `do resize`;
+  - dragging ends in `do move … to=x,y`;
+  - the grip ends in `do resize … to=WxH`;
+  - closing it is `do remove`.
+- Other `* screen` surfaces show as "<who> has N open".
+- Each app implements `text(ctx)`, what a text-only inhabitant reads for that window.
+- Apps prefix `look <id>;` to their commands, so their gestures are not fenced against what was on screen.
+- The shell loads `calm.style` as a file, and its style panel edits page memory only.
+
+`desk-shell/natives/prose.js` is an 80-line prose editor loaded nowhere. It reads the old node shape, from before `paint`, and the compiler refuses `native` and `settle`.
+
+`desk-shell/OWNERS.md` names one owner per file. While the old team is paused (from 28 Sep), Claude edits the paused owners' files where the command center needs it, and logs each change in `research/command-center/FRICTION.md`.
+
+## Residents: the house
+
+`house.py` runs resident agents that live in a world (`python house.py [world] [--fake PORT]`, default `frontier`; normally started by the keeper).
+
+**Settings.** Props on the placed note titled "The house" override the defaults:
+- `model=claude-opus-5-5`;
+- `breather=120` s;
+- `wake_every=14400` s;
+- `workers=1`;
+- `worker_model`.
+
+**A resident** is any surface with `role=resident`, its corner. Its props:
+- `actor`, the name it is given. A corner without one has status `unnamed` and is never started.
+- `want=awake|rest`.
+- `wake`, the desk line run on each wake (default `run arrive`).
+- An optional `model`.
+
+**The process.**
+```text
+claude -p --input-format stream-json --output-format stream-json --verbose --system-prompt "" --tools "" --strict-mcp-config --setting-sources "" --model M [--resume <session>]
+```
+- The binary is `$HOUSE_CLAUDE`, else the newest `claude` found by `--version`.
+- cwd is `house-state/<world>/<corner>/`.
+- The environment drops every `CLAUDE*` variable and sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`.
+- The resident has no tools: everything it knows comes from the world.
+
+**The relay.** Only lines beginning with `>` reach the desk, and a line whose first word is a desk command counts without the mark. They run as the resident through deskd when `DESKD` is set, else through `desk_mcp.run_desk`. The receipt is the next message.
+
+**Welcome and waking.**
+- The welcome (the placed note "The door", with `$me` replaced by the name) prefixes the first message after a fresh start, a lost conversation, or a `compact_boundary` event (a compaction).
+- Every wake begins `You are <actor>. Your corner is <rid>.`, followed by:
+  - the receipt of the wake line;
+  - news;
+  - any undelivered text from a turn that didn't finish.
+- A resident is woken:
+  - when its process first starts;
+  - when a timed rest ends (`(you rested 2 hours)`);
+  - every `breather` seconds while an objective is open (a subject with `objective=open`);
+  - every `wake_every` seconds.
+
+**Rest and quiet.**
+- `> rest` rests until called. `> rest <human time>` (minutes, hours, days, weeks, "an hour and a half") rests for that long, at most 30 days; an unreadable time is answered and the resident goes on.
+- Lines run before a rest are delivered on the next wake.
+- A reply with no commands gets held news or `(quiet)`. After 10 quiet exchanges in a row, the resident rests.
+- An empty reply rests.
+
+**News.**
+- **Urgent news ends any rest:**
+  - a line in a chat in its corner;
+  - `@name`, `@everyone` or `@all` anywhere;
+  - a comment on a thing in its corner;
+  - a comment on its own commission.
+- **Held news rides along with the next message:** a line in a chat whose `members` include `all` or the resident.
+
+**Failure.** A lost conversation (`No conversation found`) starts fresh, with the welcome. Other failures retry with backoff up to an hour, with status `error`.
+
+**State.**
+- The house writes the corner's `status` (`awake`, `asleep`, `unnamed`, `error`) as actor `house`, only on change.
+- `house-state/<world>/house.json`, rewritten every pass, is read by the `house` row source.
+- Each corner keeps `state.json` and `transcript.jsonl`.
+- `house-state/` is never committed.
+
+**Exit codes.** A second house on one world exits 76. Under the keeper, a house whose landing changed Python exits 75 once no one is mid-turn.
+
+## Commissions, workers and the keeper
+
+The second tier of live building: code the world can't change yet.
+
+**A commission** is any placed subject with a `commission` prop. Its states:
+```text
+asked -> working -> (waiting <-> working) -> ready -> landing -> landed | reverted | failed   (anyone: cancelled)
+```
+- `asked_by` is the prop, else whoever created it, else alex.
+- "Alex's standing trust is the grant": nothing waits for approval.
+
+**A worker** (`workshop.py`) is started when fewer than `workers` are running.
+- The house makes `git worktree add .worktrees/<cid> -b worker/<cid> HEAD` and copies the world in as `sessions/<world>-try.pickle`.
+- It then runs:
+```text
+claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob Grep mcp__desk__desk Bash(<r>:*) PowerShell(<r>:*) --mcp-config … --setting-sources "" --append-system-prompt <protocol>
+```
+  - `<r>` covers git status, diff, add, commit, log, show and rebase, `node --check`, and python.
+  - The protocol tells the worker to read AGENTS.md. It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
+- The worker's desk tool (`desk_mcp.py`, as `worker-<cid>`) acts in the live world.
+- It talks through comments on its commission, and those comments come back to it as messages.
+- It says it is done by committing and setting `commission=ready`.
+
+**Landing** happens between the house's passes:
+1. The branch's changes must be non-empty and avoid `sessions/` and `.env`.
+2. Health is taken.
+3. `git merge --no-ff worker/<cid>` into whatever branch is checked out, with the subject `land <cid>: <title>`.
+4. Health is taken again. If it fails, or a lens that compiled before no longer does, the merge is reverted (`git revert -m 1`).
+5. The result is commented, the worktree removed and the branch deleted.
+6. A landed `.py` change asks the house to restart.
+
+**The keeper** (`keeper.py [world] [--port 8794]`) runs deskd and the house (the house with `DESKD` pointing at that deskd, and `HOUSE_KEEPER=1`).
+- It restarts deskd whenever HEAD moves.
+- It restarts the house:
+  - at once on exit 75;
+  - after 60 s on exit 76;
+  - after 30 s on any other death.
+- If the house dies 3 times within 5 minutes after a `land ` commit less than 15 minutes old, the keeper reverts that commit.
+- Its log is `house-state/keeper.log`.
+
+**Health** (`health.py <world> [--json]`), in order:
+1. every `*.py` compiles;
+2. `node --check` passes on `desk-shell/*.js` and `style/*.js`;
+3. `test_scene.py` passes;
+4. `suite/sessions.py --check` shows 0 golden differences;
+5. every placed lens compiles.
+
+A refusing lens is listed but doesn't fail health.
+
+**Trials.** These spend real model calls.
+- `try_house.py` copies a world to `try-<tag>`, names and wakes chosen corners, runs the real house under turn and time caps, writes a report to `research/command-center/trials/`, and deletes the world and conversations.
+- `try_worker.py` runs one real commission in a throwaway worktree, landing on a `trial/<tag>` branch, never on main.
+- `fake_model.py` is a scripted stand-in for the model API, for house tests.
+
+## Documents
+
+- **`export_docs.py [session] [--force] [--dry]`** writes this document from the binder *How the desk is built* to `docs/` and to Alex's vault, each with a stamp. The first note is the title and introduction; each later note is a section. A copy edited outside the desk is left alone, with a warning. For `frontier` it also writes `research/object-facet-frontier/desk-export.txt`.
+- **`handbook_docs.py [world]`** copies `docs/Agora.md` and `docs/Dynamic Desk.md` verbatim into the Handbook binder *What we're building*, rewriting only on a change.
+- **`docs_sync.py [--watch [s]] [--no-handbook]`** keeps the five design documents the same in `docs/` and the vault, ignoring line endings.
+  - An edit on either side is copied to the other.
+  - When both sides moved, it refuses and shows the first difference.
+  - A change to Agora or Dynamic Desk runs `handbook_docs.py`.
+  - Nothing starts it automatically yet.
+- **`desk_mcp.py`** is the desk as an MCP tool over stdio: one tool, `desk {line, as, session, window}`. It validates actor and session names, refuses `!` lines, and runs `explore.py` once per call.
 
 ## Code map
 
 | File | Lines | Responsibility |
 |---|---:|---|
-| `world.py` | 824 | Subjects, appearances, surfaces, links, comments, geometry, events, `apply`, `undo`, the revision fence |
-| `desk.py` | 950 | Outline notation, the seen fence (per thing and aspect, per observer), `;` batching, reading commands, `undo`, `do` |
-| `desk_moo.py` | 263 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
-| `desk_knife.py` | 1175 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics |
-| `moo.py` | 534 | The verb registry: `@verb` declarations, kind inheritance, composed verbs, synonyms |
-| `knife.py` | 250 | The selection language and pair verbs |
-| `scene.py` | 796 | Lens grammar, compiler, text printer, row sources |
+| `world.py` | 965 | Subjects, appearances, surfaces, links, comments, geometry (and `DESK_GEOMETRY=choices`), events, `apply`, `undo`, chat signing |
+| `desk.py` | 1069 | Outline notation, the seen fence and its aspect table, the blind-replace check, `;` batching, reading commands, `undo`, `do`, the world-verb fallthrough |
+| `desk_moo.py` | 267 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
+| `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
+| `moo.py` | 535 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
+| `knife.py` | 261 | The selection language (with `unanswered:`) and pair verbs |
+| `verbs.py` | 260 | World verbs: finding, filling, running, reaches |
+| `scene.py` | 1444 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
+| `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
 | `worktree.py` | 207 | Fork, journal, diff, all-or-nothing replay merge |
-| `explore.py` | 184 | CLI: forward to deskd or run under the lock; per-observer state (`--window`); `!actor` injection |
-| `deskd.py` | 208 | HTTP server and the gesture fence |
-| `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things; `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo |
-| `test_scene.py` | 62 | Four lens-admission tests |
+| `explore.py` | 229 | CLI: forward to deskd or run under the pid lock; atomic save; `--window --dump --shape --reset`; `!actor` injection |
+| `deskd.py` | 355 | HTTP server and the gesture fence |
+| `house.py` | 698 | Residents |
+| `workshop.py` | 311 | Commissions and workers |
+| `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
+| `health.py` | 119 | The checks a landing must pass |
+| `try_house.py`, `try_worker.py`, `fake_model.py` | 463 | Trials and a fake model |
+| `desk_mcp.py` | 176 | The desk as an MCP tool |
+| `export_docs.py`, `handbook_docs.py`, `docs_sync.py` | 316 | The documents |
+| `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
+| `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
+| `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
+| `test_scene.py`, `test_journal.py`, `golden_prints.py`, `suite/` | 382, 839, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
+| `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 520 | The lens painter, continuity, the desk terminal |
+| `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
+| `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
+| `desk-shell/checks/` | 1823 + 884 | Iris's browser checks and results, Rook's defect list, and Pike's continuity instrument (`continuity/run.mjs`, with 13 results) |
 
-`scene.py` grew from 452 to 796 lines with the round-two binding words, about 86 lines per word counted from its first version (Pike, round six).
-| `desk-shell/lens.js`, `lens.html` | 154 | The generic painter |
-| `desk-shell/style/calm.style`, `style.js` | 391 | The style language and its compiler to CSS |
-| `desk-shell/shell.js`, `core.js`, `apps/*.js` | 1921 | The windowed shell and its three apps |
-| `desk-shell/checks/` | 1823 | Iris's measured browser checks and results; Rook's defect list |
+Which file for which change:
 
-Which file for which change: a new verb goes in `moo.py` (and `world.py` if it needs a new primitive or undo kind); a new command in `desk_knife.py`; a new lens word in `scene.py`, then `lens.js`, then `test_scene.py`; a new role in `calm.style`, reread on every compile; a new endpoint in `deskd.py` inside `Session`.
+| Change | Where it goes |
+|---|---|
+| A verb anyone can use | A note tagged `verb` in the world |
+| A new primitive or undo kind | `world.py` and `moo.py` |
+| A new command | `desk_knife.py` |
+| A new lens word | See "How the language grows" |
+| A new role or token | The style note in the world |
+| A new endpoint | `Handler.do_GET` / `do_POST` in `deskd.py` |
+| Resident behaviour | `house.py` |
+| Code the world can't change | A commission |
 
 ## Evidence and limits
 
-**Automated checks.** `test_scene.py` runs four tests, all passing today, covering lens admission only. Nothing automated covers `world.py`, verbs, the fence, undo, worktrees or the server. The first text desk's sixteen tests (now under `research/archive/text-desk-lab-v1/`) exercise an earlier desk, not this code. `desk-shell/checks/` needs a live page and a running server. Model trials (`run.py`) depend on a transport and a Codex binary outside this repository.
+**Checks that ran on 29 September.**
 
-**Verified live, 18 September.** The lens painter painted 38 of 38 scene nodes and 200 of 200 for the desktop lens, with declared boxes exact to the pixel and every type size on the ramp. A reader's selection survived another actor's act. Rook reproduced nineteen shell and app defects, listed in `desk-shell/checks/rook-bugs.md`; most remain open or unverified.
+| Check | Result |
+|---|---|
+| `python health.py frontier` | python ok; scripts ok; test_scene 14 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.5 s |
+| `test_scene.py` | 21 tests, all pass when called. Its `__main__` block sits before the last 7, so `python test_scene.py` runs only 14 |
+| `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`. S11 drives an old code path and no longer describes the desk |
+| `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs |
 
-**Verified in scratch sessions, 23 September.** The two fence refusals; the lens-revision refusal; undo limited to the latest change; a `;` batch keeping earlier steps after a later refusal; a `script` definition making no event so that a bare `undo` reverted an older change; export output failing to replay because titles become ambiguous; a merge refused for a change by the same author; `!actor` lines signing most verbs as the session's own actor.
+- `golden_prints.py` has no check mode (it writes); `suite/sessions.py --check` is the read-only comparison.
+- `desk-shell/checks/` needs a live page and server, and was not run.
+- Nothing automated covers deskd's HTTP layer, the house with a real model, or the browser.
 
-**Fixed today.** A function-local import in `knife.py` turned seven selection refusals into crashes, and a CLI crash loses the whole invocation. Removed; the refusals now print.
+**Fixed since the last review:**
+- A repeat records its membership.
+- A fallback scene carries its revision, and its gestures are refused.
+- `!actor` injection signs every verb as the injected actor.
+- `only when` takes a value test.
+- The refusal vocabulary is printed from the grammar table.
+- Saves are atomic.
+- The lock is pid-aware and never proceeds without it.
 
-**Verified in scratch sessions, 23–24 September:**
-- The fence at (thing, aspect) grain: a change to one prop no longer blocks another; the same prop still refuses; a worktree merge applies when base and fork touched different props (Jeff).
-- Round six's probes, by Sable and Juniper, reproduced by Jeff where marked:
-  - two builds of one scene are byte-identical and add no event;
-  - a `;` batch half-applies (reproduced);
-  - `script` definitions make no event (reproduced);
-  - `only when $wd=Mon` is accepted and meaningless;
-  - a prop named `n` silently shadows the repeat count;
-  - the `if` refusal lists 11 words and omits 7 the grammar has;
-  - `of events` silently shows the last 20 of 76.
+**Open defects a builder will meet** (reproduced 29 Sep unless marked read).
 
-**Open defects a builder will meet.**
-- The `worktrees` row source loads other sessions' pickle files during compilation.
-- A repeat over a selection doesn't record that it read the selection's membership, so tagging a thing can change a scene without any printed read.
-- `$n` is empty inside a repeat's instances.
-- `prop:to>date` is read as a prop name and matches nothing.
-- One viewer's `look` can change another viewer's `of actors` scene.
-- A scene served from the last-good fallback carries no lens revision, so gestures from it skip the lens fence, and it is rebuilt without the lens's props.
-- `export` does not replay: repeated placements make titles ambiguous, and props on unplaced subjects are dropped silently.
-- `!actor` injection signs events as the session's actor for every verb except `prop`, so `rule on … by=` never fires for them.
-- `help` omits the topics `scene`, `worktree`, `table`, `find`, `read` and `compare`, and the terms `comments:` and `links:`.
-- The shell's Notes app rewrites `"` to `'` in titles, and Escape on a new-note draft creates the note.
+*The fence and undo:*
+- Undoing a tiled `swap` crashes the invocation (`knife.py` records `restore: None`), and nothing is saved.
+- Your own receipt marks a thing fully seen, so after any act on it a `rewrite` passes the blind-replace check and drops text you never read.
+- Events made through a selection or a rule touch every aspect (their `via` isn't a verb). So `do tag in:Box add=k` makes an unrelated `append` stale.
+- A selection target skips the "not looked yet" refusal, and pair verbs never check staleness (read).
+- For a non-text aspect, the stale advice says "look at it again", but `look` doesn't print tags; `read` does.
+- A multi-step world verb is undone one step at a time.
+- Via deskd, the CLI does not stop at a refusal.
+- A `;` batch half-applies, and a `script` definition makes no event, so a bare `undo` reverts an older change.
 
-**Persistence and safety.** The pickle is the database, rewritten in place with no journal, no atomic write and no format version; loading it executes code, so a session file must be trusted. The server binds to localhost and checks no origin or token. Fences coordinate; nothing authenticates.
+*Worktrees and export:*
+- A worktree merge detects conflicts only for targets named by id. The same prop changed in base and fork through a title merges silently, and the base's value is lost.
+- `export` does not replay: an unplaced subject and its props are dropped, and repeated placements make titles ambiguous.
+
+*Selections, lenses and help:*
+- `prop:k>v` is read as a prop name and matches nothing, with no refusal.
+- `of events` shows the last 20 with no note that it was cut.
+- The `worktrees` row source loads other sessions' pickles, with no lock.
+- One viewer's `look` changes another viewer's `of actors` scene.
+- `$count` is not filled on the repeat's own part, although the docstring says it is. Inside instances, `$n` prints literally.
+- Host names `$me` and `$session` enter a gesture's fence as `prop:me` and `prop:session`.
+- A part placed by `spread` still offers `on drag`, so a computed position can be written back.
+- A placed lens starts with an empty context and can't read the thing it is placed on.
+- The compiler's identity hash covers `scene.py` and the seed style but not `lens_ir.py`.
+- `help` doesn't list `scene`, `worktree`, `compare` or `sync` at the top, and `help selections` omits `comments:`, `links:`, `parts:`, `part-of:` and `unanswered:`.
+- Comments and replies by jeff are stored as `by: alex` (read).
+
+*The shell:*
+- The Notes app rewrites `"` to `'` in titles (read). Whether Escape on a new-note draft creates the note needs a browser.
+
+**Persistence and safety.**
+- The pickle is the database, with no journal and no format version. Loading it executes code, so a session file must be trusted.
+- Saves are atomic, but `export_docs.load` can read without the lock and remove another process's lock (read).
+- deskd binds to localhost and checks no origin or token. It accepts POST bodies without a content type and does not validate session names, `..` included (read). A page from another origin could send simple POSTs to `/api/do` (imagined, not tried).
+- Fences coordinate; nothing authenticates.
+- Workers are real `claude -p` processes with file and shell tools. Their branches are merged without human review, on standing trust, and only `sessions/` and `.env` are off limits.
+- The keeper can revert HEAD on its own.
+- Residents run with no tools and a scrubbed environment.
+
+**Friction log.** `research/command-center/FRICTION.md` holds F1–F27. Open or partly open:
+- F2: scripts can't say who runs them.
+- F3: identity equals name.
+- F9: a repeat can't show the newest N.
+- F21: no plain way to "say".
+- F24: a verb can't say "the rest of the words".
+- F25: a verb's title is also a name.
 
 ## What a builder hits first
 
-In priority order, from an attempt to describe a calendar in this framework.
+In priority order, from an attempt to describe a calendar in this framework, updated 29 Sep.
 
-1. **No time type.** Kinds are a closed list, `due` is a date only, and props are strings compared by equality. Adding any of these needs Python.
-2. **A lens cannot read props.** `text $start` is refused; only the nine built-in names and row fields exist. *(Now fixed: `$start` and `$trip.start` read props and print what they read.)*
-3. **Placement cannot follow a value.** `spread` places by index; there is no arithmetic and no row source for days or hours. *(Partly eased: `derive … days-from` makes a row per day, and `day-n` computes a date. There is still no arithmetic.)*
-4. **Repeats cannot be ordered or headed.** `of` takes world order, and a repeat's own children print after its instances.
-5. **Gestures carry pixels and one field.** Nothing maps a position to a date, and no gesture creates a thing from input.
-6. **Two interfaces that do not meet.** The windowed shell and the lens painter are separate pages; a builder chooses bespoke JavaScript or a small grammar.
-7. **Text entry is whole-field and commits on blur** until the prose native is wired.
-8. **Definitions are not uniform.** Lenses are notes; rules, scripts, clock and style are not, so they have no history, undo or fork.
-9. **No durable store, no identity, no tests** for the command layer.
+1. **No time type.** Kinds are a closed list; `due` is a date only; props are strings compared by equality, and `prop:k>v` silently matches nothing. Adding any of these needs Python.
+2. **A lens cannot read props.** *Fixed:* `$start` and `$trip.start` read props and print what they read.
+3. **Placement cannot follow a value.** `spread` places by index, and there is no arithmetic. *Eased:* `derive … days-from` makes a row per day, and `day-n` computes a date.
+4. **Repeats cannot be ordered or headed.** `of` takes world order, and a part prints its instances before its placed lens and fixed children.
+5. **Gestures carry pixels and one field.** *Eased:* an `edit` can run any verb, including a `create` titled with `$value`, and a drop onto a derived day row can carry `$it.date`. Nothing maps a position to a date.
+6. **Two interfaces that do not meet.** The windowed shell and the lens painter are separate pages. The lens page now has a desk terminal beside it.
+7. **Text entry is whole-field**, committed on blur, Enter or Ctrl-Enter. Drafts now survive a refusal or a reload. The prose native is still unwired.
+8. **Definitions are not uniform.** Lenses, styles and world verbs are notes. Rules, scripts and the clock are not: they have no history or undo, though worktrees carry them.
+9. **No durable store, no identity, few pass/fail tests** for the command layer. The instruments (`test_journal.py`, `suite/`) drive it but don't gate.
 
 ## Under study
 
-Tentative mechanisms: designed or argued, not built, unless marked. Each names the commitment it serves. Sources are in `research/object-facet-frontier/`: POSITION v2, the round-six proposition, and the researchers' notes. Items marked **(decision N)** wait on Alex, numbered as in the round-six proposition; "POSITION 8.x" refers to POSITION v2's decisions.
+Tentative mechanisms: designed or argued, not built, unless marked. Each names the commitment it serves.
+- **Sources:**
+  - `research/object-facet-frontier/`: POSITION v2, the round-six proposition, and the researchers' notes;
+  - `research/command-center/`: the drafts *Three ways to change the world*, *Kinds and shapes* and *Living in the world*, also in frontier as a598, a613 and a595, part of the task a593.
+- Items marked **(decision N)** wait on Alex, numbered as in the round-six proposition.
 
-**For "extending gets cheaper" and "a view says why": the staged compiler.**
-- The compiler is split into stages: parse (a table of word shapes), resolve names, check, lower to six intermediate kinds (bind, let, guard, emit, act, place), evaluate through one logged door into the world, then print and paint by kind.
-- A new surface word becomes a table row plus a short lowering. A library word, written in lens with `define` in a note tagged `lib`, costs the compiler nothing.
-- Growth is measured per commit (checks C1–C3, `experiments/growth/measure.py`). The design is wrong if, after staging, the next five words cost more than 20 lines each.
+**Built since the last review: the staged compiler.** Parse, resolve, lower to the six kinds, evaluate through the Accessor, and emit; see "Lenses". Still open:
+- the evaluator is a transcription of the old one, not a dispatch by kind;
+- it still reads the world directly in places;
+- R is logged but nothing consumes it (the fence is built separately);
+- there is no incremental rebuild;
+- `define`/`lib` library words are not built.
 
-**For "a view says why" and "nothing is silently stale": the read-set.**
-- The evaluator reaches the world only through an accessor that logs every read, membership included.
-- One log feeds the printer, the gesture fence and incremental rebuilding.
+The growth measure (`research/object-facet-frontier/experiments/growth/measure.py`, M1–M6) is run by hand and measures only the frozen `scene.make`, not `lens_ir.py`.
 
-**For "readable, not walled": names and scopes.**
-- Written scope rules N1–N6: lookup runs innermost first through lets, frames, the thing, then the host.
-- No shadowing. `$count` replaces `$n`. `$item`, `$id` and `$it` are distinct.
-- Refusal text is generated from the grammar table.
+**Partly built: names and scopes.** `resolve` classifies every name and refuses shadowing of frames and built-ins; `$count` exists; refusals come from the grammar table. But classification checks built-ins first rather than innermost first, and a prop is silently shadowed by a built-in.
 
-**For "readable, not walled": `if`, arithmetic and nesting (decision 1).**
-- They are admitted in printed form: a total `if` prints its test and the branch taken.
-- Nesting is lowered to named, printed steps. Anything referenced from outside must be named.
-- This replaces the growth rule "no if, no arithmetic" with the properties L1–L8, measures C1–C10 and tests T1–T7.
-- Alex's direction (24 Sep): think long-term about what the language needs, without walls too early.
+**For "readable, not walled": `if`, arithmetic and nesting (decision 1).** *Not built*, except the `only when $x op v` guard, which prints its inputs.
 
-**For "one language" (decision 2).** One expression language in two contexts: reading in lenses, and proposing changes in gestures, rules and definitions. No separate evaluator.
+**For "one language" (decision 2).** One expression language in two contexts: reading in lenses, and proposing changes in gestures, rules, definitions and verbs. *Not built.* *Three ways to change the world* proposes:
+- one filler for blanks shared by world verbs and lens gestures;
+- verbs checked when saved;
+- write-through a view.
 
-**For "whole or not at all", "see before it happens" and "no silent overwrites": proposals.**
-- A gesture or rule yields one proposal: operation rows from one input state, applied whole or not at all, previewed first.
-- A proposal includes any rules it sets off.
-- One conflict rule is shared by gestures, rules and merges.
-- In the interim, gestures may not call scripts or rules (decision 3).
-- Viewer effects such as the clipboard are named and never replayed (decision 4).
+**For "whole or not at all", "see before it happens" and "no silent overwrites": proposals.** *Not built.*
+- A gesture or rule yields one proposal, applied whole or not at all and previewed first, including the rules it sets off.
+- Only `on drop` is limited to one command today. Decisions 3 and 4 are not enforced.
 
-**For "everything that changes behavior is visible".** Rules, scripts, the clock and the style become world data with history and undo. The hidden last-good cache is removed.
+**For "everything that changes behavior is visible".** *Style: built* (a world note). Rules, scripts and the clock remain desk attributes. The last-good cache remains, now named in `def`.
 
-**For "extending gets cheaper": the library.**
-- `define` in `lib` notes. Row sources are core only when they expose a kernel noun; `sections` becomes library.
-- Open questions: does a lens find a library word by name or by identity? What happens when two libraries define one name? How are words discovered? Who owns a word?
-
-**For "grows without walls too early": new intermediate kinds.** Not ruled out. A proposed bar before adding one:
+**For "extending gets cheaper": the library and new intermediate kinds.** *Not built.* The proposed bar for a new kind:
 - two unrelated tasks need it;
 - it can't be lowered into the existing kinds;
 - every consumer states what it does with it;
 - it keeps the properties.
 
-Candidates: time and animation, trees, built-in parts, behavior, reductions over rows.
+**For "new things to show don't need new code in the core": kinds in the world.** *Kinds and shapes* proposes:
+- a few storage shapes in the host;
+- many kinds as notes tagged `kind`;
+- several kinds per thing;
+- kinds that describe and never enforce.
 
-**For "everyday quantities come out right": allocation (decision 6).**
-- The disagreement: a core `split` operator that always prints its sum check (Pike), or library words plus a `check` word (Sable).
-- The deciding test is the household budget: 36 writes, 9 repairs and 14 silent wrongs today.
+*Not built*; its first step touches `world.py`.
 
-**For "true-when, not just written-when": timelines (decision 5).**
-- An aspect may be a sequence of dated segments, read with `at <date>`.
-- A missing end means open-ended, and the split policy is named.
+**For "the world is a place": rooms and narration.** *Living in the world* proposes:
+- rooms as places where verbs live, with "where you are";
+- narration in `look` and `examine`;
+- the desktop as a room with local layout verbs, and the Porch becoming the Desktop.
 
-**For "your view settings are yours": the viewer store.** Per-viewer values (a tab, a sort order) are printed, read by lenses, written by gestures, and never journaled.
+*Not built.* How arrangements, appearances and views divide is held open by Alex.
 
-**For "new things to show never need app code" and "nothing in progress is lost": the painter.**
-- The painter grows by primitives: frame, text run, path, image; press, edit, drag, carry, drop.
-- A refused gesture keeps the typed draft.
+**For "everyday quantities come out right": allocation (decision 6).** *Not built.* `suite/cases/budget` is the instrument.
 
-**For "room for many meanings" and "meaning outlives code": owned aspects.**
-- Each piece of data has an owner and its own history.
-- Names can be related (same-as, narrower, distinct) and apply when both owners agree. Who may declare them is Alex's and the Constitution's (POSITION 8.4).
+**For "true-when, not just written-when": timelines (decision 5).** *Not built.*
 
-**For "bring work back together": partial merge (POSITION 8.2).** Worktrees journal operations. A merge applies the clean parts and holds only the conflicts.
+**For "your view settings are yours": the viewer store.** *Partly built, in the browser only:* drafts, folds and terminal history in localStorage. Lenses can't read it, and nothing is journaled.
 
-**For "comments keep their place" and "work apart": text with element identity (POSITION 8.3).**
-- Anchored comments first.
-- Then the text gateway: a writer declares what it read, changed sentences are refused, clean ones get a character diff, and moves are recorded as moves.
-- A CRDT only if offline writing becomes near-term.
+**For "new things to show never need app code" and "nothing in progress is lost": the painter.** *Partly built:*
+- frame, text, code runs, press, edit, drag, carry and drop exist; path and image don't;
+- a refused gesture keeps the typed draft.
+
+**For "room for many meanings" and "meaning outlives code": owned aspects.** *Not built.* Who may relate names is Alex's and the Constitution's (POSITION 8.4).
+
+**For "bring work back together": partial merge (POSITION 8.2).** *Prototype only:* `journal.py` merges by operations and holds conflicts, but nothing running uses it. `worktree.py` still replays.
+
+**For "comments keep their place" and "work apart": text with element identity (POSITION 8.3).** *Not built.* The order is anchored comments first, then the text gateway, then a CRDT only if offline writing becomes near-term.
 
 ## Related documents
 
@@ -297,4 +771,4 @@ Candidates: time and animation, trees, built-in parts, behavior, reductions over
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e166. Edit it there; a direct edit here makes the next export stop and warn. sha1:ad61d19acb7e -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e656. Edit it there; a direct edit here makes the next export stop and warn. sha1:e989014233bc -->
