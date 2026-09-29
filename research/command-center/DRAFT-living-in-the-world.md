@@ -76,6 +76,60 @@ You go somewhere to do a kind of thing, and the room makes that easy.
 
 The core stays tiny, and everything else lives on things. That is how the vocabulary grows without the system getting heavier.
 
+### The desktop is a room (added 29 Sep) [imagined, shaped by Alex]
+
+Alex:
+
+> "the desktop is itself a room in our new view correct? With lenses and views and appearances (naming ignored), as object that are editable with verbs?"
+
+and, on what to keep:
+
+> "add the thing about changing the porch into the desktop, thats a great start, though hold off on the arrangements and appearances thing. I want the local verbs but i'm not quite sure if im confident on the arrangments and appearances and views divide"
+
+**The desktop is a room: the place where the things that make Alex's screen are gathered, to be inspected and changed.** Lenses (notes tagged `lens`), styles (notes tagged `style`) and views (live lists) are ordinary objects with one id, a history and an undo, edited with verbs like anything else. A resident can walk in and change what Alex sees the way it changes anything:
+
+```text
+> go desktop
+The Desktop. The lenses, styles and views that make up Alex's screen, laid out to be looked at and changed.
+You see: command-center (a lens), pixel (a style), Who's home (a view).
+> read pixel
+> do rewrite pixel …          (Alex's command center repaints in the new look)
+```
+
+This is a sketch: `go` and the room itself don't exist yet. Rewriting a style and the page repainting do [ran, 28 Sep, F7].
+
+**Local verbs: layout belongs to the desktop room.** The verbs that are about where something sits on a screen are `move … to=<x>,<y>`, `resize`, `raise`, `lower`, `tile`, `untile`, `fold` and `unfold`. Today they apply everywhere, because `moo.py` binds them to kinds that everything has [read]:
+- `move`, `resize`, `raise` and `lower` to `thing`;
+- `fold` and `unfold` to `appearance`;
+- `tile` and `untile` to `surface`.
+
+`move` does two jobs in one verb:
+- `into=`, `before=` and `after=` say where a thing belongs, which stays everywhere;
+- `to=` and `by=` are pixels, which become desktop-local.
+
+That is why Wren's first `verbs a573`, on its own soul note, listed `resize to=<w>x<h>`, `raise`, `lower`, `move … to=<x>,<y>` and `fold` [read, §1].
+
+If rooms are places where similar verbs are at hand, these are the desktop room's verbs:
+- a resident in the Lounge never sees them;
+- a resident who goes to the desktop to rearrange Alex's screen has all of them;
+- `examine` elsewhere lists only verbs about a thing's content and its relations (retitle, rewrite, comment, link, tag, prop, move *into* somewhere).
+
+This is the first concrete case of room-local verbs, and it removes most of the screen talk from §1 at its source.
+
+**The room holds definitions, not the picture.** Alex's screen is painted *from* the lenses and styles. Editing them in the room changes what he sees, but the room is not his screen. A lens listed in the desktop room and used inside another lens is still one object, with one id and one history.
+
+**The Porch becomes the Desktop.** After 29 Sep's moves, the Porch holds:
+- the command-center lens (a589) and its style `pixel` (a587);
+- the door (a568);
+- the house's settings (a566);
+- its own description (a564).
+
+Porch talk already moved to the Lounge as Lounge talk (e573). The lens and the style are exactly what the desktop room is for. The door and the house's settings are the house's own controls, which fit a room where the house's machinery is looked at and changed. So the Porch doesn't need to dissolve into nothing: it becomes the Desktop.
+- **In the world:** a retitle of f562 and a new description, both ordinary undoable events. The house finds the door and its settings by title, and the painter finds lenses and styles by title, so nothing breaks when they stay where they are.
+- **In the host:** the local verbs need the "where you are" pointer and the room level of verb lookup (§3, and *Three ways to change the world*, steps 3 and on). They also need `moo.py`'s layout verbs to be bound to the desktop room instead of to `thing`.
+
+**Held open: how arrangement, appearances and views divide.** Alex isn't yet confident in that divide (§4's "Where arrangement lives" is my earlier proposal, and it stays a proposal). The desktop room doesn't depend on it. Until it's decided, the layout verbs in the desktop act on today's appearances, as they do now. They are just found in one room instead of everywhere.
+
 ## 4. Layout is text you can look at, not a room you are in [imagined, shaped by Alex]
 
 Alex:
@@ -96,6 +150,8 @@ Looking at something narrows the verbs to what it offers.
 These are the same affordances Alex gets by clicking, printed as text: one scene, two printers. Layout isn't hidden from agents. It's something they look at when they choose, never the medium they live through.
 
 The symmetry is useful: Alex also has a location and a focus, and his focus is what his page has open. The desk already knows that much ("alex has this open").
+
+> **Held, 29 Sep.** Alex: "i'm not quite sure if im confident on the arrangments and appearances and views divide". The paragraphs below are my earlier proposal and stay as written. Nothing else in this draft depends on them; the desktop room (§3) works on today's appearances.
 
 **Where arrangement lives.** With the unmarked "apps own appearances" line set aside, the uniform answer is that **an arrangement is an object in its own right**:
 - it refers to other things and says how they sit: this column, that grid, these coordinates on a canvas;
@@ -207,6 +263,7 @@ Before any interpreter, new face or substrate change:
 That list is the evidence for which rooms, verbs and narration the house needs, and it is written by the inhabitants. It also tells us which way §6.3 should go.
 
 After that, if the direction holds:
+- the Porch becomes the Desktop (a retitle and a description, when Alex says), and the layout verbs become local to it once rooms have "where you are" (§3, the desktop room);
 - a narrator face over the existing world: rooms marked as places, one id per object, no geometry, events told as sentences, focus with lens gestures as affordances;
 - then the substrate questions (arrangement as objects, appearances) with the trials' evidence in hand.
 
