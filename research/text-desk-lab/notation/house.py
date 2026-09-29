@@ -19,8 +19,10 @@ the resident knows comes from the world, and everything it does goes through it:
     `wake_every` seconds pass. A plain line in a shared chat (Porch talk) wakes no one: it goes with whatever reaches
     the resident next.
   - every wake begins with one line saying who it is: `You are <name>. Your corner is <id>.`
-  - its first pass is the door: the text of the Porch note "The door". It names itself with a line `i am <name>`,
-    and that name is its desk identity from then on (prop `actor` on its corner).
+  - it is given its name (Alex, 29 Sep): prop `actor` on its corner, its desk identity. A corner with no name waits,
+    `unnamed`, and is never started. Whenever it enters the desk with a fresh memory (its first start, a lost
+    conversation, or claude compacting the conversation), the first message the house sends it begins with the
+    welcome: the text of the note "The door", with `$me` replaced by its name.
 
 The house writes what it observes as actor `house`, only the coarse states and only when they change:
 `status=door|awake|asleep|error`. Whether a resident is mid-turn or resting changes every few seconds, so it lives in
@@ -61,8 +63,6 @@ STATE = HERE / "house-state"
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree"}
-NAME = re.compile(r"^[a-z][a-z0-9-]{1,19}$")
-RESERVED = {"alex", "house", "harness", "jeff", "claude", "all", "everyone"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 ANOTHER = 76         # the exit code for "another house already runs this world": keeper does not fight it
@@ -166,14 +166,6 @@ def deskd_do(world, who, text):
     return "\n".join(out)
 
 
-def door_name(reply):
-    for line in reply.splitlines():
-        m = re.match(r"^\s*>?\s*`?i am ([A-Za-z][A-Za-z0-9-]*)`?\s*\.?\s*$", line.strip(), re.I)
-        if m:
-            return m.group(1).lower()
-    return None
-
-
 UNITS = {"m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60,
          "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600,
          "d": 86400, "day": 86400, "days": 86400, "w": 604800, "week": 604800, "weeks": 604800}
@@ -266,6 +258,9 @@ class Resident:
                "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
         if self.state.get("session"):
             cmd += ["--resume", self.state["session"]]
+        else:                                  # a fresh memory: first arrival, or the conversation was lost
+            self.state["welcome_due"] = "a fresh conversation"
+            self.save()
         self.proc = subprocess.Popen(cmd, cwd=self.dir, env=clean_env(self.house.fake), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=open(self.dir / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1)
@@ -305,6 +300,12 @@ class Resident:
         queue) loses nothing: the pipe error is logged and the failure is judged from the process's own events."""
         if carry is None and kind in ("news", "receipt"):
             carry = text
+        if self.state.get("welcome_due"):      # entering the desk with a fresh memory: the welcome comes first
+            welcome = self.house.welcome_for(self)
+            if welcome:
+                self.log("welcome", self.state["welcome_due"])
+                text = welcome + "\n\n---\n" + text
+            self.state.pop("welcome_due", None)
         self.state["last_sent"] = now()
         self.state["pending"] = {"kind": kind, "carry": carry or ""}      # cleared when its turn ends well
         self.save()
@@ -332,6 +333,11 @@ class Resident:
                 if self.state.get("session") != ev["session_id"]:
                     self.state["session"] = ev["session_id"]
                     self.save()
+            elif t == "system" and ev.get("subtype") == "compact_boundary":
+                # claude compacted the conversation: the memory is a summary now, so the next thing the house sends
+                # begins with the welcome again (Alex, 29 Sep: on compaction, or a full reset)
+                self.state["welcome_due"] = "the conversation was compacted"
+                self.save()
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):
                     if c.get("type") == "text":
@@ -397,6 +403,15 @@ class House:
             if s["title"] == title and w.appearances_of(s["id"]):
                 return s
         return None
+
+    def welcome_for(self, r):
+        """The door note's text with the resident's given name in it ($me), or None when there is no door note."""
+        w = self.load()
+        actor = ((w.nodes.get(r.rid) or {}).get("props") or {}).get("actor")
+        door = self.note(w, "The door")
+        if not door or not actor:
+            return None
+        return door["text"].replace("$me", actor)
 
     def settings(self, w):
         s = self.note(w, "The house")
@@ -490,10 +505,10 @@ class House:
                 w = self.load()
                 corner = w.nodes.get(rid, corner)
                 actor = (corner.get("props") or {}).get("actor")
-            if want != "awake":
+            if want != "awake" or not actor:               # a resident is given its name (Alex, 29 Sep); none, no start
                 if r.alive() and not r.busy:
                     r.stop()
-                self.set_status(r, corner, "asleep")
+                self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if not r.alive():
                 if r.state.get("retry_at", 0) > now():
@@ -502,14 +517,6 @@ class House:
                 r.start(props.get("model") or cfg["model"])
                 r.state.pop("woke", None)
             if r.busy:
-                continue
-            if not actor:
-                if not r.state.get("door_sent"):
-                    door = self.note(w, "The door")
-                    r.send(door["text"] if door else "What is your name? Write: i am <name>", "door")
-                    r.state["door_sent"] = True
-                    r.save()
-                    self.set_status(r, corner, "door")
                 continue
             if not r.state.get("woke"):
                 self.wake(r, corner, actor, "")
@@ -560,17 +567,8 @@ class House:
         if text is None or isinstance(text, dict):     # the process ended, or its turn failed
             self.failed(r, corner, text)
             return
-        if not actor:                          # at the door
-            name = door_name(text)
-            taken = RESERVED | {(n.get("props") or {}).get("actor") for n in self.corners(w).values()} | {e.get("by") for e in w.events}
-            if not name or not NAME.match(name) or name in taken:
-                why = ("that name is taken" if name in taken else "that is not a name the desk can carry") if name else "I did not hear a name"
-                r.send(f"The door waits ({why}). Write your name on its own line: i am <name>. One word, lower case "
-                       f"letters, digits or -, 2 to 20 long.", "door")
-                return
-            self.act("house", f"look {r.rid} :1; do prop {r.rid} actor={name}")
-            r.log("named", name)
-            return                            # the next step wakes it under its name
+        if not actor:                          # its name was taken away mid-turn: nothing is done in the world unsigned
+            return
         cmds, rest = rest_in(commands_in(text))
         receipt = self.act(actor, "\n".join(cmds)) if cmds else ""
         if cmds:
@@ -625,8 +623,6 @@ class House:
         carry = (r.state.pop("pending", None) or {}).get("carry")
         if carry:                                          # said again with the next wake, whatever the failure
             r.state["undelivered"] = (r.state.get("undelivered", "") + "\n" + carry).strip("\n")
-        if not (corner.get("props") or {}).get("actor"):
-            r.state.pop("door_sent", None)                 # still at the door: the door is said again
         if r.lost_conversation():
             r.log("lost", {"session": r.state.pop("session", None)})
             r.state["lost"] = True

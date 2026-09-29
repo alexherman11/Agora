@@ -1,13 +1,14 @@
 """try_house: run the house for real on a throwaway copy of a world, then clean up everything it made.
 
-    python try_house.py [--from frontier] [--corners f571,f576] [--model M] [--turns 12] [--minutes 8]
-                        [--say "a line from Alex" ...] [--porch "a line in Porch talk" ...] [--keep] [--name tag]
+    python try_house.py [--from frontier] [--corners f571,f576] [--names wren,thimble] [--model M] [--turns 12]
+                        [--minutes 8] [--say "a line from Alex" ...] [--porch "a line in Lounge talk" ...] [--keep] [--name tag]
 
 It copies sessions/<from>.pickle to a disposable world `try-<tag>`, wakes the chosen corners (default: the first
-resident corner) and lets the others rest, and runs house.py on it with real `claude -p` residents. The --say and
---porch lines are said as Alex in the order given, one at a time, once every awake resident has been named, woken and
-gone quiet: --say in the first awake resident's own chat, --porch in Porch talk (the chat with members=all). {0}, {1}
-... in a line become the names the awake residents chose, so a line can say @{1}. Each resident's turn count when a
+resident corner), gives each awake corner without a name the next of --names (residents are given names, Alex 29 Sep),
+lets the others rest, and runs house.py on it with real `claude -p` residents. The --say and --porch lines are said as
+Alex in the order given, one at a time, once every awake resident has been woken and gone quiet: --say in the first
+awake resident's own chat, --porch in the shared chat (Lounge talk if there is one, else any chat with members=all).
+{0}, {1} ... in a line become the awake residents' names, so a line can say @{1}. Each resident's turn count when a
 line is said goes in the report, which is how you see who a line reached. The run ends when every awake resident is quiet and every line has been said and answered, or when
 the turn cap or the time limit is reached (these bound what a trial can cost).
 
@@ -69,14 +70,18 @@ def main():
     corners = sorted(n["id"] for n in w.nodes.values()
                      if n["type"] == "surface" and (n.get("props") or {}).get("role") == "resident")
     awake = (arg("--corners") or corners[0]).split(",")
+    names = (arg("--names") or "wren,thimble,moss,fern").split(",")     # residents are given names (Alex, 29 Sep)
     for rid in corners:
         extra = f" model={arg('--model')}" if arg("--model") and rid in awake else ""
+        if rid in awake and not ((w.nodes.get(rid) or {}).get("props") or {}).get("actor"):
+            extra += f" actor={names[awake.index(rid)]}"
         print(desk(world, "alex", f"look {rid} :1; do prop {rid} want={'awake' if rid in awake else 'rest'}{extra}").splitlines()[-2][:160])
     chat = next((s["id"] for s in w.subjects.values() if s["kind"] == "chat" and any(
         a.get("parent") == awake[0] for a in w.nodes.values() if a["type"] == "appearance" and a.get("subject") == s["id"])), None)
     chat_app = next((a["id"] for a in w.nodes.values() if a["type"] == "appearance" and a.get("subject") == chat), None)
-    porch = next((s["id"] for s in w.subjects.values() if s["kind"] == "chat"
-                  and "all" in str((s.get("props") or {}).get("members", "")).lower().split(",")), None)
+    shared = [s for s in w.subjects.values() if s["kind"] == "chat"
+              and "all" in str((s.get("props") or {}).get("members", "")).lower().split(",")]
+    porch = next((s["id"] for s in sorted(shared, key=lambda s: s["title"] != "Lounge talk")), None)   # the Lounge's chat first
     porch_app = next((a["id"] for a in w.nodes.values() if a["type"] == "appearance" and a.get("subject") == porch), None)
 
     state = house.STATE / world
