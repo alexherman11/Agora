@@ -37,3 +37,7 @@ research/archive/tessera-lab/evidence/
 research/text-desk-lab/notation/house-state/
 research/text-desk-lab/notation/fake-model-log.jsonl
 research/text-desk-lab/notation/house-test.log
+
+# live building: reaches nothing answered (evidence, per world), workers' git worktrees
+research/text-desk-lab/notation/reaches/
+.worktrees/

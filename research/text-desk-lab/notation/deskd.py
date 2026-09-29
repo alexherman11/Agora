@@ -89,6 +89,18 @@ def same_part(desk, dp):
         return False
 
 
+def _code_version():
+    import subprocess
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=Path(__file__).resolve().parent,
+                              capture_output=True, text=True, timeout=10).stdout.strip() or "dev"
+    except Exception:
+        return "dev"
+
+
+CODE_VERSION = _code_version()
+
+
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
@@ -165,6 +177,9 @@ class Handler(SimpleHTTPRequestHandler):
                     out = {"refused": f"the lens compiler failed ({type(e).__name__}: {e}); this is a bug in scene.py, not in your lens",
                            "events_total": len(desk.world.events)}
             return self._json(out)
+        if u.path == "/api/version":
+            # live building: the code this deskd runs. keeper.py restarts deskd when HEAD moves; the painter reloads on a change
+            return self._json({"code": CODE_VERSION})
         if u.path == "/api/style":
             # F7: a style is world data (a note tagged style); the seed file answers only when the world has none
             import scene

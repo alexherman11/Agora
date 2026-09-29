@@ -268,6 +268,7 @@ class Desk:
         hit = verbs.try_line(self, line, self.world.me)
         if hit is not None:
             return hit
+        verbs.record_miss(self, line)
         raise Refusal(f"unknown command {cmd!r}; nothing here answers to it. help lists the desk's commands; "
                       f"a verb anyone can make is a note tagged verb (help verbs)")
 

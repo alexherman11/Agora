@@ -243,4 +243,13 @@
 
   await refresh();
   setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
+  // live building (tier 2): when the code under the page changes, the page reloads itself, but never under someone's
+  // hands. Drafts already survive a reload (viewer.js keeps them); a part in hand or a line being typed waits.
+  let code = null;
+  setInterval(async () => {
+    let v; try { v = (await (await fetch("/api/version")).json()).code; } catch (e) { return; }
+    if (!v) return; if (code === null) { code = v; return; } if (v === code) return;
+    const a = document.activeElement, typing = V.hold || (a && (a.isContentEditable || (a.value || "").length));
+    if (!typing) location.reload(); else V.show("new code is here; the page reloads when you put this down");
+  }, 5000);
 })();

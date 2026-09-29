@@ -22,7 +22,13 @@ house-state/<world>/house.json (with liveness, turns and the time of the last tu
 Transcripts (every stream event, and every message the house sent) are house-state/<world>/<corner>/transcript.jsonl.
 Everything is kept per world: two worlds can hold the same corner ids (a copy of a world does), and a resident must
 never resume another world's conversation.
-Settings are props on the Porch note "The house": model, breather, wake_every. Replay never wakes anyone.
+Settings are props on the Porch note "The house": model, breather, wake_every, and for workers: workers (how many at
+once, default 1) and worker_model (default: model). Replay never wakes anyone.
+
+Workers (workshop.py): a task with prop commission=asked is taken up by a disposable worker with real tools in its own
+git worktree; it talks to whoever asked through comments on the commission, and the house lands its branch between
+passes, after the health checks. Under keeper.py, the house asks to be restarted (exit 75) after a landing changed
+Python, once no resident is mid-turn.
 
 --fake PORT points every resident at fake_model.py, for testing the loop without a model.
 """
@@ -43,6 +49,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
+import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
@@ -50,7 +57,8 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "rows", "scene", "worktree"}
 NAME = re.compile(r"^[a-z][a-z0-9-]{1,19}$")
 RESERVED = {"alex", "house", "harness", "jeff", "claude", "all", "everyone"}
-DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400"}
+DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
+RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 
 
 def now():
@@ -90,8 +98,10 @@ def clean_env(fake):
 
 
 def commands_in(reply):
-    """The command lines of a reply, in order. A command line begins with a desk command word; a quoted value left
-    open continues onto the next lines. Wrapping backticks and code fences are allowed."""
+    """The command lines of a reply, in order. A line beginning with `>` is an attempt, whatever its words (Alex's door:
+    "use > at the beginning ... to start a command"), so a resident can reach for something that isn't there yet; a
+    line beginning with a desk command word still counts without the mark. A quoted value left open continues onto
+    the next lines. Wrapping backticks and code fences are allowed."""
     out, cur, open_q = [], None, False
     for raw in reply.splitlines():
         line = raw.strip()
@@ -106,8 +116,11 @@ def commands_in(reply):
             continue
         if len(line) > 1 and line.startswith("`") and line.endswith("`"):
             line = line[1:-1].strip()
+        attempt = line.startswith(">")
+        if attempt:
+            line = line[1:].strip().strip("`").strip()
         first = line.split(" ", 1)[0].lower() if line else ""
-        if first in COMMANDS:
+        if line and (attempt or first in COMMANDS):
             if line.count('"') % 2 == 1:
                 cur, open_q = line, True
             else:
@@ -117,9 +130,38 @@ def commands_in(reply):
     return out
 
 
+def deskd_do(world, who, text):
+    """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
+    or None when no deskd answers (then the caller runs them itself)."""
+    import urllib.error
+    import urllib.request
+    url = os.environ.get("DESKD", "")
+    if not url or url == "off":
+        return None
+    lines, out = desk_mcp.split_lines(text), []
+    for k, line in enumerate(lines):
+        body = json.dumps({"session": world, "as": who, "line": line}).encode("utf-8")
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
+                                        timeout=120) as f:
+                r = json.loads(f.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, ValueError):
+            if k == 0:
+                return None
+            out.append("ERR deskd stopped answering; the lines above were applied, this one and the rest were not")
+            break
+        said = r.get("text") or ("ERR " + str(r.get("error")))
+        out.append(f"> {line}\n{said}\n")
+        if r.get("error") or said.startswith("ERR"):
+            if k < len(lines) - 1:
+                out.append(f"stopped: {len(lines) - k - 1} later line(s) not run because this one was refused")
+            break
+    return "\n".join(out)
+
+
 def door_name(reply):
     for line in reply.splitlines():
-        m = re.match(r"^\s*`?i am ([A-Za-z][A-Za-z0-9-]*)`?\s*\.?\s*$", line.strip(), re.I)
+        m = re.match(r"^\s*>?\s*`?i am ([A-Za-z][A-Za-z0-9-]*)`?\s*\.?\s*$", line.strip(), re.I)
         if m:
             return m.group(1).lower()
     return None
@@ -264,6 +306,7 @@ class House:
         self.dir = STATE / world
         self.dir.mkdir(parents=True, exist_ok=True)
         self.claude, self.claude_version = find_claude()
+        self.workshop = workshop.Workshop(self)
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -274,7 +317,11 @@ class House:
         return self.desk.world
 
     def act(self, who, line):
-        text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world})
+        """Desk lines as `who`. Through deskd when it is up, so residents and the painter run the same code (one host);
+        otherwise the same path a desk tool call takes, one fresh process per call."""
+        text = deskd_do(self.world, who, line)
+        if text is None:
+            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world})
         return text
 
     def note(self, w, title):
@@ -338,6 +385,9 @@ class House:
                 urgent = True
             elif e["verb"] == "comment" and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
+                urgent = True
+            elif e["verb"] == "comment" and s and (s.get("props") or {}).get("asked_by") == actor:
+                inbox.append(f"~ {e['by']} on your commission \"{s['title']}\" ({e['id']}): {said[:1500]}")
                 urgent = True
         r.state["cursor"] = len(w.events)
         r.save()
@@ -408,6 +458,7 @@ class House:
                 self.set_status(r, corner, "awake")
                 continue
             self.set_status(r, corner, "awake")
+        self.workshop.step(self.load(), cfg)
         self.beat(corners)
 
     def wake(self, r, corner, actor, lead):
@@ -479,6 +530,10 @@ class House:
                                      "turns": r.state.get("turns", 0), "last_turn": r.state.get("last_turn"),
                                      "last_sent": r.state.get("last_sent"), "status": r.status,
                                      "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at")}
+        out["workers"] = {cid: {"actor": wk.actor, "asked_by": wk.asked_by, "alive": wk.alive(),
+                                "doing": "working" if wk.busy else ("waiting" if wk.alive() else "stopped"),
+                                "turns": wk.state.get("turns", 0), "branch": wk.branch}
+                          for cid, wk in self.workshop.workers.items()}
         (self.dir / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 
     def run(self):
@@ -490,12 +545,21 @@ class House:
                     self.step()
                 except Exception as e:
                     print(f"house: step failed: {type(e).__name__}: {e}", flush=True)
+                if (self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER")
+                        and not any(r.busy for r in self.residents.values())
+                        and not any(x.busy for x in self.workshop.workers.values())):
+                    print("house: a landing changed the code; restarting on it", flush=True)
+                    self.exit_code = RESTART
+                    break
                 time.sleep(2)
         except KeyboardInterrupt:
             pass
         finally:
             for r in self.residents.values():
                 r.stop()
+            for x in list(self.workshop.workers.values()):
+                x.stop()
+        return getattr(self, "exit_code", 0)
 
 
 if __name__ == "__main__":
@@ -503,4 +567,4 @@ if __name__ == "__main__":
     fake = sys.argv[sys.argv.index("--fake") + 1] if "--fake" in sys.argv else None
     if fake:
         args = [a for a in args if a != fake]
-    House(args[0] if args else "frontier", fake).run()
+    sys.exit(House(args[0] if args else "frontier", fake).run())

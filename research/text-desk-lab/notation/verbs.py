@@ -227,6 +227,22 @@ def try_line(desk, line, me):
     return run(desk, s, words, me, thing)
 
 
+def record_miss(desk, line):
+    """Every reach nothing answered: reaches/<world>.jsonl (who, what, when). The evidence for which verbs the house
+    needs, written by its inhabitants; kept outside the world, like the house's transcripts."""
+    import json
+    import pathlib
+    import time
+    world = (getattr(desk, "_session", "") or "unknown").split("@")[0]
+    d = pathlib.Path(__file__).resolve().parent / "reaches"
+    try:
+        d.mkdir(exist_ok=True)
+        with (d / f"{world}.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": time.time(), "who": desk.world.me, "line": line}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 def miss(word):
     """What the desk says when nothing answers: honest, and a way in (how a reach is met is otherwise left open)."""
     return (f"nothing here answers to {word!r}. help lists the desk's commands; a verb anyone can make is a note "
