@@ -930,6 +930,11 @@ class DeskKnife(DeskMoo):
                 if "=" in a and not is_target(a):
                     k, _, v = a.partition("=")
                     kv[k] = unescape_value(v)
+            if verb not in self._builtin_verbs():     # tier 1: `do sweep porch` may name a verb made in the world
+                import verbs
+                hit = verbs.try_line(self, arg, self.world.me)
+                if hit is not None:
+                    return hit
             return self.cmd_do_knife(verb, positional, kv)
         return super().repl(line)
 
@@ -1002,7 +1007,22 @@ class DeskKnife(DeskMoo):
             return f"{name}  (pair verb; level 2)\n  {doc}\n  args: {args}\n  e.g. do {name} a20 a22" + (" to=a22" if name == "match" else "")
         if name in knife.SPECIALIZED:
             return f"no verb {name} here. general verbs: " + " ".join(knife.GENERAL + list(knife.PAIR_DOC)) + "\nselections do the specializing (help selections)."
+        import verbs
+        if name in ("verbs", "verb", "world verbs"):
+            return verbs.HELP
+        if name not in self._builtin_verbs():
+            made = verbs.visible(self, name, self.world.me)      # a verb someone made that you could use
+            if made:
+                return "\n\n".join(verbs.describe(self, s) for s in made)
+            try:
+                self._resolve(name)                           # help <thing> is examine <thing>
+                return self.cmd_examine(name)
+            except Refusal:
+                pass
         return super().cmd_help(name)
+
+    def _builtin_verbs(self):
+        return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(knife.SPECIALIZED) | set(moo.REGISTRY) | self._verb_names()
 
     def cmd_examine(self, ident):
         nid = self._resolve(ident or "desk")
@@ -1063,6 +1083,11 @@ class DeskKnife(DeskMoo):
         if self.today:
             d = w.last_day(nid)
             out.append("  when: " + (f"last touched {d} ({w.days_between(d, self.today)}d ago by the clock)" if d else "not touched since the clock was set"))
+        import verbs
+        made = verbs.on_thing(self, nid)
+        if made:
+            out.append("  verbs on this thing, made in the world: " + ", ".join(
+                f"{verbs._names(s['title'])[0]} ({w.appearances_of(s['id'])[0]})" for s in made) + "   (help <verb>)")
         if self.lean:
             groups = [" ".join(names) for names in knife.general_verbs_by_origin(w, nid).values()]
             out.append("  verbs: " + " · ".join(groups) + (" · pair: swap beside match link" if n["parent"] else "")

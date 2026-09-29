@@ -264,7 +264,12 @@ class Desk:
             if self.variant != "apply":
                 raise Refusal("plan/apply are not available in this desk; use do")
             return self.cmd_apply(rest, dry=(cmd == "plan"))
-        raise Refusal(f"unknown command {cmd!r}; try help")
+        import verbs      # tier 1: a word the desk does not know may be a verb someone made in the world
+        hit = verbs.try_line(self, line, self.world.me)
+        if hit is not None:
+            return hit
+        raise Refusal(f"unknown command {cmd!r}; nothing here answers to it. help lists the desk's commands; "
+                      f"a verb anyone can make is a note tagged verb (help verbs)")
 
     def _verb_names(self):
         return {"move", "resize", "raise", "lower", "remove", "tile", "untile", "rename", "group", "fold", "unfold",
@@ -841,7 +846,8 @@ class Desk:
             return "no events yet"
         return "\n".join(
             f"{e['id']} {e['verb']} {e['target']} {self._fmt_args(e['args'])} by {e['by']}"
-            + (f" via {e['via']}" if e.get("via") and e["via"] != e["verb"] else "") + (" (undone)" if e.get("undone") else "")
+            + (f" via {e['via']}" if e.get("via") and e["via"] != e["verb"] else "")
+            + (f" (verb {e['verb_run']})" if e.get("verb_run") else "") + (" (undone)" if e.get("undone") else "")
             for e in evs)
 
     def _fmt_args(self, args):
