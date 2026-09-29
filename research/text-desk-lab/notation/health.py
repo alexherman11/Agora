@@ -9,13 +9,15 @@ Checks, from this checkout:
   - every lens in <world> that the desk can find still compiles; the list of lenses that compile is printed, so a
     landing can be judged against the list from before it (a lens that was already broken is not the change's fault)
 
-Prints one line per check; with --json, a last line {"ok": bool, "lenses_ok": [...], "failed": [...]}.
+Prints one line per check, each ending in the seconds it took, then a total line; with --json, a last line
+{"ok": bool, "lenses_ok": [...], "failed": [...], "seconds": {check: s, ..., "total": s}}.
 It reads the world under the desk's lock and never writes it.
 """
 import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -69,32 +71,47 @@ def check_lenses(world):
 def main():
     world = next((a for a in sys.argv[1:] if not a.startswith("--")), "frontier")
     failed = []
+    seconds = {}                     # check -> seconds it took; printed on its line, and in --json
+    start = time.perf_counter()
+
+    def took(check, t0):
+        seconds[check] = round(time.perf_counter() - t0, 1)
+        return f" ({seconds[check]:.1f}s)"
+
+    t0 = time.perf_counter()
     bad = check_python()
-    print(f"python: {'ok' if not bad else 'FAILED'}" + "".join(f"\n  {b}" for b in bad))
+    print(f"python: {'ok' if not bad else 'FAILED'}{took('python', t0)}" + "".join(f"\n  {b}" for b in bad))
     failed += [f"python {b}" for b in bad]
+    t0 = time.perf_counter()
     bad, note = check_js()
-    print(f"scripts: {note or ('ok' if not bad else 'FAILED')}" + "".join(f"\n  {b}" for b in bad))
+    print(f"scripts: {note or ('ok' if not bad else 'FAILED')}{took('scripts', t0)}" + "".join(f"\n  {b}" for b in bad))
     failed += [f"script {b}" for b in bad]
     if not failed:                   # the rest needs code that at least compiles
+        t0 = time.perf_counter()
         code, out = run(["test_scene.py"])
         last = (out.strip().splitlines() or ["?"])[-1]
-        print(f"test_scene: {last}")
+        print(f"test_scene: {last}{took('test_scene', t0)}")
         if code:
             failed.append(f"test_scene: {last}")
+        t0 = time.perf_counter()
         code, out = run(["suite/sessions.py", "--check"])
         line = next((l for l in out.splitlines() if "worlds at" in l), out.strip()[-200:])
-        print(f"session prints: {line}")
+        print(f"session prints: {line}{took('session prints', t0)}")
         if code or " 0 differ in the golden form" not in line:
             failed.append(f"session prints: {line}")
     lenses_ok, bad = [], []
+    t0 = time.perf_counter()
     try:
         lenses_ok, bad = check_lenses(world)
-        print(f"lenses in {world}: {len(lenses_ok)} compile" + (f", {len(bad)} refuse" if bad else ""))
+        print(f"lenses in {world}: {len(lenses_ok)} compile" + (f", {len(bad)} refuse" if bad else "") + took("lenses", t0))
     except Exception as e:
         failed.append(f"lenses: the world could not be read: {type(e).__name__}: {e}")
-        print(f"lenses in {world}: could not read the world ({e})")
+        print(f"lenses in {world}: could not read the world ({e}){took('lenses', t0)}")
+    total = round(time.perf_counter() - start, 1)
+    print(f"total: {total:.1f}s")
     if "--json" in sys.argv:
-        print(json.dumps({"ok": not failed, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": failed}))
+        print(json.dumps({"ok": not failed, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": failed,
+                          "seconds": {**seconds, "total": total}}))
     sys.exit(1 if failed else 0)
 
 
