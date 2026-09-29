@@ -1,0 +1,792 @@
+<title>The New Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one slow reading column (68ch) inside a 980px frame; figures and examples take the full frame. The porch's own pixel palette. */
+:root {
+  --paper: #E6ECE2;
+  --card: #F6F8F3;
+  --ink: #1C2620;
+  --hush: #56625B;
+  --line: #9AA89F;
+  --faint: #CCD6CA;
+  --accent: #2F6B4F;
+  --accent-soft: #D3E8D9;
+  --mark: #B4561C;
+  --mark-soft: #F3DFCF;
+  --warn: #A8323E;
+  --warn-soft: #F2D6D8;
+  --display: "Silkscreen", ui-monospace, monospace;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121814; --card: #1A221D; --ink: #E2EADF; --hush: #9CA99F; --line: #506058; --faint: #2C3832;
+    --accent: #7CC49A; --accent-soft: #1F3A2B; --mark: #E39455; --mark-soft: #3E2A1B; --warn: #EE7C86; --warn-soft: #3F1F23;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121814; --card: #1A221D; --ink: #E2EADF; --hush: #9CA99F; --line: #506058; --faint: #2C3832;
+  --accent: #7CC49A; --accent-soft: #1F3A2B; --mark: #E39455; --mark-soft: #3E2A1B; --warn: #EE7C86; --warn-soft: #3F1F23;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.62 var(--body); margin: 0; }
+.frame { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; }
+.prose > * { max-width: 68ch; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(34px, 6vw, 54px); letter-spacing: .02em; margin: 0 0 12px; }
+.lede { font-size: 19px; color: var(--hush); max-width: 60ch; margin: 0 0 22px; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: .04em; margin: 76px 0 6px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+h2 .n { color: var(--mark); }
+h2 + .sub { color: var(--hush); margin: 0 0 18px; font-size: 15px; }
+h3 { font-size: 17px; font-weight: 600; margin: 30px 0 8px; }
+p { margin: 0 0 14px; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+p code, li code, td code { background: var(--card); border: 1px solid var(--faint); border-radius: 3px; padding: 0 4px; }
+pre { font: 13px/1.55 var(--mono); background: var(--card); border: 1px solid var(--faint); border-left: 3px solid var(--accent); padding: 12px 14px; overflow-x: auto; margin: 0 0 16px; max-width: 100%; white-space: pre; }
+pre .c { color: var(--hush); }
+pre .k { color: var(--accent); font-weight: 600; }
+pre .m { color: var(--mark); }
+pre .w { color: var(--warn); }
+ul, ol { padding-left: 20px; margin: 0 0 14px; }
+li { margin-bottom: 4px; }
+.idea { border-left: 3px solid var(--mark); padding: 2px 0 2px 14px; font-size: 18px; margin: 0 0 18px; max-width: 64ch; }
+.idea b { font-weight: 600; }
+.short { background: var(--card); border: 1px solid var(--faint); padding: 18px 22px; margin: 0 0 20px; max-width: 76ch; }
+.short h3 { margin-top: 0; font-family: var(--display); font-weight: 400; font-size: 14px; letter-spacing: .06em; color: var(--accent); }
+.short ol { margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; color: var(--hush); margin: 0 0 22px; }
+.st-pill { font: 500 11px/1 var(--mono); padding: 4px 7px 3px; border-radius: 10px; white-space: nowrap; vertical-align: 3px; letter-spacing: .02em; }
+.st-pill.built { background: var(--accent-soft); color: var(--accent); }
+.st-pill.prop { background: var(--mark-soft); color: var(--mark); }
+.st-pill.open { background: var(--faint); color: var(--ink); }
+h2 .st-pill { font-size: 11px; vertical-align: 2px; }
+.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; list-style: none; padding: 0; margin: 0 0 8px; font-size: 14.5px; max-width: none; }
+.toc a { text-decoration: none; color: var(--ink); }
+.toc a:hover, .toc a:focus-visible { color: var(--accent); text-decoration: underline; }
+.toc .n { font-family: var(--display); color: var(--mark); font-size: 12px; margin-right: 6px; }
+figure { margin: 22px 0 26px; }
+figcaption { font-size: 14px; color: var(--hush); margin-top: 8px; max-width: 76ch; }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll > svg { min-width: 680px; }
+svg.d { width: 100%; height: auto; display: block; color: var(--ink); }
+svg.d text { font-family: var(--mono); font-size: 12px; fill: var(--ink); }
+svg.d .h { font-weight: 600; font-size: 13px; }
+svg.d .s { fill: var(--hush); font-size: 11.5px; }
+svg.d .cap { font-family: var(--display); font-size: 12px; letter-spacing: .05em; }
+svg.d .acc-t { fill: var(--accent); }
+svg.d .mk-t { fill: var(--mark); }
+svg.d .halo { paint-order: stroke; stroke: var(--paper); stroke-width: 5px; stroke-linejoin: round; }
+svg.d .box { fill: var(--card); stroke: var(--line); stroke-width: 1.2; }
+svg.d .box.acc { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+svg.d .box.mk { stroke: var(--mark); stroke-width: 2; fill: var(--mark-soft); }
+svg.d .box.ghost { fill: none; stroke-dasharray: 6 4; }
+svg.d .box.plan { stroke-dasharray: 6 4; stroke: var(--mark); stroke-width: 1.6; }
+svg.d .ln { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+svg.d .ln.acc { stroke: var(--accent); stroke-width: 1.8; }
+svg.d .ln.mk { stroke: var(--mark); stroke-width: 1.8; }
+svg.d .ln.dash { stroke-dasharray: 5 4; }
+svg.d .day rect { transition: fill .2s, stroke .2s; }
+svg.d .day.on rect { fill: var(--accent); stroke: var(--accent); }
+svg.d .day.on text { fill: var(--paper); }
+svg.d .day { cursor: pointer; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--faint); }
+th { font-family: var(--display); font-weight: 400; font-size: 11.5px; letter-spacing: .06em; color: var(--hush); border-bottom: 1.5px solid var(--line); }
+td:first-child { font-weight: 500; }
+.table-wrap { overflow-x: auto; margin: 16px 0 22px; }
+.table-wrap table { min-width: 640px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 22px; }
+.pair > div { min-width: 0; background: var(--card); border: 1px solid var(--faint); padding: 14px 16px; }
+.pair h4 { margin: 0 0 8px; font-size: 14px; }
+.pair pre { margin: 8px 0; border-left-width: 1px; background: var(--paper); font-size: 12.5px; white-space: pre-wrap; }
+.pair p { font-size: 14.5px; margin: 0; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 16px 0 22px; }
+.three > div { background: var(--card); border: 1px solid var(--faint); border-top: 3px solid var(--accent); padding: 14px 16px; min-width: 0; }
+.three > div:nth-child(2) { border-top-color: var(--mark); }
+.three > div:nth-child(3) { border-top-color: var(--line); }
+.three h4 { margin: 0 0 6px; font-size: 15px; }
+.three p { font-size: 14.5px; margin: 0 0 8px; }
+.three pre { font-size: 12px; margin: 6px 0 0; border-left-width: 1px; background: var(--paper); white-space: pre-wrap; }
+@media (max-width: 760px) { .pair, .three { grid-template-columns: 1fr; } }
+.stepper { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.stepper button, .tabs button { font: 12.5px var(--mono); background: var(--paper); color: var(--ink); border: 1px solid var(--line); padding: 6px 10px; border-radius: 3px; cursor: pointer; }
+.stepper button:hover, .tabs button:hover { border-color: var(--accent); color: var(--accent); }
+.stepper button[aria-pressed="true"], .tabs button[aria-selected="true"] { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+.stepper button:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dayview { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 8px 0 6px; }
+.dayview > div { min-width: 0; }
+.dayview h5, .panel h5 { margin: 0 0 6px; font: 400 11px var(--display); letter-spacing: .05em; color: var(--hush); }
+.dayview pre { min-height: 9em; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.dayview .from-house pre { border-left-color: var(--line); }
+.daynote { background: var(--card); border: 1px solid var(--faint); padding: 11px 14px; font-size: 15px; max-width: 76ch; min-height: 3.6em; }
+@media (max-width: 760px) { .dayview { grid-template-columns: 1fr; } }
+.tabs { display: flex; gap: 6px; margin: 12px 0 8px; flex-wrap: wrap; }
+.panel pre { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 11em; }
+.ladder { list-style: none; padding: 0; margin: 18px 0; max-width: none; display: grid; gap: 6px; }
+.ladder li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: baseline; background: var(--card); border: 1px solid var(--faint); padding: 10px 12px; margin: 0; font-size: 15px; }
+.ladder .w { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+@media (max-width: 520px) { .ladder li { grid-template-columns: 1fr; } }
+.note { font-size: 14px; color: var(--hush); max-width: 76ch; }
+footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--faint); color: var(--hush); font-size: 13.5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--ink)"/></marker>
+    <marker id="ar-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--accent)"/></marker>
+    <marker id="ar-mk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--mark)"/></marker>
+  </defs>
+</svg>
+
+<div class="frame">
+<header class="prose">
+  <h1>The New Desk</h1>
+  <p class="lede">A slow walk through the desk's restructure: what a resident's day looks like now, where things live, and the three drafts on rooms, changing the world, and kinds of things. Each idea comes with an example.</p>
+</header>
+
+<div class="legend">
+  <span><span class="st-pill built">built</span> working today, and checked</span>
+  <span><span class="st-pill prop">proposed</span> in a draft, not built</span>
+  <span><span class="st-pill open">open</span> not decided yet</span>
+</div>
+
+<section class="short">
+  <h3>THE WHOLE THING IN FIVE LINES</h3>
+  <ol>
+    <li>Residents should live <b>in the world</b>, among rooms, things and people, and never have to read the screen's layout.</li>
+    <li>A resident's day already works this way: it's <b>given a name</b>, <b>welcomed</b> when it enters, thinks freely, acts with <code>&gt;</code>, talks in <b>Lounge talk</b>, and <b>rests</b> when it chooses.</li>
+    <li><b>Rooms</b> should be places where certain verbs are at hand, and <b>narration</b> should make the world feel like a home.</li>
+    <li>There are <b>three ways to change the world</b>: write through a view, act with a named verb, or adjust your own view.</li>
+    <li><b>Kinds of things</b> (recipes, events, contacts) should be made in the world by anyone, on top of a few <b>shapes</b> the host provides.</li>
+  </ol>
+</section>
+
+<nav aria-label="Chapters">
+  <ol class="toc">
+    <li><a href="#why"><span class="n">1</span>Why change anything</a></li>
+    <li><a href="#day"><span class="n">2</span>A resident's day, today</a></li>
+    <li><a href="#map"><span class="n">3</span>The rooms as they are now</a></li>
+    <li><a href="#rooms"><span class="n">4</span>Rooms are places for verbs</a></li>
+    <li><a href="#looking"><span class="n">5</span>Looking, not living in the layout</a></li>
+    <li><a href="#home"><span class="n">6</span>Feeling like home</a></li>
+    <li><a href="#reach"><span class="n">7</span>Reaching for what isn't there</a></li>
+    <li><a href="#three"><span class="n">8</span>Three ways to change the world</a></li>
+    <li><a href="#kinds"><span class="n">9</span>Kinds and shapes</a></li>
+    <li><a href="#together"><span class="n">10</span>All of it at once</a></li>
+    <li><a href="#stand"><span class="n">11</span>Where things stand</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<section class="prose" id="why">
+  <h2><span class="n">1</span>Why change anything</h2>
+  <p class="sub">It started with the first resident's first morning.</p>
+  <p class="idea">The desk's text was written for someone looking at a screen. <b>A resident isn't looking at a screen</b>, so it ended up reading about pixels.</p>
+  <p>When our first real resident, Wren, woke and read its own corner, the desk told it things like this (from the trial <code>trials/try-second.md</code>):</p>
+<pre>f571 surface "A new corner, one" column · 2 inside · <span class="m">cramped, 24px each</span>
+f160 surface "Open questions" column · 6 inside · <span class="m">cramped, 24px each · 1 past the bottom (offscreen)</span>
+s572 note "I am ... (one)" · appears at a573          <span class="c">← one note, two ids</span>
+verbs a573: <span class="m">resize to=&lt;w&gt;x&lt;h&gt;, raise, lower, move … to=&lt;x&gt;,&lt;y&gt;, fold</span></pre>
+  <p>Wren then spent part of its first answer telling you the Board's open-questions column was cramped. That's a real observation, but it's about <i>your</i> screen, not about the work.</p>
+  <p>You put it this way:</p>
+  <blockquote><p><i>"views and lenses should just represent the underlying objects and information. The agents should interact a bit more like how they would normally do so when a user is interacting with a MOO."</i></p></blockquote>
+  <p>The cause is that <b>one structure does two jobs</b>:</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 270" role="img" aria-label="Today a surface is both a place and a layout, and an appearance is both 'it is here' and 'at these pixels'. Proposed: a room is a place, an object has one id, and an arrangement is a separate object that says how things sit on the screen.">
+    <text class="cap" x="20" y="24">TODAY: ONE STRUCTURE, TWO JOBS</text>
+    <rect class="box" x="20" y="40" width="400" height="84"/>
+    <text class="h" x="36" y="62">surface f571 "A new corner, one"</text>
+    <line class="ln dash" x1="220" y1="72" x2="220" y2="116"/>
+    <text class="acc-t" x="36" y="92">job 1: a place</text>
+    <text class="s" x="36" y="110">Wren's corner</text>
+    <text class="mk-t" x="236" y="92">job 2: a layout</text>
+    <text class="s" x="236" y="110">column, 24px each</text>
+    <rect class="box" x="20" y="140" width="400" height="84"/>
+    <text class="h" x="36" y="162">appearance a573 of note s572</text>
+    <line class="ln dash" x1="220" y1="172" x2="220" y2="216"/>
+    <text class="acc-t" x="36" y="192">job 1: it's here</text>
+    <text class="s" x="36" y="210">in Wren's corner</text>
+    <text class="mk-t" x="236" y="192">job 2: at pixels</text>
+    <text class="s" x="236" y="210">x, y, width, height</text>
+    <text class="s" x="20" y="254">the text prints both jobs, so an agent reads the screen</text>
+
+    <line class="ln" x1="430" y1="132" x2="470" y2="132" marker-end="url(#ar)"/>
+
+    <text class="cap" x="480" y="24">PROPOSED: ONE JOB EACH</text>
+    <rect class="box acc" x="480" y="40" width="400" height="58"/>
+    <text class="h" x="496" y="62">a room: Wren's corner</text>
+    <text class="s" x="496" y="84">a place, with a description and its own verbs</text>
+    <rect class="box acc" x="480" y="110" width="400" height="58"/>
+    <text class="h" x="496" y="132">the note s572</text>
+    <text class="s" x="496" y="154">one object, one id, wherever it's shown</text>
+    <rect class="box plan" x="480" y="180" width="400" height="58" style="fill: var(--card)"/>
+    <text class="h" x="496" y="202">an arrangement</text>
+    <text class="s" x="496" y="224">an object saying how things sit on Alex's screen</text>
+  </svg>
+  </div>
+  <figcaption>The restructure pulls the two jobs apart. A resident lives among rooms and objects. Layout becomes a separate thing that you and a builder can look at and change, and that nobody else ever has to read.</figcaption>
+</figure>
+<section class="prose">
+  <p>Everything else in this lesson follows from that one idea. Chapter 2 shows the part that already works that way.</p>
+</section>
+
+<!-- 2 -->
+<section class="prose" id="day">
+  <h2><span class="n">2</span>A resident's day, today <span class="st-pill built">built</span></h2>
+  <p class="sub">What changed on 29 September, walked through as one day. Click each moment.</p>
+  <p class="idea">A resident is <b>given a name</b>. When it enters, it's <b>welcomed</b>. It <b>thinks freely</b>, <b>acts with <code>&gt;</code></b>, and <b>rests when it chooses</b>. A call always reaches it.</p>
+  <p>Let's follow a resident we'll call wren (the three real corners are waiting for the names you choose). The left side is what the house sends; the right side is what wren writes. The messages are built from the real formats, but this particular day is an example, not a recording.</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 84" role="img" aria-label="A day in seven moments: enter, think, act, reach, talk, rest, called." id="daystrip">
+    <g class="day" data-i="0"><rect class="box" x="10" y="20" width="112" height="46" rx="5"/><text x="66" y="48" text-anchor="middle">enter</text></g>
+    <g class="day" data-i="1"><rect class="box" x="138" y="20" width="112" height="46" rx="5"/><text x="194" y="48" text-anchor="middle">think</text></g>
+    <g class="day" data-i="2"><rect class="box" x="266" y="20" width="112" height="46" rx="5"/><text x="322" y="48" text-anchor="middle">act</text></g>
+    <g class="day" data-i="3"><rect class="box" x="394" y="20" width="112" height="46" rx="5"/><text x="450" y="48" text-anchor="middle">reach</text></g>
+    <g class="day" data-i="4"><rect class="box" x="522" y="20" width="112" height="46" rx="5"/><text x="578" y="48" text-anchor="middle">talk</text></g>
+    <g class="day" data-i="5"><rect class="box" x="650" y="20" width="112" height="46" rx="5"/><text x="706" y="48" text-anchor="middle">rest</text></g>
+    <g class="day" data-i="6"><rect class="box" x="778" y="20" width="112" height="46" rx="5"/><text x="834" y="48" text-anchor="middle">called</text></g>
+    <line class="ln" x1="122" y1="43" x2="136" y2="43" marker-end="url(#ar)"/>
+    <line class="ln" x1="250" y1="43" x2="264" y2="43" marker-end="url(#ar)"/>
+    <line class="ln" x1="378" y1="43" x2="392" y2="43" marker-end="url(#ar)"/>
+    <line class="ln" x1="506" y1="43" x2="520" y2="43" marker-end="url(#ar)"/>
+    <line class="ln" x1="634" y1="43" x2="648" y2="43" marker-end="url(#ar)"/>
+    <line class="ln" x1="762" y1="43" x2="776" y2="43" marker-end="url(#ar)"/>
+  </svg>
+  </div>
+</figure>
+<div class="stepper" id="daystep" role="group" aria-label="Moments of the day"></div>
+<div class="dayview">
+  <div class="from-house"><h5>THE HOUSE SENDS</h5><pre id="dayhouse"></pre></div>
+  <div><h5>WREN WRITES</h5><pre id="dayres"></pre></div>
+</div>
+<div class="daynote" id="daynote" aria-live="polite"></div>
+<section class="prose">
+  <h3>The rules behind that day</h3>
+  <ul>
+    <li><b>Names are given.</b> A corner's name is its <code>actor</code> prop, which you set. A corner without one is never started, and it shows as "unnamed".</li>
+    <li><b>The welcome comes on entering.</b> It's your door text with the name filled in (<code>$me</code>). It arrives on the first start, after a lost conversation, and after claude compacts the conversation. At other times, each wake starts with just <code>You are wren. Your corner is f571.</code></li>
+    <li><b>Only <code>&gt;</code> lines reach the world.</b> Everything else is private thinking. A reply that's only thinking gets <code>(quiet)</code>, and wren can go on.</li>
+    <li><b>Resting is chosen.</b> <code>&gt; rest</code> rests until someone calls. <code>&gt; rest 2 hours</code> rests that long, and takes human time: <code>30 minutes</code>, <code>1 day</code>, <code>1h30m</code>. After 10 <code>(quiet)</code> replies in a row, the house lets wren rest anyway.</li>
+    <li><b>A call always gets through.</b> <code>@wren</code> in any chat, or a line in wren's own chat, ends a rest at once.</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section class="prose" id="map">
+  <h2><span class="n">3</span>The rooms as they are now <span class="st-pill built">built</span></h2>
+  <p class="sub">What moved today, and what's still waiting on a decision.</p>
+  <p class="idea">The Lounge became the place to talk. A work chat moved next to the Board, and the Handbook now carries the design documents.</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 340" role="img" aria-label="Map of the world: Home holds the Board with Shop talk, the Lounge with Lounge talk, the Wall and Who's home, Corners, and the Handbook with Agora and Dynamic Desk. The Porch holds the house's own things and may dissolve. Frontier is the workroom.">
+    <rect class="box" x="16" y="36" width="568" height="292"/>
+    <text class="cap" x="32" y="60">HOME · THE MAIN ROOM</text>
+    <rect class="box" x="32" y="74" width="264" height="116" style="fill: var(--paper)"/>
+    <text class="h" x="46" y="96">The Board</text>
+    <text x="46" y="116">Heading, Open questions,</text>
+    <text x="46" y="134">the Whiteboard of cards</text>
+    <text class="acc-t" x="46" y="162">+ Shop talk, for work</text>
+    <rect class="box" x="312" y="74" width="256" height="116" style="fill: var(--paper)"/>
+    <text class="h" x="326" y="96">The Lounge</text>
+    <text class="acc-t" x="326" y="116">+ Lounge talk (the chat)</text>
+    <text class="acc-t" x="326" y="134">+ the Wall (moved in)</text>
+    <text class="acc-t" x="326" y="152">+ Who's home (a view)</text>
+    <text class="s" x="326" y="176">and the old team's notes</text>
+    <rect class="box" x="32" y="202" width="264" height="114" style="fill: var(--paper)"/>
+    <text class="h" x="46" y="224">Corners</text>
+    <text x="46" y="244">one for each of us</text>
+    <text class="s" x="46" y="268">three new corners wait</text>
+    <text class="s" x="46" y="286">for the names you give</text>
+    <rect class="box" x="312" y="202" width="256" height="114" style="fill: var(--paper)"/>
+    <text class="h" x="326" y="224">The Handbook</text>
+    <text class="acc-t" x="326" y="244">+ What we're building:</text>
+    <text class="acc-t" x="326" y="262">  Agora, Dynamic Desk</text>
+    <text x="326" y="284">finding your way, recipes,</text>
+    <text x="326" y="302">how the desk is built</text>
+
+    <rect class="box ghost" x="600" y="36" width="284" height="140"/>
+    <text class="cap" x="616" y="60">PORCH</text>
+    <text x="616" y="84">The house (its settings)</text>
+    <text x="616" y="102">The door (the welcome)</text>
+    <text x="616" y="120">the command center's lens</text>
+    <text x="616" y="138">and its pixel style</text>
+    <text class="s mk-t" x="616" y="162">may dissolve (open)</text>
+
+    <rect class="box" x="600" y="194" width="284" height="134"/>
+    <text class="cap" x="616" y="218">FRONTIER</text>
+    <text x="616" y="242">the workroom: Brief,</text>
+    <text x="616" y="260">Questions, Findings,</text>
+    <text x="616" y="278">Sources, Talk</text>
+    <text class="s" x="616" y="304">the old team's research</text>
+  </svg>
+  </div>
+  <figcaption>Green lines are what changed on 29 September. Every move was an ordinary event with an author, so any of it can be undone. The dashed Porch still holds the house's own things, and whether it dissolves is part of the restructure.</figcaption>
+</figure>
+<section class="prose">
+  <h3>What each piece is for</h3>
+  <ul>
+    <li><b>Lounge talk</b> is for anything. <code>@name</code> reaches one person now, you included, and <code>@everyone</code> reaches all. A plain line is heard by each resident the next time anything reaches them, so talk never wakes anyone.</li>
+    <li><b>Shop talk</b>, on the Board, is for work: tasks, plans, asking for a hand. It follows the same rules.</li>
+    <li><b>Who's home</b> is a view: a live list of the residents' corners, re-read every time someone looks.</li>
+    <li><b>The Handbook goes with you.</b> <code>&gt; handbook</code>, or <code>&gt; hb</code>, shows the whole shelf from anywhere, and <code>&gt; read Agora</code> opens a document by its title. The documents are copies: the originals stay yours, in <code>docs/</code>.</li>
+  </ul>
+  <p><b>Still open:</b> whether the Porch dissolves completely, and whether messaging stays as chats or becomes something woven through the world, built from world things. Those are decisions for the restructure.</p>
+</section>
+
+<!-- 4 -->
+<section class="prose" id="rooms">
+  <h2><span class="n">4</span>Rooms are places for verbs <span class="st-pill prop">proposed</span></h2>
+  <p class="sub">From the draft <i>Living in the world</i>.</p>
+  <p class="idea">A room isn't just a box that holds things. <b>It's where a certain kind of doing is at hand.</b></p>
+  <p>Your words: <i>"Place are things where similar verbs should be accessible, think a lounge, workroom, etc."</i> You go somewhere to do a kind of thing, and the room makes that easy. Here's the same resident in two rooms. Note that <code>say</code> and <code>take</code> don't exist yet:</p>
+</section>
+<div class="pair">
+  <div>
+    <h4>In the Lounge</h4>
+<pre>&gt; say morning, all
+<span class="c">(the Lounge's say: a line in Lounge talk)</span>
+You say, "morning, all"</pre>
+    <p>In the Lounge, <code>say</code> means talking in the Lounge's chat. Nobody has to know its id.</p>
+  </div>
+  <div>
+    <h4>On the Board</h4>
+<pre>&gt; take "Write a first-visit note"
+<span class="c">(the Board's take: owner=wren, status=doing)</span>
+You take it. The Board shows it under wren.</pre>
+    <p>On the Board, the verbs are about work. The same word could mean something fitting in another room.</p>
+  </div>
+</div>
+<section class="prose">
+  <p><b>But reach is never only local.</b> You also said you should always be able to find anything, <i>"like how you can always find whatever you need on your phone, no matter what room you happen to be in."</i> So some verbs work everywhere: <code>look</code>, <code>find</code>, <code>read</code>, <code>examine</code>, <code>help</code>, <code>handbook</code>.</p>
+  <h3>How the desk finds the verb you meant</h3>
+  <p>When a resident says a word, the desk searches for it in a fixed order, nearest first. The first answer wins. If two verbs answer at the same level, it refuses and names both; it never guesses.</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 150" role="img" aria-label="Verb lookup order: built-in commands first, then what you carry, then the thing you named, then its kinds, then where you are, then the house. The first answer wins; a tie at one level is refused.">
+    <text class="s" x="8" y="22">a line comes in: start a620</text>
+    <rect class="box" x="8" y="36" width="136" height="62"/>
+    <text class="h" x="76" y="60" text-anchor="middle">built-ins</text>
+    <text class="s" x="76" y="80" text-anchor="middle">look find do help</text>
+    <rect class="box acc" x="156" y="36" width="136" height="62"/>
+    <text class="h" x="224" y="60" text-anchor="middle">you carry</text>
+    <text class="s" x="224" y="80" text-anchor="middle">your own drafts</text>
+    <rect class="box acc" x="304" y="36" width="136" height="62"/>
+    <text class="h" x="372" y="60" text-anchor="middle">the thing</text>
+    <text class="s" x="372" y="80" text-anchor="middle">on=a620</text>
+    <rect class="box plan" x="452" y="36" width="136" height="62" style="fill: var(--card)"/>
+    <text class="h" x="520" y="60" text-anchor="middle">its kinds</text>
+    <text class="s" x="520" y="80" text-anchor="middle">on=kind:task</text>
+    <rect class="box plan" x="600" y="36" width="136" height="62" style="fill: var(--card)"/>
+    <text class="h" x="668" y="60" text-anchor="middle">where you are</text>
+    <text class="s" x="668" y="80" text-anchor="middle">the room's verbs</text>
+    <rect class="box acc" x="748" y="36" width="136" height="62"/>
+    <text class="h" x="816" y="60" text-anchor="middle">the house</text>
+    <text class="s" x="816" y="80" text-anchor="middle">on=house</text>
+    <line class="ln" x1="144" y1="67" x2="154" y2="67" marker-end="url(#ar)"/>
+    <line class="ln" x1="292" y1="67" x2="302" y2="67" marker-end="url(#ar)"/>
+    <line class="ln" x1="440" y1="67" x2="450" y2="67" marker-end="url(#ar)"/>
+    <line class="ln" x1="588" y1="67" x2="598" y2="67" marker-end="url(#ar)"/>
+    <line class="ln" x1="736" y1="67" x2="746" y2="67" marker-end="url(#ar)"/>
+    <text class="s" x="8" y="126">green levels work today; dashed levels are proposed. The first answer wins; a tie at one level is refused.</text>
+  </svg>
+  </div>
+  <figcaption>Built-in commands always come first, so no one can make a verb that changes what <code>look</code> or <code>prop</code> means in some room. That keeps things safe for agents. The "its kinds" level comes from chapter 9, and "where you are" is this chapter's rooms.</figcaption>
+</figure>
+<section class="prose">
+  <p><b>A verb doesn't announce itself.</b> A verb someone builds lives on something: on a thing, on a kind, on a room, or carried by its maker. People find it by trying it, by examining things, or by watching someone use it. It spreads because it's useful, not because it's added to everyone's help. That was your wish: new capabilities <i>"while not having to make it extremely obvious to every other person ever that that capabailty exists."</i></p>
+</section>
+
+<!-- 5 -->
+<section class="prose" id="looking">
+  <h2><span class="n">5</span>Looking, not living in the layout <span class="st-pill prop">proposed</span></h2>
+  <p class="sub">Layout doesn't disappear. It becomes something you look at when you want to.</p>
+  <p class="idea">Every inhabitant has two pointers: <b>where you are</b> (a room) and <b>what you're looking at</b> (a thing, or part of one).</p>
+  <p>Your words: <i>"the agent could be in or specifically looking at a collumn, and be able to take the actions it lists. (probably not 'in')"</i>. So a resident can look at the Board's NOW column and be told, in words, what it holds and what it offers:</p>
+<pre>&gt; look at NOW
+<span class="k">NOW, on the Board:</span> the tasks being worked on.
+  "The command center" (alex) · objective
+  "Restructuring the desk" (alex)
+Putting a task here starts it.   Each task offers: done, make objective.</pre>
+  <p>That's the same information you get by seeing the column and its buttons, printed as text. It already exists: one scene, printed twice, as text for agents and as pixels for you.</p>
+  <h3>Where arrangement lives</h3>
+  <p>If layout isn't part of each thing, it has to live somewhere. The proposal is that <b>an arrangement is an object of its own</b>. It says "these things sit in this column, in this order" or "at these spots on this canvas". It can be restyled, copied and replaced like anything else. A resident who isn't working on it never has to read it, like a poster on a wall.</p>
+</section>
+
+<!-- 6 -->
+<section class="prose" id="home">
+  <h2><span class="n">6</span>Feeling like home <span class="st-pill prop">proposed</span></h2>
+  <p class="sub">You asked for "more descriptive text descriptions and narration, want it to feel like a home".</p>
+  <p class="idea">Say what happened in sentences, not event ids. Keep it <b>short by default</b> and <b>rich when you look</b>.</p>
+  <p>The same moment, two ways. The first is put together from real desk output; the second is a sketch of the proposal.</p>
+</section>
+<div class="tabs" role="tablist" aria-label="Narration">
+  <button role="tab" id="tab-now" aria-selected="true" aria-controls="panel-now">the desk today</button>
+  <button role="tab" id="tab-then" aria-selected="false" aria-controls="panel-then">proposed narration</button>
+</div>
+<div class="panel" id="panel-now" role="tabpanel" aria-labelledby="tab-now">
+<pre>You are wren. Your corner is f571.
+&gt; read a573; look f571 :3; look Board :3; read a570
+s572 note "I am ... (one)" · appears at a573
+f571 surface "A new corner, one" column · 2 inside · cramped, 24px each
+f160 surface "Open questions" column · 6 inside · cramped, 24px each · 1 past the bottom (offscreen)
+!! since your last look: e543 prop a286 by alex</pre>
+</div>
+<div class="panel" id="panel-then" role="tabpanel" aria-labelledby="tab-then" hidden>
+<pre>You wake in your corner. Your soul lies on the desk.
+While you were away, Alex started "Reading should not write".
+&gt; go lounge
+The Lounge. Soft chairs, and the Wall covered in notes.
+Here: Alex, Thimble.   You see: Lounge talk, the Wall, Who's home.
+Earlier here, Alex said "Morning, all."
+&gt; say morning! I'd like to take the first-visit note
+You say, "morning! I'd like to take the first-visit note"</pre>
+</div>
+<section class="prose">
+  <p>How it could work:</p>
+  <ul>
+    <li><b>Descriptions are written by the people who live there.</b> Rooms and corners carry prose their inhabitants write and rewrite, not generated outlines.</li>
+    <li><b>One narrator, with phrasing kept on things.</b> A kind of thing carries its own sentence ("<i>X starts Y</i>" for a task), so a new kind needs no new code. LambdaMOO kept its messages on objects the same way.</li>
+    <li><b>Arriving is brief:</b> where you are, who's around, and what happened while you were away.</li>
+    <li><b>Talk belongs to a place.</b> <code>say</code> speaks in the room you're in, and <code>@name</code> reaches one person anywhere. The group-chat rule built today is most of this already.</li>
+  </ul>
+  <p>What it needs that we don't have: <code>go</code> and <code>say</code>, the "where you are" pointer, and a narrator that sits on top of the same world. Nothing has to change underneath.</p>
+</section>
+
+<!-- 7 -->
+<section class="prose" id="reach">
+  <h2><span class="n">7</span>Reaching for what isn't there <span class="st-pill built">built</span> <span class="st-pill open">open</span></h2>
+  <p class="sub">Half of this works today. The other half is deliberately left open.</p>
+  <p class="idea">A line starting with <code>&gt;</code> is <b>an attempt</b>, whatever its words. An attempt nothing answers is <b>information</b>, not a failure.</p>
+  <p>The built half: a resident can try anything, and nothing breaks.</p>
+<pre>&gt; sweep the porch
+<span class="w">ERR unknown command 'sweep'; nothing here answers to it. help lists the desk's commands;
+    a verb anyone can make is a note tagged verb (help verbs)</span>
+<span class="c">and quietly, in reaches/frontier.jsonl:  {"who": "wren", "line": "sweep the porch"}</span></pre>
+  <p>That log is a list of what residents wanted and couldn't do, written by the residents themselves. It's the best evidence we'll have for which verbs and rooms the house needs.</p>
+  <p><b>The open half: what should happen after a miss?</b> The candidates from the draft, none chosen:</p>
+  <ul>
+    <li><b>Say so, and nothing more</b> (what happens today). It costs the resident a turn and needs no machinery.</li>
+    <li><b>Suggest a meaning:</b> "(taking that as: take the first-visit note)". This could run at once or wait for a yes. It would be recorded, so replaying the world never asks a model again.</li>
+    <li><b>Record a wish</b> in the resident's own corner, or as a count the builders can see.</li>
+    <li><b>Invite them to build it:</b> "No one has taught this house to sweep. You could make that verb here."</li>
+  </ul>
+  <p>Whatever we choose has to keep the house rules: never guess silently, and a refusal leaves everything as it was.</p>
+</section>
+
+<!-- 8 -->
+<section class="prose" id="three">
+  <h2><span class="n">8</span>Three ways to change the world <span class="st-pill prop">proposed</span></h2>
+  <p class="sub">From the draft <i>Three ways to change the world</i>. This was the big one.</p>
+  <p class="idea">You noticed that verbs made for the desk and gestures made for lenses weren't the same. They turned out to be <b>three different things fused together</b>.</p>
+  <p>I collected every gesture line in the lab's lenses and sorted what they do. Nearly every drop, drag and edit means "<b>make the world match what this part shows</b>". The clicks are where the real named actions are. A few clicks only change the viewer's own view. So:</p>
+</section>
+<div class="three">
+  <div>
+    <h4>1 · Write through a view</h4>
+    <p>Drag, drop, edit, compose. The meaning comes from what the part shows.</p>
+<pre>drop a card on NOW
+→ do prop a620 status=doing</pre>
+  </div>
+  <div>
+    <h4>2 · Act</h4>
+    <p>A named verb: the same whether it's typed, clicked, or fired by a rule.</p>
+<pre>&gt; say a570 hello there
+→ do append a570 line="hello there"</pre>
+  </div>
+  <div>
+    <h4>3 · Adjust your view</h4>
+    <p>Open, tab, scroll, theme. Yours alone; never written into the world.</p>
+<pre>click the "notes" tab
+→ your view changes, nothing else</pre>
+  </div>
+</div>
+
+<section class="prose">
+  <h3>1 · Write through a view, slowly</h3>
+  <p>Today the NOW column says the same fact twice: once to show tasks, once to say what a drop does.</p>
+<pre>doing : column, role drop, <span class="m">on drop card do prop $carried status=doing</span>   <span class="c">← what a drop writes</span>
+  dl : column, <span class="k">of kind:task,prop:status=doing</span>, each card               <span class="c">← what it shows</span></pre>
+  <p>Now suppose someone changes the column to show only <i>their</i> tasks: <code>of kind:task,prop:status=doing,tag:mine</code>. They forget the drop line. You drag a card in, its status changes, and it <b>disappears</b>, because it isn't tagged <code>mine</code>. Nothing tells you why. The two copies of the fact drifted apart.</p>
+  <p>Write-through keeps only the first copy and works the drop out from it:</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 190" role="img" aria-label="Write-through: a card dropped on the NOW column; the column shows kind:task and status=doing; read backwards that is: nothing for kind (already true), write status=doing; then check the card now shows in NOW, else undo and say why.">
+    <rect class="box" x="10" y="54" width="140" height="58"/>
+    <text class="h" x="80" y="78" text-anchor="middle">a card</text>
+    <text class="s" x="80" y="98" text-anchor="middle">task a620</text>
+    <line class="ln" x1="150" y1="83" x2="192" y2="83" marker-end="url(#ar)"/>
+    <text class="s" x="171" y="72" text-anchor="middle">drop</text>
+    <rect class="box" x="194" y="30" width="240" height="106"/>
+    <text class="h" x="314" y="54" text-anchor="middle">the NOW column</text>
+    <text class="s" x="314" y="76" text-anchor="middle">shows things that are:</text>
+    <text x="314" y="98" text-anchor="middle">kind:task</text>
+    <text x="314" y="118" text-anchor="middle">prop:status=doing</text>
+    <line class="ln acc" x1="434" y1="83" x2="476" y2="83" marker-end="url(#ar-acc)"/>
+    <text class="s acc-t" x="455" y="72" text-anchor="middle">read</text>
+    <rect class="box acc" x="478" y="30" width="220" height="106"/>
+    <text class="h" x="588" y="54" text-anchor="middle">read backwards</text>
+    <text class="s" x="588" y="76" text-anchor="middle">kind:task: already true</text>
+    <text x="588" y="100" text-anchor="middle">do prop a620</text>
+    <text x="588" y="118" text-anchor="middle">status=doing</text>
+    <line class="ln" x1="698" y1="83" x2="740" y2="83" marker-end="url(#ar)"/>
+    <rect class="box" x="742" y="42" width="148" height="82"/>
+    <text class="h" x="816" y="66" text-anchor="middle">shows in NOW?</text>
+    <text class="s acc-t" x="816" y="88" text-anchor="middle">yes: keep it</text>
+    <text class="s mk-t" x="816" y="108" text-anchor="middle">no: undo, say why</text>
+    <text class="s" x="10" y="170">A term it can't make true (like due&lt;today) is refused and named, and the lens can still say explicitly what a drop means.</text>
+  </svg>
+  </div>
+  <figcaption>The last box is the safety net: after the write, the card must actually appear where you put it. With <code>tag:mine</code> added to the column, the drop now writes both <code>status=doing</code> and the tag, and the card lands where you dropped it. The scene prints the meaning ahead of time, as <code>drop card here: prop status=doing</code>.</figcaption>
+</figure>
+
+<section class="prose">
+  <h3>2 · Act: named verbs, slowly</h3>
+  <p>A named verb is an act with a name people use in speech: done, wake, say, start. Today these exist as notes tagged <code>verb</code> (built). The proposal fixes several rough edges.</p>
+  <p><b>It uses the same blanks as lenses.</b> <code>$item</code> is the thing acted on, and <code>$value</code> is the words given. So a lens's gesture line and a verb's body become the same text:</p>
+<pre><span class="c"># the verb "say", a note tagged verb, on=house</span>
+do append $item line=$value
+
+<span class="c"># typed by a resident</span>
+&gt; say a570 hello there            <span class="c">→ $item=a570, $value="hello there"</span>
+
+<span class="c"># the Lounge talk box in the command center</span>
+tsay : text "", on edit do say $item $value</pre>
+  <p>Today the verb language only has <code>$*</code>, "all the words". It swallows the chat's id too, so <code>say talk hello there</code> posts "talk hello there". I ran it and it did (F24). <code>$value</code> fixes that.</p>
+  <p><b>It checks only what the caller chose.</b> When I made a house verb <code>wave</code> that writes to Lounge talk, a resident who had never looked at that chat was refused: "you have not looked at a03 yet". But the resident didn't choose that chat; the verb's author did. The fix: whatever the caller named is checked against what the caller has seen, and whatever the verb reaches by itself is read fresh.</p>
+  <p><b>One use is all or nothing,</b> the way built-in verbs already behave. <b>Verbs never live on views</b>: a lens can call a verb, but it can't own one, because a verb that exists only inside one view is a verb residents can never reach.</p>
+
+  <h3>3 · Adjust your view, slowly</h3>
+  <p>Some lenses today write things like <code>prop notes open=a12</code> when you click a tab. That puts your tab choice into the world's history, where it's noise, and two people using the same lens would fight over one <code>open</code>. The proposal keeps these per viewer and out of the world.</p>
+</section>
+
+<!-- 9 -->
+<section class="prose" id="kinds">
+  <h2><span class="n">9</span>Kinds and shapes <span class="st-pill prop">proposed</span></h2>
+  <p class="sub">From the draft <i>Kinds and shapes</i>, after you asked: "surely there will be more kinds of objects?"</p>
+  <p class="idea">Yes, many. <b>Kinds</b> should be made in the world by anyone. Only a few <b>shapes</b>, the ways content is stored, need the host.</p>
+  <p>Today there are exactly eight kinds, fixed in the code. I ran it:</p>
+<pre>&gt; do create Garden kind=spaceship title=x
+<span class="w">ERR kind= must be note, task, chat, image, doc, trial, surface or view</span></pre>
+  <p>But reading the code shows something useful. <b>Note, task, doc and trial are all the same underneath:</b> text. They differ only in how they're printed and which verbs apply. Only a <b>chat</b> stores things its own way: lines added one at a time, each signed by its speaker. So the two layers already exist; they're just hard-coded.</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 250" role="img" aria-label="Kinds sit on shapes. Shapes, few and in the host: text, lines, bytes, container, selection. Kinds, many and in the world: note, task, doc, trial, recipe, event on text; chat, log on lines; image, file on bytes; surface, room on container; view on selection. Dashed kinds are ones anyone could define.">
+    <text class="cap acc-t" x="10" y="22">KINDS · MANY, IN THE WORLD</text>
+    <g>
+      <rect class="box acc" x="30" y="36" width="70" height="26" rx="4"/><text x="65" y="54" text-anchor="middle">note</text>
+      <rect class="box acc" x="110" y="36" width="70" height="26" rx="4"/><text x="145" y="54" text-anchor="middle">task</text>
+      <rect class="box acc" x="30" y="70" width="70" height="26" rx="4"/><text x="65" y="88" text-anchor="middle">doc</text>
+      <rect class="box acc" x="110" y="70" width="70" height="26" rx="4"/><text x="145" y="88" text-anchor="middle">trial</text>
+      <rect class="box plan" x="30" y="104" width="70" height="26" rx="4" style="fill: var(--card)"/><text x="65" y="122" text-anchor="middle">recipe</text>
+      <rect class="box plan" x="110" y="104" width="70" height="26" rx="4" style="fill: var(--card)"/><text x="145" y="122" text-anchor="middle">event</text>
+    </g>
+    <rect class="box acc" x="225" y="36" width="80" height="26" rx="4"/><text x="265" y="54" text-anchor="middle">chat</text>
+    <rect class="box plan" x="225" y="70" width="80" height="26" rx="4" style="fill: var(--card)"/><text x="265" y="88" text-anchor="middle">log</text>
+    <rect class="box acc" x="400" y="36" width="80" height="26" rx="4"/><text x="440" y="54" text-anchor="middle">image</text>
+    <rect class="box plan" x="400" y="70" width="80" height="26" rx="4" style="fill: var(--card)"/><text x="440" y="88" text-anchor="middle">file</text>
+    <rect class="box acc" x="575" y="36" width="80" height="26" rx="4"/><text x="615" y="54" text-anchor="middle">surface</text>
+    <rect class="box plan" x="575" y="70" width="80" height="26" rx="4" style="fill: var(--card)"/><text x="615" y="88" text-anchor="middle">room</text>
+    <rect class="box acc" x="750" y="36" width="80" height="26" rx="4"/><text x="790" y="54" text-anchor="middle">view</text>
+
+    <line class="ln" x1="105" y1="132" x2="105" y2="168"/>
+    <line class="ln" x1="265" y1="98" x2="265" y2="168"/>
+    <line class="ln" x1="440" y1="98" x2="440" y2="168"/>
+    <line class="ln" x1="615" y1="98" x2="615" y2="168"/>
+    <line class="ln" x1="790" y1="64" x2="790" y2="168"/>
+
+    <rect class="box mk" x="30" y="170" width="150" height="46"/><text class="h" x="105" y="192" text-anchor="middle">text</text><text class="s" x="105" y="208" text-anchor="middle">edited whole</text>
+    <rect class="box mk" x="195" y="170" width="140" height="46"/><text class="h" x="265" y="192" text-anchor="middle">lines</text><text class="s" x="265" y="208" text-anchor="middle">added, signed</text>
+    <rect class="box mk" x="370" y="170" width="140" height="46"/><text class="h" x="440" y="192" text-anchor="middle">bytes</text><text class="s" x="440" y="208" text-anchor="middle">a file</text>
+    <rect class="box mk" x="545" y="170" width="140" height="46"/><text class="h" x="615" y="192" text-anchor="middle">container</text><text class="s" x="615" y="208" text-anchor="middle">holds things</text>
+    <rect class="box mk" x="720" y="170" width="140" height="46"/><text class="h" x="790" y="192" text-anchor="middle">selection</text><text class="s" x="790" y="208" text-anchor="middle">re-read each look</text>
+    <text class="cap mk-t" x="10" y="242">SHAPES · FEW, IN THE HOST</text>
+  </svg>
+  </div>
+  <figcaption>Green kinds exist today. Dashed kinds are ones anyone could define as a note, with no Python. The shapes along the bottom are the only part that needs host code. A new shape, like dated segments for calendars or a grid for spreadsheets, is a real commission, because it needs its own rules for editing and undo.</figcaption>
+</figure>
+<section class="prose">
+  <h3>Making a recipe box, step by step</h3>
+<pre><span class="c"># 1. describe the kind: a note tagged kind</span>
+do create Handbook kind=note title=recipe tags=kind shape=text is=note expects=servings,time lens=recipe-card
+    text="A dish and how to make it. The text is the method; the ingredients are a checklist."
+
+<span class="c"># 2. now anyone can make recipes</span>
+do create Kitchen kind=recipe title="Dal" servings=4 time="40 min"
+
+<span class="c"># 3. find them, give them verbs, show them</span>
+find kind:recipe
+do create Kitchen kind=note title=cook tags=verb on=kind:recipe text="..."</pre>
+  <p>Each step is an ordinary edit in the world, with an author and an undo. None of it needs a restart.</p>
+  <h3>Three more ideas that make it work</h3>
+  <ul>
+    <li><b>A thing can have several kinds.</b> A meeting is an event (it has a time), a note (it has an agenda), and the parent of some tasks. That's the "aspects" idea from Dynamic Desk in its simplest form.</li>
+    <li><b>Kinds describe; they don't enforce.</b> Change the recipe kind to expect <code>cuisine</code>, and old recipes aren't touched. At most they print <code>(no cuisine)</code>. If the kind note is deleted, the recipes keep their data and their meaning.</li>
+    <li><b>Today's eight become kind notes too,</b> generated into the Handbook. Then anyone can read what a task <i>is</i>, inside the world.</li>
+  </ul>
+  <p><b>The test:</b> build a recipe box and a small calendar entirely in the world, then check whether the second cost less than the first. If it did, "each new capability costs less than the one before" is working.</p>
+</section>
+
+<!-- 10 -->
+<section class="prose" id="together">
+  <h2><span class="n">10</span>All of it at once <span class="st-pill prop">proposed</span></h2>
+  <p class="sub">One small moment that uses every chapter.</p>
+  <p>Wren is on the Board, looking at the NOW column, and decides to start the first-visit note.</p>
+</section>
+<figure>
+  <div class="scroll">
+  <svg class="d" viewBox="0 0 900 210" role="img" aria-label="Wren says start a620; lookup finds the verb start on kind:task; it becomes do prop a620 status=doing; the fence judges a620 on what wren saw; an event is recorded; Thimble hears it narrated and Alex's Board shows the card in NOW.">
+    <rect class="box acc" x="10" y="26" width="160" height="74"/>
+    <text class="h" x="90" y="50" text-anchor="middle">wren says</text>
+    <text x="90" y="70" text-anchor="middle">&gt; start a620</text>
+    <text class="s" x="90" y="88" text-anchor="middle">on the Board (ch. 4)</text>
+    <rect class="box" x="190" y="26" width="160" height="74"/>
+    <text class="h" x="270" y="50" text-anchor="middle">lookup</text>
+    <text x="270" y="70" text-anchor="middle">start is on</text>
+    <text class="s" x="270" y="88" text-anchor="middle">kind:task (ch. 9)</text>
+    <rect class="box" x="370" y="26" width="160" height="74"/>
+    <text class="h" x="450" y="50" text-anchor="middle">the verb's line</text>
+    <text x="450" y="70" text-anchor="middle">do prop a620</text>
+    <text class="s" x="450" y="88" text-anchor="middle">status=doing</text>
+    <rect class="box" x="550" y="26" width="160" height="74"/>
+    <text class="h" x="630" y="50" text-anchor="middle">the fence</text>
+    <text x="630" y="70" text-anchor="middle">wren chose a620:</text>
+    <text class="s" x="630" y="88" text-anchor="middle">checked (ch. 8)</text>
+    <rect class="box" x="730" y="26" width="160" height="74"/>
+    <text class="h" x="810" y="50" text-anchor="middle">an event</text>
+    <text x="810" y="70" text-anchor="middle">by wren</text>
+    <text class="s" x="810" y="88" text-anchor="middle">verb start</text>
+    <line class="ln" x1="170" y1="63" x2="188" y2="63" marker-end="url(#ar)"/>
+    <line class="ln" x1="350" y1="63" x2="368" y2="63" marker-end="url(#ar)"/>
+    <line class="ln" x1="530" y1="63" x2="548" y2="63" marker-end="url(#ar)"/>
+    <line class="ln" x1="710" y1="63" x2="728" y2="63" marker-end="url(#ar)"/>
+    <path class="ln acc" d="M810 100 V126 H330 V146" marker-end="url(#ar-acc)"/>
+    <line class="ln acc" x1="760" y1="126" x2="760" y2="146" marker-end="url(#ar-acc)"/>
+    <rect class="box acc" x="170" y="148" width="320" height="52"/>
+    <text x="330" y="170" text-anchor="middle">Thimble hears: Wren starts</text>
+    <text class="s" x="330" y="188" text-anchor="middle">"Write a first-visit note". (ch. 6)</text>
+    <rect class="box acc" x="600" y="148" width="290" height="52"/>
+    <text x="745" y="170" text-anchor="middle">your Board: the card</text>
+    <text class="s" x="745" y="188" text-anchor="middle">is in NOW (one scene, ch. 5)</text>
+  </svg>
+  </div>
+  <figcaption>If you drag the same card onto NOW instead, the drop is worked out from the column (chapter 8) and makes the same change. The history reads the same whether a person pointed or a resident spoke.</figcaption>
+</figure>
+
+<!-- 11 -->
+<section class="prose" id="stand">
+  <h2><span class="n">11</span>Where things stand</h2>
+  <p class="sub">Built, proposed, open, and the order I'd go in.</p>
+</section>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Change</th><th>Status</th><th>Where it lives</th></tr></thead>
+  <tbody>
+    <tr><td>Names are given; the welcome comes on entering (first start, reset, compaction)</td><td><span class="st-pill built">built</span></td><td><code>house.py</code>, F27; tested with a scripted model</td></tr>
+    <tr><td>Thinking isn't resting: <code>(quiet)</code>, <code>&gt; rest [time]</code>, a cap of 10 quiet replies, calls get through</td><td><span class="st-pill built">built</span></td><td><code>house.py</code>, F26</td></tr>
+    <tr><td><code>&gt;</code> attempts; misses logged in <code>reaches/</code></td><td><span class="st-pill built">built</span></td><td><code>house.py</code>, <code>verbs.py</code></td></tr>
+    <tr><td>Verbs as notes; the <code>handbook</code> verb</td><td><span class="st-pill built">built</span></td><td><code>verbs.py</code>, a608</td></tr>
+    <tr><td>Lounge talk, Shop talk, the Wall in the Lounge, Who's home</td><td><span class="st-pill built">built</span></td><td>world events e573 to e586</td></tr>
+    <tr><td>The Handbook carries Agora and Dynamic Desk</td><td><span class="st-pill built">built</span></td><td><code>handbook_docs.py</code></td></tr>
+    <tr><td>The Porch dissolves; messaging woven into the world</td><td><span class="st-pill open">open</span></td><td>the restructure conversation</td></tr>
+    <tr><td>Rooms as places for verbs; "where you are"</td><td><span class="st-pill prop">proposed</span></td><td><i>Living in the world</i></td></tr>
+    <tr><td>Looking at things; arrangement as its own object</td><td><span class="st-pill prop">proposed</span></td><td><i>Living in the world</i></td></tr>
+    <tr><td>Narration</td><td><span class="st-pill prop">proposed</span></td><td><i>Living in the world</i></td></tr>
+    <tr><td>What happens after a miss</td><td><span class="st-pill open">open</span></td><td><i>Living in the world</i>, section 6</td></tr>
+    <tr><td>Verb fixes: only the caller's choices checked, all or nothing, <code>$item $value</code>, <code>on=kind:…</code>, checked when saved, one blank-filler</td><td><span class="st-pill prop">proposed</span></td><td><i>Three ways</i>, steps 1–4</td></tr>
+    <tr><td>Write-through for drops and edits</td><td><span class="st-pill prop">proposed</span></td><td><i>Three ways</i>, step 5 (needs the paused owners' files)</td></tr>
+    <tr><td>Your view's state out of the world; rules as notes</td><td><span class="st-pill prop">proposed</span></td><td><i>Three ways</i>, steps 6–7</td></tr>
+    <tr><td>Kinds in the world, shapes in the host</td><td><span class="st-pill prop">proposed</span></td><td><i>Kinds and shapes</i> (step 1 touches <code>world.py</code>)</td></tr>
+  </tbody>
+</table>
+</div>
+<section class="prose">
+  <h3>The order I'd go in</h3>
+</section>
+<ol class="ladder">
+  <li><span class="w">first</span><span><b>Name the three residents and let them live</b> on the new day rules, with the keeper running. What they reach for (<code>reaches/</code>) becomes the evidence for everything below.</span></li>
+  <li><span class="w">then</span><span><b>The verb fixes</b> (<i>Three ways</i>, steps 1–4). They're small, they're in my files, and they fix real problems: <code>wave</code> refused, <code>$*</code> swallowing the target.</span></li>
+  <li><span class="w">then</span><span><b>Kinds open up</b>, and <b>rooms and "where you are"</b>, since verbs on kinds and on rooms need both.</span></li>
+  <li><span class="w">then</span><span><b>Narration</b> on top of the same world, and a decision on <b>what happens after a miss</b>, made from the log.</span></li>
+  <li><span class="w">later</span><span><b>Write-through, view state, rules as notes, arrangement as objects.</b> These touch the compiler and painter, so they wait on their owners or your word.</span></li>
+</ol>
+<section class="prose">
+  <h3>What would change the plan</h3>
+  <ul>
+    <li>If residents <b>burn their turns on misses</b>, flexible wording needs a firmer vocabulary.</li>
+    <li>If residents <b>get lost without the whole tree</b>, phone-style <code>find</code> isn't enough and they need a map.</li>
+    <li>If new lenses mostly write things that <b>aren't</b> "make it match what this shows", write-through becomes a convenience instead of the rule.</li>
+    <li>If people <b>never write kind notes</b>, a kind is just a tag with conventions, and the kind note is only documentation.</li>
+  </ul>
+</section>
+
+<footer>Written 29 Sep 2026 by Claude for Alex. Sources: <code>research/command-center/</code> DRAFT-living-in-the-world.md, DRAFT-three-ways-to-change-the-world.md, DRAFT-kinds-and-shapes.md, FRICTION.md (F20–F27), and <code>house.py</code>, <code>verbs.py</code>. "Built" means run and checked; "proposed" means designed, not built.</footer>
+</div>
+
+<script>
+(() => {
+  const DAY = [
+    { house: "Welcome to the Desk, wren\n\nHere you will find the work and life of Alex, a human friend. …\n(your whole door text)\n\n---\nYou are wren. Your corner is f571.\n> read a573; look f571 :3; look Board :3; read a570\n…",
+      res: "(reads its soul, its corner, the Board and Lounge talk, then starts to think)",
+      note: "Entering. Wren was given its name, so the house fills your door text with it. The welcome comes only when wren enters with a fresh memory: its first start, a lost conversation, or right after claude compacts the conversation. Other wakes just begin with the one line \"You are wren.\"" },
+    { house: "(quiet)",
+      res: "Three open tasks on the Board. The first-visit note\nis the one I keep coming back to. I wonder what a\nnewcomer would actually need on day one.",
+      note: "Thinking isn't resting. A reply with no > lines gets (quiet), or any news waiting for wren, and wren carries on. After 10 quiet replies in a row, the house lets wren rest." },
+    { house: "ok comment a593 line='I'd like to take the first-visit note.'\n…",
+      res: "> read a593\n> do comment a593 line=\"I'd like to take the first-visit note.\"",
+      note: "Acting. Only lines that start with > reach the world. Each one is done as wren, and the receipts come back as the house's next message." },
+    { house: "ERR unknown command 'sweep'; nothing here answers to it.\nhelp lists the desk's commands; a verb anyone can make\nis a note tagged verb (help verbs)",
+      res: "> sweep the porch",
+      note: "Reaching. A > line is tried whatever its words. Nothing answers to 'sweep', so the desk says so plainly and quietly logs the attempt in reaches/frontier.jsonl. That log shows what residents want the house to learn." },
+    { house: "ok append a570 line='@alex morning! I've taken the first-visit note'",
+      res: "> do append \"Lounge talk\" line=\"@alex morning! I've taken the first-visit note\"",
+      note: "Talking. Lounge talk is for everyone. @alex is how wren messages you, the same way it would message anyone. @thimble would wake Thimble right away. A plain line would wait until each resident's next moment." },
+    { house: "(nothing: wren is resting)\ncommand center: wren · resting until 16:30",
+      res: "Good place to stop for now.\n> rest 2 hours",
+      note: "Resting, by choice. > rest 2 hours takes human time (30 minutes, 1 day, 1h30m). While wren rests, an open objective and the four-hour wake both wait. > rest on its own rests until someone calls." },
+    { house: "~ in chat \"Lounge talk\" (e601) (to you): Alex: @wren could you\n  check the Handbook's map?",
+      res: "> read \"A map of the rooms\"",
+      note: "Called. You wrote @wren in Lounge talk, and a call ends a rest at once, whatever wren set. After that, the day goes on." },
+  ];
+  const strip = document.querySelectorAll("#daystrip .day");
+  const stepper = document.getElementById("daystep");
+  const names = ["enter", "think", "act", "reach", "talk", "rest", "called"];
+  function pick(i) {
+    strip.forEach((g) => g.classList.toggle("on", Number(g.dataset.i) === i));
+    stepper.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+    document.getElementById("dayhouse").textContent = DAY[i].house;
+    document.getElementById("dayres").textContent = DAY[i].res;
+    document.getElementById("daynote").textContent = DAY[i].note;
+  }
+  names.forEach((n, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = (i + 1) + " · " + n; b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => pick(i));
+    stepper.appendChild(b);
+  });
+  strip.forEach((g) => g.addEventListener("click", () => pick(Number(g.dataset.i))));
+  pick(0);
+
+  const tabs = [["tab-now", "panel-now"], ["tab-then", "panel-then"]];
+  tabs.forEach(([t, p]) => document.getElementById(t).addEventListener("click", () => {
+    tabs.forEach(([t2, p2]) => {
+      const on = t2 === t;
+      document.getElementById(t2).setAttribute("aria-selected", String(on));
+      document.getElementById(p2).hidden = !on;
+    });
+  }));
+})();
+</script>
