@@ -30,3 +30,32 @@ Builder: Claude (the teaching session), from outside at first; the residents are
 - `research/command-center/seed/`: the pixel style and the command-center lens as first installed (`install.py` seeds a world). The world's copies are the live ones: restyle the porch by editing the `pixel` note in the Porch.
 - The house's state: `research/text-desk-lab/notation/house-state/<world>/` (house.json, and per corner state.json, transcript.jsonl, stderr.log). claude keeps each resident's conversation itself, under `~/.claude/projects/<that corner's folder, flattened>`; if it is lost, the resident starts fresh from the world (F15).
 - The house runs the newest `claude` it finds (on PATH or kept by the desktop app), or `$HOUSE_CLAUDE`: the standalone 2.1.173 on PATH refuses Opus 5.5.
+
+## Live building (28 Sep, Alex: "the two tier live world, and the workers")
+
+Two tiers. What can be made in the world is made there, at once. What needs host code goes through a worker and git.
+
+- **Tier 1, world verbs** (`notation/verbs.py`; inside the desk, `help verbs`). A verb is a note tagged `verb`:
+  - its title is the word (aliases with `|`), and its text is desk lines with `$1 … $* $1.title $me $this`;
+  - it has no `on` while its maker carries it as a draft, `on=<id>` to sit on a thing, and `on=house` for everyone;
+  - lookup goes carried, then the named thing, then the house, and ambiguity at one level refuses;
+  - `use <id> …` runs one verb exactly;
+  - a verb runs as whoever invokes it, stops at the first refusal, and marks its events `verb_run`.
+
+  A line that starts with `>` is an attempt, whatever its words. A word nothing answers to is logged to `reaches/<world>.jsonl`, so reaches can be read later without being announced to everyone.
+- **Tier 2, commissions and workers** (`notation/workshop.py`; `help commissions`).
+  - A task with `commission=asked` is taken by a disposable `claude -p` worker with real tools. It works in its own git worktree (`.worktrees/<id>`, branch `worker/<id>`), on a copy of the world named `<world>-try`.
+  - It talks to whoever asked through comments on the task.
+  - It says it is done by committing and setting `commission=ready`.
+  - The house lands it between passes: `health.py` before and after a `--no-ff` merge, and a revert if health fails or a lens stops compiling.
+  - States: asked → working → waiting ↔ working → ready → landing → landed | reverted | failed | cancelled.
+  - Alex: commissions are trusted, not granted by him.
+- **`notation/health.py`** is what a landing must pass: Python parses, `node --check` on the JS, test_scene, the golden session prints (0 differ), and every lens in the world compiles. About 7 s. `--json` for machines.
+- **`notation/keeper.py`** keeps deskd and the house on the current code (F23). It restarts deskd when HEAD moves, restarts the house when it exits 75 (it asked, after a landing changed Python), and reverts a `land ` commit after three house deaths since it landed. A second house on one world refuses (exit 76). The painter reloads when `/api/version` changes, never mid-gesture or mid-typing.
+- **`notation/try_worker.py`**: a real commission in a throwaway checkout, landing on a `trial/<tag>` branch (never main), with a report in `trials/worker-<tag>.md`. Two have run (help-list and health-times); both were reviewed and merged.
+
+Running it live on frontier (not yet done; waits on Alex's go): stop any hand-started deskd on the port, then
+
+    C:/Projects/Agora4/.venv/Scripts/python.exe keeper.py frontier --port 8794
+
+from `research/text-desk-lab/notation/`. Its log is `house-state/keeper.log`.

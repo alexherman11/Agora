@@ -59,6 +59,7 @@ NAME = re.compile(r"^[a-z][a-z0-9-]{1,19}$")
 RESERVED = {"alex", "house", "harness", "jeff", "claude", "all", "everyone"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
+ANOTHER = 76         # the exit code for "another house already runs this world": keeper does not fight it
 
 
 def now():
@@ -536,7 +537,22 @@ class House:
                           for cid, wk in self.workshop.workers.items()}
         (self.dir / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 
+    def another_house(self):
+        """One house per world, as there is one JEFF: two would run two sets of residents answering at once. Another
+        house is alive when its heartbeat (written every pass, ~2 s) is fresh and it isn't this process."""
+        try:
+            st = json.loads((self.dir / "house.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if st.get("pid") != os.getpid() and now() - float(st.get("beat") or 0) < 15:
+            return st.get("pid")
+        return None
+
     def run(self):
+        other = self.another_house()
+        if other:
+            print(f"house: another house (pid {other}) is running world {self.world}; not starting a second", flush=True)
+            return ANOTHER
         print(f"house: world {self.world}, claude {self.claude_version} ({self.claude})"
               + (f", fake model on {self.fake}" if self.fake else ""), flush=True)
         try:

@@ -45,7 +45,8 @@ HELP_LEAN = HELP_KNIFE.replace(
 ) + """
   table <selection> [cols=a,b] [by=col]   one row per thing, props side by side (e.g. table kind:trial)
   $new                   the surface created earlier in this session; $item the last created thing
-  more: help rules · help scripts · help views · help clock · help handles · help why · help export · help trials"""
+  more: help rules · help scripts · help views · help clock · help handles · help why · help export · help trials
+  building: help verbs (capabilities anyone makes in the world) · help commissions (a worker changes the code for you)"""
 
 
 class DeskKnife(DeskMoo):
@@ -939,6 +940,15 @@ class DeskKnife(DeskMoo):
         return super().repl(line)
 
     HELP_TOPICS = {
+        "commissions": """commissions: a worker changes what the world can't (the desk's code, the house, the painter) for you.
+  Write a task with prop commission=asked; its text says what you want, why, and how you'll know it's done:
+    do create <place> kind=task title="..." commission=asked text="What: ... Why: ... Done when: ..."
+  The house gives it to a disposable worker with real tools, in its own copy of the code. The worker talks to you in
+  comments on the task (to widen its scope, to put a decision to you, or when it's stuck); answer with
+    do comment <task> line="..."
+  When it's done, the house lands it between turns: checks the host is still whole, and reverts it if not. The task
+  shows where it is: commission=asked|working|waiting|ready|landing|landed|reverted|failed. Set commission=cancelled
+  to stop it. Most things don't need a worker: views, styles, notes and verbs (help verbs) change in the world itself.""",
         "rules": """rules: the desk acts on its own when things change.
   rule when <selection> do <verb> [target] [k=v ...]   fires once on each thing that enters the selection
                                                         (now=1: also on the things that match right now)

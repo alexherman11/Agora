@@ -62,7 +62,7 @@ def main():
     time.sleep(2)
     house = start(["house.py", world], env, name="house")
     log(f"keeper: world {world}, deskd on {port}, HEAD {head[:7]}")
-    deaths, backoff_until = [], 0.0
+    deaths, backoff_until, deskd_at, deskd_wait = [], 0.0, time.time(), 0.0
     try:
         while True:
             time.sleep(2)
@@ -71,10 +71,13 @@ def main():
                 log(f"HEAD moved {head[:7]} -> {now_head[:7]} ({git('log', '-1', '--format=%s')[:80]}); restarting deskd")
                 head = now_head
                 stop(deskd)
-                deskd = start(["deskd.py", port], name="deskd")
-            elif deskd.poll() is not None:
-                log(f"deskd exited ({deskd.returncode}); starting it again")
-                deskd = start(["deskd.py", port], name="deskd")
+                deskd, deskd_at = start(["deskd.py", port], name="deskd"), time.time()
+            elif deskd.poll() is not None and time.time() >= deskd_wait:
+                quick = time.time() - deskd_at < 10
+                log(f"deskd exited ({deskd.returncode})" + ("; it ran under 10 s (is the port taken?): waiting 60 s" if quick else "; starting it again"))
+                if quick:
+                    deskd_wait = time.time() + 60
+                deskd, deskd_at = start(["deskd.py", port], name="deskd"), time.time()
             if house is None:                          # waiting out a pause after a crash
                 if time.time() >= backoff_until:
                     house = start(["house.py", world], env, name="house")
@@ -86,11 +89,17 @@ def main():
                 log("the house asked to restart on new code")
                 house = start(["house.py", world], env, name="house")
                 continue
+            if code == 76:
+                log("another house already runs this world (one house per world); keeper will not start a second. "
+                    "Stop the other one, or this keeper")
+                backoff_until, house = time.time() + 60, None
+                continue
             deaths = [t for t in deaths if time.time() - t < 300] + [time.time()]
             subject = git("log", "-1", "--format=%s")
             landed_at = int(git("log", "-1", "--format=%ct") or 0)
-            if len(deaths) >= 3 and subject.startswith("land ") and time.time() - landed_at < 900:
-                log(f"the house died {len(deaths)} times since '{subject[:80]}'; reverting that landing")
+            since = [t for t in deaths if t >= landed_at]       # only deaths after the landing count against it
+            if len(since) >= 3 and subject.startswith("land ") and time.time() - landed_at < 900:
+                log(f"the house died {len(since)} times since '{subject[:80]}'; reverting that landing")
                 r = subprocess.run(["git", "revert", "-m", "1", "--no-edit", "HEAD"], cwd=REPO, capture_output=True, text=True)
                 log("revert: " + ((r.stdout + r.stderr).strip()[-300:] or "ok"))
                 deaths = []

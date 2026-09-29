@@ -139,3 +139,15 @@ So it committed after checking only by reading, and said so. Fix (workshop.py):
   something is refused rather than work around it.
 I ran the worker's change myself on main after merging (help reply, zzz, arrange, tidy, link; health all green):
 4fe2b96.
+
+The second worker trial (trials/worker-health-times.md, commission a598 in its copy: health.py should time each check) ran health on its try-world with no refusals. It landed on its trial branch, and I merged it after review (d407a81).
+
+## F23. The keeper, tested against itself (fixed)
+
+`keeper.py` is the one part of live building that must not depend on the code it protects. I tested it in a throwaway checkout, with a deliberately breaking `land ` commit. Three things were wrong:
+- **It counted deaths from before the landing.** A house that crashed twice before the landing, then once after, looked like three deaths against the landing, and would have reverted it. Now only deaths after the landing's commit time count (`since`).
+- **A hard-killed keeper orphans its children.** Killing keeper's process (not Ctrl-C) leaves the house and deskd running. The next keeper started a second house on the same world, and two houses would each wake the same residents. Fix, in the house rather than the keeper: a house refuses to start when the world's house.json has a heartbeat under 15 s old from another pid, and exits 76. Keeper reads 76 as "another house runs this world", waits 60 s, and tries again; it does not kill the other. Checked (ran): the second house exited 76.
+- **deskd on a taken port would restart every 2 s** (read, from the loop; I didn't run it). Now, if deskd exits within 10 s of starting, keeper waits 60 s before the next try and says the port may be taken.
+
+What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
+Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
