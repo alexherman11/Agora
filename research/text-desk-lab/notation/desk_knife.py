@@ -1006,7 +1006,12 @@ class DeskKnife(DeskMoo):
             args, doc = knife.PAIR_DOC[name]
             return f"{name}  (pair verb; level 2)\n  {doc}\n  args: {args}\n  e.g. do {name} a20 a22" + (" to=a22" if name == "match" else "")
         if name in knife.SPECIALIZED:
-            return f"no verb {name} here. general verbs: " + " ".join(knife.GENERAL + list(knife.PAIR_DOC)) + "\nselections do the specializing (help selections)."
+            return (f"no verb {name} here; use {self.SPECIALIZED_ALT.get(name, 'a general verb')}. general verbs: "
+                    + " ".join(self._help_verbs()) + "\nselections do the specializing (help selections).")
+        if name in moo.SYNONYMS and name not in moo.REGISTRY and moo.SYNONYMS[name] in knife.SPECIALIZED:
+            # F21: moo would say "read as tidy" and then point at a verb this desk refuses
+            to = moo.SYNONYMS[name]
+            return f"{name} is not a verb here; elsewhere it means {to}, which this desk does not do.\n" + self.cmd_help(to)
         import verbs
         if name in ("verbs", "verb", "world verbs"):
             return verbs.HELP
@@ -1019,7 +1024,17 @@ class DeskKnife(DeskMoo):
                 return self.cmd_examine(name)
             except Refusal:
                 pass
+            # F21: moo's list is its whole registry, reply and tidy included; list only what this desk does
+            return f"no verb {name} here. verbs: " + " ".join(self._help_verbs()) + "\nexamine <id> shows which apply to a thing."
         return super().cmd_help(name)
+
+    SPECIALIZED_ALT = {"reply": "append (examine the chat: it shows what awaits a reply)", "dedupe": "remove also:<id>",
+                       "reveal": "raise", "tidy": "tile", "split": "group kind:<k>,in:<surface> then tile the surface as=row",
+                       "gather": "move ?<words> into=<surface> one=1", "done": "retitle", "stack": "tile"}
+
+    def _help_verbs(self):
+        """The verbs help may name: each answers help <verb> here and is done by this desk."""
+        return knife.GENERAL + [p for p in knife.PAIR_DOC if p not in knife.GENERAL]     # link is both
 
     def _builtin_verbs(self):
         return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(knife.SPECIALIZED) | set(moo.REGISTRY) | self._verb_names()
@@ -1156,9 +1171,7 @@ class DeskKnife(DeskMoo):
             return (f"ok {verb} {a} {b}  [{evs[0]}" + (f"..{evs[-1]}" if len(evs) > 1 else "") + "]\n  now: "
                     + self.line(a, 1) + self.position_note(a) + "\n  now: " + self.line(b, 1) + self.position_note(b))
         if (verb if verb in moo.REGISTRY else moo.SYNONYMS.get(verb, verb)) in knife.SPECIALIZED:
-            alt = {"reply": "append (examine the chat: it shows what awaits a reply)", "dedupe": "remove also:<id>",
-                   "reveal": "raise", "tidy": "tile", "split": "group kind:<k>,in:<surface> then tile the surface as=row",
-                   "gather": "move ?<words> into=<surface> one=1", "done": "retitle", "stack": "tile"}.get(verb, "a general verb")
+            alt = self.SPECIALIZED_ALT.get(verb, "a general verb")
             raise Refusal(f"no {verb} here; use {alt}. help selections lists the selection forms")
         sel = self._parse_selection(positional[0])
         if sel is None:
