@@ -9,10 +9,16 @@ the resident knows comes from the world, and everything it does goes through it:
 
   - lines of its reply that begin with a desk command are done in the world, signed with its name; the desk's
     reply is its next message. Any other line is its own thinking, kept in its transcript and nowhere else.
-  - a reply with no command lines ends its turn. It is resting until someone speaks to it (a line in a chat in its
-    own corner, @its-name or @everyone anywhere, a comment on something in its corner), an objective is open (a
-    thing with prop:objective=open; then it is woken again after `breather` seconds), or `wake_every` seconds pass.
-    A plain line in a shared chat (Porch talk) wakes no one: it goes with whatever reaches the resident next.
+  - thinking isn't resting (Alex, 29 Sep). A reply with no command lines is answered `(quiet)`, or with whatever
+    news is waiting, and the resident goes on; after 10 quiet exchanges in a row the house lets it rest.
+  - it rests when it says so: `> rest` rests until someone calls; `> rest 2 hours` (or 30 minutes, 1 day, 1h30m,
+    half an hour: human time, a month at most) rests that long. An empty reply rests too. A resting resident is
+    reached at once by a call (a line in a chat in its own corner, @its-name or @everyone anywhere, a comment on
+    something in its corner, a comment on its commission). Otherwise it is woken when its timed rest ends, or, after an
+    untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
+    `wake_every` seconds pass. A plain line in a shared chat (Porch talk) wakes no one: it goes with whatever reaches
+    the resident next.
+  - every wake begins with one line saying who it is: `You are <name>. Your corner is <id>.`
   - its first pass is the door: the text of the Porch note "The door". It names itself with a line `i am <name>`,
     and that name is its desk identity from then on (prop `actor` on its corner).
 
@@ -166,6 +172,67 @@ def door_name(reply):
         if m:
             return m.group(1).lower()
     return None
+
+
+UNITS = {"m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60,
+         "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600,
+         "d": 86400, "day": 86400, "days": 86400, "w": 604800, "week": 604800, "weeks": 604800}
+REST_MAX = 30 * 86400      # a month: longer than that is a leaving, not a rest
+QUIET_MAX = 10             # Alex (29 Sep): ten quiet exchanges, then the house lets a resident rest
+
+
+def duration(text):
+    """Human time -> seconds, or None if it isn't one: `2 hours`, `30 minutes`, `1 day`, `1h30m`, `an hour`,
+    `half an hour`, `2 days and 3 hours`, `for 90 min`."""
+    t = " " + text.lower().strip().rstrip(".") + " "
+    t = re.sub(r"^\s*for\s+", " ", t)
+    t = re.sub(r"\bhalf an?\s+", "0.5 ", t)
+    t = re.sub(r"\ban?\s+(?=[a-z])", "1 ", t)
+    t = re.sub(r"\band\b|,", " ", t)
+    total, rest = 0.0, t
+    for n, unit in re.findall(r"(\d+(?:\.\d+)?)\s*([a-z]+)", t):
+        if unit not in UNITS:
+            return None
+        total += float(n) * UNITS[unit]
+    rest = re.sub(r"(\d+(?:\.\d+)?)\s*([a-z]+)", " ", t)
+    if rest.strip() or total <= 0:
+        return None
+    return int(total)
+
+
+def human(seconds):
+    """Seconds -> `2 hours`, `1 day 3 hours`, `45 minutes`."""
+    out, s = [], int(round(seconds / 60.0)) * 60
+    for name, size in (("day", 86400), ("hour", 3600), ("minute", 60)):
+        n, s = divmod(s, size)
+        if n:
+            out.append(f"{n} {name}{'s' if n != 1 else ''}")
+    return " ".join(out) or "a moment"
+
+
+def rest_in(cmds):
+    """Split a reply's command lines into (the rest of them, rest). rest is None (no rest asked), 0 (rest until
+    someone calls), a number of seconds, or a sentence saying why the time could not be read. `rest` is the house's
+    word, not the desk's: a resident says `> rest` or `> rest 2 hours`, and the house keeps it."""
+    keep, rest = [], None
+    for line in cmds:
+        m = re.match(r"^rest\b\s*(.*)$", line.strip(), re.I)
+        if not m:
+            keep.append(line)
+            continue
+        when = m.group(1).strip()
+        if not when:
+            rest = 0
+            continue
+        secs = duration(when)
+        if secs is None:
+            rest = (f"'{when}' isn't a time I can keep. Say how long, the way people do: > rest 2 hours, "
+                    f"> rest 30 minutes, > rest 1 day, > rest 1h30m; or just > rest, until someone calls")
+        elif secs > REST_MAX:
+            rest = f"{human(secs)} is longer than a rest ({human(REST_MAX)} at most); > rest with a shorter time"
+        else:
+            rest = secs
+    return keep, rest
 
 
 class Resident:
@@ -449,8 +516,18 @@ class House:
                 continue
             called = self.news(w, r, actor)
             idle = now() - r.state.get("last_turn", now())
-            if called:
+            until = r.state.get("rest_until")
+            if called:                                     # a call ends any rest
+                r.state.pop("rest_until", None)
+                r.state.pop("rest_for", None)
                 r.send("\n".join(self.take(r)))
+            elif until and now() < until:                  # resting for a while: only a call reaches it
+                self.set_status(r, corner, "awake")
+                continue
+            elif until:
+                slept = r.state.pop("rest_for", None) or 0
+                r.state.pop("rest_until", None)
+                self.wake(r, corner, actor, f"(you rested {human(slept)})\n")
             elif objective and idle >= float(cfg["breather"]):
                 self.wake(r, corner, actor, "(time passes; an objective is open)\n")
             elif idle >= float(cfg["wake_every"]):
@@ -464,8 +541,11 @@ class House:
 
     def wake(self, r, corner, actor, lead):
         line = (corner.get("props") or {}).get("wake") or "run arrive"
+        r.state["quiet"] = 0
         if r.state.pop("lost", None):
             lead = "(the house lost our earlier conversation; your soul and the world kept everything)\n" + lead
+        # Alex (29 Sep): who they are, one line at the top of every arrival, so a name outlives a fading memory
+        lead = f"You are {actor}. Your corner is {r.rid}.\n" + lead
         undelivered = r.state.pop("undelivered", "")
         if undelivered:
             lead += "(your last turn did not finish; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
@@ -491,12 +571,47 @@ class House:
             self.act("house", f"look {r.rid} :1; do prop {r.rid} actor={name}")
             r.log("named", name)
             return                            # the next step wakes it under its name
-        cmds = commands_in(text)
+        cmds, rest = rest_in(commands_in(text))
+        receipt = self.act(actor, "\n".join(cmds)) if cmds else ""
         if cmds:
-            receipt = self.act(actor, "\n".join(cmds))
+            r.state["quiet"] = 0
+        if isinstance(rest, str):                         # a rest the house could not read: say so, and go on
+            r.send((receipt + "\n---\n" if receipt else "") + f"~ house: {rest}", "receipt")
+            return
+        if rest is not None:
+            if receipt:                                   # what it did before resting reaches it when it next arrives
+                r.state.setdefault("inbox", []).append("~ what your last lines did, before you rested:\n" + receipt)
+            self.rest(r, rest, "you said > rest")
+            return
+        if receipt:
             self.news(self.load(), r, actor)              # the room goes with the receipt: talk, held or not
             heard = self.take(r)
             r.send(receipt + ("\n---\n" + "\n".join(heard) if heard else ""), "receipt")
+            return
+        if not text.strip():
+            self.rest(r, 0, "an empty reply")
+            return
+        # thinking, with nothing done: the world is quiet, and the resident may go on (Alex, 29 Sep: thinking isn't
+        # resting). After QUIET_MAX quiet exchanges in a row the house lets it rest, so it can't loop politely forever.
+        r.state["quiet"] = r.state.get("quiet", 0) + 1
+        if r.state["quiet"] > QUIET_MAX:
+            self.rest(r, 0, f"{QUIET_MAX} quiet exchanges in a row")
+            return
+        self.news(self.load(), r, actor)
+        heard = self.take(r)
+        r.send("\n".join(heard) if heard else "(quiet)", "news" if heard else "quiet")
+
+    def rest(self, r, seconds, why):
+        """The resident rests: until someone calls (seconds=0), or for that long. A call still reaches it (Alex: he
+        can talk with them at any point); an open objective and wake_every wait until the rest is over."""
+        r.state["quiet"] = 0
+        if seconds:
+            r.state["rest_until"], r.state["rest_for"] = now() + seconds, seconds
+        else:
+            r.state.pop("rest_until", None)
+            r.state.pop("rest_for", None)
+        r.log("rest", {"why": why, "for": seconds})
+        r.save()
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not
@@ -530,7 +645,8 @@ class House:
                                      "alive": r.alive(), "doing": "working" if r.busy else ("resting" if r.alive() else "stopped"),
                                      "turns": r.state.get("turns", 0), "last_turn": r.state.get("last_turn"),
                                      "last_sent": r.state.get("last_sent"), "status": r.status,
-                                     "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at")}
+                                     "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at"),
+                                     "rest_until": r.state.get("rest_until"), "quiet": r.state.get("quiet", 0)}
         out["workers"] = {cid: {"actor": wk.actor, "asked_by": wk.asked_by, "alive": wk.alive(),
                                 "doing": "working" if wk.busy else ("waiting" if wk.alive() else "stopped"),
                                 "turns": wk.state.get("turns", 0), "branch": wk.branch}

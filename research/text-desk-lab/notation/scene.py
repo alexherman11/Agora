@@ -178,6 +178,10 @@ def house_rows(desk, corner=None):
             continue
         last = r.get("last_turn")
         doing = (r.get("doing") or "?") if fresh == "live" else "house " + fresh.replace("stale", "stopped") + " ago"
+        if fresh == "live" and doing == "resting" and r.get("rest_until"):     # a rest the resident timed itself
+            until = float(r["rest_until"])
+            fmt = "%H:%M" if until - time.time() < 86400 else "%a %H:%M"
+            doing = "resting until " + time.strftime(fmt, time.localtime(until))
         out.append({"resident": r.get("actor") or "(at the door)", "corner": cid, "doing": doing,
                     "turns": r.get("turns", 0), "since": time.strftime("%H:%M", time.localtime(last)) if last else "",
                     "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh})

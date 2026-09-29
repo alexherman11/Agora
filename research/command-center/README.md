@@ -31,6 +31,17 @@ Builder: Claude (the teaching session), from outside at first; the residents are
 - The house's state: `research/text-desk-lab/notation/house-state/<world>/` (house.json, and per corner state.json, transcript.jsonl, stderr.log). claude keeps each resident's conversation itself, under `~/.claude/projects/<that corner's folder, flattened>`; if it is lost, the resident starts fresh from the world (F15).
 - The house runs the newest `claude` it finds (on PATH or kept by the desktop app), or `$HOUSE_CLAUDE`: the standalone 2.1.173 on PATH refuses Opus 5.5.
 
+## Residents' days (29 Sep, Alex)
+
+- **Thinking isn't resting.** A reply of only thinking is answered `(quiet)` (or with waiting news); a resident rests when it says `> rest` (until someone calls) or `> rest 2 hours` (human time, a month at most). A call reaches it at once, resting or not. After 10 quiet exchanges in a row the house lets it rest (F26).
+- **Every wake begins with who it is:** `You are <name>. Your corner is <id>.`, then its own wake lines as before.
+- **The Handbook goes with them.** `handbook` (or `hb`), a house verb (a608), shows the whole shelf from anywhere. The binder *What we're building* carries Agora and Dynamic Desk, copied verbatim from `docs/` by `notation/handbook_docs.py` (the docs stay the source; run it after they change).
+
+## Drafts and the lesson
+
+- `DRAFT-living-in-the-world.md` (a595) and `DRAFT-three-ways-to-change-the-world.md` (a598), both part of the task *Restructuring the desk* (a593).
+- `LESSON-how-the-desk-grows.html`: the walkthrough of live building, published for Alex.
+
 ## Live building (28 Sep, Alex: "the two tier live world, and the workers")
 
 Two tiers. What can be made in the world is made there, at once. What needs host code goes through a worker and git.
