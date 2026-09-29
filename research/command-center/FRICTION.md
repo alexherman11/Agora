@@ -120,3 +120,22 @@ Both proposed a "first visit" note for newcomers. The first two are real gaps. T
 **F17, resolved by Alex (28 Sep):** he moved the paused team's cards from NOW back to BACKLOG himself (e547–e554). At his direction, the command center became the objective: a new task a591 "The command center" (status=doing, objective=open, in the Porch). Juniper's old a302 objective flag was cleared (e555).
 
 **F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
+
+## F22. The first worker could not run anything (fixed)
+
+In trials/worker-help-list.md, a real worker (commission a598: help lists verbs the desk can't do):
+- found the cause, wrote a sound fix, asked for help through the desk (comment c599), and committed;
+- the house landed it on the trial branch after the health checks (asked → working → waiting → working → ready →
+  landing → landed, about 3 minutes).
+But every attempt to run code was refused, for four reasons:
+- on Windows its shell is PowerShell, and only Bash patterns were allowed;
+- it called the interpreter by its full path, which `python:*` doesn't match;
+- a command that chains `cd` with anything is refused whole;
+- the protocol told it to copy the live world from outside its worktree, which the sandbox rightly blocks.
+So it committed after checking only by reading, and said so. Fix (workshop.py):
+- the house copies the world into the worktree as `<world>-try` when the worker starts;
+- the allowed commands cover both shells and the interpreter under all three names;
+- the protocol says one command per call, from the worktree root, with no cd, and to say on the commission when
+  something is refused rather than work around it.
+I ran the worker's change myself on main after merging (help reply, zzz, arrange, tidy, link; health all green):
+4fe2b96.

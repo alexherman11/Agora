@@ -55,11 +55,14 @@ Then end your turn; their answer comes back to you as a message. Short progress 
 Never: touch {notation}/sessions/ (the worlds) or any .env file; push; delete what you did not make; edit
 src/agora3/prompts/jeff.md.
 
-Trying your change against the real world: copy the live world into your worktree and run the desk there, e.g.
-  copy {live}/sessions/{world}.pickle to {notation}/sessions/{world}-try.pickle, then from {notation}/:
-  python explore.py {world}-try --as {actor}      (with DESKD=off in the environment)
-  python test_scene.py      python health.py {world}-try
-Don't commit the -try world.
+Running things: the house has copied the live world into your worktree as {notation}/sessions/{world}-try.pickle.
+Run one command per call, from your worktree root, with no cd and no chaining (; && |): the permission check approves
+single commands only. `python` is the lab's interpreter, and the lab's scripts find their own files, e.g.
+  python {notation}/explore.py {world}-try --as {actor}      (it reads desk lines from stdin; DESKD is off)
+  python {notation}/test_scene.py
+  python {notation}/health.py {world}-try
+  python {notation}/suite/sessions.py --check
+Don't commit the -try world. If something you need is refused, say so on the commission rather than working around it.
 
 Finishing: commit your change on your branch (git add the files you changed; git commit). Then, through the desk:
   do comment {task} line="done: what changed; what you ran and what it printed; what you did not check"
@@ -187,6 +190,12 @@ class Workshop:
                 self.set_state(cid, "failed")
                 self.say(cid, f"the house could not make a worktree for this: {r.stderr.strip()[:300]}")
                 return
+        try:                              # a copy of the world to try things on, inside the worktree it may touch
+            import shutil
+            shutil.copyfile(HERE / "sessions" / f"{self.house.world}.pickle",
+                            tree / NOTATION / "sessions" / f"{self.house.world}-try.pickle")
+        except OSError as e:
+            self.say(cid, f"(the house could not copy the world for trying things: {e})")
         wk = Worker(self.house, cid, tree, branch, asked_by)
         self.workers[cid] = wk
         wk.state["cursor"] = len(w.events)
@@ -275,9 +284,12 @@ class Worker:
                     encoding="utf-8")
                 prompt = PROTOCOL.format(tree=self.tree, branch=self.branch, notation=NOTATION, asked_by=self.asked_by,
                                          task=self.cid, live=HERE.as_posix(), world=world, actor=self.actor)
-                tools = ["Read", "Edit", "Write", "Glob", "Grep", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git add:*)",
-                         "Bash(git commit:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git rebase:*)", "Bash(python:*)",
-                         "Bash(cd:*)", "Bash(cp:*)", "Bash(copy:*)", "Bash(ls:*)", "Bash(node --check:*)", "mcp__desk__desk"]
+                # the worker may use either shell (on Windows its default is PowerShell), and may call the interpreter
+                # by name or by its full path (trial help-list: every run was refused for want of these)
+                runs = ["git status", "git diff", "git add", "git commit", "git log", "git show", "git rebase", "node --check",
+                        "python", str(PY).replace("\\", "/"), str(PY)]
+                tools = ["Read", "Edit", "Write", "Glob", "Grep", "mcp__desk__desk"] + [
+                    f"{shell}({r}:*)" for shell in ("Bash", "PowerShell") for r in runs]
                 cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                        "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
                        "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
