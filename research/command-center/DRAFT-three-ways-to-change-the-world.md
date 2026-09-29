@@ -170,7 +170,14 @@ A named verb is an act with a name people use in speech: done, wake, resolve, sa
   - The body must parse as desk lines, every blank must be one the verb has, and every command must exist.
   - A verb that fails the check is still saved, because we never discard what someone wrote. It is marked broken, with the reason.
 - **A broken verb refuses. It never runs its last good version.** A lens can show its last good version safely; doing an old act silently would be guessing.
-- **Filled once, in one place.** Blanks are filled after the line is parsed, with values, not by pasting text into a command. That removes the three copies of the escaping code.
+- **Filled once, in one place, for verbs and lenses alike.** Today five places fill blanks, each with its own names:
+  - the scene, at paint time (`$item $title $frame.field`);
+  - the painter (`$value $x $y`);
+  - deskd (`$carried`);
+  - `verbs.run` (`$1 $* $me $this`);
+  - `cmd_run` for scripts (`$1`).
+
+  Three of them carry their own copy of the escaping code [read]. One filler, used by lens gestures, verbs and rules, fills blanks after the line is parsed, with values, not by pasting text into a command.
 - **Rules call named verbs.** A rule becomes a note: `when <selection> do <verb> …`. It runs as its author, who endorsed the standing automation. Scripts retire into carried verbs, and `run` becomes `use`.
 
 ### 3.3 Adjust the view
@@ -223,12 +230,13 @@ Smallest first, each able to stand alone:
 
 1. **World verbs: the fence rule and all-or-nothing.** This fixes the refused `wave` [ran]. Host, `verbs.py`.
 2. **The built-in call shape and lens blanks for world verbs** (`$item $value $k`), with `$1` kept for a while. This closes F24; `script` retires into carried verbs. Host, `verbs.py` and `desk_knife.py`.
-3. **`on=` as a selection, and the "matches the target" level in lookup.** Host, `verbs.py`.
-4. **Write-through for `prop:`, `tag:` and single-field text,** with the check and the printed meaning; explicit acts unchanged. The test: rewrite the command-center lens without its three hand-written status drops, and check that every drag does exactly what it did before. The compiler and painter are Jeff's and Pike's files (OWNERS.md), so this waits on their return or Alex's word.
-5. **Viewer state out of the world.**
-6. **Rules as notes calling named verbs.**
+3. **`on=` as a selection, and the "matches the target" level in lookup.** Verbs checked when saved; a broken verb is kept and marked, and refuses. Host, `verbs.py`.
+4. **One filler for blanks,** shared by world verbs, scripts (until they retire) and lens gestures. The verb side is host (`verbs.py`, `desk_knife.py`). The lens side touches the scene, the painter and deskd, so it goes with step 5.
+5. **Write-through for `prop:`, `tag:` and single-field text,** with the check and the printed meaning; explicit acts unchanged. The test: rewrite the command-center lens without its three hand-written status drops, and check that every drag does exactly what it did before. The compiler and painter are Jeff's and Pike's files (OWNERS.md), so this waits on their return or Alex's word.
+6. **Viewer state out of the world.**
+7. **Rules as notes calling named verbs.**
 
-Steps 1–3 are good first commissions for the worker path. They are small, have clear "done when" tests, and live in files the house owns.
+Steps 1–3, and the verb side of 4, are good first commissions for the worker path. They are small, have clear "done when" tests, and live in files the house owns.
 
 ## Related
 
