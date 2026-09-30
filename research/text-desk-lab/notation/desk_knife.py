@@ -1519,6 +1519,18 @@ class DeskKnife(DeskMoo):
             self.vars = self.vars or {}
             self.vars[alias] = w.last_created
             return out + f"\n  ${alias} = {w.last_created}"
+        if verb == "put" and ("above" in kv or "status" in kv) and self._parse_selection(positional[0]) is None:
+            tid = self._resolve(positional[0], allow_subject=False)
+            tn = w.nodes.get(tid)
+            kind = (w.subjects[tn["subject"]]["kind"] if tn.get("subject") else "surface") if tn else "thing"
+            if kind != "task":
+                raise Refusal(f"put above=/status= orders a task's card in its lane; {tid} is a {kind}. "
+                              f"To move it, do put {tid} into=<surface> (put is move for anything but a card)")
+        if verb == "put" and kv.get("above"):
+            # a1069: the card it goes above is part of what the act means, so it must have been looked at
+            kv["above"] = self._resolve(kv["above"], allow_subject=False)
+            if self.seen.get(kv["above"]) is None:
+                raise Refusal(f"you have not looked at {kv['above']} yet; look or examine it first")
         if verb == "place" and positional[0] not in w.subjects:
             # place is a subject verb; a title or appearance id names the subject behind it
             hit = self._resolve(positional[0])

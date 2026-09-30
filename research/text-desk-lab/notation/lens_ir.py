@@ -9,6 +9,7 @@ The scene it produces has the same shape as scene.build's, so scene.to_text and 
 Juniper's golden prints judge the switch. Jeff owns this file (desk-shell/OWNERS.md)."""
 import re
 
+import moo
 import scene as S
 from desk import aspects_of, aspects_meet, event_aspects
 
@@ -144,7 +145,7 @@ def lower(root, parts):
             bind = {"kind": "one", "q": node["the"], "as": node["as"], "capture": dict(node["capture"])}
         elif node["of"] or node["over"]:
             bind = {"kind": "many", "of": node["of"], "over": node["over"], "each": node["each"], "as": node["as"], "clamp": node["clamp"],
-                    "last": bool(node.get("clamp_last"))}
+                    "last": bool(node.get("clamp_last")), "by": node.get("by")}
         else:
             bind = None
         guard = None
@@ -412,6 +413,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 out["of"] = sel_text
                 rs = acc.rows(sel_text) if sel_text.partition(":")[0] in S.SOURCES else None
                 total = len(rs) if rs is not None else None
+                if b.get("by"):
+                    out["by"] = b["by"]             # a1069: ordered here, in the scene, so both printers show one order
+                if rs is not None and b.get("by"):
+                    rs = sorted(rs, key=lambda r: tuple(moo.order_value(r.get(k)) for k in b["by"]))
                 if rs is not None:
                     first = max(0, len(rs) - keep) if b.get("last") else 0
                     for k, r in enumerate(rs[first:first + keep], first):
@@ -419,7 +424,15 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
-                    shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]] if b["clamp"] else []
+                    if b.get("by"):
+                        if named is not None:
+                            at = {i: k for k, (i, _st) in enumerate(named)}
+                            named = sorted(named, key=lambda x: (tuple(moo.order_value(moo.props_of(w, x[0]).get(k)) for k in b["by"]), at[x[0]]))
+                        else:
+                            ids = moo.order_by(w, list(ids), b["by"])
+                    # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in
+                    shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]
+                             + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []
                     if named is not None:
                         total = len(named)
                         for i, st in pick(named):

@@ -45,6 +45,11 @@ def aspects_of(verb, args):
     a = args or {}
     if verb == "prop":
         return {f"prop:{k}" for k in a if k not in ("at", "_by", "remove")} | {f"prop:{k.strip()}" for k in str(a.get("remove", "")).split(",") if k.strip()}
+    if verb == "put":
+        # a1069: a card put in a lane's order touches its props; put with a move's arguments is move (a synonym)
+        if any(k in a for k in ("into", "before", "after", "to", "by")):
+            return {"place"}
+        return {"prop:status", "prop:priority", "prop:rank"}
     if verb in ("retitle", "rename"):
         return {"title"}
     if verb == "edit":

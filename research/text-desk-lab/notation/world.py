@@ -918,8 +918,11 @@ class World:
             raise Refusal(f"{event_id} cannot be undone (already undone or is an undo)")
         if (ev.get("undo") or {}).get("refuse"):      # a678: a go is kept in the journal but out of undo's reach
             raise Refusal(ev["undo"]["refuse"].format(eid=event_id))
+        # a1069: `place above=` changes several subjects in one event (the card, and the ranks it renumbered); a later
+        # change to any of them stops the undo, as a later change to the target always did
+        mine = {ev["target"]} | (set(ev.get("changed") or []) if "restore_subjects" in (ev.get("undo") or {}) else set())
         later = [e for e in self.events if int(e["id"][1:]) > int(event_id[1:]) and not e.get("undone")
-                 and e["verb"] != "undo" and (e["target"] == ev["target"] or ev["target"] in (e.get("changed") or []))]
+                 and e["verb"] != "undo" and (e["target"] in mine or mine & set(e.get("changed") or []))]
         if later:
             raise Refusal(f"{event_id} is not the latest change to {ev['target']}; {later[-1]['id']} came after it. undo that first, or act on the current state")
         u = ev["undo"]
@@ -943,6 +946,12 @@ class World:
             self.subjects[r["id"]] = r
             for a in self.appearances_of(r["id"]):
                 self._bump(a)
+        elif "restore_subjects" in u:
+            for r in deepcopy(u["restore_subjects"]):
+                r["rev"] = self.subjects[r["id"]]["rev"] + 1
+                self.subjects[r["id"]] = r
+                for a in self.appearances_of(r["id"]):
+                    self._bump(a)
         elif "drop_comment" in u:
             owner, c = self.find_comment(u["drop_comment"])
             if owner:
