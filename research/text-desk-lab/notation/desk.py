@@ -51,7 +51,10 @@ def aspects_of(verb, args):
     if verb in ("link", "unlink"):
         return {"links"}
     if verb in ("move", "resize", "place", "tile", "untile", "stack", "fold", "unfold", "sort", "tidy", "gather", "swap",
-                "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop"):
+                "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop", "remove"):
+        # remove takes an appearance off its surface: the subject and all it says survive (undo puts it back), so it is
+        # fenced as the other placement verbs are. Alex, 29 Sep: deleting a task from the Desktop was refused over an
+        # owner removed hours before the page was painted, a change no view could show.
         return {"place"}
     return None
 

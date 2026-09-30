@@ -41,7 +41,7 @@
   function make(n) {
     const old = kept.get(n.key), p = n.paint || {};
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
-    const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
+    const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
     if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { tracks(old.el); next.set(n.key, old); return old.el; } }
     const el = document.createElement("div");
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
@@ -75,6 +75,7 @@
       if (a.on === "drag" && p.box) drags(el, n, a);
       if (a.on === "carry") carries(el, n);
       if (a.on === "drop") { el.dataset.drop = a.part; el._drop = a; }
+      if (a.on === "menu") el.dataset.menu = "1";                 // its entries are read from el._n when the menu opens
     }
     for (const k of n.kids) el.appendChild(make(k));
     if (p.tracks) tracks(el);
@@ -93,7 +94,8 @@
     // a moment (not remembered), and Escape or a press outside closes it. Its handle's look is role `menu`, a plain
     // fold's is `fold`, each over `tool`, so a style that names neither keeps the tool look.
     const float = !!(p.fold && p.fold.float);
-    const h = document.createElement("button"); h.type = "button"; h.className = Style.roleClass("tool") + " " + Style.roleClass(float ? "menu" : "fold");
+    const h = document.createElement("button"); h.type = "button";
+    h.className = Style.roleClass("tool") + " " + Style.roleClass((p.fold && p.fold.handle) || (float ? "menu" : "fold"));
     h.setAttribute("aria-label", (p.fold && p.fold.label) || n.part || "section");
     const dflt = p.fold ? p.fold.folded : !!p.folded;          // Jeff 75e39d8: fold is {folded, label}; 5bb7f7f emitted folded: true
     const lab = (p.fold && p.fold.label) || "";                  // the lens's handle label is drawn, not only announced
@@ -105,6 +107,45 @@
   const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) m._close(); });
   document.addEventListener("pointerdown", e => closeFloats(e.target));
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
+
+  // Alex, 29 Sep ("native right click behavior"): a part's own menu, from its `on menu "<label>" do ...` entries, opened
+  // by a right-click or the menu key anywhere on it (the innermost part that has entries). Text being edited, a part
+  // with no entries, and a right-click with Shift keep the browser's own menu. An entry sends its line as a click does.
+  let pop = null;
+  function closeMenu(refocus) { if (!pop) return; const back = pop._from; pop.remove(); pop = null; if (refocus && back && back.focus) back.focus(); }
+  document.addEventListener("contextmenu", e => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (e.shiftKey || !t || t.isContentEditable || t.closest("input, textarea")) return;
+    const el = t.closest("[data-menu]");
+    const entries = el && paint.contains(el) && el._n ? el._n.acts.filter(a => a.on === "menu") : [];
+    if (!entries.length) return;
+    e.preventDefault(); closeMenu();
+    const box = document.createElement("div"); box.id = "menu-pop"; box.setAttribute("role", "menu");
+    box.className = Style.roleClass("sheet") + " " + Style.roleClass("popup");
+    for (const a of entries) {
+      const b = document.createElement("button"); Object.assign(b, { type: "button", textContent: a.label });
+      b.className = Style.roleClass("tool") + " " + Style.roleClass("menu.item"); b.setAttribute("role", "menuitem");
+      b.addEventListener("click", () => { closeMenu(); send(el._n, a.line); });
+      box.append(b);
+    }
+    document.body.append(box);
+    let x = e.clientX, y = e.clientY;
+    if (!x && !y) { const r = el.getBoundingClientRect(); x = r.left + 8; y = r.top + 8; }        // the menu key: at the part
+    box.style.left = Math.max(0, Math.min(x, innerWidth - box.offsetWidth - 4)) + "px";
+    box.style.top = Math.max(0, Math.min(y, innerHeight - box.offsetHeight - 4)) + "px";
+    box._from = document.activeElement; pop = box; box.querySelector("button").focus();
+  });
+  document.addEventListener("pointerdown", e => { if (pop && !pop.contains(e.target)) closeMenu(); }, true);
+  document.addEventListener("scroll", () => closeMenu(), true);
+  addEventListener("blur", () => closeMenu());
+  document.addEventListener("keydown", e => {
+    if (!pop) return;
+    if (e.key === "Escape") { closeMenu(true); e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const bs = [...pop.querySelectorAll("button")], i = bs.indexOf(document.activeElement);
+      bs[(i + (e.key === "ArrowDown" ? 1 : -1) + bs.length) % bs.length].focus(); e.preventDefault();
+    }
+  }, true);
   // paint.semantic (pike-8 section 4): what assistive technology is told, on the node's one element. A press leaf is a
   // button: a Tab stop that Enter and Space activate (the codex team's finding: a clickable div is not a control).
   function semantic(el, s) {
@@ -221,7 +262,11 @@
   function carries(el, n) {
     el.tabIndex = 0; el.dataset.carry = n.part;
     el.addEventListener("pointerdown", e => {
-      if (e.target.isContentEditable) return;
+      // a carry is the primary button on the card itself: the right button opens its menu, and a press on one of the
+      // card's own controls (a fold handle, a start button) is that control's click, which a pointer capture would steal
+      if (e.target.isContentEditable || e.button !== 0) return;
+      const ctl = e.target.closest("button, [role=button]");
+      if (ctl && ctl !== el && el.contains(ctl)) return;
       take(el); el.setPointerCapture(e.pointerId);
       const x0 = e.clientX, y0 = e.clientY;
       const at = m => document.elementsFromPoint(m.clientX, m.clientY).find(x => x.dataset && x.dataset.drop === n.part) || null;

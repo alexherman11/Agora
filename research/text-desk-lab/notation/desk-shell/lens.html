@@ -41,9 +41,11 @@
   [data-folded="1"] > [data-key] { display: none; }
   [data-folded="1"] { flex: 0 0 auto !important; }
   /* the painter's own buttons (fold handles) wear only their role: the browser's button box is not a look anyone chose */
-  :where(#paint button) { appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }   /* a folded part gives up its share: its siblings take the room */
+  :where(#paint button, #menu-pop button) { appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }   /* a folded part gives up its share: its siblings take the room */
   /* fold ... float: a menu, its open contents drawn over the page below the handle */
   .l-float { position: relative; }
+  /* a part's own menu (on menu "<label>" do ...), at the pointer */
+  #menu-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 12ch; box-sizing: border-box; }
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
   [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */

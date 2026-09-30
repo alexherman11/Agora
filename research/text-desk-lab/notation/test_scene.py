@@ -338,6 +338,32 @@ def test_fold_open_and_float():
         tmp.unlink(missing_ok=True)
 
 
+def test_menu_entries_and_a_filled_fold_label():
+    """Alex, 29 Sep: `on menu "<label>" do ...` entries, a fold label filled like text, and `handle <role>`."""
+    src = chr(10).join(["ws : column", '  card : column, on menu "delete" do remove a1, on menu "start" do prop a1 status=doing',
+                        '    more : column, fold "$title" handle meta', '      t : text "x"'])
+    refused('x : column, on menu delete do remove a1', "on menu")
+    refused('x : column, fold "a" handle', "handle <role>")
+    root, parts = scene.parse(src)
+    card = parts["ws"]["kids"][0]
+    assert [(a["on"], a.get("label")) for a in card["on"]] == [("menu", "delete"), ("menu", "start")]
+    assert card["kids"][0]["fold_handle"] == "meta"
+    import deskd, lens_ir
+    tmp = _scratch("_test_menu")
+    try:
+        with deskd.Session("_test_menu", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src.replace("ws : column", "ws : column, the f01"))
+            scene.emit(sc)
+            card = scene.painter_view(sc)["kids"][0]
+            assert [(a["on"], a["label"]) for a in card["acts"]] == [("menu", "delete"), ("menu", "start")] and card.get("fence") is not None
+            fold = card["kids"][0]["paint"]["fold"]
+            assert fold["handle"] == "meta" and "$" not in fold["label"] and fold["label"], fold
+            text = scene.to_text(sc, "ws", "jeff", 0)
+            assert '· menu "delete": do remove a1' in text and "handle meta" in text, text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_value_test_has():
     """`has` and `!has`: the words contain the value, ignoring case; a value with a $name in it is filled."""
     m = scene._VALUE_TEST.fullmatch("$said has @$me")

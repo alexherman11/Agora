@@ -62,8 +62,10 @@ import re
 from desk import split_batch
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "measure", "wrap", "lines", "share", "hint", "plain")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
-GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "measure", "wrap", "lines", "share", "hint", "plain")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
+GESTURES = ("click", "edit", "drag", "menu")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
+# Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
+# painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count")
 
 
@@ -330,12 +332,23 @@ def _w_fold(node, p, val, n, env):
     world log "in a menu like the terminal"): `open` shows it unfolded until the viewer folds it, and `float` draws its
     open contents over the page, below the handle, instead of pushing the page down (a menu). A folded part gives up
     its `share`, so its siblings take the room."""
+    # Alex, 29 Sep ("click on tasks to expand them"): the label is a template filled like text (`fold "$title"`), and
+    # `handle <role>` gives the handle a look of the lens's choosing (a card's title rather than a tool).
     m = re.fullmatch(r'("[^"]+")?\s*(.*)', val.strip())
     mods = m.group(2).split() if m else ["?"]
+    handle = None
+    if "handle" in mods:
+        k = mods.index("handle")
+        handle = mods[k + 1] if k + 1 < len(mods) else None
+        del mods[k:k + 2]
+        if not handle or not re.fullmatch(r"[\w.-]+", handle):
+            raise LensRefusal(f'line {n}: `fold ... handle <role>`: the role the handle wears; got {p!r}')
+        if env["roles"] is not None and handle not in env["roles"]:
+            raise LensRefusal(f"line {n}: no role {handle!r} for the fold's handle in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
     if any(x not in ("open", "float") for x in mods) or len(set(mods)) != len(mods):
-        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float]`; got {p!r}')
+        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [handle <role>]`; got {p!r}')
     node["fold"] = m.group(1).strip('"') if m.group(1) else True
-    node["fold_open"], node["fold_float"] = "open" in mods, "float" in mods
+    node["fold_open"], node["fold_float"], node["fold_handle"] = "open" in mods, "float" in mods, handle
 
 
 def _w_measure(node, p, val, n, env):
@@ -505,11 +518,16 @@ def _w_only(node, p, val, n, env):
 
 def _w_on(node, p, val, n, env):
     g, do, cmd = val.partition(" do ")
-    drop_part = None
+    drop_part = label = None
     if g.startswith("drop "):
         drop_part, g = g[5:].strip(), "drop"
-    if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part):
-        raise LensRefusal(f"line {n}: `on <{'|'.join(GESTURES)}> do <desk command>` or `on drop <part> do <desk command>`; got {p!r}")
+    if g.startswith("menu "):
+        label, g = g[5:].strip(), "menu"
+        if not re.fullmatch(r'"[^"]+"', label):
+            raise LensRefusal(f'line {n}: `on menu "<label>" do <desk command>`: the entry\'s words, quoted; got {p!r}')
+        label = label.strip('"')
+    if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
+        raise LensRefusal(f"line {n}: `on <click|edit|drag> do <desk command>`, `on menu \"<label>\" do <desk command>` or `on drop <part> do <desk command>`; got {p!r}")
     cmd = cmd.strip()
     if g == "drop" and len(split_batch(cmd)) > 1:
         raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
@@ -517,7 +535,7 @@ def _w_on(node, p, val, n, env):
     # unless it begins with one of the desk's own reading or session commands.
     if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
         cmd = "do " + cmd
-    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {})})
+    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {})})
 
 
 # word -> (shape as a reader sees it, setter). A layout word is its own name.
@@ -526,7 +544,7 @@ WORDS = {
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end", _w_scroll),
-    "fold": ('fold ["<handle label>"] [open] [float]', _w_fold),
+    "fold": ('fold ["<handle label>"] [open] [float] [handle <role>]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
@@ -1011,6 +1029,8 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         out = {"part": node["name"], "key": key, "role": node["role"], "layout": node["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": node["clamp"], "acts": [], "kids": []}
         out.update({k: node[k] for k in PAINT_WORDS if node.get(k) not in (None, False)})
+        if isinstance(out.get("fold"), str) and "$" in out["fold"]:
+            out["fold"] = _fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
         if node["the"]:
             out["the"] = (_fill(node["the"], ctx), the_state)
         if node["as"]:
@@ -1069,7 +1089,7 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
         # a thing that is gone or unplaced has no appearance to act on: no gesture is offered, and the text says why
         safe["_frames"] = {k: {kk: (_cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
         acts = [] if (node["on"] and ctx.get("_state") in ("gone", "unplaced")) else [
-            {"on": a["on"], "line": _fill(a["line"], safe, track), **({"part": a["part"]} if a.get("part") else {})} for a in node["on"]]
+            {"on": a["on"], "line": _fill(a["line"], safe, track), **{k: a[k] for k in ("part", "label") if a.get(k)}} for a in node["on"]]
         if node["carry"]:
             if not ctx.get("item"):
                 raise LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")
@@ -1251,7 +1271,7 @@ def to_text(scene, name, who, at):
                 bits.append(f"{wd} {n[wd]}")
         if n.get("fold"):
             bits.append(("unfolded" if n.get("fold_open") else "folded") + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else "")
-                        + (" float" if n.get("fold_float") else ""))
+                        + (" float" if n.get("fold_float") else "") + (f" handle {n['fold_handle']}" if n.get("fold_handle") else ""))
         if n.get("wrap") == "verbatim":
             bits.append("verbatim")
         if n.get("lines"):
@@ -1299,7 +1319,8 @@ def to_text(scene, name, who, at):
         for a in n["acts"]:
             if a["on"] == "fold":
                 continue                    # the line already says folded; the fold act is the viewer's, with no line
-            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f": {a['line']}" if a.get("line") else ""))
+            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f' "{a["label"]}"' if a.get("label") else "")
+                        + (f": {a['line']}" if a.get("line") else ""))
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):
                 bits.append(f"~ {a}: {v['facts'][n['key']]}")
@@ -1407,6 +1428,8 @@ def emit(node):
             paint["fold"] = {"folded": not node.get("fold_open"), "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
             if node.get("fold_float"):
                 paint["fold"]["float"] = True
+            if node.get("fold_handle"):
+                paint["fold"]["handle"] = node["fold_handle"]
             paint["semantic"] = {"role": "group", "expanded": bool(node.get("fold_open"))}
     elif paint["kind"] == "text" and not paint.get("absent"):
         if node.get("wrap"):

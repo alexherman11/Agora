@@ -267,6 +267,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         out = {"part": node["part"], "key": key, "role": em["role"], "layout": em["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": em["clamp"], "acts": [], "kids": []}
         out.update({k: em[k] for k in S.PAINT_WORDS if k in em})
+        if isinstance(out.get("fold"), str) and "$" in out["fold"]:
+            out["fold"] = S._fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
         if b and b["kind"] == "one":
             out["the"] = (S._fill(b["q"], ctx), the_state)
         if b and b.get("as"):
@@ -333,7 +335,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         out["id"] = ctx.get("id")
         safe["_frames"] = {k: {kk: (S._cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
-            {"on": a["on"], "line": S._fill(a["line"], safe, track), **({"part": a["part"]} if a.get("part") else {})} for a in node["acts"]]
+            {"on": a["on"], "line": S._fill(a["line"], safe, track), **{k: a[k] for k in ("part", "label") if a.get(k)}} for a in node["acts"]]
         if node["carry"]:
             if not ctx.get("item"):
                 raise S.LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")
