@@ -349,10 +349,18 @@ class Desk:
         if allow_subject and ident in self.world.subjects:
             return ident
         hits = [n["id"] for n in self.world.nodes.values() if self.world.title(n).lower() == ident.lower()]
+        # a990 (4), Pike e1804 (F25): a verb's title is a word, not a name. Verb notes stay out of title resolution, so
+        # two rooms each growing a tidy never make `read tidy` ambiguous; a verb note is reached by its id
+        verbish = [h for h in hits if self.world.nodes[h]["type"] == "appearance"
+                   and "verb" in (self.world.subjects[self.world.nodes[h]["subject"]].get("tags") or [])]
+        hits = [h for h in hits if h not in verbish]
         if len(hits) == 1:
             return hits[0]
         if len(hits) > 1:
             raise Refusal(f"{ident!r} names {len(hits)} things: {', '.join(hits)}; use an id")
+        if verbish:
+            raise Refusal(f"{ident!r} is a verb's word, not a name for a thing: the verb note is {', '.join(verbish)} "
+                          f"(help {ident} explains it; read or change it by its id)")
         raise Refusal(f"no such id {ident!r} (ids look like f02, a05, s03; use look or find)")
 
     def _touched_by_others(self, nid, fields=None, others_only=True):

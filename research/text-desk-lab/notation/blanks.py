@@ -3,7 +3,8 @@
 A blank is a word beginning with $ that stands for a value the desk knows when the line runs. Typed desk lines,
 world verbs, scripts and rules all fill their blanks here, the same way:
 
-    $here          the room you are in (rooms.room_of); $here.<prop> a prop of it: $here.talk, $here.describe
+    $here          the room you are in (rooms.room_of); $here.<prop> a prop of it: $here.talk, $here.describe.
+                   In a rule, the rule's own home (a990): the room its author saved it in
     $new           the thing made most recently earlier in this reply (any kind; of several made by one line, the
                    last); refused, saying why, if nothing in this reply made anything. The receipt says what it was
     $today         the clock's date                     $me   whoever is acting
@@ -41,9 +42,10 @@ KNOWN = "$here $here.<prop> $new $today $me, a handle you set ($name); in a verb
 class Ctx:
     """Where a line is being filled. kind: typed | verb | script | rule."""
 
-    def __init__(self, kind, args=None, rest="", me=None, this=None, item=None, name="", prev=None):
+    def __init__(self, kind, args=None, rest="", me=None, this=None, item=None, name="", prev=None, home=None):
         self.kind, self.args, self.rest, self.me, self.this, self.item, self.name = kind, args, rest, me, this, item, name
         self.prev = prev        # what was made most recently earlier at this level of this reply (None: nothing yet)
+        self.home = home        # a990: the room a template lives in (its bare words are looked up there), or None
 
     @property
     def template(self):
@@ -70,8 +72,11 @@ def _title(desk, ident):
 
 def _here(desk, ctx, name):
     if ctx.kind == "rule":
-        raise Refusal(f"${name}: a rule has no room (rules act from nowhere until rooms step 2b gives each a home); "
-                      f"name the thing itself")
+        # a990: a rule stands in its own home, the room its author saved it in, wherever anyone is now
+        if ctx.home:
+            return ctx.home
+        raise Refusal(f"${name}: this rule has no room (it was saved before rules had homes, or where there are no "
+                      f"rooms); name the thing itself, or save the rule again from the room it belongs to")
     import rooms
     w = desk.world
     if not rooms.all_rooms(w):
@@ -254,6 +259,7 @@ def made_by(events):
 
 HELP = """blanks: words beginning with $ that the desk fills with a value when the line runs.
   $here          the room you are in; $here.<prop> a prop of it: $here.talk its chat, $here.describe its note
+                 (in a rule: the room the rule lives in, where its author saved it)
   $new           the thing made most recently earlier in this reply (a note, task, surface, view ...; if one line
                  made several, the last). Only this reply: in a reply where nothing was made yet it refuses and
                  says why. The receipt ends ($new = <id>), so you see which thing it was

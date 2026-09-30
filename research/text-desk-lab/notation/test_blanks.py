@@ -203,10 +203,14 @@ reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled")
 ruled = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Ruled"][-1]
 check("a rule's $item.title is the title of the thing it fired on", props(ruled).get("tagged") == "Ruled", props(ruled))
 reply(ME, f"rule drop {D.rules[-1]['id']}")
+import rooms as _rooms   # noqa: E402
+saved_in = _rooms.room_of(W, ME)
 reply(ME, f"rule on create by={ME} do prop where=$here")
 got = reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled2")
 reply(ME, f"rule drop {D.rules[-1]['id']}")
-check("$here in a rule refuses: rules have no room until step 2b", "a rule has no room" in got[-1][1], got[-1])
+# a990 (rooms step 2b) gave each rule a home: $here in a rule is the room it was saved in, not the tripper's
+check("$here in a rule is the rule's home, the room it was saved in (a990)",
+      f"where={saved_in}" in got[-1][1] and saved_in != CORNER, (saved_in, got[-1]))
 
 # 7. presence: Jeff is at Home without ever going there; a sleeping resident is not 'here with you'
 be("worker-test")

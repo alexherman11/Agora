@@ -271,6 +271,7 @@ class Handler(SimpleHTTPRequestHandler):
             before, n0 = set(desk.world.nodes), len(desk.world.events)
             ob = body.get("observed") or {}
             d = ob.get("def") or {}
+            lens_id = d.get("id")                   # a990: the lens a gesture was painted by (d may be reassigned below)
             cur = desk.world.subjects.get(d.get("id"))
             if d and d.get("status") == "fallback":
                 return self._json({"text": None, "error": f"refused: this view is showing a fallback of lens {d.get('lens')} because the current one does not compile; "
@@ -388,8 +389,15 @@ class Handler(SimpleHTTPRequestHandler):
                 r = {"text": text}
             else:
                 allids = worktree.ids_of(desk)
-                r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
-                                           "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
+                # a990 (3): a lens act is a template that stands in its own home: a bare word in it is looked up from
+                # the room its lens lives in, strictly, never from where the person clicking is
+                import verbs
+                desk._act_home = (verbs.room_holding(desk.world, lens_id),) if lens_id in desk.world.subjects else None
+                try:
+                    r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
+                                               "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
+                finally:
+                    desk._act_home = None
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably

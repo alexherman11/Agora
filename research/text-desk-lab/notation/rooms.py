@@ -36,6 +36,36 @@ UNDO_REFUSAL = ("{eid} is a go: where you are is not a change to anything in the
                 "go <room> takes you anywhere, from anywhere")
 
 
+# a990 (rooms step 2b): a room SHOWS the verbs at hand and locks nothing. The layout verbs (what moves pixels on Alex's
+# screen) are listed by examine and verbs only in a room whose prop verbs= names layout (the Desktop), in the rooms
+# inside it, and to someone placed nowhere (Alex, whose hands are on the Desktop). Elsewhere one line points there.
+# Every one of them still works from anywhere: this is what is shown, not what is allowed.
+LAYOUT = ("resize", "raise", "lower", "tile", "untile", "fold", "unfold", "match")
+MOVE_ANYWHERE = "into=<surface> | before=<id> | after=<id>"     # move to= and by= are layout; these are order and place
+
+
+def layout_rooms(w):
+    return [f for f in all_rooms(w) if "layout" in re.split(r"[,\s]+", str((w.nodes[f].get("props") or {}).get("verbs", "")))]
+
+
+def layout_at_hand(desk):
+    """Are the layout verbs shown to this reader? True in a world where no room says verbs=layout (nothing to point
+    to), for someone placed nowhere, and in or inside a room that says it."""
+    import verbs
+    w = desk.world
+    marked = layout_rooms(w)
+    if not marked or not placed(w.me):
+        return True
+    here = room_of(w, w.me)
+    return here is None or bool(set(verbs.rooms_up(w, here)) & set(marked))
+
+
+def layout_pointer(desk):
+    """The one line said where the layout verbs are not listed."""
+    w = desk.world
+    return "layout verbs are at hand on the " + " and the ".join(w.nodes[f]["title"] for f in layout_rooms(w))
+
+
 def placed(actor):
     return str(actor or "").split("/")[0].lower() not in UNPLACED
 
