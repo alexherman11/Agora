@@ -168,7 +168,72 @@ def probe(name, run):
         if not ruled or any(e["by"] != "pike" or "tripped_by" in e for e in ruled):
             return "silent", f"the old rule's events read {[(e['id'], e['by'], e.get('tripped_by')) for e in ruled]!r}"
         return "holds", ""
+    # a744 (talk, 3a): a plain read of a chat shows what is new to you, under one header
+    if name == "catch-up-alternating":
+        # juniper and pike take 20 turns on a chat with 30 lines of history: read, then say something. Every read's body
+        # is one header plus exactly the lines added since that reader's last read, their own included; nothing skipped.
+        old = [f"Alex: old line {k}" for k in range(30)]
+        _as(run, "alex", 'do create f01 kind=chat title="Pair talk" text="' + "\\n".join(old) + '"')
+        shown, last = {"juniper": [], "pike": []}, {}
+        for t in range(20):
+            who = ("juniper", "pike")[t % 2]
+            _as(run, who, "look")
+            out, refused = _as(run, who, 'read "Pair talk"')
+            lines = _chat("Pair talk", run)
+            body = _body(out)
+            start = last.get(who, len(lines) - 10)
+            want = ([f"({start} earlier lines folded; read {_app(run, 'Pair talk')} :3 for all)"] if start else []) + lines[start:]
+            if refused or body != want:
+                return "silent", f"turn {t}, {who} read {body[:3]!r}... wanted {want[:3]!r}... ({len(body)} vs {len(want)} lines)"
+            shown[who] += lines[start:]
+            last[who] = len(lines)
+            _, refused = _as(run, who, f'do append "Pair talk" line="turn {t}"')
+            if refused:
+                return "visible", f"turn {t}: {who}'s line was refused"
+        for who in shown:
+            out, _ = _as(run, who, 'read "Pair talk"')
+            shown[who] += [l for l in _body(out) if not l.startswith("(")]
+            missed = [l for l in _chat("Pair talk", run)[30:] if l not in shown[who]]     # every line said in the 20 turns
+            if missed:
+                return "silent", f"{who} never saw {missed[:3]!r}"
+        out, _ = _as(run, "pike", 'read "Pair talk"')
+        if _body(out) != [f"(nothing new since you last read; 50 lines; read {_app(run, 'Pair talk')} :3 or tail=<n>)"]:
+            return "visible", f"a read with nothing new printed {_body(out)!r}"
+        return "holds", ""
+    if name == "first-read-fenced":
+        # a first read shows the last 10 lines and does not unlock a rewrite; :3 does; after that, a read that folds only
+        # lines already seen keeps it unlocked
+        _as(run, "wren", "look")
+        out, _ = _as(run, "wren", 'read "Pair talk"')
+        if len(_body(out)) != 11:
+            return "silent", f"wren's first read printed {len(_body(out))} lines, not a header and 10"
+        _, rw = _as(run, "wren", 'do rewrite "Pair talk" text="Wren: tidied"')
+        if not rw:
+            return "silent", "wren rewrote the chat having seen only its last 10 lines"
+        _as(run, "wren", 'read "Pair talk" :3')
+        _as(run, "juniper", 'do append "Pair talk" line="one more"')
+        out, _ = _as(run, "wren", 'read "Pair talk"')
+        if _body(out)[1:] != ["Juniper: one more"]:
+            return "silent", f"wren's catch-up read printed {_body(out)!r}"
+        out, rw = _as(run, "wren", 'do rewrite "Pair talk" text="Wren: tidied"')
+        if rw:
+            return "visible", f"wren has seen every line and was refused: {out.splitlines()[-1][:120]!r}"
+        return "holds", ""
     raise KeyError(name)
+
+
+def _chat(title, run):
+    return next(s for s in run.desk.world.subjects.values() if s["title"] == title)["text"].splitlines()
+
+
+def _app(run, title):
+    w = run.desk.world
+    sid = next(k for k, s in w.subjects.items() if s["title"] == title)
+    return w.appearances_of(sid)[0]
+
+
+def _body(out):
+    return out.split("\n---\n", 1)[1].split("\n---", 1)[0].splitlines()
 
 
 STATE = {}

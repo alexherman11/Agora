@@ -815,8 +815,11 @@ class Desk:
         secs = w.sections(s["text"])
         named = [(h, b) for h, b in secs if h]
         body = s["text"]
+        whole = None
+        if s["kind"] == "chat" and section is None:
+            body, whole = self._chat_body(nid, s, full, tail)
             # Juniper (trip D step 11): fold-as-budget is for long texts; a short sectioned plan prints whole, so reading it is reading it
-        if named and section is None and not full and not tail and (len(s["text"].split()) > 300 or s["text"].count("\n") >= 40):   # tail= wants the end of the text, not its outline
+        elif named and section is None and not full and not tail and (len(s["text"].split()) > 300 or s["text"].count("\n") >= 40):   # tail= wants the end of the text, not its outline
             # fold-as-budget for text: the outline of sections, each with its word count
             pre = next((b for h, b in secs if h is None), "")
             lines = ([pre] if pre else []) + [f"## {h}  ({len(b.split())}w)" for h, b in named]
@@ -830,14 +833,15 @@ class Desk:
             if not pick:
                 raise Refusal(f"no section {section!r}; sections: " + ", ".join(f"#{i + 1} {h}" for i, (h, _) in enumerate(named)))
             body = f"## {pick[0]}\n{pick[1]}"
-        if tail:
+        if tail and whole is None:
             bl = body.splitlines()
             if len(bl) > tail:
                 cut = bl[:-tail]
                 heading = next((l for l in reversed(cut) if l.startswith("## ")), None)   # the section the tail lines belong to
                 keep = [heading] if heading else []
                 body = "\n".join(keep + [f"(… {len(cut) - len(keep)} earlier line(s) folded; without tail= for all)"] + bl[-tail:])
-        whole = body == s["text"]          # a section outline, one section or a tail is a partial read: the text is not seen
+        if whole is None:
+            whole = body == s["text"]      # a section outline, one section or a tail is a partial read: the text is not seen
         shown = ["title", "tags", "due", "comments", "links", "prop:*"] + [f"prop:{k}" for k in props] + (["text"] if whole else [])
         self._mark_seen(nid, shown)
         self._mark_seen(s["id"], shown)
@@ -857,6 +861,39 @@ class Desk:
                 arrow = f"{l['kind']} →" if l["from"] == s["id"] else f"← {l['kind']} from"
                 out += f"\n  {l['id']} {arrow} {other} \"{ot}\""
         return out
+
+    CHAT_FIRST = 10       # lines a first read of a chat shows
+
+    def _chat_body(self, nid, s, full, tail):
+        """Sable a744 (talk, 3a): a plain read of a chat prints the lines added since this reader last read it, their own
+        included (appending is not reading, a656), under one header; a first read, the last CHAT_FIRST. Each reader keeps
+        the run of lines it has been shown, lo..hi, with a digest of lines[:hi], so a rewrite of what was shown starts
+        over. The text counts as seen only when the run reaches line 0: folding lines you never saw does not unlock a
+        rewrite. :3 and tail= print as before and extend the run. Returns (body, whole) or (text, None) for the old path."""
+        import hashlib
+        lines = s["text"].splitlines()
+        n = len(lines)
+        dig = lambda k: hashlib.sha1("\n".join(lines[:k]).encode()).hexdigest()
+        reads = getattr(self, "_chat_reads", None)
+        if reads is None:
+            reads = self._chat_reads = {}
+        obs = self._observer()
+        rec = reads.get((obs, s["id"])) or reads.get((obs.split("/")[0], s["id"]))
+        if rec and (rec[1] > n or rec[2] != dig(rec[1])):
+            rec = None                      # rewritten since: what you were shown is gone
+        if full or tail:
+            start = 0 if full else max(0, n - tail)
+            lo = min(start, rec[0]) if rec and start <= rec[1] else start
+            reads[(obs, s["id"])] = (lo, n, dig(n))
+            return s["text"], None
+        start = rec[1] if rec else max(0, n - self.CHAT_FIRST)
+        lo = rec[0] if rec else start
+        reads[(obs, s["id"])] = (lo, n, dig(n))
+        if rec and start == n:
+            return f"(nothing new since you last read; {n} lines; read {nid} :3 or tail=<n>)", lo == 0
+        if start == 0:
+            return s["text"], True
+        return "\n".join([f"({start} earlier lines folded; read {nid} :3 for all)"] + lines[start:]), lo == 0
 
     def _where_line(self, nid):
         w = self.world
