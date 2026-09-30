@@ -74,7 +74,10 @@ class LensRefusal(Exception):
 
 
 # ---- admission: what Astra's foundations audit (research/shared-visual-desk/round5-bridge) reproduced ----------
-BUDGET = 1500          # scene nodes. A lens that needs more must say `clamp N` on its repeat and let the text say the rest.
+BUDGET = 5000          # scene nodes. A lens that needs more must say `clamp N` on its repeat and let the text say the rest.
+# 30 Sep: it was 1500, a round guard Astra's audit asked for against runaway repeats (18 Sep: 'no explicit negotiated
+# resource bound'), never a measured limit; the Desktop kept reaching it. It stays a guard, not a working size: deskd
+# now rebuilds a scene only when what it shows changed, and the painter keeps its last good paint when one is refused.
 
 
 def _outside_quotes(line, sep):

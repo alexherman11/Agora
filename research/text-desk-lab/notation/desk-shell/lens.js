@@ -335,11 +335,13 @@
 
   async function refresh(force) {
     const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter`)).json();
-    const key = JSON.stringify(r.scene || r.refused);
+    const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene it built; comparing 700 KB was the fallback
     if (key === last && !force) return;
     last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null;
     await restyle((def && def.style_name) || "calm", (def && def.style_rev) || "seed");
-    if (r.refused) { if (!V.hold) paint.replaceChildren(); V.show("refused: " + r.refused); return; }
+    // 30 Sep (Alex: the Desktop kept going blank over the node budget): a refused scene keeps the last good paint on
+    // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
+    if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
     V.show(r.text); report();
   }

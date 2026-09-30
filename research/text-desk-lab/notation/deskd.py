@@ -112,6 +112,34 @@ class BadRequest(ValueError):
     pass
 
 
+# 30 Sep (Alex: the 1500-node budget kept blanking the Desktop): the painter asks for its scene every 1.5 s, and each ask
+# loaded the 8 MB world, built the whole lens and pickled the world twice (0.5-0.7 s for the Desktop's 1387 nodes, 723
+# KB), though nothing had changed. A scene is now built again only when something it can show changed: the world file
+# (a request that changes nothing doesn't write it), the house's state apart from its heartbeat, whether the house is
+# alive, or the minute (times print as 08:15). The answer for anything else is the one already built.
+_SCENES, _GEN = {}, 0
+
+
+def _scene_key(q):
+    name = q.get("session", "desktop")
+    if not SESSION_NAME.match(str(name)):
+        return None
+    try:
+        st = (SESSIONS / f"{name}.pickle").stat()
+    except OSError:
+        return None
+    house = None
+    try:
+        h = json.loads((HERE / "house-state" / name.split("@")[0] / "house.json").read_text(encoding="utf-8"))
+        beat = float(h.pop("beat", 0) or 0)
+        h.pop("pid", None)
+        house = (json.dumps(h, sort_keys=True, default=str), time.time() - beat < 30)
+    except (OSError, ValueError, TypeError):
+        pass
+    return (name, (q.get("as") or "alex").lower(), q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, house,
+            int(time.time() // 60))
+
+
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
@@ -219,6 +247,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(snap)
         if u.path == "/api/scene":
             import scene
+            key = _scene_key(q)
+            if key is not None and key in _SCENES:
+                return self._json(_SCENES[key])
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 try:
                     sc, text = scene.scene_for(desk, q.get("lens", ""))
@@ -230,6 +261,13 @@ class Handler(SimpleHTTPRequestHandler):
                 except Exception as e:      # Astra: a compiler fault must arrive as a refusal, not as a dead endpoint
                     out = {"refused": f"the lens compiler failed ({type(e).__name__}: {e}); this is a bug in scene.py, not in your lens",
                            "events_total": len(desk.world.events)}
+            global _GEN
+            _GEN += 1
+            out["gen"] = f"{os.getpid()}-{_GEN}"        # names this build, so a painter compares a word, not 700 KB
+            if key is not None and key == _scene_key(q):     # unchanged while it was built: keep it (a few, the newest)
+                _SCENES[key] = out
+                while len(_SCENES) > 16:
+                    _SCENES.pop(next(iter(_SCENES)))
             return self._json(out)
         if u.path == "/api/version":
             # live building: the code this deskd runs. keeper.py restarts deskd when HEAD moves; the painter reloads on a change
