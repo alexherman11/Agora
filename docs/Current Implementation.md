@@ -156,9 +156,10 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 
 | Family | Commands |
 |---|---|
-| Reading | `look [id] [:1-:4]`, `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts`, `vars`, `help` (`?`) |
+| Reading | `look [id] [:1-:4]` (`look` alone, in a world with rooms: your room, narrated; see Rooms), `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts`, `vars`, `help` (`?`) |
 | Changing | `do <verb> <target> k=v`, `undo [eN]`; pair verbs `swap`, `beside`, `match`, `link`; world verbs (`<word> …`, `do <word> …`, `use <id> …`) |
 | Defining | `rule when … do …`, `rule on <verb> [by=] do …`, `rule drop rN`; `script <name> = …`, `script drop`, `run`; `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
+| Moving | `go <room> [:1]`, `go` (see Rooms) |
 | Branching | `worktree`, `worktree fork\|diff\|merge <name>` |
 | External | `sync`, `launch` (harness) |
 
@@ -225,6 +226,15 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 **Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $today`; run with `run <name> args`. Scripts are not validated when defined, and `$me` is not filled in a script (F2). A rule may run a script; a script a rule runs acts as the rule's author.
 
 **Views.** `do create <surface> kind=view title=X query=<selection>` makes a view; with `cols=` (and `by=`, `desc=`) it prints as a table. You can't move a thing into a view, create inside one, or tile, group or sort one.
+
+**Rooms** (a678, rooms step 1; `rooms.py`). A room is a surface with prop `role=room`, or `role=resident` (a corner is its resident's room). Its props: `describe=<id>` (the note that describes it: its text, or its title when it has none), `talk=<id>` (the chat where talk here lands), `shows=<selection>` (what is at hand; default its children), `home=<selection>` (default `in:<the room>`; must be invertible: `in:<surface>` and `tag:<word>` terms only. Step 1 only checks it, and a narrated look says so when it isn't; nothing lands there yet).
+- Every actor is in exactly one room. It is not stored apart: an actor's room is the `to=` of their latest `go` event (target the actor, `args to= from=`, `changed` empty, fence aspect `presence`). Someone who never went anywhere is in their own corner (the surface with `role=resident actor=<them>`), or, with no corner, in Home (the outermost `role=room` surface). A room since unmarked or removed sends them back to that default. **Alex is not placed** in step 1 (a678 (8)): `go` refuses him and his bare `look` is the tree.
+- `go <room>`: by id, by title, or by a word of the title (case aside, `Sable's` answers to `sable`); from anywhere. It records the event and prints the narration. A surface that isn't a room is refused with the list of rooms; several matches are refused with the list, except that your own corner wins (`go corner`). Going where you already are makes no event. `go <room> :1` walks without looking (the receipt only; nothing counts as seen): the house uses it. `go` alone prints where you are and who is in each room.
+- A bare `look`, in a world with rooms and for anyone but Alex, narrates your room: `You are in <title> (<id>).` (`, your own corner.` in yours), the description (cut at 120 words, with a pointer), who else is here (`Here with you: Pike, Sable (asleep).`, from the corner's `status`; only residents and actors who have gone somewhere count), what is at hand from `shows=`, one line and one id each with no geometry (kind, title, and a task's status, owner, due; a surface's count; at most 12, then a pointer), skipping the describe and talk notes, then the talk chat's last 3 lines as signed, each cut at 35 words, and how to speak (`do append <talk> line=...`). `look <id>`, `look :N` with no id and `look desk` are the tree, unchanged. In a world with no rooms (the suite's) a bare `look` is the tree as before.
+- **What a narrated look counts as seen** (a678 (7)): the room's title, the describe note's title and text only when printed whole, and the talk chat's title, plus its text only when all of it was printed. Things listed at hand are not marked at all: look or read one before acting on it (`you have not looked at …`). A chat line still lands after a narrated look, since adding to a chat is never stale.
+- A go is journaled like any event (history lists it; a fork copies it; a worktree merge replays `go` lines, and they never conflict) but outside undo's reach: `undo eN` on a go refuses (`eN is a go: where you are is not a change to anything in the world, so undo leaves it…`), and a bare `undo` passes over it.
+- The `!!` line folds walking: at most one per actor, their latest room (`e975 pike went to Lounge`; grouped: `pike: undo in e900, now in Lounge`).
+- `rows house` has a `room` field, so Who's home can show where each resident is.
 
 **Clock.**
 - `clock` shows the desk's date.
@@ -508,6 +518,8 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 - Lines run before a rest are delivered on the next wake.
 - A reply with no commands gets held news or `(quiet)`. After 10 quiet exchanges in a row, the resident rests.
 - An empty reply rests.
+- Any rest sends the resident home to its corner (Alex, 29 Sep; a678): the house runs `go <corner> :1` as the resident, which walks without looking, so it wakes where it rested.
+- A wake line can now be `read <soul> :3; look`: the bare look narrates the room it is in (its corner after a rest). Measured on a copy of frontier on 29 Sep: about 1300 words, against about 6000 for today's `read <soul> :3; look <corner> :3; look Board :3; read a570`. `go` counts as a desk command in a reply without the `>` mark.
 
 **News.**
 - **Urgent news ends any rest:**
@@ -608,6 +620,7 @@ A refusing lens is listed but doesn't fail health.
 | `verbs.py` | 262 | World verbs: finding, filling, running, reaches |
 | `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
+| `rooms.py` | 288 | Rooms (a678): what a room is, where each actor is (derived from `go` events), `go`, the narrated bare `look` |
 | `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
 | `explore.py` | 257 | CLI: forward to deskd or run under the pid lock (`take_lock`, `release_lock`); atomic save; `--window --dump --shape --reset`; `!actor` injection |
 | `deskd.py` | 408 | HTTP server, its origin and session-name checks, and the gesture fence |
@@ -785,4 +798,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1087. Edit it there; a direct edit here makes the next export stop and warn. sha1:6f2ca7580df6 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1115. Edit it there; a direct edit here makes the next export stop and warn. sha1:ffad00ff57fe -->
