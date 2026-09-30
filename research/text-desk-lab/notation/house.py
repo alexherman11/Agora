@@ -171,6 +171,7 @@ UNITS = {"m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60,
          "d": 86400, "day": 86400, "days": 86400, "w": 604800, "week": 604800, "weeks": 604800}
 REST_MAX = 30 * 86400      # a month: longer than that is a leaving, not a rest
 QUIET_MAX = 10             # Alex (29 Sep): ten quiet exchanges, then the house lets a resident rest
+SAID_KEEP, SAID_CHARS = 10, 2000    # the turns shown on Alex's Desktop: the last ten replies, each cut at 2000 characters
 
 
 def duration(text):
@@ -352,6 +353,10 @@ class Resident:
                 self.state["last_turn"] = now()
                 for k in ("pending", "failures", "retry_at"):
                     self.state.pop(k, None)
+                # what it wrote, the last few turns, for Alex's view (the `turns` row source; Alex, 29 Sep)
+                said = self.state.setdefault("said", [])
+                said.append({"n": self.state["turns"], "at": self.state["last_turn"], "text": "\n".join(self.reply)[:SAID_CHARS]})
+                del said[:-SAID_KEEP]
                 self.save()
                 ended.append("\n".join(self.reply))
                 self.reply = []
@@ -642,7 +647,8 @@ class House:
                                      "turns": r.state.get("turns", 0), "last_turn": r.state.get("last_turn"),
                                      "last_sent": r.state.get("last_sent"), "status": r.status,
                                      "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at"),
-                                     "rest_until": r.state.get("rest_until"), "quiet": r.state.get("quiet", 0)}
+                                     "rest_until": r.state.get("rest_until"), "quiet": r.state.get("quiet", 0),
+                                     "said": r.state.get("said", [])}
         out["workers"] = {cid: {"actor": wk.actor, "asked_by": wk.asked_by, "alive": wk.alive(),
                                 "doing": "working" if wk.busy else ("waiting" if wk.alive() else "stopped"),
                                 "turns": wk.state.get("turns", 0), "branch": wk.branch}

@@ -151,9 +151,36 @@ SOURCES = {
     # the command center (research/command-center): a chat's lines, and what the house observes of its residents
     "messages": ("messages:<id>", ("item", "who", "said", "index")),
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh")),
+    # what each resident wrote, its last turns, newest first (Alex, 29 Sep: to see their turns and text)
+    "turns": ("turns[:<corner>]", ("resident", "corner", "turn", "at", "said", "acts")),
 }
 NAMES = NAMES + tuple(f for _, fs in SOURCES.values() for f in fs)
 HOUSE_STATE = pathlib.Path(__file__).resolve().parent / "house-state"   # <world>/house.json, written by house.py
+
+
+def turn_rows(desk, corner=None):
+    """The replies the house kept for each resident (house.json `said`), newest first. `acts` counts the lines that
+    reached the desk (those beginning with >); the rest is the resident's own thinking, shown as written."""
+    import json
+    import time
+    try:
+        world = (getattr(desk, "_session", "") or "").split("@")[0]
+        st = json.loads((HOUSE_STATE / world / "house.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if st.get("world") != world:
+        return []
+    out = []
+    for cid, r in sorted((st.get("residents") or {}).items()):
+        if corner and cid != corner:
+            continue
+        for t in r.get("said") or []:
+            at = t.get("at")
+            out.append({"resident": r.get("actor") or "(no name yet)", "corner": cid, "turn": t.get("n", 0),
+                        "at": time.strftime("%H:%M", time.localtime(at)) if at else "", "said": t.get("text") or "(nothing)",
+                        "acts": sum(1 for l in (t.get("text") or "").splitlines() if l.lstrip().startswith(">")), "_t": at or 0})
+    out.sort(key=lambda r: r.pop("_t"), reverse=True)
+    return out
 
 
 def house_rows(desk, corner=None):
@@ -192,10 +219,12 @@ def rows(desk, source, session=None):
     """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection)."""
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head != "house" and (head in ("sections", "comments", "messages")) != bool(arg)):
-        return None      # sections, comments and messages need an id; house takes one or none; the rest take none
+    if head not in SOURCES or (head not in ("house", "turns") and (head in ("sections", "comments", "messages")) != bool(arg)):
+        return None      # sections, comments and messages need an id; house and turns take one or none; the rest none
     if head == "house":
         return house_rows(desk, desk._resolve(arg) if arg else None)
+    if head == "turns":
+        return turn_rows(desk, desk._resolve(arg) if arg else None)
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)

@@ -150,6 +150,12 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def end_headers(self):
+        # the painter's files change under live building: a browser must ask again each time (a 304 is cheap), or a
+        # page reloaded for new code runs yesterday's lens.js (29 Sep: the fold label did not appear until a hard reload)
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def _json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)

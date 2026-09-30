@@ -89,7 +89,8 @@
     const h = document.createElement("button"); h.type = "button"; h.className = Style.roleClass("tool");
     h.setAttribute("aria-label", (p.fold && p.fold.label) || n.part || "section");
     const dflt = p.fold ? p.fold.folded : !!p.folded;          // Jeff 75e39d8: fold is {folded, label}; 5bb7f7f emitted folded: true
-    const set = f => { el.dataset.folded = f ? "1" : ""; el.setAttribute("aria-expanded", String(!f)); h.textContent = f ? "▸" : "▾"; h.setAttribute("aria-expanded", String(!f)); if (el.parentElement) tracks(el.parentElement); };
+    const lab = (p.fold && p.fold.label) || "";                  // the lens's handle label is drawn, not only announced
+    const set = f => { el.dataset.folded = f ? "1" : ""; el.setAttribute("aria-expanded", String(!f)); h.textContent = (f ? "▸" : "▾") + (lab ? " " + lab : ""); h.setAttribute("aria-expanded", String(!f)); if (el.parentElement) tracks(el.parentElement); };
     h.addEventListener("click", () => { const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f); });
     el.prepend(h); set(V.folded(n.key, dflt));
   }

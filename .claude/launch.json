@@ -20,6 +20,12 @@
       "port": 8780
     },
     {
+      "name": "keeper",
+      "runtimeExecutable": "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["C:\\Projects\\Agora4\\research\\text-desk-lab\\notation\\keeper.py", "frontier", "--port", "8794"],
+      "port": 8794
+    },
+    {
       "name": "command-center",
       "runtimeExecutable": "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
       "runtimeArgs": ["C:\\Projects\\Agora4\\research\\text-desk-lab\\notation\\deskd.py", "8794"],

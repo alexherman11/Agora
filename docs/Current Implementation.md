@@ -278,7 +278,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
 | `text <template>` | Words (template names below); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
-| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>`, `actors`, `events`, `worktrees`, `house[:<corner>]`. An empty repeat prints `(empty)` |
+| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>`, `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, newest first: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`). An empty repeat prints `(empty)` |
 | `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
 | `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
 | `over $<list>` | Repeat over a list field or derived rows; `$it` is each value |
@@ -399,7 +399,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 | `POST /api/observe` | `{session, as, lens, at, viewport, facts}`, capped at 400 facts; returns `{ok, kept}` |
 | anything else | GET: a static file from `desk-shell/`. POST: 404 |
 
-- The server is a `ThreadingHTTPServer` on 127.0.0.1. Replies are `no-store`.
+- The server is a `ThreadingHTTPServer` on 127.0.0.1. API replies are `no-store`; every reply also says `no-cache`, so a browser rechecks the painter's files and a page reloaded for new code gets it.
 - deskd answers only its own pages: an `/api/` request whose `Origin` is not its own address, or that a browser marks `Sec-Fetch-Site: cross-site`, gets 403. Local programs that send neither header (the CLI, the house) are let through, as before.
 - A session name must match `^[A-Za-z0-9_][A-Za-z0-9_@-]{0,63}$` (no dots or slashes), else 400. A POST body that isn't a JSON object is 400.
 - Per-actor state is keyed by actor alone; the CLI keys it by actor and window.
@@ -420,7 +420,7 @@ Two pages paint the same world.
 
 **The lens painter** (`lens.html`, which loads `style/style.js`, `viewer.js`, `lens.js` and `term.js`) is the generic painter.
 - It reads the paint contract (key, paint, acts, fence) and knows no app, kind, colour or size.
-- `lens.js` is 255 lines.
+- `lens.js` is 256 lines. It draws a fold's handle with its label (`▸ turns`); clicking it is the viewer's own toggle, kept in the browser, never an event.
 - `viewer.js` (155) keeps continuity:
   - unchanged elements are kept by key, so a reader's selection survives another person's act;
   - drafts survive a refusal, a reload or a closed tab (localStorage `lens-drafts:…`), and so do folds;
@@ -506,7 +506,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 
 **State.**
 - The house writes the corner's `status` (`awake`, `asleep`, `unnamed`, `error`) as actor `house`, only on change.
-- `house-state/<world>/house.json`, rewritten every pass, is read by the `house` row source.
+- `house-state/<world>/house.json`, rewritten every pass, is read by the `house` and `turns` row sources. It carries each resident's last 10 replies (`said`, each cut at 2000 characters), so Alex's Desktop can show what they wrote, their own thinking included.
 - Each corner keeps `state.json` and `transcript.jsonl`.
 - `house-state/` is never committed.
 
@@ -589,12 +589,12 @@ A refusing lens is listed but doesn't fail health.
 | `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
 | `knife.py` | 263 | The selection language (with `unanswered:`) and pair verbs |
 | `verbs.py` | 262 | World verbs: finding, filling, running, reaches |
-| `scene.py` | 1444 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
+| `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
 | `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
 | `explore.py` | 229 | CLI: forward to deskd or run under the pid lock; atomic save; `--window --dump --shape --reset`; `!actor` injection |
-| `deskd.py` | 395 | HTTP server, its origin and session-name checks, and the gesture fence |
-| `house.py` | 698 | Residents |
+| `deskd.py` | 401 | HTTP server, its origin and session-name checks, and the gesture fence |
+| `house.py` | 704 | Residents |
 | `workshop.py` | 342 | Commissions and workers |
 | `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
 | `health.py` | 119 | The checks a landing must pass |
@@ -605,7 +605,7 @@ A refusing lens is listed but doesn't fail health.
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
 | `test_scene.py`, `test_journal.py`, `golden_prints.py`, `suite/` | 382, 839, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
-| `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 520 | The lens painter, continuity, the desk terminal |
+| `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 521 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
 | `desk-shell/checks/` | 1823 + 884 | Iris's browser checks and results, Rook's defect list, and Pike's continuity instrument (`continuity/run.mjs`, with 13 results) |
@@ -768,4 +768,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e699. Edit it there; a direct edit here makes the next export stop and warn. sha1:8d705bdf0dac -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e705. Edit it there; a direct edit here makes the next export stop and warn. sha1:d9add0cc8cba -->
