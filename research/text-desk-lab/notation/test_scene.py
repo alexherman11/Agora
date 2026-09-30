@@ -438,6 +438,9 @@ def test_rooms_go_look_and_replay():
     out = do("go lounge", "juniper")
     ev = re.match(r"ok (e\d+):", out).group(1)
     body = out.split("\n", 1)[1]
+    head, clock, body = body.split("\n", 2)
+    assert clock.startswith("No clock is set here; the house's time is "), clock      # a948 (3): every narration is dated
+    body = head + "\n" + body
     assert body.startswith(f"You are in Lounge ({lounge}).\nLow couches around a table.\nNo one else is here.\nAt hand:\n  {letter} note \"A letter\"\n"), body
     assert "Couches" not in body and "  Jeff: two\n  Jeff: three\n  Jeff: four\n" in body, body
     assert not re.search(r"\b(px|cramped|offscreen|spills?)\b", body) and len(body.split()) < 250

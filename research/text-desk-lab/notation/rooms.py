@@ -16,6 +16,10 @@ corner, in Home (the outermost room). Alex is not placed in step 1 (a678 (8)): h
 Step 2a (a806): `rest` takes you home (your corner, or Home), recorded as a go with via=rest; the house rests a
 resident this way. $here and $here.<prop> (blanks.py) read room_of. A sleeping resident (their corner says
 status=asleep) is never listed as 'here with you'; a room says 'Pike is asleep here' instead.
+
+Step 2c (a948): look <room> with no depth narrates that room, from wherever you are ('Lounge (f182), seen from
+Juniper's corner (f581).'); look <room> :2 is the tree. Every narration has a date and time line from the desk's
+clock, and names each actor's presence: asleep (want=rest), resting (between turns), or plain (in a turn now).
 """
 
 import re
@@ -105,9 +109,52 @@ def here(w, fid):
 
 
 def asleep(w, actor):
-    """A resident whose corner says status=asleep (the house writes it when want is not awake)."""
+    """A resident whose corner says want=rest, or status=asleep (the house writes it when want is not awake)."""
     c = corner_of(w, actor)
-    return bool(c) and (w.nodes[c].get("props") or {}).get("status") == "asleep"
+    p = (w.nodes[c].get("props") or {}) if c else {}
+    return p.get("want") == "rest" or p.get("status") == "asleep"
+
+
+def presences(desk):
+    """a948 (4): how each actor is, in one word: 'asleep' (want=rest), 'resting' (the house runs them and they are
+    between turns; 'resting until 21:40' when they timed it), or '' (awake: in a turn right now, or someone the house
+    does not run, such as a person at the desk). Whether a resident is mid-turn is the house's observation, kept in its
+    own state, not the world's history; it is read once per print through scene.house_rows, the reader the house lens
+    uses, so the two never disagree. -> a function actor -> word."""
+    import scene
+    doing = {}
+    for r in scene.house_rows(desk):
+        d = r["doing"]
+        doing[r["corner"]] = "" if d == "working" else d if d.startswith("resting") else "resting"   # stopped: not in a turn
+    w = desk.world
+
+    def word(actor):
+        if asleep(w, actor):
+            return "asleep"
+        return doing.get(corner_of(w, actor), "")
+    return word
+
+
+def _day(d):
+    return f"{d.day} {d:%b}"
+
+
+def clock_line(desk):
+    """a948 (3): the date and time, from the one clock that fills $today and counts age< and due< (the desk's clock,
+    DeskKnife.today). Following the wall clock it is the house's own time. Set by hand, the clock is a day with no
+    hour, so any other day than the house's is said, both days named, rather than two 'todays' disagreeing silently."""
+    from datetime import date, datetime
+    now = datetime.now()
+    at = f"{_day(now)}, {now:%H:%M}"
+    today = getattr(desk, "today", None)
+    if not today:
+        return f"No clock is set here; the house's time is {at} (clock follow keeps today on the wall date)."
+    if today == now.date().isoformat():
+        return f"It is {at}."
+    d = date.fromisoformat(today)
+    n = abs((now.date() - d).days)
+    return (f"The desk's clock says {_day(d)}, {n} day{'s' if n != 1 else ''} {'behind' if d < now.date() else 'ahead of'} the "
+            f"house's time, {at}: $today, due< and age< count from {_day(d)} (clock follow joins them).")
 
 
 def resolve(w, word, actor):
@@ -239,14 +286,40 @@ def speak_verb(desk, fid, tnid, sid):
     return None
 
 
+def look_target(desk, arg):
+    """a948 (2): the room `look <arg>` names, when it names one and asks for no depth; else None, and look keeps the
+    tree (look <room> :2 is the tree too). By id, $here, title, or a word of its title (look lounge, look corner)."""
+    words = arg.split()
+    if not words or any(re.fullmatch(r":\d+", x) for x in words):
+        return None
+    word = arg.strip().strip('"\'')
+    try:
+        nid = desk._resolve(word)
+    except Refusal:
+        try:
+            return resolve(desk.world, word, desk.world.me)
+        except Refusal as e:
+            if re.search(r"names \d+ rooms", str(e)):
+                raise             # look corner, with no corner of your own: which one is the useful answer
+            return None           # look's own refusal says what it can't find
+    return nid if is_room(desk.world, nid) else None
+
+
 def narrate(desk, fid):
     """What a person standing in the room would take in: its name, its description, who is here, what is at hand,
-    and the last few lines said here. It counts as seen only what it prints whole (a678 (7))."""
+    and the last few lines said here. It counts as seen only what it prints whole (a678 (7)). From another room
+    (look <room>, a948) it says where you are looking from, and counts the same things seen."""
     w = desk.world
     me = str(w.me).lower()
     n = w.nodes[fid]
     p = n.get("props") or {}
-    out = [f"You are in {n['title']} ({fid})" + (", your own corner." if corner_of(w, me) == fid else ".")]
+    mine, at = corner_of(w, me) == fid, room_of(w, me)
+    if at == fid:
+        out = [f"You are in {n['title']} ({fid})" + (", your own corner." if mine else ".")]
+    else:
+        out = [f"{n['title']} ({fid})" + (", your own corner," if mine else ",")
+               + (f" seen from {w.nodes[at]['title']} ({at})." if at else " seen from outside the rooms.")]
+    out.append(clock_line(desk))
     marks = [(fid, ["title"])]
     dnid, ds = _target(desk, p["describe"]) if p.get("describe") else (None, None)
     if ds:
@@ -256,11 +329,16 @@ def narrate(desk, fid):
         if shown == body:
             marks += [(dnid, ["title"] + (["text"] if ds["text"].strip() else [])), (ds["id"], ["title"] + (["text"] if ds["text"].strip() else []))]
     others = [a for a in here(w, fid) if a != me]
-    awake = [a for a in others if not asleep(w, a)]
-    sleeping = [a for a in others if asleep(w, a)]
-    # a806 (6): a sleeping actor is never 'here with you'; one asleep is said so, wherever they sleep
-    out.append("Here with you: " + ", ".join(w.display_name(a) for a in awake) + "." if awake else
-               "No one else is here." if not sleeping else "No one else here is awake.")
+    how = presences(desk)
+    awake = [a for a in others if how(a) != "asleep"]
+    sleeping = [a for a in others if how(a) == "asleep"]
+    # a806 (6): a sleeping actor is never 'here with you'; one asleep is said so, wherever they sleep. a948 (4): one
+    # between turns is here, and resting; only someone in a turn right now is named plain
+    names = ", ".join(w.display_name(a) + (f" ({how(a)})" if how(a) else "") for a in awake)
+    if at == fid:
+        out.append(f"Here with you: {names}." if awake else "No one else is here." if not sleeping else "No one else here is awake.")
+    else:
+        out.append(f"Here: {names}." if awake else "No one is here." if not sleeping else "No one here is awake.")
     for a in sleeping:
         out.append(f"{w.display_name(a)} is asleep here" + (" (their own corner)." if corner_of(w, a) == fid else "."))
     tnid, ts = _target(desk, p["talk"]) if p.get("talk") else (None, None)
@@ -278,7 +356,7 @@ def narrate(desk, fid):
         out.append("At hand:")
         out += ["  " + item_line(desk, i) for i in ids[:AT_HAND_MAX]]
         if len(ids) > AT_HAND_MAX:
-            out.append(f"  (+{len(ids) - AT_HAND_MAX} more; look {fid} lists them all)")
+            out.append(f"  (+{len(ids) - AT_HAND_MAX} more; look {fid} :2 lists them all)")
     else:
         out.append("Nothing at hand.")
     if ts:
@@ -313,8 +391,9 @@ def where_all(desk):
     mine = room_of(w, me)
     out = [f"You are in {w.nodes[mine]['title']} ({mine})." if mine else
            "You are not placed in a room (Alex has a focus, not a location, in step 1)."]
+    how = presences(desk)
     for f in all_rooms(w):
-        people = [w.display_name(a) + (" (asleep)" if asleep(w, a) else "") for a in here(w, f)]
+        people = [w.display_name(a) + (f" ({how(a)})" if how(a) else "") for a in here(w, f)]
         out.append(f"  {f} {w.nodes[f]['title']}" + (": " + ", ".join(people) if people else ""))
     out.append("go <room> takes you there, by id or a word of its title")
     return "\n".join(out)
