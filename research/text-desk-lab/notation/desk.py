@@ -808,7 +808,7 @@ class Desk:
         elif w.nodes[nid]["type"] == "appearance":
             s = w.subjects[w.nodes[nid]["subject"]]
         else:
-            raise Refusal(f"{nid} is a surface; look {nid} shows what is inside")
+            raise Refusal(f"{nid} is a surface; look {nid} :2 shows what is inside")
         apps = w.appearances_of(s["id"])
         head = f"{s['id']} {s['kind']} \"{s['title']}\" · appears at {', '.join(apps)}"
         if s["tags"]:

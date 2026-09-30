@@ -782,6 +782,7 @@ class DeskKnife(DeskMoo):
     _ctxs = None        # a806: where lines are being filled, innermost last (blanks.Ctx); empty for a typed line
     _reply = None       # the reply the current top-level call belongs to (the caller's token, or one per call)
     _made = None        # {reader slot: (reply, ids made most recently in that reply)}: what $new reads next
+    _taught_new = None  # the reply whose receipt last taught $new (a948 (6)): once per reply
 
     def dispatch(self, name, args):
         if not self._ctxs:
@@ -824,8 +825,15 @@ class DeskKnife(DeskMoo):
             key = "text" if "text" in r else "error"
             r[key] += f"\n  ($new = {self._filled_new})"
             self._filled_new = None
+            self._taught_new = self._reply          # they know the word already: no lesson in this reply
         # what this line made itself, before the rules act on it; $new is the most recent thing made in this reply
-        ctx.prev = blanks.made_by(self.world.events[n0:]) or ctx.prev
+        made = blanks.made_by(self.world.events[n0:])
+        if top and made and "text" in r and self._taught_new != self._reply:
+            # a948 (6): an id guessed for a thing just made (a943 for a948) is the habit $new replaces; the lesson
+            # comes once per reply, on the receipt, exactly where the guess would be
+            r["text"] += "\n  (next lines in this reply can call it $new)"
+            self._taught_new = self._reply
+        ctx.prev = made or ctx.prev
         if top:
             self._made = dict(self._made or {})
             self._made[self._slot()] = (self._reply, ctx.prev)
@@ -909,7 +917,7 @@ class DeskKnife(DeskMoo):
                 out.append(f"  in {p} \"{w.title(w.nodes[p])}\":")
                 out.extend("    " + self.line(i, 1) for i in kids[:cap])
                 if len(kids) > cap:
-                    more = f"look {p} shows all of it" if "in:" in words else f"find {words.strip()},in:{p} lists them"
+                    more = f"look {p} :2 shows all of it" if "in:" in words else f"find {words.strip()},in:{p} lists them"
                     out.append(f"    (+{len(kids) - cap} more here; {more})")
             out.append(f"  as a selection: {words.strip()}   e.g. do move {words.strip()} into=<surface>   (help selections)")
             return "\n".join(out)
@@ -941,10 +949,12 @@ class DeskKnife(DeskMoo):
         if cmd == "go":
             import rooms
             return rooms.cmd_go(self, arg)
-        if cmd == "look" and not arg:
-            import rooms           # a678: a bare look narrates the room you are in; look <id> keeps the tree
-            if rooms.narrates(self):
-                return rooms.narrate(self, rooms.room_of(self.world, self.world.me))
+        if cmd == "look":
+            import rooms           # a678: a bare look narrates the room you are in; a948: look <room> narrates that
+            if rooms.narrates(self):   # room, from wherever you are; look <room> :2 and look <anything else> keep the tree
+                fid = rooms.look_target(self, arg) if arg else rooms.room_of(self.world, self.world.me)
+                if fid:
+                    return rooms.narrate(self, fid)
         if cmd == "rules":
             return self.cmd_rules()
         if cmd == "rule":
@@ -1046,15 +1056,18 @@ class DeskKnife(DeskMoo):
   shows=<selection> what is at hand (default: what is inside it), home=<in:|tag: selection> where things made here land.
   go <room>        walk there, from anywhere, by id or a word of its title (go lounge); prints the room
   go <room> :1     walk without looking            go alone: where you are, and who is in each room
-  look             with no id: the room you are in: its description, who is here, what is at hand (one id each),
-                   the last lines said here. Only what it prints whole counts as seen: look <id> or read before changing
-                   a thing listed at hand. look <id> is the tree, as always.
+  look             with no id: the room you are in: the date and time, its description, who is here, what is at hand
+                   (one id each), the last lines said here. Only what it prints whole counts as seen: look <id> or read
+                   before changing a thing listed at hand.
+  look <room>      the same for any room, from where you are (it says so); look <room> :2 is the tree. look <id> on
+                   anything that is not a room is the tree, as always.
   rest             go home to your corner (Home if you have none); history marks it via=rest
   $here            the room you are in, in any target or value: do move a12 into=$here; $here.talk its chat, so
                    a verb can say: do append $here.talk line="$*" (help blanks)
   Where you are is kept in the world (history lists each go) but undo leaves it: go back instead. Someone who never
   went anywhere is in their own corner, or in Home (Jeff too). Resting sends a resident home to their corner. A
-  resident asleep (status=asleep on their corner) is never 'here with you': the room says they are asleep here.""",
+  resident asleep (want=rest on their corner) is never 'here with you': the room says they are asleep here. One
+  between turns is named '(resting)'; one in a turn right now, or anyone the house does not run, is named plain.""",
         "commissions": """commissions: a worker changes what the world can't (the desk's code, the house, the painter) for you.
   Write a task with prop commission=asked; its text says what you want, why, and how you'll know it's done:
     do create <place> kind=task title="..." commission=asked text="What: ... Why: ... Done when: ..."

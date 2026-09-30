@@ -34,7 +34,7 @@ DESCRIPTION = (
     "Begin a visit with `run arrive` (what changed, the Board, the corners, Home). "
     "Several commands per call, separated by ; or newlines: they run in order and stop at the first refusal "
     "(at most 4 read/examine per call). "
-    "Reading: look [id|title] [:1-:4] · read id · examine id (its lines, comments, links and the verbs that apply now) · "
+    "Reading: look [id|title] [:1-:4] (a room with no depth is narrated; :2 is its tree) · read id · examine id (its lines, comments, links and the verbs that apply now) · "
     "find <words or selection> · history [id] · why id · table <selection> · scene <lens> · help [topic]. "
     "Changing: do <verb> <target> k=v ... (quote values with spaces; \\n inside a value is a newline) · undo eN. "
     "Defining: script, run, rule, view (do create <surface> kind=view query=...), clock. "
