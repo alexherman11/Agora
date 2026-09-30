@@ -366,13 +366,14 @@ def narrate(desk, fid):
         cut = [_cut(raw[k], LINE_MAX) for k in tail]
         out.append(f"Talk here ({tnid} \"{ts['title']}\")" + (", the last lines:" if said else ": nothing said yet."))
         out += ["  " + l for l in cut]
-        # a951: what it prints extends your read run, as tail= would; a line it cut is not read (a hole in the run)
+        # a951: what it prints extends your read run, as tail= would; a line it cut is not read (a hole in the run).
+        # a986: so are the lines between your last read and these, which a plain read then shows
         start = 0 if len(said) <= TALK_LINES else tail[0]
         run = desk._chat_run(ts)
         gap = others_in(w, raw, run[1], start) if run and run[1] < start else 0   # after your last read, before these
         whole = desk._chat_shown(ts, start, {k for k, c in zip(tail, cut) if c != raw[k]})
         verb = speak_verb(desk, fid, tnid, ts["id"])
-        more = (f"; {gap} earlier line{'s' if gap > 1 else ''} from others you haven't read: read {tnid} tail={len(raw) - run[1]}" if gap else
+        more = (f"; {gap} earlier line{'s' if gap > 1 else ''} from others you haven't read: read {tnid}" if gap else
                 f"; read {tnid} tail=20 for more" if len(said) > TALK_LINES else "")
         out.append(f"  ({verb} <words>{more})" if verb else f"  (say: do append {tnid} line=\"...\"{more})")
         marks += [(tnid, ["title"] + (["text"] if whole else [])), (ts["id"], ["title"] + (["text"] if whole else []))]
