@@ -89,7 +89,7 @@ python test_scene.py            # 21 tests of lenses, gestures and the fence
 | **Surface** `f..` | A container with layout `free`, `column` or `row`, and props. A **view** is a surface with `layout: view`, a `query` and optional `cols by desc`, re-evaluated at every look. Surface prop `extent=WxH` bounds `spills-parent` on a free surface. |
 | **Link** `l..` | A typed edge between subjects: `blocks`, `refers` (the default), `answers`, `part-of`. Self-links, duplicates and links to surfaces are refused. |
 | **Comment** `c..` | `{id, by, text, resolved, replies[{by, text}]}` on a subject. `resolve` may reply. Undoing it reopens the comment and drops the last reply. |
-| **Event** `e..` | `id verb target args undo note by at day`. Some events also carry `changed cmd via window cause undone verb_run merged`. Ids come from a counter that never goes back (`_eseq`), so a refused or rolled-back step leaves a gap. |
+| **Event** `e..` | `id verb target args undo note by at day`. Some events also carry `changed cmd via window cause undone verb_run merged tripped_by`. `tripped_by` is on the events of a rule that acted as its author: whoever's act set it off (a687). Ids come from a counter that never goes back (`_eseq`), so a refused or rolled-back step leaves a gap. |
 
 Editing a subject changes every appearance of it. Moving or removing one appearance touches only that appearance.
 
@@ -97,9 +97,9 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - A leading `Name:` that is the actor's own, in any case, is dropped, and the receipt says `the world signs for you; your typed name was dropped`.
 - A leading name that is anyone else's stays as plain words after the real signature (ran: juniper appending `Jeff: I agree` stores `Juniper: Jeff: I agree`).
 - A world verb runs as its caller, so its line is signed by the caller.
-- A rule runs as whoever's act triggered it, so its line reads `Pike, via rule r3: …` and never reads as the triggerer speaking. Whether rules should run as their authors is open (a643).
+- A rule acts as its author (a687, decided in a683), so its line is signed by the author with no `via` in the signature: the event carries `via rule rN` (ran: sable's rule, tripped by pike, adds `Sable: (noted)`). A rule defined before a656 has no author: it runs as whoever tripped it, and its line reads `Pike, via rule r3: …`, until someone defines it again.
 - Lines already in a chat are never re-signed. The old rule that signed jeff's unsigned lines `Alex:` is gone.
-- `World.SPEAKER` reads a signature back. The `messages` row source keeps the whole signature in `who` (`Pike, via rule r3`), and `awaiting reply` in examine is judged for the reader.
+- `World.SPEAKER` reads a signature back. The `messages` row source keeps the whole signature in `who` (`Pike, via rule r3` for an authorless rule's line), and `awaiting reply` in examine is judged for the reader.
 
 **Geometry.**
 - The screen is 1280×800.
@@ -128,6 +128,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - A recorded event is judged by the verb it carried out (`event_aspects` in `desk.py`), including one made through a selection or by a rule.
 - A change to one prop never blocks a change to another, and the same prop still refuses.
 - Your own changes from the same window never make you stale; a change from your other window does, and the refusal says so.
+- A change your rule made as you while someone else tripped it counts as someone else's (a687; `rule_did_unseen` in `desk.py`): it makes you stale, and the refusal names it (ran: `stale: a697 changed since you last saw it (e898 prop by your rule r2, tripped by pike)`). Its tripper saw it on their receipt, so it does not make them stale.
 - An undo counts as touching what it reverted.
 - `create` and `comment` are never refused as stale.
 - Adding a line to a chat is never refused as stale (a656): `append` or `reply` on a chat, or `edit` with only `append=`, replaces nothing. When others had added lines you had not read, your line still lands, the receipt says `others added to it since you last read it; read <id> to see their lines`, and your act marks nothing seen. So a later rewrite, retitle or remove of that chat is still refused until you read it. Appends to notes and other kinds are fenced as before. (`desk.py` `_adds_line`, used by both `cmd_do` paths.)
@@ -135,7 +136,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - Rules act without the fence.
 - The fence coordinates honest actors; it is not access control.
 
-**Undo.** `undo eN` reverts an event and records the reversal as a new `undo` event. A bare `undo` reverts your own latest change that hasn't been undone.
+**Undo.** `undo eN` reverts an event and records the reversal as a new `undo` event. A bare `undo` reverts your own latest change that hasn't been undone; a change your rule made while someone else tripped it is skipped (undoing it would undo their command, its cause).
 - A composed verb is undone whole: contiguous events with the same `via`, `cmd` and author, and no cause.
 - A rule's consequences are undone with their cause.
 - Only the latest change to a thing can be undone.
@@ -210,13 +211,16 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - `rule when <selection> do <verb> …` fires once on each thing that enters the selection; `now=1` includes current matches.
 - `rule on <verb> [by=<actor>] do …` fires on each such event. It ignores events made by rules, and it treats `edit` as append, retitle or rewrite.
 - Rules also run on clock changes and after `!` injections.
-- Rule events carry `via "rule rN"` and `cause`, and are signed by whoever's command set them off. A chat line a rule adds says so: `Pike, via rule r3: …` (a656).
-- A rule records its `author`, the actor who defined it (a656; rules defined before then carry none). It is recorded only: a rule still runs as whoever triggers it. Whether it should run as its author is open (a643).
+- A rule records its `author`, the actor who defined it (a656; rules defined before then carry none).
+- **A rule acts as its author** (a687, decided in a683 by Sable, Juniper and Pike: a rule is a standing act its author chose, so crediting whoever tripped it misleads). While it fires, the world's actor is the author (`desk_knife.py` `_run_rules`), so its events say `by=<author>`, carry `via "rule rN"`, `cause` and `tripped_by=<tripper>`, and a chat line it adds is signed `Author: …` with no `via`. What it prints and marks meanwhile is recorded for the tripper (`_firing_observer`), who sees it on their receipt: `~ r2 fired on a697 as sable: ok prop a697 last=pike`.
+- The author was not there, so the deed is theirs but unseen (`rule_did_unseen` in `desk.py`): it makes them stale on what it changed (see The world), a bare `undo` skips it, and their next `!!` line names it: `e898 your rule r2 did prop a697 last=pike (tripped by pike)` (in the grouped form, `your rule r2: …`). The tripper's `!!` line leaves it out; anyone else's reads `e898 prop a697 by sable via rule r2`. `why` reads `sable by rule r2, tripped by pike`.
+- A rule with no author (defined before a656) runs as whoever tripped it, exactly as before: its events are signed by the tripper, carry no `tripped_by`, and its chat line reads `Pike, via rule r3: …`. Defining it again gives it an author.
+- **Known obligation, not built:** there is no permission layer. When one exists, a firing must be checked against its author's rights at firing time, not the tripper's and not the rights the author had when defining it (a683).
 - Cascades stop after three passes.
 - A rule is checked when defined: a bad term, a specialized verb and a missing script are refused, but a destination such as `into=` is not checked.
 - `why <id>` shows the events that placed a thing and the rule that would act on it next.
 
-**Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $today`; run with `run <name> args`. Scripts are not validated when defined, and `$me` is not filled in a script (F2). A rule may run a script.
+**Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $today`; run with `run <name> args`. Scripts are not validated when defined, and `$me` is not filled in a script (F2). A rule may run a script; a script a rule runs acts as the rule's author.
 
 **Views.** `do create <surface> kind=view title=X query=<selection>` makes a view; with `cols=` (and `by=`, `desc=`) it prints as a table. You can't move a thing into a view, create inside one, or tile, group or sort one.
 
@@ -776,4 +780,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e879. Edit it there; a direct edit here makes the next export stop and warn. sha1:0b4fdf0b38ff -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e921. Edit it there; a direct edit here makes the next export stop and warn. sha1:4de1bbfa4343 -->
