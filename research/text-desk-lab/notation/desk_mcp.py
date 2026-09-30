@@ -106,6 +106,8 @@ def run_desk(args):
     if any(cmd.lstrip().startswith("!") for cmd in lines):
         return "ERR `!actor` lines inject another actor's act; they are for test harnesses, not for inhabitants", True
     cmd = [PY, str(HERE / "explore.py"), session, "--as", who] + (["--window", window] if window else [])
+    if args.get("whole"):       # a736: the house's own flag, not the tool's: each line is one command, ; is words
+        cmd.append("--whole")
     try:
         r = subprocess.run(cmd, cwd=HERE, input="\n".join(lines) + "\n", capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=120,

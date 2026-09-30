@@ -112,15 +112,16 @@ def fresh():
     return d
 
 
-def via_deskd(name, me, lines):
+def via_deskd(name, me, lines, whole=False):
     """When deskd is up it is the one owner of every world: send each line as one turn and hold nothing between
-    turns. Returns False when no server answers, and the caller falls back to the file lock."""
+    turns. A refusal stops the lines after it, as it does without deskd. Returns False when no server answers, and
+    the caller falls back to the file lock."""
     import os, urllib.request, urllib.error
     if os.environ.get("DESKD", "") == "off":
         return False
     url = os.environ.get("DESKD", "http://127.0.0.1:8780") + "/api/do"
     for k, line in enumerate(lines):
-        body = json.dumps({"session": name, "as": me, "line": line, "cli": True}).encode("utf-8")
+        body = json.dumps({"session": name, "as": me, "line": line, "cli": True, "whole": whole}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url, body, {"Content-Type": "application/json"}), timeout=60) as f:
                 r = json.loads(f.read().decode("utf-8"))
@@ -130,8 +131,15 @@ def via_deskd(name, me, lines):
             print("ERR deskd stopped answering; the lines above were applied, this one and the rest were not")
             return True
         print(f"> {line}")
-        print(r.get("text") or ("ERR " + str(r.get("error"))))
+        said = r.get("text") or ("ERR " + str(r.get("error")))
+        print(said)
         print()
+        rest = lines[k + 1:]
+        if (r.get("error") or said.startswith("ERR")) and rest:
+            # a736: through deskd the lines after a refusal ran anyway; they stop here as they do under the file lock
+            print(f"stopped: {len(rest)} later line(s) not run because this one was refused. Not run: " + " | ".join(rest))
+            print()
+            break
     return True
 
 
@@ -141,11 +149,13 @@ def main():
     # --window <name>: Juniper's step 11. Two windows of one person are two readers; each keeps its own "what I saw",
     # so the second refuses a stale edit instead of overwriting the first. Events still say the same actor.
     window = sys.argv[sys.argv.index("--window") + 1] if "--window" in sys.argv[:-1] else ""
-    if not [a for a in sys.argv[2:] if a.startswith("--") and a not in ("--as", "--window")]:
+    # --whole (a736): each stdin line is one command; a ; in it is words. The house sends a resident's > lines so.
+    whole = "--whole" in sys.argv
+    if not [a for a in sys.argv[2:] if a.startswith("--") and a not in ("--as", "--window", "--whole")]:
         lines = [l.rstrip("\n") for l in sys.stdin]
         lines = [l for l in lines if l.strip() and not l.startswith("#")]
         who = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
-        if not window and not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines):
+        if not window and not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines, whole):
             return
         import io
         sys.stdin = io.StringIO("\n".join(lines) + "\n")
@@ -242,16 +252,18 @@ def main():
             print()
             continue
         before, n0 = worktree.ids_of(desk), len(desk.world.events)
-        r = desk.dispatch("desk", {"line": line})
+        r = desk.dispatch("desk", {"line": line, "whole": whole})
         worktree.record(desk, line, me, before, n0)
         text = r.get("text") or ("ERR " + r["error"])
         print(text)
         print()
         if r.get("error") or text.startswith("ERR") or "\nERR" in text:
-            rest = [l for l in sys.stdin if l.strip() and not l.startswith("#")]
+            rest = [l.rstrip("\n") for l in sys.stdin if l.strip() and not l.startswith("#")]
             if rest:
                 # Sable and Juniper: after a refused create, the next line ran against the previous $item. A refusal ends the batch.
-                print(f"stopped: {len(rest)} later line(s) not run because this one was refused ($item and $new still name the last thing made)")
+                # Juniper (a736): and say which, so they can be sent again
+                print(f"stopped: {len(rest)} later line(s) not run because this one was refused ($item and $new still name the last thing made). "
+                      f"Not run: " + " | ".join(rest))
                 print()
             break
     per[slot] = (desk.seen, desk.open, desk.last_event_seen)
