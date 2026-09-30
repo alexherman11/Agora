@@ -825,7 +825,7 @@ class House:
                 if (self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER")
                         and not any(r.busy for r in self.residents.values())
                         and not any(x.busy for x in self.workshop.workers.values())):
-                    print("house: a landing changed the code; restarting on it", flush=True)
+                    print("house: the code changed (a landing or a commit); restarting on it", flush=True)
                     self.exit_code = RESTART
                     break
                 time.sleep(2)
