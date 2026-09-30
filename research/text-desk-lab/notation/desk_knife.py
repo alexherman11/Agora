@@ -236,7 +236,8 @@ class DeskKnife(DeskMoo):
             act["kv"].pop("now", None)
             self.rules = self.rules or []
             rid = self._next_rule_id()
-            self.rules.append({"id": rid, "on": on_verb, "by": by, **act, "done": set(), "fired": 0,
+            # author: who made it (a656). Recorded only: a rule still runs as whoever triggers it (a643 decides)
+            self.rules.append({"id": rid, "on": on_verb, "by": by, "author": self.world.me, **act, "done": set(), "fired": 0,
                                "cursor": len(self.world.events), "sel": f"on {on_verb}" + (f" by={by}" if by else "")})
             return f"ok {rid}: on {on_verb}" + (f" by={by}" if by else "") + f" do {self._action_text(act)}"
         if len(argv) < 4 or argv[0] != "when" or argv[2] != "do":
@@ -248,7 +249,7 @@ class DeskKnife(DeskMoo):
         now = act["kv"].pop("now", None)
         self.rules = self.rules or []
         rid = self._next_rule_id()
-        rule = {"id": rid, "sel": sel_text, **act, "done": set(), "fired": 0}
+        rule = {"id": rid, "sel": sel_text, "author": self.world.me, **act, "done": set(), "fired": 0}
         self.rules.append(rule)
         out = f"ok {rid}: when {sel_text} do {self._action_text(act)}"
         # things already in the selection count as already handled: a rule is about what enters, not what is,
@@ -680,6 +681,7 @@ class DeskKnife(DeskMoo):
                         n0 = len(self.world.events)
                         revs0 = {k: v["rev"] for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items())}
                         self._mark_seen(i)
+                        self.world.acting_rule = r["id"]     # a chat line it adds is signed 'Name, via rule rN' (a656)
                         try:
                             receipt = self._fire(r, i)
                             r["fired"] += 1
@@ -687,6 +689,8 @@ class DeskKnife(DeskMoo):
                             self._note(f"~ {r['id']} fired on {i}: " + receipt)
                         except Refusal as e:
                             self._note(f"~ {r['id']} could not {r['verb']} {i}: {e}")
+                        finally:
+                            self.world.acting_rule = None
                         for ev in self.world.events[n0:]:
                             ev["via"] = f"rule {r['id']}"
                             if cause:
@@ -706,7 +710,7 @@ class DeskKnife(DeskMoo):
     def snapshot(self):
         snap = self.world.snapshot()
         snap["rules"] = [{"id": r["id"], "text": ("" if r.get("on") else "when ") + r["sel"] + " do " + self._action_text(r),
-                          "on": r.get("on"), "by": r.get("by"), "when": None if r.get("on") else r["sel"],
+                          "on": r.get("on"), "by": r.get("by"), "author": r.get("author"), "when": None if r.get("on") else r["sel"],
                           "verb": r["verb"], "script": r.get("script"), "fired": r.get("fired", 0)} for r in (self.rules or [])]
         snap["scripts"] = dict(self.scripts or {})
         snap["clock"] = {"today": self.today, "follow": bool(self.follow)}
@@ -1092,8 +1096,9 @@ class DeskKnife(DeskMoo):
             if len(apps) > 1:
                 out.append("  also appears at " + ", ".join(f"{a} in {w.nodes[a]['parent']}" for a in apps if a != nid))
             if s["kind"] == "chat":
-                pend = moo.unanswered(w, s["id"])
+                pend = moo.unanswered(w, s["id"], str(w.me or "alex").lower())
                 out.append("  awaiting reply: " + " | ".join(pend) if pend else "  nothing awaiting a reply")
+                out.append("  " + moo.CHAT_RULES)
             if not (self.bullets or self.lean):
                 open_c = [c for c in s.get("comments", []) if not c["resolved"]]
                 if open_c:

@@ -237,11 +237,12 @@ def rows(desk, source, session=None):
         return [{"item": nid, "cid": c["id"], "by": c["by"], "text": c["text"], "state": "resolved" if c["resolved"] else "open"}
                 for c in s.get("comments", [])]
     if head == "messages":
-        # a chat's lines: each is signed by its speaker (world.apply signs a chat line with its actor)
+        # a chat's lines: each is signed by its speaker (world.apply signs a chat line with its actor); a line a rule
+        # added keeps its whole signature in who ('Alex, via rule r3'), so it never reads as Alex speaking
         out = []
         for k, line in enumerate((l for l in s["text"].splitlines() if l.strip()), 1):
-            m = re.match(r"^(\w[\w-]*):\s*(.*)$", line)
-            out.append({"item": nid, "who": m.group(1) if m else "", "said": m.group(2) if m else line, "index": k})
+            m = w.SPEAKER.match(line)
+            out.append({"item": nid, "who": m.group(0).rstrip(" \t:") if m else "", "said": line[m.end():] if m else line, "index": k})
         return out
     if head == "events":
         return [{"eid": e["id"], "verb": e["verb"], "target": e["target"], "by": e["by"], "at": e.get("at", e.get("day", "")),

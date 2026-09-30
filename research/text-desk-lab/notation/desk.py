@@ -40,13 +40,13 @@ def aspects_of(verb, args):
         return {"title"}
     if verb == "edit":
         return {k for k in ("title", "text", "due") if k in a} | ({"text"} if "append" in a else set()) or None
-    if verb in ("rewrite", "append", "check", "uncheck", "split", "seal", "unseal"):
-        return {"text"}
+    if verb in ("rewrite", "append", "reply", "check", "uncheck", "split", "seal", "unseal"):
+        return {"text"}              # reply is the chat verb: it adds a line to the text (a656; it was counted as comments)
     if verb == "due":
         return {"due"}
     if verb in ("tag", "untag"):
         return {"tags"}
-    if verb in ("comment", "reply", "resolve"):
+    if verb in ("comment", "resolve"):
         return {"comments"}           # Juniper: a comment must not refresh a finish, nor stale a card's gestures
     if verb in ("link", "unlink"):
         return {"links"}
@@ -400,6 +400,19 @@ class Desk:
         idx[key] = cur
 
     REPLACING = ("rewrite", "retitle", "rename", "edit", "due", "prop", "untag")
+
+    def _adds_line(self, nid, verb, kv):
+        """Sable a656: a line added to a chat replaces nothing, so it is never refused as stale (in a live room every
+        message was refused if someone else spoke first). Rewriting, retitling or removing a chat stays fenced, and the
+        adder's receipt does not count as reading the lines it did not see. Appends to notes are unchanged."""
+        if verb == "edit":
+            if set(kv or {}) != {"append"}:
+                return False
+        elif verb not in ("append", "reply") or (kv or {}).get("section"):
+            return False
+        n = self.world.nodes.get(nid)
+        s = self.world.subjects.get(n.get("subject") if n else nid)
+        return bool(s) and s["kind"] == "chat"
 
     def _blind(self, nid, verb, kv):
         """The aspect this act would replace without ever having had it printed, or None. Adding (tag, append, comment,
@@ -944,7 +957,8 @@ class Desk:
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         if seen is None:
             raise Refusal(f"you have not looked at {nid} yet; look, read or where it first")
-        if seen != cur:
+        behind = seen != cur and self._adds_line(nid, verb, kv)     # a chat line lands; what I missed stays unread
+        if seen != cur and not behind:
             recent = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
             why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {recent[-1]['by']}" if recent else ""
             raise Refusal(f"stale: {nid} changed since you last saw it{why}; {self._again(nid, aspects_of(verb, kv))} before acting")
@@ -958,7 +972,7 @@ class Desk:
                 pass
             w.events[-1].setdefault("changed", []).append(c)
         self._after_mutation()
-        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result of what you touched
+        for c in {nid, *r.get("changed", [])} if not behind else ():      # you did it, you saw the result of what you touched
             self._note_seen(c, len(w.events), sorted(aspects_of(verb, kv)) if aspects_of(verb, kv) is not None else None)
             if c in w.nodes:
                 self.seen[c] = w.nodes[c]["rev"]
@@ -969,14 +983,17 @@ class Desk:
             out += f" → created {r['created']}"
         if r.get("note"):
             out += f"\n  {r['note']}"
+        if behind:
+            out += f"\n  others added to it since you last read it; read {nid} to see their lines"
         if r.get("created") in w.nodes:
             self._mark_seen(r["created"])
             out += "\n  now: " + self.line(r["created"], 1) + self.position_note(r["created"])
-        for c in r.get("changed", []):
+        for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:
                 self._mark_rev(c, aspects_of(verb, kv))    # your own change: the aspects you wrote are seen, the others are not
         if nid in w.nodes:
-            self._mark_rev(nid, aspects_of(verb, kv))
+            if not behind:
+                self._mark_rev(nid, aspects_of(verb, kv))
             self._receipt = True
             try:
                 out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)

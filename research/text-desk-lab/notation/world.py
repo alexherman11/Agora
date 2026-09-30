@@ -471,6 +471,29 @@ class World:
             v["unlink"] = "id=<lNN>"
         return v
 
+    @staticmethod
+    def display_name(actor):
+        """How an actor is named where people read: 'sable' -> 'Sable'."""
+        a = str(actor or "")
+        return a[:1].upper() + a[1:]
+
+    # a chat line's signature: 'Sable: ...', or 'Alex, via rule r3: ...' when a rule added it (group 1 the speaker)
+    SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
+
+    def sign_chat_line(self, line, actor):
+        """A chat line as the world keeps it: 'Name: words', Name the actor's display name. Returns (line, dropped):
+        a leading 'Name:' that is the actor's own (any case) is dropped, since the world signs now; a leading name that
+        is anyone else's stays as plain words after the signature. A rule runs as whoever triggered it (Sable a656:
+        whether it should run as its author is a643's question), so its line says so: 'Alex, via rule r3: ...' never
+        reads as Alex speaking."""
+        words = str(line).strip()
+        said = re.match(r"^([\w-]+)[ \t]*:[ \t]*", words)
+        dropped = bool(said and said.group(1).casefold() == str(actor).casefold())
+        if dropped:
+            words = words[said.end():]
+        rule = getattr(self, "acting_rule", None)
+        return self.display_name(actor) + (f", via rule {rule}" if rule else "") + ": " + words, dropped
+
     def apply(self, verb, target, rev, args, actor=None):
         actor = actor or self.me
         args = dict(args or {})
@@ -805,6 +828,7 @@ class World:
                 new = "\n\n".join((f"## {h}\n" if h else "") + b for h, b in secs)
             args = {"text": new}
             verb = "edit"
+        signed_note = ""
         if verb == "edit":
             if not any(k in args for k in ("title", "text", "append")):
                 raise Refusal("edit needs title=, text= or append=")
@@ -815,14 +839,14 @@ class World:
             if "append" in args:
                 line = str(args["append"])
                 if s["kind"] == "chat":
-                    # Juniper a484: the speaker of a chat line is the actor of the event, never a prefix a writer typed.
-                    # A line signed with the actor's own name stays as written; any other line, unsigned or signed with
-                    # someone else's name, is signed by its actor and keeps its words. (Replaces: jeff's unsigned lines
-                    # were signed "Alex:", and any "Name:" prefix was trusted whoever typed it.)
-                    said = re.match(r"^(\w+):", line.strip())
-                    if not (said and said.group(1).casefold() == str(actor).casefold()):
-                        line = str(actor).capitalize() + ": " + line.strip()
-                        args = dict(args, append=line, signed=str(actor).capitalize())
+                    # Juniper a484, Sable a656: the world signs every chat line with the event's actor, by display name.
+                    # A typed "Name:" that is the actor's own is dropped (the world signs now, and the receipt says so);
+                    # one naming anyone else stays as plain words after the real signature ("Juniper: Jeff: ...").
+                    # A world verb runs as its caller and a rule as its author, so they sign as those.
+                    line, dropped = self.sign_chat_line(line, actor)
+                    args = dict(args, append=line, signed=self.display_name(actor))
+                    if dropped:
+                        signed_note = "the world signs for you; your typed name was dropped"
                 s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
         elif verb == "place":
             dest = args.get("into")
@@ -840,6 +864,8 @@ class World:
             self._bump(a)
         ev = self._event(verb, via or sid, args, {"restore_subject": before}, actor)
         note = f"subject {sid} changed; {len(apps)} appearance(s) now show the new content"
+        if args.get("signed"):
+            note += f"\n  said: {args['append']}" + (f"  ({signed_note})" if signed_note else "")
         if "text" in args:
             old_lines = [l for l in before["text"].splitlines() if l.strip()]
             new_lines = [l for l in s["text"].splitlines() if l.strip()]

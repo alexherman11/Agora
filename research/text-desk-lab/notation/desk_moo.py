@@ -153,8 +153,9 @@ class DeskMoo(Desk):
             if len(apps) > 1:
                 out.append("  also appears at " + ", ".join(f"{a} in {w.nodes[a]['parent']}" for a in apps if a != nid))
             if s["kind"] == "chat":
-                pend = moo.unanswered(w, s["id"])
+                pend = moo.unanswered(w, s["id"], str(w.me or "alex").lower())
                 out.append("  awaiting reply: " + " | ".join(pend) if pend else "  nothing awaiting a reply")
+                out.append("  " + moo.CHAT_RULES)
         out.append("  where: " + self._where_line(nid))
         for origin, names in moo.verbs_by_origin(w, nid).items():
             out.append(f"  verbs from {origin}: " + "  ".join(
@@ -212,7 +213,8 @@ class DeskMoo(Desk):
         if blind:
             raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
         hit = name not in ("create", "comment") and self._touched_by_others(nid, mine, others_only=not getattr(self, "_window", ""))
-        if hit:
+        behind = bool(hit) and self._adds_line(nid, name, kv)     # a chat line lands; what I missed stays unread (a656)
+        if hit and not behind:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
             who = "you, in your other window" if hit["by"] == self.world.me else hit["by"]
             raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}); {self._again(nid, mine)} before acting")
@@ -226,7 +228,7 @@ class DeskMoo(Desk):
                 ev["via"] = name
                 ev["window"] = getattr(self, "_window", "") or ""     # which of this actor's windows acted (Sable: the observer)
         self._after_mutation()
-        for c in {nid, *r.get("changed", [])}:      # you did it, you saw the result of what YOU touched; the scan for others' deeds still
+        for c in {nid, *r.get("changed", [])} if not behind else ():   # you did it, you saw the result of what YOU touched; the scan for others' deeds still
             if c in w.nodes:                        # starts at your last real look, and it is keyed by aspect (Sable's spec 1)
                 self.seen[c] = w.nodes[c]["rev"]
             elif c in w.subjects:
@@ -251,11 +253,14 @@ class DeskMoo(Desk):
                     out += "\n    where: " + self._where_line(cid)   # geometry matters only where things can overlap
         if r.get("note"):
             out += f"\n  {r['note']}"
-        for c in r.get("changed", []):
+        if behind:
+            out += f"\n  others added to it since you last read it; read {nid} to see their lines"
+        for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:
                 self._mark_rev(c, aspects_of(name, kv))    # your own change: the aspects you wrote are seen, the others are not
         if nid in w.nodes:
-            self._mark_rev(nid, aspects_of(name, kv))
+            if not behind:
+                self._mark_rev(nid, aspects_of(name, kv))
             self._receipt = True
             try:
                 out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
