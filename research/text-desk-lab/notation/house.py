@@ -63,8 +63,16 @@ import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
 # a916, use versus mention: words inside backticks or quotes are talked about, never addressed (the rule lives in
-# world.py, so the painter's inbox rows judge "for you" the same way)
-from world import QUOTED, unquoted  # noqa: E402,F401
+# world.py, so the painter's inbox rows judge "for you" the same way). 30 Sep: a house running since before the rule
+# moved still holds the old world module, and the workshop imports this file fresh inside it; the fallback keeps that
+# import working (it failed every pass for 40 minutes, and no worker could start) until the house restarts.
+try:
+    from world import QUOTED, unquoted  # noqa: E402,F401
+except ImportError:
+    QUOTED = re.compile(r"`[^`]*`|\"[^\"\n]*\"|(?<![\w])'[^'\n]*'(?![\w])")
+
+    def unquoted(text):
+        return QUOTED.sub(" ", str(text))
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "plan", "apply", "export", "sync", "x", "ex", "?"}
