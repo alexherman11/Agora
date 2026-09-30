@@ -733,6 +733,7 @@ class World:
             raise Refusal(f"stale: {sid} is at rev {s['rev']}, you observed {rev}; look again")
         before = deepcopy(s)
         apps = self.appearances_of(sid)
+        replaced = None
         if verb == "comment":
             line = str(args.get("line", args.get("text", ""))).strip()
             if not line:
@@ -829,6 +830,7 @@ class World:
                                  else "include more of the words around it, so it appears once"))
             args = {"text": s["text"].replace(old, new, 1)}
             verb = "edit"
+            replaced = (old, new)
         elif verb == "rewrite":
             new = str(args.get("text", args.get("line", "")))
             if args.get("section"):
@@ -881,7 +883,11 @@ class World:
         note = f"subject {sid} changed; {len(apps)} appearance(s) now show the new content"
         if args.get("signed"):
             note += f"\n  said: {args['append']}" + (f"  ({signed_note})" if signed_note else "")
-        if "text" in args:
+        if replaced:
+            # Juniper a651: a replace changes one passage; its receipt says which, not every line that now differs
+            cut = lambda t: t if len(t) <= 240 else t[:120] + " … " + t[-100:]      # noqa: E731
+            note += f'\n  replaced: "{cut(replaced[0])}"\n  with:     "{cut(replaced[1])}"'
+        elif "text" in args:
             old_lines = [l for l in before["text"].splitlines() if l.strip()]
             new_lines = [l for l in s["text"].splitlines() if l.strip()]
             dropped = [l for l in old_lines if l not in new_lines]

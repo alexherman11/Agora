@@ -468,9 +468,16 @@ class House:
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
                     urgent = urgent or now_
                 continue
-            if called.search(said):
+            if "text" in args and e["verb"] == "edit":
+                # Pike a611: rewriting a note that already said @everyone (a lens's hint) reached every resident as a
+                # mention. A mention in a rewritten text counts only when the new text says it more often than the old.
+                old = str(((e.get("undo") or {}).get("restore_subject") or {}).get("text", ""))
+                if len(called.findall(str(args["text"]))) <= len(called.findall(old)):
+                    said = " ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str))
+            m = called.search(said)
+            if m:
                 where = f" on \"{s['title']}\"" if s else ""
-                inbox.append(f"~ {e['by']} mentioned you{where} ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
                 urgent = True
             elif e["verb"] == "comment" and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
