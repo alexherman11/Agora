@@ -111,7 +111,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - It keeps two stores:
   - `seen[id] = rev`;
   - a seen index keyed by (observer, thing) → {aspect: event index}.
-- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `reply` (the chat verb) touches `text`.
+- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `remove` counts as `place`, as the other placement verbs do: the subject and what it says survive, and undo puts the appearance back. `reply` (the chat verb) touches `text`.
 - Three refusals:
   - `you have not looked at a04 yet; look, examine or read it first`;
   - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
@@ -287,7 +287,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | Word | Meaning |
 |---|---|
 | `column` `row` `free` `grid <tracks>` `cells` | Layout. Tracks are in `fr` or `fit`, and a track may be `<n>gap` |
-| `gap`, `scroll none\|scroll\|end`, `fold ["label"] [open] [float]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event, folded to begin with unless `open`; `float` draws the open contents over the page below the handle (a menu: it opens for a moment, and Escape or a press outside closes it); a folded part gives up its `share`; the painter's fold handle wears role `fold` (`menu` when floating) over `tool`; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
+| `gap`, `scroll none\|scroll\|end`, `fold ["label"] [open] [float] [handle <role>]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event, folded to begin with unless `open`; `float` draws the open contents over the page below the handle (a menu: it opens for a moment, and Escape or a press outside closes it); a folded part gives up its `share`; the label is a template filled like text (`fold "$title"`); the painter's fold handle wears the role named by `handle <role>`, else `fold` (`menu` when floating), over `tool`; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
 | `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
 | `text <template>` | Words (template names below); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
@@ -301,7 +301,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | `spread x <a> step <n\|$prop> to <max>` | Computed placement by index, printed as `(spread, not its place in the world)` |
 | `lens <name>` | Place another lens, whose name may be templated (`lens $kind`); a lens may not contain itself |
 | `only when <selection>` or `only when $x <op> v` | The part exists only on a match. A value test (`= != < > <= >=`, and `has` / `!has`: the words contain the value, ignoring case; a value with a `$name` in it is filled, so `only when $said has @$me`) prints its inputs; a missing value counts as absent, not false |
-| `carry`, `on click\|edit\|drag do <command>`, `on drop <part> do <command>` | Gestures (see Gestures and their fence) |
+| `carry`, `on click\|edit\|drag do <command>`, `on menu "<label>" do <command>`, `on drop <part> do <command>` | Gestures (see Gestures and their fence) |
 
 **Template names.**
 - Fields: `$title $text $kind $due $tags $id $item $count`.
@@ -360,7 +360,8 @@ A gesture is a desk command written in the lens, and `do` is implied unless the 
 - `click` fills `$x $y`.
 - `edit` fills `$value`. It commits on Enter or Ctrl-Enter (`paint.commit`); `on edit` on clamped text is refused.
 - `drag` fills `$x $y`, and is painted only on a node with a box.
-- `carry` marks a part that can be picked up.
+- `carry` marks a part that can be picked up. A carry starts with the primary button on the part itself; the right button, and a press on one of the part's own controls (a fold handle, a clickable part inside it), leave it alone.
+- `on menu "<label>" do <command>` adds an entry to the part's own menu. The painter opens it on a right-click or the menu key anywhere on the part (the innermost part with entries), and an entry sends its line as a click does. Editable text, a part with no entries, and Shift with the right-click keep the browser's menu. Escape, a press outside or a scroll closes it; the arrow keys move through it.
 - `on drop <part> do <one command>` runs on the receiver. `$carried` is filled by deskd with the carried item's id.
 
 The painter fills only the first occurrence of each name. Click and edit lines may still batch with `;` and may `run` a script.
@@ -781,4 +782,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e933. Edit it there; a direct edit here makes the next export stop and warn. sha1:db7ecd0d7e57 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e940. Edit it there; a direct edit here makes the next export stop and warn. sha1:f1091ccf5d16 -->

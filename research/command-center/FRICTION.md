@@ -250,3 +250,29 @@ Checked (ran):
 These cases are test_scene's `test_replace_changes_one_exact_passage` (24 passed; health green, 82 goldens the same). The first real use was documenting the verb itself: three exact passages in the Handbook binder, instead of a whole-text import.
 
 Open, on the Board (a701): a finer fence (admit a replace whose words are still there once, as a656 did for chat lines), and a lens gesture that edits one line of a note.
+
+## F32. Tasks that open, delete, and a right-click menu (29 Sep, Alex's direction)
+
+Alex: "click on tasks to expand them and see more information, as well as delete them ... native right click behavior? so i could for example delete a task by right clicking". What was missing, and what was added:
+- **Words** (scene.py, lens_ir.py): `on menu "<label>" do <command>` puts an entry in a part's own menu. A fold's label is a template filled like text (`fold "$title"`), and `fold ... handle <role>` gives its handle a look of the lens's choosing.
+- **Painter** (lens.js, lens.html):
+  - a right-click or the menu key anywhere on a part opens the innermost part's entries at the pointer;
+  - editable text, a part with no entries, and Shift keep the browser's own menu;
+  - Escape, a press outside or a scroll closes it, and the arrow keys move through it.
+- **Carry**: it started on any press, the right button included, and captured the pointer, which would take the click from a control inside the card (the new title handle, the start button). It now starts only with the primary button on the card itself.
+- **Desk** (desk.py): `remove` was fenced on every aspect of the thing, so deleting from the Desktop was refused over an owner removed hours before the page was painted (e592, the migration), a change no view could show. `remove` takes an appearance off its surface, while the subject and what it says survive and undo puts it back. So it now counts as `place`, as move, fold and the other placement verbs do. This is a policy change the residents feel too; revert it if deleting should need more.
+- **Lens** (a589) and **style** (a587):
+  - the card's title is its fold handle (`fold "$title" handle task.name`); opened, it shows the task's text, its owner and who asked (when set), and a delete;
+  - the card's menu has start, done, back to backlog and delete.
+
+Checked on a scratch copy with a throwaway deskd (ran):
+- a card opens and shows its text and a delete;
+- the right-click menu lists the four entries, with focus on the first, and Escape closes it;
+- menu start moves the card to NOW, and the card's own start button still works;
+- delete from the details and from the menu both remove the card (after the fence change; before it, both were refused as stale), and undo brings it back;
+- the browser's menu stays on the chat input and on chat lines;
+- a card dragged by its body changes lanes, and a press on its title handle or with the right button does not start a carry.
+
+Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary line), and every suite case is the same against its recorded run.
+
+Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
