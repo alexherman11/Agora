@@ -407,9 +407,9 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 - The shell polls `/api/events` every 1.5 s. The painter polls `/api/scene?view=painter` every 1.5 s and `/api/version` every 5 s, and reloads the page when the code changed, unless someone is typing or holding a part.
 
 **Sessions.** A session is one file, `sessions/<name>.pickle`, holding the whole Python desk: world, rules, scripts, clock, per-actor state, observations and the last-good lenses.
-- Every request that names a session, reads included, loads it under `sessions/<name>.lock`, acts, and saves it.
+- Every request that names a session, reads included, loads it under `sessions/<name>.lock` and acts. deskd saves only when the request changed something: it compares the pickled desk before and after, so a painter's poll writes nothing.
 - A request for an unknown session with a valid name creates it.
-- The lock holds the holder's pid. A waiter removes a lock whose pid is dead or that is over 60 s old. It gives up after 60 s (`could not take … lock`) and never proceeds without the lock.
+- The lock holds the holder's pid. A waiter treats a lock under a second old as busy and does not open it. Only an older lock is read, and it is removed if its pid is dead or it is over 60 s old. A waiter gives up after 60 s (`could not take … lock`) and never proceeds without the lock. A holder releases with `explore.release_lock`: it removes only its own lock, and retries briefly when Windows refuses to delete a file another process has open.
 - A save writes `<name>.pickle.tmp`, then renames it into place (`explore.save_desk`).
 - The CLI saves once at the end of an invocation.
 - `export_docs.load`, which the house, `health.py` and `try_house.py` use to read a world, takes the same lock. When it can't, it raises an error rather than exiting, so the house logs a failed step and tries again on its next pass.
@@ -431,7 +431,7 @@ Two pages paint the same world.
   - carry and drop work;
   - code prints as runs;
   - `paint.semantic` marks buttons and groups.
-- `term.js` (56) is a desk terminal in the right-hand pane by default. It sends lines to `/api/do` and keeps its history in localStorage.
+- `term.js` (76) is a desk terminal in the right-hand pane by default. It sends lines to `/api/do` and keeps its history in localStorage. × closes it and the painter takes the full width; "▸ terminal" (top right) or Ctrl+` opens it again. Open or closed is remembered per world in the browser.
 
 **The windowed shell** (`index.html`, `shell.js`, `core.js`, `apps/`) has a dock, draggable windows, and three hand-written apps: Notes, Editor and Together (`apps/third.js`).
 - A window is an appearance on the `<actor> screen` surface:
@@ -592,8 +592,8 @@ A refusing lens is listed but doesn't fail health.
 | `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
 | `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
-| `explore.py` | 229 | CLI: forward to deskd or run under the pid lock; atomic save; `--window --dump --shape --reset`; `!actor` injection |
-| `deskd.py` | 401 | HTTP server, its origin and session-name checks, and the gesture fence |
+| `explore.py` | 257 | CLI: forward to deskd or run under the pid lock (`take_lock`, `release_lock`); atomic save; `--window --dump --shape --reset`; `!actor` injection |
+| `deskd.py` | 408 | HTTP server, its origin and session-name checks, and the gesture fence |
 | `house.py` | 704 | Residents |
 | `workshop.py` | 342 | Commissions and workers |
 | `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
@@ -605,7 +605,7 @@ A refusing lens is listed but doesn't fail health.
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
 | `test_scene.py`, `test_journal.py`, `golden_prints.py`, `suite/` | 382, 839, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
-| `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 521 | The lens painter, continuity, the desk terminal |
+| `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 544 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
 | `desk-shell/checks/` | 1823 + 884 | Iris's browser checks and results, Rook's defect list, and Pike's continuity instrument (`continuity/run.mjs`, with 13 results) |
@@ -768,4 +768,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e705. Edit it there; a direct edit here makes the next export stop and warn. sha1:d9add0cc8cba -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e729. Edit it there; a direct edit here makes the next export stop and warn. sha1:2cee34ae0473 -->

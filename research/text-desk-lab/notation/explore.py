@@ -45,25 +45,53 @@ def take_lock(lock, tries=600, pause=0.1):
     for _ in range(tries):
         try:
             fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, str(os.getpid()).encode())
-            os.close(fd)
-            return
-        except FileExistsError:
+        except (FileExistsError, PermissionError):     # held; on Windows a lock being deleted refuses with PermissionError
             try:
-                pid = lock.read_text().strip()
+                age = time.time() - lock.stat().st_mtime
             except OSError:
-                pid = ""
-            if (pid and not _alive(pid)) or time.time() - lock.stat().st_mtime > 60:
-                lock.unlink(missing_ok=True)   # a dead or crashed holder
+                time.sleep(0.005)                       # released just now: try again at once
+                continue
+            # 29 Sep, three residents live: every waiter opened the lock to read its pid, and Windows will not delete a
+            # file another process has open, so the holder's release failed and everyone waited out the minute. A lock
+            # under a second old is simply busy; only an older one is opened to see whether its holder died.
+            if age > 1:
+                try:
+                    pid = lock.read_text().strip()
+                except OSError:
+                    pid = ""
+                if (pid and not _alive(pid)) or age > 60:
+                    release_lock(lock, anyone=True)     # a dead or crashed holder
             time.sleep(pause)
+            continue
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return
     raise SystemExit(f"could not take {lock.name} after {tries * pause:.0f}s; another run holds it")
 
 
-def save_desk(path, desk):
+def release_lock(lock, anyone=False):
+    """Remove the lock, ours unless `anyone`. Windows refuses to delete a file another process has open for a moment
+    (a waiter reading it): try again briefly rather than leave a lock behind that makes everyone wait a minute."""
+    import time
+    if not anyone:
+        try:
+            if lock.read_text().strip() != str(os.getpid()):
+                return                                  # not ours any more (it was taken as stale): leave it
+        except OSError:
+            return
+    for _ in range(200):
+        try:
+            lock.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.01)
+
+
+def save_desk(path, desk, data=None):
     """Write the session atomically: to a temp file, then rename over the old one. Sable's baseline (1): a write killed
-    halfway left a pickle that would not load, and the whole session was lost."""
+    halfway left a pickle that would not load, and the whole session was lost. `data`: the pickled desk, if in hand."""
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(pickle.dumps(desk))
+    tmp.write_bytes(data if data is not None else pickle.dumps(desk))
     os.replace(tmp, path)
 
 
@@ -121,7 +149,7 @@ def main():
     import atexit
     lock = SESSIONS / f"{name}.lock"
     take_lock(lock)
-    atexit.register(lambda: lock.unlink(missing_ok=True))
+    atexit.register(lambda: release_lock(lock))
     if "--reset" in sys.argv or not path.exists():
         desk = fresh()
     else:

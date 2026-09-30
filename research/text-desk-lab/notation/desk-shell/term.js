@@ -18,6 +18,26 @@
   form.append(prompt, input); box.append(out, form);
   document.body.appendChild(box);
 
+  // Alex, 29 Sep: a way to close the terminal. × closes it and the painter takes the full width; "▸ terminal" (or
+  // Ctrl+`) opens it again. Open or closed is this browser's choice for this world, never the world's.
+  const openKey = `desk-term-open:${session}:${who}`;
+  const head = document.createElement("div"); head.className = "term-head";
+  const shut = document.createElement("button"); Object.assign(shut, { type: "button", textContent: "×", title: "close the terminal (Ctrl+`)" });
+  shut.className = R("tool"); shut.setAttribute("aria-label", "close the terminal");
+  head.append(shut); box.prepend(head);
+  const reopen = document.createElement("button"); Object.assign(reopen, { type: "button", id: "term-open", textContent: "▸ terminal", title: "open the terminal (Ctrl+`)" });
+  reopen.className = R("tool"); document.body.appendChild(reopen);
+  function show(on, focus) {
+    document.body.dataset.inspector = on ? "term" : "off"; reopen.hidden = on;
+    try { localStorage.setItem(openKey, on ? "1" : "0"); } catch (e) { /* view state only */ }
+    if (on && focus) input.focus();
+  }
+  shut.addEventListener("click", () => show(false));
+  reopen.addEventListener("click", () => show(true, true));
+  document.addEventListener("keydown", e => { if (e.key === "`" && e.ctrlKey) { show(document.body.dataset.inspector !== "term", true); e.preventDefault(); } });
+  let startOpen = true; try { startOpen = localStorage.getItem(openKey) !== "0"; } catch (e) { startOpen = true; }
+  show(startOpen, false);
+
   const key = `desk-term:${session}:${who}`;
   let hist = []; try { hist = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) { hist = []; }
   let at = hist.length, draft = "";

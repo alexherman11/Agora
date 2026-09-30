@@ -132,15 +132,22 @@ class Session:
             desk.seen, desk.open, desk.last_event_seen = {}, {desk.world.root}, len(desk.world.events)
         desk._per = per
         self.desk, self.per = desk, per
+        # 29 Sep, three residents live: every request rewrote the whole world, a painter's poll included, and each
+        # rewrite moved the file's time so the house reloaded it under the lock on every pass. A request that
+        # changed nothing now writes nothing.
+        per[self.actor] = (desk.seen, desk.open, desk.last_event_seen)
+        self.before = pickle.dumps(desk) if self.path.exists() else None
         return desk
 
     def __exit__(self, *exc):
         try:
             d = self.desk
             self.per[self.actor] = (d.seen, d.open, d.last_event_seen)
-            explore.save_desk(self.path, d)
+            now = pickle.dumps(d)
+            if now != self.before:
+                explore.save_desk(self.path, d, now)
         finally:
-            self.lock.unlink(missing_ok=True)
+            explore.release_lock(self.lock)
 
 
 class Handler(SimpleHTTPRequestHandler):

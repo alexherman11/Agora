@@ -19,6 +19,9 @@
   #term .term-out { flex: 1; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   #term .term-line { display: flex; align-items: baseline; }
   #term input { flex: 1; min-width: 0; font: inherit; color: inherit; background: transparent; border: 0; outline: none; padding: 0; }
+  #term .term-head { display: flex; justify-content: flex-end; }
+  body[data-inspector="off"] #term { display: none; }
+  #term-open { position: fixed; top: 0.5rem; right: 0.5rem; z-index: 11; }
   #paint, #said { overflow: auto; min-width: 0; }
   #paint { height: 100%; }
   /* the live refusal region (codex team, pike-8): announced to screen readers; shown when the inspector is off */

@@ -43,7 +43,7 @@ def load(session):
     try:
         return pickle.loads((SESSIONS / f"{session}.pickle").read_bytes())
     finally:
-        lock.unlink(missing_ok=True)
+        explore.release_lock(lock)
 
 
 def binder_notes(world):
