@@ -385,6 +385,26 @@ def test_menu_entries_and_a_filled_fold_label():
         tmp.unlink(missing_ok=True)
 
 
+def test_fold_group():
+    """Alex, 30 Sep: `fold ... group <name>`, an accordion: the group reaches the painter and both printers say it."""
+    src = chr(10).join(["ws : column", '  a : column, fold "chat" open group talk', '    t : text "x"',
+                        '  b : column, fold "turns" group talk', '    u : text "y"'])
+    refused('x : column, fold "a" group', "group <name>")
+    root, parts = scene.parse(src)
+    assert [k["fold_group"] for k in parts["ws"]["kids"]] == ["talk", "talk"]
+    import deskd, lens_ir
+    tmp = _scratch("_test_group")
+    try:
+        with deskd.Session("_test_group", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            kids = scene.painter_view(sc)["kids"]
+            assert [k["paint"]["fold"].get("group") for k in kids] == ["talk", "talk"], kids
+            assert scene.to_text(sc, "ws", "jeff", 0).count("group talk") == 2
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_value_test_has():
     """`has` and `!has`: the words contain the value, ignoring case; a value with a $name in it is filled."""
     m = scene._VALUE_TEST.fullmatch("$said has @$me")

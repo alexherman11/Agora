@@ -57,6 +57,12 @@
   [data-key] { white-space: pre-line; }
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
   .t-verbatim { white-space: pre; overflow-x: auto; }
+  /* scrollbars from the style (Alex, 30 Sep: skinny square bars that fit the theme). A style with a `scrollbar` token
+     (the thumb's colour) and `scrollbar_w` (its width) draws them; without one the browser's own stay. */
+  [data-bars] ::-webkit-scrollbar { width: var(--t-scrollbar_w); height: var(--t-scrollbar_w); background: transparent; }
+  [data-bars] ::-webkit-scrollbar-thumb { background: var(--t-scrollbar); border-radius: 0; }
+  [data-bars] ::-webkit-scrollbar-track, [data-bars] ::-webkit-scrollbar-corner { background: transparent; }
+  @supports not selector(::-webkit-scrollbar) { [data-bars] * { scrollbar-width: thin; scrollbar-color: var(--t-scrollbar) transparent; } }
 </style>
 </head>
 <body class="r-desk">

@@ -20,6 +20,8 @@
     if (styled === name + "@" + rev) return;
     const st = await (await fetch(`/api/style?session=${encodeURIComponent(session)}&name=${encodeURIComponent(name)}`)).json();
     if (st.text != null) { try { Style.install(st.text, q.get("theme") || undefined); styled = name + "@" + rev; } catch (e) { V.show("style " + name + " refused: " + (e.message || e)); } }
+    // Alex, 30 Sep (scrollbars that fit the theme): a style with a `scrollbar` token draws its own bars (lens.html)
+    document.documentElement.toggleAttribute("data-bars", !!Style.token("scrollbar"));
   }
   const V = Viewer(session, who, lens, said, document.getElementById("status"));
   let last = "", sceneAt = 0, def = null;
@@ -110,7 +112,16 @@
     const lab = (p.fold && p.fold.label) || "";                  // the lens's handle label is drawn, not only announced
     const set = f => { el.dataset.folded = f ? "1" : ""; el.setAttribute("aria-expanded", String(!f)); h.textContent = (f ? "▸" : "▾") + (lab ? " " + lab : ""); h.setAttribute("aria-expanded", String(!f)); if (el.parentElement) tracks(el.parentElement); };
     if (float) { el.classList.add("l-float"); el._close = () => set(true); }
-    h.addEventListener("click", () => { if (float) { set(el.dataset.folded !== "1"); return; } const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f); });
+    el._fold = f => { V.fold(n.key, f); set(f); };
+    const group = p.fold && p.fold.group;
+    if (group) el.dataset.foldGroup = group;
+    h.addEventListener("click", () => {
+      if (float) { set(el.dataset.folded !== "1"); return; }
+      const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f);
+      // `fold ... group <name>` (Alex, 30 Sep): opening one folds its open siblings in the same group, an accordion
+      if (!f && group && el.parentElement)
+        [...el.parentElement.children].forEach(s => { if (s !== el && s.dataset.foldGroup === group && s.dataset.folded !== "1" && s._fold) s._fold(true); });
+    });
     el.prepend(h); set(float ? dflt : V.folded(n.key, dflt));
   }
   const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) m._close(); });
