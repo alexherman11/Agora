@@ -160,9 +160,16 @@ def v_unfold(w, nid, a):
     return _prim(w, "unfold", nid, a)
 
 
-@verb("append", ["text"], "Add a line at the end of the text. Edits the subject: every appearance changes.", "line=<str>", 'do append a18 line="4. Review"')
+@verb("append", ["text"], "Add a line at the end of the text. Edits the subject: every appearance changes. "
+      "On a chat the world signs the line with your name (type only your words; a 'Name:' of your own is dropped), "
+      "and adding a line is never refused as stale, since it replaces nothing; rewriting a chat is still fenced.",
+      "line=<str>", 'do append a18 line="4. Review"')
 def v_append(w, nid, a):
     return _prim(w, "append", nid, a)
+
+
+CHAT_RULES = ("the world signs each line with who added it (type only your words); adding a line is never refused "
+              "as stale, rewriting the chat is")
 
 
 def unanswered(w, sid, me="alex"):
@@ -170,7 +177,8 @@ def unanswered(w, sid, me="alex"):
     lines = [l for l in w.subjects[sid]["text"].splitlines() if l.strip()]
     out = []
     for l in reversed(lines):
-        if l.lower().startswith(me + ":") or not re.match(r"^\w+:", l):
+        said = w.SPEAKER.match(l)
+        if not said or said.group(1).lower() == me:
             break   # ours: signed by us, or unsigned
         out.append(l)
     return list(reversed(out))
