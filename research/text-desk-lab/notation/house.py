@@ -533,13 +533,20 @@ class House:
         called = re.compile(rf"@({re.escape(actor)}|everyone|all)\b", re.I)
         named = re.compile(rf"@({re.escape(actor)})\b", re.I)     # outside a chat line only a name reaches (a916)
         for e in w.events[start:]:
-            if e.get("by") in (actor, "house") or e.get("undone"):
+            if e.get("by") == actor or e.get("undone"):
                 continue
             sid = e["target"]
             if sid in w.nodes and w.nodes[sid]["type"] == "appearance":
                 sid = w.nodes[sid]["subject"]
             s = w.subjects.get(sid)
             args = e.get("args") or {}
+            if e.get("by") == "house":
+                # Alex, 30 Sep ("make it so they get woken when something is there for them"): the house's own word on
+                # your commission (landed, landed then reverted, the worker stopped, failed) reaches you as the worker's
+                # does; everything else the house writes is its bookkeeping. Sable's a1062 and a1101 failed this
+                # morning, and the only sign was their absence from a view that hides failures.
+                if not (e["verb"] == "comment" and s and (s.get("props") or {}).get("asked_by") == actor):
+                    continue
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
             if e["verb"] == "prop" and e["target"] == r.rid and args.get("call"):
                 # Alex, 30 Sep: the Desktop's wake button sets call=<who> on the corner (want=awake alone changed
