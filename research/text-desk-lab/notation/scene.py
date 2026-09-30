@@ -62,7 +62,7 @@ import re
 from desk import split_batch
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "measure", "wrap", "lines", "share", "hint", "plain")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "measure", "wrap", "lines", "share", "hint", "plain", "peek")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
 GESTURES = ("click", "edit", "drag", "menu")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
@@ -462,6 +462,10 @@ def _w_plain(node, p, val, n, env):
     node["plain"] = True          # Juniper a559: no runs; backticks print as the characters they are
 
 
+def _w_peek(node, p, val, n, env):
+    node["peek"] = True           # a1032 (Alex: 'see what they are working on at a glance'): shown while its parent is folded
+
+
 _RUNS = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.S)
 
 
@@ -640,6 +644,7 @@ WORDS = {
     "share": ("share <weight>", _w_share),
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
+    "peek": ("peek", _w_peek),
     "carry": ("carry", _w_carry),
     "role": ("role <name>", _w_role),
     "text": ('text "..."', _w_text),
@@ -693,7 +698,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False}
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             row = WORDS.get(word)
@@ -1374,6 +1379,8 @@ def to_text(scene, name, who, at):
             bits.append(f"lines {n['lines'][0]}..{n['lines'][1] if n['lines'][1] is not None else ''}")
         if n.get("hint"):
             bits.append(f'hint "{n["hint"]}"')
+        if n.get("peek"):
+            bits.append("peek")
         if n.get("plain"):
             bits.append("plain")
         elif n.get("text") and runs_of(n["text"]):
@@ -1546,6 +1553,8 @@ def emit(node):
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:
         paint["share"] = node["share"]
+    if node.get("peek") and not paint.get("absent"):
+        paint["peek"] = True
     node["paint"] = paint
     acts = list(node.get("acts") or [])
     if node.get("fold") and not any(a.get("on") == "fold" for a in acts):

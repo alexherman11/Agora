@@ -338,6 +338,27 @@ def test_fold_open_and_float():
         tmp.unlink(missing_ok=True)
 
 
+def test_peek_stays_while_folded():
+    """a1032 (Alex, 30 Sep: 'see what they are working on at a glance'): `peek` marks a child the painter keeps showing
+    while its parent is folded; it prints, emits on frames and text alike, and an absent part does not peek."""
+    src = chr(10).join(["ws : column", '  tile : column, fold "pike"', '    now : column, peek', '      t : text "a"',
+                        '    said : text "b", peek', '    gone : text "c", peek, only when $said = x', '    rest : text "d"'])
+    root, parts = scene.parse(src)
+    assert parts["ws"]["kids"][0]["kids"][0]["peek"] and not parts["ws"]["kids"][0]["kids"][3]["peek"]
+    import deskd, lens_ir
+    tmp = _scratch("_test_peek")
+    try:
+        with deskd.Session("_test_peek", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            now, said, gone, rest = scene.painter_view(sc)["kids"][0]["kids"]
+            assert now["paint"]["peek"] and said["paint"]["peek"], (now["paint"], said["paint"])
+            assert "peek" not in gone["paint"] and "peek" not in rest["paint"], (gone["paint"], rest["paint"])
+            assert scene.to_text(sc, "ws", "jeff", 0).count("peek") == 2
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_menu_entries_and_a_filled_fold_label():
     """Alex, 29 Sep: `on menu "<label>" do ...` entries, a fold label filled like text, and `handle <role>`."""
     src = chr(10).join(["ws : column", '  card : column, on menu "delete" do remove a1, on menu "start" do prop a1 status=doing',

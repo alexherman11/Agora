@@ -38,7 +38,7 @@
   .l-grid { display: grid; align-items: start; }
   .l-grid > [data-key] { min-width: 0; }
   .l-cells { display: contents; }
-  [data-folded="1"] > [data-key] { display: none; }
+  [data-folded="1"] > [data-key]:not([data-peek]) { display: none; }   /* `peek`: a summary a folded part keeps showing */
   [data-folded="1"] { flex: 0 0 auto !important; }
   /* the painter's own buttons (fold handles) wear only their role: the browser's button box is not a look anyone chose */
   :where(#paint button, #menu-pop button) { appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }   /* a folded part gives up its share: its siblings take the room */
@@ -48,6 +48,7 @@
   #menu-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 12ch; box-sizing: border-box; }
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
+  .l-float > [data-peek] { position: static; width: auto; max-height: none; }   /* a peek stays beside the handle, in the page */
   [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */
   [data-hint]:empty::before { content: attr(data-hint); color: var(--t-hush); }
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }
