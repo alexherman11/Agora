@@ -27,12 +27,20 @@
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more) {
     const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
-    const observed = { ...(n.fence || {}), at: sceneAt, def, ...more };
+    const observed = { ...(n.fence || {}), at: sceneAt, def, ...more }, gesture = V.gesture(n.key, draft !== undefined);   // a1008
     let r;
-    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed }) })).json(); }
-    catch (e) { V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true); }
+    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture }) })).json(); }
+    catch (e) {      // a1008: the next scene is painted even if it is unchanged, so the kept draft can be sent again (same id)
+      last = ""; V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true);
+    }
     const t = r.text || r.error || ""; V.answered(n.key, r.error || t.startsWith("ERR") ? t : null, draft, token);
     await refresh(true);
+    // a1008, the cause of e1851/e1852: typed words live in the element, not in its signature, so a composer whose
+    // line was sent was reused still showing it, and its next blur sent it again. Once no draft holds them, they go.
+    const k = kept.get(n.key), p = k && k.el._n.paint;
+    if (p && p.text != null && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
+      if (p.runs) runs(k.el, p.runs); else k.el.textContent = p.text; V.mark(k.el, n.key);
+    }
   }
 
   // Iris, Astra: a part whose painting did not change keeps its element; only what changed is made again. Pike (run 1):

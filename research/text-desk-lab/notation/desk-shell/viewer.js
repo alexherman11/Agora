@@ -39,6 +39,15 @@ const Viewer = (session, who, lens, said, status) => {
       const token = { draft: drafts.get(key) };
       pending.set(key, token); return token;
     },
+    // a1008: one intent, one event. A gesture's id is minted at the press and lives on its draft (kept with it, over
+    // repaints and reloads) until the draft is answered or its words change (typed makes a new draft), so a retry of
+    // the same words resends the same id and deskd acts at most once. A press with no draft (a click) is its own id.
+    gesture(key, drafted) {
+      const d = drafted ? drafts.get(key) : null;
+      const id = (d && d.gesture) || `${who}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      if (d && !d.gesture) { d.gesture = id; v.show(); }
+      return id;
+    },
     // Only the submitted generation is cleared or annotated: typing that arrived while the request was in flight stays,
     // with its own fence. A lost response says so; it claims neither success nor refusal.
     answered(key, err, draft, token) {
@@ -50,7 +59,7 @@ const Viewer = (session, who, lens, said, status) => {
         notice = refusal(err);
         // pike-8 section 3: a refused draft is kept, and the world's current value will be drawn beside it (both sides);
         // a resend is fenced on the value shown, never on a fresher one the person has not seen
-        if (draft !== undefined && !newer) drafts.set(key, { text: draft, why: err.split("\n").pop(), refused: true, shown: null });
+        if (draft !== undefined && !newer) drafts.set(key, { text: draft, why: err.split("\n").pop(), refused: true, shown: null, gesture: token && token.draft && token.draft.gesture });
       } else if (newer) notice = "sent the earlier words; what you typed since is still unsent";
       else { notice = ""; drafts.delete(key); }
       v.show();

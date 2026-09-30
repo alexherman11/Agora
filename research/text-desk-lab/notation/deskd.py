@@ -6,7 +6,9 @@ GET  /api/snapshot?session=<name>&as=<actor>    the world as JSON (rules, script
                                                  outline text exactly as the actor would read it
 POST /api/do   {"session": "...", "as": "...", "line": "..."}    run desk commands; returns the receipt text and
                                                  the number of events so far; "whole": true runs the line as one
-                                                 command, a ; in it being words (a resident's > line, a736)
+                                                 command, a ; in it being words (a resident's > line, a736);
+                                                 "gesture": "<id>" (a1008) is recorded on the events it made, and a
+                                                 second post with that id does nothing and answers "already done, as eN"
 GET  /api/events?session=<name>&since=<n>       events after index n (poll this; it is cheap)
 GET  /anything-else                              static files from static_dir (the shell)
 
@@ -266,9 +268,21 @@ class Handler(SimpleHTTPRequestHandler):
         line = str(body.get("line", "")).strip()
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)
+        # a1008: one intent, one event. A gesture carries an id minted where the person pressed, kept unchanged across
+        # repaints and retries. If an event already carries it, nothing new is done and the answer names that event.
+        # Judged before any fence: the world may have moved because of the first send itself. By id only, never by
+        # words (the same words pressed twice are two lines). The id is kept on the event, so a restart forgets nothing.
+        gid = body.get("gesture")
+        if gid is not None and not (isinstance(gid, str) and 0 < len(gid) <= 80):
+            raise BadRequest("gesture must be a short string (at most 80 characters), minted where the person pressed")
         sess = Session(body.get("session", "desktop"), body.get("as"))
         with sess as desk:
             before, n0 = set(desk.world.nodes), len(desk.world.events)
+            done = [e for e in desk.world.events if gid and e.get("gesture") == gid]
+            if done:
+                return self._json({"text": f"already done, as {done[0]['id']}: this gesture was acted on at {done[0].get('at', '?')}; "
+                                   "nothing new was done", "error": None, "events_total": n0, "line": line,
+                                   "as": (body.get("as") or "alex"), "created": [], "events": [], "already": [e["id"] for e in done]})
             ob = body.get("observed") or {}
             d = ob.get("def") or {}
             lens_id = d.get("id")                   # a990: the lens a gesture was painted by (d may be reassigned below)
@@ -402,6 +416,9 @@ class Handler(SimpleHTTPRequestHandler):
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably
             events = [e["id"] for e in desk.world.events[n0:]]
+            if gid:
+                for e in desk.world.events[n0:]:
+                    e["gesture"] = gid          # a1008: kept on what it made, saved with the world
         text = r.get("text") or ""
         # Rook: a parse failure came back as error=null. And a refusal in the second step of `look x; do y` hid in the text.
         bad = [l for l in text.splitlines() if l.startswith("ERR")]

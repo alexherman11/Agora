@@ -24,6 +24,12 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     scroll <part> <dy>           scroll a part by dy pixels
     wait <ms>
     text <part>                  the part's visible text
+    blur                         take focus off what has it (as a click on nothing would)
+    events [n]                   the world's last n events (default 5): id, verb, by, gesture, and the line's words
+    resend [k]                   post again, unchanged, the k-th last gesture this page sent (default 1: the last);
+                                 prints deskd's answer. A retry after a lost answer, as the painter would make it
+    restart | stop | start       stop the throwaway deskd and/or start it again on the same port (not with --live);
+                                 a press while it is stopped is a lost answer, as when deskd restarts mid-send
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
 """
@@ -140,12 +146,25 @@ class Page:
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "scroll", "wait", "text")
+STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "scroll", "wait", "text",
+         "blur", "events", "resend", "restart", "stop", "start")
+# a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
+SENDS_JS = """(() => { const f = window.fetch; window.__sends = [];
+  window.fetch = (u, o) => { if (String(u).startsWith('/api/do') && o && o.body) window.__sends.push(o.body); return f(u, o); }; })();"""
+EVENTS_JS = r"""
+(async (n) => {
+  const s = new URLSearchParams(location.search).get('session');
+  const t = (await (await fetch(`/api/events?session=${s}&since=999999999`)).json()).total;
+  const evs = (await (await fetch(`/api/events?session=${s}&since=${Math.max(0, t - n)}`)).json()).events;
+  return [`events: ${t} in all`, ...evs.map(e => `  ${e.id} ${e.verb} ${e.target} by ${e.by}${e.gesture ? ' gesture ' + e.gesture : ''} `
+    + JSON.stringify(e.args || {}).slice(0, 90))].join('\n');
+})
+"""
 KEYS = {"Enter": (13, "\r"), "Escape": (27, ""), "Tab": (9, "\t"), "Backspace": (8, ""), "Delete": (46, ""),
         "ArrowDown": (40, ""), "ArrowUp": (38, ""), "ArrowLeft": (37, ""), "ArrowRight": (39, ""), "Space": (32, " ")}
 
 
-async def run(url, steps, size, shots):
+async def run(url, steps, size, shots, restart=None):
     w, h = size
     exe = next((b for b in BROWSERS if Path(b).exists()), None)
     if not exe:
@@ -163,6 +182,7 @@ async def run(url, steps, size, shots):
             p = Page(ws)
             await p.call("Page.enable")
             await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=1, mobile=False)
+            await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
             await p.call("Page.navigate", url=url)
             for _ in range(100):                          # the painter has drawn when a keyed part exists, or it refused
                 await asyncio.sleep(0.2)
@@ -244,6 +264,27 @@ async def run(url, steps, size, shots):
                     key = arg()
                     i += 1
                     print(await p.js(f"(() => {{ const e = document.querySelector('[data-key=\"{key}\"]'); return e ? e.innerText : 'no part {key}'; }})()"))
+                elif s == "blur":
+                    print("blurred " + str(await p.js("(() => { const a = document.activeElement; const k = a && a.dataset && a.dataset.key; if (a && a.blur) a.blur(); return k || (a ? a.tagName : 'nothing'); })()")))
+                    await asyncio.sleep(1.2)
+                elif s == "events":
+                    n = 5
+                    if i < len(steps) and steps[i].isdigit():
+                        n, i = int(steps[i]), i + 1
+                    print(await p.js(f"{EVENTS_JS}({n})"))
+                elif s == "resend":
+                    k = 1
+                    if i < len(steps) and steps[i].isdigit():
+                        k, i = int(steps[i]), i + 1
+                    r = await p.js(f"""(async () => {{ const b = window.__sends[window.__sends.length - {k}]; if (!b) return 'resend: this page sent nothing yet';
+                        const r = await (await fetch('/api/do', {{method: 'POST', body: b}})).json();
+                        return 'resent ' + JSON.stringify(JSON.parse(b).gesture || null) + ': ' + JSON.stringify({{text: r.text, error: r.error, events: r.events}}); }})()""")
+                    print(r)
+                elif s in ("restart", "stop", "start"):
+                    if not restart:
+                        raise RuntimeError(f"{s}: only the throwaway deskd can be stopped or started (not with --live)")
+                    restart(s)
+                    print({"restart": "deskd restarted", "stop": "deskd stopped", "start": "deskd started"}[s])
                 else:
                     raise RuntimeError(f"unknown step {s!r}; see python screen.py --help")
     finally:
@@ -277,7 +318,7 @@ def main():
     if not who:
         raise SystemExit("screen: say who is looking with --as <you> (a press acts as that name)")
     steps = steps or ["facts", "shot"]
-    srv, copy = None, None
+    srv, copy, restart = None, None, None
     try:
         if live:
             port, session = 8794, world
@@ -291,9 +332,18 @@ def main():
             port = free_port()
             srv = subprocess.Popen([PY, "deskd.py", str(port)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             wait_http(f"http://127.0.0.1:{port}/lens.html")
+
+            def restart(how):
+                nonlocal srv
+                if how in ("restart", "stop") and srv.poll() is None:
+                    srv.terminate()
+                    srv.wait()
+                if how in ("restart", "start") and srv.poll() is not None:
+                    srv = subprocess.Popen([PY, "deskd.py", str(port)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    wait_http(f"http://127.0.0.1:{port}/lens.html")
         q = urllib.parse.urlencode({"session": session, "as": who, "lens": lens, "view": "painter", "inspect": "0"})
         print(f"screen: {'LIVE ' if live else 'a copy of '}{world} as {who}, lens {lens}, {size[0]}x{size[1]}")
-        asyncio.run(run(f"http://127.0.0.1:{port}/lens.html?{q}", steps, size, [0]))
+        asyncio.run(run(f"http://127.0.0.1:{port}/lens.html?{q}", steps, size, [0], restart))
     finally:
         if srv:
             srv.terminate()
