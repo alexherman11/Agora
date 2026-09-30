@@ -1290,6 +1290,8 @@ class DeskKnife(DeskMoo):
                     "  prints what it makes). Its words: " + scene.vocabulary() + ".\n"
                     "  fold: the viewer's own toggle; a folded part hides its children and gives up its share, except a child\n"
                     "  marked peek, which stays shown as the folded part's summary (e.g. a resident's Now cards on a folded tile).\n"
+                    "  Only a direct child peeks: a peek under a hidden part (a plain child of the folded part, or a fold inside\n"
+                    "  it) stays hidden, so a folded part never leaks its insides (test_peek_paint.py).\n"
                     "  A selection (of, the, only when) is filled from fields ($id) and frames, not from a thing's props: name\n"
                     "  the repeat (of ... as r) and write $r.actor; a bare $actor there stays the literal word and matches nothing.")
         if name in knife.PAIR_DOC:
