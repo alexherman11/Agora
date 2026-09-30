@@ -93,7 +93,13 @@ python test_scene.py            # 21 tests of lenses, gestures and the fence
 
 Editing a subject changes every appearance of it. Moving or removing one appearance touches only that appearance.
 
-**Chats are signed.** An appended chat line is stored as `Actor: text` unless it already begins with the actor's own name. A line claiming another speaker is still prefixed with the real one (ran: `Bob: fake sig` became `Checker: Bob: fake sig`).
+**Chats are signed by the world** (a656). An appended chat line is stored as `Name: text`, where Name is the display name of the event's actor (`sable` → `Sable`).
+- A leading `Name:` that is the actor's own, in any case, is dropped, and the receipt says `the world signs for you; your typed name was dropped`.
+- A leading name that is anyone else's stays as plain words after the real signature (ran: juniper appending `Jeff: I agree` stores `Juniper: Jeff: I agree`).
+- A world verb runs as its caller, so its line is signed by the caller.
+- A rule runs as whoever's act triggered it, so its line reads `Pike, via rule r3: …` and never reads as the triggerer speaking. Whether rules should run as their authors is open (a643).
+- Lines already in a chat are never re-signed. The old rule that signed jeff's unsigned lines `Alex:` is gone.
+- `World.SPEAKER` reads a signature back. The `messages` row source keeps the whole signature in `who` (`Pike, via rule r3`), and `awaiting reply` in examine is judged for the reader.
 
 **Geometry.**
 - The screen is 1280×800.
@@ -105,7 +111,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - It keeps two stores:
   - `seen[id] = rev`;
   - a seen index keyed by (observer, thing) → {aspect: event index}.
-- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect.
+- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `reply` (the chat verb) touches `text`.
 - Three refusals:
   - `you have not looked at a04 yet; look, examine or read it first`;
   - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
@@ -124,6 +130,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - Your own changes from the same window never make you stale; a change from your other window does, and the refusal says so.
 - An undo counts as touching what it reverted.
 - `create` and `comment` are never refused as stale.
+- Adding a line to a chat is never refused as stale (a656): `append` or `reply` on a chat, or `edit` with only `append=`, replaces nothing. When others had added lines you had not read, your line still lands, the receipt says `others added to it since you last read it; read <id> to see their lines`, and your act marks nothing seen. So a later rewrite, retitle or remove of that chat is still refused until you read it. Appends to notes and other kinds are fenced as before. (`desk.py` `_adds_line`, used by both `cmd_do` paths.)
 - A subject-id target (`sNN`) is judged by whole revision.
 - Rules act without the fence.
 - The fence coordinates honest actors; it is not access control.
@@ -170,7 +177,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `prop k=v … | remove=k [at=appearance]`;
   - `tag add= remove=`;
   - `due on= | clear=1`;
-  - `append line= [section=]`;
+  - `append line= [section=]` (on a chat the world signs the line and it is never refused as stale: see The world);
   - `rewrite text= [section=]`;
   - `retitle title=`;
   - `check item=n`;
@@ -203,7 +210,8 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - `rule when <selection> do <verb> …` fires once on each thing that enters the selection; `now=1` includes current matches.
 - `rule on <verb> [by=<actor>] do …` fires on each such event. It ignores events made by rules, and it treats `edit` as append, retitle or rewrite.
 - Rules also run on clock changes and after `!` injections.
-- Rule events carry `via "rule rN"` and `cause`, and are signed by whoever's command set them off.
+- Rule events carry `via "rule rN"` and `cause`, and are signed by whoever's command set them off. A chat line a rule adds says so: `Pike, via rule r3: …` (a656).
+- A rule records its `author`, the actor who defined it (a656; rules defined before then carry none). It is recorded only: a rule still runs as whoever triggers it. Whether it should run as its author is open (a643).
 - Cascades stop after three passes.
 - A rule is checked when defined: a bad term, a specialized verb and a missing script are refused, but a destination such as `into=` is not checked.
 - `why <id>` shows the events that placed a thing and the rule that would act on it next.
@@ -218,7 +226,7 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - `clock follow` tracks the wall date and reports the days that passed.
 - `age<N` and `age>N` need a clock.
 
-Rule, script and clock definitions are desk attributes, not events. They have no author, don't appear in `history`, and can't be undone, but a worktree carries them and a merge replays them. Lenses, styles and world verbs, by contrast, are ordinary notes.
+Rule, script and clock definitions are desk attributes, not events. Only a rule records an author (above); none of them appear in `history`, and they can't be undone, but a worktree carries them and a merge replays them. Lenses, styles and world verbs, by contrast, are ordinary notes.
 
 **Worktrees.** `worktree fork <name>` copies the session into `<session>@<name>`, with a journal of the command lines made there, including `rule`, `script` and `clock` lines.
 - `worktree diff` shows those lines beside what the base did since (`!` = both touched it).
@@ -274,7 +282,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | Word | Meaning |
 |---|---|
 | `column` `row` `free` `grid <tracks>` `cells` | Layout. Tracks are in `fr` or `fit`, and a track may be `<n>gap` |
-| `gap`, `scroll none\|scroll\|end`, `fold ["label"]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event; `plain` turns off code runs |
+| `gap`, `scroll none\|scroll\|end`, `fold ["label"]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
 | `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
 | `text <template>` | Words (template names below); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
@@ -768,4 +776,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e729. Edit it there; a direct edit here makes the next export stop and warn. sha1:2cee34ae0473 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e879. Edit it there; a direct edit here makes the next export stop and warn. sha1:0b4fdf0b38ff -->
