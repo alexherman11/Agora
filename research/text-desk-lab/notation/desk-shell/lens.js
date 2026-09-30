@@ -334,7 +334,9 @@
   });
 
   async function refresh(force) {
-    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter`)).json();
+    const have = !force && /^\d+-\d+$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
+    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter${have}`)).json();
+    if (r.same) return;                          // deskd: nothing changed since the build this page has
     const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene it built; comparing 700 KB was the fallback
     if (key === last && !force) return;
     last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null;

@@ -249,7 +249,10 @@ class Handler(SimpleHTTPRequestHandler):
             import scene
             key = _scene_key(q)
             if key is not None and key in _SCENES:
-                return self._json(None, body=_SCENES[key])     # the bytes already built: no load, no build, no encode
+                gen, body = _SCENES[key]
+                if q.get("have") == gen:                 # the painter already has this build: say so in a few bytes
+                    return self._json({"same": True, "gen": gen})
+                return self._json(None, body=body)       # the bytes already built: no load, no build, no encode
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 try:
                     sc, text = scene.scene_for(desk, q.get("lens", ""))
@@ -265,7 +268,7 @@ class Handler(SimpleHTTPRequestHandler):
             _GEN += 1
             out["gen"] = f"{os.getpid()}-{_GEN}"        # names this build, so a painter compares a word, not 700 KB
             if key is not None and key == _scene_key(q):     # unchanged while it was built: keep it (a few, the newest)
-                _SCENES[key] = json.dumps(out, ensure_ascii=False).encode("utf-8")
+                _SCENES[key] = (out["gen"], json.dumps(out, ensure_ascii=False).encode("utf-8"))
                 while len(_SCENES) > 16:
                     _SCENES.pop(next(iter(_SCENES)))
             return self._json(out)
