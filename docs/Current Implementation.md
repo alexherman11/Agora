@@ -50,7 +50,8 @@ printf 'help\nlook\n' | DESKD=off python explore.py mine --as me
 python deskd.py 8780            # serves desk-shell/ and the JSON API on 127.0.0.1
 python keeper.py frontier --port 8794   # deskd and the house together, on the current code
 python health.py frontier       # the checks a landing must pass
-python test_scene.py            # 21 tests of lenses, gestures and the fence
+python test_scene.py            # 25 tests of lenses, gestures and the fence
+python screen.py frontier --as me facts porch/main 2 shot   # the painter in headless Chrome, on a copy of the world
 ```
 
 **The CLI.** `explore.py <session> --as <actor>` reads command lines from stdin and prints a receipt for each.
@@ -180,7 +181,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `due on= | clear=1`;
   - `append line= [section=]` (on a chat the world signs the line and it is never refused as stale: see The world);
   - `rewrite text= [section=]`;
-  - `replace old= new=`: one exact passage, which must appear exactly once (refused with the count otherwise); fenced as rewrite is;
+  - `replace old= new=`: one exact passage, which must appear exactly once (refused with the count otherwise); fenced as rewrite is; the receipt shows the passage replaced and what replaced it;
   - `retitle title=`;
   - `check item=n`;
   - `comment line=`;
@@ -511,7 +512,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 **News.**
 - **Urgent news ends any rest:**
   - a line in a chat in its corner;
-  - `@name`, `@everyone` or `@all` anywhere;
+  - `@name`, `@everyone` or `@all` anywhere; in a rewritten text only when the new text says it more often than the old (a note that already said @everyone, like a lens hint, is not news). The notice says what reached you (`as @everyone`);
   - a comment on a thing in its corner;
   - a comment on its own commission.
 - **Held news rides along with the next message:** a line in a chat whose `members` include `all` or the resident.
@@ -547,6 +548,8 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
   - Its system prompt is Claude Code's own, plus `AGENTS.md` verbatim, then the worker protocol. The protocol asks it to keep *Current Implementation* true (see Landing). It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
 - The worker's desk tool (`desk_mcp.py`, as `worker-<cid>`) acts in the live world.
 - It talks through comments on its commission, and those comments come back to it as messages.
+- It can see the painter: `screen.py <world> --as <who> STEP ...` copies the world (removed after), serves it with the caller's own `desk-shell/` from a deskd on a free port, drives headless Chrome over the DevTools protocol, and runs steps: `facts [prefix] [depth]` (each painted part's size, scrolls or cut, folded, off screen), `shot [file.png]`, `click`, `right`, `menu`, `choose`, `type`, `key`, `drag`, `scroll`, `wait`, `text`. Parts are named by data-key (`<key>/handle` for a fold's handle). `--live` points at the keeper's deskd instead, where a press is a real act.
+- After the house restarts, a commission underway (`working`, `waiting` or `ready`) whose worktree still exists is resumed on the worker's saved session. A turn the restart cut short is said to it again, and it hears only what it has not heard.
 - It says it is done by committing and setting `commission=ready`.
 
 **Landing** happens between the house's passes:
@@ -554,7 +557,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 2. Health is taken.
 3. `git merge --no-ff worker/<cid>` into whatever branch is checked out, with the subject `land <cid>: <title>`.
 4. Health is taken again. If it fails, or a lens that compiled before no longer does, the merge is reverted (`git revert -m 1`).
-5. In frontier, from the main checkout, *Current Implementation* is exported from its Handbook binder and committed if it changed. The protocol asks the worker to rewrite the sections its change affects before it sets `ready`.
+5. In frontier, from the main checkout, *Current Implementation* is exported from its Handbook binder and committed if it changed. The protocol asks the worker to change the passages its change affects, with `replace`, before it sets `ready`.
 6. The result is commented, the worktree removed and the branch deleted.
 7. A landed `.py` change asks the house to restart.
 
@@ -562,7 +565,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 - It restarts deskd whenever HEAD moves.
 - It restarts the house:
   - at once on exit 75;
-  - after 60 s on exit 76;
+  - after 60 s on exit 76 (another house is alive; a heartbeat counts only while its process is still running, so a house restarting on new code does not block its successor);
   - after 30 s on any other death.
 - If the house dies 3 times within 5 minutes after a `land ` commit less than 15 minutes old, the keeper reverts that commit.
 - Its log is `house-state/keeper.log`.
@@ -643,8 +646,8 @@ Which file for which change:
 
 | Check | Result |
 |---|---|
-| `python health.py frontier` | python ok; scripts ok; test_scene 21 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.4 s |
-| `test_scene.py` | 21 passed |
+| `python health.py frontier` | python ok; scripts ok; test_scene 25 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.4 s |
+| `test_scene.py` | 25 passed |
 | `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`. S11 drives an old code path and no longer describes the desk |
 | `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs |
 
@@ -782,4 +785,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e940. Edit it there; a direct edit here makes the next export stop and warn. sha1:f1091ccf5d16 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1087. Edit it there; a direct edit here makes the next export stop and warn. sha1:6f2ca7580df6 -->
