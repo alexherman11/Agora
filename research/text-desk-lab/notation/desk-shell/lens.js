@@ -60,6 +60,9 @@
     if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
     if (p.kind === "frame") frames(el, n, p);
     if (p.share != null) { el.style.flex = `${p.share} 1 0`; el.style.minWidth = el.style.minHeight = "0"; }   // a weight, as a track is
+    // a grid given a share is bounded, so it divides its height among its rows and its cells fill them; a cell with
+    // `scroll` then scrolls inside the window instead of the page growing (Alex, 29 Sep: the window is bounded)
+    if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines) { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     for (const a of n.acts) {
@@ -86,14 +89,22 @@
     if (p.scroll && p.scroll !== "none") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
     if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
     if (!n.acts.some(a => a.on === "fold")) return;
-    const h = document.createElement("button"); h.type = "button"; h.className = Style.roleClass("tool");
+    // Alex, 29 Sep: a floating fold is a menu. Its open contents are drawn over the page below the handle, it opens for
+    // a moment (not remembered), and Escape or a press outside closes it. Its handle's look is role `menu`, a plain
+    // fold's is `fold`, each over `tool`, so a style that names neither keeps the tool look.
+    const float = !!(p.fold && p.fold.float);
+    const h = document.createElement("button"); h.type = "button"; h.className = Style.roleClass("tool") + " " + Style.roleClass(float ? "menu" : "fold");
     h.setAttribute("aria-label", (p.fold && p.fold.label) || n.part || "section");
     const dflt = p.fold ? p.fold.folded : !!p.folded;          // Jeff 75e39d8: fold is {folded, label}; 5bb7f7f emitted folded: true
     const lab = (p.fold && p.fold.label) || "";                  // the lens's handle label is drawn, not only announced
     const set = f => { el.dataset.folded = f ? "1" : ""; el.setAttribute("aria-expanded", String(!f)); h.textContent = (f ? "▸" : "▾") + (lab ? " " + lab : ""); h.setAttribute("aria-expanded", String(!f)); if (el.parentElement) tracks(el.parentElement); };
-    h.addEventListener("click", () => { const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f); });
-    el.prepend(h); set(V.folded(n.key, dflt));
+    if (float) { el.classList.add("l-float"); el._close = () => set(true); }
+    h.addEventListener("click", () => { if (float) { set(el.dataset.folded !== "1"); return; } const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f); });
+    el.prepend(h); set(float ? dflt : V.folded(n.key, dflt));
   }
+  const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) m._close(); });
+  document.addEventListener("pointerdown", e => closeFloats(e.target));
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
   // paint.semantic (pike-8 section 4): what assistive technology is told, on the node's one element. A press leaf is a
   // button: a Tab stop that Enter and Space activate (the codex team's finding: a clickable div is not a control).
   function semantic(el, s) {

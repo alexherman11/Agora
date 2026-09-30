@@ -317,6 +317,36 @@ def test_paint_words_print_and_emit():
         tmp.unlink(missing_ok=True)
 
 
+def test_fold_open_and_float():
+    """Alex, 29 Sep: `fold ... open` starts unfolded, `fold ... float` is a menu drawn over the page; both print and emit."""
+    src = chr(10).join(["ws : column", '  talk : column, fold "LOUNGE" open, share 2', '    t : text "a"',
+                        '  log : column, fold "the world" float', '    ev : text "b"'])
+    refused('x : column, fold "a" opne', "[open] [float]")
+    refused("x : column, fold open open", "[open] [float]")
+    import deskd, lens_ir
+    tmp = _scratch("_test_fold")
+    try:
+        with deskd.Session("_test_fold", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            talk, log = scene.painter_view(sc)["kids"]
+            assert talk["paint"]["fold"] == {"folded": False, "label": "LOUNGE"} and talk["paint"]["share"] == 2
+            assert log["paint"]["fold"] == {"folded": True, "label": "the world", "float": True}
+            text = scene.to_text(sc, "ws", "jeff", 0)
+            assert 'unfolded "LOUNGE"' in text and 'folded "the world" float' in text, text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_value_test_has():
+    """`has` and `!has`: the words contain the value, ignoring case; a value with a $name in it is filled."""
+    m = scene._VALUE_TEST.fullmatch("$said has @$me")
+    assert m and m.groups() == ("$said", "has", "@$me")
+    assert scene._VALUE_TEST.fullmatch("$said !has @alex").group(2) == "!has"
+    assert scene._compare("ok @Alex, look", "has", "@alex") and scene._compare("ok", "!has", "@alex")
+    assert not scene._compare("ok", "has", "@alex") and scene._compare("5", ">", "3")
+
+
 def test_freshness_words_are_host_reads():
     """Juniper: $touched is the last event on the thing, $changed.<field> the last that changed that aspect; a comment
     refreshes the first and not the second; undo is not a touch; neither enters the gesture fence."""

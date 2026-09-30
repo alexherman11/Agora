@@ -23,7 +23,11 @@
   body[data-inspector="off"] #term { display: none; }
   #term-open { position: fixed; top: 0.5rem; right: 0.5rem; z-index: 11; }
   #paint, #said { overflow: auto; min-width: 0; }
-  #paint { height: 100%; }
+  /* the painted root is a flex item of the window: with `share` it takes the window's height and its shares split it
+     (Alex, 29 Sep: no infinite scroll, the window is bounded); without one it keeps its own height and #paint scrolls */
+  #paint { height: 100%; display: flex; flex-direction: column; }
+  #paint > [data-key] { flex-shrink: 0; }
+  .l-grid[data-bounded] > [data-key] { min-height: 0; }
   /* the live refusal region (codex team, pike-8): announced to screen readers; shown when the inspector is off */
   #status { position: fixed; inset: auto 1rem 1rem auto; z-index: 10; max-width: min(60ch, calc(100vw - 2rem));
     max-height: 30vh; overflow: auto; white-space: pre-wrap; box-sizing: border-box; }
@@ -35,6 +39,13 @@
   .l-grid > [data-key] { min-width: 0; }
   .l-cells { display: contents; }
   [data-folded="1"] > [data-key] { display: none; }
+  [data-folded="1"] { flex: 0 0 auto !important; }
+  /* the painter's own buttons (fold handles) wear only their role: the browser's button box is not a look anyone chose */
+  :where(#paint button) { appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }   /* a folded part gives up its share: its siblings take the room */
+  /* fold ... float: a menu, its open contents drawn over the page below the handle */
+  .l-float { position: relative; }
+  .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
+    max-height: 70vh; overflow: auto; box-sizing: border-box; }
   [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */
   [data-hint]:empty::before { content: attr(data-hint); color: var(--t-hush); }
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }

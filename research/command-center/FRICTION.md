@@ -193,3 +193,40 @@ What the fixes cover:
 Each fix was re-run against the case that reproduced it (ran). Health is green, 21 tests passed, 82 goldens are unchanged, and the nine suite cases and test_journal's tally are unchanged.
 
 To keep the document current: it now opens with a rule, a change updates its section in the same change. The worker protocol asks workers to keep the binder true, and the house exports and commits *Current Implementation* after a landing in frontier. The first test of that step committed an uncommitted export under a false label (reset before anything else happened); the step now commits only what its own export wrote.
+
+## F29. The Desktop grew without end (29 Sep, Alex's direction)
+
+Alex: "i dont want infinite scroll please, Lets make it so the window is bounded". The page grew with every chat line, so the whole Desktop scrolled as one long page. The lens language already had `share` (a child's share of its column) and `scroll`, but two things were missing. Nothing gave the painted root a height to share, and a grid's cells grew to fit their content. Two painter changes fix that (lens.html, lens.js: Pike's files, edited under the paused-owners clause):
+- `#paint` is a flex column. A root with `share` takes the window's height, and a root without one keeps its own height while `#paint` scrolls as before. `flex-shrink: 0` keeps unshared roots from being squeezed.
+- a grid given a `share` is bounded. It divides its height among its rows (`grid-auto-rows: minmax(0, 1fr)`), and its cells stretch to fill them, so a cell with `scroll` scrolls inside the window.
+
+The lens (a589) says the rest in world words. `share 1` goes on the root and on `main`, and `scroll scroll` on the residents and board columns. In the middle, FOR YOU, Lounge talk and Shop talk split the height 1:2:2, each list scrolling on its own, with the chats pinned to the newest line (`scroll end`).
+
+Checked in a scratch world on a throwaway deskd (ran). The window was 1270 px tall and the page was 1270. Before, the middle column was 12273 px; now the inbox, Lounge and Shop lists are 228, 392 and 413 px high, and each scrolls. With the shares taken off the root, the same page is 2494 px tall and `#paint` scrolls, so unbounded lenses behave as before. "Juniper: my day" (no share) keeps its own 254 px. Not checked: phone width, or a lens with several bounded grids nested.
+
+My mistake while documenting this: I put the `share` sentence into the binder with my scratch importer. It rewrites every section that differs from my draft, and my draft was older than worker-a656's rewrite of "The world" (e852). So it reverted the worker's section at e854. Undone at e856 (ran: a239 is back to the worker's 1084 words). I then exported by hand, which put a656's not-yet-landed chat signing into docs/. Both copies are restored to HEAD. The binder carries the sentence, and the house's export after a656 lands writes both. The lesson: an importer should refuse a section that moved since its draft was taken (refuse stale, never guess), and a hand export before a pending landing documents code that isn't there.
+
+## F30. Chats that fold, a board that fits, the world as a menu, lines to Alex highlighted (29 Sep, Alex's direction)
+
+Alex asked for four things:
+- "collapse chats i'm not looking at ... so chats i do care about can be the full height";
+- a board that doesn't scroll off the page, and is more pleasant;
+- the world log "in a menu like the terminal at the top";
+- "messages to me should be pleasantly highlighted".
+
+What was missing, and what was added:
+- **Scene words** (scene.py, Jeff's file, and lens_ir.py): `fold` takes two modifiers, `fold ["label"] [open] [float]`. `open` starts unfolded, still the viewer's own choice with no event. `float` draws the open contents over the page below the handle, a menu. Value tests gain `has` and `!has`, which ask whether the words contain the value, ignoring case. A value with a `$name` inside it is filled, as a bare `$name` already was, so `only when $said has @$me` works.
+- **Painter** (lens.js, lens.html, Pike's files):
+  - a folded part gives up its `share`, so its siblings take the room;
+  - a float fold opens for a moment and is not remembered; Escape or a press outside closes it;
+  - the painter's own buttons lose the browser's button box and wear only their role: `menu` for a float handle, `fold` for a plain one, each over `tool`, so a style that names neither keeps the old look.
+- **World** (the Desktop lens a589 and its style a587):
+  - FOR YOU, Lounge talk and Shop talk are open folds;
+  - the board lanes share the right column's height and each scrolls on its own;
+  - cards are role `task`, with their tools on one line;
+  - the world log is `fold "the world" float` in the top bar;
+  - a chat line with `@$me` in it is drawn in role `mention`, a soft amber with a mark-coloured left edge.
+
+Checked in a scratch world on a throwaway deskd (ran). With all three chats open they are 242, 485 and 485 px tall. Folding Shop and FOR YOU gives Lounge 1155 px, and unfolding restores the split. The menu opens, and a press outside or Escape closes it. 22 lines are highlighted, every one contains @alex, and no plain line does. Health: 23 tests passed. Two goldens differed only in the vocabulary a refusal prints (the new `fold` form) and were rebased; 82 are the same.
+
+Not checked: phone width; how a screen reader announces a float fold. While testing I misread Alex's clicks in the same browser tab as flakiness, until tabs_context showed the tab was in front; the scripted test above is the record.

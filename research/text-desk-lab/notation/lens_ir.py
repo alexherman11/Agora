@@ -293,7 +293,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             vctx = dict(ctx.get("_props") or {})
             vctx.update(ctx)
             left = S._fill(g["ref"], vctx, track)
-            right = S._fill(g["rhs"], vctx, track) if g["rhs"].startswith("$") else g["rhs"]
+            right = S._fill(g["rhs"], vctx, track) if "$" in g["rhs"] else g["rhs"]
             gone = [x for x, v in ((g["ref"], left), (g["rhs"], right)) if x.startswith("$") and (v == x or v == "")]
             if gone or not S._compare(left, g["op"], right):
                 out.update(text=None, acts=[], kids=[], absent=g["src"],

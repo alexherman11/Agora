@@ -133,3 +133,5 @@ rebased play2/desktop with the working-tree compiler at 538cfd8 (an intended cha
 rebased play2/editor with the working-tree compiler at 538cfd8 (an intended change)
 rebased bridge/spacing-wish with the working-tree compiler at 9fab412 (an intended change)
 rebased frontier/p-if with the working-tree compiler at 9fab412 (an intended change)
+rebased bridge/spacing-wish with the working-tree compiler at 76cb028 (an intended change)
+rebased frontier/p-if with the working-tree compiler at 76cb028 (an intended change)

@@ -32,7 +32,7 @@ An unindented name defines a part; the first one is the root.
                                  lens note itself: do prop <lens> spacing=210. Computed presentation, never written back
     lens <name>                  place another lens here. A lens may not contain itself
     only when <selection>        the part exists only if the current thing (or anything) matches; the text prints the absence
-    only when $x <op> value      a value test (= != < > <= >=) on a field, prop, frame field or derive of this part, judged
+    only when $x <op> value      a value test (= != < > <= >= has !has) on a field, prop, frame field or derive of this part, judged
                                  after its derives; prints its inputs; a missing value is absence (no x), not false
     the <selection>              exactly one thing becomes the current thing here; the text prints which (-> s31 (a32)),
                                  or (empty), or (ambiguous: a32, a50) with nothing built under it and gestures off
@@ -62,7 +62,7 @@ import re
 from desk import split_batch
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "measure", "wrap", "lines", "share", "hint", "plain")   # pike-7 sections 6 and 9, lowered here
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "measure", "wrap", "lines", "share", "hint", "plain")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
 GESTURES = ("click", "edit", "drag")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count")
 
@@ -326,10 +326,16 @@ def _w_scroll(node, p, val, n, env):
 
 def _w_fold(node, p, val, n, env):
     """`fold` or `fold "Projects"`: folded by default, until a viewer unfolds it (a choice that makes no event); the
-    label is the lens's words for the handle, else the part's text or name."""
-    if val and not re.fullmatch(r'"[^"]+"', val):
-        raise LensRefusal(f'line {n}: `fold` or `fold "<label for the handle>"`; got {p!r}')
-    node["fold"] = val.strip('"') if val else True
+    label is the lens's words for the handle, else the part's text or name. Alex, 29 Sep ("a collapsing system", and the
+    world log "in a menu like the terminal"): `open` shows it unfolded until the viewer folds it, and `float` draws its
+    open contents over the page, below the handle, instead of pushing the page down (a menu). A folded part gives up
+    its `share`, so its siblings take the room."""
+    m = re.fullmatch(r'("[^"]+")?\s*(.*)', val.strip())
+    mods = m.group(2).split() if m else ["?"]
+    if any(x not in ("open", "float") for x in mods) or len(set(mods)) != len(mods):
+        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float]`; got {p!r}')
+    node["fold"] = m.group(1).strip('"') if m.group(1) else True
+    node["fold_open"], node["fold_float"] = "open" in mods, "float" in mods
 
 
 def _w_measure(node, p, val, n, env):
@@ -520,7 +526,7 @@ WORDS = {
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end", _w_scroll),
-    "fold": ('fold ["<handle label>"]', _w_fold),
+    "fold": ('fold ["<handle label>"] [open] [float]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
@@ -779,7 +785,9 @@ INTERPS = {"day-n": (("date", "n"), _day_n), "days-from": (("start", "end"), _da
            "time": (("when",), lambda v: _when(v, "time")), "date": (("when",), lambda v: _when(v, "date"))}
 _VAR = re.compile(r"\$(\w+)(?:\.(\w+))?")
 # Pike (round six, `if`): a structural test on a value. `only when $wd = Mon`, `only when $beds > 5`, `only when $a.due < $today`.
-_VALUE_TEST = re.compile(r"(\$[\w.-]+)\s*(=|!=|<=|>=|<|>)\s*(\$[\w.-]+|\"[^\"]*\"|\S+)")
+# Alex, 29 Sep ("messages to me should be pleasantly highlighted"): `has` and `!has` ask whether the words contain the
+# value, ignoring case: `only when $said has @$me`. A value with a $name in it is filled, as a bare $name is.
+_VALUE_TEST = re.compile(r"(\$[\w.-]+)\s*(=|!=|<=|>=|<|>|!?has(?=\s))\s*(\$[\w.-]+|\"[^\"]*\"|\S+)")
 
 
 def _compare(left, op, right):
@@ -787,6 +795,8 @@ def _compare(left, op, right):
         a, b = float(left), float(right)
     except (TypeError, ValueError):
         a, b = str(left), str(right)
+    if op in ("has", "!has"):
+        return (str(right).lower() in str(left).lower()) == (op == "has")
     return {"=": a == b, "!=": a != b, "<": a < b, ">": a > b, "<=": a <= b, ">=": a >= b}[op]
 
 
@@ -1028,7 +1038,7 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
             vctx = dict(ctx.get("_props") or {})
             vctx.update(ctx)
             left = _fill(ref, vctx, track)
-            right = _fill(rhs, vctx, track) if rhs.startswith("$") else rhs
+            right = _fill(rhs, vctx, track) if "$" in rhs else rhs
             gone = [x for x, v in ((ref, left), (rhs, right)) if x.startswith("$") and (v == x or v == "")]
             if gone or not _compare(left, op, right):
                 out.update(text=None, acts=[], kids=[], absent=node["only"],
@@ -1240,7 +1250,8 @@ def to_text(scene, name, who, at):
             if n.get(wd) is not None:
                 bits.append(f"{wd} {n[wd]}")
         if n.get("fold"):
-            bits.append("folded" + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else ""))
+            bits.append(("unfolded" if n.get("fold_open") else "folded") + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else "")
+                        + (" float" if n.get("fold_float") else ""))
         if n.get("wrap") == "verbatim":
             bits.append("verbatim")
         if n.get("lines"):
@@ -1393,8 +1404,10 @@ def emit(node):
             if node.get(k) is not None:
                 paint[k] = node[k]
         if node.get("fold"):
-            paint["fold"] = {"folded": True, "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
-            paint["semantic"] = {"role": "group", "expanded": False}
+            paint["fold"] = {"folded": not node.get("fold_open"), "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
+            if node.get("fold_float"):
+                paint["fold"]["float"] = True
+            paint["semantic"] = {"role": "group", "expanded": bool(node.get("fold_open"))}
     elif paint["kind"] == "text" and not paint.get("absent"):
         if node.get("wrap"):
             paint["wrap"] = node["wrap"]
