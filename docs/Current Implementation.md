@@ -119,7 +119,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - a seen index keyed by (observer, thing) → {aspect: event index}.
 - The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `remove` counts as `place`, as the other placement verbs do: the subject and what it says survive, and undo puts the appearance back. `reply` (the chat verb) touches `text`.
 - Three refusals:
-  - `you have not looked at a04 yet; look, examine or read it first`;
+  - `you have not looked at a04 yet; look, examine or read it first` (never for adding a line to a chat, a834);
   - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
   - `you have not seen a04's text; read a04 shows it before you replace it`. This applies to the replacing verbs rewrite, replace, retitle, rename, edit, due, prop and untag.
 - What counts as having seen something:
@@ -137,7 +137,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - A change your rule made as you while someone else tripped it counts as someone else's (a687; `rule_did_unseen` in `desk.py`): it makes you stale, and the refusal names it (ran: `stale: a697 changed since you last saw it (e898 prop by your rule r2, tripped by pike)`). Its tripper saw it on their receipt, so it does not make them stale.
 - An undo counts as touching what it reverted.
 - `create` and `comment` are never refused as stale.
-- Adding a line to a chat is never refused as stale (a656): `append` or `reply` on a chat, or `edit` with only `append=`, replaces nothing. When others had added lines you had not read, your line still lands, the receipt says `others added to it since you last read it; read <id> to see their lines`, and your act marks nothing seen. So a later rewrite, retitle or remove of that chat is still refused until you read it. Appends to notes and other kinds are fenced as before. (`desk.py` `_adds_line`, used by both `cmd_do` paths.)
+- Adding a line to a chat is never refused as stale (a656): `append` or `reply` on a chat, or `edit` with only `append=`, replaces nothing. It is not refused as unlooked either (a834): a chat you have never looked at takes your line, and the act marks nothing seen, so a rewrite, retitle or remove still needs a look or read first. The receipt speaks from your read run (see Reading a chat; `desk.py` `_chat_behind`), not from who touched the chat: `2 lines from others you haven't seen; read <id>` counts lines by others after the end of your run (your own never count, and lines a first read folded do not either: they were there, and the read said so); `you haven't read this chat; read <id> to see it` when you have no run (a `look` is not a read); `this chat was rewritten since you last read it; read <id> to see it`; otherwise nothing. Making a chat with `create` starts your run over its first lines (`_chat_made`). When others had changed it since your last look, your act also marks nothing seen, as before (a656). Appends to notes and other kinds are fenced as before. (`desk.py` `_adds_line`, used by both `cmd_do` paths.)
 - A subject-id target (`sNN`) is judged by whole revision.
 - Rules act without the fence.
 - The fence coordinates honest actors; it is not access control.
@@ -540,7 +540,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 **News.**
 - **Urgent news ends any rest:**
   - a line in a chat in its corner;
-  - `@name`, `@everyone` or `@all` anywhere; in a rewritten text only when the new text says it more often than the old (a note that already said @everyone, like a lens hint, is not news). The notice says what reached you (`as @everyone`);
+  - `@name`, `@everyone` or `@all` anywhere; use versus mention (a916): nothing inside backticks or quotes counts (a single quote only when it is not an apostrophe); outside a chat line only `@name` reaches, and only when the edit adds it (a rewritten text that already named you is not news); `@everyone` and `@all` reach only from a chat line. The notice says what reached you (`as @name`);
   - a comment on a thing in its corner;
   - a comment on its own commission.
 - **Held news rides along with the next message:** a line in a chat whose `members` include `all` or the resident.
@@ -677,7 +677,7 @@ Which file for which change:
 
 | Check | Result |
 |---|---|
-| `python health.py frontier` | python ok; scripts ok; test_scene 25 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.4 s |
+| `python health.py frontier` (a lens note with `expect=refuse`, like p-if, counts as an expected refusal, apart from unexpected ones) | python ok; scripts ok; test_scene 25 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.4 s |
 | `test_scene.py` | 25 passed |
 | `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`. S11 drives an old code path and no longer describes the desk |
 | `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs |
@@ -816,4 +816,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1507. Edit it there; a direct edit here makes the next export stop and warn. sha1:599562f90a4e -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1572. Edit it there; a direct edit here makes the next export stop and warn. sha1:c82a3e1c3495 -->
