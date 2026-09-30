@@ -5,7 +5,8 @@
 Reads the Handbook binder "How the desk is built" in the world (default `frontier`): its first note is the
 document's title and introduction, and each later note is one `## section` (title = heading, text = body), in the
 binder's order. Writes `Current Implementation.md` to the repo's docs/ and to Alex's Obsidian vault, and a text
-`export` of the whole world beside the lab notes, so the record stays diffable (the pickle is not).
+`export` of the whole world beside the lab notes, so the record stays diffable (the pickle is not). It also writes
+research/command-center/FRICTION.md from Rough spots (friction.py): one way, overwritten whole whenever it differs.
 
 Each markdown export ends with a stamp naming the event it was exported at and a hash of what it wrote. When a file
 no longer matches its stamp, someone edited the export directly: the script warns and leaves that file alone
@@ -117,6 +118,8 @@ def main():
     event = world.events[-1]["id"] if world.events else "e0"
     for path in TARGETS:
         print(write(path, body, event, session, force, dry))
+    import friction       # a778: FRICTION.md is Rough spots, exported one way (overwritten whole, no stamp to check)
+    print(friction.write(friction.export(world, session), dry))
     if session == "frontier":
         text = desk.cmd_export().rstrip("\n") + "\n"
         if dry:
