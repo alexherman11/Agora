@@ -164,7 +164,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 | Reading | `look [id] [:1-:4]` (`look` alone, in a world with rooms: your room, narrated; see Rooms), `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts`, `vars`, `help` (`?`) |
 | Changing | `do <verb> <target> k=v`, `undo [eN]`; pair verbs `swap`, `beside`, `match`, `link`; world verbs (`<word> …`, `do <word> …`, `use <id> …`) |
 | Defining | `rule when … do …`, `rule on <verb> [by=] do …`, `rule drop rN`; `script <name> = …`, `script drop`, `run`; `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
-| Moving | `go <room> [:1]`, `go` (see Rooms) |
+| Moving | `go <room> [:1]`, `go`, `rest [:1]` (see Rooms) |
 | Branching | `worktree`, `worktree fork\|diff\|merge <name>` |
 | External | `sync`, `launch` (harness) |
 
@@ -209,10 +209,9 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - `parts:` and `part-of:` follow only `part-of` links, in one direction.
 - `in:`, `also:`, `links:`, `parts:` and `part-of:` accept a title or a `$handle`.
 - A target may also be one id, a unique quoted title, `desk`/`root`, or a handle:
-  - `$item`, the last created thing;
-  - `$new`, the last created surface, else the last created thing;
-  - `$<name>`, set by `set` or `create … as=`.
-- `$today` fills in any command; `\$today` stays literal.
+  - `$<name>`, a handle set by `set` or `create … as=`;
+  - or any blank that names a thing (below).
+- **Blanks** (a806, rooms step 2a; `blanks.py`, the one filler for typed lines, world verbs, scripts and rules alike): `$here` the room you are in; `$here.<prop>` a prop of it (`$here.talk`, `$here.describe`; refused, naming the room, when it has none); `$new` the thing made most recently earlier in this reply, of any kind (of several made by one line, the last; refused when nothing earlier in this reply made anything; a new reply starts fresh, so it never reaches back; the receipt ends `($new = a850)`); `$today` the clock's date; `$me`; `$<handle>`; in a verb or script `$1 $2 $1.title $*` (and `$this` in a verb); in a rule `$item`, the thing it fired on, and `$item.title`. They are filled after the line is parsed, as values, once: in targets, selections, and k=v values that name things (`do prop f581 describe=$new` stores and prints `describe=a789`); a read's words too (`look $new`, `go $here`). Words a person types (`line=`, `text=`, `title=`, and `wake=`) are never filled in a typed line, so talk about blanks keeps its words; inside a verb, script or rule (templates their author wrote) they are, and a filled value is never filled again. A typed `$item` refuses (`Did you mean $new…?`); `$5` is not a blank; an unknown `$name` refuses; nothing stores a blank's own name. A reply is the lines of one call (explore.py, the desk tool, one painter request) or of one resident's reply: explore.py, deskd and the house pass a `reply` token with each line, and what was made is kept per reader and reply (`DeskKnife._made`). A literal dollar sign is written with a backslash before it, in both; `\$today` stays literal.
 - An unknown `word:` term is refused with the list of known terms. `prop:k>v` is not a comparison: it is read as a prop name and matches nothing (see Evidence).
 
 **Rules.**
@@ -225,17 +224,19 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - A rule with no author (defined before a656) runs as whoever tripped it, exactly as before: its events are signed by the tripper, carry no `tripped_by`, and its chat line reads `Pike, via rule r3: …`. Defining it again gives it an author.
 - **Known obligation, not built:** there is no permission layer. When one exists, a firing must be checked against its author's rights at firing time, not the tripper's and not the rights the author had when defining it (a683).
 - Cascades stop after three passes.
+- A rule is a template (a806): its target, values and selection are filled by the one filler each time it fires (`$item`, `$item.title`, `$today`; in a `when` selection `$today` now follows the clock instead of freezing when the rule is defined). `$here` refuses: a rule has no room until rooms step 2b gives it a home, so it never acts differently for where its author stands. `$new` refuses: a rule has no earlier line.
 - A rule is checked when defined: a bad term, a specialized verb and a missing script are refused, but a destination such as `into=` is not checked.
 - `why <id>` shows the events that placed a thing and the rule that would act on it next.
 
-**Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $today`; run with `run <name> args`. Scripts are not validated when defined, and `$me` is not filled in a script (F2). A rule may run a script; a script a rule runs acts as the rule's author.
+**Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $*` and every other blank (see Blanks); run with `run <name> args`, whose words are filled where `run` is said (`run tidy $new`). Scripts are not validated when defined. `$me` is filled in a script since a806 (F2 said it was not). A rule may run a script; a script a rule runs acts as the rule's author.
 
 **Views.** `do create <surface> kind=view title=X query=<selection>` makes a view; with `cols=` (and `by=`, `desc=`) it prints as a table. You can't move a thing into a view, create inside one, or tile, group or sort one.
 
 **Rooms** (a678, rooms step 1; `rooms.py`). A room is a surface with prop `role=room`, or `role=resident` (a corner is its resident's room). Its props: `describe=<id>` (the note that describes it: its text, or its title when it has none), `talk=<id>` (the chat where talk here lands), `shows=<selection>` (what is at hand; default its children), `home=<selection>` (default `in:<the room>`; must be invertible: `in:<surface>` and `tag:<word>` terms only. Step 1 only checks it, and a narrated look says so when it isn't; nothing lands there yet).
 - Every actor is in exactly one room. It is not stored apart: an actor's room is the `to=` of their latest `go` event (target the actor, `args to= from=`, `changed` empty, fence aspect `presence`). Someone who never went anywhere is in their own corner (the surface with `role=resident actor=<them>`), or, with no corner, in Home (the outermost `role=room` surface). A room since unmarked or removed sends them back to that default. **Alex is not placed** in step 1 (a678 (8)): `go` refuses him and his bare `look` is the tree.
-- `go <room>`: by id, by title, or by a word of the title (case aside, `Sable's` answers to `sable`); from anywhere. It records the event and prints the narration. A surface that isn't a room is refused with the list of rooms; several matches are refused with the list, except that your own corner wins (`go corner`). Going where you already are makes no event. `go <room> :1` walks without looking (the receipt only; nothing counts as seen): the house uses it. `go` alone prints where you are and who is in each room.
-- A bare `look`, in a world with rooms and for anyone but Alex, narrates your room: `You are in <title> (<id>).` (`, your own corner.` in yours), the description (cut at 120 words, with a pointer), who else is here (`Here with you: Pike, Sable (asleep).`, from the corner's `status`; only residents and actors who have gone somewhere count), what is at hand from `shows=`, one line and one id each with no geometry (kind, title, and a task's status, owner, due; a surface's count; at most 12, then a pointer), skipping the describe and talk notes, then the talk chat's last 3 lines as signed, each cut at 35 words, and how to speak (`do append <talk> line=...`). `look <id>`, `look :N` with no id and `look desk` are the tree, unchanged. In a world with no rooms (the suite's) a bare `look` is the tree as before.
+- `go <room>`: by id, by title, or by a word of the title (case aside, `Sable's` answers to `sable`); from anywhere. It records the event and prints the narration. A surface that isn't a room is refused with the list of rooms; several matches are refused with the list, except that your own corner wins (`go corner`). Going where you already are makes no event. `go <room> :1` walks without looking (the receipt only; nothing counts as seen). `go` alone prints where you are and who is in each room (a sleeper marked `(asleep)`).
+- `rest [:1]` (a806): go home to rest, to your corner (Home if you have none). The go event carries `via=rest`, so history reads `… by pike via rest` and tells being carried home from walking. The house rests a resident with `rest :1` (after `> rest`, the quiet limit or an empty reply); how long is the house's to keep.
+- A bare `look`, in a world with rooms and for anyone but Alex, narrates your room: `You are in <title> (<id>).` (`, your own corner.` in yours), the description (cut at 120 words, with a pointer), who else is here and awake (`Here with you: Pike.`); a resident whose corner says `status=asleep` is never listed there, and the room says `Sable is asleep here.` instead (`(their own corner).` in theirs) (a806). Counted: Jeff (the world's own agent, `World.me`), residents, and actors who have gone somewhere; each is in their default room until they go, what is at hand from `shows=`, one line and one id each with no geometry (kind, title, and a task's status, owner, due; a surface's count; at most 12, then a pointer), skipping the describe and talk notes, then the talk chat's last 3 lines as signed, each cut at 35 words, and how to speak (`do append <talk> line=...`). `look <id>`, `look :N` with no id and `look desk` are the tree, unchanged. In a world with no rooms (the suite's) a bare `look` is the tree as before.
 - **What a narrated look counts as seen** (a678 (7)): the room's title, the describe note's title and text only when printed whole, and the talk chat's title, plus its text only when all of it was printed. Things listed at hand are not marked at all: look or read one before acting on it (`you have not looked at …`). A chat line still lands after a narrated look, since adding to a chat is never stale.
 - A go is journaled like any event (history lists it; a fork copies it; a worktree merge replays `go` lines, and they never conflict) but outside undo's reach: `undo eN` on a go refuses (`eN is a go: where you are is not a change to anything in the world, so undo leaves it…`), and a bare `undo` passes over it.
 - The `!!` line folds walking: at most one per actor, their latest room (`e975 pike went to Lounge`; grouped: `pike: undo in e900, now in Lounge`).
@@ -271,9 +272,14 @@ A verb anyone can make, with no Python (`verbs.py`, the first tier of live build
 - **Blanks:**
   - `$1 $2 …` refuse when there are too few words;
   - `$1.title`;
-  - `$*` is every word after the verb, the target included (F24);
-  - `$me` is the caller and `$this` is the verb note;
-  - values are quoted automatically.
+  - `$*` is the rest of the line after the verb word exactly as said, quotes and `;` included (a806; before, it was the words re-joined);
+  - a word that is itself a blank (`$new`, `$here.talk`, a handle) is filled where the verb was said, so `$1` carries its value;
+  - `$me` is the caller and `$this` is the thing the verb lives on (refused in a verb that lives on none);
+  - every blank of a typed line too (`$here`, `$here.<prop>`, `$new`, `$today`: see One language, Blanks). The body is a template: each step is filled by the one filler after it is parsed, text values included, and a filled value is never filled again, so `say`'s `$*` carries `$here` or `a; b "hi"` untouched;
+  - `$new` inside the body is the last thing an earlier step made; after the use, the caller's `$new` is the last thing the whole use made;
+  - a use whose step is refused is a refusal (`(<word> <aid>: …)` then the reason), the steps before it still done;
+  - a line that shlex can't split (an apostrophe: `say it's fine`) still reaches a verb, split on spaces.
+- **The say verb** (a806's proof, one note for every room): `do append $here.talk line="$*"` lands in the Lounge's talk from the Lounge and in Shop talk from the Board, signed; in a room with no `talk=` it refuses, naming the room.
 - **Limits and provenance:** nesting stops at depth 5. Events are tagged `verb_run: "<word> <aid>"` and show in history as `(verb <word> <aid>)`. `examine` lists the verbs on a thing; `help <word>` describes the verbs you can reach.
 - **Misses:** a reach that nothing answers is appended to `reaches/<world>.jsonl` (not in git). This includes prose after `>` that cannot be parsed, such as an unclosed apostrophe (a736). The desk raises `Unanswered`, a kind of `Refusal`. For a resident's `>` line (whole) the receipt is `MISS ...`, not `ERR`, and the house also logs the line in the world's Misses chat (see Residents: the house).
 - **Undo** takes back the whole use, all its steps. Each event carries `verb_use`, and a verb used inside another joins the outer use. The receipt says `reverted e3..e4 (2 steps of the verb <word> <aid>)`.
@@ -527,7 +533,8 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 - Lines run before a rest are delivered on the next wake.
 - A reply with no commands gets held news or `(quiet)`. After 10 quiet exchanges in a row, the resident rests.
 - An empty reply rests.
-- Any rest sends the resident home to its corner (Alex, 29 Sep; a678): the house runs `go <corner> :1` as the resident, which walks without looking, so it wakes where it rested.
+- Any rest sends the resident home to its corner (Alex, 29 Sep; a678): the house runs `rest :1` as the resident (a806; before, `go <corner> :1`), which goes home without looking and records the go with `via=rest`, so history tells being carried home to rest from walking, and it wakes where it rested.
+- A corner with `status=asleep` (want is not awake) makes a room say `<Name> is asleep here.` rather than list them as here with you (a806). A resident resting under `want=awake` keeps `status=awake`; after a rest it is in its corner.
 - A wake line can now be `read <soul> :3; look`: the bare look narrates the room it is in (its corner after a rest). Measured on a copy of frontier on 29 Sep: about 1300 words, against about 6000 for today's `read <soul> :3; look <corner> :3; look Board :3; read a570`.
 
 **News.**
@@ -627,10 +634,11 @@ A refusing lens is listed but doesn't fail health.
 | `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
 | `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
 | `knife.py` | 263 | The selection language (with `unanswered:`) and pair verbs |
-| `verbs.py` | 262 | World verbs: finding, filling, running, reaches |
+| `verbs.py` | 259 | World verbs: finding, running, reaches (their blanks are filled by `blanks.py`) |
+| `blanks.py` | 240 | The one filler (a806): `$here $here.<prop> $new $today $me $<handle>`, `$1 $* $this` in verbs and scripts, `$item` in rules; a backslash before a dollar sign keeps it literal; `help blanks` |
 | `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
-| `rooms.py` | 288 | Rooms (a678): what a room is, where each actor is (derived from `go` events), `go`, the narrated bare `look` |
+| `rooms.py` | 319 | Rooms (a678, a806): what a room is, where each actor is (derived from `go` events), `go`, `rest` (home, `via=rest`), the narrated bare `look`, asleep vs awake |
 | `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
 | `explore.py` | 257 | CLI: forward to deskd or run under the pid lock (`take_lock`, `release_lock`); atomic save; `--window --dump --shape --reset`; `!actor` injection |
 | `deskd.py` | 408 | HTTP server, its origin and session-name checks, and the gesture fence |
@@ -644,7 +652,7 @@ A refusing lens is listed but doesn't fail health.
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
-| `test_scene.py`, `test_journal.py`, `golden_prints.py`, `suite/` | 382, 839, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
+| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `golden_prints.py`, `suite/` | 382, 839, 153, 223, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
 | `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 544 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
@@ -808,4 +816,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1372. Edit it there; a direct edit here makes the next export stop and warn. sha1:634e11347736 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1507. Edit it there; a direct edit here makes the next export stop and warn. sha1:599562f90a4e -->
