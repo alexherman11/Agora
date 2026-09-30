@@ -2,7 +2,8 @@
 //
 // The world lives in deskd (python deskd.py). This file is the only thing that talks to it.
 //   Desk.snapshot            the last world snapshot (subjects, nodes, links, rules, scripts, clock, outline)
-//   Desk.do(line)            EVERY change goes through here, as a desk command line. Returns {text, error}.
+//   Desk.do(line)            EVERY change goes through here, as a desk command line. Returns {text, error, gesture}.
+//                            One call is one press, with its own gesture id; Desk.do(line, {gesture}) retries that press.
 //   Desk.on(fn)              fn(snapshot, newEvents) after every refresh
 //   Desk.registerApp(app)    app = { id, title, glyph, accepts(node, subject) -> bool, open(host, ctx), text(ctx) -> string }
 //                            open() draws into `host` (a window body). text() returns what a text-only inhabitant
@@ -46,10 +47,26 @@ const Desk = (() => {
     listeners.forEach(fn => fn(snapshot, fresh));
   }
 
-  async function run(line) {
-    const r = await (await fetch("/api/do", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session, as: actor, line }) })).json();
-    log.push({ line, text: r.text, error: r.error, at: new Date() });
+  // a1047: one intent, one event, as a1008 gave the painter. Every Desk.do is one press: it mints a gesture id when
+  // called, unless the caller passes the id of the press it is retrying (Desk.do(line, {gesture})). An answer lost on
+  // the way (the request never came back) is sent again with the same id, so deskd acts at most once and says
+  // "already done, as eN" if the first got through. By id only: the same words from two presses are two lines.
+  // Only a lost request is retried; an answer that came back, even a broken one, is never sent twice.
+  const mint = () => `${actor}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  async function run(line, opt = {}) {
+    const gesture = opt.gesture || mint(), body = JSON.stringify({ session, as: actor, line, gesture });
+    let res = null, lost = null;
+    for (const wait of [0, 500, 2000]) {
+      if (wait) await new Promise(ok => setTimeout(ok, wait));
+      try { res = await fetch("/api/do", { method: "POST", headers: { "Content-Type": "application/json" }, body }); break; }
+      catch (e) { lost = e; }
+    }
+    let r;
+    if (!res) r = { text: null, lost: true, error: `the answer was lost three times (${lost && lost.message}); whether it was done is unknown `
+                    + `until the view repaints. Desk.do(line, {gesture: "${gesture}"}) sends it again as the same press` };
+    else { try { r = await res.json(); } catch (e) { r = { text: null, error: `deskd answered ${res.status} without words; not sent again` }; } }
+    r.gesture = gesture;
+    log.push({ line, text: r.text, error: r.error, gesture, at: new Date() });
     await refresh();
     return r;
   }

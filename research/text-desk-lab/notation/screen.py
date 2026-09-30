@@ -4,13 +4,17 @@ Alex, 29 Sep: workers change the painter without being able to see it. This driv
 over the DevTools protocol against a throwaway deskd, so any agent that can run Python can look at a view, press it,
 and read back what it measured. The screenshot is a PNG a model can open with its Read tool.
 
-    python screen.py <world> --as <you> [--lens command-center] [--size 1500x900] [--live] STEP ...
+    python screen.py <world> --as <you> [--lens command-center] [--size 1500x900] [--live] [--term] [--page shell] STEP ...
+
+--term keeps the desk terminal beside the lens (it is hidden by default here); --page shell opens the windowed
+desktop (index.html: dock, windows, apps) instead of the painter.
 
 By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served by a deskd on a free port
 from THIS directory's desk-shell/, so a worktree sees its own painter code and nothing you do reaches the shared world.
 `--live` points at the keeper's deskd (port 8794) instead: every press is then a real act, as --as, in the real world.
 
-STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/add, or x,y in CSS pixels)
+STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/add, or x,y in CSS pixels, or a CSS
+       selector beginning # or . for a part with no key: #term input, .window .titlebar)
     shot [file.png]              screenshot (default screen-<n>.png here); prints the path
     facts [key-prefix] [depth]   per painted part (to depth levels below the prefix, default 2): size, whether it
                                  scrolls or is cut, folded, hidden, off screen, a leaf's words; the window; the status line
@@ -23,6 +27,8 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     drag <part> <part|x,y>       press on the first, move, release on the second
     scroll <part> <dy>           scroll a part by dy pixels
     wait <ms>
+    answer <text>                the next prompt() or confirm() the page opens is answered with text, as a person
+                                 typing into it would; a dialog with no answer set is dismissed (and said)
     text <part>                  the part's visible text
     blur                         take focus off what has it (as a click on nothing would)
     events [n]                   the world's last n events (default 5): id, verb, by, gesture, and the line's words
@@ -101,7 +107,7 @@ def wait_http(url, secs=20):
 
 class Page:
     def __init__(self, ws):
-        self.ws, self.n = ws, 0
+        self.ws, self.n, self.reply = ws, 0, None
 
     async def call(self, method, **params):
         self.n += 1
@@ -109,6 +115,15 @@ class Page:
         await self.ws.send(json.dumps({"id": me, "method": method, "params": params}))
         while True:
             m = json.loads(await self.ws.recv())
+            if m.get("method") == "Page.javascriptDialogOpening":
+                # a1047: a prompt() or confirm() blocks the press that opened it; it is answered as `answer` said, or
+                # dismissed. Sent without waiting: the press's own reply comes once the dialog is closed.
+                d, text, self.reply = m["params"], self.reply, None
+                print(f"dialog ({d.get('type')}) {d.get('message', '')!r}: " + (f"answered {text!r}" if text is not None else "dismissed"))
+                self.n += 1
+                await self.ws.send(json.dumps({"id": self.n, "method": "Page.handleJavaScriptDialog",
+                                               "params": {"accept": text is not None, "promptText": text or ""}}))
+                continue
             if m.get("id") == me:
                 if "error" in m:
                     raise RuntimeError(f"{method}: {m['error'].get('message')}")
@@ -124,6 +139,13 @@ class Page:
         if "," in target and all(p.strip().lstrip("-").replace(".", "").isdigit() for p in target.split(",")):
             x, y = (float(p) for p in target.split(","))
             return x, y
+        if target[:1] in "#.":                  # a1047: a part with no key (the terminal's line, a shell window) by CSS
+            r = await self.js(f"""(() => {{ const e = document.querySelector({json.dumps(target)}); if (!e) return null;
+                e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
+                return [r.left + r.width / 2, r.top + r.height / 2, r.width, r.height]; }})()""")
+            if not r or (r[2] == 0 and r[3] == 0):
+                raise RuntimeError(f"nothing visible matches {target!r}")
+            return r[0], r[1]
         handle = target.endswith("/handle")
         key = target[:-len("/handle")] if handle else target
         r = await self.js(f"""(() => {{ let e = document.querySelector('[data-key="{key}"]'); if (!e) return null;
@@ -146,7 +168,7 @@ class Page:
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "scroll", "wait", "text",
+STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "scroll", "wait", "answer", "text",
          "blur", "events", "resend", "restart", "stop", "start")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
 SENDS_JS = """(() => { const f = window.fetch; window.__sends = [];
@@ -186,7 +208,7 @@ async def run(url, steps, size, shots, restart=None):
             await p.call("Page.navigate", url=url)
             for _ in range(100):                          # the painter has drawn when a keyed part exists, or it refused
                 await asyncio.sleep(0.2)
-                ok = await p.js("!!document.querySelector('#paint [data-key]') || !!(document.getElementById('status')||{}).textContent")
+                ok = await p.js("!!document.querySelector('#paint [data-key], #dock button') || !!(document.getElementById('status')||{}).textContent")
                 if ok:
                     break
             await asyncio.sleep(0.6)
@@ -260,6 +282,10 @@ async def run(url, steps, size, shots, restart=None):
                 elif s == "wait":
                     await asyncio.sleep(float(arg()) / 1000)
                     i += 1
+                elif s == "answer":
+                    p.reply = arg()
+                    i += 1
+                    print(f"the next dialog will be answered {p.reply!r}")
                 elif s == "text":
                     key = arg()
                     i += 1
@@ -302,9 +328,16 @@ def main():
         print(__doc__)
         return
     world, who, lens, size, live, steps = a[0], None, "command-center", (1500, 900), False, []
+    page, term = "lens", False
     k = 1
     while k < len(a):
-        if a[k] == "--as":
+        if a[k] == "--page":
+            page, k = a[k + 1], k + 2
+            if page not in ("lens", "shell"):
+                raise SystemExit("screen: --page is lens (the painter, lens.html) or shell (the windowed desktop, index.html)")
+        elif a[k] == "--term":
+            term, k = True, k + 1
+        elif a[k] == "--as":
             who, k = a[k + 1], k + 2
         elif a[k] == "--lens":
             lens, k = a[k + 1], k + 2
@@ -341,9 +374,13 @@ def main():
                 if how in ("restart", "start") and srv.poll() is not None:
                     srv = subprocess.Popen([PY, "deskd.py", str(port)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     wait_http(f"http://127.0.0.1:{port}/lens.html")
-        q = urllib.parse.urlencode({"session": session, "as": who, "lens": lens, "view": "painter", "inspect": "0"})
-        print(f"screen: {'LIVE ' if live else 'a copy of '}{world} as {who}, lens {lens}, {size[0]}x{size[1]}")
-        asyncio.run(run(f"http://127.0.0.1:{port}/lens.html?{q}", steps, size, [0], restart))
+        if page == "shell":
+            q, what, file = urllib.parse.urlencode({"session": session, "as": who}), "the windowed shell", "index.html"
+        else:
+            q = {"session": session, "as": who, "lens": lens, "view": "painter"} | ({} if term else {"inspect": "0"})
+            q, what, file = urllib.parse.urlencode(q), f"lens {lens}" + (" with the terminal" if term else ""), "lens.html"
+        print(f"screen: {'LIVE ' if live else 'a copy of '}{world} as {who}, {what}, {size[0]}x{size[1]}")
+        asyncio.run(run(f"http://127.0.0.1:{port}/{file}?{q}", steps, size, [0], restart))
     finally:
         if srv:
             srv.terminate()
