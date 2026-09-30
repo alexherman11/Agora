@@ -117,7 +117,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - It keeps two stores:
   - `seen[id] = rev`;
   - a seen index keyed by (observer, thing) → {aspect: event index}.
-- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `remove` counts as `place`, as the other placement verbs do: the subject and what it says survive, and undo puts the appearance back. `reply` (the chat verb) touches `text`.
+- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `remove` counts as `place`, as the other placement verbs do: the subject and what it says survive, and undo puts the appearance back. `place <card> above=|status=` (a1081) is not a placement: it touches `prop:status`, `prop:priority` and `prop:rank`. `reply` (the chat verb) touches `text`.
 - Three refusals:
   - `you have not looked at a04 yet; look, examine or read it first` (never for adding a line to a chat, a834);
   - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
@@ -145,12 +145,12 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 **Undo.** `undo eN` reverts an event and records the reversal as a new `undo` event. A bare `undo` reverts your own latest change that hasn't been undone; a change your rule made while someone else tripped it is skipped (undoing it would undo their command, its cause).
 - A composed verb is undone whole: contiguous events with the same `via`, `cmd` and author, and no cause.
 - A rule's consequences are undone with their cause.
-- Only the latest change to a thing can be undone.
+- Only the latest change to a thing can be undone. For an event that changed several subjects (`restore_subjects`), a later change to any of them stops the undo.
 - An event marked external (`launch`) cannot be undone.
 - There is no redo (an undo cannot be undone).
 - Undo is neither fenced nor limited to the author.
 - A world verb's use is undone whole, all its steps.
-- Undo kinds: `restore`, `restore_props`, `restore_subject` (a whole copy of the subject), `drop_comment`, `reopen`, `drop_link`, `restore_link`, `reorder` (a tiled swap), `delete` (with `delete_subject`), `external`.
+- Undo kinds: `restore`, `restore_props`, `restore_subject` (a whole copy of the subject), `restore_subjects` (whole copies of several, for `place above=`, a1081), `drop_comment`, `reopen`, `drop_link`, `restore_link`, `reorder` (a tiled swap), `delete` (with `delete_subject`), `external`.
 
 ## One language
 
@@ -164,7 +164,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 | Reading | `look [id] [:1-:4]` (`look` alone, in a world with rooms: your room, narrated; `look <room>` with no depth: that room, narrated from where you are; see Rooms), `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts` (only says scripts are verbs now, a1027), `vars`, `help` (`?`) |
 | Changing | `do <verb> <target> k=v`, `undo [eN]`; pair verbs `swap`, `beside`, `match`, `link`; world verbs (`<word> …`, `do <word> …`, `use <id> …`) |
 | Defining | rules and verbs are notes (see Rules and World verbs; `rule`, `script` and `run` only name that door, a1027); `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
-| Moving | `go <room> [:1]`, `go`, `rest [:1]` (see Rooms) |
+| Moving | `go <room> [:1]`, `go`, `rest [:1]`, `wake <name>` (see Rooms) |
 | Branching | `worktree`, `worktree fork\|diff\|merge <name>` |
 | External | `sync`, `launch` (harness) |
 
@@ -183,6 +183,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `tile as=`;
   - `sort by=due|title|kind [desc=1]`;
   - `prop k=v … | remove=k [at=appearance]`;
+  - `place <subject> into=<surface>` (a new appearance), or on a task's card (a1081, for a1069): `place <card> above=<card>` gives it that card's `status` and `priority` (removing its own when the other has none) and a `rank` just above it; `place <card> status=<value>` sends it to the bottom of its priority group among cards with that status. The house picks the rank (steps of 1000, halved between neighbours); when a gap runs out, or the card it goes above has no rank, it renumbers that group quietly, their order unchanged. One event, `place`, undone whole (`restore_subjects`); the receipt names the status and priority it changed, the rank, and any card renumbered. The card it goes above must have been looked at. A place that changes nothing refuses, `already there`;
   - `tag add= remove=`;
   - `due on= | clear=1`;
   - `append line= [section=]` (on a chat the world signs the line and it is never refused as stale: see The world);
@@ -195,7 +196,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `link to= as=`;
   - `unlink id=lNN`;
   - `resize to=WxH` (at least 40×24).
-- Most verbs go through `World.apply`. `prop`, `tag`, `due`, `launch` and the tiled `swap` write their events directly. A new primitive still needs Python; a composition does not (see World verbs).
+- Most verbs go through `World.apply`. `prop`, `tag`, `due`, `launch`, `place above=|status=` and the tiled `swap` write their events directly. A new primitive still needs Python; a composition does not (see World verbs).
 
 **Selections are the shared noun phrase.** The same grammar names a verb's target, a `find`, a view's `query=`, a rule's trigger, and a lens's `of`, `the` and `only when`:
 
@@ -240,6 +241,7 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - Every actor is in exactly one room. It is not stored apart: an actor's room is the `to=` of their latest `go` event (target the actor, `args to= from=`, `changed` empty, fence aspect `presence`). Someone who never went anywhere is in their own corner (the surface with `role=resident actor=<them>`), or, with no corner, in Home (the outermost `role=room` surface). A room since unmarked or removed sends them back to that default. **Alex is not placed** in step 1 (a678 (8)): `go` refuses him and his bare `look` is the tree.
 - `go <room>`: by id, by title, or by a word of the title (case aside, `Sable's` answers to `sable`); from anywhere. It records the event and prints the narration. A surface that isn't a room is refused with the list of rooms; several matches are refused with the list, except that your own corner wins (`go corner`). Going where you already are makes no event. `go <room> :1` walks without looking (the receipt only; nothing counts as seen). `go` alone prints where you are and who is in each room (each marked in the words a narration uses, `(asleep)` or `(resting)`; a948).
 - `rest [:1]` (a806): go home to rest, to your corner (Home if you have none). The go event carries `via=rest`, so history reads `… by pike via rest` and tells being carried home from walking. The house rests a resident with `rest :1` (after `> rest`, the quiet limit or an empty reply); how long is the house's to keep.
+- `wake <name>` (a1062; `rooms.cmd_wake`): end that resident's rest now. It sets `call=<you>` on their corner, signed by you, the event marked `via=wake`, with no look needed first (a call, like `go`); the house delivers it at once and their wake says who called and which of your lines was held for them. It refuses yourself and a name no corner has. A line to a resting resident from a resident or an agent waits for their next wake, and the speaker's receipt says so and when; a person's line (a surface says `person=<them>`) still calls at once (see Residents: the house, News).
 - A bare `look`, in a world with rooms and for anyone but Alex, narrates your room: `You are in <title> (<id>).` (`, your own corner.` in yours), a date and time line (below), the description (cut at 120 words, with a pointer), who else is here (`Here with you: Pike (resting), Sable.`). a948 names each in one of three words: asleep (their corner says `want=rest`, or `status=asleep`), resting (the house runs them and they are between turns; `resting until 21:40` when they timed the rest), or plain (in a turn right now, or someone the house does not run). Whether a resident is mid-turn is the house's own observation in `house-state/<world>/house.json`, read once per print through `scene.house_rows` (the reader behind `rows house`), so a stopped or stale house calls no one it runs awake, and a world with no house state (a copy, a test world) names everyone plain. A resident asleep is never listed there, and the room says `Sable is asleep here.` instead (`(their own corner).` in theirs) (a806). Counted: Jeff (the world's own agent, `World.me`), residents, and actors who have gone somewhere; each is in their default room until they go, what is at hand from `shows=`, one line and one id each with no geometry (kind, title, and a task's status, owner, due; a surface's count; at most 12, then a pointer), skipping the describe and talk notes, then the talk chat's last 3 lines as signed, each cut at 35 words, and how to speak (a951; `rooms.py` `speak_verb`): the word of a world verb that appends to `$here.talk` (in your own room) or to this talk by id, and that its word alone would run for you (carried or on the house; `verbs.find` decides), found at print time and never named in code: today `(say <words>; read <talk> tail=20 for more)`; with no such verb, `(say: do append <talk> line=...)`. When lines by others came between your read run and the lines shown, the hint counts them instead: `; 7 earlier lines from others you haven't read: read <talk>`; they are holes in your run (a986), so a plain read shows them. `look <room>` with no depth (a948; by id, `$here`, title, or a word of its title as `go` takes them; `look corner` is your own) narrates that room from wherever you are: `Lounge (f182), seen from Juniper's corner (f581).`, then `Here: …` or `No one is here.` in place of `Here with you`. It moves no one and counts as seen exactly what a look in the room would (it is the same `rooms.narrate`, so talk lines it prints whole extend your read run through a951's `_chat_shown`). `look <room> :2` is the room's tree; `look <id>` on anything that is not a room, `look :N` with no id and `look desk` are the tree, unchanged, and Alex's `look <room>` is the tree. The date line (a948; `rooms.clock_line`): `It is 29 Sep, 21:14.`, the day from the desk's clock (`DeskKnife.today`, the one that fills `$today` and counts `age<` and `due<`) and the hour from the house's wall time. With the clock set by hand to another day it names both: `The desk's clock says 27 Sep, 2 days behind the house's time, 29 Sep, 21:14: …`; with no clock, `No clock is set here; the house's time is …`. The clock is a day with no hour, so any other day is said. In a world with no rooms (the suite's) a bare `look` is the tree as before.
 - **What a narrated look counts as seen** (a678 (7)): the room's title, the describe note's title and text only when printed whole, and the talk chat's title, plus its text only when your read run then holds all of it with no holes (a951: the lines it prints extend your run as `tail=` would, and a line cut with `…` is not read, for the receipt or for a rewrite; see Reading a chat). Things listed at hand are not marked at all: look or read one before acting on it (`you have not looked at …`). A chat line still lands after a narrated look, since adding to a chat is never stale.
 - A go is journaled like any event (history lists it; a fork copies it; a worktree merge replays `go` lines, and they never conflict) but outside undo's reach: `undo eN` on a go refuses (`eN is a go: where you are is not a change to anything in the world, so undo leaves it…`), and a bare `undo` passes over it.
@@ -327,6 +329,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
 | `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
 | `over $<list>` | Repeat over a list field or derived rows; `$it` is each value |
+| `by <prop>[, <prop>]` | On an `of` repeat (a1081, for a1069): its members in the order of those props, numbers ascending, then words, a missing value last; ties keep the selection's order, which is the order the appearances were made (a row source sorts by its fields). Applied in the scene, before `clamp`, so `scene`, `look` and the painter show one order, and the repeat prints `· N of <selection> by <props>`. The names after the comma are more props, so a prop named like a lens word (`role`, `text`) can't follow `by` there. A clamped repeat's membership read records the props, and deskd re-orders before comparing the prefix. Refused without `of`. The Desktop's lanes: `of kind:task,prop:status=doing, by priority, rank` |
 | `derive <name> = <interp> <inputs>` | A named calculation from a closed list: `day-n`, `days-from`, `day-or-time`, `weekday`, `week-of`, `time`, `date`. It prints its inputs and result |
 | `capture <field>=<value>` | Use this value instead of following; prints `(now X: differs)` when the world has moved on. Kept out of the fence |
 | `at item` | The appearance's own world geometry, only under a `free` parent |
@@ -533,7 +536,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 
 **Welcome and waking.**
 - The welcome (the placed note "The door", with `$me` replaced by the name) prefixes the first message after a fresh start, a lost conversation, or a `compact_boundary` event (a compaction).
-- Every wake begins `You are <actor>. Your corner is <rid>.`, followed by:
+- Every wake begins `You are <actor>. Your corner is <rid>.` and its reason, then, first, who woke it and what was kept for it while it rested (a1062; see News), followed by:
   - the receipt of the wake line;
   - news;
   - any undelivered text from a turn that didn't finish.
@@ -553,18 +556,20 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 - A wake line can now be `read <soul> :3; look`: the bare look narrates the room it is in (its corner after a rest). Measured on a copy of frontier on 29 Sep: about 1300 words, against about 6000 for today's `read <soul> :3; look <corner> :3; look Board :3; read a570`.
 
 **News.**
-- **Urgent news ends any rest:**
+- **A call ends any rest** (a1062): `wake <name>` or the Desktop's wake button (both below, under Waking is its own act); a comment on a thing in its corner; a comment on its own commission.
+- **Lines that address it** end any rest when a person says them, and wait for its next wake when a resident or an agent does (a1062, below):
   - a line in a chat in its corner;
-  - `@name`, `@everyone` or `@all` anywhere; use versus mention (a916): nothing inside backticks or quotes counts (a single quote only when it is not an apostrophe); outside a chat line only `@name` reaches, and only when the edit adds it (a rewritten text that already named you is not news); `@everyone` and `@all` reach only from a chat line. The notice says what reached you (`as @name`);
-  - a comment on a thing in its corner;
-  - a comment on its own commission.
+  - `@name`, `@everyone` or `@all` anywhere; use versus mention (a916): nothing inside backticks or quotes counts (a single quote only when it is not an apostrophe); outside a chat line only `@name` reaches, and only when the edit adds it (a rewritten text that already named you is not news); `@everyone` and `@all` reach only from a chat line. The notice says what reached you (`as @name`).
 - **Held news rides along with the next message:** a line in a chat whose `members` include `all` or the resident.
+- **A mention waits for waking** (a1062). Who is speaking is read from the world, never from a name in code (`rooms.kind_of`, a1016): a *resident* (a corner names them), a *person* at a keyboard (a surface whose prop `person=` names them: the live Desktop says `person=alex`), or an *agent* (anyone else: a worker, a Claude session). While a resident is between turns (resting by choice or not; `house.news(..., resting=True)` in the pass and at a wake), a line above from a resident or an agent does not end its rest: it is kept in its `state.json` as `for_you` and said first at its next wake, however that comes (a timed rest ending, `breather`, `wake_every`, a call, a person's line), after `You are <actor>...` and the reason, as `for you while you rested (N):` then each `~ HH:MM in chat '<title>' (eN): <signed line>` (`~ HH:MM <who> mentioned you on '<title>', as @name (eN): ...` outside a chat). To a resident in a turn nothing changed: it goes with its next message, marked `(to you)`. A line in its own corner's chat (a visitors' book) from a resident waits the same way: a note at the door, not a knock. A plain line in a shared chat is never marked for you.
+- **Waking is its own act** (a1062). `wake <name>` (a desk command, beside `rest`; `rooms.cmd_wake`) sets `call=<you>` on that resident's corner, signed by you and marked `via=wake`; the Desktop's wake button sets the same prop (with `want=awake`). The house takes it as a call: `~ <who> woke you (wake, eN)` (from the Desktop, `~ <who> called you from the Desktop (eN)`), followed, when a line of the waker's was held, by `, for the line they left you:` and that line; the rest of what was held follows under `for you while you rested`. The house clears `call` once delivered, by a call or by a wake (a resident started from `want=rest`), so the next wake is a change again. `wake` refuses yourself and a name no corner has; `wake` a second time before delivery says it is already called. Its receipt: `ok eN: you wake Pike (f576); the house calls them now, and their wake says you called`, or, to a resident in a turn, that the call goes with what reaches them when it ends, or, to one asleep (`want=rest`), that the call waits until someone sets `want=awake` (a resident's wake never sets `want`).
+- **The speaker's receipt** (a1062; `rooms.waiting_note`, from `desk._chat_waits` after an append to a chat): for each resident the line calls (as the house hears it: `rooms.called_by_line`) who is resting or asleep, one line: `Pike is resting until 15:36; they'll see this when they wake, first and marked for them, so there's no need to say so (wake pike to call them now)`; after an untimed rest `Pike is resting, until 14:38 at the latest; ...` (from `house.json`'s `wakes_at`); asleep, `Pike is asleep (the house doesn't run them); ...`. A person's receipt says `Pike was resting; your line calls them now`. Nothing is said for a resident in a turn, or when no house state is readable (a copy, a test world).
 
 **Failure.** A lost conversation (`No conversation found`) starts fresh, with the welcome. Other failures retry with backoff up to an hour, with status `error`.
 
 **State.**
 - The house writes the corner's `status` (`awake`, `asleep`, `unnamed`, `error`) as actor `house`, only on change.
-- `house-state/<world>/house.json`, rewritten every pass, is read by the `house` and `turns` row sources, and by a narrated look for presence (a948, through the `house` source's reader). It carries each resident's last 10 replies (`said`, each cut at 2000 characters), so Alex's Desktop can show what they wrote, their own thinking included.
+- `house-state/<world>/house.json`, rewritten every pass, is read by the `house` and `turns` row sources, and by a narrated look for presence (a948, through the `house` source's reader). It carries `wakes_at` (a1062: when the house would next wake a resident between turns on its own: a timed rest's end, else its last turn plus `breather` while an objective is open, else plus `wake_every`; the `house` row source prints it as `wakes`, HH:MM, while it rests) and `held` (how many lines wait for its next wake), and each resident's last 10 replies (`said`, each cut at 2000 characters), so Alex's Desktop can show what they wrote, their own thinking included.
 - Each corner keeps `state.json` and `transcript.jsonl`.
 - `house-state/` is never committed.
 
@@ -653,7 +658,7 @@ A refusing lens is listed but doesn't fail health.
 | `blanks.py` | 240 | The one filler (a806): `$here $here.<prop> $new $today $me $<handle>`, `$1 $* $this` in verbs, `$item` in rules, a thing's parts `.title .maker .<prop>` (a1027); a backslash before a dollar sign keeps it literal; `help blanks` |
 | `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
-| `rooms.py` | 437 | Rooms (a678, a806, a948): what a room is, where each actor is (derived from `go` events), `go`, `rest` (home, `via=rest`), the narrated `look` and `look <room>`, the date line, presence (asleep, resting, plain) |
+| `rooms.py` | 437 | Rooms (a678, a806, a948): what a room is, where each actor is (derived from `go` events), `go`, `rest` (home, `via=rest`), `wake <name>` (a call, a1062), the narrated `look` and `look <room>`, the date line, presence (asleep, resting, plain), what kind a speaker is (`kind_of`: resident, person, agent), who a chat line calls and the receipt's line for those resting (`called_by_line`, `waiting_note`; a1062) |
 | `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
 | `explore.py` | 257 | CLI: forward to deskd or run under the pid lock (`take_lock`, `release_lock`); atomic save; `--window --dump --shape --reset`; `!actor` injection |
 | `deskd.py` | 408 | HTTP server, its origin and session-name checks, and the gesture fence |
@@ -667,7 +672,7 @@ A refusing lens is listed but doesn't fail health.
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
-| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `golden_prints.py`, `suite/` | 382, 839, 153, 223, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
+| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `test_waiting.py`, `golden_prints.py`, `suite/` | 382, 839, 153, 223, 210, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
 | `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 544 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
@@ -832,4 +837,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2178. Edit it there; a direct edit here makes the next export stop and warn. sha1:3bffe97aef4b -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2543. Edit it there; a direct edit here makes the next export stop and warn. sha1:97f4fadcbcb9 -->

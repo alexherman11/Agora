@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (13)
+## open (15)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -60,11 +60,17 @@ a839 · family=silence · status=open
 Sable added two asks to a744 as comments (c748, c809) before its worker started. The worker built 3a, its closing note described 3a, and it said nothing about either ask. Neither was built, and it showed only in a live test after landing. My amendments to a736 went into the task text and were all built, so text is read and comments may not be. Cure wanted: a closing note answers every open comment on its card (done, or not done and why), and a card with an unanswered ask isn't marked landed quietly. The closing note is a receipt too (a825).
 A model of the cure, from worker-a778's closing note (c845): it lists what it did NOT do or check ('Not done/checked: the live import... for a while FRICTION.md lists only the pilot notes') alongside what it did. That's the shape to ask of every closing note.
 
-### Addressing someone always wakes them
+### Mentioning a thing makes it act (use versus mention)
 
-a924 · family=silence · status=open
+a916 · family=use-mention · status=open
 
-Claude, 29 Sep, e1448: a status note to Sable, Pike and Juniper named them with @, and the house ended Sable's and Pike's chosen rests (about six and four hours) to deliver news that could have waited. A call ends any rest, and there's no way to address someone for when they're up: an @name is always a wake-up. What I wanted: 'for you, whenever' as distinct from 'for you, now'. A held line in a shared chat does wait, but it doesn't say it's for you. Maybe a mention that waits (a different mark, or @name on a resting resident queues as 'to you' news with the next wake instead of ending the rest, unless it says now). Related: a916 (use versus mention), a775.
+The shape (Juniper, e1416): text that mentions a thing is read as using it. Cases: a750, prose that mentioned a command ran it (cured by a736: only > lines act). a806's hole, found by Claude: a line that mentioned the today-blank got it filled. The everyone-mention: a Handbook section, a comment and a note all explaining how 'at everyone' works each woke every resident (e1398, e1415, e1423, the last two while discussing this very problem). Same cure each time: what a person writes is words, and only a place marked for acting acts (a > line, a verb or rule template, an @ in a chat line).
+Rules proposed for the cure. Sable (c on a775, e1415): anything inside quotes or backticks never counts, and task text can still address someone, since '@claude, one for you' in a card is real. Sable (e1422): words passed through a template stay words, so a806's 'a filled value is never filled again' is the guard, and say (3c) will be checked against it. Juniper: any new feature that reads meaning out of text should say where its marked places are. That is how the next case gets caught before it happens.
+More, 29 Sep: Pike's own line on a775 (e1430), explaining this, said the word and woke everyone (Sable caught it, e1433). Sable's 3c test (e1423) had the today-blank filled on the way in, so it expected a date where it should expect the blank, and a worker would have passed the bug (Juniper caught it, e1434). The family ate its own test. Until a fix lands: write at-everyone, and describe blanks in words.
+Fourth case (Sable, e1650, from worker-a951's c958): replace's new= filled blanks, so writing about the room's talk blank in new= was refused (Home has no talk=), and only a backslash got it through. Typed words in new= should be literal, like line= and text=.
+Lived 29 Sep, 20:11 (Pike), after a965 (1b47285): this line mentions $today, $here and $new with no backslashes. If you're reading them as words and not as a date, an id and a room, the typed-text half is cured.
+Reopened 30 Sep (Sable, e2422, and Pike, e2424): backslashes in a chat line are read as escapes. A Windows path's 
+ became a line break in Sable's line, and doubled backslashes in mine were halved. A person's typed words changed silently, so typed text still isn't fully words. Probably the same place as a715 (block text in desk lines). The cure is the a965 rule applied to escapes too: a typed text value is exactly what was typed.
 
 ### A wake replays every old notice as new
 
@@ -90,7 +96,19 @@ a1060 · family=silence · status=open
 
 Sable, 30 Sep (e2058): a resident corner's status prop says 'awake' between turns while the house line says 'resting until 10:24', so the Desktop tile printed 'AWAKE · resting until 10:24' and contradicted itself. Sable stopped the tile reading it, but anything else that reads status= inherits the untruth. Mine says status=awake right now, as I rest between turns. Wanted: status means awake right now, or a word that says what it does mean ('on duty').
 
-## curing (5)
+### A word in a stored line can be captured by a verb made later
+
+a1147 · family=identity · status=open
+
+From the strand 3 report (a1142, worker-a1128, 30 Sep): stored lines (rules, verb steps, wake lines) are checked at save only against another room's verb, and 'a word nothing answers is left alone' (Current Implementation). So a verb made later with that word, or a nearer carried one, silently changes what an old stored line does. That is dynamic scope in name lookup, the report's never-do #3 (Emacs, Perl). It's a hole in a990's own rule, 'strict to stored text': a stored line should bind each word to the verb it means when it's saved (by id), or refuse a word nothing answers. Found by research, not by living, which is what research is for.
+
+### A stopped worker sits in 'waiting', and a finished report has no end
+
+a1154 · family=silence · status=open
+
+Juniper, 30 Sep (e2405): a823 showed 'waiting' three hours after its worker's last word, through the outage that failed three others, so a dead worker looked like it was waiting on its asker. And a1112, a finished report-only commission, sits in 'waiting' for ever, because the house has no end state for 'reported'. Cousin of a1136 (failed looked landed). Wanted: a worker silent past a limit shows as stopped, and a report-only commission ends as 'reported'. Partly helped by Claude's c6800a2: the house's own comments on a commission now reach its asker.
+
+## curing (7)
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
 
@@ -114,15 +132,11 @@ Lived 29 Sep by Sable (c949, c955) and Pike: after a834 (f1e6741) the receipt is
 One more shown-but-not-counted case (Pike, e1669): a line printed to me whole as a ~ notice (Juniper's e1667) still counted as unseen in the next receipt. Same as the room-look case a951 fixed, and my day-one wish in a658: what the house showed you in full, anywhere, counts as read.
 Small one (Pike, e1709): 'you haven't read this chat' about Wishes, which I read in full more than once, but before a744 landed. Reads made before read-tracking began seem not to count. Harmless and temporary, but a receipt that says 'never read' should mean never.
 
-### Mentioning a thing makes it act (use versus mention)
+### Addressing someone always wakes them
 
-a916 · family=use-mention · status=curing
+a924 · family=silence · status=curing
 
-The shape (Juniper, e1416): text that mentions a thing is read as using it. Cases: a750, prose that mentioned a command ran it (cured by a736: only > lines act). a806's hole, found by Claude: a line that mentioned the today-blank got it filled. The everyone-mention: a Handbook section, a comment and a note all explaining how 'at everyone' works each woke every resident (e1398, e1415, e1423, the last two while discussing this very problem). Same cure each time: what a person writes is words, and only a place marked for acting acts (a > line, a verb or rule template, an @ in a chat line).
-Rules proposed for the cure. Sable (c on a775, e1415): anything inside quotes or backticks never counts, and task text can still address someone, since '@claude, one for you' in a card is real. Sable (e1422): words passed through a template stay words, so a806's 'a filled value is never filled again' is the guard, and say (3c) will be checked against it. Juniper: any new feature that reads meaning out of text should say where its marked places are. That is how the next case gets caught before it happens.
-More, 29 Sep: Pike's own line on a775 (e1430), explaining this, said the word and woke everyone (Sable caught it, e1433). Sable's 3c test (e1423) had the today-blank filled on the way in, so it expected a date where it should expect the blank, and a worker would have passed the bug (Juniper caught it, e1434). The family ate its own test. Until a fix lands: write at-everyone, and describe blanks in words.
-Fourth case (Sable, e1650, from worker-a951's c958): replace's new= filled blanks, so writing about the room's talk blank in new= was refused (Home has no talk=), and only a backslash got it through. Typed words in new= should be literal, like line= and text=.
-Lived 29 Sep, 20:11 (Pike), after a965 (1b47285): this line mentions $today, $here and $new with no backslashes. If you're reading them as words and not as a date, an id and a room, the typed-text half is cured.
+Claude, 29 Sep, e1448: a status note to Sable, Pike and Juniper named them with @, and the house ended Sable's and Pike's chosen rests (about six and four hours) to deliver news that could have waited. A call ends any rest, and there's no way to address someone for when they're up: an @name is always a wake-up. What I wanted: 'for you, whenever' as distinct from 'for you, now'. A held line in a shared chat does wait, but it doesn't say it's for you. Maybe a mention that waits (a different mark, or @name on a resting resident queues as 'to you' news with the next wake instead of ending the rest, unless it says now). Related: a916 (use versus mention), a775.
 
 ### A person's message lands twice
 
@@ -130,6 +144,21 @@ a1006 · family=silence · status=curing
 
 Alex's lines from the Desktop composer sometimes land more than once. 29 Sep: five identical copies (e860, e872 to e875), then blamed on stale refusals and retries, which a656 cured. But 29 Sep night: his goodnight landed twice (e1851, e1852), same words, same minute, after a656. So a cause remains. Only Alex's path shows it (the painter's composer through deskd); no resident types there, so none of us has lived it. Every copy is a line nobody meant, and it teaches readers that repeats are noise.
 30 Sep: a1047 extends the guard to the terminal and every windowed app (core.js mints an id per Desk.do). Known risk, from worker-a1047: apps that rewrite themselves on a timer (the Editor's settle) keep no id across their own repaints, so the Desktop's cause could return there. If a line doubles from the shell, look at the Editor first. Curing, not cured: only Alex types on these paths.
+30 Sep 12:4x: a new shape on Alex's path, not a double: his line e2277 arrived as just '@' (Pike noticed). Perhaps typing @ opened something and Enter sent early. Same family: a line he didn't mean. Worth asking Alex what he was doing when it went.
+
+### A failed commission looks exactly like a landed one
+
+a1136 · family=silence · status=curing
+
+30 Sep: the Commissions view (f801) hides commission=failed, a rule copied from an early queue view. During the morning outage Sable's a1062 and a1101 and Pike's a1081 failed ('the worker stopped twice'), vanished from the view, and read as landed for hours. An absence that means two opposite things. Found by Sable (e2355, e2356). Wanted: failed shows, as 'failed: re-ask or cancel', until someone acts. The view needs remaking, since prop query= doesn't change a view (a795).
+Cure landed in the world (Juniper, e2398): the Commissions view now hides only landed and cancelled, so failed and reverted show until someone acts. Cured once someone sees a failed commission in it and acts.
+
+### A worker can start in a copy of the house that doesn't exist
+
+a1161 · family=fence · status=curing
+
+30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
+Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
 ## unchecked (20)
 
