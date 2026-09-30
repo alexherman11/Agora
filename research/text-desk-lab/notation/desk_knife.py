@@ -55,7 +55,7 @@ HELP_LEAN = HELP_KNIFE.replace(
                          first word. One > line is one command: a ; in it is words, so several commands are several
                          > lines, run in order; a refusal stops the ones after it. A > line nothing answers (a
                          quote) is a MISS: logged in Misses, it stops nothing. Scripts and wake lines keep ;
-  more: help rules · help scripts · help views · help clock · help handles · help blanks · help why · help export · help trials
+  more: help rules · help scripts · help views · help clock · help handles · help blanks · help why · help export · help trials · help lens
   building: help verbs (capabilities anyone makes in the world) · help commissions (a worker changes the code for you)"""
 
 
@@ -1284,6 +1284,14 @@ class DeskKnife(DeskMoo):
             return self.HELP_TOPICS[name]
         if name in ("selections", "selection", "select"):
             return SELECTION_HELP
+        if name in ("lens", "lenses"):
+            import scene      # a1032: the words from the parser's own table, so this help cannot lag behind it
+            return ("a lens is a note tagged lens; each line is `name : word, word`, indentation is containment (scene <lens>\n"
+                    "  prints what it makes). Its words: " + scene.vocabulary() + ".\n"
+                    "  fold: the viewer's own toggle; a folded part hides its children and gives up its share, except a child\n"
+                    "  marked peek, which stays shown as the folded part's summary (e.g. a resident's Now cards on a folded tile).\n"
+                    "  A selection (of, the, only when) is filled from fields ($id) and frames, not from a thing's props: name\n"
+                    "  the repeat (of ... as r) and write $r.actor; a bare $actor there stays the literal word and matches nothing.")
         if name in knife.PAIR_DOC:
             args, doc = knife.PAIR_DOC[name]
             return f"{name}  (pair verb; level 2)\n  {doc}\n  args: {args}\n  e.g. do {name} a20 a22" + (" to=a22" if name == "match" else "")
