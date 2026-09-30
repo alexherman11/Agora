@@ -4,7 +4,7 @@
 
 Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
-  - test_scene.py passes
+  - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
   - the frozen session prints are unchanged in the golden form (suite/sessions.py --check)
   - every lens in <world> that the desk can find still compiles; the list of lenses that compile is printed, so a
     landing can be judged against the list from before it (a lens that was already broken is not the change's fault)
@@ -96,6 +96,22 @@ def main():
         print(f"test_scene: {last}{took('test_scene', t0)}")
         if code:
             failed.append(f"test_scene: {last}")
+        # Pike a611, 30 Sep: some painter rules live only in CSS (peek's nesting, a1032), and only a browser can test
+        # them. When one is here, every test_*_paint.py runs (about 3 s each); without one, the line says so
+        t0 = time.perf_counter()
+        from screen import BROWSERS
+        paints = sorted(HERE.glob("test_*_paint.py"))
+        if not any(Path(b).exists() for b in BROWSERS):
+            print(f"paint tests: no browser here; {len(paints)} not run{took('paint', t0)}")
+        elif paints:
+            outs = []
+            for p in paints:
+                code, out = run([p.name], timeout=180)
+                last = (out.strip().splitlines() or ["?"])[-1]
+                outs.append(f"{p.stem}: {last}")
+                if code:
+                    failed.append(f"paint {p.stem}: {last}")
+            print(f"paint tests: {'; '.join(outs)}{took('paint', t0)}")
         t0 = time.perf_counter()
         code, out = run(["suite/sessions.py", "--check"])
         line = next((l for l in out.splitlines() if "worlds at" in l), out.strip()[-200:])
