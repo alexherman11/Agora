@@ -49,9 +49,20 @@
   }
   write(`desk terminal · ${who} in ${session} · help for the manual, clear to clear`, "term.echo");
 
+  // a1047: one intent, one event (a1008 gave the painter this). Enter on new words mints a gesture id. If the answer is
+  // lost, the words go back into the line holding that id, kept over a reload: Enter on them, untouched, sends the
+  // same press again, and deskd says "already done, as eN" if the first got through. Typing in the line or walking
+  // the history lets go of the id, so the same words sent again on purpose are a new press and a new line.
+  const heldKey = `desk-term-held:${session}:${who}`;
+  let held = null; try { held = JSON.parse(localStorage.getItem(heldKey) || "null"); } catch (e) { held = null; }
+  const hold = h => { held = h; try { h ? localStorage.setItem(heldKey, JSON.stringify(h)) : localStorage.removeItem(heldKey); } catch (e) { /* view state only */ } };
+  if (held && held.line) { input.value = held.line; write(`"${held.line}" was sent and its answer was lost; Enter sends it again as the same press`, "term.err"); }
+  input.addEventListener("input", () => { if (held) hold(null); });
+
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const line = input.value.trim(); if (!line) return;
+    const gesture = held && held.line === line ? held.id : `${who}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     input.value = ""; draft = "";
     if (hist[hist.length - 1] !== line) hist.push(line);
     hist = hist.slice(-200); at = hist.length;
@@ -59,15 +70,22 @@
     if (line === "clear") { out.replaceChildren(); return; }
     write(`${who}> ${line}`, "term.echo");
     input.disabled = true;
-    try {
-      const r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line }) })).json();
+    let res = null;
+    try { res = await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, gesture }) }); }
+    catch (e3) {
+      hold({ line, id: gesture }); input.value = line;
+      write(`the answer was lost (${e3.message}); whether it was done is unknown. The line is back below: Enter sends it again as the same press, and the desk says if it was already done`, "term.err");
+    }
+    if (res) {
+      hold(null);                         // an answer came back: this press is finished, whatever it said
+      let r; try { r = await res.json(); } catch (e4) { r = { error: `deskd answered ${res.status} without words` }; }
       const t = r.text || r.error || "(no answer)";
       write(t.replace(/^> .*\n/, ""), r.error || /^ERR/m.test(t) ? "term.err" : null);
-    } catch (e3) {
-      write(`the answer was lost (${e3.message}); whether it was done is unknown until the view repaints`, "term.err");
-    } finally { input.disabled = false; input.focus(); }
+    }
+    input.disabled = false; input.focus();
   });
   input.addEventListener("keydown", e => {
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && held) hold(null);
     if (e.key === "ArrowUp" && at > 0) { if (at === hist.length) draft = input.value; input.value = hist[--at]; e.preventDefault(); }
     else if (e.key === "ArrowDown" && at < hist.length) { at++; input.value = at === hist.length ? draft : hist[at]; e.preventDefault(); }
     else if (e.key === "l" && e.ctrlKey) { out.replaceChildren(); e.preventDefault(); }
