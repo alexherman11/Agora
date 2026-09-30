@@ -581,6 +581,109 @@ def test_code_runs_are_automatic_and_plain_opts_out():
     assert "runs" not in m["paint"]
 
 
+def test_count_word_and_true_size():
+    """a1101: `count <selection>` is a size without drawing; $count on a repeat is its size before the clamp."""
+    import deskd, lens_ir
+    refused("root : column, of kind:note, count kind:note, each c\nc : text a", "a repeat already has $count")
+    tmp = _scratch("_test_count")
+    try:
+        with deskd.Session("_test_count", "jeff") as desk:
+            src = chr(10).join(["root : column",
+                                '  line : text "$count notes", role meta, count kind:note, only when $count > 1',
+                                '  none : text "$count gone", count tag:no-such-tag, only when $count > 0',
+                                '  list : column, of kind:note, clamp 1, each c, text "$n of $count"',
+                                '    foot : text "all $count"',
+                                'c : text "$title ($count)"'])
+            sc = lens_ir.evaluate(desk, src)
+            line, none, lst = sc["kids"]
+            assert line["text"] == "2 notes" and line["counted"] == ("kind:note", 2), line
+            assert none.get("absent") and none["why"] == "$count is 0, not > 0", none
+            assert lst["text"] == "1 of 2", lst["text"]
+            assert lst["kids"][0]["text"].endswith("(2)") and lst["kids"][-1]["text"] == "all 2", [k["text"] for k in lst["kids"]]
+            assert "· count 2 of kind:note" in scene.to_text(sc, "t", "jeff", 0)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_scene_for_one_part_and_ok():
+    """a1101: scene <lens> <part path> prints only that part; scene <lens> ok is one line; the lens name may be quoted;
+    a lens without style= says so; lens and style edits say their effect on the receipt."""
+    import deskd
+    tmp = _scratch("_test_part")
+    try:
+        with deskd.Session("_test_part", "jeff") as desk:
+            say = lambda line: (lambda r: r.get("text") or r.get("error"))(desk.dispatch("desk", {"line": line}))   # noqa: E731
+            say("look")
+            src = "\\n".join(["root : column", "  side : column", '    h : text \\"PEOPLE\\"', "    list : column, of kind:note, each c",
+                              '  other : text \\"elsewhere\\"', 'c : text \\"$title\\"'])
+            made = say(f'do create f01 kind=note tags=lens title="two words" text="{src}"')
+            assert "~ lens two words compiles: " in made and "no style=; using the default (calm)" in made, made
+            out = say('scene "two words" side')
+            assert "part side: 1 match" in out and "PEOPLE" in out and "elsewhere" not in out, out
+            assert "= root/side" in out and "no style=; using the default (calm)" in out.splitlines()[0]
+            assert " matches · " in say("scene two words list/c")      # each instance of c is a match
+            assert len(say("scene two words ok").splitlines()) == 1
+            assert "no part 'nope'" in say("scene two words nope")
+            say("find two words")
+            aid = [s for s in desk.world.subjects.values() if s["title"] == "two words"][0]
+            app = desk.world.appearances_of(aid["id"])[0]
+            say(f"read {app} :3")
+            broke = say(f'do replace {app} old="text \\"elsewhere\\"" new="text \\"elsewhere\\", role no-such"')
+            assert "~ ! lens two words does not compile: line 5: no role 'no-such'" in broke and "| two words line 5: other :" in broke, broke
+            assert say("scene two words ok").startswith("lens two words does not compile")
+            # a style note, and a lens under it
+            say('do create f01 kind=note tags=style title=plainer text="token paper = #fff\\ntoken ink = #111\\nrole body : ink"')
+            say(f"read {app} :3")
+            say(f'do replace {app} old=", role no-such" new=", role body"')
+            said = say(f"do prop {app} style=plainer")
+            assert "~ lens two words compiles" in said and "style plainer" in said, said
+            st = [s for s in desk.world.subjects.values() if s["title"] == "plainer"][0]
+            sa = desk.world.appearances_of(st["id"])[0]
+            say(f"read {sa} :3")
+            out = say(f'do append {sa} line="role oops on paper"')
+            assert "~ style plainer does not parse: line 4" in out and "lenses using it: two words; all compile" in out, out
+            say(f"read {sa} :3")
+            out = say(f'do replace {sa} old="role oops on paper" new="role card : on papr"')
+            assert "~ style plainer parses" in out and "- new: role card `on papr` (line 4)" in out, out
+            say(f"read {sa} :3")
+            out = say(f'do replace {sa} old="role body : ink" new="role bodies : ink"')
+            assert "now refusing: 1" in out and "no role 'body' in style plainer" in out, out
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+STYLE_SAMPLES = [
+    "token paper = #EEE\ntoken ink = #111\ntoken gap = 8\ntoken text = plex 14/1.5\ntoken line = ink at 70%\n"
+    "role a : on paper, ink, text down 2, pad gap, pad top gap, corner 3, corner gap, lift 1, lift gap, edge line\n"
+    "role b : on papr, inky, text.pixel, space below gap /2, between gap x2, width 30em, border left ink, text at 12\n"
+    "role c : text medium, hide title, ink at 40%, glow",
+    "role x : on #fff",
+    "role x : pad 12px",
+    "role x on paper",
+    "present card : title",
+    "theme dark of calm\n  role x : ink",
+    "token a = #000\nsomething else",
+    "# only a comment\ntoken paper = #fff  # trailing comment\nrole y : on paper",
+]
+
+
+def test_style_check_agrees_with_the_painter():
+    """a1101: scene.style_check mirrors desk-shell/style/style.js; judged against node running the real file."""
+    import json, pathlib, shutil, subprocess
+    here = pathlib.Path(scene.__file__).resolve().parent
+    samples = STYLE_SAMPLES + [(here / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")]
+    for src in samples:
+        py = scene.style_check(src)
+        if not shutil.which("node"):
+            continue
+        js = json.loads(subprocess.run(["node", str(here / "desk-shell" / "checks" / "style-read.js")], input=src,
+                                       capture_output=True, text=True, encoding="utf-8", check=True).stdout)
+        assert (py["refusal"] or "").split(":")[0] == (js["refusal"] or ""), (src, py["refusal"], js["refusal"])
+        assert sorted([r, p] for r, p, _l, _w in py["unread"]) == sorted(js["unread"]), (src, py["unread"], js["unread"])
+    bad = scene.style_check(STYLE_SAMPLES[0])["unread"]
+    assert ("b", "on papr", 7,"names no token of the right kind") in bad
+
+
 if __name__ == "__main__":
     n = 0
     for name, fn in list(globals().items()):

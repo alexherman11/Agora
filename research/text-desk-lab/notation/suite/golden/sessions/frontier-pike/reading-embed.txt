@@ -1,4 +1,4 @@
-scene reading-embed · for golden · world @59
+scene reading-embed · for golden · world @59 · no style=; using the default (calm)
   top column
     c · lens cal
       cal a32 row · the tag:trip -> s31 (a32) as trip · key lens:cal

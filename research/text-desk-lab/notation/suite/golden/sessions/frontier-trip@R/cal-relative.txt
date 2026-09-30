@@ -1,4 +1,4 @@
-scene cal relative · for golden · world @48
+scene cal relative · for golden · world @48 · no style=; using the default (calm)
   cal row
     d1 [sheet] column
       head "Day 1" [heading]

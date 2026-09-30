@@ -1,4 +1,4 @@
-scene cal-today · for golden · world @59
+scene cal-today · for golden · world @59 · no style=; using the default (calm)
   cal column
     items column · 2 of tag:bigsur
       it a34 [card] · key a34

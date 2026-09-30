@@ -1,4 +1,4 @@
-scene due list · for golden · world @20
+scene due list · for golden · world @20 · no style=; using the default (calm)
   list a03 column · the prop:role=term -> s02 (a03) as term
     rows a03 column as a · 3 of parts:a03,prop:role=assignment
       row a05 row · dd = day-n(2027-03-29, 17) = 2027-04-14 · wd = weekday(2027-04-14) = Wed · read term s02 start=2027-03-29; a s04 off=17 · key a05

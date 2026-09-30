@@ -1,4 +1,4 @@
-scene cal sections · for golden · world @21
+scene cal sections · for golden · world @21 · no style=; using the default (calm)
   cal row · 3 of sections:a03
     day a03 [sheet] column · key before-the-first-heading
       head a03 "(before the first heading)" [heading]

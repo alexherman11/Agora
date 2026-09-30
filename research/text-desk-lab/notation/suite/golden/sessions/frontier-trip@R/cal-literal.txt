@@ -1,4 +1,4 @@
-scene cal literal · for golden · world @48
+scene cal literal · for golden · world @48 · no style=; using the default (calm)
   cal row
     d1 [sheet] column
       head "Sat Oct 10" [heading]
