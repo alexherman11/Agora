@@ -50,6 +50,8 @@ def aspects_of(verb, args):
         return {"comments"}           # Juniper: a comment must not refresh a finish, nor stale a card's gestures
     if verb in ("link", "unlink"):
         return {"links"}
+    if verb == "go":
+        return {"presence"}           # a678: where an actor is; no thing's aspect
     if verb in ("move", "resize", "place", "tile", "untile", "stack", "fold", "unfold", "sort", "tidy", "gather", "swap",
                 "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop", "remove"):
         # remove takes an appearance off its surface: the subject and all it says survive (undo puts it back), so it is
@@ -652,14 +654,23 @@ class Desk:
         evs = [e for e in self.world.events[self.last_event_seen:]
                if (e["by"] != me and e.get("tripped_by") != me) or rule_did_unseen(e, me)]
         self.last_event_seen = len(self.world.events)
+        # a678 (6): walking folds, at most one line per actor, their latest room
+        latest = {e["by"]: e for e in evs if e["verb"] == "go"}
+        evs = [e for e in evs if e["verb"] != "go" or latest.get(e["by"]) is e]
         if not evs:
             return ""
 
         def rule_of(e):
             return str(e.get("via") or "").split(" ", 1)[-1] if e.get("tripped_by") else None
 
+        def went(e):
+            to = (e.get("args") or {}).get("to")
+            return self.world.nodes[to]["title"] if to in self.world.nodes else to
+
         if len(evs) <= 4:
             def part(e):
+                if e["verb"] == "go":
+                    return f"{e['id']} {e['by']} went to {went(e)}"
                 if rule_did_unseen(e, me):
                     args = {k: (v if len(str(v)) <= 60 else str(v)[:57] + "…") for k, v in (e.get("args") or {}).items()}
                     verb = e["verb"]
@@ -674,7 +685,12 @@ class Desk:
         mine = {e["undo"].get("delete_subject") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
         mine |= {e["undo"].get("delete") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
         lines, to_me, undone = {}, [], []
+        moved = {}
         for e in evs:
+            if e["verb"] == "go":
+                moved[e["by"]] = went(e)
+                lines.setdefault(e["by"], {})
+                continue
             if e["verb"] == "undo":
                 undone.append(e)
             if e["verb"] == "comment" and e["target"] in mine:
@@ -692,7 +708,8 @@ class Desk:
         for by, groups in lines.items():
             top = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:4]
             out.append(f"   {by}: " + ", ".join(f"{len(ids)} {verb} in {name}" if len(ids) > 1 else f"{verb} in {name}" for (verb, name), ids in top)
-                       + (f", +{len(groups) - 4} more kinds" if len(groups) > 4 else ""))
+                       + (f", +{len(groups) - 4} more kinds" if len(groups) > 4 else "")
+                       + ((", now " if groups else "now ") + f"in {moved[by]}" if by in moved else ""))
         return "\n".join(out) + "\n"
 
     # ---- commands ---------------------------------------------------
@@ -918,7 +935,8 @@ class Desk:
     def cmd_undo(self, eid):
         if not eid:
             mine = [e for e in self.world.events if e["by"] == self.world.me and e["verb"] != "undo" and not e.get("undone")
-                    and not rule_did_unseen(e, self.world.me)]   # a687: your rule's firing, tripped by another, undoes their command
+                    and not rule_did_unseen(e, self.world.me)   # a687: your rule's firing, tripped by another, undoes their command
+                    and not (e.get("undo") or {}).get("refuse")]   # a678: walking is not a change; bare undo passes over it
             if not mine:
                 raise Refusal("nothing of yours to undo")
             eid = mine[-1]["id"]   # bare undo: your latest change

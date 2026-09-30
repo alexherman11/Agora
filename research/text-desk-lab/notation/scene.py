@@ -152,7 +152,7 @@ SOURCES = {
     "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
     # the command center (research/command-center): a chat's lines, and what the house observes of its residents
     "messages": ("messages:<id>", ("item", "who", "said", "index")),
-    "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh")),
+    "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room")),
     # what each resident wrote, its last turns, newest first (Alex, 29 Sep: to see their turns and text)
     "turns": ("turns[:<corner>]", ("resident", "corner", "turn", "at", "said", "acts")),
 }
@@ -192,6 +192,7 @@ def house_rows(desk, corner=None):
     observation as if it were current. Reading the clock here is a host read, like $today."""
     import json
     import time
+    import rooms
     try:
         world = (getattr(desk, "_session", "") or "").split("@")[0]
         st = json.loads((HOUSE_STATE / world / "house.json").read_text(encoding="utf-8"))
@@ -211,9 +212,11 @@ def house_rows(desk, corner=None):
             until = float(r["rest_until"])
             fmt = "%H:%M" if until - time.time() < 86400 else "%a %H:%M"
             doing = "resting until " + time.strftime(fmt, time.localtime(until))
+        room = rooms.room_of(desk.world, r.get("actor")) if r.get("actor") else None    # a678: where they are, a world fact
         out.append({"resident": r.get("actor") or "(no name yet)", "corner": cid, "doing": doing,
                     "turns": r.get("turns", 0), "since": time.strftime("%H:%M", time.localtime(last)) if last else "",
-                    "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh})
+                    "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh,
+                    "room": desk.world.nodes[room]["title"] if room else ""})
     return out
 
 
@@ -533,7 +536,7 @@ def _w_on(node, p, val, n, env):
         raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
     # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
     # unless it begins with one of the desk's own reading or session commands.
-    if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold"):
+    if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold", "go"):
         cmd = "do " + cmd
     node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {})})
 

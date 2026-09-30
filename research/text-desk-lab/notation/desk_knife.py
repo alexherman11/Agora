@@ -43,6 +43,8 @@ HELP_LEAN = HELP_KNIFE.replace(
     "  examine id             description plus every verb this thing answers to, by origin",
     "  examine id             a thing's detail: its lines, comments, links, and the verbs that apply right now",
 ) + """
+  go <room>              walk to a room (by id or a word of its title); go alone: who is where. help rooms
+  look                   with no id, in a world with rooms: the room you are in, as a person there sees it
   table <selection> [cols=a,b] [by=col]   one row per thing, props side by side (e.g. table kind:trial)
   $new                   the surface created earlier in this session; $item the last created thing
   more: help rules · help scripts · help views · help clock · help handles · help why · help export · help trials
@@ -864,6 +866,13 @@ class DeskKnife(DeskMoo):
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
+        if cmd == "go":
+            import rooms
+            return rooms.cmd_go(self, arg)
+        if cmd == "look" and not arg:
+            import rooms           # a678: a bare look narrates the room you are in; look <id> keeps the tree
+            if rooms.narrates(self):
+                return rooms.narrate(self, rooms.room_of(self.world, self.world.me))
         if cmd == "rules":
             return self.cmd_rules()
         if cmd == "rule":
@@ -958,6 +967,16 @@ class DeskKnife(DeskMoo):
         return super().repl(line)
 
     HELP_TOPICS = {
+        "rooms": """rooms: you are always in one room. A room is a surface with prop role=room (a corner, role=resident, is its
+  resident's room). Its props: describe=<id> its description, talk=<id> the chat where talk here lands,
+  shows=<selection> what is at hand (default: what is inside it), home=<in:|tag: selection> where things made here land.
+  go <room>        walk there, from anywhere, by id or a word of its title (go lounge); prints the room
+  go <room> :1     walk without looking            go alone: where you are, and who is in each room
+  look             with no id: the room you are in: its description, who is here, what is at hand (one id each),
+                   the last lines said here. Only what it prints whole counts as seen: look <id> or read before changing
+                   a thing listed at hand. look <id> is the tree, as always.
+  Where you are is kept in the world (history lists each go) but undo leaves it: go back instead. Someone who never
+  went anywhere is in their own corner, or in Home. Resting sends a resident home to their corner.""",
         "commissions": """commissions: a worker changes what the world can't (the desk's code, the house, the painter) for you.
   Write a task with prop commission=asked; its text says what you want, why, and how you'll know it's done:
     do create <place> kind=task title="..." commission=asked text="What: ... Why: ... Done when: ..."
