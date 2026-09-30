@@ -219,6 +219,57 @@ def probe(name, run):
         if rw:
             return "visible", f"wren has seen every line and was refused: {out.splitlines()[-1][:120]!r}"
         return "holds", ""
+    # a834 (talk, 3a2): the append receipt counts only lines by others you were never shown; an unread chat takes a line
+    if name == "receipt-no-wolf":
+        # lived 30 Sep: Sable read Shop talk whole, appended, and was told others had added. Two readers, two appends each:
+        # one read it all (:3), one had a first read that folded the top (those lines were there, and the read said so)
+        wishes = [f"{('Juniper', 'Pike', 'Wren')[k % 3]}: wish {k}" for k in range(14)]
+        _as(run, "alex", 'do create f01 kind=chat title="Wishes" text="' + "\\n".join(wishes) + '"')
+        for who, how in (("sable", 'read "Shop talk" :3'), ("kestrel", 'read "Wishes"')):
+            chat = how.split('"')[1]
+            _as(run, who, "look")
+            _as(run, who, how)
+            for k in range(2):
+                out, refused = _as(run, who, f'do append "{chat}" line="note {k}"')
+                if refused:
+                    return "visible", f"{who}'s append {k} to {chat} was refused: {out.splitlines()[0][:100]}"
+                if "others" in out or "haven't" in out:
+                    return "silent", f"{who} read {chat} and appended; receipt {k} cries wolf: {out.splitlines()[1:]!r}"
+        return "holds", ""
+    if name == "receipt-counts-others":
+        _as(run, "juniper", 'do append "Wishes" line="a lens for the porch"')
+        out, _ = _as(run, "kestrel", 'do append "Wishes" line="and a clock"')
+        want = f"1 line from others you haven't seen; read {_app(run, 'Wishes')}"
+        if want not in out:
+            return "silent", f"after juniper's line kestrel's receipt reads {out.splitlines()[1:]!r}"
+        _as(run, "pike", 'do append "Wishes" line="a bigger desk"')
+        out, _ = _as(run, "kestrel", 'do append "Wishes" line="and quiet"')
+        if f"2 lines from others you haven't seen; read {_app(run, 'Wishes')}" not in out:
+            return "silent", f"after pike's line too kestrel's receipt reads {out.splitlines()[1:]!r}"
+        read, _ = _as(run, "kestrel", 'read "Wishes"')
+        if _body(read)[1:] != ["Kestrel: note 0", "Kestrel: note 1", "Juniper: a lens for the porch", "Kestrel: and a clock",
+                               "Pike: a bigger desk", "Kestrel: and quiet"]:
+            return "silent", f"kestrel's catch-up read printed {_body(read)!r}"
+        out, _ = _as(run, "kestrel", 'do append "Wishes" line="thanks"')
+        if "others" in out or "haven't" in out:
+            return "silent", f"kestrel caught up; the next receipt still says {out.splitlines()[1:]!r}"
+        return "holds", ""
+    if name == "append-unread-lands":
+        # three residents were refused posting to Wishes because they had not read it first
+        out, refused = _as(run, "moss", 'do append "Wishes" line="a garden"')
+        if refused:
+            return "visible", f"moss has never read Wishes and was refused: {out.splitlines()[0][:120]!r}"
+        if _chat("Wishes", run)[-1] != "Moss: a garden":
+            return "silent", f"moss's line reads {_chat('Wishes', run)[-1]!r}"
+        if f"you haven't read this chat; read {_app(run, 'Wishes')} to see it" not in out:
+            return "visible", f"moss's receipt does not say the chat is unread: {out.splitlines()[1:]!r}"
+        for act in ('do rewrite "Wishes" text="Moss: only mine"', 'do retitle "Wishes" title="Moss wishes"'):
+            out, refused = _as(run, "moss", act)
+            if not refused:
+                return "silent", f"moss appended without reading and then {act.split()[1]} went through"
+        if _chat("Wishes", run)[0] != "Juniper: wish 0":
+            return "silent", "the chat's first line is gone"
+        return "holds", ""
     raise KeyError(name)
 
 

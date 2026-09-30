@@ -901,6 +901,50 @@ class Desk:
             return s["text"], True
         return "\n".join([f"({start} earlier lines folded; read {nid} :3 for all)"] + lines[start:]), lo == 0
 
+    def _chat_made(self, cid):
+        """a834: whoever makes a chat wrote its first lines, so they start that reader's run (else the maker's first
+        append says they have not read it)."""
+        import hashlib
+        n = self.world.nodes.get(cid)
+        s = self.world.subjects.get(n.get("subject") if n else cid)
+        if not s or s["kind"] != "chat" or getattr(self, "_in_rules", False):
+            return
+        lines = s["text"].splitlines()
+        if getattr(self, "_chat_reads", None) is None:
+            self._chat_reads = {}
+        self._chat_reads[(self._observer(), s["id"])] = (0, len(lines), hashlib.sha1("\n".join(lines).encode()).hexdigest())
+
+    def _chat_behind(self, nid):
+        """Sable a834: what an append's receipt says about the lines this reader has not been shown, or "". Counts only
+        lines by others added after the end of this reader's run (a744): your own never count, and lines a first read
+        folded were there when you read and the read said so. A chat you have no read of, or one rewritten since, says
+        so instead of counting; a receipt is testimony, and one that cries wolf stops being read."""
+        import hashlib
+        w = self.world
+        n = w.nodes.get(nid)
+        s = w.subjects.get(n.get("subject") if n else nid)
+        if not s or s["kind"] != "chat":
+            return ""
+        lines = s["text"].splitlines()
+        obs = self._observer()
+        reads = getattr(self, "_chat_reads", None) or {}
+        rec = reads.get((obs, s["id"])) or reads.get((obs.split("/")[0], s["id"]))
+        if rec is None:
+            return f"you haven't read this chat; read {nid} to see it"
+        if rec[1] > len(lines) or rec[2] != hashlib.sha1("\n".join(lines[:rec[1]]).encode()).hexdigest():
+            return f"this chat was rewritten since you last read it; read {nid} to see it"
+        me = w.display_name(w.me).casefold()
+        who, count = None, 0
+        for k, l in enumerate(lines):
+            said = w.SPEAKER.match(l)
+            if said:
+                who = said.group(1).casefold()     # an unsigned line goes with the line above it (a multi-line append)
+            if k >= rec[1] and l.strip() and who != me:
+                count += 1
+        if not count:
+            return ""
+        return f"{count} line{'s' if count > 1 else ''} from others you haven't seen; read {nid}"
+
     def _where_line(self, nid):
         w = self.world
         n = w.nodes[nid]
@@ -1071,9 +1115,10 @@ class Desk:
         kv = dict(kv)   # values were unescaped where they were parsed
         cur = w.nodes[nid]["rev"] if nid in w.nodes else w.subjects[nid]["rev"]
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
-        if seen is None:
+        adds = self._adds_line(nid, verb, kv)
+        if seen is None and not adds:     # a834: an added line overwrites nothing, so looking first protects nothing
             raise Refusal(f"you have not looked at {nid} yet; look, read or where it first")
-        behind = seen != cur and self._adds_line(nid, verb, kv)     # a chat line lands; what I missed stays unread
+        behind = (seen != cur and adds) or seen is None     # a chat line lands; what I missed stays unread, and nothing is marked seen
         if seen != cur and not behind:
             recent = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
             why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {recent[-1]['by']}" if recent else ""
@@ -1099,10 +1144,13 @@ class Desk:
             out += f" → created {r['created']}"
         if r.get("note"):
             out += f"\n  {r['note']}"
-        if behind:
-            out += f"\n  others added to it since you last read it; read {nid} to see their lines"
+        said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
+        if said:
+            out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since
         if r.get("created") in w.nodes:
             self._mark_seen(r["created"])
+            if verb == "create":
+                self._chat_made(r["created"])
             out += "\n  now: " + self.line(r["created"], 1) + self.position_note(r["created"])
         for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:

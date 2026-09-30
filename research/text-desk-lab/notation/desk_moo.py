@@ -203,7 +203,9 @@ class DeskMoo(Desk):
         name, note = self.adapter.resolve(w, verb, nid)
         cur = w.nodes[nid]["rev"]
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
-        if seen is None:
+        adds = self._adds_line(nid, name, kv)
+        unread = seen is None and adds      # a834: an added line overwrites nothing, so looking first protects nothing
+        if seen is None and not unread:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))
         # Sable's spec 1, first test: the fence is keyed by (subject, aspect). A windowed reader (Juniper's step 11) is
@@ -213,7 +215,7 @@ class DeskMoo(Desk):
         if blind:
             raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
         hit = name not in ("create", "comment") and self._touched_by_others(nid, mine, others_only=not getattr(self, "_window", ""))
-        behind = bool(hit) and self._adds_line(nid, name, kv)     # a chat line lands; what I missed stays unread (a656)
+        behind = (bool(hit) and adds) or unread     # a chat line lands; what I missed stays unread (a656), and it marks nothing seen
         if hit and not behind:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
             who = (f"your {hit['via']}, tripped by {hit['tripped_by']}" if rule_did_unseen(hit, self.world.me)
@@ -247,6 +249,8 @@ class DeskMoo(Desk):
         if r.get("created"):
             out += f" → created {r['created']}"
             cid = str(r["created"]).split()[0]
+            if cid in w.nodes and name == "create":
+                self._chat_made(cid)
             if cid in w.nodes:
                 out += "\n  " + self.line(cid, 1)
                 parent = w.nodes[cid]["parent"]
@@ -254,8 +258,9 @@ class DeskMoo(Desk):
                     out += "\n    where: " + self._where_line(cid)   # geometry matters only where things can overlap
         if r.get("note"):
             out += f"\n  {r['note']}"
-        if behind:
-            out += f"\n  others added to it since you last read it; read {nid} to see their lines"
+        said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
+        if said:
+            out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since
         for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:
                 self._mark_rev(c, aspects_of(name, kv))    # your own change: the aspects you wrote are seen, the others are not

@@ -19,3 +19,7 @@ probe authorless-rule-as-before
 # a744: read <chat> shows what is new to you
 probe catch-up-alternating
 probe first-read-fenced
+# a834: receipts that don't cry wolf; a line in a chat you have not read lands
+probe receipt-no-wolf
+probe receipt-counts-others
+probe append-unread-lands
