@@ -10,7 +10,8 @@ STEPS = {
     "talk": ("Alex asks JEFF something in their chat; JEFF answers; a visitor answers too.", None),
 }
 M4_FACTS = {"jeff-signs-as-jeff", "no-speaking-for-others", "old-lines-stay", "two-speak-unread", "stale-rewrite-refused",
-            "own-name-once", "verb-signs-caller", "rule-says-via"}
+            "own-name-once", "verb-signs-caller", "rule-acts-as-author", "author-told-your-rule", "author-fenced-by-rule",
+            "authorless-rule-as-before"}
 
 
 def plan():
@@ -109,24 +110,68 @@ def probe(name, run):
         if refused or last != "Wren: *waves at pike*":
             return "silent", f"wren used juniper's verb; the chat reads {last!r} ({out.splitlines()[-1][:80]})"
         return "holds", ""
-    if name == "rule-says-via":
-        # Sable e839: a rule runs as whoever triggered it (whether it should run as its author is a643's), so its line
-        # is signed by the triggerer and says the rule did it; the rule records its author for that later decision
+    if name == "rule-acts-as-author":
+        # a687 (decided in a683): a rule is a standing act its author chose, so it acts as its author. Sable's rule,
+        # tripped by pike, adds a line signed 'Sable:' with no 'via' (the event carries it); pike's receipt says whose
         out, refused = _as(run, "sable", 'rule on append by=pike do append line="(noted by the room)"')
         m = re.search(r"^ok (r\d+):", out, re.M)
-        rid = m.group(1) if m else "?"
-        rule = next((r for r in run.desk.rules or [] if r["id"] == rid), None)
-        _, rp = _as(run, "pike", 'do append "Shop talk" line="shipping it"')
+        rid = STATE["rid"] = m.group(1) if m else "?"
+        n0 = len(run.desk.world.events)
+        pout, rp = _as(run, "pike", 'do append "Shop talk" line="shipping it"')
         tail = _lines(run)[-2:]
-        _as(run, "sable", f"rule drop {rid}")
-        if refused or rp or rule is None:
-            return "visible", f"the rule or pike's line was refused: {out.splitlines()[0][:100]}"
-        if tail != ["Pike: shipping it", f"Pike, via rule {rid}: (noted by the room)"]:
+        ruled = [e for e in run.desk.world.events[n0:] if e.get("via") == f"rule {rid}"]
+        if refused or rp:
+            return "visible", f"the rule or pike's line was refused: {(out if refused else pout).splitlines()[0][:100]}"
+        if tail != ["Pike: shipping it", "Sable: (noted by the room)"]:
             return "silent", f"after pike's line the chat reads {tail!r}"
-        if rule.get("author") != "sable":
-            return "silent", f"the rule records its author as {rule.get('author')!r}"
+        if not ruled or any(e["by"] != "sable" or e.get("tripped_by") != "pike" for e in ruled):
+            return "silent", f"the rule's events read {[(e['id'], e['by'], e.get('tripped_by')) for e in ruled]!r}"
+        if f"{rid} fired on" not in pout or "as sable" not in pout:
+            return "visible", f"pike's receipt does not say the rule acted as sable: {pout.splitlines()[-1][:100]!r}"
+        return "holds", ""
+    if name == "author-told-your-rule":
+        # Sable has not looked since pike tripped the rule: her !! line names the deed as her rule's, not as 'by sable'
+        out, _ = _as(run, "sable", "look")
+        head = out.splitlines()[0] if out.startswith("!!") else ""
+        want = f"your rule {STATE['rid']} did append"
+        if want not in head:
+            return "silent", f"sable's first line after the rule acted for her: {head[:160]!r}"
+        return "holds", ""
+    if name == "author-fenced-by-rule":
+        # Sable keeps a prop she wrote; her rule rewrites it when pike speaks; she, who has not looked since, is refused
+        # when she writes it again: the rule's deed was not on her receipts
+        _as(run, "sable", f"rule drop {STATE['rid']}")
+        _as(run, "sable", 'do prop "Shop talk" last=nobody')
+        out, _ = _as(run, "sable", 'rule on append by=pike do prop last=pike')
+        rid = re.search(r"^ok (r\d+):", out, re.M).group(1)
+        _as(run, "pike", 'do append "Shop talk" line="and again"')
+        out, refused = _as(run, "sable", 'do prop "Shop talk" last=sable')
+        _as(run, "sable", f"rule drop {rid}")
+        if not refused:
+            return "silent", "sable overwrote what her rule wrote without having seen it"
+        if "stale" not in out or f"your rule {rid}" not in out:
+            return "visible", f"refused, but not for her rule's deed: {out.splitlines()[-1][:160]!r}"
+        return "holds", ""
+    if name == "authorless-rule-as-before":
+        # a rule saved before a656 carries no author: it runs as whoever tripped it, its line says 'via rule', and no
+        # event of it carries tripped_by (so no one's fence or !! line changes)
+        out, _ = _as(run, "sable", 'rule on append by=pike do append line="(an old rule)"')
+        rid = re.search(r"^ok (r\d+):", out, re.M).group(1)
+        next(r for r in run.desk.rules if r["id"] == rid).pop("author")      # as a rule unpickled from before a656
+        n0 = len(run.desk.world.events)
+        _, rp = _as(run, "pike", 'do append "Shop talk" line="old times"')
+        tail = _lines(run)[-2:]
+        ruled = [e for e in run.desk.world.events[n0:] if e.get("via") == f"rule {rid}"]
+        _as(run, "sable", f"rule drop {rid}")
+        if rp or tail != ["Pike: old times", f"Pike, via rule {rid}: (an old rule)"]:
+            return "silent", f"after pike's line the chat reads {tail!r}"
+        if not ruled or any(e["by"] != "pike" or "tripped_by" in e for e in ruled):
+            return "silent", f"the old rule's events read {[(e['id'], e['by'], e.get('tripped_by')) for e in ruled]!r}"
         return "holds", ""
     raise KeyError(name)
+
+
+STATE = {}
 
 
 OLD = ["Alex: is the renderer ready?", "Jeff: tomorrow", "an unsigned line from before", "Priya: Jeff: quoting him"]

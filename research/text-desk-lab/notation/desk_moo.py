@@ -6,7 +6,7 @@ New commands: examine id, help [verb], verbs id (by origin). `do` goes through t
 import shlex
 
 import moo
-from desk import Desk, HELP, aspects_of, unescape_value
+from desk import Desk, HELP, aspects_of, rule_did_unseen, unescape_value
 from world import Refusal
 
 HELP_MOO = HELP.replace(
@@ -216,7 +216,8 @@ class DeskMoo(Desk):
         behind = bool(hit) and self._adds_line(nid, name, kv)     # a chat line lands; what I missed stays unread (a656)
         if hit and not behind:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
-            who = "you, in your other window" if hit["by"] == self.world.me else hit["by"]
+            who = (f"your {hit['via']}, tripped by {hit['tripped_by']}" if rule_did_unseen(hit, self.world.me)
+                   else "you, in your other window" if hit["by"] == self.world.me else hit["by"])
             raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}); {self._again(nid, mine)} before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         v = moo.REGISTRY[name]

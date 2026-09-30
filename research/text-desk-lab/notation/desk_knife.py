@@ -6,7 +6,7 @@ import shlex
 import harness   # registers launch; provides sync
 import knife
 import moo
-from desk import unescape_value
+from desk import rule_did_unseen, unescape_value
 from desk_moo import DeskMoo, HELP_MOO
 from world import Refusal
 
@@ -236,7 +236,7 @@ class DeskKnife(DeskMoo):
             act["kv"].pop("now", None)
             self.rules = self.rules or []
             rid = self._next_rule_id()
-            # author: who made it (a656). Recorded only: a rule still runs as whoever triggers it (a643 decides)
+            # author: who made it (a656); the rule fires as its author (a687, decided in a683)
             self.rules.append({"id": rid, "on": on_verb, "by": by, "author": self.world.me, **act, "done": set(), "fired": 0,
                                "cursor": len(self.world.events), "sel": f"on {on_verb}" + (f" by={by}" if by else "")})
             return f"ok {rid}: on {on_verb}" + (f" by={by}" if by else "") + f" do {self._action_text(act)}"
@@ -476,6 +476,8 @@ class DeskKnife(DeskMoo):
             who = e["by"]
             via = e.get("via")
             how = f" by rule {via.split()[1]}" if via and via.startswith("rule ") else (f" via {via}" if via else "")
+            if e.get("tripped_by") and e["tripped_by"] != who:
+                how += f", tripped by {e['tripped_by']}"
             cause = f" (because of {e['cause']})" if e.get("cause") else ""
             done = " (undone)" if e.get("undone") else ""
             args = {k: (v if len(str(v)) <= 120 else str(v)[:117] + "…") for k, v in (e.get("args") or {}).items()}   # a fold, declared
@@ -681,18 +683,30 @@ class DeskKnife(DeskMoo):
                         n0 = len(self.world.events)
                         revs0 = {k: v["rev"] for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items())}
                         self._mark_seen(i)
-                        self.world.acting_rule = r["id"]     # a chat line it adds is signed 'Name, via rule rN' (a656)
+                        # a683/a687: a rule is a standing act its author chose, so it acts as its author: events say
+                        # by=<author> via=rule rN, and a chat line it adds is the author's own. What gets printed meanwhile
+                        # is still the tripper's to have seen (_observer). A rule saved before a656 has no author and
+                        # runs as the tripper, its chat line signed 'Name, via rule rN', until someone re-saves it.
+                        author, tripper = r.get("author"), self.world.me
+                        if author:
+                            self._firing_observer, self.world.me = self._observer(), author
+                        else:
+                            self.world.acting_rule = r["id"]
                         try:
                             receipt = self._fire(r, i)
                             r["fired"] += 1
                             fired = True
-                            self._note(f"~ {r['id']} fired on {i}: " + receipt)
+                            self._note(f"~ {r['id']} fired on {i}" + (f" as {author}" if author and author != tripper else "")
+                                       + ": " + receipt)
                         except Refusal as e:
                             self._note(f"~ {r['id']} could not {r['verb']} {i}: {e}")
                         finally:
                             self.world.acting_rule = None
+                            self.world.me, self._firing_observer = tripper, None
                         for ev in self.world.events[n0:]:
                             ev["via"] = f"rule {r['id']}"
+                            if author:
+                                ev["tripped_by"] = tripper
                             if cause:
                                 ev["cause"] = cause
                         # the rule is our own automation: what it changed counts as seen, like our own writes
@@ -1139,7 +1153,7 @@ class DeskKnife(DeskMoo):
             if seen is not None and seen != w.nodes[i]["rev"]:
                 sid = w.nodes[i].get("subject")
                 last = [e for e in w.events if e["target"] == i or (sid and e["target"] == sid) or i in (e.get("changed") or [])]
-                if last and last[-1]["by"] != self.world.me:
+                if last and (last[-1]["by"] != self.world.me or rule_did_unseen(last[-1], self.world.me)):
                     stale.append(f"{i} (changed by {last[-1]['by']})")
         if stale:
             raise Refusal("stale: " + ", ".join(stale) + "; look at them again before acting")
