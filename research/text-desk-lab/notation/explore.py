@@ -208,11 +208,7 @@ def main():
         walk(w.root, 0)
         for l in w.links:
             print(f"link {w.subjects[l['from']]['title']!r} -> {w.subjects[l['to']]['title']!r} {l['kind']}")
-        for r in desk.rules or []:
-            print(f"rule {r['sel']} {r['verb']} {r['kv']}")
-        for name, body in (desk.scripts or {}).items():
-            print(f"script {name} = {body}")
-        return
+        return          # a1027: rules are notes (tags=['rule'] above); scripts are retired into verbs
     if "--reset" in sys.argv and sys.stdin.isatty():
         save_desk(path, desk)
         print("reset")

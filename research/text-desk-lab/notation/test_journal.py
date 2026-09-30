@@ -127,9 +127,7 @@ def fingerprint(d):
                            f"props={sorted((s.get('props') or {}).items())} comments={[(c['by'], c['text'], c['resolved']) for c in s['comments']]}")
     walk(w.root, 0)
     out += sorted(f"link {w.subjects[l['from']]['title']!r} -> {w.subjects[l['to']]['title']!r} {l['kind']}" for l in w.links)
-    out += [f"rule {r['sel']} {r['verb']} {r.get('kv')}" for r in d.rules or []]
-    out += [f"script {k} = {v}" for k, v in sorted((d.scripts or {}).items())]
-    out.append(f"clock {d.today}")
+    out.append(f"clock {d.today}")      # a1027: rules are notes (in the walk above); scripts are retired into verbs
     return out
 
 
@@ -139,7 +137,7 @@ def diff(a, b):
 
 # ---------------------------------------------------------------------------------------------------------------
 def build_home():
-    """A small ordinary desk: a note, a task, a link, a rule, a script, a clock, an agent's write, an undo."""
+    """A small ordinary desk: a note, a task, a link, a rule (a note since a1027), a clock, an agent's write, an undo."""
     dk, lines = Desk(), []
 
     def run(line, slot="alex"):
@@ -152,8 +150,7 @@ def build_home():
     run(f"do prop {task} status=open")
     run(f'do append {note} line="bread"')
     run(f"do link {note} to={task} kind=about")
-    run("rule when prop:status=done do tag add=done")
-    run("script morning = look")
+    run('do create f01 kind=note tags=rule title="Done gets tagged" text="when prop:status=done do tag add=done"')
     run(f'do append {note} line="oops"')
     run("undo")
     run("look", "jeff")
@@ -201,8 +198,8 @@ def s1():
             f"command lines replayed: {len(db)} line(s) differ, same ids: {same_ids}" + (": " + "; ".join(db[:3]) if db else ""),
             f"events rerun as verbs: {len(fails)} failed" + (" (" + "; ".join(fails[:3]) + ")" if fails else "") + f", {len(dc)} line(s) differ"
             + (": " + "; ".join(dc[:4]) if dc else ""),
-            f"events carrying an after-value: {after} of {len(dk.w.events)}; rules, scripts and clock made "
-            f"{sum(1 for ev in dk.w.events if ev['verb'] in ('rule', 'script', 'clock'))} events",
+            f"events carrying an after-value: {after} of {len(dk.w.events)}; the rule is a note, made by an event like any "
+            f"other (a1027); the clock made {sum(1 for ev in dk.w.events if ev['verb'] == 'clock')} events",
             "the rule's tag is signed: " + "; ".join(f"{ev['id']} {ev['verb']} by {ev['by']} via {ev.get('via')!r}" for ev in dk.w.events if ev.get("cause"))
             + " (the rule is alex's; jeff only set a status)"],
            "every batch carries its ops' before and after; replay assigns values and runs nothing, so the three routes collapse into one "
@@ -402,38 +399,45 @@ def s6():
     dk.do("look")
     made(dk.do("do create f01 kind=note title=Inbox"))
     n0 = len(dk.w.events)
-    dk.do("rule when tag:urgent do move into=f01")
-    dk.do("script morning = look")
+    # a1027: a rule is a note, so defining one is an event; a script line is refused (scripts are verbs now)
+    rule_line = 'do create f01 kind=note tags=rule title=Urgent text="when tag:urgent do move into=f01"'
+    rule = made(dk.do(rule_line))
+    scr = dk.do("script morning = look")
     dk.do("clock 2026-09-25")
     n1 = len(dk.w.events)
     u = dk.do("undo")
-    still = "Inbox" in [s["title"] for s in dk.w.subjects.values()]
-    # a definition edited on both sides of a fork
+    gone = rule not in dk.w.nodes
+    rule = made(dk.do(rule_line))
+    # a rule edited on both sides of a fork
     _, dk.d = worktree.handle("worktree fork defs", "base", dk.d, "alex")
     fork = Desk(pickle.loads((tmp / "base@defs.pickle").read_bytes()))
     fork.do("look")
-    line = "script morning = find tag:urgent"
+    fork.do(f"read {rule}")
+    line = f'do replace {rule} old="tag:urgent" new="tag:now"'
     before, k = worktree.ids_of(fork.d), len(fork.w.events)
     fork.do(line)
     worktree.record(fork.d, line, "alex", before, k)
     (tmp / "base@defs.pickle").write_bytes(pickle.dumps(fork.d))
-    home = dk.do("script morning = look Inbox", "jeff")
+    dk.do(f"read {rule}", "jeff")
+    home = dk.do(f'do replace {rule} old="into=f01" new="into=desk"', "jeff")
     m, dk.d = worktree.handle("worktree merge defs", "base", dk.d, "alex")
-    report("S6", s6.title, "breaks",
-           "Alex writes a rule, a morning script and sets the clock, then says undo. Later he edits the morning script in a fork "
-           "while the agent edits the same script at home.",
-           [f"rule + script + clock made {n1 - n0} event(s)", f"undo after them: {first(u)} (Inbox {'survives' if still else 'was taken back instead'})",
+    text = next((s["text"] for s in dk.w.subjects.values() if s["title"] == "Urgent"), None)
+    report("S6", s6.title, "half",
+           "Alex writes a rule, tries a morning script and sets the clock, then says undo. Later he edits the rule in a fork "
+           "while the agent edits the same rule at home.",
+           [f"rule note + script line + clock made {n1 - n0} event(s); the script line: {first(scr)}",
+            f"undo after them: {first(u)} (the rule {'was taken back' if gone else 'survives'})",
             f"agent at home: {first(home)}",
-            f"merge: {first(m)}; the script is now {(dk.d.scripts or {}).get('morning')!r}; the agent's version is gone and nothing said so"],
-           "a definition is a referent with a code aspect: defining it is an op (undoable, attributed, fenced), and the two script "
-           "edits are one held conflict on (morning, code)")
+            f"merge: {first(m)}; the rule's text is now {text!r}"],
+           "a definition is a referent with a code aspect: defining it is an op (undoable, attributed, fenced). Since a1027 a rule "
+           "is one (a note); the clock is still a desk attribute outside the history")
 
 
 @scenario("S7", "what the pickle keeps that no record carries")
 def s7():
     dk, lines, note, task = build_home()
     d = dk.d
-    quiet = ["look", f"look {note}", "rule when tag:x do tag add=y", "script evening = look", "clock 2026-09-26", f"set g = {note}"]
+    quiet = ["look", f"look {note}", "clock 2026-09-26", f"set g = {note}"]     # a1027: rule and script lines only refuse now
     changed = {}
     for line in quiet:
         dk.as_("alex")

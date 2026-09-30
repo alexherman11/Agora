@@ -348,6 +348,16 @@ class Desk:
             ident = blanks.fill(self, ident)   # a806: a blank that reaches a target unfilled goes to the one filler
         if ident in ("desk", "root"):
             return self.world.root
+        if ident.lower().startswith("corner:"):
+            # a1027: someone's sill, by their name. The one place a name becomes a room: when persons have ids (a1016),
+            # this is what changes
+            import rooms
+            who = ident[7:].strip()
+            fid = rooms.corner_of(self.world, who)
+            if not fid:
+                raise Refusal(f"no sill for {who!r}: no corner says actor={who} (corner:<name> finds a resident's corner by "
+                              f"the name it was given; a1016)")
+            return fid
         if ident in self.world.nodes:
             return ident
         if allow_subject and ident in self.world.subjects:
@@ -597,6 +607,8 @@ class Desk:
             s = w.subjects[n["subject"]]
             self._mark_seen(s["id"], ["title", "place", "due", "prop:*"] + [f"prop:{k}" for k in (s.get("props") or {})])    # a word count is not the text
             head = f"{nid} {s['kind']} \"{s['title']}\""
+            if "rule" in (s.get("tags") or []) and hasattr(self, "rule_mark"):
+                bits.append(self.rule_mark(s["id"]))     # a1027: a narrated look leaves rules out; the tree marks them
             geo = self._geom(nid)
             if geo:
                 bits.append(geo)
@@ -1144,7 +1156,10 @@ class Desk:
         self._after_mutation()
         if len(done) > 1:
             what = (f"{len(done)} steps of the verb {ev.get('verb_run')}" if ev.get("verb_use")
-                    else f"{len(done)} steps of {ev['via']}" if ev.get("via") else f"{eid} and {len(caused)} rule consequence(s)")
+                    else f"{len(done) - len(caused)} steps of {ev['via']}" if ev.get("via") and len(done) - len(caused) > 1
+                    else f"{eid}")
+            if caused:
+                what += f", and {len(caused)} rule consequence(s): " + ", ".join(sorted({c.get('via', 'rule')[5:] for c in caused}))
             return f"ok {r['event']}: reverted {done[-1]}..{done[0]} ({what})"
         # Jeff lost a lens to this: a refused command, then a bare undo, which reverted something minutes older and said only its number
         said = f"{ev['verb']} {ev['target']}" + (f" {self._fmt_args(ev.get('args'))}" if ev.get("args") else "")

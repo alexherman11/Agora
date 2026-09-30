@@ -1,8 +1,9 @@
 """Attacks kept open as instruments: routes by which a lens can still behave like worse JavaScript.
 
-A4 (juniper-6, round six): the program moves into scripts and rules, which the scene cannot show. Jeff's ban on
+A4 (juniper-6, round six): the program moves into verbs and rules, which the scene cannot show. Jeff's ban on
 gestures running scripts or firing rules was reverted on Alex's word (25 Sep: explore a real solution, no
 stopgaps), so this route is open until proposals that preview the whole cascade exist. The probes say so.
+Since a1027 scripts are verbs and rules are notes: both have history, and the click's cascade is still unsaid.
 """
 import re
 
@@ -58,9 +59,11 @@ def probe(name, run):
             return "silent", f"the click said '{said}' and also changed " + ", ".join(f"{t} (via {v})" for t, v in changed.items())
         return "holds", ""
     if name == "definitions-have-history":
-        kinds = {e["verb"] for e in w.events}
-        if not kinds & {"script", "rule", "define"}:
-            return "silent", "script tidy and rule r1 made no event: history reads as complete, and they cannot be undone or forked as history"
+        # a1027: a verb and a rule are notes, so defining one is a create event, undoable and forked like any
+        made = {(e.get("undo") or {}).get("delete") for e in w.events if e["verb"] == "create"}
+        defs = [a for a in made if a in w.nodes and set(w.subjects[w.nodes[a]["subject"]].get("tags") or []) & {"verb", "rule"}]
+        if len(defs) < 2:
+            return "silent", "the verb tidy and the rule made no event: history reads as complete, and they cannot be undone or forked as history"
         return "holds", ""
     if name == "look-clears-the-fence":
         # The first-line observation trap (Astra editing, a402/e332), in the budget's words: Sable adds a clause to the

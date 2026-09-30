@@ -170,13 +170,20 @@ check("use <id> runs the Lounge's from a corner", not got[-1][2] and prop(NOTE, 
 
 # ---- stored lines name their door when saved ----------------------------------------------------------------
 t, e = said("juniper", "script t1 = tidy $1")
-check("saving a script away from a room with tidy is refused at save, naming the doors",
-      "not saved" in e and f"use {LT}" in e and "not where this line lives" in e, e)
-print("     " + e.splitlines()[-1])
-t, e = said("juniper", "rule when tag:messy do tidy")
-check("saving a rule away from a room with tidy is refused at save, naming the doors", f"use {LT}" in e and f"Board ({BOARD}" in e, e)
-t, e = said("juniper", f"rule when tag:messy2 do use {LT}")
-check("... and a rule that names its door (use <id>) saves anywhere", not e and "ok r" in t, e or t)
+check("a script line is refused: scripts are verbs now (a1027)", "scripts are verbs now" in e, e)
+
+
+def rule_in(me, fid, title, text):
+    """a1027: a rule is a note tagged rule; the room holding it is its home. -> (its id, receipt, error)"""
+    got = reply(me, f"look {fid} :1", f'do create {fid} kind=note tags=rule title="{title}" text="{text}"')
+    return W.last_created, got[-1][1], got[-1][2]
+
+
+_, t, e = rule_in("juniper", CORNER, "messy", "when tag:messy do tidy")
+check("a rule note saved away from a room with tidy is saved broken, naming the doors",
+      not e and "saved broken" in t and f"use {LT}" in t and f"Board ({BOARD}" in t, e or t)
+_, t, e = rule_in("juniper", CORNER, "messy2", f"when tag:messy2 do use {LT}")
+check("... and a rule that names its door (use <id>) saves anywhere", not e and "saved:" in t, e or t)
 t, e = said("juniper", f'do prop {CORNER} wake="read a583 :3; look; tidy {NOTE}"')
 check("a wake line calling bare tidy, set on a corner, is refused naming the doors", "wake line is stored text" in e and f"use {LT}" in e, e)
 HV = make("juniper", CORNER, "neaten")
@@ -188,14 +195,8 @@ check("a house verb whose lines say bare tidy is refused when it becomes a verb,
 
 # ---- (3) templates stand in their own home ------------------------------------------------------------------
 goto("juniper", LOUNGE)
-t, e = said("juniper", "script t2 = tidy $1")
-check("a script saved in the Lounge calling bare tidy saves, and says where it lives", not e and f"lives in Lounge ({LOUNGE})" in t, e or t)
-got = reply("pike", f"look {bnote} :1", f"run t2 {bnote}")
-check("run from the Board by someone else, it runs the Lounge's tidy", not got[-1][2] and prop(bnote, "tidied") == "lounge", got[-1])
-
-t, e = said("juniper", "rule when tag:messy do tidy")
-check("a rule saved in the Lounge calling bare tidy saves", not e and "ok r" in t, e or t)
-rid = D.rules[-1]["id"]
+rid, t, e = rule_in("juniper", LOUNGE, "Lounge mess", "when tag:messy do tidy")
+check("a rule note in the Lounge calling bare tidy saves, and says where it lives", not e and f"lives in Lounge ({LOUNGE})" in t, e or t)
 for where, label in ((LOUNGE, "in the Lounge"), (BOARD, "in the Board")):
     goto("juniper", where)
     x = make("pike", BOARD, f"mess {label}")
@@ -208,30 +209,29 @@ got = reply("pike", f"look {x} :1", f"do tag {x} add=messy")
 check("... and while its author is asleep in her corner", rooms.asleep(W, "juniper") and prop(x, "tidied") == "lounge", got[-1])
 W.nodes[CORNER]["props"]["want"] = "awake"
 
-# (5), Juniper c996: where a rule lives is seen and changed on purpose (rules are no placed notes yet: the room it was
-# saved in is the fallback, and so every rule's home today)
-t, e = said("juniper", f"examine {rid}")
-check("examine rN shows where the rule lives", not e and f"lives in Lounge ({LOUNGE})" in t, e or t)
-t, e = said("juniper", f"rule home {rid} corner")
-check("rule home to a room where tidy is not at hand is refused, naming the doors", f"use {LT}" in e, e or t)
-t, e = said("juniper", f"rule home {rid} board")
-check("rule home to the Board is accepted", not e and f"lives in Board ({BOARD})" in t, e or t)
+# (5), Juniper c996, finished by a1027: where a rule lives is the room holding its note, seen and moved on purpose
+t = reply("juniper", f"examine {rid}")[-1][1]
+check("examine on the rule note shows where the rule lives", f"lives in Lounge ({LOUNGE})" in t, t)
+got = reply("juniper", f"look {rid} :1", f"look {CORNER} :1", f"do move {rid} into={CORNER}")
+check("moving the note to a room where tidy is not at hand makes it broken, naming the doors",
+      not got[-1][2] and "saved broken" in got[-1][1] and f"use {LT}" in got[-1][1], got[-1])
+x = make("pike", BOARD, "mess while broken")
+reply("pike", f"look {x} :1", f"do tag {x} add=messy")
+check("... and while broken it never fires", prop(x, "tidied") is None, prop(x, "tidied"))
+got = reply("juniper", f"look {rid} :1", f"look {BOARD} :1", f"do move {rid} into={BOARD}")
+check("moving it to the Board saves it there", not got[-1][2] and f"lives in Board ({BOARD})" in got[-1][1], got[-1])
 x = make("pike", BOARD, "mess after the move")
 reply("pike", f"look {x} :1", f"do tag {x} add=messy")
 check("... and the rule now runs the Board's tidy", prop(x, "tidied") == "board", prop(x, "tidied"))
-reply("juniper", f"rule home {rid} lounge")
-t, e = said("juniper", "script home t2 corner")
-check("script home to a room where tidy is not at hand is refused", "not moved" in e and f"use {LT}" in e, e or t)
-t, e = said("juniper", "script home t2 board")
-check("script home to the Board is accepted, and scripts says so", not e and f"(lives in Board {BOARD})" in said("juniper", "scripts")[0], e or t)
+reply("juniper", f"look {rid} :1", f"look {LOUNGE} :1", f"do move {rid} into={LOUNGE}")
 
 # a rule living elsewhere whose word lost its room: Pike's corner had a tidy when he saved it, then it went
 PC = rooms.corner_of(W, "pike")
 goto("pike", PC)
 PT = make("pike", PC, "tidy", f"tags=verb on={PC}")
 reply("pike", f"look {PT} :1", f'do rewrite {PT} text="do prop $1 tidied=pike"')
-t, e = said("pike", "rule when tag:pikemess do tidy")
-check("Pike saves a rule in his corner while tidy is at hand there", not e, e)
+pr, t, e = rule_in("pike", PC, "Pike's mess", "when tag:pikemess do tidy")
+check("Pike saves a rule in his corner while tidy is at hand there", not e and "saved:" in t, e or t)
 reply("pike", f"look {PT} :1", f"do remove {PT}")
 x = make("sable", BOARD, "orphan")
 got = reply("sable", f"look {x} :1", f"do tag {x} add=pikemess")
@@ -249,8 +249,8 @@ reply("pike", f"look {bnote} :1", f"do prop {bnote} tidied=no")
 got = reply("pike", f"look {bnote} :1", f"use {SP} {bnote}")
 check("used from the Board, its bare tidy means the Lounge's, not the caller's", not got[-1][2] and prop(bnote, "tidied") == "lounge", got[-1])
 
-got = reply("juniper", f"look {LOUNGE} :1", f"rule when tag:herey do move into=$here")
-check("a rule's $here is its home", not got[-1][2], got[-1])
+_, t, e = rule_in("juniper", LOUNGE, "herey", "when tag:herey do move into=\\$here")
+check("a rule's $here is its home", not e and "saved:" in t, e or t)
 goto("juniper", CORNER)
 x = make("pike", BOARD, "herey")
 reply("pike", f"look {x} :1", f"do tag {x} add=herey")

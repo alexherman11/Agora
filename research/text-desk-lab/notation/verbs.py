@@ -23,10 +23,10 @@ A room is a namespace (Sable e1758). A bare word is looked for nearest first: wh
 the room the line stands in and the rooms around it, the house. From anywhere else a room's verb is reached by
 naming it, `use <id>`. Forgiving to people, strict to stored text (Pike e1782, Sable e1786): a person typing a room
 verb's word from elsewhere gets it while it is the only one, and on a tie is told every door; a stored line (a rule,
-a script, a wake line, a verb's own lines) must name its door when it is saved if its word isn't at hand where it
-lives, and at run time it never guesses. A second verb with the same word in the same room is refused when it is
-made. Where a line stands (`standing`): a typed line where its typer is; a verb's lines, a script, a rule where THEY
-live, never where their author or caller stands; a lens gesture in the room its lens lives in.
+a wake line, a verb's own lines) must name its door when it is saved if its word isn't at hand where it lives (a rule
+that doesn't is saved broken, a1027), and at run time it never guesses. A second verb with the same word in the same
+room is refused when it is made. Where a line stands (`standing`): a typed line where its typer is; a verb's lines
+and a rule where THEY live, never where their author or caller stands; a lens gesture in the room its lens lives in.
 
 `help <word>` explains a verb you can use; `examine <thing>` lists the verbs on a thing, and the verbs of the room
 you are in; nothing lists every verb in the house. You find verbs by trying them, by examining things, or by
@@ -435,9 +435,10 @@ HELP = """verbs: capabilities that live in the world, made by anyone, as notes.
   A bare word is looked for nearest first: what you carry, the things you named, the room you are in and the rooms
   around it, the house. A room's verb typed from elsewhere runs while it is the only one; if several rooms have one,
   you are told every door (go there, or use <id>). Two verbs with one word in one room are refused when made.
-  Stored lines stand in their own home: a verb's lines where the verb lives, a script or rule in the room it was
-  saved in, a lens gesture in its lens's room. They must name their door when saved (use <id>) if their word is
-  only at hand in another room, and at run time they never guess.
+  Stored lines stand in their own home: a verb's lines where the verb lives, a rule in the room holding its note,
+  a lens gesture in its lens's room. They must name their door when saved (use <id>) if their word is only at
+  hand in another room (a rule that doesn't is saved broken), and at run time they never guess.
+  Scripts were verbs nobody declared, and are retired (a1027): run X is just X.
   A verb's title is a word, not a name: read, look and do reach a verb note by its id, never by its title.
   help <word> explains a verb you can use; examine <thing> lists the verbs on it, and the ones at hand in your room.
   Nothing lists them all.

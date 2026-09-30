@@ -198,18 +198,27 @@ check("a declared selection (create query=<selection>) with a blank inside is fi
       view and W.nodes[view].get("query") == f"kind:note,in:{rooms.room_of(W, ME)}", (got, view and W.nodes[view].get("query")))
 
 # 6. rules: $item is the thing it fired on; $here and $new refuse, saying why
-got = reply(ME, f"rule on create by={ME} do prop tagged=$item.title")
+import rooms as _rooms   # noqa: E402
+saved_in = _rooms.room_of(W, ME)
+
+
+def rule_note(text):
+    """a1027: a rule is a note tagged rule, placed in the room it acts from (here: the room ME stands in)."""
+    got = reply(ME, "look $here :1", f'do create $here kind=note tags=rule title="probe rule" text="{text}"')
+    assert not got[-1][2], got[-1]
+    return W.last_created
+
+
+r = rule_note(f"on create by={ME} do prop tagged=\\$item.title")
 reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled")
 ruled = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Ruled"][-1]
 check("a rule's $item.title is the title of the thing it fired on", props(ruled).get("tagged") == "Ruled", props(ruled))
-reply(ME, f"rule drop {D.rules[-1]['id']}")
-import rooms as _rooms   # noqa: E402
-saved_in = _rooms.room_of(W, ME)
-reply(ME, f"rule on create by={ME} do prop where=$here")
+reply(ME, f"look {r} :1", f"do remove {r}")
+r = rule_note(f"on create by={ME} do prop where=\\$here")
 got = reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled2")
-reply(ME, f"rule drop {D.rules[-1]['id']}")
-# a990 (rooms step 2b) gave each rule a home: $here in a rule is the room it was saved in, not the tripper's
-check("$here in a rule is the rule's home, the room it was saved in (a990)",
+reply(ME, f"look {r} :1", f"do remove {r}")
+# a990 (rooms step 2b) gave each rule a home; a1027: it is the room holding the rule's note, not the tripper's
+check("$here in a rule is the rule's home, the room holding its note (a990, a1027)",
       f"where={saved_in}" in got[-1][1] and saved_in != CORNER, (saved_in, got[-1]))
 
 # 7. presence: Jeff is at Home without ever going there; a sleeping resident is not 'here with you'

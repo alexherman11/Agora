@@ -2,7 +2,7 @@
 
     python deskd.py [port] [static_dir]
 
-GET  /api/snapshot?session=<name>&as=<actor>    the world as JSON (rules, scripts, clock included), plus the
+GET  /api/snapshot?session=<name>&as=<actor>    the world as JSON (rules, each with its note, and the clock included), plus the
                                                  outline text exactly as the actor would read it
 POST /api/do   {"session": "...", "as": "...", "line": "..."}    run desk commands; returns the receipt text and
                                                  the number of events so far; "whole": true runs the line as one
