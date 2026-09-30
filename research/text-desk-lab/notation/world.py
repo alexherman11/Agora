@@ -38,6 +38,16 @@ class Refusal(Exception):
     pass
 
 
+# a916, use versus mention: words inside backticks or quotes are talked about, never addressed. A single quote counts
+# only as a quote, not as the apostrophe inside a word (I'd, Pike's). The house (who hears what) and the painter's
+# inbox rows (what is for you) read the same rule from here.
+QUOTED = re.compile(r"`[^`]*`|\"[^\"\n]*\"|(?<![\w])'[^'\n]*'(?![\w])")
+
+
+def unquoted(text):
+    return QUOTED.sub(" ", str(text))
+
+
 class World:
     def __init__(self):
         self.subjects = {}

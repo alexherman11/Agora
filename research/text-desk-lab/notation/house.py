@@ -62,13 +62,9 @@ import explore       # noqa: E402  _alive(): is a pid still running
 import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
-# a916, use versus mention: words inside backticks or quotes are talked about, never addressed. A single quote counts
-# only as a quote, not as the apostrophe inside a word (I'd, Pike's).
-QUOTED = re.compile(r"`[^`]*`|\"[^\"\n]*\"|(?<![\w])'[^'\n]*'(?![\w])")
-
-
-def unquoted(text):
-    return QUOTED.sub(" ", str(text))
+# a916, use versus mention: words inside backticks or quotes are talked about, never addressed (the rule lives in
+# world.py, so the painter's inbox rows judge "for you" the same way)
+from world import QUOTED, unquoted  # noqa: E402,F401
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "plan", "apply", "export", "sync", "x", "ex", "?"}

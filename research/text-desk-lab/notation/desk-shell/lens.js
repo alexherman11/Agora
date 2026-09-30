@@ -254,25 +254,54 @@
   function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: new Map(rs.map(r => [r.dataset.key, r._n.fence])) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
   function put(r) {
     const c = carrying; if (!c) return;
-    over(null); carrying = null; c.el.style.transform = ""; receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
+    over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = "";
+    if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
+    receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
     if (!r || r.contains(c.el)) { V.hold = null; c.el.focus(); return; }
     const f = c.seen.get(r.dataset.key) || r._n.fence || {};
     send({ key: r._n.key, fence: f }, r._drop.line, undefined, { carried: c.n.fence, receiver: f });
   }
+  // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
+  function ghost(el) {
+    const b = el.getBoundingClientRect(), g = el.cloneNode(true);
+    g.querySelectorAll("[data-key]").forEach(x => x.removeAttribute("data-key")); g.removeAttribute("data-key");
+    Object.assign(g.style, { position: "fixed", left: b.left + "px", top: b.top + "px", width: b.width + "px", margin: 0,
+      pointerEvents: "none", zIndex: 30, opacity: .92, boxShadow: "0 6px 18px rgba(0,0,0,.25)" });
+    document.body.appendChild(g); return g;
+  }
   function carries(el, n) {
     el.tabIndex = 0; el.dataset.carry = n.part;
     el.addEventListener("pointerdown", e => {
-      // a carry is the primary button on the card itself: the right button opens its menu, and a press on one of the
-      // card's own controls (a fold handle, a start button) is that control's click, which a pointer capture would steal
+      // 30 Sep (Alex: dragging cards didn't work): the card's title is its fold handle, a button covering most of the
+      // card, and a press on a control was never a carry. Now a press becomes a carry only once it moves a few pixels,
+      // from anywhere on the card, the title included; a press that doesn't move stays that control's click. The right
+      // button opens the menu, and a press in text being typed stays typing.
       if (e.target.isContentEditable || e.button !== 0) return;
-      const ctl = e.target.closest("button, [role=button]");
-      if (ctl && ctl !== el && el.contains(ctl)) return;
-      take(el); el.setPointerCapture(e.pointerId);
-      const x0 = e.clientX, y0 = e.clientY;
+      const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
+      let c = null;
       const at = m => document.elementsFromPoint(m.clientX, m.clientY).find(x => x.dataset && x.dataset.drop === n.part) || null;
-      const move = m => { el.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px)`; over(at(m)); };
-      const up = m => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); put(at(m)); };
-      el.addEventListener("pointermove", move); el.addEventListener("pointerup", up);
+      const move = m => {
+        if (m.pointerId !== pid) return;
+        if (!c) {
+          if (Math.hypot(m.clientX - x0, m.clientY - y0) < 5 || carrying) return;
+          take(el); c = carrying; c.ghost = ghost(el); el.style.opacity = ".35";
+          document.body.style.userSelect = "none"; getSelection().removeAllRanges();
+        }
+        c.ghost.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px)`; over(at(m));
+      };
+      const up = m => {
+        if (m.pointerId !== pid) return;
+        document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up);
+        document.removeEventListener("pointercancel", up);
+        if (!c) return;
+        // the release after a carry is not a click on the control it began on (it would fold or start the card)
+        const eat = k => { k.stopPropagation(); k.preventDefault(); };
+        window.addEventListener("click", eat, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", eat, { capture: true }), 0);
+        put(m.type === "pointercancel" ? null : at(m));
+      };
+      document.addEventListener("pointermove", move); document.addEventListener("pointerup", up);
+      document.addEventListener("pointercancel", up);
     });
     el.addEventListener("keydown", e => { if (e.key === " " && e.target === el && !carrying) { e.preventDefault(); take(el); } });
   }
