@@ -1,0 +1,240 @@
+"""blanks: the one filler (a806, rooms step 2a; a598 3.2's 'filled once, in one place').
+
+A blank is a word beginning with $ that stands for a value the desk knows when the line runs. Typed desk lines,
+world verbs, scripts and rules all fill their blanks here, the same way:
+
+    $here          the room you are in (rooms.room_of); $here.<prop> a prop of it: $here.talk, $here.describe
+    $new           the thing made most recently earlier in this reply (any kind; of several made by one line, the
+                   last); refused, saying why, if nothing in this reply made anything. The receipt says what it was
+    $today         the clock's date                     $me   whoever is acting
+    $<handle>      a handle you named (set draft = a98, or create ... as=draft)
+    in a verb or a script:  $1 $2 ... its words, $1.title the title of the thing $1 names, $* the rest of the line
+                            exactly as said, $this the thing a verb lives on
+    in a rule:     $item   the thing it fired on (the target, as in a lens act); $item.title its title
+
+Where they are filled: after the line is parsed, in the values themselves (a target, a selection, a k=v value), so a
+filled value is never read again as desk words or filled a second time ($* may carry '$here' or 'a; b "hi"' through
+untouched). Text a person types (line=, text=, title=) stays as typed: talk about blanks must never become ids. Only
+inside a verb body, a script or a rule, which its author wrote as a template, are text values filled too. A literal
+dollar sign is written \\$ anywhere. A blank that can't be filled refuses; it is never stored as its own name.
+
+$new is kept per reader and per reply: each line that makes something records it, and the later lines of the same
+reply (same `reply` token from the caller, or the same call) read the most recent (Juniper, a806 (10)). A line in a
+new reply finds nothing there, so a $new can never reach back to a thing made an hour ago. A verb body is a reply of
+its own: its steps see each other's $new, and the caller's next line sees the last thing the whole use made.
+"""
+import re
+
+from world import Refusal
+
+LIT = ""          # a \$ in the line, kept out of shlex's way until it lands in a value as a plain $
+TEXT_KEYS = ("line", "text", "title", "wake")   # words a person types (wake: desk words run later): literal when typed
+BLANK = re.compile(re.escape(LIT) + r"|\$(\*|\d+|[A-Za-z_][A-Za-z0-9_]*)((?:\.[A-Za-z_][A-Za-z0-9_-]*)?)")
+WORD = re.compile(r"^\$(\d+|[A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_-]*)?$")
+READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
+         "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
+
+KNOWN = "$here $here.<prop> $new $today $me, a handle you set ($name); in a verb or script $1 $2 $* $this; in a rule $item"
+
+
+class Ctx:
+    """Where a line is being filled. kind: typed | verb | script | rule."""
+
+    def __init__(self, kind, args=None, rest="", me=None, this=None, item=None, name="", prev=None):
+        self.kind, self.args, self.rest, self.me, self.this, self.item, self.name = kind, args, rest, me, this, item, name
+        self.prev = prev        # what was made most recently earlier at this level of this reply (None: nothing yet)
+
+    @property
+    def template(self):
+        return self.kind != "typed"
+
+
+def protect(line):
+    """Before a line is split into words: every \\$ becomes LIT, so no parser eats the backslash."""
+    return (line or "").replace("\\$", LIT)
+
+
+def literal(text):
+    return str(text).replace(LIT, "$")
+
+
+def ctx_of(desk):
+    stack = getattr(desk, "_ctxs", None)
+    return stack[-1] if stack else Ctx("typed")
+
+
+def _title(desk, ident):
+    return desk._title_of(ident)
+
+
+def _here(desk, ctx, name):
+    if ctx.kind == "rule":
+        raise Refusal(f"${name}: a rule has no room (rules act from nowhere until rooms step 2b gives each a home); "
+                      f"name the thing itself")
+    import rooms
+    w = desk.world
+    if not rooms.all_rooms(w):
+        raise Refusal(f"${name}: this world has no rooms, so there is no here (a room is a surface with prop role=room)")
+    fid = rooms.room_of(w, w.me)
+    if fid is None:
+        raise Refusal(f"${name}: {w.display_name(w.me)} is not placed in a room (a focus, not a location), so there is no here")
+    return fid
+
+
+def _one(desk, ctx, name, attr):
+    """The value of one blank, or a Refusal. attr is '' or '.<word>'."""
+    w = desk.world
+    what = "$" + name + attr
+    if name.isdigit():
+        k = int(name)
+        if ctx.args is None or k < 1:
+            raise Refusal(f"{what} stands for a word after a verb or script; there are none here")
+        if k > len(ctx.args):
+            raise Refusal(f"{ctx.name or 'this'} needs {k} word(s) after it; got {len(ctx.args)}"
+                          + (f". help {ctx.name}" if ctx.name else ""))
+        val = ctx.args[k - 1]
+        if isinstance(val, Refusal):
+            raise val
+        if attr == ".title":
+            return _title(desk, val)
+        if attr:
+            raise Refusal(f"{what}: the only word after ${name}. is title")
+        return val
+    if name == "here":
+        fid = _here(desk, ctx, name)
+        if not attr:
+            return fid
+        p = attr[1:]
+        props = w.nodes[fid].get("props") or {}
+        if p in props and str(props[p]).strip():
+            return str(props[p])
+        if p == "title":
+            return w.nodes[fid]["title"]
+        raise Refusal(f"{what}: {w.nodes[fid]['title']} ({fid}), the room you are in, has no {p}= "
+                      f"(do prop {fid} {p}=<id> gives it one)")
+    if name == "new":
+        if ctx.kind == "rule":
+            raise Refusal("$new: a rule has no earlier line; it acts on $item, the thing it fired on")
+        if not ctx.prev:
+            where = "this verb's earlier steps" if ctx.kind == "verb" else "this reply"
+            raise Refusal(f"$new names the thing made most recently earlier in this reply, and nothing earlier in "
+                          f"{where} made anything (a new reply starts fresh). Use the id a receipt printed")
+        val = ctx.prev[-1]              # a line that made several: the last (Juniper, a806 (10))
+        desk._filled_new = val
+    elif name == "item":
+        if ctx.kind != "rule" or not ctx.item:
+            raise Refusal("$item stands for the target: the thing a rule fired on, or the thing a lens gesture acts on. "
+                          "Did you mean $new, the thing made most recently in this reply?")
+        val = ctx.item
+    elif name == "this":
+        if ctx.kind != "verb":
+            raise Refusal("$this is the thing a verb lives on; it has a value only inside a verb")
+        if not ctx.this:
+            raise Refusal(f"{ctx.name} says $this but lives on no thing")
+        val = ctx.this
+    elif name == "today":
+        today = getattr(desk, "today", None)
+        if not today:
+            raise Refusal("$today is unset; clock YYYY-MM-DD sets it (clock follow keeps it on the wall date)")
+        if attr:
+            raise Refusal(f"{what}: $today has no parts")
+        return today
+    elif name == "me":
+        val = ctx.me or w.me
+        if attr:
+            raise Refusal(f"{what}: $me has no parts")
+        return str(val)
+    elif name in (getattr(desk, "vars", None) or {}):
+        val = desk.vars[name]
+    else:
+        raise Refusal(f"${name} is no blank here. Blanks: {KNOWN}. A literal dollar sign is written \\$")
+    if attr == ".title":
+        return _title(desk, val)
+    if attr:
+        raise Refusal(f"{what}: the only word after ${name}. is title")
+    return val
+
+
+def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
+    """Fill every blank in one value, in one pass: what a blank becomes is never read again. text=True: the value is
+    words a person wrote (line=, text=, title=), filled only inside a template. quote=True: the value is still desk
+    words (a read command's arguments), so a filled value with a space is quoted, and one inside quotes is escaped.
+    soft=True (a receipt's echo): a blank that can't be filled stays as written instead of refusing."""
+    ctx = ctx or ctx_of(desk)
+    value = str(value)
+    if text and not ctx.template:
+        return literal(value)
+
+    def one(m):
+        if m.group(0) == LIT:
+            return "\\$" if soft else "$"
+        name, attr = m.group(1), m.group(2) or ""
+        if name == "*":
+            if ctx.args is None:
+                return m.group(0)               # typed: $* is two characters
+            val = literal(ctx.rest)
+        elif name.isdigit() and ctx.args is None:
+            return m.group(0)                   # typed: $5 is a price, not a blank
+        else:
+            try:
+                val = str(_one(desk, ctx, name, attr))
+            except Refusal:
+                if soft:
+                    return m.group(0)
+                raise
+        if not quote:
+            return val
+        if value[:m.start()].count('"') % 2 == 1:
+            return val.replace("\\", "\\\\").replace('"', '\\"')
+        return '"' + val.replace("\\", "\\\\").replace('"', '\\"') + '"' if (" " in val or not val) else val
+
+    keep = getattr(desk, "_filled_new", None)
+    out = BLANK.sub(one, value)
+    if soft:
+        desk._filled_new = keep          # an echo names nothing: only a line that ran says what its $new was
+    return out
+
+
+def show(desk, line, ctx=None):
+    """A template line as it will run, for a receipt: each blank that can be filled now shows its value; one that
+    can't shows as written (the step that uses it says why)."""
+    return fill(desk, line, ctx=ctx, quote=True, soft=True)
+
+
+def word(desk, raw, ctx=None):
+    """A verb's word as the caller said it: a whole-word blank ($new, $here.talk, $draft) is filled in the caller's
+    place now, so `polish $new` means what $new means on that line. -> the value, or the Refusal to raise if the verb
+    uses it. Any other word is kept as said."""
+    raw = str(raw)
+    if not WORD.match(raw):
+        return literal(raw)
+    try:
+        return fill(desk, raw, ctx=ctx)
+    except Refusal as e:
+        return e
+
+
+def made_by(events):
+    """The things a line made: each create or group it did itself, not what a rule did after it."""
+    out = []
+    for e in events:
+        if e["verb"] in ("create", "group") and isinstance(e.get("undo"), dict) and e["undo"].get("delete") \
+                and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
+            out.append(e["undo"]["delete"])
+    return out
+
+
+HELP = """blanks: words beginning with $ that the desk fills with a value when the line runs.
+  $here          the room you are in; $here.<prop> a prop of it: $here.talk its chat, $here.describe its note
+  $new           the thing made most recently earlier in this reply (a note, task, surface, view ...; if one line
+                 made several, the last). Only this reply: in a reply where nothing was made yet it refuses and
+                 says why. The receipt ends ($new = <id>), so you see which thing it was
+  $today         the clock's date          $me   who you are          $<name>   a handle (help handles)
+  in a verb or script: $1 $2 .. its words ($1.title a thing's title), $* the rest of the line exactly as said,
+                 $this the thing a verb lives on        in a rule: $item the thing it fired on, $item.title its title
+  They are filled in targets and in k=v values that name things: do prop f581 describe=$new, do move a12 into=$here.
+  Words you type stay as typed: line=, text= and title= are never filled in a typed line, so a chat line about
+  $here keeps its words. Inside a verb, a script or a rule (templates their author wrote), text values are filled
+  too, once: what a blank becomes is never filled again. A literal dollar sign is \\$, in both.
+  A blank that can't be filled refuses; nothing stores a blank's own name. A receipt shows the value, not the blank.
+  e.g. do create $here kind=note title=Plan   then   do link $new $here.describe"""

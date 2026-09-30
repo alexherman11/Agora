@@ -183,8 +183,9 @@ def deskd_do(world, who, text, whole=False):
     if not url or url == "off":
         return None
     lines, out = desk_mcp.split_lines(text), []
+    reply = __import__("uuid").uuid4().hex      # a806: one reply's lines share it, so $new names what the line before made
     for k, line in enumerate(lines):
-        body = json.dumps({"session": world, "as": who, "line": line, "whole": whole}).encode("utf-8")
+        body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
                                         timeout=120) as f:
@@ -713,7 +714,8 @@ class House:
         # Alex, 29 Sep (a678): rest sends you home to your corner, so you wake where you rested
         actor = ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("actor")
         if actor:
-            r.log("home", self.act(actor, f"go {r.rid} :1")[:300])     # :1 the receipt only: what it didn't see isn't seen
+            # a806 (9): the desk's rest, a go home marked via=rest, so history tells being carried home from walking
+            r.log("home", self.act(actor, "rest :1")[:300])
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not

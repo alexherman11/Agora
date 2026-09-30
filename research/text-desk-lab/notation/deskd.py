@@ -388,7 +388,8 @@ class Handler(SimpleHTTPRequestHandler):
                 r = {"text": text}
             else:
                 allids = worktree.ids_of(desk)
-                r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole"))})   # a736: a > line is one command
+                r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
+                                           "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably

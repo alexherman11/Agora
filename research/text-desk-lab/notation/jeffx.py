@@ -86,7 +86,7 @@ def tools_for(variant):
     if variant in ("nine", "bullets"):
         tool["description"] = (
             "Desk commands; the reply is text. One call may carry several commands separated by ; (run in order, stopping at the "
-            "first refusal); $new stands for the surface created earlier in the same session, $item for the last created thing. "
+            "first refusal); $new stands for the thing made most recently earlier in the same call. "
             "General verbs (move, remove, raise, lower, resize, group, tile, sort, create, append, retitle, rewrite, comment, resolve, "
             "check, link, unlink) work on any thing; the target can be one id, an id list, or a selection: ?words, kind:image, tag:x, "
             "in:f04, hidden, also:a18, due<date, comments:open, links:<id>, combined with commas. Pair verbs: swap A B, beside A B, "
@@ -98,8 +98,8 @@ def tools_for(variant):
     if variant == "lean":
         tool["description"] = (
             "Desk commands; the reply is text. Several commands per call, separated by ; (run in order, stop at the first "
-            "refusal; at most 4 reads per call), e.g. read a20; read a30; do resolve c35 text=\"UTC\". $new = the surface "
-            "created earlier this session. Commands: look [id] [:1|:2] · examine id (a thing's lines, comments, links and the "
+            "refusal; at most 4 reads per call), e.g. read a20; read a30; do resolve c35 text=\"UTC\". $new = the thing made "
+            "most recently earlier in this call. Commands: look [id] [:1|:2] · examine id (a thing's lines, comments, links and the "
             "verbs that apply now) · read id [#n|:3] · find words · where id · pivot id · history [id] · help [verb|selections] · "
             "do <verb> <target> k=v ... · undo eN. General verbs (move, remove, group, tile, sort, create, append, rewrite, "
             "comment, resolve, check, link, ...) work on any thing; a target is an id, an id list, or a selection such as "

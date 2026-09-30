@@ -4,8 +4,9 @@ A verb is a note tagged `verb`. Its title is the word it answers to (`sweep`, or
 text is desk command lines, one per line (or separated by ;). Lines beginning with # are its description, shown by
 `help <word>`. In the lines:
 
-    $1 $2 ...   the words after the verb (a word that names a thing may be an id or a title)
-    $*          all of them, as one quoted value
+    $1 $2 ...   the words after the verb (a word that names a thing may be an id or a title; a word that is a
+                blank, like $new, is filled where the verb was said)
+    $*          the rest of the line after the verb word, exactly as said, as one value
     $1.title    the title of the thing $1 names
     $me         whoever is using it
     $this       the thing the verb lives on (when it lives on a thing)
@@ -148,8 +149,11 @@ def _steps(text):
     return out
 
 
-def run(desk, s, words, me, this=None):
-    """Use verb `s` with `words`. -> the receipt text."""
+def run(desk, s, words, me, this=None, rest=None):
+    """Use verb `s` with `words` (as the caller said them; `rest`, the line after the verb word, exactly). -> the
+    receipt text. The body is a template: each of its commands is filled by the one filler (blanks.py) as it runs,
+    after it is parsed, so a word the caller said is never read again as desk words (a806)."""
+    import blanks
     w = desk.world
     depth = getattr(desk, "_verb_depth", 0)
     if depth >= MAX_DEPTH:
@@ -157,48 +161,39 @@ def run(desk, s, words, me, this=None):
     body = "; ".join(_steps(s["text"]))
     if not body:
         raise Refusal(f"the verb {w.appearances_of(s['id'])[0]} has no steps yet (its text holds no command lines)")
+    name = _names(s["title"])[0]
     need = sorted({int(m) for m in re.findall(r"\$(\d+)", body)})
     if need and need[-1] > len(words):
-        raise Refusal(f"{_names(s['title'])[0]} needs {need[-1]} word(s) after it; got {len(words)}. help {_names(s['title'])[0]}")
-
-    def quoted(val, text, at):
-        if text[:at].count('"') % 2 == 1:           # already inside a quoted value: paste raw, escaped
-            return val.replace("\\", "\\\\").replace('"', '\\"')
-        return '"' + val.replace("\\", "\\\\").replace('"', '\\"') + '"' if (" " in val or not val) else val
-
-    def fill(m):
-        name, attr = m.group(1), m.group(2)
-        if name.isdigit():
-            val = words[int(name) - 1]
-            if attr == ".title":
-                val = desk._title_of(val)
-        elif name == "me":
-            val = me
-        elif name == "this":
-            if not this:
-                raise Refusal(f"{_names(s['title'])[0]} says $this but lives on no thing")
-            val = this
-        else:
-            return m.group(0)
-        return quoted(val, body, m.start())
-
-    line = re.sub(r"\$(\d+|me|this)(\.title)?", fill, body)
-    while "$*" in line:
-        at = line.find("$*")
-        line = line[:at] + quoted(" ".join(words), line, at) + line[at + 2:]
+        raise Refusal(f"{name} needs {need[-1]} word(s) after it; got {len(words)}. help {name}")
+    ctx = blanks.Ctx("verb", args=[blanks.word(desk, x) for x in words], me=me, this=this, name=name,
+                     rest=" ".join(words) if rest is None else rest)
+    tag = f"{name} {w.appearances_of(s['id'])[0]}"
+    shown = blanks.show(desk, body, ctx)
     n0 = len(w.events)
     desk._verb_depth = depth + 1
+    desk._ctxs = (getattr(desk, "_ctxs", None) or []) + [ctx]
     try:
-        r = desk.dispatch("desk", {"line": line})
+        r = desk.dispatch("desk", {"line": body})
     finally:
         desk._verb_depth = depth
-    tag = f"{_names(s['title'])[0]} {w.appearances_of(s['id'])[0]}"
+        desk._ctxs = desk._ctxs[:-1]
     use = w.events[n0]["id"] if len(w.events) > n0 else None
     for e in w.events[n0:]:
         e.setdefault("verb_run", tag)        # provenance only: the fence still judges each step by its own verb
         e["verb_use"] = use                  # one use, undone whole; a verb used inside another joins the outer use
-    text = r["text"] if "text" in r else "ERR " + r["error"]
-    return f"({tag}: {line})\n{text}"
+    if "error" in r or r.get("batch_error"):
+        # a806: a use whose step was refused is a refusal (steps before it stay done, and say so), not an ok
+        raise Refusal(f"({tag}: {shown})\n" + (r.get("text") or r.get("error")))
+    return f"({tag}: {shown})\n{r['text']}"
+
+
+def _rest(line, n):
+    """The line after its first n words, exactly as written (quotes, semicolons and all)."""
+    rest = line.strip()
+    for _ in range(n):
+        parts = rest.split(None, 1)
+        rest = parts[1] if len(parts) > 1 else ""
+    return rest
 
 
 def try_line(desk, line, me):
@@ -206,7 +201,7 @@ def try_line(desk, line, me):
     try:
         argv = shlex.split(line)
     except ValueError:
-        return None
+        argv = line.split()             # say it's fine: an apostrophe is words, not an open quote
     if not argv:
         return None
     word, words = argv[0].lstrip("@").lower(), argv[1:]
@@ -220,13 +215,13 @@ def try_line(desk, line, me):
             kind, val = where(desk.world, s)
             if kind == "actor" and val != (me or "").lower():
                 raise Refusal(f"{words[0]} is carried by {val}; only they can use it")
-            return run(desk, s, words[1:], me, val if kind == "thing" else None)
+            return run(desk, s, words[1:], me, val if kind == "thing" else None, _rest(line, 2))
         return None
     hit = find(desk, word, words, me)
     if hit is None:
         return None
     s, level, thing = hit
-    return run(desk, s, words, me, thing)
+    return run(desk, s, words, me, thing, _rest(line, 1))
 
 
 def record_miss(desk, line):
@@ -253,8 +248,10 @@ def miss(word):
 
 HELP = """verbs: capabilities that live in the world, made by anyone, as notes.
   A verb is a note tagged verb. Its title is the word (sweep, or sweep|brush); its text is desk command lines,
-  one per line; lines starting with # describe it. $1 $2 .. are the words after it, $* all of them, $1.title a
-  thing's title, $me whoever uses it, $this the thing it lives on.
+  one per line; lines starting with # describe it. $1 $2 .. are the words after it, $* the rest of the line
+  exactly as said (quotes and ; included), $1.title a thing's title, $me whoever uses it, $this the thing it lives
+  on, and every blank a typed line has ($here, $here.talk, $new, $today: help blanks). A verb is a template, so its
+  text values are filled too, once: a $here in what the caller said stays as they said it.
   Where it lives (prop on):  none = carried by its maker only (a draft)   on=<id> = on that thing   on=house = everyone
   Using one: just say it (sweep porch), or do sweep porch. use <verb id> [words] names exactly which.
   help <word> explains a verb you can use; examine <thing> lists the verbs on it. Nothing lists them all.
