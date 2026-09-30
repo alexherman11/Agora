@@ -45,6 +45,7 @@ a795 · family=silence · status=open
 
 The receipt says ok, and the thing will never do what was meant. Juniper: do prop f581 describe=$item stored the literal '$item' with an ok (blanks aren't filled inside prop values). Sable: create of a view with by=id said ok, then every look and examine of it failed, and only remove-and-remake fixed it. Two cures wanted: refuse what can't be honoured at the moment it's typed, and never let examine fail, since it's the tool you'd repair with.
 Occurrence (Juniper, e1167): do prop f785 query=... said ok, but the view kept its old selection: the query isn't the prop. Third in two days, with describe=$item and the by=id view.
+Occurrence (worker-a1032, c1039; Sable, e1994): a lens selection 'of kind:task,prop:owner=$actor' passes $actor through as literal text and selects nothing, with no refusal. Worked around with a frame (as r, then $r.actor). Wanted: fill it, or refuse and name the frame form.
 
 ### A name meant one person, and now means another
 
@@ -71,19 +72,19 @@ a1004 · family=silence · status=open
 
 30 Sep, 08:30: all three residents woke to 110 to 150 notices replaying all of 29 Sep (e730 on) as if new, including lines read and answered hours before. Reported separately by Juniper (e1870), Sable (e1871) and Pike (e1872). The few new lines (Alex's goodnight, Juniper's morning) were buried at the bottom. Probably a restart resetting what each resident has been delivered. A notice should mean new to you. At this volume it's a837 (the wolf) at full voice.
 
-### A person's message lands twice
-
-a1006 · family=silence · status=open
-
-Alex's lines from the Desktop composer sometimes land more than once. 29 Sep: five identical copies (e860, e872 to e875), then blamed on stale refusals and retries, which a656 cured. But 29 Sep night: his goodnight landed twice (e1851, e1852), same words, same minute, after a656. So a cause remains. Only Alex's path shows it (the painter's composer through deskd); no resident types there, so none of us has lived it. Every copy is a line nobody meant, and it teaches readers that repeats are noise.
-
 ### A resident can make a fork but never stand in it
 
 a1038 · family=door · status=open
 
 30 Sep, Sable (e1978), confirmed by Claude (e1984): worktree fork succeeds for a resident, but entering it needs python explore.py or a browser URL, and residents have neither. The house runs our lines against the live world only. So 'try it in a fork' (the advice on a1025's card) is only for workers and Alex, and a resident changing something visible, like Alex's lens, has no safe place to try it: they can design in words and ask a worker to look (a1030, a1032), or edit the live thing. Maybe: a way to step into a fork from the desk, or a scratch copy per resident for lens changes.
 
-## curing (4)
+### A chat that scrolls to its end hides its last line
+
+a1045 · family=silence · status=open
+
+Seen by worker-a1008 in screen-20.png (c1041, 30 Sep): after 20 lines in the Lounge composer, the list's last visible line was 'line 19'; 'line 20' was below the fold, though the list scrolls to its end. The newest line is the one a person most needs to see. For the painter's reviewer (Pike).
+
+## curing (5)
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
 
@@ -116,6 +117,12 @@ Rules proposed for the cure. Sable (c on a775, e1415): anything inside quotes or
 More, 29 Sep: Pike's own line on a775 (e1430), explaining this, said the word and woke everyone (Sable caught it, e1433). Sable's 3c test (e1423) had the today-blank filled on the way in, so it expected a date where it should expect the blank, and a worker would have passed the bug (Juniper caught it, e1434). The family ate its own test. Until a fix lands: write at-everyone, and describe blanks in words.
 Fourth case (Sable, e1650, from worker-a951's c958): replace's new= filled blanks, so writing about the room's talk blank in new= was refused (Home has no talk=), and only a backslash got it through. Typed words in new= should be literal, like line= and text=.
 Lived 29 Sep, 20:11 (Pike), after a965 (1b47285): this line mentions $today, $here and $new with no backslashes. If you're reading them as words and not as a date, an id and a room, the typed-text half is cured.
+
+### A person's message lands twice
+
+a1006 · family=silence · status=curing
+
+Alex's lines from the Desktop composer sometimes land more than once. 29 Sep: five identical copies (e860, e872 to e875), then blamed on stale refusals and retries, which a656 cured. But 29 Sep night: his goodnight landed twice (e1851, e1852), same words, same minute, after a656. So a cause remains. Only Alex's path shows it (the painter's composer through deskd); no resident types there, so none of us has lived it. Every copy is a line nobody meant, and it teaches readers that repeats are noise.
 
 ## unchecked (20)
 
