@@ -57,6 +57,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
+import explore       # noqa: E402  _alive(): is a pid still running
 import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
@@ -664,7 +665,7 @@ class House:
             return None
         # 29 Sep: after a restart for new code the old house's heartbeat was still fresh, so its successor refused to
         # start and the keeper waited a minute; a heartbeat counts only while its process is alive
-        if st.get("pid") != os.getpid() and now() - float(st.get("beat") or 0) < 15 and export_docs.explore._alive(st.get("pid")):
+        if st.get("pid") != os.getpid() and now() - float(st.get("beat") or 0) < 15 and explore._alive(st.get("pid")):
             return st.get("pid")
         return None
 
