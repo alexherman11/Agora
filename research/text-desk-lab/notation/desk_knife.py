@@ -1350,7 +1350,7 @@ class DeskKnife(DeskMoo):
   scene <lens> <part path>   only that part and what is inside it, each match under its full key (= porch/main/people).
                    A path is part names or key segments, matched at the end: people, people/list, list/f571.
                    Only what it prints counts as seen.
-  scene <lens> ok  one line: compiles, its nodes against the budget (835 of 1500), and its style; or the refusal
+  scene <lens> ok  one line: compiles, its node count against the budget, and its style; or the refusal
                    with the lens line it names.
   The name may be quoted ("scratch lens") or bare, spaces and all. A lens with no style= says so on the scene's
   first line (no style=; using the default (calm)); do prop <lens> style=<name> chooses one.
