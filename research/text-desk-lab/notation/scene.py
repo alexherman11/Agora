@@ -435,9 +435,15 @@ def _w_text(node, p, val, n, env):
 
 
 def _w_clamp(node, p, val, n, env):
-    if not val.isdigit():
-        raise LensRefusal(f"line {n}: `clamp <number>`; got {p!r}")
-    node["clamp"] = int(val)
+    # 29 Sep (a repeat couldn't show the newest N; the Desktop's chats passed the scene budget): `clamp last N` keeps
+    # the last N of a repeat, the newest lines of a chat, keyed as they would be without the clamp
+    last = val.startswith("last ")
+    num = val[5:].strip() if last else val
+    if not num.isdigit():
+        raise LensRefusal(f"line {n}: `clamp <number>` or, on a repeat, `clamp last <number>`; got {p!r}")
+    node["clamp"] = int(num)
+    if last:
+        node["clamp_last"] = True
 
 
 def _w_of(node, p, val, n, env):
@@ -557,7 +563,7 @@ WORDS = {
     "carry": ("carry", _w_carry),
     "role": ("role <name>", _w_role),
     "text": ('text "..."', _w_text),
-    "clamp": ("clamp <n>", _w_clamp),
+    "clamp": ("clamp [last] <n>", _w_clamp),
     "the": ("the <selection> [as <frame>]", _w_the),
     "of": ("of <selection> [as <frame>]", _w_of),
     "over": ("over $<rows> [as <frame>]", _w_over),
@@ -1143,23 +1149,26 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                 out["of"] = sel_text                  # Pike: the text printed the selection unfilled; print what was asked
                 rs = rows(desk, sel_text)
                 keep = node["clamp"] or 10 ** 9       # Flint: clamp N on a repeat; 305 things put 305 nodes in both printers
+                last = bool(node.get("clamp_last"))
                 total = len(rs) if rs is not None else None
                 cnt = min(total, keep) if total is not None else None
-                for k, r in enumerate((rs or [])[:keep]):
+                first = max(0, len(rs or []) - keep) if last else 0
+                for k, r in enumerate((rs or [])[first:first + keep], first):
                     # Pike: sections and tags were keyed by position, so an insert retargeted every draft below it. Key by what it is.
                     okey = r.get("cid") or r.get("eid") or r.get("name") or (_slug(r["heading"]) if "heading" in r else k)
                     out["kids"].append(make(each, _inst(ctx, node, {**ctx, "count": cnt, **r}), f"{key}/{okey}", node["layout"], chain))
                 named = _named(w, sel_text) if rs is None else None
+                pick = (lambda xs: xs[-keep:]) if last else (lambda xs: xs[:keep])      # noqa: E731
                 if named is not None:
                     total = len(named)
-                    for i, st in named[:keep]:
+                    for i, st in pick(named):
                         out["kids"].append(make(each, _inst(ctx, node, dict(_ctx_for(w, i, st), count=min(total, keep))), f"{key}/{i}", node["layout"], chain))
                     out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                 else:
                     sel = desk._parse_selection(sel_text) if rs is None else None
                     ids = sel[0] if sel else []
                     total = len(ids) if total is None else total
-                    for i in ids[:keep]:
+                    for i in pick(list(ids)):
                         out["kids"].append(make(each, _inst(ctx, node, dict(_ctx_for(w, i), count=min(total, keep))), f"{key}/{i}", node["layout"], chain))
                 # Juniper (round six, past Sable's probes): tagging a thing outside the printed reads moved the scene, because
                 # the repeat had read "the set matching tag:day" and recorded nothing. A membership read is a read.
@@ -1167,9 +1176,13 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 if total > keep:
                     out["cut"] = total - keep
-                    out["kids"].append({"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
-                                        "text": f"{total - keep} more not shown (clamp {keep}); find {_fill(node['of'], ctx)} lists all {total}",
-                                        "clamp": None, "acts": [], "kids": []})
+                    cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
+                           "text": (f"{total - keep} earlier not shown (clamp last {keep}); " if last else f"{total - keep} more not shown (clamp {keep}); ")
+                           + f"find {_fill(node['of'], ctx)} lists all {total}", "clamp": None, "acts": [], "kids": []}
+                    if last:
+                        out["kids"].insert(0, cut)
+                    else:
+                        out["kids"].append(cut)
             else:
                 rows_over = ctx.get("_" + node["over"], [])
                 for k, v in enumerate(rows_over):

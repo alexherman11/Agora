@@ -141,7 +141,8 @@ def lower(root, parts):
         if node["the"]:
             bind = {"kind": "one", "q": node["the"], "as": node["as"], "capture": dict(node["capture"])}
         elif node["of"] or node["over"]:
-            bind = {"kind": "many", "of": node["of"], "over": node["over"], "each": node["each"], "as": node["as"], "clamp": node["clamp"]}
+            bind = {"kind": "many", "of": node["of"], "over": node["over"], "each": node["each"], "as": node["as"], "clamp": node["clamp"],
+                    "last": bool(node.get("clamp_last"))}
         else:
             bind = None
         guard = None
@@ -403,35 +404,41 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         if b and b["kind"] == "many":
             each = irs[b["each"]]
             keep = b["clamp"] or 10 ** 9
+            pick = (lambda xs: xs[-keep:]) if b.get("last") else (lambda xs: xs[:keep])      # noqa: E731  clamp last N: the newest
             if b["of"]:
                 sel_text = S._fill(b["of"], ctx)
                 out["of"] = sel_text
                 rs = acc.rows(sel_text) if sel_text.partition(":")[0] in S.SOURCES else None
                 total = len(rs) if rs is not None else None
                 if rs is not None:
-                    for k, r in enumerate(rs[:keep]):
+                    first = max(0, len(rs) - keep) if b.get("last") else 0
+                    for k, r in enumerate(rs[first:first + keep], first):
                         okey = r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
                         out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
-                    shown = [["select", sel_text, [list(x) for x in named[:keep]] if named is not None else list(ids[:keep]), keep]] if b["clamp"] else []
+                    shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]] if b["clamp"] else []
                     if named is not None:
                         total = len(named)
-                        for i, st in named[:keep]:
+                        for i, st in pick(named):
                             mcb = cb + shown + ([[i, S._rev_of(w, i), []]] if st != "live" else _member_reads(w, i, sel_text))
                             out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total)), f"{key}/{i}", em["layout"], chain, mcb))
                         out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                     else:
                         total = len(ids)
-                        for i in ids[:keep]:
+                        for i in pick(list(ids)):
                             out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total)), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
                 got = [k["item"] or k["key"] for k in out["kids"]]
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 if total > keep:
                     out["cut"] = total - keep
-                    out["kids"].append({"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
-                                        "text": f"{total - keep} more not shown (clamp {keep}); find {sel_text} lists all {total}",
-                                        "clamp": None, "acts": [], "kids": []})
+                    cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
+                           "text": (f"{total - keep} earlier not shown (clamp last {keep}); " if b.get("last") else f"{total - keep} more not shown (clamp {keep}); ")
+                           + f"find {sel_text} lists all {total}", "clamp": None, "acts": [], "kids": []}
+                    if b.get("last"):
+                        out["kids"].insert(0, cut)
+                    else:
+                        out["kids"].append(cut)
             else:
                 rows_over = ctx.get("_" + b["over"], [])
                 dcb = cb + frame_reads()
