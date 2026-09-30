@@ -476,7 +476,7 @@ Two pages paint the same world.
 
 `desk-shell/natives/prose.js` is an 80-line prose editor loaded nowhere. It reads the old node shape, from before `paint`, and the compiler refuses `native` and `settle`.
 
-`desk-shell/OWNERS.md` names one owner per file. While the old team is paused (from 28 Sep), Claude edits the paused owners' files where the command center needs it, and logs each change in `research/command-center/FRICTION.md`.
+`desk-shell/OWNERS.md` names one owner per file. While the old team is paused (from 28 Sep), Claude edits the paused owners' files where the command center needs it, and logs each change as a friction in Rough spots (f747); `research/command-center/FRICTION.md` is now an export of it.
 
 ## Residents: the house
 
@@ -578,7 +578,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 2. Health is taken.
 3. `git merge --no-ff worker/<cid>` into whatever branch is checked out, with the subject `land <cid>: <title>`.
 4. Health is taken again. If it fails, or a lens that compiled before no longer does, the merge is reverted (`git revert -m 1`).
-5. In frontier, from the main checkout, *Current Implementation* is exported from its Handbook binder and committed if it changed. The protocol asks the worker to change the passages its change affects, with `replace`, before it sets `ready`.
+5. In frontier, from the main checkout, *Current Implementation* is exported from its Handbook binder, and `research/command-center/FRICTION.md` from Rough spots (`friction.py`, one way), by one `export_docs.py` run; whichever of the two it wrote is committed (`docs: <names> after land <cid>`). The protocol asks the worker to change the passages its change affects, with `replace`, before it sets `ready`.
 6. The result is commented, the worktree removed and the branch deleted.
 7. A landed `.py` change asks the house to restart. It restarts when no resident or worker is mid-turn, and until it has, no new commission starts (so the next worker runs, and branches from, the code that landed).
 
@@ -607,7 +607,8 @@ A refusing lens is listed but doesn't fail health.
 
 ## Documents
 
-- **`export_docs.py [session] [--force] [--dry]`** writes this document from the binder *How the desk is built* to `docs/` and to Alex's vault, each with a stamp. The first note is the title and introduction; each later note is a section. A copy edited outside the desk is left alone, with a warning. For `frontier` it also writes `research/object-facet-frontier/desk-export.txt`.
+- **`export_docs.py [session] [--force] [--dry]`** writes this document from the binder *How the desk is built* to `docs/` and to Alex's vault, each with a stamp. The first note is the title and introduction; each later note is a section. A copy edited outside the desk is left alone, with a warning. For `frontier` it also writes `research/object-facet-frontier/desk-export.txt`. Every run also writes `research/command-center/FRICTION.md` through `friction.py`.
+- **`friction.py`** (a778) keeps Rough spots (f747) and `FRICTION.md` one list. `export <session> [--dry]` writes the file from the world: every placed note with a `family=` prop, grouped by status (open, curing, unchecked, cured, then any other), each with its appearance ids and `f=` if it has one. The file's first line says it is generated and one way. It carries no stamp; every export overwrites it whole when it differs, so a hand edit is gone at the next export. `lines [source.md]` prints a `look f747` and one `do create f747 ... f=F<n> status=unchecked family=unsorted` per `## F<n>.` entry, quoted as `export` quotes text; `check <session> [source.md]` compares each placed note with `f=F<n>` against its entry, title and text, and prints `N entries; N identical in the world; K faults`. The source defaults to the frozen hand-written log, `research/archive/FRICTION-by-hand-to-29-Sep.md` (F1 to F32).
 - **`handbook_docs.py [world]`** copies `docs/Agora.md` and `docs/Dynamic Desk.md` verbatim into the Handbook binder *What we're building*, rewriting only on a change.
 - **`docs_sync.py [--watch [s]] [--no-handbook]`** keeps the five design documents the same in `docs/` and the vault, ignoring line endings.
   - An edit on either side is copied to the other.
@@ -711,7 +712,7 @@ Which file for which change:
 - The keeper can revert HEAD on its own.
 - Residents run with no tools and a scrubbed environment.
 
-**Friction log.** `research/command-center/FRICTION.md` holds F1–F27. Open or partly open:
+**Friction log.** Frictions live in the world, in Rough spots (f747): a note with `family=` and `status=`. `research/command-center/FRICTION.md` is exported from there (`friction.py`), one way. The hand-written log F1 to F32 is frozen in `research/archive/FRICTION-by-hand-to-29-Sep.md` and imported as notes with `f=F<n> status=unchecked family=unsorted`. As that log left them, open or partly open:
 - F2: scripts can't say who runs them.
 - F3: identity equals name.
 - F9: a repeat can't show the newest N.
@@ -807,4 +808,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1324. Edit it there; a direct edit here makes the next export stop and warn. sha1:9332a4a28b7c -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1372. Edit it there; a direct edit here makes the next export stop and warn. sha1:634e11347736 -->
