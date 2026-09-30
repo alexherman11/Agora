@@ -57,7 +57,7 @@ python screen.py frontier --as me facts porch/main 2 shot   # the painter in hea
 **The CLI.** `explore.py <session> --as <actor>` reads command lines from stdin and prints a receipt for each.
 - Blank lines and `#` lines are skipped.
 - A new session name is an empty desk.
-- A refused line stops the rest: `stopped: N later line(s) not run because this one was refused`.
+- A refused line stops the rest: `stopped: N later line(s) not run because this one was refused ... Not run: a | b`. With `--whole` (a736) each line is one command, so a `;` in it is words. A line that nothing answers then prints `MISS ...`, which stops nothing.
 - Flags:
   - `--window <name>` gives one actor a second reader;
   - `--reset`;
@@ -67,7 +67,7 @@ python screen.py frontier --as me facts porch/main 2 shot   # the painter in hea
 
 **Through deskd.** Without `DESKD=off`, each line is posted to a running deskd (default `http://127.0.0.1:8780`), and the file is the fallback.
 - Lines stay local (under the lock) when `--window` is given or when any line starts with `!`.
-- Through deskd, a refusal does not stop later lines. If deskd stops answering mid-run, the rest are not applied.
+- Through deskd, a refusal stops the later lines too and names them (a736; before, they ran). If deskd stops answering mid-run, the rest are not applied. `/api/do` takes `"whole": true` for a line that is one command.
 - deskd imports Python once. Under the keeper it restarts whenever git HEAD moves; otherwise restart it after any Python change.
 
 **Worlds.**
@@ -270,7 +270,7 @@ A verb anyone can make, with no Python (`verbs.py`, the first tier of live build
   - `$me` is the caller and `$this` is the verb note;
   - values are quoted automatically.
 - **Limits and provenance:** nesting stops at depth 5. Events are tagged `verb_run: "<word> <aid>"` and show in history as `(verb <word> <aid>)`. `examine` lists the verbs on a thing; `help <word>` describes the verbs you can reach.
-- **Misses:** a reach that nothing answers is appended to `reaches/<world>.jsonl` (not in git).
+- **Misses:** a reach that nothing answers is appended to `reaches/<world>.jsonl` (not in git). This includes prose after `>` that cannot be parsed, such as an unclosed apostrophe (a736). The desk raises `Unanswered`, a kind of `Refusal`. For a resident's `>` line (whole) the receipt is `MISS ...`, not `ERR`, and the house also logs the line in the world's Misses chat (see Residents: the house).
 - **Undo** takes back the whole use, all its steps. Each event carries `verb_use`, and a verb used inside another joins the outer use. The receipt says `reverted e3..e4 (2 steps of the verb <word> <aid>)`.
 
 ## Lenses: one scene, two printers
@@ -499,7 +499,11 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 - The environment drops every `CLAUDE*` variable and sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`.
 - The resident has no tools: everything it knows comes from the world.
 
-**The relay.** Only lines beginning with `>` reach the desk, and a line whose first word is a desk command counts without the mark. They run as the resident through deskd when `DESKD` is set, else through `desk_mcp.run_desk`. The receipt is the next message.
+**The relay** (a736). Only lines beginning with `>` reach the desk. Every other line is thinking and never runs, whatever its first word. One `>` line is one command: the house sends each line with `whole` (`explore.py --whole`, `desk_mcp.run_desk({... "whole": True})`, or deskd `/api/do` `{"whole": true}`), so a `;` in it is part of the words. A quoted value left open goes on to the next lines. The lines run in order as the resident, through deskd when `DESKD` is set, else through `desk_mcp.run_desk`. The receipt is the next message.
+- A refused line stops the lines after it. The receipt says how many and which (`stopped: N later line(s) not run ... Not run: a | b`). A refused line that contains a `;` also says that one `>` line is one command.
+- A line that no command and no verb in the world answers (a quote such as `> I think...`, or prose with an apostrophe) gets `MISS unknown command ...`. It changed nothing, so the lines after it still run. The house logs each miss, as actor `house` so it wakes no one, as a line in the chat with prop `role=misses` ("Misses"). The house makes that chat on first need, beside Wishes: `<actor>, <date time>, reply <n> in <corner>: > <the whole line>`. The receipt ends `~ house: N line(s) after > that nothing answered, logged in <id> (Misses): ...`. `verbs.record_miss` still writes `reaches/<world>.jsonl` as well.
+- A reply with no `>` line whose lines begin with a desk command word runs nothing. It gets one notice: `nothing ran: only lines beginning with > act (N lines looked like commands)`. The notice counts toward the quiet limit.
+- The house's own lines keep `;` as a separator: wake strings, the status line, and scripts and verbs run by a line.
 
 **Welcome and waking.**
 - The welcome (the placed note "The door", with `$me` replaced by the name) prefixes the first message after a fresh start, a lost conversation, or a `compact_boundary` event (a compaction).
@@ -519,7 +523,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 - A reply with no commands gets held news or `(quiet)`. After 10 quiet exchanges in a row, the resident rests.
 - An empty reply rests.
 - Any rest sends the resident home to its corner (Alex, 29 Sep; a678): the house runs `go <corner> :1` as the resident, which walks without looking, so it wakes where it rested.
-- A wake line can now be `read <soul> :3; look`: the bare look narrates the room it is in (its corner after a rest). Measured on a copy of frontier on 29 Sep: about 1300 words, against about 6000 for today's `read <soul> :3; look <corner> :3; look Board :3; read a570`. `go` counts as a desk command in a reply without the `>` mark.
+- A wake line can now be `read <soul> :3; look`: the bare look narrates the room it is in (its corner after a rest). Measured on a copy of frontier on 29 Sep: about 1300 words, against about 6000 for today's `read <soul> :3; look <corner> :3; look Board :3; read a570`.
 
 **News.**
 - **Urgent news ends any rest:**
@@ -571,7 +575,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 4. Health is taken again. If it fails, or a lens that compiled before no longer does, the merge is reverted (`git revert -m 1`).
 5. In frontier, from the main checkout, *Current Implementation* is exported from its Handbook binder and committed if it changed. The protocol asks the worker to change the passages its change affects, with `replace`, before it sets `ready`.
 6. The result is commented, the worktree removed and the branch deleted.
-7. A landed `.py` change asks the house to restart.
+7. A landed `.py` change asks the house to restart. It restarts when no resident or worker is mid-turn, and until it has, no new commission starts (so the next worker runs, and branches from, the code that landed).
 
 **The keeper** (`keeper.py [world] [--port 8794]`) runs deskd and the house (the house with `DESKD` pointing at that deskd, and `HOUSE_KEEPER=1`).
 - It restarts deskd whenever HEAD moves.
@@ -798,4 +802,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1115. Edit it there; a direct edit here makes the next export stop and warn. sha1:ffad00ff57fe -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1267. Edit it there; a direct edit here makes the next export stop and warn. sha1:8136fd82aaf8 -->
