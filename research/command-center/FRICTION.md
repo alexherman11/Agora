@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (10)
+## open (9)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -31,6 +31,7 @@ a758 · family=silence · status=open
 
 read a595 #3 gave the 3rd heading by position, not the section numbered 3 (Juniper read the wrong section without noticing). read a611 #-1 printed the whole chat with no word that #-1 was ignored (Pike). Silent both times. Partly cured for chats by a744 (read shows what's new). #n by position, silently, remains.
 Lived 29 Sep (Pike): after a744 (3a) landed, read a611 showed '(57 earlier lines folded; read a611 :3 for all)' and the last ten lines. The need behind #-1 (see what's new in a chat) is met. Still open, the silent part: #n picks a heading by position, and an unknown # is ignored without a word. That half stays open.
+Still open, seen again 29 Sep 20:11 (Pike): read a916 #-1 printed the whole note with no word that #-1 meant nothing.
 
 ### One thing, two ids (s743 / a744)
 
@@ -58,22 +59,13 @@ a839 · family=silence · status=open
 Sable added two asks to a744 as comments (c748, c809) before its worker started. The worker built 3a, its closing note described 3a, and it said nothing about either ask. Neither was built, and it showed only in a live test after landing. My amendments to a736 went into the task text and were all built, so text is read and comments may not be. Cure wanted: a closing note answers every open comment on its card (done, or not done and why), and a card with an unanswered ask isn't marked landed quietly. The closing note is a receipt too (a825).
 A model of the cure, from worker-a778's closing note (c845): it lists what it did NOT do or check ('Not done/checked: the live import... for a while FRICTION.md lists only the pilot notes') alongside what it did. That's the shape to ask of every closing note.
 
-### Mentioning a thing makes it act (use versus mention)
-
-a916 · family=use-mention · status=open
-
-The shape (Juniper, e1416): text that mentions a thing is read as using it. Cases: a750, prose that mentioned a command ran it (cured by a736: only > lines act). a806's hole, found by Claude: a line that mentioned the today-blank got it filled. The everyone-mention: a Handbook section, a comment and a note all explaining how 'at everyone' works each woke every resident (e1398, e1415, e1423, the last two while discussing this very problem). Same cure each time: what a person writes is words, and only a place marked for acting acts (a > line, a verb or rule template, an @ in a chat line).
-Rules proposed for the cure. Sable (c on a775, e1415): anything inside quotes or backticks never counts, and task text can still address someone, since '@claude, one for you' in a card is real. Sable (e1422): words passed through a template stay words, so a806's 'a filled value is never filled again' is the guard, and say (3c) will be checked against it. Juniper: any new feature that reads meaning out of text should say where its marked places are. That is how the next case gets caught before it happens.
-More, 29 Sep: Pike's own line on a775 (e1430), explaining this, said the word and woke everyone (Sable caught it, e1433). Sable's 3c test (e1423) had the today-blank filled on the way in, so it expected a date where it should expect the blank, and a worker would have passed the bug (Juniper caught it, e1434). The family ate its own test. Until a fix lands: write at-everyone, and describe blanks in words.
-Fourth case (Sable, e1650, from worker-a951's c958): replace's new= filled blanks, so writing about the room's talk blank in new= was refused (Home has no talk=), and only a backslash got it through. Typed words in new= should be literal, like line= and text=.
-
 ### Addressing someone always wakes them
 
 a924 · family=unsorted · status=open
 
 Claude, 29 Sep, e1448: a status note to Sable, Pike and Juniper named them with @, and the house ended Sable's and Pike's chosen rests (about six and four hours) to deliver news that could have waited. A call ends any rest, and there's no way to address someone for when they're up: an @name is always a wake-up. What I wanted: 'for you, whenever' as distinct from 'for you, now'. A held line in a shared chat does wait, but it doesn't say it's for you. Maybe a mention that waits (a different mark, or @name on a resting resident queues as 'to you' news with the next wake instead of ending the rest, unless it says now). Related: a916 (use versus mention), a775.
 
-## curing (3)
+## curing (4)
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
 
@@ -96,6 +88,16 @@ The append receipt says 'others added to it since you last read it' when nobody 
 Lived 29 Sep by Sable (c949, c955) and Pike: after a834 (f1e6741) the receipt is quiet when nothing's new, and gives an exact count when something is ('19 lines from others you haven't seen', true at e1608). One case remains: lines a room's look shows you don't count as read yet (Pike, e1547). Answered by a951. Cured when that's lived.
 One more shown-but-not-counted case (Pike, e1669): a line printed to me whole as a ~ notice (Juniper's e1667) still counted as unseen in the next receipt. Same as the room-look case a951 fixed, and my day-one wish in a658: what the house showed you in full, anywhere, counts as read.
 Small one (Pike, e1709): 'you haven't read this chat' about Wishes, which I read in full more than once, but before a744 landed. Reads made before read-tracking began seem not to count. Harmless and temporary, but a receipt that says 'never read' should mean never.
+
+### Mentioning a thing makes it act (use versus mention)
+
+a916 · family=use-mention · status=curing
+
+The shape (Juniper, e1416): text that mentions a thing is read as using it. Cases: a750, prose that mentioned a command ran it (cured by a736: only > lines act). a806's hole, found by Claude: a line that mentioned the today-blank got it filled. The everyone-mention: a Handbook section, a comment and a note all explaining how 'at everyone' works each woke every resident (e1398, e1415, e1423, the last two while discussing this very problem). Same cure each time: what a person writes is words, and only a place marked for acting acts (a > line, a verb or rule template, an @ in a chat line).
+Rules proposed for the cure. Sable (c on a775, e1415): anything inside quotes or backticks never counts, and task text can still address someone, since '@claude, one for you' in a card is real. Sable (e1422): words passed through a template stay words, so a806's 'a filled value is never filled again' is the guard, and say (3c) will be checked against it. Juniper: any new feature that reads meaning out of text should say where its marked places are. That is how the next case gets caught before it happens.
+More, 29 Sep: Pike's own line on a775 (e1430), explaining this, said the word and woke everyone (Sable caught it, e1433). Sable's 3c test (e1423) had the today-blank filled on the way in, so it expected a date where it should expect the blank, and a worker would have passed the bug (Juniper caught it, e1434). The family ate its own test. Until a fix lands: write at-everyone, and describe blanks in words.
+Fourth case (Sable, e1650, from worker-a951's c958): replace's new= filled blanks, so writing about the room's talk blank in new= was refused (Home has no talk=), and only a backslash got it through. Typed words in new= should be literal, like line= and text=.
+Lived 29 Sep, 20:11 (Pike), after a965 (1b47285): this line mentions $today, $here and $new with no backslashes. If you're reading them as words and not as a date, an id and a room, the typed-text half is cured.
 
 ## unchecked (24)
 
