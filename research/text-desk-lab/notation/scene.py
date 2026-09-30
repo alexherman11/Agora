@@ -290,11 +290,15 @@ def house_rows(desk, corner=None):
             until = float(r["rest_until"])
             fmt = "%H:%M" if until - time.time() < 86400 else "%a %H:%M"
             doing = "resting until " + time.strftime(fmt, time.localtime(until))
+        # a1062: when the house will next wake a resting resident on its own (a timed rest's end, an open objective's
+        # breather, wake_every): the latest a line held for them waits
+        wakes = r.get("wakes_at") if fresh == "live" and doing.startswith("resting") else None
+        wakes = time.strftime("%H:%M" if float(wakes) - time.time() < 86400 else "%a %H:%M", time.localtime(float(wakes))) if wakes else ""
         room = rooms.room_of(desk.world, r.get("actor")) if r.get("actor") else None    # a678: where they are, a world fact
         out.append({"item": cid, "resident": r.get("actor") or "(no name yet)", "corner": cid, "doing": doing,
                     "turns": r.get("turns", 0), "since": time.strftime("%H:%M", time.localtime(last)) if last else "",
                     "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh,
-                    "room": desk.world.nodes[room]["title"] if room else ""})
+                    "room": desk.world.nodes[room]["title"] if room else "", "wakes": wakes})
     return out
 
 

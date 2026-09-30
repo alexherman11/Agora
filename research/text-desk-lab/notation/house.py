@@ -14,8 +14,11 @@ the resident knows comes from the world, and everything it does goes through it:
     news is waiting, and the resident goes on; after 10 quiet exchanges in a row the house lets it rest.
   - it rests when it says so: `> rest` rests until someone calls; `> rest 2 hours` (or 30 minutes, 1 day, 1h30m,
     half an hour: human time, a month at most) rests that long. An empty reply rests too. A resting resident is
-    reached at once by a call (a line in a chat in its own corner, @its-name or @everyone anywhere, a comment on
-    something in its corner, a comment on its commission). Otherwise it is woken when its timed rest ends, or, after an
+    reached at once by a call: `wake <name>` or the Desktop's wake (call= on its corner), a comment on something in
+    its corner, a comment on its commission, and, from a person at a keyboard (a surface says person=<them>), a line
+    in a chat in its own corner or @its-name or @everyone anywhere. The same lines from a resident or an agent wait
+    (a1062): kept for it and said first at its next wake, under 'for you while you rested', with chat and time; the
+    speaker's receipt says when that will be. Otherwise it is woken when its timed rest ends, or, after an
     untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
     `wake_every` seconds pass. A plain line in a shared chat (Lounge talk) wakes no one: it goes with whatever reaches
     the resident next.
@@ -75,7 +78,7 @@ except ImportError:
         return QUOTED.sub(" ", str(text))
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
-            "rows", "scene", "worktree", "go", "plan", "apply", "export", "sync", "x", "ex", "?"}
+            "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 ANOTHER = 76         # the exit code for "another house already runs this world": keeper does not fight it
@@ -293,6 +296,7 @@ class Resident:
         self.reply = []            # text of the turn in progress
         self.status = None         # last status written to the world
         self.failed = False        # this process has already been judged failed (a result error, then its exit)
+        self.wakes_at = None       # a1062: when the house would next wake it on its own, while it rests
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
@@ -520,13 +524,17 @@ class House:
             r.status = status
 
     # ---- what a resident should hear --------------------------------------------------------------------------
-    def news(self, w, r, actor):
+    def news(self, w, r, actor, resting=False):
         """Gather what `actor` should hear from the events since its cursor into its inbox; -> True when something in
         it should reach the resident now. Now: every line in a chat in its own corner (a direct chat), a line anywhere
         that names it (@name) or everyone (@everyone, @all), a comment on something in its corner. Held: a plain line
         in a shared chat (Lounge talk). A held line wakes no one; it goes with whatever reaches the resident next (a
         wake, news, the receipt of its own commands), so a resident at work hears the room within a turn and a resting
-        one is not woken by talk. `take()` empties the inbox in order. Advances the cursor."""
+        one is not woken by talk. `take()` empties the inbox in order. Advances the cursor.
+        a1062: while it is `resting`, a line that would call it (its own corner's chat, @name, @everyone) waits when a
+        resident or agent said it: it is kept for you (for_you) and said first at its next wake, however that comes.
+        A person at a keyboard (rooms.kind_of) still calls at once, and so does wake <name> (a call= on the corner)."""
+        import rooms
         start = r.state.get("cursor", len(w.events))
         inbox, urgent = r.state.setdefault("inbox", []), False
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
@@ -541,20 +549,30 @@ class House:
             s = w.subjects.get(sid)
             args = e.get("args") or {}
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
+            waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # a note at the door, not a knock
             if e["verb"] == "prop" and e["target"] == r.rid and args.get("call"):
                 # Alex, 30 Sep: the Desktop's wake button sets call=<who> on the corner (want=awake alone changed
                 # nothing for a resident resting by choice, so it was refused as a no-op). A call ends a rest the
-                # resident chose, as an @name would; the house clears the prop once it's delivered (step)
-                inbox.append(f"~ {e['by']} called you from the Desktop ({e['id']})")
+                # resident chose, as an @name would; the house clears the prop once it's delivered (step).
+                # a1062: `wake <name>` sets the same prop, marked via=wake; the wake says who and why
+                how = "woke you (wake" if e.get("via") == "wake" else "called you from the Desktop ("
+                r.state.setdefault("calls", []).append({"by": e["by"], "text": f"~ {e['by']} {how}{', ' if e.get('via') == 'wake' else ''}{e['id']})"})
                 urgent = True
                 continue
+            at = str(e.get("at") or "")[11:16]
             if s and s["kind"] == "chat" and "append" in args:
                 members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
                 if sid in mine:                                    # a chat in its own corner is its own
+                    if waits:                                      # a1062 (5): a book line is a note at the door
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                     urgent = True
                 elif "all" in members or actor in members:
                     now_ = bool(called.search(unquoted(said)))
+                    if now_ and waits:
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
                     urgent = urgent or now_
                 continue
@@ -570,6 +588,9 @@ class House:
             m = named.search(heard_in)
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
+                if waits:                                          # a1062: a mention waits for waking, anywhere
+                    self._hold(r, e, f"~ {at} {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
+                    continue
                 inbox.append(f"~ {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
                 urgent = True
             elif e["verb"] == "comment" and sid in mine:
@@ -583,10 +604,29 @@ class House:
         return urgent
 
     def take(self, r):
-        """-> everything in the resident's inbox, in order, and empties it."""
-        lines = r.state.pop("inbox", None) or []
+        """-> everything in the resident's inbox, in order, and empties it: first() before the rest."""
+        lines = self.first(r) + (r.state.pop("inbox", None) or [])
         r.save()
         return lines
+
+    def first(self, r):
+        """a1062: what is said first when a resident is reached, and empties it: who woke it (and why: the last line
+        the waker left that was held, if any), then what was kept for it while it rested, each with its chat and time."""
+        calls = r.state.pop("calls", None) or []
+        held = r.state.pop("for_you", None) or []
+        head = []
+        for c in calls:
+            why = next((h for h in reversed(held) if h["by"] == c["by"]), None)
+            if why is not None:
+                held.remove(why)
+            head.append(c["text"] + (", for the line they left you:\n  " + why["text"] if why else ""))
+        if held:
+            head.append(f"for you while you rested ({len(held)}):\n" + "\n".join("  " + h["text"] for h in held))
+        return head
+
+    def _hold(self, r, e, text):
+        """a1062: keep a line for the resident's next wake, marked for it."""
+        r.state.setdefault("for_you", []).append({"by": e.get("by"), "id": e["id"], "text": text})
 
     def _inside(self, w, node, fid):
         p = node.get("parent")
@@ -627,9 +667,12 @@ class House:
             if not r.state.get("woke"):
                 self.wake(r, corner, actor, "")
                 continue
-            called = self.news(w, r, actor)
+            called = self.news(w, r, actor, resting=True)     # between turns: a line from a resident waits (a1062)
             idle = now() - r.state.get("last_turn", now())
             until = r.state.get("rest_until")
+            # a1062: when the house would wake it on its own, the latest a held line waits (said in a speaker's receipt)
+            last = r.state.get("last_turn", now())
+            r.wakes_at = until or (last + float(cfg["breather"]) if objective else last + float(cfg["wake_every"]))
             if called:                                     # a call ends any rest
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
@@ -665,10 +708,17 @@ class House:
         if undelivered:
             lead += "(your last turn did not finish; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
         r.state["woke"] = now()
-        self.news(self.load(), r, actor)                  # what came while it slept is said after the wake, not dropped
+        # what came while it slept is said with the wake, not dropped; a1062: a line kept for it (or that would have
+        # called it, from a resident) comes first, marked for it, before the wake's own look
+        self.news(self.load(), r, actor, resting=True)
+        callers = {c["by"] for c in r.state.get("calls") or []}
+        first = self.first(r)
         heard = self.take(r)
-        news = "\n".join(([undelivered] if undelivered else []) + heard)
+        news = "\n".join(([undelivered] if undelivered else []) + first + heard)
+        lead += "".join(x + "\n" for x in first)
         r.send(lead + self.act(actor, line) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
+        if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:      # a1062: a call delivered by a wake is cleared too, so the
+            self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")     # next wake <name> is a change again
         self.set_status(r, corner, "awake")
 
     def after_turn(self, w, r, corner, actor, text):
@@ -773,6 +823,7 @@ class House:
                                      "last_sent": r.state.get("last_sent"), "status": r.status,
                                      "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at"),
                                      "rest_until": r.state.get("rest_until"), "quiet": r.state.get("quiet", 0),
+                                     "wakes_at": r.wakes_at, "held": len(r.state.get("for_you") or []),
                                      "said": r.state.get("said", [])}
         out["workers"] = {cid: {"actor": wk.actor, "asked_by": wk.asked_by, "alive": wk.alive(),
                                 "doing": "working" if wk.busy else ("waiting" if wk.alive() else "stopped"),
