@@ -541,10 +541,11 @@ class House:
             s = w.subjects.get(sid)
             args = e.get("args") or {}
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
-            if e["verb"] == "prop" and e["target"] == r.rid and str(args.get("want", "")) == "awake":
-                # Alex, 30 Sep: the Desktop's wake button sets want=awake on the corner; someone pressing it is a call,
-                # so it ends a rest the resident chose, as an @name would
-                inbox.append(f"~ {e['by']} woke you from the Desktop ({e['id']})")
+            if e["verb"] == "prop" and e["target"] == r.rid and args.get("call"):
+                # Alex, 30 Sep: the Desktop's wake button sets call=<who> on the corner (want=awake alone changed
+                # nothing for a resident resting by choice, so it was refused as a no-op). A call ends a rest the
+                # resident chose, as an @name would; the house clears the prop once it's delivered (step)
+                inbox.append(f"~ {e['by']} called you from the Desktop ({e['id']})")
                 urgent = True
                 continue
             if s and s["kind"] == "chat" and "append" in args:
@@ -633,6 +634,8 @@ class House:
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
                 r.send("\n".join(self.take(r)))
+                if props.get("call"):                      # delivered: clear it, so the next press is a change again
+                    self.act("house", f"look {rid} :1; do prop {rid} remove=call")
             elif until and now() < until:                  # resting for a while: only a call reaches it
                 self.set_status(r, corner, "awake")
                 continue
@@ -797,12 +800,28 @@ class House:
             return ANOTHER
         print(f"house: world {self.world}, claude {self.claude_version} ({self.claude})"
               + (f", fake model on {self.fake}" if self.fake else ""), flush=True)
+        # 30 Sep: a commit by hand (not a landing) that changed the lab's Python left the house on old code for hours,
+        # and once half-imported new code (the QUOTED import error). Any commit that changes a .py here now asks for
+        # the same drained restart a landing does. Checked every 30 passes (about a minute).
+        def head():
+            r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True, text=True)
+            return r.stdout.strip() if r.returncode == 0 else ""
+        started_on, passes = head(), 0
         try:
             while True:
                 try:
                     self.step()
                 except Exception as e:
                     print(f"house: step failed: {type(e).__name__}: {e}", flush=True)
+                passes += 1
+                if started_on and passes % 30 == 0 and not self.workshop.restart_wanted:
+                    now_on = head()
+                    if now_on and now_on != started_on:
+                        d = subprocess.run(["git", "diff", "--name-only", started_on, now_on, "--", "."], cwd=HERE,
+                                           capture_output=True, text=True).stdout.split()
+                        if any(p.endswith(".py") for p in d):
+                            print(f"house: the code under me changed ({started_on[:7]} -> {now_on[:7]}); restarting when no one is mid-turn", flush=True)
+                            self.workshop.restart_wanted = True
                 if (self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER")
                         and not any(r.busy for r in self.residents.values())
                         and not any(x.busy for x in self.workshop.workers.values())):
