@@ -438,7 +438,7 @@ class DeskKnife(DeskMoo):
         tgt = blanks.fill(self, r.get("target") or "$item", ctx=ctx)
         if r.get("target") and tgt != i:
             self._mark_seen(self._resolve(tgt))
-        kv = {k: blanks.fill(self, v, text=k in blanks.TEXT_KEYS, ctx=ctx) for k, v in r["kv"].items()}
+        kv = {k: blanks.fill(self, v, ctx=ctx) for k, v in r["kv"].items()}     # a rule is a template: all filled
         return self.cmd_do_knife(r["verb"], [tgt], kv).splitlines()[0]
 
     def _title_of(self, ident):
@@ -1039,14 +1039,14 @@ class DeskKnife(DeskMoo):
                 hit = verbs.try_line(self, arg, self.world.me)
                 if hit is not None:
                     return hit
-            # a806: each value is filled once, after parsing: targets and values that name things always; words a
-            # person wrote (line= text= title=, and wake=, desk words run later) only inside a template
+            # a806: each value is filled once, after parsing: targets always; each k=v by what the verb's own
+            # argument list says it is (a965: text is words by default; blanks.fill_arg)
             positional = [blanks.fill(self, unescape_value(a)) for a in argv[1:] if is_target(a)]   # titles carry escapes too
             kv = {}
             for a in argv[1:]:
                 if "=" in a and not is_target(a):
                     k, _, v = a.partition("=")
-                    kv[k] = blanks.fill(self, unescape_value(v), text=k in blanks.TEXT_KEYS)
+                    kv[k] = blanks.fill_arg(self, verb, k, unescape_value(v))
             return self.cmd_do_knife(verb, positional, kv)
         return super().repl(line)
 

@@ -145,7 +145,7 @@ def v_group(w, nid, a):
     return _prim(w, "group", nid, a)
 
 
-@verb("create", ["surface"], "Make a new note, task, chat, doc, image or surface inside this surface.", "kind=note|task|chat|doc|image|surface title=<str> [text=<str>] [due=YYYY-MM-DD] [tags=a,b] [layout=column|row|free]", 'do create f03 kind=task title="Send parser" due=2026-09-19')
+@verb("create", ["surface"], "Make a new note, task, chat, doc, image or surface inside this surface.", "kind=note|task|chat|doc|image|surface title=<str> [text=<str>] [due=YYYY-MM-DD] [tags=a,b] [layout=column|row|free] [query=<selection> for kind=view] [any other key: a prop]", 'do create f03 kind=task title="Send parser" due=2026-09-19')
 def v_create(w, nid, a):
     return _prim(w, "create", nid, a)
 
