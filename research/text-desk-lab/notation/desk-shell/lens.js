@@ -351,11 +351,16 @@
   setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
   // live building (tier 2): when the code under the page changes, the page reloads itself, but never under someone's
   // hands. Drafts already survive a reload (viewer.js keeps them); a part in hand or a line being typed waits.
-  let code = null;
+  // 30 Sep: "under someone's hands" means typing now, not a caret left in a kept draft an hour ago (Alex's tab sat on old
+  // code for that); a key in the last 15 s, or a part in hand, still holds the reload
+  let code = null, keyed = 0, down = false;
+  document.addEventListener("keydown", () => { keyed = Date.now(); }, true);
+  document.addEventListener("pointerdown", () => { down = true; }, true);
+  ["pointerup", "pointercancel"].forEach(t => document.addEventListener(t, () => { down = false; keyed = Date.now(); }, true));
   setInterval(async () => {
     let v; try { v = (await (await fetch("/api/version")).json()).code; } catch (e) { return; }
     if (!v) return; if (code === null) { code = v; return; } if (v === code) return;
-    const a = document.activeElement, typing = V.hold || (a && (a.isContentEditable || (a.value || "").length));
+    const typing = down || carrying || Date.now() - keyed < 15000;      // V.hold is set by a mere focus, so not it
     if (!typing) location.reload(); else V.show("new code is here; the page reloads when you put this down");
   }, 5000);
 })();
