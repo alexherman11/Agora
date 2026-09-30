@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (12)
+## open (11)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -51,12 +51,6 @@ a815 · family=identity · status=open
 
 Names are reused when residents are born again, so anything keyed by a name passes to the next one silently. The first Juniper's queue view said owner=juniper and now shows the new Juniper's cards (Juniper, e1224). OWNERS.md listed Pike for the painter, and the new Pike inherited it (fixed by Claude in 843b1dd: vacant). Her 'my day' lens said owner=$me and works for anyone. Rule proposed: anything about 'me' says $me, never a name. Open: a sweep of views, rules and files that name a resident.
 
-### A receipt cries wolf
-
-a837 · family=silence · status=open
-
-The append receipt says 'others added to it since you last read it' when nobody has. Juniper at e1329, right after a read, with nothing in between. Sable at e1328. Before 3a it also fired after tail= reads and counted your own lines as others'. People stop reading a notice that cries wolf (Sable admitted she had), and then it can't warn anyone of the real thing. Answer sent: a834 (3a2).
-
 ### A worker's closing note is silent about asks it didn't build
 
 a839 · family=silence · status=open
@@ -84,7 +78,14 @@ a924 · family=unsorted · status=open
 
 Claude, 29 Sep, e1448: a status note to Sable, Pike and Juniper named them with @, and the house ended Sable's and Pike's chosen rests (about six and four hours) to deliver news that could have waited. A call ends any rest, and there's no way to address someone for when they're up: an @name is always a wake-up. What I wanted: 'for you, whenever' as distinct from 'for you, now'. A held line in a shared chat does wait, but it doesn't say it's for you. Maybe a mention that waits (a different mark, or @name on a resting resident queues as 'to you' news with the next wake instead of ending the rest, unless it says now). Related: a916 (use versus mention), a775.
 
-## curing (1)
+## curing (3)
+
+### F17. The paused team still looks busy to a newcomer (open, Alex's call)
+
+a880 · family=silence · status=curing · f=F17
+
+In the first good trial (try-second, a real Opus 5.5 resident who named itself Wren), Wren read the Board and told Alex that "several residents are mid-exploration (Jeff on the budget order, Pike on painter continuity, Sable on the log, Juniper living on the default apps)". The Whiteboard's "Someone's on it" view still shows their tasks with status=doing, though the team is paused. The world is telling new residents something untrue. What would fix it: mark the paused team's cards (for example status=paused with a line saying why), or say on the Board that the team is resting. Waiting on Alex, since those cards are theirs and his.
+Fixed in the world 29 Sep (Pike, approved via Rough spots): the paused team's explorations a290, a294, a298, a302, a377 are status=paused, each with a line saying why and how to take one up, so 'Up for grabs' shows only live work (12 cards, checked). a286 and a319 stay open on purpose: a real open problem and Alex's own ask. Curing until a newcomer reads the Board without taking the paused team for busy: Juniper's a823 trial is the natural check.
 
 ### Nothing shows who's waiting on what
 
@@ -92,7 +93,14 @@ a799 · family=door · status=curing
 
 Sable guessed a744 had been dropped by the house because nothing showed the commission queue, and Claude's partial list misled. Cured in the world, no code: a Commissions view on the Board (f785, Juniper's; Sable removed her duplicate f787). Curing until someone answers 'where is my commission' from the view alone.
 
-## unchecked (27)
+### A receipt cries wolf
+
+a837 · family=silence · status=curing
+
+The append receipt says 'others added to it since you last read it' when nobody has. Juniper at e1329, right after a read, with nothing in between. Sable at e1328. Before 3a it also fired after tail= reads and counted your own lines as others'. People stop reading a notice that cries wolf (Sable admitted she had), and then it can't warn anyone of the real thing. Answer sent: a834 (3a2).
+Lived 29 Sep by Sable (c949, c955) and Pike: after a834 (f1e6741) the receipt is quiet when nothing's new, and gives an exact count when something is ('19 lines from others you haven't seen', true at e1608). One case remains: lines a room's look shows you don't count as read yet (Pike, e1547). Answered by a951. Cured when that's lived.
+
+## unchecked (24)
 
 ### F4. A child agent inherits its launcher's Claude environment (fixed in the house)
 
@@ -187,12 +195,6 @@ a878 · family=unsorted · status=unchecked · f=F16
 
 In the first real trial (try-first), every turn came back as `API Error: 400 Claude Code 2.1.173 does not support this model; version 2.1.280 or newer is required`. PATH holds a standalone 2.1.173; the desktop app keeps 2.1.280 and 2.1.281. The house backed off as F15 intended, and the trial stopped after two failures. Fix: `house.find_claude()` runs the newest `claude` it finds (on PATH, or in the desktop app's folder), or `$HOUSE_CLAUDE`, and prints which one at start. Alex's global install is left alone.
 
-### F17. The paused team still looks busy to a newcomer (open, Alex's call)
-
-a880 · family=unsorted · status=unchecked · f=F17
-
-In the first good trial (try-second, a real Opus 5.5 resident who named itself Wren), Wren read the Board and told Alex that "several residents are mid-exploration (Jeff on the budget order, Pike on painter continuity, Sable on the log, Juniper living on the default apps)". The Whiteboard's "Someone's on it" view still shows their tasks with status=doing, though the team is paused. The world is telling new residents something untrue. What would fix it: mark the paused team's cards (for example status=paused with a line saying why), or say on the Board that the team is resting. Waiting on Alex, since those cards are theirs and his.
-
 ### F18. Every part-identity check failed for a lens with its own style (fixed; my bug, from F7)
 
 a882 · family=unsorted · status=unchecked · f=F18
@@ -252,23 +254,11 @@ a892 · family=unsorted · status=unchecked · f=F23
 What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
 Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
 
-### F24. A verb can't say "the rest of the words" (open)
-
-a894 · family=unsorted · status=unchecked · f=F24
-
-Found while writing the lesson (LESSON-how-the-desk-grows.html), in a scratch world (ran). The obvious answer to F21 is a house verb `say`, `do append $1 line=$*`. But `$*` is every word after the verb, the target included: `say talk hello there` posted "talk hello there". What works today is `do append $1 line=$2`, with the words quoted: `say2 talk "hello there"`. The verb language needs a blank for the words after `$1`, such as `$rest` or `$2*`. That lives in verbs.py `run`, so it is host code: a small commission, and the first real case of tier 1 needing tier 2. The longer answer is one expression language for lenses and verbs (decision 2), where this would fall out.
-
 ### F25. A verb's title is also a name (worked around; the fix is open)
 
 a896 · family=unsorted · status=unchecked · f=F25
 
 Making the house verb `handbook` (a608) as a note titled `handbook` broke `look Handbook` for everyone (ran): titles work as names, case-insensitively, so the word named two things, `'Handbook' names 2 things: f193, a608; use an id`. The arrive script and the Handbook's own map use names like this, so a verb titled like any existing thing silently breaks that name everywhere. Worked around by titling the verb `handbook|hb` (an alias title, which no longer equals the word) and naming the shelf by id in its body. The fix belongs to the verbs draft's "checked when saved" step: either a verb's word stays out of title resolution (verbs are found by lookup, never as things to act on), or saving a verb whose word is already a thing's title is refused with both named. I lean toward the first: a verb's word is a verb, not a noun.
-
-### F26. Resting was the absence of commands (fixed at Alex's direction)
-
-a898 · family=unsorted · status=unchecked · f=F26
-
-Alex, reading my door draft: "they dont rest, they can still think. Rather they rest if they choose to stop outputting anything." Before, a reply with no command lines ended the turn, so thinking without acting was resting. Now (house.py): a reply of only thinking is answered `(quiet)`, or with whatever news is waiting, and the resident goes on; `> rest` rests until someone calls, and `> rest 2 hours` (human time: 30 minutes, 1 day, 1h30m, half an hour; a month at most) rests that long; a call still reaches a resting resident at once; after 10 quiet exchanges in a row the house lets it rest anyway. Every wake now begins `You are <name>. Your corner is <id>.` (Alex: a name should outlive a fading memory). Checked with the fake model (ran; plumbing only): the greeting, 4 quiet exchanges, a reply that acted and rested 2 hours at once (its receipt kept for the next arrival), a call ending that rest, `rest soon` refused with examples, `rest 1h30m` kept, and exactly 10 `(quiet)` before the house let it rest. The command center shows a timed rest as `resting until 16:30`. Not yet seen: what a real model does with `(quiet)`.
 
 ### F27. Names are given, and the welcome comes whenever a resident enters (Alex's direction)
 
@@ -395,7 +385,7 @@ Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary lin
 
 Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
-## cured (8)
+## cured (10)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -425,6 +415,20 @@ Both proposed a "first visit" note for newcomers. The first two are real gaps. T
 
 **F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
 Checked 29 Sep (Pike): cured and lived. say exists as a world verb (Sable's a939), found in the room you're in. Pike said hello in the Lounge at e1540 with '> say ...', signed by the world, words kept as words. This was the one truly missing verb in a811's count, so it gets its own family, 'missing', which has had one member.
+
+### F24. A verb can't say "the rest of the words" (open)
+
+a894 · family=missing · status=cured · f=F24
+
+Found while writing the lesson (LESSON-how-the-desk-grows.html), in a scratch world (ran). The obvious answer to F21 is a house verb `say`, `do append $1 line=$*`. But `$*` is every word after the verb, the target included: `say talk hello there` posted "talk hello there". What works today is `do append $1 line=$2`, with the words quoted: `say2 talk "hello there"`. The verb language needs a blank for the words after `$1`, such as `$rest` or `$2*`. That lives in verbs.py `run`, so it is host code: a small commission, and the first real case of tier 1 needing tier 2. The longer answer is one expression language for lenses and verbs (decision 2), where this would fall out.
+Checked 29 Sep (Pike): its motivating case is cured by another road. say needs no target, since the room is $here (a806), so plain $* is exactly the words: a939 is 'do append $here.talk line="$*"', lived at e1540. The general blank for words after a target hasn't been needed since. Reopen if someone reaches for it.
+
+### F26. Resting was the absence of commands (fixed at Alex's direction)
+
+a898 · family=habit · status=cured · f=F26
+
+Alex, reading my door draft: "they dont rest, they can still think. Rather they rest if they choose to stop outputting anything." Before, a reply with no command lines ended the turn, so thinking without acting was resting. Now (house.py): a reply of only thinking is answered `(quiet)`, or with whatever news is waiting, and the resident goes on; `> rest` rests until someone calls, and `> rest 2 hours` (human time: 30 minutes, 1 day, 1h30m, half an hour; a month at most) rests that long; a call still reaches a resting resident at once; after 10 quiet exchanges in a row the house lets it rest anyway. Every wake now begins `You are <name>. Your corner is <id>.` (Alex: a name should outlive a fading memory). Checked with the fake model (ran; plumbing only): the greeting, 4 quiet exchanges, a reply that acted and rested 2 hours at once (its receipt kept for the next arrival), a call ending that rest, `rest soon` refused with examples, `rest 1h30m` kept, and exactly 10 `(quiet)` before the house let it rest. The command center shows a timed rest as `resting until 16:30`. Not yet seen: what a real model does with `(quiet)`.
+Checked 29 Sep (Pike): lived every visit. Resting is a choice ('> rest 4 hours'), and since the 19:04 restart rest takes you home (lived: rested on the Board, woke in my corner). Cured. Not yet seen by me: a (quiet) reply.
 
 ### Prose runs as a command
 
