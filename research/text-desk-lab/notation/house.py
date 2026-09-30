@@ -671,6 +671,11 @@ class House:
                 r.state.pop("woke", None)
             if r.busy:
                 continue
+            if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
+                # 30 Sep (a1062 landed at 14:41 and the house was still on older code at 15:00): the restart waits for a
+                # moment with no one mid-turn, and with three residents and three workers that moment never came. While
+                # it waits, no new turn starts; news stays unread (the cursor isn't moved) for the house that follows
+                continue
             if not r.state.get("woke"):
                 self.wake(r, corner, actor, "")
                 continue

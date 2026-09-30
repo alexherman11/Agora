@@ -181,6 +181,8 @@ class Workshop:
                 continue
             if not wk.alive() or wk.busy:
                 continue
+            if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
+                continue                 # draining for a restart: no new turn starts; what it would hear waits (house.step)
             heard = self.heard(w, cid, s2, wk)
             if heard:
                 if state == "waiting":
