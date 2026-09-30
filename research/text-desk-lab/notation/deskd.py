@@ -194,8 +194,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
-    def _json(self, obj, code=200):
-        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+    def _json(self, obj, code=200, body=None):
+        body = body if body is not None else json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -249,7 +249,7 @@ class Handler(SimpleHTTPRequestHandler):
             import scene
             key = _scene_key(q)
             if key is not None and key in _SCENES:
-                return self._json(_SCENES[key])
+                return self._json(None, body=_SCENES[key])     # the bytes already built: no load, no build, no encode
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 try:
                     sc, text = scene.scene_for(desk, q.get("lens", ""))
@@ -265,7 +265,7 @@ class Handler(SimpleHTTPRequestHandler):
             _GEN += 1
             out["gen"] = f"{os.getpid()}-{_GEN}"        # names this build, so a painter compares a word, not 700 KB
             if key is not None and key == _scene_key(q):     # unchanged while it was built: keep it (a few, the newest)
-                _SCENES[key] = out
+                _SCENES[key] = json.dumps(out, ensure_ascii=False).encode("utf-8")
                 while len(_SCENES) > 16:
                     _SCENES.pop(next(iter(_SCENES)))
             return self._json(out)
