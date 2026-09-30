@@ -669,17 +669,14 @@ STYLE_SAMPLES = [
 
 def test_style_check_agrees_with_the_painter():
     """a1101: scene.style_check mirrors desk-shell/style/style.js; judged against node running the real file."""
-    import json, pathlib, shutil, subprocess
+    import pathlib, health      # the same comparison health prints on its own line, with the world's styles too
     here = pathlib.Path(scene.__file__).resolve().parent
-    samples = STYLE_SAMPLES + [(here / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")]
-    for src in samples:
-        py = scene.style_check(src)
-        if not shutil.which("node"):
-            continue
-        js = json.loads(subprocess.run(["node", str(here / "desk-shell" / "checks" / "style-read.js")], input=src,
-                                       capture_output=True, text=True, encoding="utf-8", check=True).stdout)
-        assert (py["refusal"] or "").split(":")[0] == (js["refusal"] or ""), (src, py["refusal"], js["refusal"])
-        assert sorted([r, p] for r, p, _l, _w in py["unread"]) == sorted(js["unread"]), (src, py["unread"], js["unread"])
+    srcs = [(f"sample {k + 1}", s) for k, s in enumerate(STYLE_SAMPLES)]
+    srcs.append(("calm.style", (here / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")))
+    bad, note = health.style_mirror(srcs)
+    assert not bad, bad
+    if note:
+        print("  (" + note + ")")
     bad = scene.style_check(STYLE_SAMPLES[0])["unread"]
     assert ("b", "on papr", 7,"names no token of the right kind") in bad
 
