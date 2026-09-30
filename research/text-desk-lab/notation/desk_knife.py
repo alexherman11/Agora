@@ -3,6 +3,7 @@
 import re
 import shlex
 
+import blanks
 import harness   # registers launch; provides sync
 import knife
 import moo
@@ -46,12 +47,15 @@ HELP_LEAN = HELP_KNIFE.replace(
   go <room>              walk to a room (by id or a word of its title); go alone: who is where. help rooms
   look                   with no id, in a world with rooms: the room you are in, as a person there sees it
   table <selection> [cols=a,b] [by=col]   one row per thing, props side by side (e.g. table kind:trial)
-  $new                   the surface created earlier in this session; $item the last created thing
+  rest                   go home to your corner (Home if you have none), marked via=rest in history
+  $here $here.talk $new  blanks, filled when the line runs: the room you are in, a prop of it, the thing made most
+                         recently earlier in this reply; $today $me. Words you type (line= text= title=) stay as typed;
+                         \\$ is a literal dollar sign. help blanks
   in the house (a resident's reply): only a line beginning with > acts; any other line is thinking, whatever its
                          first word. One > line is one command: a ; in it is words, so several commands are several
                          > lines, run in order; a refusal stops the ones after it. A > line nothing answers (a
                          quote) is a MISS: logged in Misses, it stops nothing. Scripts and wake lines keep ;
-  more: help rules · help scripts · help views · help clock · help handles · help why · help export · help trials
+  more: help rules · help scripts · help views · help clock · help handles · help blanks · help why · help export · help trials
   building: help verbs (capabilities anyone makes in the world) · help commissions (a worker changes the code for you)"""
 
 
@@ -249,7 +253,7 @@ class DeskKnife(DeskMoo):
         if len(argv) < 4 or argv[0] != "when" or argv[2] != "do":
             raise Refusal("rule when <selection> do <verb> [k=v ...]   |   rule on <verb> [by=<actor>] do <verb> [k=v ...]   |   rule drop rN")
         sel_text = argv[1]
-        if self._parse_selection(sel_text) is None:
+        if self._rule_selection(sel_text) is None:
             raise Refusal(f"{sel_text!r} is not a selection (help selections)")
         act = self._parse_action(argv[3:])
         now = act["kv"].pop("now", None)
@@ -260,7 +264,7 @@ class DeskKnife(DeskMoo):
         out = f"ok {rid}: when {sel_text} do {self._action_text(act)}"
         # things already in the selection count as already handled: a rule is about what enters, not what is,
         # unless now=1 says to fire on the current matches too
-        ids, desc = self._parse_selection(sel_text)
+        ids, desc = self._rule_selection(sel_text)
         if now:
             out += f"\n  {len(ids)} thing(s) match {desc} now; firing on them"
             self._run_rules()
@@ -363,6 +367,10 @@ class DeskKnife(DeskMoo):
         out.append("  columns: id title kind tags due in age words, and any prop; cols= picks, by= sorts (desc=1)")
         return out
 
+    def _rule_selection(self, sel):
+        """A rule's selection, its blanks filled each time it is asked ($today follows the clock; $here refuses)."""
+        return self._parse_selection(blanks.fill(self, sel, ctx=blanks.Ctx("rule")))
+
     def _parse_action(self, argv):
         """The part of a rule after do: <verb> [target] [k=v ...], or run <script> [args ...]. $item stands for the
         thing the rule fired on, in a script's args or in a k=v value."""
@@ -394,14 +402,25 @@ class DeskKnife(DeskMoo):
 
     def _action_text(self, r):
         if r["verb"] == "run":
-            return "run " + " ".join([r["script"]] + [self._q(a) for a in r.get("args", [])])
-        return f"{r['verb']} {r.get('target') or ''} {self._fmt_args(r['kv'])}".replace("  ", " ").rstrip()
+            text = "run " + " ".join([r["script"]] + [self._q(a) for a in r.get("args", [])])
+        else:
+            text = f"{r['verb']} {r.get('target') or ''} {self._fmt_args(r['kv'])}".replace("  ", " ").rstrip()
+        return text.replace(blanks.LIT, "\\$")      # a literal dollar sign reads back as it was written
 
     def _fire(self, r, i):
-        """Run rule r's action on thing i; returns one receipt line."""
+        """Run rule r's action on thing i; returns one receipt line. A rule is a template its author wrote: every
+        value is filled by the one filler, $item being the thing it fired on (a806)."""
+        ctx = blanks.Ctx("rule", item=i, name=r["id"])
+        self._ctxs = (self._ctxs or []) + [ctx]
+        try:
+            return self._fire_in(r, i, ctx)
+        finally:
+            self._ctxs = self._ctxs[:-1]
+
+    def _fire_in(self, r, i, ctx):
         if r["verb"] == "run":
-            args = [a.replace("$item.title", self._title_of(i)).replace("$item", i) for a in r.get("args", [])]
-            line = "run " + " ".join([r["script"]] + [self._q(a) for a in args])
+            args = [blanks.fill(self, a, ctx=ctx) for a in r.get("args", [])]
+            line = "run " + " ".join([r["script"]] + [self._q(a).replace("$", "\\$") for a in args])
             saved, self._rule_notes = self._rule_notes, None   # the nested command must not swallow the notes so far
             try:
                 res = self.dispatch("desk", {"line": line})
@@ -416,12 +435,10 @@ class DeskKnife(DeskMoo):
             if err:
                 raise Refusal(err[4:])
             return line + " → " + (body[0] if body else "ok")
-        tgt = r.get("target") or i
-        if tgt == "$item":
-            tgt = i
-        elif r.get("target"):
+        tgt = blanks.fill(self, r.get("target") or "$item", ctx=ctx)
+        if r.get("target") and tgt != i:
             self._mark_seen(self._resolve(tgt))
-        kv = {k: v.replace("$item.title", self._title_of(i)).replace("$item", i) for k, v in r["kv"].items()}
+        kv = {k: blanks.fill(self, v, text=k in blanks.TEXT_KEYS, ctx=ctx) for k, v in r["kv"].items()}
         return self.cmd_do_knife(r["verb"], [tgt], kv).splitlines()[0]
 
     def _title_of(self, ident):
@@ -494,7 +511,7 @@ class DeskKnife(DeskMoo):
             if r.get("on"):
                 continue
             try:
-                ids, _ = self._parse_selection(r["sel"])
+                ids, _ = self._rule_selection(r["sel"])
             except Refusal:
                 continue
             if nid in ids and nid not in r["done"]:
@@ -522,7 +539,8 @@ class DeskKnife(DeskMoo):
         def q(s):
             # a literal backslash becomes four: shlex halves it, then the do parser halves it again after
             # turning unescaped \n into newlines, so text with a literal backslash-n survives a round trip
-            return '"' + str(s).replace("\\", "\\\\\\\\").replace('"', '\\"').replace("\n", "\\n").replace("$today", "\\$today") + '"'
+            # every $ as \$: a replayed value is what was stored, never a blank filled again (a806)
+            return '"' + str(s).replace("\\", "\\\\\\\\").replace('"', '\\"').replace("\n", "\\n").replace("$", "\\$") + '"'
 
         def ref(nid):
             return "desk" if nid == w.root else q(w.title(w.nodes[nid]))
@@ -625,18 +643,18 @@ class DeskKnife(DeskMoo):
         missing = sorted({m for m in re.findall(r"\$(\d+)", body) if int(m) > len(args)})
         if missing:
             raise Refusal(f"run {name} needs {max(int(m) for m in missing)} argument(s); got {len(args)}")
-        def fill(m):
-            val = args[int(m.group(1)) - 1]
-            if m.group(2):   # $1.title: the thing's title, for prose (Terra asked for this form before it existed)
-                val = self._title_of(val)
-            inside = body[:m.start()].count('"') % 2 == 1   # already inside a double-quoted value: paste raw
-            if inside:
-                return val.replace("\\", "\\\\").replace('"', '\\"')
-            return '"' + val.replace("\\", "\\\\").replace('"', '\\"') + '"' if (" " in val or not val) else val
-        line = re.sub(r"\$(\d+)(\.title)?", fill, body)
-        r = self.dispatch("desk", {"line": line})
+        # a806: the arguments are filled where run was said (run tidy $new); the body is a template, filled by the one
+        # filler as each of its commands runs ($1.title: Terra asked for this form before it existed)
+        rest = arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else ""
+        ctx = blanks.Ctx("script", args=[blanks.word(self, a) for a in args], rest=rest, name=name)
+        shown = blanks.show(self, body, ctx)
+        self._ctxs = (self._ctxs or []) + [ctx]
+        try:
+            r = self.dispatch("desk", {"line": body})
+        finally:
+            self._ctxs = self._ctxs[:-1]
         body_text = r["text"] if "text" in r else "ERR " + r["error"]
-        return f"run {name}: {line}\n" + body_text
+        return f"run {name}: {shown}\n" + body_text
 
     def _run_rules(self, cause=None):
         if not self.rules or self._in_rules:
@@ -672,7 +690,7 @@ class DeskKnife(DeskMoo):
                         r["done"] = set()   # an event rule fires every time
                     else:
                         try:
-                            ids, desc = self._parse_selection(r["sel"])
+                            ids, desc = self._rule_selection(r["sel"])
                         except Refusal as e:
                             self._note(f"~ {r['id']} could not select ({e})")
                             continue
@@ -761,12 +779,56 @@ class DeskKnife(DeskMoo):
         self.last_here = now
         return note
 
+    _ctxs = None        # a806: where lines are being filled, innermost last (blanks.Ctx); empty for a typed line
+    _reply = None       # the reply the current top-level call belongs to (the caller's token, or one per call)
+    _made = None        # {reader slot: (reply, ids made most recently in that reply)}: what $new reads next
+
+    def dispatch(self, name, args):
+        if not self._ctxs:
+            # lines sent one by one (deskd, explore, the house) share the caller's reply token; without one, the
+            # lines of one call are one reply, and a later call starts a new one
+            import uuid
+            self._reply = args.get("reply") or uuid.uuid4().hex
+        return super().dispatch(name, args)
+
+    def _echo(self, part):
+        """A step of a verb, script or rule is echoed as it runs, its blanks filled: a receipt shows values (a806 (5));
+        a typed line is echoed as it was typed."""
+        ctx = blanks.ctx_of(self)
+        return blanks.show(self, blanks.protect(part), ctx) if ctx.template else part
+
+    def _slot(self):
+        return str(self.world.me) + ("/" + self._window if getattr(self, "_window", "") else "")
+
     def _one(self, args, name="desk", whole=False):
+        top = not self._ctxs
+        if top:
+            # a typed line: $new is what this reader made most recently in this same reply, never in an earlier one
+            rec = (self._made or {}).get(self._slot())
+            self._ctxs = [blanks.Ctx("typed", prev=rec[1] if rec and rec[0] == self._reply else None)]
+        try:
+            return self._one_filled(args, name, whole, top)
+        finally:
+            if top:
+                self._ctxs = None
+
+    def _one_filled(self, args, name, whole, top):
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
         n0 = len(self.world.events)
+        ctx, self._filled_new = self._ctxs[-1], None
         r = super()._one(args, name, whole)
+        if self._filled_new:
+            # a806 (10): the receipt names what $new was, so a $new that meant something else is seen at once
+            key = "text" if "text" in r else "error"
+            r[key] += f"\n  ($new = {self._filled_new})"
+            self._filled_new = None
+        # what this line made itself, before the rules act on it; $new is the most recent thing made in this reply
+        ctx.prev = blanks.made_by(self.world.events[n0:]) or ctx.prev
+        if top:
+            self._made = dict(self._made or {})
+            self._made[self._slot()] = (self._reply, ctx.prev)
         if len(self.world.events) > n0:
             # after the receipt is composed, so the receipt describes the command, then the rules; the command's
             # last event is the cause of whatever the rules do, so one undo takes both back
@@ -862,14 +924,20 @@ class DeskKnife(DeskMoo):
         line = (line or "").strip()
         if not line:
             return HELP_KNIFE
-        if "$today" in line and not line.lower().startswith("script "):
-            # substituted when a command runs, not when a script is defined
-            if not self.today and re.search(r"(?<!\\)\$today", line):
-                raise Refusal("$today is unset; clock YYYY-MM-DD sets it")
-            line = re.sub(r"(?<!\\)\$today", self.today or "", line)   # \$today stays literal (export writes it so)
+        # a806: blanks are filled after the line is parsed, as values, by the one filler (blanks.py); a script is
+        # defined as written. \$ is a literal dollar sign: it is set aside here, before any parser can eat the backslash
+        if not line.lower().startswith("script "):
+            line = blanks.protect(line)
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
+        if arg and cmd not in ("do", "rule", "run", "script") and (blanks.ctx_of(self).template or cmd in blanks.READS):
+            # words that name things (look $new, go $here); inside a verb or script, every command's words
+            arg = blanks.fill(self, arg, quote=True)
+            line = words[0] + " " + arg
+        if cmd == "rest":
+            import rooms
+            return rooms.cmd_rest(self, arg)
         if cmd == "go":
             import rooms
             return rooms.cmd_go(self, arg)
@@ -956,17 +1024,19 @@ class DeskKnife(DeskMoo):
             # begins with a selection term is the target, = or not.
             SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of):|^-?(due|age)[<>]|^[?]")
             is_target = lambda a: "=" not in a or a.startswith("?") or bool(SEL.match(a))
-            positional = [unescape_value(a) for a in argv[1:] if is_target(a)]   # titles carry escapes too
-            kv = {}
-            for a in argv[1:]:
-                if "=" in a and not is_target(a):
-                    k, _, v = a.partition("=")
-                    kv[k] = unescape_value(v)
             if verb not in self._builtin_verbs():     # tier 1: `do sweep porch` may name a verb made in the world
                 import verbs
                 hit = verbs.try_line(self, arg, self.world.me)
                 if hit is not None:
                     return hit
+            # a806: each value is filled once, after parsing: targets and values that name things always; words a
+            # person wrote (line= text= title=, and wake=, desk words run later) only inside a template
+            positional = [blanks.fill(self, unescape_value(a)) for a in argv[1:] if is_target(a)]   # titles carry escapes too
+            kv = {}
+            for a in argv[1:]:
+                if "=" in a and not is_target(a):
+                    k, _, v = a.partition("=")
+                    kv[k] = blanks.fill(self, unescape_value(v), text=k in blanks.TEXT_KEYS)
             return self.cmd_do_knife(verb, positional, kv)
         return super().repl(line)
 
@@ -979,8 +1049,12 @@ class DeskKnife(DeskMoo):
   look             with no id: the room you are in: its description, who is here, what is at hand (one id each),
                    the last lines said here. Only what it prints whole counts as seen: look <id> or read before changing
                    a thing listed at hand. look <id> is the tree, as always.
+  rest             go home to your corner (Home if you have none); history marks it via=rest
+  $here            the room you are in, in any target or value: do move a12 into=$here; $here.talk its chat, so
+                   a verb can say: do append $here.talk line="$*" (help blanks)
   Where you are is kept in the world (history lists each go) but undo leaves it: go back instead. Someone who never
-  went anywhere is in their own corner, or in Home. Resting sends a resident home to their corner.""",
+  went anywhere is in their own corner, or in Home (Jeff too). Resting sends a resident home to their corner. A
+  resident asleep (status=asleep on their corner) is never 'here with you': the room says they are asleep here.""",
         "commissions": """commissions: a worker changes what the world can't (the desk's code, the house, the painter) for you.
   Write a task with prop commission=asked; its text says what you want, why, and how you'll know it's done:
     do create <place> kind=task title="..." commission=asked text="What: ... Why: ... Done when: ..."
@@ -1000,12 +1074,15 @@ class DeskKnife(DeskMoo):
   target is the thing itself unless you name one: rule when in:Today do sort Today by=due
   the action may run a script: rule on prop by=harness do run announce $item   ($item = the thing it fired on,
                                                                                $item.title its title)
+  A rule is a template: its values are filled when it fires ($item, $today; help blanks). $here refuses: a rule has
+  no room until rooms step 2b gives it a home, and $new refuses: a rule has no earlier line.
   rules              list them, with how often each fired      rule drop rN   remove one
   A rule's actions print as ~ lines after your command's receipt; undo of your command undoes them too.
   why <id> shows how a thing got where it is and which rule would act on it next.
   e.g. rule when tag:fixed do move into=Done      rule on append by=priya do tag add=needs-reply""",
         "scripts": """scripts: named command sequences.
-  script <name> = <commands separated by ;>     $1 $2 .. stand for run's arguments; $today for the clock's date
+  script <name> = <commands separated by ;>     $1 $2 .. stand for run's arguments, $* all of them as said;
+                                                 $today $here $new $me as anywhere (help blanks)
                                                  $1.title is the title of the thing $1 names (for prose)
   run <name> [args]                              scripts may call scripts; a rule may run one (help rules)
   scripts                                        list them
@@ -1027,10 +1104,12 @@ class DeskKnife(DeskMoo):
         "clock": """clock: clock follow keeps today on the wall date: days pass on their own, the rules run when a new day is
   noticed, and the first command after an absence says how long you were away. clock alone shows the date and hour.
   clock YYYY-MM-DD (or clock now) sets today by hand, re-evaluates the rules, and stops following.
-  today in due< / due> terms is the clock's date; $today in any command; age<N / age>N select by days since a
+  today in due< / due> terms is the clock's date; $today in a target or value (not in words you type: help
+  blanks); age<N / age>N select by days since a
   thing was last touched (undo is not touching). examine prints when: with the last touch.""",
         "handles": """handles: names for ids. do create ... as=draft, or set draft = <id or title>; then $draft names it.
-  vars lists them. $new is the last surface created, $item the last thing.""",
+  vars lists them. $new is the thing made most recently in this reply (help blanks).""",
+        "blanks": blanks.HELP,
         "export": "export: prints the commands that rebuild this desk from an empty one, by title. Replay them after one look.",
         "trials": """trials: model runs as things on the desk.
   do create <surface> kind=trial title=<str> then do prop <trial> task=home2 variant=lean model=gpt-5.6-sol

@@ -466,7 +466,7 @@
     const done = async commit => {
       const t = inp.textContent.trim(); box.remove(); say("");
       if (!commit || !t) return;
-      await Desk.do(`look ${surf.id}; do create ${surf.id} kind=note title="${q(t)}"; do move $item to=${x},${y}`);
+      await Desk.do(`look ${surf.id}; do create ${surf.id} kind=note title="${q(t)}"; do move $new to=${x},${y}`);
     };
     inp.onkeydown = k => {
       if (k.key === "Enter") { k.preventDefault(); done(true); }
@@ -569,7 +569,7 @@
     }
 
     L.push("= what this window offers a hand (and the command each one is)");
-    L.push(`  double-click empty canvas   ->  do create ${surf.id} kind=note title="..."; do move $item to=x,y`);
+    L.push(`  double-click empty canvas   ->  do create ${surf.id} kind=note title="..."; do move $new to=x,y`);
     L.push(`  click a title or a body     ->  do retitle <id> title="..."  /  do rewrite <id> text="..."`);
     L.push(`  drag a card / its corner    ->  do move <id> to=x,y   /   do resize <id> to=WxH`);
     L.push(`  drag the dot on a card      ->  do link <a> <b> as=refers      (there is no unlink; filed to-jeff)`);

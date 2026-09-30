@@ -166,9 +166,10 @@ class Desk:
                             outs.append(f"({len(rest)} later command(s) not run: at most {self.read_cap} reads per call. "
                                         f"Not run: {'; '.join(rest)}. Ask for them in another call, or narrow with find)")
                             break
+                    shown = self._echo(part)
                     r = self._one({"line": part})
                     body = r["text"] if "text" in r else "ERR " + r["error"]
-                    outs.append(f"[{i + 1}] {part}\n{body}")
+                    outs.append(f"[{i + 1}] {shown}\n{body}")
                     if "error" in r:
                         error = True
                         if i < len(parts) - 1:
@@ -180,6 +181,10 @@ class Desk:
         return self._one(args, name)
 
     _cmd_no = 0
+
+    def _echo(self, part):
+        """How a command of a batch is echoed above its receipt: as written (a desk that fills blanks shows values)."""
+        return part
 
     def _one(self, args, name="desk", whole=False):
         header = self.delta_header()
@@ -246,8 +251,11 @@ class Desk:
         except ValueError as e:
             if first.lstrip("@") in BASE_COMMANDS:
                 raise Refusal(f"could not parse: {e}")
-            # a736: prose after > ("> I don't think so") has an apostrophe; nothing answers it, and it is a miss
             import verbs
+            hit = verbs.try_line(self, line, self.world.me)    # a806: say it's fine is a verb's words, apostrophe and all
+            if hit is not None:
+                return hit
+            # a736: prose after > ("> I don't think so") has an apostrophe; nothing answers it, and it is a miss
             verbs.record_miss(self, line)
             raise Unanswered(f"unknown command {first!r}; nothing here answers to it. help lists the desk's commands; "
                              f"a verb anyone can make is a note tagged verb (help verbs)")
@@ -331,11 +339,9 @@ class Desk:
         ident = ident.lstrip("@").strip().strip('"\'')   # any command may name a thing by its quoted title
         if ident.startswith("$") and ident[1:] in (getattr(self, "vars", None) or {}):
             ident = self.vars[ident[1:]]   # a handle you named: create ... as=draft, or set draft = a98
-        if ident in ("$new", "$item"):
-            want = (self.world.last_surface or self.world.last_created) if ident == "$new" else self.world.last_created
-            if not want:
-                raise Refusal(f"{ident}: nothing has been created yet in this session")
-            ident = want
+        import blanks
+        if blanks.WORD.match(ident) and getattr(self, "_ctxs", None) is not None:
+            ident = blanks.fill(self, ident)   # a806: a blank that reaches a target unfilled goes to the one filler
         if ident in ("desk", "root"):
             return self.world.root
         if ident in self.world.nodes:

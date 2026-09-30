@@ -12,6 +12,10 @@ an actor's room is the `to` of their latest go. So it is journaled with everythi
 merge replays the go lines), and nothing else needs to be kept in step. It is outside undo's reach: undo on a go
 refuses and says why, and a bare undo skips it. Someone who never went anywhere is in their own corner, or, with no
 corner, in Home (the outermost room). Alex is not placed in step 1 (a678 (8)): he has a focus, not a location.
+
+Step 2a (a806): `rest` takes you home (your corner, or Home), recorded as a go with via=rest; the house rests a
+resident this way. $here and $here.<prop> (blanks.py) read room_of. A sleeping resident (their corner says
+status=asleep) is never listed as 'here with you'; a room says 'Pike is asleep here' instead.
 """
 
 import re
@@ -80,8 +84,10 @@ def room_of(w, actor):
 
 
 def actors(w):
-    """The actors who have a place: residents (a corner with actor=) and anyone who has gone somewhere."""
-    names = []
+    """The actors who have a place: the world's own agent (World.me, jeff), who is always somewhere, residents (a
+    corner with actor=) and anyone who has gone somewhere. Someone listed here who never went anywhere is at their
+    default room (a806 (4)), so 'who is here' agrees with $here for them."""
+    names = [str(type(w).me).lower()]
     for n in w.nodes.values():
         p = n.get("props") or {}
         if n["type"] == "surface" and p.get("role") == "resident" and p.get("actor"):
@@ -96,6 +102,12 @@ def actors(w):
 
 def here(w, fid):
     return [a for a in actors(w) if room_of(w, a) == fid]
+
+
+def asleep(w, actor):
+    """A resident whose corner says status=asleep (the house writes it when want is not awake)."""
+    c = corner_of(w, actor)
+    return bool(c) and (w.nodes[c].get("props") or {}).get("status") == "asleep"
 
 
 def resolve(w, word, actor):
@@ -127,13 +139,16 @@ def resolve(w, word, actor):
     raise Refusal(return_hint + listing)
 
 
-def go(w, actor, fid):
-    """Put `actor` in room `fid`. -> the event, or None when they are there already."""
+def go(w, actor, fid, via=None):
+    """Put `actor` in room `fid`. -> the event, or None when they are there already. via=rest marks a move the
+    actor did not walk: carried home to rest (a806 (9)), as a rule's deeds say via=rule."""
     was = room_of(w, actor)
     if was == fid:
         return None
     ev = w._event("go", str(actor), {"to": fid, "from": was}, {"refuse": UNDO_REFUSAL}, actor)
     ev["changed"] = []
+    if via:
+        ev["via"] = via
     return ev
 
 
@@ -210,14 +225,13 @@ def narrate(desk, fid):
         if shown == body:
             marks += [(dnid, ["title"] + (["text"] if ds["text"].strip() else [])), (ds["id"], ["title"] + (["text"] if ds["text"].strip() else []))]
     others = [a for a in here(w, fid) if a != me]
-    if others:
-        def who(a):
-            c = corner_of(w, a)
-            asleep = c and (w.nodes[c].get("props") or {}).get("status") == "asleep"
-            return w.display_name(a) + (" (asleep)" if asleep else "")
-        out.append("Here with you: " + ", ".join(who(a) for a in others) + ".")
-    else:
-        out.append("No one else is here.")
+    awake = [a for a in others if not asleep(w, a)]
+    sleeping = [a for a in others if asleep(w, a)]
+    # a806 (6): a sleeping actor is never 'here with you'; one asleep is said so, wherever they sleep
+    out.append("Here with you: " + ", ".join(w.display_name(a) for a in awake) + "." if awake else
+               "No one else is here." if not sleeping else "No one else here is awake.")
+    for a in sleeping:
+        out.append(f"{w.display_name(a)} is asleep here" + (" (their own corner)." if corner_of(w, a) == fid else "."))
     tnid, ts = _target(desk, p["talk"]) if p.get("talk") else (None, None)
     skip = {x for x in (dnid, tnid) if x} | {x["id"] for x in (ds, ts) if x}
     if p.get("shows"):
@@ -261,7 +275,7 @@ def where_all(desk):
     out = [f"You are in {w.nodes[mine]['title']} ({mine})." if mine else
            "You are not placed in a room (Alex has a focus, not a location, in step 1)."]
     for f in all_rooms(w):
-        people = [w.display_name(a) for a in here(w, f)]
+        people = [w.display_name(a) + (" (asleep)" if asleep(w, a) else "") for a in here(w, f)]
         out.append(f"  {f} {w.nodes[f]['title']}" + (": " + ", ".join(people) if people else ""))
     out.append("go <room> takes you there, by id or a word of its title")
     return "\n".join(out)
@@ -281,6 +295,23 @@ def cmd_go(desk, arg):
     ev = go(w, w.me, fid)
     head = f"ok {ev['id']}: you go to {w.nodes[fid]['title']} ({fid})" if ev else f"(you are already in {w.nodes[fid]['title']} ({fid}))"
     return head if brief else head + "\n" + narrate(desk, fid)
+
+
+def cmd_rest(desk, arg):
+    """rest: go home to rest, to your corner (Home if you have none). The move is marked via=rest, so history tells
+    being carried home to rest from walking. How long a resident rests is the house's to keep (> rest 2 hours); here
+    it only takes you home. `rest :1` gives the receipt only."""
+    w = desk.world
+    if not all_rooms(w):
+        raise Refusal("this world has no rooms, so there is no home to rest in")
+    if not placed(w.me):
+        raise Refusal("Alex is not placed in a room: he has a focus, not a location")
+    fid = default_room(w, w.me)
+    ev = go(w, w.me, fid, via="rest")
+    where = f"{w.nodes[fid]['title']} ({fid})"
+    return (f"ok {ev['id']}: you go home to rest, to {where}" if ev else f"(you are already home, in {where})") + (
+        "" if arg.strip() in ("", ":1") else "\n  (how long you rest is the house's to keep, when a resident says > rest; "
+                                               "the desk only takes you home)")
 
 
 def narrates(desk):

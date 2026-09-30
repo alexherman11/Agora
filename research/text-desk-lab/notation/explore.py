@@ -112,6 +112,9 @@ def fresh():
     return d
 
 
+REPLY = __import__("uuid").uuid4().hex   # a806: the lines of one call are one reply; $new reaches no further back
+
+
 def via_deskd(name, me, lines, whole=False):
     """When deskd is up it is the one owner of every world: send each line as one turn and hold nothing between
     turns. A refusal stops the lines after it, as it does without deskd. Returns False when no server answers, and
@@ -120,8 +123,10 @@ def via_deskd(name, me, lines, whole=False):
     if os.environ.get("DESKD", "") == "off":
         return False
     url = os.environ.get("DESKD", "http://127.0.0.1:8780") + "/api/do"
+    reply = REPLY
     for k, line in enumerate(lines):
-        body = json.dumps({"session": name, "as": me, "line": line, "cli": True, "whole": whole}).encode("utf-8")
+        body = json.dumps({"session": name, "as": me, "line": line, "cli": True, "whole": whole,
+                           "reply": reply}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url, body, {"Content-Type": "application/json"}), timeout=60) as f:
                 r = json.loads(f.read().decode("utf-8"))
@@ -252,7 +257,7 @@ def main():
             print()
             continue
         before, n0 = worktree.ids_of(desk), len(desk.world.events)
-        r = desk.dispatch("desk", {"line": line, "whole": whole})
+        r = desk.dispatch("desk", {"line": line, "whole": whole, "reply": REPLY})
         worktree.record(desk, line, me, before, n0)
         text = r.get("text") or ("ERR " + r["error"])
         print(text)
@@ -262,7 +267,7 @@ def main():
             if rest:
                 # Sable and Juniper: after a refused create, the next line ran against the previous $item. A refusal ends the batch.
                 # Juniper (a736): and say which, so they can be sent again
-                print(f"stopped: {len(rest)} later line(s) not run because this one was refused ($item and $new still name the last thing made). "
+                print(f"stopped: {len(rest)} later line(s) not run because this one was refused. "
                       f"Not run: " + " | ".join(rest))
                 print()
             break
