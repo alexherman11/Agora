@@ -223,14 +223,15 @@ def line_times(w, sid):
 
 def inbox_rows(desk, me):
     """Every chat line for `me`, newest first: a line in a chat whose members name me (a direct chat), or one that
-    calls @me, @everyone or @all outside quotes, the house's own rule for what reaches a resident now (house.news).
-    `open` says no line of mine has followed it in that chat yet."""
+    calls @me by name outside quotes. @everyone and @all don't count (Alex, 30 Sep: 'just direct chats and @alex';
+    a broadcast in a shared chat stayed 'for you' forever, since he rarely writes there). Narrower than what reaches
+    a resident (house.news), on purpose. `open` says no line of mine has followed it in that chat yet."""
     import re
     from world import unquoted
     w, me = desk.world, str(me or "").lower()
     if not me:
         return []
-    called = re.compile(rf"@({re.escape(me)}|everyone|all)\b", re.I)
+    called = re.compile(rf"@{re.escape(me)}\b", re.I)
     where = {}
     for nid, n in w.nodes.items():
         if n["type"] == "appearance" and n["subject"] not in where:
