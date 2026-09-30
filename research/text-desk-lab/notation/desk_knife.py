@@ -47,6 +47,10 @@ HELP_LEAN = HELP_KNIFE.replace(
   look                   with no id, in a world with rooms: the room you are in, as a person there sees it
   table <selection> [cols=a,b] [by=col]   one row per thing, props side by side (e.g. table kind:trial)
   $new                   the surface created earlier in this session; $item the last created thing
+  in the house (a resident's reply): only a line beginning with > acts; any other line is thinking, whatever its
+                         first word. One > line is one command: a ; in it is words, so several commands are several
+                         > lines, run in order; a refusal stops the ones after it. A > line nothing answers (a
+                         quote) is a MISS: logged in Misses, it stops nothing. Scripts and wake lines keep ;
   more: help rules · help scripts · help views · help clock · help handles · help why · help export · help trials
   building: help verbs (capabilities anyone makes in the world) · help commissions (a worker changes the code for you)"""
 
@@ -757,12 +761,12 @@ class DeskKnife(DeskMoo):
         self.last_here = now
         return note
 
-    def _one(self, args, name="desk"):
+    def _one(self, args, name="desk", whole=False):
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
         n0 = len(self.world.events)
-        r = super()._one(args, name)
+        r = super()._one(args, name, whole)
         if len(self.world.events) > n0:
             # after the receipt is composed, so the receipt describes the command, then the rules; the command's
             # last event is the cause of whatever the rules do, so one undo takes both back

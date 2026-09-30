@@ -7,8 +7,9 @@ commands it reads each time it wakes, e.g. `read a600; look f590 :3; look Board 
 resident as one long-lived `claude -p` session with no system prompt, no tools, no settings and no memory. Everything
 the resident knows comes from the world, and everything it does goes through it:
 
-  - lines of its reply that begin with a desk command are done in the world, signed with its name; the desk's
-    reply is its next message. Any other line is its own thinking, kept in its transcript and nowhere else.
+  - lines of its reply that begin with > are done in the world, one line one command, signed with its name; the
+    desk's reply is its next message. Any other line is its own thinking, kept in its transcript and nowhere else,
+    whatever its first word (a736). A > line nothing answers (a quote) is a miss: logged, and it stops nothing.
   - thinking isn't resting (Alex, 29 Sep). A reply with no command lines is answered `(quiet)`, or with whatever
     news is waiting, and the resident goes on; after 10 quiet exchanges in a row the house lets it rest.
   - it rests when it says so: `> rest` rests until someone calls; `> rest 2 hours` (or 30 minutes, 1 day, 1h30m,
@@ -63,7 +64,7 @@ import workshop      # noqa: E402  workers for what the world can't change yet
 STATE = HERE / "house-state"
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
-            "rows", "scene", "worktree", "go"}
+            "rows", "scene", "worktree", "go", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 ANOTHER = 76         # the exit code for "another house already runs this world": keeper does not fight it
@@ -105,11 +106,17 @@ def clean_env(fake):
     return env
 
 
+def is_command(line):
+    """Does this line begin with a desk command word (or the house's own `rest`)?"""
+    first = line.strip().split(None, 1)[0].lower() if line.strip() else ""
+    return first in COMMANDS or first == "rest"
+
+
 def commands_in(reply):
-    """The command lines of a reply, in order. A line beginning with `>` is an attempt, whatever its words (Alex's door:
-    "use > at the beginning ... to start a command"), so a resident can reach for something that isn't there yet; a
-    line beginning with a desk command word still counts without the mark. A quoted value left open continues onto
-    the next lines. Wrapping backticks and code fences are allowed."""
+    """The > lines of a reply, in order, each one command (a736): only a line beginning with `>` is an attempt (Alex's
+    door: "use > at the beginning ... to start a command"), whatever its words, so a resident can reach for something
+    that isn't there yet. Every other line is thinking, whatever its first word ('Where things stand:' is not `where`).
+    A quoted value left open continues onto the next lines. Wrapping backticks and code fences are allowed."""
     out, cur, open_q = [], None, False
     for raw in reply.splitlines():
         line = raw.strip()
@@ -124,11 +131,10 @@ def commands_in(reply):
             continue
         if len(line) > 1 and line.startswith("`") and line.endswith("`"):
             line = line[1:-1].strip()
-        attempt = line.startswith(">")
-        if attempt:
-            line = line[1:].strip().strip("`").strip()
-        first = line.split(" ", 1)[0].lower() if line else ""
-        if line and (attempt or first in COMMANDS):
+        if not line.startswith(">"):
+            continue
+        line = line[1:].strip().strip("`").strip()
+        if line:
             if line.count('"') % 2 == 1:
                 cur, open_q = line, True
             else:
@@ -138,9 +144,39 @@ def commands_in(reply):
     return out
 
 
-def deskd_do(world, who, text):
+def missed_in(receipt):
+    """The > lines the desk answered MISS (a736): nothing answers them. Each is the nearest `> ` line above its MISS."""
+    out, last = [], None
+    for line in receipt.splitlines():
+        if line.startswith("> "):
+            last = line[2:]
+        elif line.startswith("MISS ") and last is not None:
+            out.append(last)
+            last = None
+    return out
+
+
+def desk_one_line(text, n=80):
+    """A line as a receipt quotes it: its first line, cut at n characters."""
+    first = text.splitlines()[0] if text else ""
+    return first if len(first) <= n and "\n" not in text else first[:n] + "…"
+
+
+def unmarked_in(reply):
+    """How many lines of a reply, without the > mark, begin with a desk command word: what used to run (a736)."""
+    n = 0
+    for raw in reply.splitlines():
+        line = raw.strip()
+        if len(line) > 1 and line.startswith("`") and line.endswith("`"):
+            line = line[1:-1].strip()
+        if line and not line.startswith((">", "```")) and is_command(line):
+            n += 1
+    return n
+
+
+def deskd_do(world, who, text, whole=False):
     """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
-    or None when no deskd answers (then the caller runs them itself)."""
+    or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736)."""
     import urllib.error
     import urllib.request
     url = os.environ.get("DESKD", "")
@@ -148,7 +184,7 @@ def deskd_do(world, who, text):
         return None
     lines, out = desk_mcp.split_lines(text), []
     for k, line in enumerate(lines):
-        body = json.dumps({"session": world, "as": who, "line": line}).encode("utf-8")
+        body = json.dumps({"session": world, "as": who, "line": line, "whole": whole}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
                                         timeout=120) as f:
@@ -162,7 +198,8 @@ def deskd_do(world, who, text):
         out.append(f"> {line}\n{said}\n")
         if r.get("error") or said.startswith("ERR"):
             if k < len(lines) - 1:
-                out.append(f"stopped: {len(lines) - k - 1} later line(s) not run because this one was refused")
+                out.append(f"stopped: {len(lines) - k - 1} later line(s) not run because this one was refused. "
+                           f"Not run: " + " | ".join(lines[k + 1:]))
             break
     return "\n".join(out)
 
@@ -396,13 +433,46 @@ class House:
             self.desk, self.mtime = export_docs.load(self.world), m
         return self.desk.world
 
-    def act(self, who, line):
+    def act(self, who, line, whole=False):
         """Desk lines as `who`. Through deskd when it is up, so residents and the painter run the same code (one host);
-        otherwise the same path a desk tool call takes, one fresh process per call."""
-        text = deskd_do(self.world, who, line)
+        otherwise the same path a desk tool call takes, one fresh process per call. whole (a736): each line is one
+        command, a ; in it is words; for a resident's > lines. The house's own lines (wake strings) keep ; as a
+        separator."""
+        text = deskd_do(self.world, who, line, whole)
         if text is None:
-            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world})
+            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole})
         return text
+
+    def misses(self, r, actor, lines):
+        """Log each > line nothing answered (a quote, a reach for something not there) in the chat with prop
+        role=misses, made on first need beside Wishes (Sable c742: the first automatic miss log); the house signs it,
+        so it wakes no one. -> the receipt line that tells the resident where."""
+        if not lines:
+            return []
+        w = self.load()
+        log = next((a for a in w.nodes.values() if a["type"] == "appearance"
+                    and ((w.subjects.get(a.get("subject")) or {}).get("props") or {}).get("role") == "misses"), None)
+        if log is None:
+            wish = next((a for a in w.nodes.values() if a["type"] == "appearance"
+                         and (w.subjects.get(a.get("subject")) or {}).get("title") == "Wishes"), None)
+            where = (wish or {}).get("parent") or w.root
+            self.act("house", f"look {where} :1; do create {where} kind=chat title=Misses members=all role=misses "
+                              f"text=\"Each > line in a resident's reply that nothing answered (no command, no verb), "
+                              f"logged by the house (a736).\"")
+            w = self.load()
+            log = next((a for a in w.nodes.values() if a["type"] == "appearance"
+                        and ((w.subjects.get(a.get("subject")) or {}).get("props") or {}).get("role") == "misses"), None)
+        at = time.strftime("%Y-%m-%d %H:%M")
+        n = r.state.get("turns", 0)
+        for line in lines:
+            got = "no miss log"
+            if log is not None:
+                said = f"{actor}, {at}, reply {n} in {r.rid}: > {line}"
+                got = self.act("house", "do append " + log["id"] + " line=" + json.dumps(said, ensure_ascii=False))
+            r.log("miss", {"line": line, "logged": got[-200:]})
+        where = f"logged in {log['id']} (Misses)" if log is not None else "the miss log could not be made"
+        return [f"~ house: {len(lines)} line{'s' if len(lines) != 1 else ''} after > that nothing answered, {where}: "
+                + " | ".join(desk_one_line(l, 60) for l in lines)]
 
     def note(self, w, title):
         for s in w.subjects.values():
@@ -582,10 +652,27 @@ class House:
             return
         if not actor:                          # its name was taken away mid-turn: nothing is done in the world unsigned
             return
-        cmds, rest = rest_in(commands_in(text))
-        receipt = self.act(actor, "\n".join(cmds)) if cmds else ""
+        attempts, rest = rest_in(commands_in(text))
+        receipt = self.act(actor, "\n".join(attempts), whole=True) if attempts else ""
+        # Sable c742: a > line nothing answers (a quote) says MISS and stops nothing after it; the desk decides, since
+        # a verb made in the world (`> handbook`) answers as well as a command does
+        missed = missed_in(receipt)
+        notes = self.misses(r, actor, missed)
+        cmds = len(attempts) > len(missed)
+        n = 0 if attempts or rest is not None else unmarked_in(text)
+        if n:
+            notes.append(f"nothing ran: only lines beginning with > act ({n} line{'s' if n != 1 else ''} looked like "
+                         f"command{'s' if n != 1 else ''})")
         if cmds:
             r.state["quiet"] = 0
+        elif notes and rest is None:     # nothing done in the world: it counts toward the quiet limit, as thinking does
+            r.state["quiet"] = r.state.get("quiet", 0) + 1
+            if r.state["quiet"] > QUIET_MAX:
+                r.state.setdefault("inbox", []).extend(notes)       # said when it next arrives
+                self.rest(r, 0, f"{QUIET_MAX} quiet exchanges in a row")
+                return
+        if notes:
+            receipt = (receipt + "\n" if receipt else "") + "\n".join(notes)
         if isinstance(rest, str):                         # a rest the house could not read: say so, and go on
             r.send((receipt + "\n---\n" if receipt else "") + f"~ house: {rest}", "receipt")
             return

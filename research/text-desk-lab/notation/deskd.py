@@ -5,7 +5,8 @@
 GET  /api/snapshot?session=<name>&as=<actor>    the world as JSON (rules, scripts, clock included), plus the
                                                  outline text exactly as the actor would read it
 POST /api/do   {"session": "...", "as": "...", "line": "..."}    run desk commands; returns the receipt text and
-                                                 the number of events so far
+                                                 the number of events so far; "whole": true runs the line as one
+                                                 command, a ; in it being words (a resident's > line, a736)
 GET  /api/events?session=<name>&since=<n>       events after index n (poll this; it is cheap)
 GET  /anything-else                              static files from static_dir (the shell)
 
@@ -387,7 +388,7 @@ class Handler(SimpleHTTPRequestHandler):
                 r = {"text": text}
             else:
                 allids = worktree.ids_of(desk)
-                r = desk.dispatch("desk", {"line": line})
+                r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole"))})   # a736: a > line is one command
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably

@@ -30,6 +30,15 @@ HELP = """commands (one per call):
 ids: f.. surface, a.. appearance, s.. subject, e.. event. quote values with spaces."""
 
 
+class Unanswered(Refusal):
+    """Nothing answers the line's first word: no command, no verb in the world. For a resident's > line (whole) it is a
+    miss, not a refusal: it changed nothing, so the lines after it still run (Sable, a736 c742)."""
+
+
+BASE_COMMANDS = {"help", "?", "look", "open", "close", "read", "where", "verbs", "pivot", "find", "history", "undo",
+                 "do", "plan", "apply"}
+
+
 def aspects_of(verb, args):
     """The aspects a deed touches, as Sable's spec 1 names them: prop:<k>, title, text, due, tags, place.
     None means everything (a verb this table does not know)."""
@@ -139,6 +148,9 @@ class Desk:
     read_cap = None # round 11 (lean): at most this many read/examine commands per call; the rest are folded, visibly
 
     def dispatch(self, name, args):
+        if name == "desk" and args.get("whole"):
+            # a736: a line a resident typed after > is one command; a ; in it is words (the desk may still refuse them)
+            return self._one({"line": args.get("line", "")}, whole=True)
         if self.batch and name == "desk":
             parts = split_batch(args.get("line", ""))
             if parts and parts[0].lower().startswith("script "):
@@ -169,11 +181,18 @@ class Desk:
 
     _cmd_no = 0
 
-    def _one(self, args, name="desk"):
+    def _one(self, args, name="desk", whole=False):
         header = self.delta_header()
         self._cmd_no += 1
         n0 = len(self.world.events)
         r = self._dispatch(name, args)
+        if whole and r.get("miss"):
+            # a736: a > line nothing answers is a miss. It says MISS, not ERR, so the lines after it go on
+            r = {"text": f"MISS {r['error']}. Nothing ran; a line that is no command changes nothing, so the lines "
+                         f"after it still run", "miss": True}
+        elif whole and "error" in r and len(split_batch(args.get("line", ""))) > 1:
+            r["error"] += ("\n  (one > line is one command, and a ; in it is part of the words; for several commands, "
+                           "put each command on its own > line)")
         for e in self.world.events[n0:]:
             e.setdefault("cmd", self._cmd_no)   # which command produced it: undo groups steps by this, not by verb
         if header:
@@ -210,7 +229,7 @@ class Desk:
                 return {"text": self.cmd_do(args.get("verb"), args.get("target"), dict(args.get("args") or {}))}
             return {"error": f"unknown tool {name}"}
         except Refusal as r:
-            return {"error": str(r)}
+            return {"error": str(r), **({"miss": True} if isinstance(r, Unanswered) else {})}
 
     # ---- repl -------------------------------------------------------
     def repl(self, line):
@@ -225,7 +244,13 @@ class Desk:
         try:
             words = shlex.split(head)
         except ValueError as e:
-            raise Refusal(f"could not parse: {e}")
+            if first.lstrip("@") in BASE_COMMANDS:
+                raise Refusal(f"could not parse: {e}")
+            # a736: prose after > ("> I don't think so") has an apostrophe; nothing answers it, and it is a miss
+            import verbs
+            verbs.record_miss(self, line)
+            raise Unanswered(f"unknown command {first!r}; nothing here answers to it. help lists the desk's commands; "
+                             f"a verb anyone can make is a note tagged verb (help verbs)")
         cmd, argv = words[0].lower(), words[1:]
         argv = [a.lstrip("@") for a in argv]
         if cmd in ("help", "?"):
@@ -292,7 +317,7 @@ class Desk:
         if hit is not None:
             return hit
         verbs.record_miss(self, line)
-        raise Refusal(f"unknown command {cmd!r}; nothing here answers to it. help lists the desk's commands; "
+        raise Unanswered(f"unknown command {cmd!r}; nothing here answers to it. help lists the desk's commands; "
                       f"a verb anyone can make is a note tagged verb (help verbs)")
 
     def _verb_names(self):
