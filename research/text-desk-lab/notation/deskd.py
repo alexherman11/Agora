@@ -373,6 +373,11 @@ class Handler(SimpleHTTPRequestHandler):
                 desk.seen[ob["item"]] = now if now != ob["rev"] else ob["rev"]
                 if now != ob["rev"]:
                     desk._note_seen(ob["item"], len(desk.world.events), sorted(fields) or None, obs=sess.actor)
+                else:
+                    # 30 Sep (Alex's wake/rest buttons were always refused): unchanged since it was painted means what
+                    # was painted is current, so it is seen now. Noting nothing left every aspect unseen since event 0,
+                    # and the desk's own fence then refused the press over any old change to it (e903, a prop of mine).
+                    desk._note_seen(ob["item"], len(desk.world.events), None, obs=sess.actor)
             for entry in (ob.get("reads") or []):
                 # Pike F1: a gesture is judged on every value its line was built from, not only the clicked item.
                 # Juniper's stale "move to Sun": the item and the lens were unchanged, the trip's start had moved.

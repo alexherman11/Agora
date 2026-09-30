@@ -541,6 +541,12 @@ class House:
             s = w.subjects.get(sid)
             args = e.get("args") or {}
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
+            if e["verb"] == "prop" and e["target"] == r.rid and str(args.get("want", "")) == "awake":
+                # Alex, 30 Sep: the Desktop's wake button sets want=awake on the corner; someone pressing it is a call,
+                # so it ends a rest the resident chose, as an @name would
+                inbox.append(f"~ {e['by']} woke you from the Desktop ({e['id']})")
+                urgent = True
+                continue
             if s and s["kind"] == "chat" and "append" in args:
                 members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
                 if sid in mine:                                    # a chat in its own corner is its own

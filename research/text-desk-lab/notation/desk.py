@@ -61,6 +61,10 @@ def aspects_of(verb, args):
         return {"links"}
     if verb == "go":
         return {"presence"}           # a678: where an actor is; no thing's aspect
+    if verb == "create":
+        # 30 Sep: a create adds to a surface's contents and changes none of its props or title. It counted as touching
+        # everything, so a resident making a note in its corner staled Alex's wake/rest press (prop want=) on the corner.
+        return {"contents"}
     if verb in ("move", "resize", "place", "tile", "untile", "stack", "fold", "unfold", "sort", "tidy", "gather", "swap",
                 "beside", "match", "align", "flow", "size", "raise", "lower", "group", "cast", "dedupe", "pop", "remove"):
         # remove takes an appearance off its surface: the subject and all it says survive (undo puts it back), so it is

@@ -155,7 +155,7 @@ SOURCES = {
     # Alex, 30 Sep: what's for me, one list, oldest first like a chat (newest at the bottom), each line saying which
     # chat it came from and when
     "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid")),
-    "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room")),
+    "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room", "item")),   # item: the corner, so a gesture on a row acts on it (30 Sep, wake/rest)
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
     "turns": ("turns[:<corner>]", ("resident", "corner", "turn", "at", "said", "acts")),
@@ -291,7 +291,7 @@ def house_rows(desk, corner=None):
             fmt = "%H:%M" if until - time.time() < 86400 else "%a %H:%M"
             doing = "resting until " + time.strftime(fmt, time.localtime(until))
         room = rooms.room_of(desk.world, r.get("actor")) if r.get("actor") else None    # a678: where they are, a world fact
-        out.append({"resident": r.get("actor") or "(no name yet)", "corner": cid, "doing": doing,
+        out.append({"item": cid, "resident": r.get("actor") or "(no name yet)", "corner": cid, "doing": doing,
                     "turns": r.get("turns", 0), "since": time.strftime("%H:%M", time.localtime(last)) if last else "",
                     "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh,
                     "room": desk.world.nodes[room]["title"] if room else ""})
