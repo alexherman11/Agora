@@ -20,8 +20,8 @@ commission:
   2. health is taken before, then the branch is merged (--no-ff, one commit per commission), then health again;
   3. the lenses that compiled before must still compile, and every check must pass, or the merge is reverted
      (git revert: history keeps both);
-  4. in frontier, Current Implementation is exported from its Handbook binder (the worker keeps that true) and
-     committed if it changed;
+  4. in frontier, Current Implementation is exported from its Handbook binder (the worker keeps that true), and
+     FRICTION.md from Rough spots, each committed if it changed;
   5. the result goes back as a comment and the worktree is removed.
 Under keeper.py the new code takes effect at once: keeper restarts deskd when HEAD moves, and the house asks to be
 restarted once no resident is mid-turn.
@@ -274,18 +274,20 @@ class Workshop:
         drifted for six days). Only for the shared world in the main checkout: a trial's copy must never write docs/."""
         if self.house.world != "frontier" or REPO.resolve() != Path("C:/Projects/Agora4").resolve():
             return ""
-        doc = "docs/Current Implementation.md"
+        # a778: FRICTION.md is exported by the same run, from Rough spots, one way
+        docs = {"docs/Current Implementation.md": "Current Implementation", "research/command-center/FRICTION.md": "FRICTION.md"}
         r = subprocess.run([str(PY), "export_docs.py", self.house.world], cwd=HERE, capture_output=True, text=True,
                            encoding="utf-8", env={**os.environ, "DESKD": "off"}, timeout=300)
-        mine = (REPO / doc).resolve()
-        wrote = any(l.startswith("wrote") and Path(l.split(None, 1)[1].strip()).resolve() == mine
-                    for l in (r.stdout or "").splitlines() if len(l.split(None, 1)) == 2)
+        written = {Path(l.split(None, 1)[1].strip()).resolve() for l in (r.stdout or "").splitlines()
+                   if l.startswith("wrote") and len(l.split(None, 1)) == 2}
+        wrote = [d for d in docs if (REPO / d).resolve() in written]
         if wrote:      # only what this export wrote: never someone's uncommitted edit (a test committed one, 29 Sep)
-            git("add", "--", doc)
-            git("commit", "-m", f"docs: Current Implementation after land {cid}", "--", doc)
-            return " Current Implementation exported from the Handbook and committed."
+            names = " and ".join(docs[d] for d in wrote)
+            git("add", "--", *wrote)
+            git("commit", "-m", f"docs: {names} after land {cid}", "--", *wrote)
+            return f" {names} exported from the world and committed."
         warn = [l for l in (r.stdout or "").splitlines() if l.startswith("WARNING")]
-        return " Current Implementation unchanged." + (f" {warn[0][:200]}" if warn else "")
+        return " Current Implementation and FRICTION.md unchanged." + (f" {warn[0][:200]}" if warn else "")
 
     def land(self, w, cid, s, wk):
         """Between passes: merge, check, keep or revert. Every outcome is said on the commission."""
