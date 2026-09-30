@@ -286,7 +286,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | Word | Meaning |
 |---|---|
 | `column` `row` `free` `grid <tracks>` `cells` | Layout. Tracks are in `fr` or `fit`, and a track may be `<n>gap` |
-| `gap`, `scroll none\|scroll\|end`, `fold ["label"]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
+| `gap`, `scroll none\|scroll\|end`, `fold ["label"] [open] [float]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event, folded to begin with unless `open`; `float` draws the open contents over the page below the handle (a menu: it opens for a moment, and Escape or a press outside closes it); a folded part gives up its `share`; the painter's fold handle wears role `fold` (`menu` when floating) over `tool`; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
 | `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
 | `text <template>` | Words (template names below); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
@@ -299,7 +299,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | `at item` | The appearance's own world geometry, only under a `free` parent |
 | `spread x <a> step <n\|$prop> to <max>` | Computed placement by index, printed as `(spread, not its place in the world)` |
 | `lens <name>` | Place another lens, whose name may be templated (`lens $kind`); a lens may not contain itself |
-| `only when <selection>` or `only when $x <op> v` | The part exists only on a match. A value test (`= != < > <= >=`) prints its inputs; a missing value counts as absent, not false |
+| `only when <selection>` or `only when $x <op> v` | The part exists only on a match. A value test (`= != < > <= >=`, and `has` / `!has`: the words contain the value, ignoring case; a value with a `$name` in it is filled, so `only when $said has @$me`) prints its inputs; a missing value counts as absent, not false |
 | `carry`, `on click\|edit\|drag do <command>`, `on drop <part> do <command>` | Gestures (see Gestures and their fence) |
 
 **Template names.**
@@ -780,4 +780,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e921. Edit it there; a direct edit here makes the next export stop and warn. sha1:4de1bbfa4343 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e925. Edit it there; a direct edit here makes the next export stop and warn. sha1:651bcf6c4c43 -->
