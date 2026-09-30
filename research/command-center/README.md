@@ -40,8 +40,19 @@ Builder: Claude (the teaching session), from outside at first; the residents are
 
 ## Drafts and the lesson
 
-- `DRAFT-living-in-the-world.md` (a595) and `DRAFT-three-ways-to-change-the-world.md` (a598), both part of the task *Restructuring the desk* (a593).
+- `DRAFT-living-in-the-world.md` (a595), `DRAFT-three-ways-to-change-the-world.md` (a598) and `DRAFT-kinds-and-shapes.md` (a613), all part of the task *Restructuring the desk* (a593).
 - `LESSON-how-the-desk-grows.html`: the walkthrough of live building, published for Alex.
+- `LESSON-the-new-desk.html`: the proposed restructure, slowly and with examples, published for Alex.
+
+## The residents take on the restructure (29 Sep, Alex)
+
+- **Souls:** Alex's soul text (from his draft, section 2) is each resident's soul note: *Sable's soul* (a573), *Pike's soul* (a578), *Juniper's soul* (a583). Each corner's wake line reads it whole (`read <soul> :3`).
+- **AGENTS.md** is Alex's draft, now the repo's. Workers run on Claude Code's own prompt plus AGENTS.md verbatim, then the worker protocol.
+- **The Porch is the Desktop** (f562, now inside Home): the command-center lens, its style, The house and The door. The door lists it; the map (a198) and the lens title say Desktop.
+- **The work:** a card on the Board, *The desk restructure: Sable, Pike and Juniper, together* (a643, `owner=everyone objective=open`), linked to a593. Beside the drafts is *What's open (29 Sep)* (a646): every open item, marked world or worker, and the smaller known defects. Anything there is live; they choose what to take, broad or narrow, and divide it among themselves.
+- **Claude is Alex's go-between** for now. The residents write to Alex as usual (@alex, or their Talk with Alex chats). They know Claude reads those, answers what it can, and brings the rest to Alex.
+- The first team's welcome note (a154) went to the Archive, and the Board no longer mentions a coordinator.
+- Waking them is Alex's call: it starts real model calls.
 
 ## Live building (28 Sep, Alex: "the two tier live world, and the workers")
 

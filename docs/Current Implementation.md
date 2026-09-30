@@ -1,6 +1,6 @@
 # Current Implementation
 
-**Reviewed 29 September 2026 · the text desk** (defects the review found were fixed the same day)
+**Checked against the code on 29 September 2026 · the text desk**
 
 The Dynamic Desk exists today as one prototype, the text desk, defined entirely in text:
 - a small world of things and placements;
@@ -17,16 +17,16 @@ It is independent of the earlier native runtime described in [[Previous Work]].
 
 Source: `C:/Projects/Agora4/research/text-desk-lab/notation/`. Paths below are relative to it. It is standard-library Python 3.12 and plain browser JavaScript, with no build step. This document describes the working tree on the date above.
 
-How it was checked: on 29 September, four reviewers checked every claim against source (**read**, with file and line) and in scratch worlds (**ran**). Where this document says a defect reproduces, it was reproduced that day. The desk is the source of this document: the Handbook binder *How the desk is built*, exported by `export_docs.py`.
+Claims are labelled by how they were checked: **read** (from source, with file and line) or **ran** (in scratch worlds). The desk is the source of this document: the Handbook binder *How the desk is built*, exported by `export_docs.py`.
 
-**Keep this current.** Before 29 September this document went six days and more than 130 commits without an update, and half of it had stopped being true. So:
+**Keep this current.** It describes the desk as it is now, not how it got there:
 - A change that alters anything described here updates this document in the same change:
   1. edit the section in the Handbook binder;
   2. run `python export_docs.py`;
   3. commit the export with the code.
 - A worker does this before it sets `commission=ready`. A defect fixed comes off the list under Evidence; a defect found goes on it.
 - When a section can't be kept exact, say so in it ("not re-checked since …") rather than leaving it to drift.
-- The date above says when the whole document was last checked. Recheck it whole when a stage of the project closes.
+- No change history here: git and the event log keep that. The date above says when the whole document was last checked against the code; recheck it whole when a stage of the project closes.
 
 ## Foundation and experiment
 
@@ -151,7 +151,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 | Changing | `do <verb> <target> k=v`, `undo [eN]`; pair verbs `swap`, `beside`, `match`, `link`; world verbs (`<word> …`, `do <word> …`, `use <id> …`) |
 | Defining | `rule when … do …`, `rule on <verb> [by=] do …`, `rule drop rN`; `script <name> = …`, `script drop`, `run`; `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
 | Branching | `worktree`, `worktree fork\|diff\|merge <name>` |
-| External | `sync`, `launch` (harness; not run in review) |
+| External | `sync`, `launch` (harness) |
 
 **Verbs.** `examine` lists only the verbs that apply to a thing right now; `help <verb>` gives the arguments and one example.
 - The verbs this desk does: `move place resize raise lower remove tile untile rename group create fold unfold append comment resolve check link unlink retitle rewrite sort prop tag due launch`.
@@ -372,7 +372,7 @@ Every refusal ends with "nothing was done. The view will repaint." A painted ges
 
 ## Style
 
-A style is a note tagged `style` and titled with its name. It is edited, undone and forked like any note (F7).
+A style is a note tagged `style` and titled with its name. It is edited, undone and forked like any note.
 - A lens picks one with prop `style=<name>`.
 - `desk-shell/style/calm.style` is only the seed, used when the world has no note of that name.
 - The style defines:
@@ -530,7 +530,7 @@ asked -> working -> (waiting <-> working) -> ready -> landing -> landed | revert
 claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob Grep mcp__desk__desk Bash(<r>:*) PowerShell(<r>:*) --mcp-config … --setting-sources "" --append-system-prompt <protocol>
 ```
   - `<r>` covers git status, diff, add, commit, log, show and rebase, `node --check`, and python.
-  - The protocol tells the worker to read AGENTS.md and to keep *Current Implementation* true (see Landing). It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
+  - Its system prompt is Claude Code's own, plus `AGENTS.md` verbatim, then the worker protocol. The protocol asks it to keep *Current Implementation* true (see Landing). It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
 - The worker's desk tool (`desk_mcp.py`, as `worker-<cid>`) acts in the live world.
 - It talks through comments on its commission, and those comments come back to it as messages.
 - It says it is done by committing and setting `commission=ready`.
@@ -595,7 +595,7 @@ A refusing lens is listed but doesn't fail health.
 | `explore.py` | 229 | CLI: forward to deskd or run under the pid lock; atomic save; `--window --dump --shape --reset`; `!actor` injection |
 | `deskd.py` | 395 | HTTP server, its origin and session-name checks, and the gesture fence |
 | `house.py` | 698 | Residents |
-| `workshop.py` | 337 | Commissions and workers |
+| `workshop.py` | 342 | Commissions and workers |
 | `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
 | `health.py` | 119 | The checks a landing must pass |
 | `try_house.py`, `try_worker.py`, `fake_model.py` | 463 | Trials and a fake model |
@@ -625,42 +625,19 @@ Which file for which change:
 
 ## Evidence and limits
 
-**Checks that ran on 29 September.**
+**Checks, as they run on the date above.**
 
 | Check | Result |
 |---|---|
 | `python health.py frontier` | python ok; scripts ok; test_scene 21 passed; session prints: 82 same, 0 differ in reads only, 0 differ in the golden form, 0 new; lenses in frontier: 7 compile, 1 refuse (`p-if`); total 3.4 s |
 | `test_scene.py` | 21 passed |
-| `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`, the same before and after the fixes below. S11 drives an old code path and no longer describes the desk |
-| `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs, before and after the fixes |
+| `test_journal.py` | An instrument that always exits 0: `9 breaks, 1 half, 1 hidden, 1 holds, 7 journal`. S11 drives an old code path and no longer describes the desk |
+| `suite/run.py` | 9 cases (trip, attacks, reads, host, chat, viewer, workspace, blocks, budget), all the same as their recorded runs |
 
 - `golden_prints.py` has no check mode (it writes); `suite/sessions.py --check` is the read-only comparison.
 - `desk-shell/checks/` needs a live page and server, and was not run.
 - Nothing automated covers deskd's HTTP layer, the house with a real model, or the browser.
-- The fixes below were each re-run against the case that reproduced them, in throwaway worlds and a throwaway deskd, and the command-center lens was painted in a browser after the origin check (177 nodes, and a same-origin POST answered 200).
-
-**Fixed since the last review:**
-- A repeat records its membership.
-- A fallback scene carries its revision, and its gestures are refused.
-- `!actor` injection signs every verb as the injected actor.
-- `only when` takes a value test.
-- The refusal vocabulary is printed from the grammar table.
-- Saves are atomic.
-- The lock is pid-aware and never proceeds without it.
-
-**Fixed 29 Sep, found by the review:**
-- Undoing a tiled `swap` crashed the invocation. It now records the old order (`reorder`), and undo puts it back.
-- Your own receipt marked a thing fully seen, so a later `rewrite` could drop text you never read. The receipt now marks nothing beyond what you wrote (ran: a tag, then a rewrite, is refused with "you have not seen a04's text").
-- Events made through a selection or a rule counted as touching every aspect, so `do tag in:Box add=k` made an unrelated `append` stale. `event_aspects` now judges them by their verb, in the desk, deskd, the lens evaluator and worktree merge. An `append` counts as `text`.
-- For tags, comments and links, the stale advice said "look at it again", which doesn't print them. It now says `read`.
-- A multi-step world verb was undone one step at a time. The whole use is now undone.
-- Undo snapshots for `prop`, `tag` and `due` shared lists and dicts with the live subject. Undoing a tag after a later prop brought the prop back. They are now whole copies. This was found while testing the fix above.
-- A worktree merge saw conflicts only for targets named by id, so a title-named change merged over the base's and lost it. The journal now records what each command touched (ran: the same case is refused, and the base keeps its value).
-- `test_scene.py`'s runner sat before its last 7 tests, so a script run executed 14 of 21. It now runs all 21.
-- deskd took any session name, `..` included, and any origin (see Processes and state).
-- `export_docs.load` read without the lock after 60 s and then removed a lock it had never taken. It now uses the desk's lock (ran: with a live holder it raises and leaves the lock; with a dead holder's lock it loads).
-
-**Open defects a builder will meet** (reproduced 29 Sep unless marked read).
+**Open defects a builder will meet** (each reproduced, unless marked read).
 
 *The fence and undo:*
 - A selection target skips the "not looked yet" refusal, and pair verbs never check staleness (read).
@@ -705,17 +682,16 @@ Which file for which change:
 
 ## What a builder hits first
 
-In priority order, from an attempt to describe a calendar in this framework, updated 29 Sep.
+In priority order, from an attempt to describe a calendar in this framework.
 
 1. **No time type.** Kinds are a closed list; `due` is a date only; props are strings compared by equality, and `prop:k>v` silently matches nothing. Adding any of these needs Python.
-2. **A lens cannot read props.** *Fixed:* `$start` and `$trip.start` read props and print what they read.
-3. **Placement cannot follow a value.** `spread` places by index, and there is no arithmetic. *Eased:* `derive … days-from` makes a row per day, and `day-n` computes a date.
-4. **Repeats cannot be ordered or headed.** `of` takes world order, and a part prints its instances before its placed lens and fixed children.
-5. **Gestures carry pixels and one field.** *Eased:* an `edit` can run any verb, including a `create` titled with `$value`, and a drop onto a derived day row can carry `$it.date`. Nothing maps a position to a date.
-6. **Two interfaces that do not meet.** The windowed shell and the lens painter are separate pages. The lens page now has a desk terminal beside it.
-7. **Text entry is whole-field**, committed on blur, Enter or Ctrl-Enter. Drafts now survive a refusal or a reload. The prose native is still unwired.
-8. **Definitions are not uniform.** Lenses, styles and world verbs are notes. Rules, scripts and the clock are not: they have no history or undo, though worktrees carry them.
-9. **No durable store, no identity, few pass/fail tests** for the command layer. The instruments (`test_journal.py`, `suite/`) drive it but don't gate.
+2. **Placement cannot follow a value.** `spread` places by index, and there is no arithmetic. `derive … days-from` makes a row per day, and `day-n` computes a date, but nothing places by a value.
+3. **Repeats cannot be ordered or headed.** `of` takes world order, and a part prints its instances before its placed lens and fixed children.
+4. **Gestures carry pixels and one field.** An `edit` can run any verb, including a `create` titled with `$value`, and a drop onto a derived day row can carry `$it.date`. Nothing maps a position to a date.
+5. **Two interfaces that do not meet.** The windowed shell and the lens painter are separate pages. The lens page has a desk terminal beside it.
+6. **Text entry is whole-field**, committed on blur, Enter or Ctrl-Enter. Drafts survive a refusal or a reload. The prose native is still unwired.
+7. **Definitions are not uniform.** Lenses, styles and world verbs are notes. Rules, scripts and the clock are not: they have no history or undo, though worktrees carry them.
+8. **No durable store, no identity, few pass/fail tests** for the command layer. The instruments (`test_journal.py`, `suite/`) drive it but don't gate.
 
 ## Under study
 
@@ -725,7 +701,7 @@ Tentative mechanisms: designed or argued, not built, unless marked. Each names t
   - `research/command-center/`: the drafts *Three ways to change the world*, *Kinds and shapes* and *Living in the world*, also in frontier as a598, a613 and a595, part of the task a593.
 - Items marked **(decision N)** wait on Alex, numbered as in the round-six proposition.
 
-**Built since the last review: the staged compiler.** Parse, resolve, lower to the six kinds, evaluate through the Accessor, and emit; see "Lenses". Still open:
+**Built: the staged compiler.** Parse, resolve, lower to the six kinds, evaluate through the Accessor, and emit; see "Lenses". Still open:
 - the evaluator is a transcription of the old one, not a dispatch by kind;
 - it still reads the world directly in places;
 - R is logged but nothing consumes it (the fence is built separately);
@@ -747,7 +723,7 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - A gesture or rule yields one proposal, applied whole or not at all and previewed first, including the rules it sets off.
 - Only `on drop` is limited to one command today. Decisions 3 and 4 are not enforced.
 
-**For "everything that changes behavior is visible".** *Style: built* (a world note). Rules, scripts and the clock remain desk attributes. The last-good cache remains, now named in `def`.
+**For "everything that changes behavior is visible".** *Style: built* (a world note). Rules, scripts and the clock remain desk attributes. The last-good cache is kept, and named in `def`.
 
 **For "extending gets cheaper": the library and new intermediate kinds.** *Not built.* The proposed bar for a new kind:
 - two unrelated tasks need it;
@@ -766,7 +742,7 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 **For "the world is a place": rooms and narration.** *Living in the world* proposes:
 - rooms as places where verbs live, with "where you are";
 - narration in `look` and `examine`;
-- the desktop as a room with local layout verbs, and the Porch becoming the Desktop.
+- the desktop as a room with local layout verbs. The Desktop exists, a room inside Home; the layout verbs are not yet local to it.
 
 *Not built.* How arrangements, appearances and views divide is held open by Alex.
 
@@ -792,4 +768,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e666. Edit it there; a direct edit here makes the next export stop and warn. sha1:7e66dbd0a976 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e699. Edit it there; a direct edit here makes the next export stop and warn. sha1:8d705bdf0dac -->

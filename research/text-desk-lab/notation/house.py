@@ -16,7 +16,7 @@ the resident knows comes from the world, and everything it does goes through it:
     reached at once by a call (a line in a chat in its own corner, @its-name or @everyone anywhere, a comment on
     something in its corner, a comment on its commission). Otherwise it is woken when its timed rest ends, or, after an
     untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
-    `wake_every` seconds pass. A plain line in a shared chat (Porch talk) wakes no one: it goes with whatever reaches
+    `wake_every` seconds pass. A plain line in a shared chat (Lounge talk) wakes no one: it goes with whatever reaches
     the resident next.
   - every wake begins with one line saying who it is: `You are <name>. Your corner is <id>.`
   - it is given its name (Alex, 29 Sep): prop `actor` on its corner, its desk identity. A corner with no name waits,
@@ -30,7 +30,7 @@ house-state/<world>/house.json (with liveness, turns and the time of the last tu
 Transcripts (every stream event, and every message the house sent) are house-state/<world>/<corner>/transcript.jsonl.
 Everything is kept per world: two worlds can hold the same corner ids (a copy of a world does), and a resident must
 never resume another world's conversation.
-Settings are props on the Porch note "The house": model, breather, wake_every, and for workers: workers (how many at
+Settings are props on the Desktop's note "The house": model, breather, wake_every, and for workers: workers (how many at
 once, default 1) and worker_model (default: model). Replay never wakes anyone.
 
 Workers (workshop.py): a task with prop commission=asked is taken up by a disposable worker with real tools in its own
@@ -436,7 +436,7 @@ class House:
         """Gather what `actor` should hear from the events since its cursor into its inbox; -> True when something in
         it should reach the resident now. Now: every line in a chat in its own corner (a direct chat), a line anywhere
         that names it (@name) or everyone (@everyone, @all), a comment on something in its corner. Held: a plain line
-        in a shared chat (Porch talk). A held line wakes no one; it goes with whatever reaches the resident next (a
+        in a shared chat (Lounge talk). A held line wakes no one; it goes with whatever reaches the resident next (a
         wake, news, the receipt of its own commands), so a resident at work hears the room within a turn and a resting
         one is not woken by talk. `take()` empties the inbox in order. Advances the cursor."""
         start = r.state.get("cursor", len(w.events))

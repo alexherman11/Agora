@@ -46,8 +46,8 @@ PROTOCOL = """You are a worker in Agora's house: a disposable builder for one co
 Where you are: your own git worktree, {tree} (branch {branch}). The live world and its residents keep running while
 you work; nothing you do reaches them until the house lands your branch. The lab is {notation}/ inside it.
 
-Before anything: read AGENTS.md at the root of your worktree. Its house principles and evidence labels (ran / read /
-imagined) apply to you.
+AGENTS.md, above this protocol, is how we work here: its principles and evidence labels (ran / read / imagined) apply
+to you. This protocol adds only what is particular to a worker.
 
 Talking: whoever commissioned you is {asked_by}. Speak to them through the desk tool, as a comment on the commission:
   do comment {task} line="..."
@@ -209,7 +209,7 @@ class Workshop:
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
         self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
-                 f"Start by reading AGENTS.md, then the code you need. Comment on {cid} if anything is unclear.")
+                 f"Read the code you need first. Comment on {cid} if anything is unclear.")
         wk.send(first)
 
     def failed(self, cid, wk, why):
@@ -310,6 +310,11 @@ class Worker:
                     encoding="utf-8")
                 prompt = PROTOCOL.format(tree=self.tree, branch=self.branch, notation=NOTATION, asked_by=self.asked_by,
                                          task=self.cid, live=HERE.as_posix(), world=world, actor=self.actor)
+                # Alex, 29 Sep: a worker runs on Claude Code's own prompt plus AGENTS.md, verbatim, the same file every
+                # agent here reads; the protocol after it adds only the worker's particulars
+                agents = Path(self.tree) / "AGENTS.md"
+                if agents.exists():
+                    prompt = agents.read_text(encoding="utf-8").strip() + "\n\n---\n\n" + prompt
                 # the worker may use either shell (on Windows its default is PowerShell), and may call the interpreter
                 # by name or by its full path (trial help-list: every run was refused for want of these)
                 runs = ["git status", "git diff", "git add", "git commit", "git log", "git show", "git rebase", "node --check",
