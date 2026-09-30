@@ -422,6 +422,7 @@ class World:
         "append": "line=<str>  (adds a line at the end; edits the subject, so every appearance changes)",
         "retitle": "title=<str>",
         "rewrite": "text=<str> [section=<heading>]  (replaces all the text, or only the body of one ## section; write \\n between lines)",
+        "replace": "old=<str> new=<str>  (changes one exact passage; old must appear exactly once; write \\n between lines)",
     }
 
     def verbs_for(self, nid):
@@ -509,7 +510,7 @@ class World:
         n = self.nodes[target]
         before = deepcopy(n)
         changed = [target]
-        if verb in ("append", "retitle", "rewrite", "edit", "comment", "resolve", "check", "link", "unlink"):
+        if verb in ("append", "retitle", "rewrite", "replace", "edit", "comment", "resolve", "check", "link", "unlink"):
             if n["type"] != "appearance":
                 raise Refusal(f"{verb} needs an appearance or subject, not a surface")
             return self._apply_subject(verb, n["subject"], None, args, actor, via=target)
@@ -813,6 +814,20 @@ class World:
             verb = "edit"
         elif verb == "retitle":
             args = {"title": args.get("title", args.get("text", ""))}
+            verb = "edit"
+        elif verb == "replace":
+            # Alex, 29 Sep: changing one line of a 67-line lens meant resending all of it as one escaped string. replace
+            # changes one exact passage, as an editor's find-and-replace does: old must appear exactly once, so what is
+            # changed is never a guess. It is fenced as rewrite is (read the text first; refused if it changed since).
+            old, new = str(args.get("old", "")), str(args.get("new", ""))
+            if not old:
+                raise Refusal("replace needs old=<the exact words to change> and new=<what they become>")
+            found = s["text"].count(old)
+            if found != 1:
+                raise Refusal(f"replace: old= appears {found} times in the text; "
+                              + ("the words must match exactly, spaces and line breaks included (read it again)" if not found
+                                 else "include more of the words around it, so it appears once"))
+            args = {"text": s["text"].replace(old, new, 1)}
             verb = "edit"
         elif verb == "rewrite":
             new = str(args.get("text", args.get("line", "")))

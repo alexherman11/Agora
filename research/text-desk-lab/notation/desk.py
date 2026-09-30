@@ -40,7 +40,7 @@ def aspects_of(verb, args):
         return {"title"}
     if verb == "edit":
         return {k for k in ("title", "text", "due") if k in a} | ({"text"} if "append" in a else set()) or None
-    if verb in ("rewrite", "append", "reply", "check", "uncheck", "split", "seal", "unseal"):
+    if verb in ("rewrite", "replace", "append", "reply", "check", "uncheck", "split", "seal", "unseal"):
         return {"text"}              # reply is the chat verb: it adds a line to the text (a656; it was counted as comments)
     if verb == "due":
         return {"due"}
@@ -292,7 +292,7 @@ class Desk:
 
     def _verb_names(self):
         return {"move", "resize", "raise", "lower", "remove", "tile", "untile", "rename", "group", "fold", "unfold",
-                "edit", "append", "retitle", "rewrite", "place"}
+                "edit", "append", "retitle", "rewrite", "replace", "place"}
 
     # ---- rendering --------------------------------------------------
     def _resolve(self, ident, allow_subject=True):
@@ -408,7 +408,7 @@ class Desk:
             cur[a] = at
         idx[key] = cur
 
-    REPLACING = ("rewrite", "retitle", "rename", "edit", "due", "prop", "untag")
+    REPLACING = ("rewrite", "replace", "retitle", "rename", "edit", "due", "prop", "untag")
 
     def _adds_line(self, nid, verb, kv):
         """Sable a656: a line added to a chat replaces nothing, so it is never refused as stale (in a live room every

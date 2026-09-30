@@ -115,7 +115,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - Three refusals:
   - `you have not looked at a04 yet; look, examine or read it first`;
   - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
-  - `you have not seen a04's text; read a04 shows it before you replace it`. This applies to the replacing verbs rewrite, retitle, rename, edit, due, prop and untag.
+  - `you have not seen a04's text; read a04 shows it before you replace it`. This applies to the replacing verbs rewrite, replace, retitle, rename, edit, due, prop and untag.
 - What counts as having seen something:
   - an outline line marks title, place, due and props (not text or tags);
   - `read` marks title, tags, due, comments, links, props, and the text only when the whole body printed;
@@ -162,7 +162,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 | External | `sync`, `launch` (harness) |
 
 **Verbs.** `examine` lists only the verbs that apply to a thing right now; `help <verb>` gives the arguments and one example.
-- The verbs this desk does: `move place resize raise lower remove tile untile rename group create fold unfold append comment resolve check link unlink retitle rewrite sort prop tag due launch`.
+- The verbs this desk does: `move place resize raise lower remove tile untile rename group create fold unfold append comment resolve check link unlink retitle rewrite replace sort prop tag due launch`.
 - The registry (`moo.py`) holds 34. The specialized ones (`split gather dedupe reveal reply tidy stack done`) are refused here, with `help` naming the alternative.
 - Synonyms such as `put` → move and `delete` → remove are accepted, and a near miss is matched at 0.75 similarity.
 - Kinds inherit verbs:
@@ -180,6 +180,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `due on= | clear=1`;
   - `append line= [section=]` (on a chat the world signs the line and it is never refused as stale: see The world);
   - `rewrite text= [section=]`;
+  - `replace old= new=`: one exact passage, which must appear exactly once (refused with the count otherwise); fenced as rewrite is;
   - `retitle title=`;
   - `check item=n`;
   - `comment line=`;
@@ -780,4 +781,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e925. Edit it there; a direct edit here makes the next export stop and warn. sha1:651bcf6c4c43 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e933. Edit it there; a direct edit here makes the next export stop and warn. sha1:db7ecd0d7e57 -->

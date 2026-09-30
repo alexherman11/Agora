@@ -233,6 +233,13 @@ def v_rewrite(w, nid, a):
     return _prim(w, "rewrite", nid, a)
 
 
+@verb("replace", ["text"], "Change one exact passage of the text, leaving the rest. old must appear exactly once: include enough "
+      "of the words around it. Write \\n between lines. Read first; the desk refuses if it changed since.",
+      "old=<str> new=<str>", 'do replace a18 old="2. Draft" new="2. Draft, then review"')
+def v_replace(w, nid, a):
+    return _prim(w, "replace", nid, a)
+
+
 # ---------------------------------------------------------------- level 2: task-shaped verbs, composed
 
 

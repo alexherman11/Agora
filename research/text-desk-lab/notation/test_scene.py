@@ -347,6 +347,34 @@ def test_value_test_has():
     assert not scene._compare("ok", "has", "@alex") and scene._compare("5", ">", "3")
 
 
+def test_replace_changes_one_exact_passage():
+    """Alex, 29 Sep: one line of a note, changed without resending the note. Fenced as rewrite is."""
+    import explore, re
+    d = explore.fresh()
+    slots = {}
+
+    def do(line, who):
+        slots[d.world.me] = (d.seen, d.open, d.last_event_seen)
+        d.seen, d.open, d.last_event_seen = slots.get(who) or ({}, {d.world.root}, len(d.world.events))
+        d.world.me = who
+        r = d.dispatch("desk", {"line": line})
+        return r.get("text") or ("ERR " + str(r.get("error")))
+
+    do("look", "juniper")
+    made = do(f'do create {d.world.root} kind=note title=lens text="a : column\\n  b : text \\"x\\", role meta\\n  c : text \\"y\\", role meta"', "juniper")
+    nid = re.search(r"\b(a\d+)\b", made.split("created", 1)[-1]).group(1)
+    assert "not looked" in do(f'do replace {nid} old="role meta" new="role tag"', "pike")
+    do(f"read {nid}", "pike")
+    assert "appears 2 times" in do(f'do replace {nid} old="role meta" new="role tag"', "pike")
+    assert "appears 0 times" in do(f'do replace {nid} old="role nope" new="role tag"', "pike")
+    assert do(f'do replace {nid} old="\\"y\\", role meta" new="\\"y\\", role tag"', "pike").startswith("ok replace")
+    text = d.world.subjects[d.world.nodes[nid]["subject"]]["text"]
+    assert text == 'a : column\n  b : text "x", role meta\n  c : text "y", role tag', text
+    do(f"read {nid}", "juniper")
+    do(f'do replace {nid} old="text \\"x\\"" new="text \\"z\\""', "pike")
+    assert "stale" in do(f'do replace {nid} old="a : column" new="a : row"', "juniper")
+
+
 def test_freshness_words_are_host_reads():
     """Juniper: $touched is the last event on the thing, $changed.<field> the last that changed that aspect; a comment
     refreshes the first and not the second; undo is not a touch; neither enters the gesture fence."""

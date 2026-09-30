@@ -230,3 +230,23 @@ What was missing, and what was added:
 Checked in a scratch world on a throwaway deskd (ran). With all three chats open they are 242, 485 and 485 px tall. Folding Shop and FOR YOU gives Lounge 1155 px, and unfolding restores the split. The menu opens, and a press outside or Escape closes it. 22 lines are highlighted, every one contains @alex, and no plain line does. Health: 23 tests passed. Two goldens differed only in the vocabulary a refusal prints (the new `fold` form) and were rebased; 82 are the same.
 
 Not checked: phone width; how a screen reader announces a float fold. While testing I misread Alex's clicks in the same browser tab as flakiness, until tabs_context showed the tab was in front; the scripted test above is the record.
+
+Found by Alex right after: adding a task from the Desktop was refused, "you have not looked at f155 yet". The add box said `do create Board ...` without being bound to anything. A painter gesture counts as having seen only what its part is bound to, so nothing told the desk Alex had seen the Board. It had always been this way; nobody had added a task from the Desktop before. The fix is in the lens: `add : text "", the f155, ... do create $item ...`. Checked on a scratch copy (ran): refused before the fix; two adds in a row after it. The lesson for any lens: a gesture that acts on a named thing should bind that thing with `the`, so the viewer's look travels with it.
+
+## F31. Changing one line of a note meant resending all of it (29 Sep, Alex's direction)
+
+The Desktop fix in F30 changed one line of the 67-line lens a589. Through the desk the only way was `do rewrite a589 text="..."`, the whole lens as one escaped string, which I scripted because by hand it is a quoting minefield. Alex: "lets definitely fix that please".
+
+The new text verb (world.py, desk.py, moo.py) is `do replace <id> old="..." new="..."`. It changes one exact passage: `old` must appear exactly once, and with none or several it is refused and says how many. It is fenced as `rewrite` is (the text aspect: read first, refused if it changed since), and undo takes it back whole. Line numbers were left out, because a number goes stale when someone adds a line above it and exact words don't.
+
+Checked (ran):
+- unread, refused;
+- one line changed;
+- two matches refused ("appears 2 times");
+- no match refused ("appears 0 times");
+- someone else changed it after my read, refused as stale;
+- undo restored the text.
+
+These cases are test_scene's `test_replace_changes_one_exact_passage` (24 passed; health green, 82 goldens the same). The first real use was documenting the verb itself: three exact passages in the Handbook binder, instead of a whole-text import.
+
+Open, on the Board (a701): a finer fence (admit a replace whose words are still there once, as a656 did for chat lines), and a lens gesture that edits one line of a note.
