@@ -57,15 +57,18 @@ def check_lenses(world):
     import scene
     desk = export_docs.load(world)
     w = desk.world
-    names = sorted({s["title"] for s in w.subjects.values() if "lens" in (s.get("tags") or []) and w.appearances_of(s["id"])})
-    ok, bad = [], []
-    for name in names:
+    lenses = {s["title"]: s for s in w.subjects.values() if "lens" in (s.get("tags") or []) and w.appearances_of(s["id"])}
+    ok, bad, expected = [], [], []
+    for name in sorted(lenses):
+        # Pike a611: a lens kept to refuse (a probe, prop expect=refuse on its note) is counted apart, so a refusal in
+        # the health line always means look at this
+        meant = str((lenses[name].get("props") or {}).get("expect", "")) == "refuse"
         try:
             scene.scene_for(desk, name)
-            ok.append(name)
+            (bad if meant else ok).append(name if not meant else f"{name}: expected to refuse, and it compiled")
         except Exception as e:        # a lens that refuses, or a compiler that breaks: both mean not whole
-            bad.append(f"{name}: {type(e).__name__}: {str(e)[:160]}")
-    return ok, bad
+            (expected if meant else bad).append(name if meant else f"{name}: {type(e).__name__}: {str(e)[:160]}")
+    return ok, bad, expected
 
 
 def main():
@@ -99,13 +102,14 @@ def main():
         print(f"session prints: {line}{took('session prints', t0)}")
         if code or " 0 differ in the golden form" not in line:
             failed.append(f"session prints: {line}")
-    lenses_ok, bad = [], []
+    lenses_ok, bad, expected = [], [], []
     t0 = time.perf_counter()
     try:
-        lenses_ok, bad = check_lenses(world)
+        lenses_ok, bad, expected = check_lenses(world)
         # Pike a611: a refusal printed on every landing that nobody can read is on its way to noise; name it and why
         why = "; ".join(b.split(". It can say")[0].replace(": LensRefusal: ", ": ")[:90] for b in bad)
-        print(f"lenses in {world}: {len(lenses_ok)} compile" + (f", {len(bad)} refuse ({why})" if bad else "") + took("lenses", t0))
+        print(f"lenses in {world}: {len(lenses_ok)} compile, {len(bad)} unexpected refusals" + (f" ({why})" if bad else "")
+              + (f", {len(expected)} expected ({', '.join(expected)})" if expected else "") + took("lenses", t0))
     except Exception as e:
         failed.append(f"lenses: the world could not be read: {type(e).__name__}: {e}")
         print(f"lenses in {world}: could not read the world ({e}){took('lenses', t0)}")
