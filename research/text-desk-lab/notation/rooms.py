@@ -208,6 +208,37 @@ def item_line(desk, nid):
     return f"{nid} {s['kind']} \"{title}\"" + (" · " + " · ".join(bits) if bits else "")
 
 
+def others_in(w, raw, a, b):
+    """How many of lines raw[a:b] were said by someone other than you (an unsigned line goes with the one above)."""
+    me, who, n = w.display_name(w.me).casefold(), None, 0
+    for k, l in enumerate(raw[:b]):
+        said = w.SPEAKER.match(l)
+        who = said.group(1).casefold() if said else who
+        n += k >= a and bool(l.strip()) and who != me
+    return n
+
+
+def speak_verb(desk, fid, tnid, sid):
+    """a951: the word the world offers for speaking in room `fid`, found at print time, or None: a verb one of whose
+    steps appends to $here.talk (only when `fid` is the room you are in) or to this talk by id, that its word alone
+    would run for you (carried or on the house; `find` decides, so the hint names what typing it would do). Never a
+    name kept here."""
+    import verbs
+    targets = {tnid, sid} | ({"$here.talk"} if room_of(desk.world, desk.world.me) == fid else set())
+    for s in verbs.all_verbs(desk.world):
+        steps = [p.strip() for l in verbs._steps(s["text"]) for p in l.split(";")]
+        if not any((m := re.match(r"(?:do\s+)?append\s+(\S+)", st)) and m.group(1).strip("\"'") in targets for st in steps):
+            continue
+        for name in verbs._names(s["title"]):
+            try:
+                hit = verbs.find(desk, name, [], desk.world.me)
+            except Refusal:
+                continue
+            if hit and hit[0]["id"] == s["id"]:
+                return name
+    return None
+
+
 def narrate(desk, fid):
     """What a person standing in the room would take in: its name, its description, who is here, what is at hand,
     and the last few lines said here. It counts as seen only what it prints whole (a678 (7))."""
@@ -251,13 +282,21 @@ def narrate(desk, fid):
     else:
         out.append("Nothing at hand.")
     if ts:
-        lines = [l for l in ts["text"].splitlines() if l.strip()]
-        tail = lines[-TALK_LINES:]
-        cut = [_cut(l, LINE_MAX) for l in tail]
-        out.append(f"Talk here ({tnid} \"{ts['title']}\")" + (", the last lines:" if lines else ": nothing said yet."))
+        raw = ts["text"].splitlines()
+        said = [k for k, l in enumerate(raw) if l.strip()]
+        tail = said[-TALK_LINES:]
+        cut = [_cut(raw[k], LINE_MAX) for k in tail]
+        out.append(f"Talk here ({tnid} \"{ts['title']}\")" + (", the last lines:" if said else ": nothing said yet."))
         out += ["  " + l for l in cut]
-        out.append(f"  (say: do append {tnid} line=\"...\"" + (f"; read {tnid} tail=20 for more)" if len(lines) > TALK_LINES else ")"))
-        whole = len(lines) <= TALK_LINES and cut == tail
+        # a951: what it prints extends your read run, as tail= would; a line it cut is not read (a hole in the run)
+        start = 0 if len(said) <= TALK_LINES else tail[0]
+        run = desk._chat_run(ts)
+        gap = others_in(w, raw, run[1], start) if run and run[1] < start else 0   # after your last read, before these
+        whole = desk._chat_shown(ts, start, {k for k, c in zip(tail, cut) if c != raw[k]})
+        verb = speak_verb(desk, fid, tnid, ts["id"])
+        more = (f"; {gap} earlier line{'s' if gap > 1 else ''} from others you haven't read: read {tnid} tail={len(raw) - run[1]}" if gap else
+                f"; read {tnid} tail=20 for more" if len(said) > TALK_LINES else "")
+        out.append(f"  ({verb} <words>{more})" if verb else f"  (say: do append {tnid} line=\"...\"{more})")
         marks += [(tnid, ["title"] + (["text"] if whole else [])), (ts["id"], ["title"] + (["text"] if whole else []))]
     bad = home_problem(desk, fid)
     if bad:
