@@ -66,9 +66,19 @@ single commands only. `python` is the lab's interpreter, and the lab's scripts f
   python {notation}/suite/sessions.py --check
 Don't commit the -try world. If something you need is refused, say so on the commission rather than working around it.
 
+Seeing the painter: you have no browser window, but you can drive a real one. screen.py serves a copy of a world with
+THIS worktree's painter code (desk-shell/) in headless Chrome, and looks and presses as a person would, in the copy only:
+  python {notation}/screen.py {world}-try --as {actor} facts porch/main 2 shot screen-1.png
+then open the PNG with Read. `facts` prints each painted part's size, whether it scrolls or is cut, folded or off
+screen; click, right (then menu, choose), type, key and drag act on parts by their key. `python {notation}/screen.py
+--help` lists every step. (It makes and removes its own copy under sessions/; that is the tool, not you.) Before you say a
+painter or lens change works, look, and say which shot or facts you looked at. Shots named screen-*.png are ignored by git.
+
 Keep the record true: docs/Current Implementation.md describes exactly what exists. If your change alters anything it
-says, rewrite that section in the live world's Handbook binder "How the desk is built" through the desk tool (read the
-note first; one note per section), and name the sections in your done comment. Don't edit the markdown file itself:
+says, change that passage in the live world's Handbook binder "How the desk is built" through the desk tool: read the
+note, then `do replace <note> old="..." new="..."` with the exact words you read. Never paste a whole section from a
+draft: others edit the binder while you work, and a draft written earlier overwrites them (it happened, 29 Sep). Name
+the sections in your done comment. Don't edit the markdown file itself:
 the house exports it from the binder when your branch lands.
 
 Finishing: commit your change on your branch (git add the files you changed; git commit). Then, through the desk:
@@ -143,6 +153,8 @@ class Workshop:
                 if running < int(cfg.get("workers", "1")):
                     self.begin(w, cid, s, cfg)
                 continue
+            if not wk and state in ("working", "waiting", "ready") and (TREES / cid).exists():
+                wk = self.resume(w, cid, s, cfg)      # the house restarted under it: carry on in its own session
             if not wk:
                 continue
             for text in wk.turns_ended():
@@ -211,6 +223,23 @@ class Workshop:
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
         wk.send(first)
+
+    def resume(self, w, cid, s, cfg):
+        """A commission underway whose worker has no process here, because the house restarted (after a landing, or the
+        keeper's restart): start it again on its own saved session, in its own worktree. It hears only what it has not
+        heard (the cursor was saved), and a turn the restart cut short is said to it again. Without a saved session it
+        is left for a person to re-ask (commission=asked)."""
+        props = s.get("props") or {}
+        wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", props.get("asked_by") or self.asked_by(w, s))
+        if not wk.state.get("session"):
+            return None
+        self.workers[cid] = wk
+        cut = (wk.state.pop("pending", None) or {}).get("carry")
+        wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        wk.log("resume", {"session": wk.state["session"], "cut": bool(cut)})
+        if cut:
+            wk.send("(the house restarted while you were working; your session is resumed. What you were last told:)\n\n" + cut)
+        return wk
 
     def failed(self, cid, wk, why):
         wk.state["failures"] = wk.state.get("failures", 0) + 1

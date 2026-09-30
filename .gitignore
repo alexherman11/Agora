@@ -41,3 +41,6 @@ research/text-desk-lab/notation/house-test.log
 # live building: reaches nothing answered (evidence, per world), workers' git worktrees
 research/text-desk-lab/notation/reaches/
 .worktrees/
+
+# screen.py shots (29 Sep)
+screen-*.png

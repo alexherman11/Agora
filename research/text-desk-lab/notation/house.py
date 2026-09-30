@@ -662,7 +662,9 @@ class House:
             st = json.loads((self.dir / "house.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
-        if st.get("pid") != os.getpid() and now() - float(st.get("beat") or 0) < 15:
+        # 29 Sep: after a restart for new code the old house's heartbeat was still fresh, so its successor refused to
+        # start and the keeper waited a minute; a heartbeat counts only while its process is alive
+        if st.get("pid") != os.getpid() and now() - float(st.get("beat") or 0) < 15 and export_docs.explore._alive(st.get("pid")):
             return st.get("pid")
         return None
 

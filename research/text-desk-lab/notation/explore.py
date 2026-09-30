@@ -27,11 +27,16 @@ def _alive(pid):
     try:
         if sys.platform == "win32":
             import ctypes
-            h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))   # PROCESS_QUERY_LIMITED_INFORMATION
+            k = ctypes.windll.kernel32
+            h = k.OpenProcess(0x1000, False, int(pid))   # PROCESS_QUERY_LIMITED_INFORMATION
             if not h:
                 return False
-            ctypes.windll.kernel32.CloseHandle(h)
-            return True
+            # an exited process can still be opened while its parent holds a handle (the keeper does, until it polls):
+            # only STILL_ACTIVE (259) is running
+            code = ctypes.c_ulong()
+            ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+            k.CloseHandle(h)
+            return not ok or code.value == 259
         os.kill(int(pid), 0)
         return True
     except (OSError, ValueError):
