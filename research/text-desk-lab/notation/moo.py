@@ -99,14 +99,25 @@ def v_move(w, nid, a):
     return _prim(w, "move", nid, a)
 
 
-@verb("place", ["subject", "task"], "Put a subject on a surface as a new appearance (into=), or put a card in a lane's order: "
-      "above=<card> gives it that card's status and priority and a rank just above it; status=<value> alone sends it to "
-      "the bottom of its priority group among cards with that status. The ranks are the house's; one event, undone whole.",
-      "into=<surface> | above=<card> | status=<value>", "do place a12 above=a30")
+@verb("place", ["subject"], "Put a subject on a surface as a new appearance; its other appearances stay where they are.",
+      "into=<surface>", "do place s10 into=f02")
 def v_place(w, sid, a):
-    if sid in w.nodes and w.nodes[sid]["type"] == "appearance" and "into" not in a:
-        return place_in_order(w, sid, a)
     return w.apply("place", sid, None, a)
+
+
+MOVE_ARGS = ("into", "before", "after", "to", "by")
+
+
+@verb("put", ["task"], "Put a card in a lane's order: above=<card> gives it that card's status and priority and a rank just "
+      "above it; status=<value> sends it to the bottom of its priority group among cards with that status. The ranks are "
+      "the house's; one event, undone whole. With into=, before=, after=, to= or by= it is move, as put is everywhere else.",
+      "above=<card> | status=<value>", "do put a12 above=a30")
+def v_put(w, nid, a):
+    # Pike c1202: its own word, so place keeps one meaning. `put` was already a synonym of move, and still is for
+    # anything that isn't a card, and for a card given a move's arguments
+    if any(k in a for k in MOVE_ARGS):
+        return v_move(w, nid, a)
+    return place_in_order(w, nid, a)
 
 
 # a1069/a1078: a lane is a selection sorted `by priority, rank`. The lens word and the verb order a group with this one
@@ -156,11 +167,11 @@ def place_in_order(w, nid, a):
     sid = w.nodes[nid]["subject"]
     s = w.subjects[sid]
     if s["kind"] != "task":
-        raise Refusal(f"place above= orders cards; {nid} is a {s['kind']}")
+        raise Refusal(f"put above= orders cards; {nid} is a {s['kind']}")
     above = a.get("above")
     if above:
         if above not in w.nodes or w.nodes[above]["type"] != "appearance" or w.subjects[w.nodes[above]["subject"]]["kind"] != "task":
-            raise Refusal(f"place {nid} above=<card>: {above} is not a card (a task's appearance)")
+            raise Refusal(f"put {nid} above=<card>: {above} is not a card (a task's appearance)")
         if w.nodes[above]["subject"] == sid:
             raise Refusal(f"{above} is {nid} itself (the same task); nothing to do")
         tp = w.subjects[w.nodes[above]["subject"]].get("props") or {}
@@ -168,7 +179,7 @@ def place_in_order(w, nid, a):
     elif a.get("status"):
         status, priority = str(a["status"]), (s.get("props") or {}).get("priority")
     else:
-        raise Refusal("place needs into=<surface> (a new appearance), above=<card>, or status=<value> (the bottom of its priority group)")
+        raise Refusal("put needs above=<card>, or status=<value> (the bottom of its priority group); into=, before= or after= moves it, as move does")
     group = _lane_group(w, status, priority, {sid})
     ranks = {i: props_of(w, i).get("rank") for i in group}
     new = {}                                           # subject -> rank, for the others the house renumbers
@@ -199,7 +210,9 @@ def place_in_order(w, nid, a):
             and (not group or (above and at == 0 and num(group[0]) > int(float(was["rank"])))
                  or (above and at and num(group[at - 1]) < int(float(was["rank"])) < num(group[at]))
                  or (not above and int(float(was["rank"])) > num(group[-1]))):
-        raise Refusal(f"{nid} is already there (status={status or '(none)'}, priority={priority or '(none)'}, rank {was['rank']}); nothing to change")
+        # a825 (Pike c1202): a drop where the card already is harms nothing, so it is not refused; no event is made
+        return {"ok": True, "event": None, "events": [], "changed": [],
+                "note": f"already there, nothing moved (status={status or '(none)'}, priority={priority or '(none)'}, rank {was['rank']})"}
     before = [deepcopy(s)] + [deepcopy(w.subjects[x]) for x in new]
     props = s.setdefault("props", {})
     for k, v in want.items():
@@ -217,10 +230,10 @@ def place_in_order(w, nid, a):
         changed += [x] + w.appearances_of(x)
     args = {"above": above} if above else {}
     args.update({k: (v if v is not None else "") for k, v in want.items()})
-    ev = w._event("place", nid, args, {"restore_subjects": before}, actor)
+    ev = w._event("put", nid, args, {"restore_subjects": before}, actor)
     said = [f"{k} {was[k] or '(none)'} -> {want[k] or '(none)'}" for k in ("status", "priority") if was[k] != want[k]]
     where = f"just above {above}" if above else f"at the bottom of {'priority ' + priority if priority else 'the cards with no priority'}"
-    note = f"placed {nid} {where} with status={status or '(none)'}" + (f", priority={priority}" if priority else ", no priority")
+    note = f"put {nid} {where} with status={status or '(none)'}" + (f", priority={priority}" if priority else ", no priority")
     note += ("; " + ", ".join(said) if said else "") + f"; rank {was['rank'] or '(none)'} -> {rank}"
     if new:
         note += f"; renumbered {len(new)} other card(s) quietly, their order unchanged: " + " ".join(
@@ -652,7 +665,7 @@ class Adapter:
         avail = [v for vs in verbs_by_origin(w, nid).values() for v in vs]
         if said in avail:
             return said, None
-        if said in REGISTRY:
+        if said in REGISTRY and SYNONYMS.get(said) not in avail:     # a1081: put is a card's verb and, elsewhere, move
             raise Refusal(f"{said} does not apply to {nid} right now (its verbs: {' '.join(avail)}); "
                           + {"resolve": "it has no open comments", "check": "it has no checklist lines", "unlink": "it has no links",
                              "untile": "it is not tiled", "sort": "it is not a tiled surface with children"}.get(said, "see examine " + nid))
