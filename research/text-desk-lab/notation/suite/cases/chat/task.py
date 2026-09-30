@@ -38,6 +38,17 @@ def _as(run, who, line):
         run.me = me
 
 
+def _rule(run, who, text):
+    """a1027: a rule is a note tagged rule; its text is the rule (quotes inside it escaped as \\")."""
+    _as(run, who, "look")
+    return _as(run, who, f'do create f01 kind=note tags=rule title="a rule" text="{text}"')
+
+
+def _drop(run, who, rid):
+    _as(run, who, f"look {rid} :1")
+    return _as(run, who, f"do remove {rid}")
+
+
 def _last_line(run):
     s = next(s for s in run.desk.world.subjects.values() if s["title"] == "With JEFF")
     return s["text"].splitlines()[-1]
@@ -113,8 +124,8 @@ def probe(name, run):
     if name == "rule-acts-as-author":
         # a687 (decided in a683): a rule is a standing act its author chose, so it acts as its author. Sable's rule,
         # tripped by pike, adds a line signed 'Sable:' with no 'via' (the event carries it); pike's receipt says whose
-        out, refused = _as(run, "sable", 'rule on append by=pike do append line="(noted by the room)"')
-        m = re.search(r"^ok (r\d+):", out, re.M)
+        out, refused = _rule(run, "sable", 'on append by=pike do append line=\\"(noted by the room)\\"')
+        m = re.search(r"~ rule (a\d+) saved:", out)
         rid = STATE["rid"] = m.group(1) if m else "?"
         n0 = len(run.desk.world.events)
         pout, rp = _as(run, "pike", 'do append "Shop talk" line="shipping it"')
@@ -140,29 +151,30 @@ def probe(name, run):
     if name == "author-fenced-by-rule":
         # Sable keeps a prop she wrote; her rule rewrites it when pike speaks; she, who has not looked since, is refused
         # when she writes it again: the rule's deed was not on her receipts
-        _as(run, "sable", f"rule drop {STATE['rid']}")
+        _drop(run, "sable", STATE["rid"])
         _as(run, "sable", 'do prop "Shop talk" last=nobody')
-        out, _ = _as(run, "sable", 'rule on append by=pike do prop last=pike')
-        rid = re.search(r"^ok (r\d+):", out, re.M).group(1)
+        out, _ = _rule(run, "sable", "on append by=pike do prop last=pike")
+        rid = re.search(r"~ rule (a\d+) saved:", out).group(1)
         _as(run, "pike", 'do append "Shop talk" line="and again"')
         out, refused = _as(run, "sable", 'do prop "Shop talk" last=sable')
-        _as(run, "sable", f"rule drop {rid}")
+        _drop(run, "sable", rid)
         if not refused:
             return "silent", "sable overwrote what her rule wrote without having seen it"
         if "stale" not in out or f"your rule {rid}" not in out:
             return "visible", f"refused, but not for her rule's deed: {out.splitlines()[-1][:160]!r}"
         return "holds", ""
     if name == "authorless-rule-as-before":
-        # a rule saved before a656 carries no author: it runs as whoever tripped it, its line says 'via rule', and no
-        # event of it carries tripped_by (so no one's fence or !! line changes)
-        out, _ = _as(run, "sable", 'rule on append by=pike do append line="(an old rule)"')
-        rid = re.search(r"^ok (r\d+):", out, re.M).group(1)
-        next(r for r in run.desk.rules if r["id"] == rid).pop("author")      # as a rule unpickled from before a656
+        # a rule with no recorded author (a656; a1027: a rule note made before its world's log began) runs as whoever
+        # tripped it, its line says 'via rule', and no event of it carries tripped_by (no one's fence or !! line changes)
+        out, _ = _rule(run, "sable", 'on append by=pike do append line=\\"(an old rule)\\"')
+        rid = re.search(r"~ rule (a\d+) saved:", out).group(1)
+        w = run.desk.world
+        run.desk._rulestate[w.nodes[rid]["subject"]]["author"] = None     # as a note whose making no event recorded
         n0 = len(run.desk.world.events)
         _, rp = _as(run, "pike", 'do append "Shop talk" line="old times"')
         tail = _lines(run)[-2:]
         ruled = [e for e in run.desk.world.events[n0:] if e.get("via") == f"rule {rid}"]
-        _as(run, "sable", f"rule drop {rid}")
+        _drop(run, "sable", rid)
         if rp or tail != ["Pike: old times", f"Pike, via rule {rid}: (an old rule)"]:
             return "silent", f"after pike's line the chat reads {tail!r}"
         if not ruled or any(e["by"] != "pike" or "tripped_by" in e for e in ruled):

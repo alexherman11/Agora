@@ -30,11 +30,22 @@ SELECTION_HELP = """selections: a target can be one id, or a selection that name
   age<2              touched within the last 2 days by the clock (age>7: untouched for a week); needs clock
   title:agenda       title contains the word
   prop:status=done   by property (prop:status alone: has the property)
+  answered-by:a1008  what a1008 answers (its links as=answers); answers:a1006 what answers a1006
+                     (parts:a30 / part-of:a20 do the same for part-of links; links:a04 is any link, either way)
   -tag:fixed         leaves out what the term would select (any term may be negated)
   a20,a22            an explicit list
 combine terms with commas (AND): kind:image,in:f04. The receipt lists everything the verb touched.
 find <selection> lists what it matches, grouped by surface: find kind:image   find tag:harbor,in:f04   find hidden
 e.g. do move ?harbor into=f02 one=1     do raise hidden,in:f04     do group kind:image,in:f04 as=column title=Pictures"""
+
+
+# Juniper: `do prop prop:day=2026-10-10 tripday=1` lost its target, because the selection carries an =. A word that
+# begins with a selection term is the target, = or not (a typed do line and a rule's action alike, a1027)
+SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of|answers|answered-by):|^-?(due|age)[<>]|^[?]")
+
+
+def is_target_word(a):
+    return "=" not in a or a.startswith("?") or bool(SEL.match(a))
 
 
 HELP_LEAN = HELP_KNIFE.replace(
@@ -54,7 +65,7 @@ HELP_LEAN = HELP_KNIFE.replace(
   in the house (a resident's reply): only a line beginning with > acts; any other line is thinking, whatever its
                          first word. One > line is one command: a ; in it is words, so several commands are several
                          > lines, run in order; a refusal stops the ones after it. A > line nothing answers (a
-                         quote) is a MISS: logged in Misses, it stops nothing. Scripts and wake lines keep ;
+                         quote) is a MISS: logged in Misses, it stops nothing. A verb's lines and wake lines keep ;
   more: help rules · help scripts · help views · help clock · help handles · help blanks · help why · help export · help trials · help lens
   building: help verbs (capabilities anyone makes in the world) · help commissions (a worker changes the code for you)"""
 
@@ -230,110 +241,207 @@ class DeskKnife(DeskMoo):
             line += f"  (+{rest} more line(s); examine {nid})" if rest else f"  (cut; examine {nid})"
         return line
 
-    # ---- rules: the first automation layer (round 11c) ----------------------------------------------
-    # rule when <selection> do <verb> [k=v ...]   fires the verb once on each thing that enters the selection
-    rules = None
+    # ---- rules: quiet notes that act on their own (a1027; the automation layer of round 11c, now as notes) ---------
+    # A rule is a note tagged rule, placed in a room. Its text is one line, `when <selection> do <verb> ...` or
+    # `on <verb> [by=<actor>] do ...`; # lines describe it. It lives in the room holding it (moving the note moves its
+    # home) and acts as whoever last chose what it does: its maker, or the last to write its text or tag it rule
+    # (a687; Juniper c1075). Its stored text is checked whenever the text, the home or the author changes: a rule that
+    # fails the check is broken, says why, and never fires, never running an earlier version (a598). A valid one re-arms:
+    # what matches it then counts as handled, so a fix never sets off a flood. Quiet (Alex, a585): a narrated look never
+    # lists rule notes; the tree marks them; `rules` and `examine` say everything.
+    rules = None            # retired: the desk-attribute rules from before a1027, kept only to say they never fire
+    _rulestate = None       # {rule note subject id: {the parsed rule, sig, home, author, broken, done, fired ...}}
+    _rule_authors = None    # {subject id: (events seen, author)}: who a rule acts as, read from the log once per change
     _rule_notes = None
     _in_rules = False
+    RULE_BLANKS = ("item", "here", "today", "me")
+    RULE_FORM = "when <selection> do <verb> [target] [k=v ...]   or   on <verb> [by=<actor>] do <verb> ..."
 
-    _rule_seq = 0
+    def _rule_subjects(self):
+        w = self.world
+        return [s for s in w.subjects.values() if "rule" in (s.get("tags") or []) and w.appearances_of(s["id"])]
 
-    def _next_rule_id(self):
-        # ids never reuse a dropped rule's number; history and receipts keep naming the old one
-        self._rule_seq = max(self._rule_seq, max((int(r["id"][1:]) for r in self.rules or []), default=0)) + 1
-        return f"r{self._rule_seq}"
+    def _rule_author(self, sid):
+        """a1027 (c1075, call 1): whoever last chose what the rule does: its maker, or the last to write its text or
+        tag it rule. An undone event counts for nothing, so an undo gives the rule back to whoever came before."""
+        w = self.world
+        cache = self._rule_authors = self._rule_authors or {}
+        if sid in cache and cache[sid][0] == len(w.events):
+            return cache[sid][1]
+        ids, who = {sid} | set(w.appearances_of(sid)), None
+        for e in w.events:
+            if e.get("undone") or e["verb"] == "undo":
+                continue
+            a = e.get("args") or {}
+            if e["verb"] == "create" and isinstance(e.get("undo"), dict):
+                made = e["undo"].get("delete")
+                if made in ids or (made in w.nodes and w.nodes[made].get("subject") == sid):
+                    who = e["by"]
+            elif e["target"] in ids and ((e["verb"] == "edit" and ("text" in a or "append" in a))
+                                         or (e["verb"] == "tag" and "rule" in str(a.get("add", "")).split(","))):
+                who = e["by"]
+        cache[sid] = (len(w.events), who)
+        return who
+
+    @staticmethod
+    def _rule_line(s):
+        lines = [l.strip() for l in s["text"].splitlines() if l.strip() and not l.strip().startswith("#")]
+        return lines
+
+    def _rule_parse(self, s, home):
+        """-> (the rule, None) or (None, why it is broken). Strict to the stored text, judged where the rule lives."""
+        lines = self._rule_line(s)
+        if not lines:
+            return None, f"its text holds no rule yet: one line, {self.RULE_FORM}"
+        if len(lines) > 1:
+            return None, f"its text holds {len(lines)} lines; a rule note holds one rule (# lines describe it)"
+        line = blanks.protect(lines[0])
+        for m in blanks.BLANK.finditer(line):
+            if m.group(0) == blanks.LIT:
+                continue
+            name, attr = m.group(1), m.group(2) or ""
+            if name == "new":
+                return None, "$new: a rule has no earlier line; it acts on $item, the thing it fired on"
+            if name not in self.RULE_BLANKS and name not in (self.vars or {}):
+                return None, (f"${name}{attr} is no blank in a rule. A rule's blanks: $item $item.title $item.<prop> "
+                              f"$item.maker $here $here.<prop> $today $me, or a handle; a literal dollar sign is \\$")
+            if attr and name in ("today", "me"):
+                return None, f"${name}{attr}: ${name} has no parts"
+        try:
+            argv = shlex.split(line)
+        except ValueError as e:
+            return None, f"could not parse: {e}"
+        try:
+            if argv and argv[0] == "on":
+                i = argv.index("do") if "do" in argv else -1
+                if i < 2:
+                    raise Refusal(f"a rule reads {self.RULE_FORM}")
+                on_verb, by = argv[1].lower(), None
+                for a in argv[2:i]:
+                    if not a.startswith("by="):
+                        raise Refusal(f"on: only by=<actor> may follow the event verb, not {a!r}")
+                    by = a[3:]
+                act = self._parse_action(argv[i + 1:], home)
+                act["kv"].pop("now", None)
+                return {"on": on_verb, "by": by, "sel": f"on {on_verb}" + (f" by={by}" if by else ""), **act}, None
+            if len(argv) < 4 or argv[0] != "when" or argv[2] != "do":
+                raise Refusal(f"a rule reads {self.RULE_FORM}")
+            if self._rule_selection(argv[1], home) is None:
+                raise Refusal(f"{argv[1]!r} is not a selection (help selections)")
+            act = self._parse_action(argv[3:], home)
+            return {"sel": argv[1], "now": act["kv"].pop("now", None), **act}, None
+        except Refusal as e:
+            return None, str(e)
+
+    def _rules_sync(self, say=True):
+        """Bring each rule note's state up to date with the world. A new rule, a changed text, a new home or a new
+        author is checked again, strictly; a valid one re-arms (what matches it now counts as handled). The act that
+        changed a rule hears what the rule is now, in ~ lines on its receipt. -> the active rules, in id order."""
+        import verbs
+        w = self.world
+        states = self._rulestate = dict(self._rulestate or {})
+        live = {s["id"]: s for s in self._rule_subjects()}
+        for sid in [k for k in states if k not in live]:
+            gone = states.pop(sid)
+            if say:
+                self._note(f"~ rule {gone['id']} no longer acts: its note is no longer placed, or no longer tagged rule")
+        for sid, s in live.items():
+            aid = w.appearances_of(sid)[0]
+            home, author = verbs.room_holding(w, sid), self._rule_author(sid)
+            sig = (s["text"], home, author)
+            prev = states.get(sid)
+            if prev is not None and prev["sig"] == sig:
+                prev["id"] = aid
+                continue
+            prev = prev or {}
+            rule, broken = self._rule_parse(s, home)
+            st = {"id": aid, "sid": sid, "sig": sig, "home": home, "author": author, "broken": broken, "done": set(),
+                  "cursor": len(w.events), "last_fail": prev.get("last_fail"), "last_skip": prev.get("last_skip"),
+                  **{k: prev.get(k, 0) for k in ("fired", "failed", "skipped")}, **(rule or {})}
+            already = []
+            if not broken and not st.get("on") and not st.get("now"):
+                try:
+                    already = self._rule_selection(st["sel"], home)[0]
+                    st["done"].update(already)
+                except Refusal as e:
+                    st["broken"] = broken = str(e)
+            states[sid] = st
+            if not say:
+                continue
+            if broken:
+                self._note(f"~ rule {aid} saved broken: {broken}. It never fires until its text is fixed (rules lists it)")
+                continue
+            where = f"lives in {w.nodes[home]['title']} ({home})" if home in w.nodes else "lives in no room, so $here refuses"
+            said = f"~ rule {aid} saved: {self._rule_line(s)[0]}  ({where}; acts as {author or '?'}"
+            if st.get("now"):
+                said += "; now=1: it fires on what matches now too"
+            elif already:
+                said += f"; {len(already)} thing(s) already match, counted as handled: it fires on what enters from now on"
+            said += ")"
+            if prev.get("author") and prev["author"] != author:
+                said += (f"\n  this rule now acts as you (it acted as {prev['author']})" if author == w.me
+                         else f"\n  this rule now acts as {author} (it acted as {prev['author']})")
+            self._note(said)
+        return sorted((st for st in states.values() if not st["broken"]), key=lambda r: int(re.sub(r"\D", "", r["id"]) or 0))
+
+    def _rule_of_note(self, nid):
+        """The rule state for a rule note named by an appearance or subject id, or None."""
+        w = self.world
+        sid = w.nodes[nid].get("subject") if nid in w.nodes else nid
+        return (self._rulestate or {}).get(sid) if sid in w.subjects and "rule" in (w.subjects[sid].get("tags") or []) else None
+
+    def _rule_lines(self, r, indent="  "):
+        """What rules and examine say of one rule: its home, who it acts as, and how it has gone."""
+        w = self.world
+        s = w.subjects[r["sid"]]
+        where = (f"lives in {w.nodes[r['home']]['title']} ({r['home']})" if r.get("home") in w.nodes
+                 else "lives in no room ($here refuses)")
+        head = f'{indent}{r["id"]} "{s["title"]}" · {where} · acts as {r.get("author") or "?"}'
+        if r["broken"]:
+            head += f" · BROKEN: {r['broken']}. It never fires until its text is fixed"
+        else:
+            head += (f" · fired {r['fired']}x" + (f" · failed {r['failed']}x (last: {r['last_fail']})" if r["failed"] else "")
+                     + (f" · skipped {r['skipped']}x (last: {r['last_skip']})" if r["skipped"] else ""))
+        text = self._rule_line(s)
+        return [head] + [f"{indent}    {l}" for l in text[:3]]
+
+    def rule_mark(self, sid):
+        """The tree's mark on a rule note (c1075, call 5: the tree is the builder's inventory, so a rule shows there)."""
+        import verbs
+        w, r = self.world, (self._rulestate or {}).get(sid)
+        s, home = w.subjects[sid], verbs.room_holding(w, sid)
+        if r is not None and r["sig"] == (s["text"], home, self._rule_author(sid)):
+            broken = r["broken"]
+        else:
+            # judged afresh, never stored: the act printing this line has not synced the rules yet, and its receipt
+            # must still say 'saved' (a read of the state here would arm the rule silently)
+            broken = self._rule_parse(s, home)[1] if w.appearances_of(sid) else None
+        return "rule, broken (rules says why)" if broken else "rule"
 
     def cmd_rules(self):
-        if not self.rules:
-            return "no rules. rule when <selection> do <verb> [k=v ...]   e.g. rule when kind:task,due<2026-09-19 do move into=Today"
-        w = self.world
-        return "\n".join(f"{r['id']} {'' if r.get('on') else 'when '}{r['sel']} do {self._action_text(r)}"
-                         + f"   (fired {r['fired']}x" + (f"; lives in {w.nodes[r['home']]['title']} {r['home']}"
-                                                         if r.get("home") in w.nodes else "") + ")" for r in self.rules)
-
-    def _saving_home(self):
-        """a990: where a rule or script being saved will live: the room its author stands in (None for someone placed
-        nowhere, or a world with no rooms). It stands there from then on, wherever its author goes."""
-        import rooms
-        w = self.world
-        return rooms.room_of(w, w.me) if rooms.all_rooms(w) else None
-
-    def _lives(self, home):
-        w = self.world
-        return f"\n  it lives in {w.nodes[home]['title']} ({home}): its bare words mean what they mean there" if home else ""
+        self._rules_sync(say=False)
+        sts = sorted(self._rulestate.values(), key=lambda r: int(re.sub(r"\D", "", r["id"]) or 0))
+        out = [f"{len(sts)} rule(s), each a note tagged rule; a narrated look never lists them, the tree marks them:"
+               if sts else f"no rules. A rule is a note tagged rule, in the room it acts from; its text is one line: "
+                           f"{self.RULE_FORM} (help rules)"]
+        for r in sts:
+            out += self._rule_lines(r)
+        if self.rules:
+            out.append(f"(this world still holds {len(self.rules)} rule(s) from before rules were notes; they never fire: "
+                       f"write each as a note)")
+        return "\n".join(out)
 
     def cmd_rule(self, arg):
-        try:
-            argv = shlex.split(arg)
-        except ValueError as e:
-            raise Refusal(f"could not parse: {e}")
-        if len(argv) >= 2 and argv[0] == "drop":
-            rid = argv[1]
-            before = len(self.rules or [])
-            self.rules = [r for r in (self.rules or []) if r["id"] != rid]
-            if len(self.rules) == before:
-                raise Refusal(f"no rule {rid}; rules lists them")
-            return f"ok dropped {rid}"
-        if argv and argv[0] == "home":
-            # a990 (5), Juniper c996: a rule's home is seen (rules, examine rN) and changed on purpose, never by where
-            # its author happens to walk. The move is judged like a save: its world verb must be at hand there
-            if len(argv) != 3:
-                raise Refusal("rule home rN <room>   (the room a rule lives in: its $here, and where its bare verb word is looked up)")
-            r = next((x for x in self.rules or [] if x["id"] == argv[1]), None)
-            if r is None:
-                raise Refusal(f"no rule {argv[1]}; rules lists them")
-            import rooms
-            import verbs
-            fid = rooms.resolve(self.world, argv[2], self.world.me)
-            if r.get("world") and r["verb"] != "use":
-                verbs.find(self, r["verb"], [a for a in r.get("args") or [] if "=" not in a], self.world.me, at=(fid, True))
-            r["home"] = fid
-            return f"ok {r['id']} lives in {self.world.nodes[fid]['title']} ({fid}) now"
-        if len(argv) >= 4 and argv[0] == "on":
-            # rule on <verb> [by=<actor>] do <verb> [k=v ...]: fires on each such event, on the event's thing
-            i = argv.index("do") if "do" in argv else -1
-            if i < 2:
-                raise Refusal("rule on <verb> [by=<actor>] do <verb> [k=v ...]")
-            on_verb, by = argv[1].lower(), None
-            for a in argv[2:i]:
-                if a.startswith("by="):
-                    by = a[3:]
-                else:
-                    raise Refusal(f"rule on: only by=<actor> may follow the event verb, not {a!r}")
-            home = self._saving_home()
-            act = self._parse_action(argv[i + 1:], home)
-            act["kv"].pop("now", None)
-            self.rules = self.rules or []
-            rid = self._next_rule_id()
-            # author: who made it (a656); the rule fires as its author (a687, decided in a683); home: where it stands (a990)
-            self.rules.append({"id": rid, "on": on_verb, "by": by, "author": self.world.me, "home": home, **act, "done": set(),
-                               "fired": 0, "cursor": len(self.world.events), "sel": f"on {on_verb}" + (f" by={by}" if by else "")})
-            return f"ok {rid}: on {on_verb}" + (f" by={by}" if by else "") + f" do {self._action_text(act)}" + self._lives(home)
-        if len(argv) < 4 or argv[0] != "when" or argv[2] != "do":
-            raise Refusal("rule when <selection> do <verb> [k=v ...]   |   rule on <verb> [by=<actor>] do <verb> [k=v ...]   |   rule drop rN")
-        sel_text = argv[1]
-        home = self._saving_home()
-        if self._rule_selection(sel_text, home) is None:
-            raise Refusal(f"{sel_text!r} is not a selection (help selections)")
-        act = self._parse_action(argv[3:], home)
-        now = act["kv"].pop("now", None)
-        self.rules = self.rules or []
-        rid = self._next_rule_id()
-        rule = {"id": rid, "sel": sel_text, "author": self.world.me, "home": home, **act, "done": set(), "fired": 0}
-        self.rules.append(rule)
-        out = f"ok {rid}: when {sel_text} do {self._action_text(act)}" + self._lives(home)
-        # things already in the selection count as already handled: a rule is about what enters, not what is,
-        # unless now=1 says to fire on the current matches too
-        ids, desc = self._rule_selection(sel_text, home)
-        if now:
-            out += f"\n  {len(ids)} thing(s) match {desc} now; firing on them"
-            self._run_rules()
-        else:
-            rule["done"].update(ids)
-            out += (f"\n  {len(ids)} thing(s) already match {desc}; the rule fires on things that enter it from now on"
-                    + (f" (to fire on these {len(ids)} too, define it with now=1)" if ids else "")
-                    + f". rules lists it; rule drop {rid} removes it")
-        return out
+        """a1027 (c1075, call 4): rules are notes, so the old command names the door, with the exact line to write."""
+        a = arg.strip().replace(blanks.LIT, "\\$")
+        if a.startswith(("when ", "on ")):
+            q = a.replace("\\", "\\\\").replace('"', '\\"')
+            raise Refusal("rules are notes now: a note tagged rule, placed in the room it acts from, whose text is the "
+                          f'rule. Write:\n  do create $here kind=note tags=rule title="<what it does>" text="{q}"')
+        if a.startswith(("drop", "home")):
+            raise Refusal("rules are notes now: remove a rule's note to drop it (do remove <id>), move it to change its "
+                          "home (do move <id> into=<room>); rules lists them")
+        raise Refusal(f"rules are notes now: a note tagged rule whose text is {self.RULE_FORM}. help rules")
 
     def cmd_table(self, arg):
         """table <selection> [cols=a,b,c] [by=col] [desc=1]: one row per thing, props side by side."""
@@ -433,18 +541,15 @@ class DeskKnife(DeskMoo):
         return self._parse_selection(blanks.fill(self, sel, ctx=blanks.Ctx("rule", home=home)))
 
     def _parse_action(self, argv, home=None):
-        """The part of a rule after do: <verb> [target] [k=v ...], run <script> [args ...], or a verb made in the world
-        (a990): its word, or use <id>, then its words. $item stands for the thing the rule fired on, in a script's args,
-        a world verb's words (the only word, when none are given) or a k=v value. A world verb's word is judged where
-        the rule will live (`home`), now, while its author is here: one only another room has refuses, naming the door."""
+        """The part of a rule after do: <verb> [target] [k=v ...], or a verb made in the world (a990): its word, or use
+        <id>, then its words. $item stands for the thing the rule fired on, in a world verb's words (the only word, when
+        none are given), a target or a k=v value. A world verb's word is judged where the rule lives (`home`): one only
+        another room has makes the rule broken, naming the door."""
         verb = argv[0].lower() if argv else ""
-        if verb == "run":
-            if len(argv) < 2:
-                raise Refusal("rule ... do run <script> [args]   ($item stands for the thing the rule fired on)")
-            if argv[1] not in (self.scripts or {}):
-                raise Refusal(f"no script {argv[1]}; define it first (scripts lists them)")
-            args = [a for a in argv[2:] if a != "now=1"]
-            return {"verb": "run", "script": argv[1], "args": args, "kv": ({"now": "1"} if len(args) < len(argv) - 2 else {}), "target": None}
+        if not verb:
+            raise Refusal(f"nothing after do; a rule reads {self.RULE_FORM}")
+        if verb in ("run", "script"):
+            raise Refusal(self.SCRIPTS_DOOR)
         if verb == "use" or verb not in self._verb_names() or verb in knife.SPECIALIZED:
             import verbs
             args = [a for a in argv[1:] if a != "now=1"]
@@ -459,17 +564,20 @@ class DeskKnife(DeskMoo):
             if verb in {n for s in verbs.all_verbs(self.world) for n in verbs._names(s["title"])}:
                 verbs.find(self, verb, [a for a in args if "=" not in a], self.world.me, at=(home, True))
                 return {"verb": verb, "world": True, "args": args, "kv": kv, "target": None}
-            raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL) + "; or run <script>, "
-                          f"or a verb made in the world")
+            raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL) + "; or a verb made in "
+                          f"the world (help verbs)")
         rest = list(argv[1:])
         target = None
-        if rest and "=" not in rest[0]:
+        if rest and is_target_word(rest[0]):
             target = rest.pop(0)   # an explicit target instead of the thing that entered: rule when in:Today do sort Today by=due
         kv = {}
         for a in rest:
             if "=" not in a:
                 raise Refusal(f"rule arguments are k=v; got {a!r}")
             k, _, v = a.partition("=")
+            if not re.fullmatch(r"[A-Za-z_][\w-]*", k):
+                # a1027: a misspelled selection term (answred-by:$item,...=...) must not pass as a prop named for it
+                raise Refusal(f"{k!r} is neither a k=v key nor a selection term (help selections)")
             kv[k] = v
         return {"verb": verb, "target": target, "kv": kv}
 
@@ -478,9 +586,7 @@ class DeskKnife(DeskMoo):
         return '"' + a.replace("\\", "\\\\").replace('"', '\\"') + '"' if (" " in a or not a) else a
 
     def _action_text(self, r):
-        if r["verb"] == "run":
-            text = "run " + " ".join([r["script"]] + [self._q(a) for a in r.get("args", [])])
-        elif r.get("world"):
+        if r.get("world"):
             text = " ".join([r["verb"]] + [self._q(a) for a in r.get("args", [])])
         else:
             text = f"{r['verb']} {r.get('target') or ''} {self._fmt_args(r['kv'])}".replace("  ", " ").rstrip()
@@ -497,23 +603,6 @@ class DeskKnife(DeskMoo):
             self._ctxs = self._ctxs[:-1]
 
     def _fire_in(self, r, i, ctx):
-        if r["verb"] == "run":
-            args = [blanks.fill(self, a, ctx=ctx) for a in r.get("args", [])]
-            line = "run " + " ".join([r["script"]] + [self._q(a).replace("$", "\\$") for a in args])
-            saved, self._rule_notes = self._rule_notes, None   # the nested command must not swallow the notes so far
-            try:
-                res = self.dispatch("desk", {"line": line})
-            finally:
-                self._rule_notes = saved
-            if "error" in res:
-                raise Refusal(res["error"])
-            lines = res["text"].splitlines()
-            start = next((k + 1 for k, l in enumerate(lines) if l.startswith("run ")), 0)   # after the script's echo line
-            body = [l.strip() for l in lines[start:] if l.strip() and not l.strip().startswith("[")]
-            err = next((l for l in body if l.startswith("ERR ")), None)
-            if err:
-                raise Refusal(err[4:])
-            return line + " → " + (body[0] if body else "ok")
         if r.get("world"):
             # a990: a verb made in the world, found from where the rule lives (the rule's ctx is innermost), strictly
             import verbs
@@ -527,7 +616,11 @@ class DeskKnife(DeskMoo):
             return line + " → " + next((l.strip() for l in res.splitlines()[1:] if l.strip()), "ok")
         tgt = blanks.fill(self, r.get("target") or "$item", ctx=ctx)
         if r.get("target") and tgt != i:
-            self._mark_seen(self._resolve(tgt))
+            sel = self._parse_selection(tgt)
+            if sel is not None and not sel[0]:
+                return None     # a1027: a selection that matches nothing is nothing to do, not a refusal
+            for x in (sel[0] if sel is not None else [self._resolve(tgt)]):
+                self._mark_seen(x)
         kv = {k: blanks.fill(self, v, ctx=ctx) for k, v in r["kv"].items()}     # a rule is a template: all filled
         return self.cmd_do_knife(r["verb"], [tgt], kv).splitlines()[0]
 
@@ -597,7 +690,7 @@ class DeskKnife(DeskMoo):
             out.append(f"  {e['id']} {e['verb']} {self._fmt_args(args)}".rstrip() + f" · {who}{how}{cause}{done}")
         # what would happen next: rules whose selection this thing matches but has not been handled by
         pending = []
-        for r in self.rules or []:
+        for r in self._rules_sync(say=False):
             if r.get("on"):
                 continue
             try:
@@ -680,108 +773,41 @@ class DeskKnife(DeskMoo):
             a, b = w.subjects.get(l["from"]), w.subjects.get(l["to"])
             if a and b:
                 out.append(f"do link {q(a['title'])} {q(b['title'])} as={l['kind']}")
-        for name, body in (self.scripts or {}).items():   # scripts first: a rule may run one
-            out.append(f"script {name} = {body}")
-        for r in self.rules or []:
-            out.append(f"rule {'' if r.get('on') else 'when '}{r['sel']} do {self._action_text(r)}")
         if skipped:
             out.append("# not carried (only you can write as you): " + "; ".join(skipped))
         return "\n".join(out)
 
-    # ---- scripts: named command sequences with $1.. placeholders (round 11c) --------------------------
-    scripts = None
-    script_homes = None     # a990: {name: the room it was saved in}; a script saved before, or by someone placed nowhere, has none
+    # ---- scripts retired into verbs (a1027): a script was a verb nobody declared ----------------------------------
+    scripts = None          # retired: the scripts of worlds from before a1027, kept only to say they never run
+    SCRIPTS_DOOR = "scripts are verbs now: make a note tagged verb (help verbs); run X is just X"
 
     def cmd_scripts(self):
-        if not self.scripts:
-            return "no scripts. script <name> = <commands separated by ;>   ($1 $2 .. stand for run's arguments)   e.g. script tidy = do sort $1 by=due; look $1"
-        homes, w = self.script_homes or {}, self.world
-        return "\n".join(f"{k} = {v}" + (f"   (lives in {w.nodes[homes[k]]['title']} {homes[k]})" if homes.get(k) in w.nodes else "")
-                         for k, v in self.scripts.items())
+        old = sorted(self.scripts or {})
+        return self.SCRIPTS_DOOR + (f"\n  (this world still holds {len(old)} old script(s), {', '.join(old)}; they never run)"
+                                    if old else "")
 
     def cmd_script(self, arg):
-        if arg.startswith("drop "):
-            name = arg[5:].strip()
-            if name not in (self.scripts or {}):
-                raise Refusal(f"no script {name}; scripts lists them")
-            users = [r["id"] for r in (self.rules or []) if r["verb"] == "run" and r.get("script") == name]
-            if users:
-                raise Refusal(f"{', '.join(users)} run {name}; drop those rules first (rule drop rN)")
-            del self.scripts[name]
-            (self.script_homes or {}).pop(name, None)
-            return f"ok dropped script {name}"
-        if arg.startswith("home "):
-            # a990 (5): a script's home is changed on purpose, and judged there like a save
-            import rooms
-            import verbs
-            words = arg.split()
-            if len(words) != 3 or words[1] not in (self.scripts or {}):
-                raise Refusal("script home <name> <room>   (scripts lists them)")
-            fid = rooms.resolve(self.world, words[2], self.world.me)
-            try:
-                verbs.check_lines(self, self.scripts[words[1]], fid)
-            except Refusal as e:
-                raise Refusal(f"script {words[1]} not moved: {e}")
-            self.script_homes = dict(self.script_homes or {})
-            self.script_homes[words[1]] = fid
-            return f"ok script {words[1]} lives in {self.world.nodes[fid]['title']} ({fid}) now"
-        name, eq, body = arg.partition("=")
-        name, body = name.strip(), body.strip()
-        if not eq or not name or not body:
-            raise Refusal("script <name> = <commands separated by ;>")
-        if " " in name:
-            raise Refusal("a script name is one word")
-        import verbs
-        home = self._saving_home()
-        try:
-            verbs.check_lines(self, body, home)     # a990: stored text names its door, judged now, where it will live
-        except Refusal as e:
-            raise Refusal(f"script {name} not saved: {e}")
-        self.scripts = self.scripts or {}
-        self.scripts[name] = body
-        self.script_homes = dict(self.script_homes or {})
-        self.script_homes[name] = home
-        out = f"ok script {name} = {body}\n  run {name} [args]   ({body.count('$')} placeholder(s))" + self._lives(home)
-        if ";" in body:
-            out += f"\n  ({body.count(';') + 1} commands in the script: a definition keeps every ; as its own, so define a script alone on its line)"
-        return out
+        raise Refusal(self.SCRIPTS_DOOR)
 
     def cmd_run(self, arg):
-        try:
-            argv = shlex.split(arg)
-        except ValueError as e:
-            raise Refusal(f"could not parse: {e}")
-        if not argv:
-            raise Refusal("run <script> [args]; scripts lists them")
-        name, args = argv[0], argv[1:]
-        body = (self.scripts or {}).get(name)
-        if body is None:
-            raise Refusal(f"no script {name}; scripts lists them")
-        missing = sorted({m for m in re.findall(r"\$(\d+)", body) if int(m) > len(args)})
-        if missing:
-            raise Refusal(f"run {name} needs {max(int(m) for m in missing)} argument(s); got {len(args)}")
-        # a806: the arguments are filled where run was said (run tidy $new); the body is a template, filled by the one
-        # filler as each of its commands runs ($1.title: Terra asked for this form before it existed)
-        rest = arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else ""
-        ctx = blanks.Ctx("script", args=[blanks.word(self, a) for a in args], rest=rest, name=name,
-                         home=(self.script_homes or {}).get(name))
-        shown = blanks.show(self, body, ctx)
-        self._ctxs = (self._ctxs or []) + [ctx]
-        try:
-            r = self.dispatch("desk", {"line": body})
-        finally:
-            self._ctxs = self._ctxs[:-1]
-        body_text = r["text"] if "text" in r else "ERR " + r["error"]
-        return f"run {name}: {shown}\n" + body_text
+        import verbs
+        name = (arg.split() or ["X"])[0]
+        door = f"scripts are verbs now: make a note tagged verb (help verbs); run {name} is just {name}"
+        if name != "X" and not verbs.visible(self, name, self.world.me):
+            door += f" (nothing answers to {name} yet: make it a verb, or just look)"
+        raise Refusal(door)
 
     def _run_rules(self, cause=None):
-        if not self.rules or self._in_rules:
+        if self._in_rules:
+            return
+        active = self._rules_sync()         # a1027: rules are notes; what each one is now is read from the world
+        if not active:
             return
         self._in_rules = True
         try:
             for _ in range(3):   # a rule's action may make another rule fire; bounded
                 fired = False
-                for r in self.rules:
+                for r in active:
                     if r.get("on"):
                         # event rule: each new matching event names the thing to act on
                         evs = self.world.events[r["cursor"]:]
@@ -812,6 +838,9 @@ class DeskKnife(DeskMoo):
                         except Refusal as e:
                             self._note(f"~ {r['id']} could not select ({e})")
                             continue
+                        # a1027: a thing that left the selection is forgotten, so entering again fires again (a
+                        # commission landed, reverted, then landed once more is due a live check twice)
+                        r["done"] &= set(ids)
                     for i in ids:
                         if i in r["done"] or i not in self.world.nodes:
                             continue
@@ -838,12 +867,21 @@ class DeskKnife(DeskMoo):
                             self.world.acting_rule = r["id"]
                         try:
                             receipt = self._fire(r, i)
-                            r["fired"] += 1
-                            fired = True
-                            self._note(f"~ {r['id']} fired on {i}" + (f" as {author}" if author and author != tripper else "")
-                                       + ": " + receipt)
+                            if receipt is not None:     # None: its selection target matched nothing, nothing to do
+                                r["fired"] += 1
+                                fired = True
+                                self._note(f"~ {r['id']} fired on {i}" + (f" as {author}" if author and author != tripper else "")
+                                           + ": " + receipt)
                         except Refusal as e:
-                            self._note(f"~ {r['id']} could not {r['verb']} {i}: {e}")
+                            why = str(e)
+                            if "no sill for" in why:
+                                # c1075: a sill that isn't there (claude has no corner) is recorded quietly, for rules
+                                r["skipped"] += 1
+                                r["last_skip"] = f"{i}, " + why[why.index("no sill for"):].split(":")[0]
+                            else:
+                                r["failed"] += 1
+                                r["last_fail"] = f"{i}, {why[:160]}"
+                                self._note(f"~ {r['id']} could not {r['verb']} {i}: {e}")
                         finally:
                             self.world.acting_rule = None
                             self.world.me, self._firing_observer = tripper, None
@@ -867,10 +905,12 @@ class DeskKnife(DeskMoo):
 
     def snapshot(self):
         snap = self.world.snapshot()
-        snap["rules"] = [{"id": r["id"], "text": ("" if r.get("on") else "when ") + r["sel"] + " do " + self._action_text(r),
-                          "on": r.get("on"), "by": r.get("by"), "author": r.get("author"), "when": None if r.get("on") else r["sel"],
-                          "verb": r["verb"], "script": r.get("script"), "fired": r.get("fired", 0)} for r in (self.rules or [])]
-        snap["scripts"] = dict(self.scripts or {})
+        self._rules_sync(say=False)
+        snap["rules"] = [{"id": r["id"], "text": " ".join(self._rule_line(self.world.subjects[r["sid"]])[:1]),
+                          "on": r.get("on"), "by": r.get("by"), "author": r.get("author"), "home": r.get("home"),
+                          "when": None if r.get("on") else r.get("sel"), "verb": r.get("verb"), "broken": r["broken"],
+                          "fired": r.get("fired", 0), "failed": r.get("failed", 0), "skipped": r.get("skipped", 0)}
+                         for r in (self._rulestate or {}).values()]
         snap["clock"] = {"today": self.today, "follow": bool(self.follow)}
         return snap
 
@@ -1011,7 +1051,7 @@ class DeskKnife(DeskMoo):
                 raise Refusal("today is unset; clock YYYY-MM-DD sets it")
             token = token.replace("today", self.today)
         for t in re.split(r",", token):
-            for key in ("in:", "also:", "links:", "parts:", "part-of:"):
+            for key in ("in:", "also:", "links:", "parts:", "part-of:", "answers:", "answered-by:"):
                 if t.startswith(key) and t[len(key):] not in self.world.nodes and t[len(key):] not in self.world.subjects:
                     t = key + self._resolve(t[len(key):].strip('"'))
             out.append(t)
@@ -1150,10 +1190,7 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
-            # Juniper: `do prop prop:day=2026-10-10 tripday=1` lost its target, because the selection carries an =. A word that
-            # begins with a selection term is the target, = or not.
-            SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of):|^-?(due|age)[<>]|^[?]")
-            is_target = lambda a: "=" not in a or a.startswith("?") or bool(SEL.match(a))
+            is_target = is_target_word      # a selection term is the target, = or not (Juniper; see SEL)
             # tier 1: `do sweep porch` may name a verb made in the world; a990: so may a retired built-in's word (tidy,
             # reply, stack ...), which this desk only refuses, so a world verb answers it first
             if verb not in self._builtin_verbs() or verb in knife.SPECIALIZED:
@@ -1206,34 +1243,28 @@ class DeskKnife(DeskMoo):
   The queue: at most `workers` run at once (a prop of the note The house; 1 unless it says more). Asked tasks wait
   and start in the order they were made, whether they were made asked or set asked later. See it with
     find prop:commission=asked      (waiting)      find prop:commission=working      (holding a slot)""",
-        "rules": """rules: the desk acts on its own when things change.
-  rule when <selection> do <verb> [target] [k=v ...]   fires once on each thing that enters the selection
-                                                        (now=1: also on the things that match right now)
-  rule on <verb> [by=<actor>] do <verb> [target] [k=v]  fires on each such event, on the thing it happened to
-  target is the thing itself unless you name one: rule when in:Today do sort Today by=due
-  the action may run a script: rule on prop by=harness do run announce $item   ($item = the thing it fired on,
-                                                                               $item.title its title)
-  the action may be a verb made in the world: rule when tag:messy do tidy   (its words; $item when none are given),
-  or use <verb id> [words]
-  A rule is a template: its values are filled when it fires ($item, $today; help blanks). A rule lives in the room
-  you save it in, wherever you go after: $here is that room, and a bare verb word means that room's verb. Saving
-  one whose word only another room has is refused, naming the door (use <id>). examine rN shows where it lives;
-  rule home rN <room> moves it there on purpose (judged there like a save). $new refuses: a rule has no earlier
-  line.
-  rules              list them, with how often each fired      rule drop rN   remove one
+        "rules": """rules: the desk acts on its own when things change. A rule is a note tagged rule, placed in the room it
+  acts from; its text is one line (# lines describe it):
+    when <selection> do <verb> [target] [k=v ...]   fires once on each thing that enters the selection
+                                                    (now=1: also on what matches when it is saved)
+    on <verb> [by=<actor>] do <verb> [target] [k=v]  fires on each such event, on the thing it happened to
+  target is the thing itself unless you name one: when in:Today do sort Today by=due. A selection target that
+  matches nothing is nothing to do. The action may be a verb made in the world: when tag:messy do tidy (its words;
+  $item when none are given), or use <verb id> [words].
+  A rule is a template: its values are filled when it fires: $item the thing it fired on, $item.title,
+  $item.<prop> one of its props, $item.maker who made it, $today, $here (help blanks). corner:<name> is the corner
+  whose actor= is that name: a sill (a missing one is skipped quietly, and rules counts it).
+  It lives in the room holding its note: $here is that room, a bare verb word means that room's verb. Move the note
+  and it lives there. It acts as whoever last chose what it does: its maker, or the last to write its text or tag
+  it rule (their receipt says so). It is checked whenever its text, home or author changes; one that fails is saved
+  broken, says why, and never fires until fixed. When it is (re)saved, what already matches counts as handled.
+  Quiet: a narrated look never lists rules; the tree marks them. rules lists every one: its home, who it acts as,
+  how often it fired, failed or was skipped, and whether it is broken; examine <rule note> says the same.
   A rule's actions print as ~ lines after your command's receipt; undo of your command undoes them too.
   why <id> shows how a thing got where it is and which rule would act on it next.
-  e.g. rule when tag:fixed do move into=Done      rule on append by=priya do tag add=needs-reply""",
-        "scripts": """scripts: named command sequences.
-  script <name> = <commands separated by ;>     $1 $2 .. stand for run's arguments, $* all of them as said;
-                                                 $today $here $new $me as anywhere (help blanks)
-                                                 $1.title is the title of the thing $1 names (for prose)
-  run <name> [args]                              scripts may call scripts; a rule may run one (help rules)
-  scripts                                        list them
-  A script lives in the room you save it in: its bare verb words mean that room's verbs, whoever runs it from
-  wherever. One whose word only another room has is refused when saved, naming the door (use <id>).
-  script home <name> <room> moves where it lives, on purpose (judged there like a save).
-  e.g. script morning = clock $1; look Overdue; look Today; find age<1""",
+  e.g. do create $here kind=note tags=rule title="Fixed goes to Done" text="when tag:fixed do move into=Done\"""",
+        "scripts": """scripts are verbs now: a script was a verb nobody declared. Make a note tagged verb (help verbs), and
+  say its word: run X is just X. script, run and scripts only say so.""",
         "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
@@ -1336,15 +1367,6 @@ class DeskKnife(DeskMoo):
         return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(knife.SPECIALIZED) | set(moo.REGISTRY) | self._verb_names()
 
     def cmd_examine(self, ident):
-        rule = next((r for r in self.rules or [] if r["id"] == ident), None) if ident else None
-        if rule is not None:
-            # a990 (5): a rule is no thing on a surface, but where it lives is seen
-            w, home = self.world, rule.get("home")
-            return (f"{rule['id']}: rule {'' if rule.get('on') else 'when '}{rule['sel']} do {self._action_text(rule)}   "
-                    f"(fired {rule.get('fired', 0)}x, by {rule.get('author') or '?'})\n  "
-                    + (f"lives in {w.nodes[home]['title']} ({home}): its $here, and where its bare verb words are looked up"
-                       if home in w.nodes else "lives in no room (saved before rules had homes, or by someone placed nowhere)")
-                    + f"\n  rule home {rule['id']} <room> moves it; rule drop {rule['id']} removes it")
         nid = self._resolve(ident or "desk")
         if nid in self.world.subjects:
             return self.cmd_pivot(nid)
@@ -1386,6 +1408,13 @@ class DeskKnife(DeskMoo):
                 out.append(f"  a {s['kind']} (subject {s['id']}) on {n['parent']}; text begins: {first}")
             if len(apps) > 1:
                 out.append("  also appears at " + ", ".join(f"{a} in {w.nodes[a]['parent']}" for a in apps if a != nid))
+            if "rule" in (s.get("tags") or []):
+                # a1027: a rule note says what rules says of it: its home, who it acts as, how it has gone
+                self._rules_sync(say=False)
+                r = self._rule_of_note(nid)
+                if r is not None:
+                    out.append("  a rule (its home is the room holding it; move the note to move it):")
+                    out += self._rule_lines(r)
             if s["kind"] == "chat":
                 pend = moo.unanswered(w, s["id"], str(w.me or "alex").lower())
                 out.append("  awaiting reply: " + " | ".join(pend) if pend else "  nothing awaiting a reply")

@@ -109,6 +109,8 @@ def term_aspects(q):
             app.add("place")
         elif t.startswith(("comments:", "links:", "parts:", "part-of:")):
             subj.add(t.split(":")[0])
+        elif t.startswith(("answers:", "answered-by:")):
+            subj.add("links")
     return subj, app
 
 

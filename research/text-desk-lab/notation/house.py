@@ -646,7 +646,7 @@ class House:
         self.beat(corners)
 
     def wake(self, r, corner, actor, lead):
-        line = (corner.get("props") or {}).get("wake") or "run arrive"
+        line = (corner.get("props") or {}).get("wake") or "look"       # a1027: scripts retired; arrive was the old tree
         r.state["quiet"] = 0
         if r.state.pop("lost", None):
             lead = "(the house lost our earlier conversation; your soul and the world kept everything)\n" + lead

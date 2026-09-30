@@ -9,9 +9,10 @@ world verbs, scripts and rules all fill their blanks here, the same way:
                    last); refused, saying why, if nothing in this reply made anything. The receipt says what it was
     $today         the clock's date                     $me   whoever is acting
     $<handle>      a handle you named (set draft = a98, or create ... as=draft)
-    in a verb or a script:  $1 $2 ... its words, $1.title the title of the thing $1 names, $* the rest of the line
-                            exactly as said, $this the thing a verb lives on
-    in a rule:     $item   the thing it fired on (the target, as in a lens act); $item.title its title
+    in a verb:     $1 $2 ... its words, $* the rest of the line exactly as said, $this the thing a verb lives on
+    in a rule:     $item   the thing it fired on (the target, as in a lens act)
+    a part of the thing a blank names (a1027): .title its title, .maker who made it, .<prop> one of its props
+                   ($item.asked_by, $1.status); a part it doesn't have refuses, naming the thing
 
 Where they are filled: after the line is parsed, in the values themselves (a target, a selection, a k=v value), so a
 filled value is never read again as desk words or filled a second time ($* may carry '$here' or 'a; b "hi"' through
@@ -36,7 +37,8 @@ WORD = re.compile(r"^\$(\d+|[A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_-]*)?$
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
-KNOWN = "$here $here.<prop> $new $today $me, a handle you set ($name); in a verb or script $1 $2 $* $this; in a rule $item"
+KNOWN = ("$here $here.<prop> $new $today $me, a handle you set ($name); in a verb $1 $2 $* $this; in a rule $item; "
+         "a thing's parts .title .maker .<prop>")
 
 
 class Ctx:
@@ -101,11 +103,7 @@ def _one(desk, ctx, name, attr):
         val = ctx.args[k - 1]
         if isinstance(val, Refusal):
             raise val
-        if attr == ".title":
-            return _title(desk, val)
-        if attr:
-            raise Refusal(f"{what}: the only word after ${name}. is title")
-        return val
+        return _part(desk, val, attr, what) if attr else val
     if name == "here":
         fid = _here(desk, ctx, name)
         if not attr:
@@ -154,11 +152,30 @@ def _one(desk, ctx, name, attr):
         val = desk.vars[name]
     else:
         raise Refusal(f"${name} is no blank here. Blanks: {KNOWN}. A literal dollar sign is written \\$")
+    return _part(desk, val, attr, what) if attr else val
+
+
+def _part(desk, val, attr, what):
+    """A part of the thing a blank names (a1027): .title its title, .maker who made it (the actor of its create), any
+    other word one of its props, as $here.<prop> is of a room. A part it doesn't have refuses, naming the thing."""
     if attr == ".title":
         return _title(desk, val)
-    if attr:
-        raise Refusal(f"{what}: the only word after ${name}. is title")
-    return val
+    w, p = desk.world, attr[1:]
+    try:
+        nid = desk._resolve(str(val))
+    except Refusal:
+        raise Refusal(f"{what}: {val} names no thing, so it has no {p}")
+    sid = w.nodes[nid].get("subject") if nid in w.nodes else nid
+    if p == "maker":
+        import verbs
+        who = verbs._author(w, sid or nid)
+        if not who:
+            raise Refusal(f"{what}: no one is recorded as making {nid} (it was made before this world's log began)")
+        return who
+    props = ((w.subjects[sid].get("props") if sid in w.subjects else w.nodes[nid].get("props")) or {})
+    if p in props and str(props[p]).strip():
+        return str(props[p])
+    raise Refusal(f"{what}: {nid} has no {p}= (a thing's parts are .title, .maker and its props)")
 
 
 def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
@@ -264,8 +281,10 @@ HELP = """blanks: words beginning with $ that the desk fills with a value when t
                  made several, the last). Only this reply: in a reply where nothing was made yet it refuses and
                  says why. The receipt ends ($new = <id>), so you see which thing it was
   $today         the clock's date          $me   who you are          $<name>   a handle (help handles)
-  in a verb or script: $1 $2 .. its words ($1.title a thing's title), $* the rest of the line exactly as said,
-                 $this the thing a verb lives on        in a rule: $item the thing it fired on, $item.title its title
+  in a verb: $1 $2 .. its words, $* the rest of the line exactly as said, $this the thing a verb lives on
+  in a rule: $item the thing it fired on
+  parts of a thing a blank names ($1 $item $new $this or a handle): .title its title, .maker who made it, .<prop>
+                 one of its props ($item.asked_by); a part it doesn't have refuses
   Text is words by default: an argument a verb declares as text (help append: line=<str>; old= new= title= text=)
   is never filled in a typed line, so a chat line about $here keeps its words. Targets, selections and ids are
   filled: do move a12 into=$here. A prop value fills only when the whole value is one blank (do prop f581

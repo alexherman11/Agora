@@ -25,7 +25,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SESSIONS = HERE / "sessions"
 ID = re.compile(r"(?<![\w$.])([afs]\d+)\b")
-JOURNALLED = ("rule ", "script ", "clock ")     # change the desk without making a world event
+JOURNALLED = ("clock ",)     # changes the desk without making a world event (a1027: rules are notes; scripts retired)
 
 
 def _aspects_of_line(cmd):

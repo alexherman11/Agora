@@ -86,9 +86,13 @@ for a, c in corner.items():
     got = reply(a, *[x.strip() for x in wake.split(";") if x.strip()])
     check(f"{a}'s wake ({wake!r}) runs whole and ends in a narration", got and not got[-1][2]
           and got[-1][1].startswith("You are in "), got[-1] if got else wake)
+import house   # noqa: E402
+import inspect   # noqa: E402
+check("a corner with no wake= wakes to look (a1027: arrive retired with scripts)",
+      '.get("wake") or "look"' in inspect.getsource(house.House.wake))
 got = reply("claude", "run arrive")
-check("run arrive (read; look Board :3; look Corners :3; look Home) runs, and its look Home narrates Home",
-      not got[-1][2] and f"Home ({HOME})" in got[-1][1] and "It is " in got[-1][1], got[-1])
+check("run arrive refuses, naming the door (a1027: scripts are verbs now)",
+      "run arrive is just arrive" in got[-1][2], got[-1])
 
 # 1. look <room> by a word of its title, from elsewhere: narrated, and it says where you look from
 reply("juniper", f"go {corner['juniper']} :1")
