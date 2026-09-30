@@ -99,10 +99,133 @@ def v_move(w, nid, a):
     return _prim(w, "move", nid, a)
 
 
-@verb("place", ["subject"], "Put a subject on a surface as a new appearance; its other appearances stay where they are.",
-      "into=<surface>", "do place s10 into=f02")
+@verb("place", ["subject", "task"], "Put a subject on a surface as a new appearance (into=), or put a card in a lane's order: "
+      "above=<card> gives it that card's status and priority and a rank just above it; status=<value> alone sends it to "
+      "the bottom of its priority group among cards with that status. The ranks are the house's; one event, undone whole.",
+      "into=<surface> | above=<card> | status=<value>", "do place a12 above=a30")
 def v_place(w, sid, a):
+    if sid in w.nodes and w.nodes[sid]["type"] == "appearance" and "into" not in a:
+        return place_in_order(w, sid, a)
     return w.apply("place", sid, None, a)
+
+
+# a1069/a1078: a lane is a selection sorted `by priority, rank`. The lens word and the verb order a group with this one
+# key, so the card the verb calls "above" is the card the person saw above.
+RANK_STEP = 1000
+
+
+def order_value(v):
+    """Numbers ascending, then words, then a missing value last."""
+    if v is None or v == "":
+        return (2, 0, "")
+    try:
+        return (0, float(v), "")
+    except (TypeError, ValueError):
+        return (1, 0, str(v).lower())
+
+
+def props_of(w, i):
+    n = w.nodes.get(i)
+    if n is not None:
+        return (n.get("props") if n["type"] == "surface" else w.subjects[n["subject"]].get("props")) or {}
+    return (w.subjects[i].get("props") or {}) if i in w.subjects else {}
+
+
+def order_by(w, ids, keys):
+    """`ids` in the order of `keys` (props); a stable sort, so ties keep the order they came in: for a selection, the
+    order the appearances were made."""
+    return sorted(ids, key=lambda i: tuple(order_value(props_of(w, i).get(k)) for k in keys))
+
+
+def _lane_group(w, status, priority, leave_out):
+    """The cards sharing a status and a priority, one per subject, in the order a lane sorted `by priority, rank` shows."""
+    seen, out = set(leave_out), []
+    for n in w.nodes.values():
+        if n["type"] != "appearance" or not n["parent"] or n.get("subject") in seen:
+            continue
+        s = w.subjects[n["subject"]]
+        p = s.get("props") or {}
+        if s["kind"] == "task" and p.get("status") == status and p.get("priority") == priority:
+            seen.add(s["id"])
+            out.append(n["id"])
+    return order_by(w, out, ["rank"])
+
+
+def place_in_order(w, nid, a):
+    actor = a.pop("_by", None) or w.me
+    sid = w.nodes[nid]["subject"]
+    s = w.subjects[sid]
+    if s["kind"] != "task":
+        raise Refusal(f"place above= orders cards; {nid} is a {s['kind']}")
+    above = a.get("above")
+    if above:
+        if above not in w.nodes or w.nodes[above]["type"] != "appearance" or w.subjects[w.nodes[above]["subject"]]["kind"] != "task":
+            raise Refusal(f"place {nid} above=<card>: {above} is not a card (a task's appearance)")
+        if w.nodes[above]["subject"] == sid:
+            raise Refusal(f"{above} is {nid} itself (the same task); nothing to do")
+        tp = w.subjects[w.nodes[above]["subject"]].get("props") or {}
+        status, priority = tp.get("status"), tp.get("priority")
+    elif a.get("status"):
+        status, priority = str(a["status"]), (s.get("props") or {}).get("priority")
+    else:
+        raise Refusal("place needs into=<surface> (a new appearance), above=<card>, or status=<value> (the bottom of its priority group)")
+    group = _lane_group(w, status, priority, {sid})
+    ranks = {i: props_of(w, i).get("rank") for i in group}
+    new = {}                                           # subject -> rank, for the others the house renumbers
+
+    def num(i):
+        v = new.get(w.nodes[i]["subject"], ranks[i])
+        return int(float(v))
+
+    def renumber(upto):
+        for k, i in enumerate(upto, 1):
+            if order_value(ranks[i])[0] != 0 or int(float(ranks[i])) != k * RANK_STEP:
+                new[w.nodes[i]["subject"]] = str(k * RANK_STEP)
+    if above:
+        at = group.index(next(i for i in group if w.nodes[i]["subject"] == w.nodes[above]["subject"]))
+        prev = group[at - 1] if at else None
+        ok = order_value(ranks[group[at]])[0] == 0 and (prev is None or (order_value(ranks[prev])[0] == 0 and num(group[at]) - num(prev) >= 2))
+        if not ok:
+            renumber(group[:at + 1])
+        rank = (num(prev) + num(group[at])) // 2 if prev is not None else num(group[at]) - RANK_STEP
+    else:
+        if any(order_value(r)[0] != 0 for r in ranks.values()):
+            renumber(group)
+        rank = (num(group[-1]) + RANK_STEP) if group else RANK_STEP
+    mine = s.get("props") or {}
+    want = {"status": status, "priority": priority, "rank": str(rank)}
+    was = {k: mine.get(k) for k in want}
+    if not new and all(was[k] == want[k] for k in ("status", "priority")) and order_value(was["rank"])[0] == 0 \
+            and (not group or (above and at == 0 and num(group[0]) > int(float(was["rank"])))
+                 or (above and at and num(group[at - 1]) < int(float(was["rank"])) < num(group[at]))
+                 or (not above and int(float(was["rank"])) > num(group[-1]))):
+        raise Refusal(f"{nid} is already there (status={status or '(none)'}, priority={priority or '(none)'}, rank {was['rank']}); nothing to change")
+    before = [deepcopy(s)] + [deepcopy(w.subjects[x]) for x in new]
+    props = s.setdefault("props", {})
+    for k, v in want.items():
+        if v is None:
+            props.pop(k, None)
+        else:
+            props[k] = v
+    for x, r in new.items():
+        w.subjects[x].setdefault("props", {})["rank"] = r
+    changed = []
+    for x in [sid, *new]:
+        w.subjects[x]["rev"] += 1
+        for ap in w.appearances_of(x):
+            w._bump(ap)
+        changed += [x] + w.appearances_of(x)
+    args = {"above": above} if above else {}
+    args.update({k: (v if v is not None else "") for k, v in want.items()})
+    ev = w._event("place", nid, args, {"restore_subjects": before}, actor)
+    said = [f"{k} {was[k] or '(none)'} -> {want[k] or '(none)'}" for k in ("status", "priority") if was[k] != want[k]]
+    where = f"just above {above}" if above else f"at the bottom of {'priority ' + priority if priority else 'the cards with no priority'}"
+    note = f"placed {nid} {where} with status={status or '(none)'}" + (f", priority={priority}" if priority else ", no priority")
+    note += ("; " + ", ".join(said) if said else "") + f"; rank {was['rank'] or '(none)'} -> {rank}"
+    if new:
+        note += f"; renumbered {len(new)} other card(s) quietly, their order unchanged: " + " ".join(
+            (w.appearances_of(x) or [x])[0] for x in sorted(new, key=lambda x: int(new[x])))
+    return {"ok": True, "event": ev["id"], "changed": changed, "note": note}
 
 
 @verb("resize", ["thing"], "Change width and height.", "to=<w>x<h>", "do resize a04 to=300x160")

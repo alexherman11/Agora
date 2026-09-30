@@ -1519,7 +1519,13 @@ class DeskKnife(DeskMoo):
             self.vars = self.vars or {}
             self.vars[alias] = w.last_created
             return out + f"\n  ${alias} = {w.last_created}"
-        if verb == "place" and positional[0] not in w.subjects:
+        if verb == "place" and "into" not in kv and ("above" in kv or "status" in kv):
+            # a1069: a card put in a lane's order acts on the card; the card it goes above is part of what it means
+            if kv.get("above"):
+                kv["above"] = self._resolve(kv["above"], allow_subject=False)
+                if self.seen.get(kv["above"]) is None:
+                    raise Refusal(f"you have not looked at {kv['above']} yet; look or examine it first")
+        elif verb == "place" and positional[0] not in w.subjects:
             # place is a subject verb; a title or appearance id names the subject behind it
             hit = self._resolve(positional[0])
             if hit in w.nodes and w.nodes[hit]["type"] == "appearance":

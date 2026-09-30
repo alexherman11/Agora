@@ -555,6 +555,14 @@ def _w_of(node, p, val, n, env):
         node["as"] = asname.strip()
 
 
+def _w_by(node, p, val, n, env):
+    # a1069/a1078: a repeat in the order of props, numbers ascending, a missing value last, ties in the order the things
+    # were made. `by priority, rank`: the parts after the comma are more props (parse joins them), not words
+    if not re.fullmatch(r"[\w.-]+( [\w.-]+)*", val or ""):
+        raise LensRefusal(f"line {n}: `by <prop>[, <prop>]` on a repeat; got {p!r}")
+    node["by"] = (node["by"] or []) + val.split()
+
+
 def _w_over(node, p, val, n, env):
     if not re.fullmatch(r"\$\w+", val):
         raise LensRefusal(f"line {n}: `over $<rows> [as <frame>]`; got {p!r}")
@@ -669,6 +677,7 @@ WORDS = {
     "the": ("the <selection> [as <frame>]", _w_the),
     "of": ("of <selection> [as <frame>]", _w_of),
     "over": ("over $<rows> [as <frame>]", _w_over),
+    "by": ("by <prop>[, <prop>]", _w_by),
     "as": ("as <frame>", _w_as),
     "each": ("each <part>", _w_each),
     "at": ("at item", _w_at),
@@ -696,6 +705,8 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `as {node['as']}` would shadow a built-in name; choose another frame name")
     if node["as"] and not (node["the"] or node["of"] or node["over"]):
         raise LensRefusal(f"line {n}: `as {node['as']}` names the thing chosen here, so this part needs `the`, `of` or `over`")
+    if node["by"] and not node["of"]:
+        raise LensRefusal(f"line {n}: `by` orders a repeat; this part has no `of`")
     if node["capture"] and not node["the"]:
         raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
 
@@ -714,10 +725,15 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False,
+                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False, "by": None,
                 "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False}
+        last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
+            if last == "by" and not val and word not in WORDS and re.fullmatch(r"[\w.-]+", word):
+                node["by"].append(word)          # `by priority, rank`: a bare name after `by` is its next prop
+                continue
+            last = word
             row = WORDS.get(word)
             if row is None:
                 raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {vocabulary()}")
@@ -1430,7 +1446,7 @@ def to_text(scene, name, who, at):
         if n.get("state"):
             bits.append(f"({n['state']})")
         if "n" in n:
-            bits.append(f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}")
+            bits.append((f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}") + (f" by {', '.join(n['by'])}" if n.get("by") else ""))
             if n["n"] == 0:
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):
