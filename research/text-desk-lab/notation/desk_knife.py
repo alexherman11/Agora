@@ -985,7 +985,10 @@ class DeskKnife(DeskMoo):
     do comment <task> line="..."
   When it's done, the house lands it between turns: checks the host is still whole, and reverts it if not. The task
   shows where it is: commission=asked|working|waiting|ready|landing|landed|reverted|failed. Set commission=cancelled
-  to stop it. Most things don't need a worker: views, styles, notes and verbs (help verbs) change in the world itself.""",
+  to stop it. Most things don't need a worker: views, styles, notes and verbs (help verbs) change in the world itself.
+  The queue: at most `workers` run at once (a prop of the note The house; 1 unless it says more). Asked tasks wait
+  and start in the order they were made, whether they were made asked or set asked later. See it with
+    find prop:commission=asked      (waiting)      find prop:commission=working      (holding a slot)""",
         "rules": """rules: the desk acts on its own when things change.
   rule when <selection> do <verb> [target] [k=v ...]   fires once on each thing that enters the selection
                                                         (now=1: also on the things that match right now)
