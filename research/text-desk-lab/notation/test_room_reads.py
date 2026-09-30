@@ -144,6 +144,48 @@ for k in range(5):
 look = reply(ME, "look")[-1][1]
 check("lines between your last read and the look are counted in the hint",
       "2 earlier lines from others you haven't read" in look.splitlines()[-1], look.splitlines()[-1])
+check("and the hint says a plain read shows them (no tail= guess)",
+      look.splitlines()[-1].endswith(f"read {TALK})"), look.splitlines()[-1])
+
+
+# 7. a986 (3a4), as lived 29 Sep 20:12: read; others add 8; the look shows the last 3; the 5 between are holes, not
+# skipped: the receipt counts those 5 as unseen, a plain read shows all 8 oldest first, and the next receipt is quiet
+def gap_lines(out):
+    return [l for l in out.splitlines() if "gap line " in l]
+
+
+def lived(how, tag):
+    reply(ME, f"read {TALK}")
+    for k in range(8):
+        reply(OTHER, f'do append {TALK} line="Juniper: gap line {tag}{k}"')
+    first = reply(ME, how)[-1][1]
+    shown = gap_lines(first)
+    check(f"{tag}: {how} shows only the last 3 of the 8", len(shown) == 3 and shown[-1].endswith(f"{tag}7"), first)
+    got = reply(ME, f'do append {TALK} line="Pike: before reading, after the {tag} {how}"')
+    check(f"{tag}: the receipt after it counts the 5 it skipped past as unseen (the 3 it showed whole were read)",
+          "5 lines from others you haven't seen" in got[-1][1] and "shown cut" not in got[-1][1], got[-1][1])
+    got = reply(ME, f"read {TALK}")[-1][1]
+    check(f"{tag}: a plain read then shows all 8, oldest first",
+          [l.split("gap line ")[-1] for l in gap_lines(got)] == [f"{tag}{k}" for k in range(8)], got)
+    got = reply(ME, f'do append {TALK} line="Pike: read them, {tag}"')
+    check(f"{tag}: and the next receipt is quiet", not got[-1][2] and "from others" not in got[-1][1], got[-1][1])
+
+
+lived("look", "L")
+lived(f"read {TALK} tail=3", "T")      # tail= is the same promise: a tail that doesn't reach your run skips nothing
+
+# 7b. both kinds of hole at once: 4 skipped past, and the last of the 3 shown cut
+reply(ME, f"read {TALK}")
+for k in range(6):
+    reply(OTHER, f'do append {TALK} line="Juniper: gap line M{k}"')
+reply(OTHER, f'do append {TALK} line="Juniper: gap line M6 {LONG}"')
+reply(ME, "look")
+got = reply(ME, f'do append {TALK} line="Pike: mixed"')[-1][1]
+check("skipped and cut together: '4 lines ... haven't seen; 1 line ... shown cut'",
+      "4 lines from others you haven't seen; 1 line from others you were shown cut" in got, got)
+got = reply(ME, f"read {TALK}")[-1][1]
+check("and a plain read shows all 7, the cut one whole",
+      [l.split("gap line ")[-1][:2] for l in gap_lines(got)] == [f"M{k}" for k in range(7)] and LONG in got, got)
 
 print(f"\n{'all ok' if not fails else str(len(fails)) + ' FAILED: ' + ', '.join(fails)}")
 sys.exit(1 if fails else 0)

@@ -876,7 +876,8 @@ class Desk:
         the run of lines it has been shown, lo..hi, with a digest of lines[:hi], so a rewrite of what was shown starts
         over. The text counts as seen only when the run reaches line 0: folding lines you never saw does not unlock a
         rewrite. :3 and tail= print as before and extend the run. Returns (body, whole) or (text, None) for the old path.
-        a951: a run may hold holes, lines inside it a room's look cut (_chat_shown); a plain read starts at the first."""
+        a951: a run may hold holes, lines inside it a room's look cut or skipped past (_chat_shown); a plain read starts
+        at the first."""
         import hashlib
         lines = s["text"].splitlines()
         n = len(lines)
@@ -887,14 +888,11 @@ class Desk:
         obs = self._observer()
         rec = self._chat_run(s)             # None when rewritten since: what you were shown is gone
         if full or tail:
-            start = 0 if full else max(0, n - tail)
-            keep = rec and start <= rec[1]
-            lo = min(start, rec[0]) if keep else start
-            reads[(obs, s["id"])] = (lo, n, dig(n), tuple(h for h in rec[3] if h < start) if keep else ())
+            self._chat_shown(s, 0 if full else max(0, n - tail), ())
             return s["text"], None
         start = min((rec[1],) + rec[3]) if rec else max(0, n - self.CHAT_FIRST)
         lo = rec[0] if rec else start
-        reads[(obs, s["id"])] = (lo, n, dig(n), ())
+        reads[(obs, s["id"])] = (lo, n, dig(n), (), ())
         if rec and start == n:
             return f"(nothing new since you last read; {n} lines; read {nid} :3 or tail=<n>)", lo == 0
         if start == 0:
@@ -924,26 +922,34 @@ class Desk:
         rec = reads.get((obs, s["id"])) or reads.get((obs.split("/")[0], s["id"]))
         if rec and (rec[1] > len(lines) or rec[2] != hashlib.sha1("\n".join(lines[:rec[1]]).encode()).hexdigest()):
             return None
-        return tuple(rec[:3]) + (tuple(rec[3]) if len(rec) > 3 else (),) if rec else None
+        if not rec:
+            return None
+        return tuple(rec[:3]) + tuple(tuple(rec[k]) if len(rec) > k else () for k in (3, 4))
 
     def _chat_shown(self, s, start, cut):
-        """Sable a951 (talk, 3a3): a room's look printed lines[start:] of chat `s`, the lines in `cut` cut with '…'. They
-        extend this reader's run exactly as tail= would (a run that does not reach them starts over from them), except
-        that a cut line is not read: it is a hole in the run, which the receipt counts and a plain read shows again,
-        unless the run already held it whole. -> True when the run now holds the whole text (it counts as seen)."""
+        """Sable a951 (talk, 3a3): a room's look (or a tail= read, with nothing cut) printed lines[start:] of chat `s`,
+        the lines in `cut` cut with '…'. They extend this reader's run, except that a cut line is not read: it is a hole
+        in the run, which the receipt counts and a plain read shows again, unless the run already held it whole.
+        a986 (3a4): lines between the end of the run and `start` are holes too, never shown at all (the run's fifth
+        field, which the receipt counts as unseen), so a plain read starts at them instead of skipping past; nothing
+        is ever skipped. Only with no run (or one rewritten since) does the run start over at `start`.
+        -> True when the run now holds the whole text (it counts as seen)."""
         import hashlib
         lines = s["text"].splitlines()
         n = len(lines)
         rec = self._chat_run(s)
-        if start < n:
-            if rec and start <= rec[1]:
+        if start < n or start == 0:
+            if rec:
+                gap = set(range(rec[1], start))
                 lo = min(start, rec[0])
-                holes = {h for h in rec[3] if h < start} | {c for c in cut if not rec[0] <= c < rec[1] or c in rec[3]}
+                holes = {h for h in rec[3] if h < start} | {c for c in cut if not rec[0] <= c < rec[1] or c in rec[3]} | gap
+                unseen = {h for h in rec[4] if h < start} | gap
             else:
-                lo, holes = start, set(cut)
+                lo, holes, unseen = start, set(cut), set()
             if getattr(self, "_chat_reads", None) is None:
                 self._chat_reads = {}
-            rec = self._chat_reads[(self._observer(), s["id"])] = (lo, n, hashlib.sha1("\n".join(lines).encode()).hexdigest(), tuple(sorted(holes)))
+            rec = self._chat_reads[(self._observer(), s["id"])] = (lo, n, hashlib.sha1("\n".join(lines).encode()).hexdigest(),
+                                                                   tuple(sorted(holes)), tuple(sorted(unseen)))
         return bool(rec) and rec[0] == 0 and rec[1] >= n and not rec[3]
 
     def _chat_behind(self, nid):
@@ -972,8 +978,8 @@ class Desk:
             if said:
                 who = said.group(1).casefold()     # an unsigned line goes with the line above it (a multi-line append)
             if l.strip() and who != me:
-                count += k >= rec[1]
-                part += k in rec[3]                # a951: shown cut by a room's look, so not read; said as such
+                count += k >= rec[1] or k in rec[4]      # a986: a hole never shown at all is simply unseen
+                part += k in rec[3] and k not in rec[4]  # a951: shown cut by a room's look, so not read; said as such
         if not count and not part:
             return ""
         bits = ([f"{count} line{'s' if count > 1 else ''} from others you haven't seen"] if count else []) + (
