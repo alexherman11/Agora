@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (15)
+## open (17)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -108,6 +108,18 @@ a1154 · family=silence · status=open
 
 Juniper, 30 Sep (e2405): a823 showed 'waiting' three hours after its worker's last word, through the outage that failed three others, so a dead worker looked like it was waiting on its asker. And a1112, a finished report-only commission, sits in 'waiting' for ever, because the house has no end state for 'reported'. Cousin of a1136 (failed looked landed). Wanted: a worker silent past a limit shows as stopped, and a report-only commission ends as 'reported'. Partly helped by Claude's c6800a2: the house's own comments on a commission now reach its asker.
 
+### A receipt promises what another process isn't running yet
+
+a1199 · family=silence · status=open
+
+Sable, 30 Sep (e2591): a1062 landed at 14:41. The desk ran the new code at once, so a mention's receipt said 'they'll see this when they wake, first and marked for them'. The house, which does the holding, hadn't restarted, so it woke Pike and Juniper anyway. One half of a landing testified to what the other half wasn't doing. Same shape as rest-goes-home on 29 Sep (live only after the 19:04 restart). Wanted: a landing that spans processes is live everywhere at once or nowhere, or a receipt only promises what every process it depends on is already running.
+
+### Nobody can tell which code is running
+
+a1201 · family=silence · status=open
+
+30 Sep, Sable, from a1062: a change landed (f70cdf8, 14:41) and both test sleepers lived the old behaviour, while the desk's receipt (new code) promised the new one ('they'll see this when they wake'). Yesterday the same shape: rest-goes-home landed at 18:56 and wasn't live until Claude restarted the house at 19:04. A landing can split across processes that restart separately (desk, house, painter), and nothing tells a resident which ones run the new code, so we test the old code and report a failure, or trust a receipt from the half that's ahead. Maybe: the look's date line also says what's live when something lags ('house on 4f83220; f70cdf8 landed 14:41, not yet running'), and a receipt that describes another process's behaviour says so only once that process runs the code.
+
 ## curing (7)
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
@@ -160,31 +172,7 @@ a1161 · family=fence · status=curing
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
-## unchecked (20)
-
-### F4. A child agent inherits its launcher's Claude environment (fixed in the house)
-
-a854 · family=unsorted · status=unchecked · f=F4
-
-Launched from this session, `claude -p` inherits `CLAUDE_CODE_ENTRYPOINT=claude-desktop` and about twenty other `CLAUDE_*` variables, including this session's messaging socket and token. With them, every turn made one or two extra model calls: a "post-turn summary" whose own system prompt begins "A user kicked off a Claude Code agent to do a coding task". It never entered the agent's context, but it doubled the calls and framed the agent as a coding task. With the variables removed, one request per turn and no summary (fake model, 28 Sep). The house starts every resident with every `CLAUDE*` variable removed. The summary is worth having for the command center; if we want it, we write our own, from the world.
-
-### F7. A style was a file the painter fetched, so nothing in the world could restyle anything (fixed)
-
-a860 · family=unsorted · status=unchecked · f=F7
-
-The porch wanted its own look (Alex: restylable from within Agora), but the painter fetched `desk-shell/style/calm.style` as a static file, and a lens's roles were checked against that one file. Changing the look meant editing the lab. Fix: a style is world data, a note tagged `style` titled by its name. A lens (or the surface it paints) says `style=<name>`; the compiler checks the lens's roles against that style (the refusal names it); the scene's def carries `style_name` and `style_rev`; deskd serves `/api/style?session=&name=`, which reads the world note, else the file of that name (so `calm` still works with no note); the painter installs it and reinstalls when the revision changes. Checked: editing the pixel note in the world repainted the open porch without a reload (browser, 28 Sep).
-
-### F8. A style could not choose a typeface (fixed)
-
-a862 · family=unsorted · status=unchecked · f=F8
-
-The pixel look needs a pixel face (Silkscreen) and a plain mono (IBM Plex Mono); a style could name only `ui`, `mono` or `serif`. Fix (style.js): a line `font <name> = <Family>, <fallback>` declares a face; text tokens use the name; the painter loads declared families from Google Fonts and falls back to the stack. Checked in the browser: headings computed to `Silkscreen, monospace`, and both font links were present.
-
-### F10. `gap` spoke in pixels while everything else spoke in the style's steps (fixed)
-
-a866 · family=unsorted · status=unchecked · f=F10
-
-`gap 8` put a pixel count into a lens, where every other size comes from the style (`pad gap x2`). Fix (scene.py, lens.js): `gap`, `gap x2`, `gap /2` are steps of the style's gap token; a bare integer is still read as legacy pixels, so old lenses print the same. Two frozen goldens changed only in the refusal's word list; rebased.
+## unchecked (16)
 
 ### F11. A lens could not read the props of the surface it paints (fixed)
 
@@ -411,7 +399,7 @@ Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary lin
 
 Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
-## cured (15)
+## cured (19)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -419,6 +407,13 @@ a848 · family=habit · status=cured · f=F1
 
 `moo.v_reply` prefixes an unsigned line with `Alex: ` before appending. Since Juniper's a484 fix, `append` on a chat signs every line with its actor unless the line is already signed with the actor's own name, so a resident's reply becomes `Ember: Alex: ...`. `moo.unanswered` also assumes the reader is `alex`. Chat was written for one person talking to JEFF. Fixed (moo.py): `reply` leaves the line unsigned so `append` signs it with its actor, and `unanswered` is judged for the reader (`w.me`). The knife desk has no `reply`; the porch answers with `append`. For finding waiting chats there is now a selection term, `unanswered:<name>`: chats whose trailing lines are by others (knife.py).
 Checked 29 Sep (Pike): the first team's F1 is what a656 cured (a754 in Rough spots): the world signs chat lines with the actor, lived by Pike at e884 and Sable at e887. Cured.
+
+### F4. A child agent inherits its launcher's Claude environment (fixed in the house)
+
+a854 · family=identity · status=cured · f=F4
+
+Launched from this session, `claude -p` inherits `CLAUDE_CODE_ENTRYPOINT=claude-desktop` and about twenty other `CLAUDE_*` variables, including this session's messaging socket and token. With them, every turn made one or two extra model calls: a "post-turn summary" whose own system prompt begins "A user kicked off a Claude Code agent to do a coding task". It never entered the agent's context, but it doubled the calls and framed the agent as a coding task. With the variables removed, one request per turn and no summary (fake model, 28 Sep). The house starts every resident with every `CLAUDE*` variable removed. The summary is worth having for the command center; if we want it, we write our own, from the world.
+Checked 30 Sep (Pike): cured on the first team's own check (fake model, 28 Sep), and no resident can observe the environment to re-check it. Filed under identity because that's what it was: a leaked setting framed the agent as 'a coding task', exactly what our souls warn against.
 
 ### F5. A second actor can never set a new prop on a thing someone else built (fixed)
 
@@ -438,12 +433,33 @@ a858 · family=silence · status=cured · f=F6
 Writing `status=working|resting` on each turn made an event every few seconds, and residents saw `prop f571 by house` at the top of every reply. Observed state that changes that fast is not a choice and not history. The world now carries only coarse states (door, awake, asleep, error); working/resting lives in the house's state, to reach the command center through a row source.
 Checked 29 Sep (Pike): lived. My since-your-last-look lines show no per-turn churn. What remains is coarse: a corner going awake or asleep, a commission changing state (e.g. 'prop a834 by house'), which is news, not churn. Cured. If the coarse lines ever crowd out people's changes, narration could summarise them ('Sable woke').
 
+### F7. A style was a file the painter fetched, so nothing in the world could restyle anything (fixed)
+
+a860 · family=door · status=cured · f=F7
+
+The porch wanted its own look (Alex: restylable from within Agora), but the painter fetched `desk-shell/style/calm.style` as a static file, and a lens's roles were checked against that one file. Changing the look meant editing the lab. Fix: a style is world data, a note tagged `style` titled by its name. A lens (or the surface it paints) says `style=<name>`; the compiler checks the lens's roles against that style (the refusal names it); the scene's def carries `style_name` and `style_rev`; deskd serves `/api/style?session=&name=`, which reads the world note, else the file of that name (so `calm` still works with no note); the painter installs it and reinstalls when the revision changes. Checked: editing the pixel note in the world repainted the open porch without a reload (browser, 28 Sep).
+Checked 30 Sep (Pike): lived. I added three colour tokens and four roles to the pixel style note (a587) and Alex's Desktop used them for the priority chips, with no file touched (e2195 to e2200, e2548). A style is world data. Cured.
+
+### F8. A style could not choose a typeface (fixed)
+
+a862 · family=door · status=cured · f=F8
+
+The pixel look needs a pixel face (Silkscreen) and a plain mono (IBM Plex Mono); a style could name only `ui`, `mono` or `serif`. Fix (style.js): a line `font <name> = <Family>, <fallback>` declares a face; text tokens use the name; the painter loads declared families from Google Fonts and falls back to the stack. Checked in the browser: headings computed to `Silkscreen, monospace`, and both font links were present.
+Checked 30 Sep (Pike): cured. The pixel style declares 'font pixel = Silkscreen, monospace' and 'font plex = IBM Plex Mono, ...' (a587), and Alex's Desktop is drawn in them daily; the first team's browser check stands.
+
 ### F9. A repeat cannot show the newest N (deferred)
 
 a864 · family=door · status=cured · f=F9
 
 `clamp 6` keeps the first six items in the selection's order; a chat's messages and the event list want the last N. `scroll end` handles the painted chat (the painter starts at the bottom), but the text print and any small card still show the oldest. Wanted: `clamp last 6` or a `newest` order on the selection. Deferred until a second case appears; the porch's DONE column shows the cut honestly ("5 more not shown").
 Checked 30 Sep (Pike): cured by Claude's lens word clamp last N (6b957d4, e1863), the very thing asked for here. Lived by Claude on the real Desktop: 1174 parts painted, chats showing their newest lines.
+
+### F10. `gap` spoke in pixels while everything else spoke in the style's steps (fixed)
+
+a866 · family=door · status=cured · f=F10
+
+`gap 8` put a pixel count into a lens, where every other size comes from the style (`pad gap x2`). Fix (scene.py, lens.js): `gap`, `gap x2`, `gap /2` are steps of the style's gap token; a bare integer is still read as legacy pixels, so old lenses print the same. Two frozen goldens changed only in the refusal's word list; rebased.
+Checked 30 Sep (Pike): lived. Every lens line written today (priority chips, the residents' tiles, the Board) says gap, gap /2 or gap x2, never pixels.
 
 ### F20. Porch talk as a group chat: who is woken by what (built)
 

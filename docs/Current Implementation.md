@@ -117,7 +117,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - It keeps two stores:
   - `seen[id] = rev`;
   - a seen index keyed by (observer, thing) → {aspect: event index}.
-- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `remove` counts as `place`, as the other placement verbs do: the subject and what it says survive, and undo puts the appearance back. `place <card> above=|status=` (a1081) is not a placement: it touches `prop:status`, `prop:priority` and `prop:rank`. `reply` (the chat verb) touches `text`.
+- The aspects are `prop:<k>`, `title`, `text`, `due`, `tags`, `comments`, `links` and `place`; `contents` is used for a create inside a surface. A verb the table doesn't know touches every aspect. `remove` counts as `place`, as the other placement verbs do: the subject and what it says survive, and undo puts the appearance back. `put <card> above=|status=` (a1081) is not a placement: it touches `prop:status`, `prop:priority` and `prop:rank`; `put` with a move's arguments is `move`, and counts as `place`. `reply` (the chat verb) touches `text`.
 - Three refusals:
   - `you have not looked at a04 yet; look, examine or read it first` (never for adding a line to a chat, a834);
   - `stale: a04 changed since you last saw it (e15 prop by other); look at it again before acting`;
@@ -150,7 +150,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - There is no redo (an undo cannot be undone).
 - Undo is neither fenced nor limited to the author.
 - A world verb's use is undone whole, all its steps.
-- Undo kinds: `restore`, `restore_props`, `restore_subject` (a whole copy of the subject), `restore_subjects` (whole copies of several, for `place above=`, a1081), `drop_comment`, `reopen`, `drop_link`, `restore_link`, `reorder` (a tiled swap), `delete` (with `delete_subject`), `external`.
+- Undo kinds: `restore`, `restore_props`, `restore_subject` (a whole copy of the subject), `restore_subjects` (whole copies of several, for `put above=`, a1081), `drop_comment`, `reopen`, `drop_link`, `restore_link`, `reorder` (a tiled swap), `delete` (with `delete_subject`), `external`.
 
 ## One language
 
@@ -169,8 +169,8 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 | External | `sync`, `launch` (harness) |
 
 **Verbs.** `examine` lists only the verbs that apply to a thing right now; `help <verb>` gives the arguments and one example. `examine` and `verbs <id>` show the layout verbs only where they are at hand (a990, rooms step 2b; see Rooms, Verbs by room): elsewhere they leave out `resize raise lower tile untile fold unfold match`, show `move` with `into=|before=|after=` only, and end with one line, `layout verbs are at hand on the Desktop`. Nothing is locked: every verb works from every room.
-- The verbs this desk does: `move place resize raise lower remove tile untile rename group create fold unfold append comment resolve check link unlink retitle rewrite replace sort prop tag due launch`.
-- The registry (`moo.py`) holds 34. The specialized ones (`split gather dedupe reveal reply tidy stack done`) are refused here, with `help` naming the alternative.
+- The verbs this desk does: `move place put resize raise lower remove tile untile rename group create fold unfold append comment resolve check link unlink retitle rewrite replace sort prop tag due launch`.
+- The registry (`moo.py`) holds 35 (`put`, a1081). The specialized ones (`split gather dedupe reveal reply tidy stack done`) are refused here, with `help` naming the alternative.
 - Synonyms such as `put` → move and `delete` → remove are accepted, and a near miss is matched at 0.75 similarity.
 - Kinds inherit verbs:
   - surface → thing;
@@ -183,7 +183,8 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `tile as=`;
   - `sort by=due|title|kind [desc=1]`;
   - `prop k=v … | remove=k [at=appearance]`;
-  - `place <subject> into=<surface>` (a new appearance), or on a task's card (a1081, for a1069): `place <card> above=<card>` gives it that card's `status` and `priority` (removing its own when the other has none) and a `rank` just above it; `place <card> status=<value>` sends it to the bottom of its priority group among cards with that status. The house picks the rank (steps of 1000, halved between neighbours); when a gap runs out, or the card it goes above has no rank, it renumbers that group quietly, their order unchanged. One event, `place`, undone whole (`restore_subjects`); the receipt names the status and priority it changed, the rank, and any card renumbered. The card it goes above must have been looked at. A place that changes nothing refuses, `already there`;
+  - `place <subject> into=<surface>`: a new appearance;
+  - `put` on a task's card (a1081, for a1069; named in Pike's c1202, one word, one meaning): `put <card> above=<card>` gives it that card's `status` and `priority` (removing its own when the other has none) and a `rank` just above it; `put <card> status=<value>` sends it to the bottom of its priority group among cards with that status. The house picks the rank (steps of 1000, halved between neighbours); when a gap runs out, or the card it goes above has no rank, it renumbers that group quietly, their order unchanged. One event, `put`, undone whole (`restore_subjects`); the receipt names the status and priority it changed, the rank, and any card renumbered. The card it goes above must have been looked at. A put that changes nothing succeeds with `already there, nothing moved` and no event (a825). `put` was already a synonym of `move`, and still is: for anything but a card, and for a card given `into= before= after= to= by=`; `put above=|status=` on anything else is refused, naming its kind. Over a selection `put` is still `move`;
   - `tag add= remove=`;
   - `due on= | clear=1`;
   - `append line= [section=]` (on a chat the world signs the line and it is never refused as stale: see The world);
@@ -196,7 +197,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `link to= as=`;
   - `unlink id=lNN`;
   - `resize to=WxH` (at least 40×24).
-- Most verbs go through `World.apply`. `prop`, `tag`, `due`, `launch`, `place above=|status=` and the tiled `swap` write their events directly. A new primitive still needs Python; a composition does not (see World verbs).
+- Most verbs go through `World.apply`. `prop`, `tag`, `due`, `launch`, `put above=|status=` and the tiled `swap` write their events directly. A new primitive still needs Python; a composition does not (see World verbs).
 
 **Selections are the shared noun phrase.** The same grammar names a verb's target, a `find`, a view's `query=`, a rule's trigger, and a lens's `of`, `the` and `only when`:
 
@@ -398,13 +399,13 @@ A gesture is a desk command written in the lens, and `do` is implied unless the 
 - `drag` fills `$x $y`, and is painted only on a node with a box.
 - `carry` marks a part that can be picked up. A carry starts with the primary button on the part itself; the right button, and a press on one of the part's own controls (a fold handle, a clickable part inside it), leave it alone.
 - `on menu "<label>" do <command>` adds an entry to the part's own menu. The painter opens it on a right-click or the menu key anywhere on the part (the innermost part with entries), and an entry sends its line as a click does. Editable text, a part with no entries, and Shift with the right-click keep the browser's menu. Escape, a press outside or a scroll closes it; the arrow keys move through it.
-- `on drop <part> do <one command>` runs on the receiver. `$carried` is filled by deskd with the carried item's id.
+- `on drop <part> do <one command>` runs on the receiver. `$carried` is filled by deskd with the carried item's id. The receiver is the topmost part under the pointer that accepts that part, so a carried card that is itself a receiver (`card : …, carry, on drop card do put $carried above=$item`) answers a drop onto it before the lane around it does; a drop on the part it came from, or on a part holding it (its own lane's empty space), sends nothing (checked with screen.py for a1081).
 
 The painter fills only the first occurrence of each name. Click and edit lines may still batch with `;` and may say a world verb's word (a `run` line refuses since a1027: scripts are verbs now).
 
 **What a gesture carries.** Each painted gesture is sent with `observed`:
 - `item` and `rev`;
-- `reads`: `[thing, rev, aspects]` for every value that filled it or fed its derivations, and `["select", query, answer, keep]` for every membership it relied on, including the binds on its chain;
+- `reads`: `[thing, rev, aspects]` for every value that filled it or fed its derivations, and `["select", query, answer, keep]` (with a fifth, the props, when the repeat says `by`) for every membership it relied on, including the binds on its chain;
 - `defpart`: the part's lens, id, path and a hash of its binding lines;
 - `bind`;
 - `at`;
@@ -418,7 +419,7 @@ It also carries `gesture` (a1008), an id minted at the press. An edit's id lives
 2. Part identity: a gesture is admitted when its part still hashes the same, even if the lens changed elsewhere. It is refused only when the part changed and the lens moved. Every closure member is checked.
 3. For a drop: the carried thing ("changed while it was in the air"), then the receiver's revision, reads and part.
 4. The item, judged on the aspects its gesture read (`touched_aspects`). The refusal names the last event, its verb and its author. When the item is accepted, the actor's seen revision moves to the current one.
-5. Each read: a thing passes if only unread aspects moved; a selection must give the same answer, compared as a set, with a clamped repeat comparing its shown prefix.
+5. Each read: a thing passes if only unread aspects moved; a selection must give the same answer, compared as a set, with a clamped repeat comparing its shown prefix (re-ordered by its `by` props first, a1081).
 
 Every refusal ends with "nothing was done. The view will repaint." A painted gesture is judged on what was painted, even against the actor's own later changes, and the painter never looks again on the person's behalf.
 
@@ -652,7 +653,7 @@ A refusing lens is listed but doesn't fail health.
 | `desk.py` | 1087 | Outline notation, the seen fence and its aspect table, the blind-replace check, `;` batching, reading commands, `undo`, `do`, the world-verb fallthrough |
 | `desk_moo.py` | 267 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
 | `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules (notes tagged `rule`: checked, armed, fired; a1027), clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
-| `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
+| `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms; the one sort key a lens's `by` and `put above=` share (`order_value`, `order_by`; a1081) |
 | `knife.py` | 263 | The selection language (with `unanswered:`, `answers:`, `answered-by:`) and pair verbs |
 | `verbs.py` | 445 | World verbs: finding (nearest first, rooms as namespaces, doors), where a line stands, stored text judged when saved, running, reaches (their blanks are filled by `blanks.py`). a990's proof is `test_room_verbs.py`; `sweep_rooms.py` tries every built-in from every room |
 | `blanks.py` | 240 | The one filler (a806): `$here $here.<prop> $new $today $me $<handle>`, `$1 $* $this` in verbs, `$item` in rules, a thing's parts `.title .maker .<prop>` (a1027); a backslash before a dollar sign keeps it literal; `help blanks` |
@@ -672,7 +673,7 @@ A refusing lens is listed but doesn't fail health.
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
-| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `test_waiting.py`, `golden_prints.py`, `suite/` | 382, 839, 153, 223, 210, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
+| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `test_waiting.py`, `test_lanes.py` (a1081: `by`, `put above=`, twenty puts, `put` still `move` elsewhere), `golden_prints.py`, `suite/` | 382, 839, 153, 223, 210, 190, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
 | `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 544 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
@@ -837,4 +838,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2543. Edit it there; a direct edit here makes the next export stop and warn. sha1:97f4fadcbcb9 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2628. Edit it there; a direct edit here makes the next export stop and warn. sha1:fc76d369b0f9 -->
