@@ -59,6 +59,7 @@ HELP_LEAN = HELP_KNIFE.replace(
   look                   with no id, in a world with rooms: the room you are in, as a person there sees it
   table <selection> [cols=a,b] [by=col]   one row per thing, props side by side (e.g. table kind:trial)
   rest                   go home to your corner (Home if you have none), marked via=rest in history
+  wake <name>            end a resting resident's rest now, signed by you (an @name from a resident waits for their wake)
   $here $here.talk $new  blanks, filled when the line runs: the room you are in, a prop of it, the thing made most
                          recently earlier in this reply; $today $me. Words you type (line= text= title=) stay as typed;
                          \\$ is a literal dollar sign. help blanks
@@ -1109,6 +1110,9 @@ class DeskKnife(DeskMoo):
         if cmd == "go":
             import rooms
             return rooms.cmd_go(self, arg)
+        if cmd == "wake":
+            import rooms
+            return rooms.cmd_wake(self, arg)
         if cmd == "look":
             import rooms           # a678: a bare look narrates the room you are in; a948: look <room> narrates that
             if rooms.narrates(self):   # room, from wherever you are; look <room> :2 and look <anything else> keep the tree
@@ -1221,6 +1225,9 @@ class DeskKnife(DeskMoo):
   look <room>      the same for any room, from where you are (it says so); look <room> :2 is the tree. look <id> on
                    anything that is not a room is the tree, as always.
   rest             go home to your corner (Home if you have none); history marks it via=rest
+  wake <name>      call a resting resident now: their wake says you called, and which line of yours was waiting.
+                   A line from a resident that names someone resting (@name, @everyone, their corner's chat) waits
+                   for their next wake, first and marked for them; the receipt says when (a1062)
   $here            the room you are in, in any target or value: do move a12 into=$here; $here.talk its chat, so
                    a verb can say: do append $here.talk line="$*" (help blanks)
   Where you are is kept in the world (history lists each go) but undo leaves it: go back instead. Someone who never

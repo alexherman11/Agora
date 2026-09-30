@@ -145,6 +145,129 @@ def asleep(w, actor):
     return p.get("want") == "rest" or p.get("status") == "asleep"
 
 
+def kind_of(w, actor):
+    """a1062: what kind of speaker `actor` is. 'resident': a corner names them (actor=). 'person': someone at a
+    keyboard, recorded where they sit: a surface whose prop person= names them (today the Desktop says person=alex).
+    'agent': anyone else who acts (a worker, a Claude session). Read from the world's record, never from a name kept
+    here (a1016); when persons have ids, this is what changes."""
+    a = str(actor or "").split("/")[0].lower()
+    if not a:
+        return "agent"
+    if corner_of(w, a):
+        return "resident"
+    for n in w.nodes.values():
+        if n["type"] == "surface" and a in {x.strip().lower() for x in str((n.get("props") or {}).get("person", "")).split(",")}:
+            return "person"
+    return "agent"
+
+
+CALLED = r"@({names}|everyone|all)\b"
+
+
+def called_by_line(w, sid, text, speaker):
+    """a1062: the residents a chat line in subject `sid` would call, as the house hears it (house.news): the owner of a
+    corner the chat sits in (a visitors' book, a talk with Alex), and, in a chat they are a member of, anyone it names
+    @name, @everyone or @all outside quotes (a916). Never the speaker. -> [actor, ...]"""
+    from world import unquoted
+    s = w.subjects.get(sid)
+    if not s or s["kind"] != "chat":
+        return []
+    members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
+    heard = unquoted(text)
+    me = str(speaker or "").split("/")[0].lower()
+    out = []
+    for fid, n in w.nodes.items():
+        p = n.get("props") or {}
+        who = str(p.get("actor", "")).lower()
+        if n["type"] != "surface" or p.get("role") != "resident" or not who or who == me:
+            continue
+        inside = any(a["type"] == "appearance" and a.get("subject") == sid and _within(w, a, fid) for a in w.nodes.values())
+        if inside or (("all" in members or who in members) and re.search(CALLED.format(names=re.escape(who)), heard, re.I)):
+            out.append(who)
+    return out
+
+
+def _within(w, node, fid):
+    p = node.get("parent")
+    while p:
+        if p == fid:
+            return True
+        p = (w.nodes.get(p) or {}).get("parent")
+    return False
+
+
+def waiting_note(desk, nid, text):
+    """a1062: what a chat line's receipt says about the residents it calls who are resting or asleep, or "". A
+    resident's line waits for their next wake, and is shown first there, marked for them; a person's line calls them
+    at once (a resting one; one asleep is not run by the house until someone wakes them). Said every time, so the
+    old '(no need to wake)' habit has nothing left to do."""
+    import scene
+    w = desk.world
+    n = w.nodes.get(nid)
+    sid = n.get("subject") if n else nid
+    who = called_by_line(w, sid, text, w.me)
+    if not who:
+        return ""
+    how = presences(desk)
+    rows = {r["corner"]: r for r in scene.house_rows(desk)}
+    resting = []
+    for a in who:
+        word = how(a)
+        if word == "asleep":
+            resting.append((a, "asleep", "is asleep (the house doesn't run them)"))
+        elif word.startswith("resting"):
+            wakes = (rows.get(corner_of(w, a)) or {}).get("wakes", "")
+            said = word if word != "resting" else ("resting, until " + wakes + " at the latest" if wakes else "resting")
+            resting.append((a, "resting", "is " + said))
+    if not resting:
+        return ""
+    person = kind_of(w, w.me) == "person"
+    out = []
+    for a, how_, said in resting:
+        name = w.display_name(a)
+        if person and how_ == "resting":
+            out.append(f"{name} was resting; your line calls them now")
+        elif person:
+            out.append(f"{name} {said}; they'll see this first when they're woken (wake {a}, or want=awake)")
+        else:
+            out.append(f"{name} {said}; they'll see this when they wake, first and marked for them, so there's no need "
+                       f"to say so (wake {a} to call them now)")
+    return "\n  ".join(out)
+
+
+def cmd_wake(desk, arg):
+    """a1062: wake <name>: end that resident's rest now. It sets call=<you> on their corner, signed by you (the
+    Desktop's wake button sets the same prop); the house delivers it at once, clears it, and their wake says who
+    called and, if you left a line that was held for them, which one. A mention never wakes a resting resident when
+    a resident or agent says it; waking is this act."""
+    import moo
+    w = desk.world
+    name = arg.strip().strip("\"'").lstrip("@").split()[0].lower() if arg.strip() else ""
+    if not name:
+        raise Refusal("wake whom? wake <name>: " + (", ".join(sorted(a for a in actors(w) if corner_of(w, a))) or "no residents here"))
+    fid = corner_of(w, name)
+    if not fid:
+        raise Refusal(f"no resident called {name!r}: no corner says actor={name}")
+    me = str(w.me).split("/")[0].lower()
+    if name == me:
+        raise Refusal("you are awake: you are acting now")
+    if str((w.nodes[fid].get("props") or {}).get("call", "")).lower() == me:
+        return f"(you already called {name}; the house delivers it within a few seconds while it runs)"
+    r = moo.REGISTRY["prop"].run(w, fid, {"call": me, "_by": w.me})
+    ev = next((x for x in w.events if x["id"] == r.get("event")), None)
+    if ev is not None:
+        ev["via"] = "wake"
+        ev.setdefault("changed", []).extend(r.get("changed", []))
+    if hasattr(desk, "_after_mutation"):
+        desk._after_mutation()
+    word = presences(desk)(name)
+    now = ("they are asleep (want=rest): the house doesn't run them, so your call waits until someone sets want=awake"
+           if word == "asleep" else
+           "they are in a turn now; your call goes with what reaches them when it ends" if not word else
+           "the house calls them now, and their wake says you called")
+    return f"ok {r.get('event')}: you wake {w.display_name(name)} ({fid}); {now}"
+
+
 def presences(desk):
     """a948 (4): how each actor is, in one word: 'asleep' (want=rest), 'resting' (the house runs them and they are
     between turns; 'resting until 21:40' when they timed it), or '' (awake: in a turn right now, or someone the house

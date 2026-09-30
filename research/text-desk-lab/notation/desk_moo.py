@@ -261,6 +261,9 @@ class DeskMoo(Desk):
         said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
         if said:
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since
+        waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
+        if waits:
+            out += f"\n  {waits}"    # a1062: who this line calls is resting, and when they'll see it
         for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:
                 self._mark_rev(c, aspects_of(name, kv))    # your own change: the aspects you wrote are seen, the others are not

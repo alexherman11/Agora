@@ -1010,6 +1010,15 @@ class Desk:
             [f"{part} line{'s' if part > 1 else ''} from others you were shown cut"] if part else [])
         return "; ".join(bits) + f"; read {nid}"
 
+    def _chat_waits(self, nid, kv):
+        """a1062: what a chat line's receipt says about the residents it calls who are resting or asleep (rooms)."""
+        import rooms
+        text = str((kv or {}).get("line", (kv or {}).get("append", "")))
+        try:
+            return rooms.waiting_note(self, nid, text)
+        except Exception as e:      # a receipt's aside must never cost the line that already landed
+            return f"(who this line reaches could not be told: {type(e).__name__})"
+
     def _where_line(self, nid):
         w = self.world
         n = w.nodes[nid]
@@ -1215,6 +1224,9 @@ class Desk:
         said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
         if said:
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since
+        waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
+        if waits:
+            out += f"\n  {waits}"    # a1062: who this line calls is resting, and when they'll see it
         if r.get("created") in w.nodes:
             self._mark_seen(r["created"])
             if verb == "create":

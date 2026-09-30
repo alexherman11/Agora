@@ -198,7 +198,7 @@ def find(desk, word, words, me, at=None):
 # ---- stored text names its door (a990 (2)): judged when it is saved, while its author is there to fix it ----------
 
 DESK_WORDS = {"help", "?", "look", "open", "close", "read", "where", "verbs", "pivot", "find", "history", "undo", "do",
-              "plan", "apply", "examine", "x", "ex", "rest", "go", "rules", "rule", "export", "why", "compare", "table",
+              "plan", "apply", "examine", "x", "ex", "rest", "wake", "go", "rules", "rule", "export", "why", "compare", "table",
               "sync", "vars", "set", "rows", "scene", "clock", "scripts", "script", "run", "use", "worktree"}
 
 
