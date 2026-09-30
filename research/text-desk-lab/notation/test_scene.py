@@ -401,6 +401,87 @@ def test_replace_changes_one_exact_passage():
     assert "stale" in do(f'do replace {nid} old="a : column" new="a : row"', "juniper")
 
 
+def test_rooms_go_look_and_replay():
+    """a678, rooms step 1: where you are is a world fact (a go event), a bare look narrates your room, undo leaves
+    walking alone, the !! line folds it, and a worktree merge replays it."""
+    import explore, pickle, re, rooms, tempfile, pathlib, worktree
+    d = explore.fresh()
+    slots = {}
+
+    def do(line, who):
+        slots[d.world.me] = (d.seen, d.open, d.last_event_seen)
+        d.seen, d.open, d.last_event_seen = slots.get(who) or ({}, {d.world.root}, len(d.world.events))
+        d.world.me = who
+        r = d.dispatch("desk", {"line": line})
+        return r.get("text") or ("ERR " + str(r.get("error")))
+
+    def made(out):
+        return re.search(r"created ([af]\d+)", out).group(1)
+
+    root = d.world.root
+    assert do("look", "jeff").startswith(f"{root} surface"), "no rooms yet: a bare look is the tree"
+    assert "no rooms" in do("go lounge", "jeff")
+    home = made(do(f"do create {root} kind=surface title=Home", "jeff"))
+    lounge = made(do(f"do create {home} kind=surface title=Lounge", "jeff"))
+    corner = made(do(f"do create {root} kind=surface title=\"Juniper's corner\"", "jeff"))
+    desc = made(do(f'do create {lounge} kind=note title=Couches text="Low couches around a table."', "jeff"))
+    talk = made(do(f"do create {lounge} kind=chat title=\"Lounge talk\"", "jeff"))
+    letter = made(do(f'do create {lounge} kind=note title="A letter" text="Dear all"', "jeff"))
+    for line in ("one", "two", "three", "four"):
+        do(f'do append {talk} line="{line}"', "jeff")
+    do(f"do prop {home} role=room", "jeff")
+    do(f"do prop {lounge} role=room describe={desc} talk={talk}", "jeff")
+    do(f"do prop {corner} role=resident actor=juniper", "jeff")
+
+    assert do("look", "juniper").startswith(f"You are in Juniper's corner ({corner}), your own corner."), "a resident starts in their corner"
+    assert do("look", "pike").startswith(f"You are in Home ({home})."), "no corner: Home"
+    out = do("go lounge", "juniper")
+    ev = re.match(r"ok (e\d+):", out).group(1)
+    body = out.split("\n", 1)[1]
+    assert body.startswith(f"You are in Lounge ({lounge}).\nLow couches around a table.\nNo one else is here.\nAt hand:\n  {letter} note \"A letter\"\n"), body
+    assert "Couches" not in body and "  Jeff: two\n  Jeff: three\n  Jeff: four\n" in body, body
+    assert not re.search(r"\b(px|cramped|offscreen|spills?)\b", body) and len(body.split()) < 250
+    assert "Here with you: Juniper." in do("go Lounge", "pike")
+    # the fence: a listed title is not a read; the talk lines let you speak
+    assert "not looked" in do(f'do rewrite {letter} text="gone"', "pike")
+    assert do(f'do append {talk} line="hi"', "pike").startswith("ok")
+    # undo leaves walking alone, and says why; history lists it
+    assert "is a go" in do(f"undo {ev}", "juniper")
+    assert "nothing of yours to undo" in do("undo", "juniper")
+    assert f"{ev} go juniper to={lounge}" in do("history", "juniper")
+    # the !! line folds walking: one line per actor, their latest room
+    do("look", "pike")
+    for place in ("home", "lounge", "home"):
+        do(f"go {place} :1", "juniper")
+    head = do("look", "pike").split("\n", 1)[0]
+    assert head.count("juniper went to") == 1 and "juniper went to Home" in head, head
+    assert "is not a room" in do(f"go {root}", "juniper")
+    # Alex is not placed: no go, and his look is the tree
+    assert "not placed" in do("go lounge", "alex") and do("look", "alex").startswith(f"{root} surface")
+    # replay: a go made in a worktree comes back with the merge
+    old = worktree.SESSIONS
+    worktree.SESSIONS = pathlib.Path(tempfile.mkdtemp())
+    try:
+        text, _ = worktree.handle("worktree fork walk", "base", d, "juniper")
+        assert text.startswith("ok"), text
+        path = worktree.SESSIONS / "base@walk.pickle"
+        f = pickle.loads(path.read_bytes())
+        f.world.me, f.seen, f.open, f.last_event_seen = "juniper", {}, {f.world.root}, len(f.world.events)
+        before, n0 = worktree.ids_of(f), len(f.world.events)
+        f.dispatch("desk", {"line": "go lounge"})
+        worktree.record(f, "go lounge", "juniper", before, n0)
+        assert rooms.room_of(f.world, "juniper") == lounge
+        path.write_bytes(pickle.dumps(f))
+        assert rooms.room_of(d.world, "juniper") == home
+        do(f"look {lounge}", "jeff")
+        assert do(f'do rename {lounge} title="The Lounge"', "jeff").startswith("ok")                 # the base touched the room meanwhile
+        text, merged = worktree.handle("worktree merge walk", "base", d, "jeff")
+        assert text.startswith("ok merged"), text
+        assert rooms.room_of(merged.world, "juniper") == lounge and rooms.room_of(merged.world, "pike") == lounge
+    finally:
+        worktree.SESSIONS = old
+
+
 def test_freshness_words_are_host_reads():
     """Juniper: $touched is the last event on the thing, $changed.<field> the last that changed that aspect; a comment
     refreshes the first and not the second; undo is not a touch; neither enters the gesture fence."""

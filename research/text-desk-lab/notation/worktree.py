@@ -39,6 +39,9 @@ def _aspects_of_line(cmd):
             return None
         if not words or words[0].lower() in ("look", "read", "examine", "find", "where", "verbs", "pivot", "history", "help", "open", "close", "scene", "rows", "table"):
             continue
+        if words[0].lower() == "go":         # a678: walking touches no thing, so it never conflicts
+            out.add("presence")
+            continue
         if len(words) < 2 or words[0].lower() != "do":
             return None
         kv = dict(w.partition("=")[::2] for w in words[2:] if "=" in w)
@@ -177,7 +180,7 @@ def handle(line, session, desk, actor):
                 # A merge must ask "changed since the FORK saw it", whoever did it.
                 named = _kin(w, set(ID.findall(cmd)) | {mapping.get(t, t) for t in j.get("touched", [])})
                 mine = _aspects_of_line(cmd)
-                for e in w.events[wt["base_events"]:first]:
+                for e in (w.events[wt["base_events"]:first] if mine != {"presence"} else []):
                     subj = (w.nodes.get(e["target"]) or {}).get("subject")
                     if not e.get("undone") and e.get("merged") != name and e["verb"] not in ("create", "comment") and (e["target"] in named or subj in named) \
                             and aspects_meet(mine, event_aspects(e)):

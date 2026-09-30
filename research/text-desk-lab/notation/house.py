@@ -63,7 +63,7 @@ import workshop      # noqa: E402  workers for what the world can't change yet
 STATE = HERE / "house-state"
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
-            "rows", "scene", "worktree"}
+            "rows", "scene", "worktree", "go"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 ANOTHER = 76         # the exit code for "another house already runs this world": keeper does not fight it
@@ -623,6 +623,10 @@ class House:
             r.state.pop("rest_for", None)
         r.log("rest", {"why": why, "for": seconds})
         r.save()
+        # Alex, 29 Sep (a678): rest sends you home to your corner, so you wake where you rested
+        actor = ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("actor")
+        if actor:
+            r.log("home", self.act(actor, f"go {r.rid} :1")[:300])     # :1 the receipt only: what it didn't see isn't seen
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not

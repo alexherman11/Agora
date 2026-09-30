@@ -906,6 +906,8 @@ class World:
             raise Refusal(f"no event {event_id}")
         if ev.get("undone") or ev["verb"] == "undo":
             raise Refusal(f"{event_id} cannot be undone (already undone or is an undo)")
+        if (ev.get("undo") or {}).get("refuse"):      # a678: a go is kept in the journal but out of undo's reach
+            raise Refusal(ev["undo"]["refuse"].format(eid=event_id))
         later = [e for e in self.events if int(e["id"][1:]) > int(event_id[1:]) and not e.get("undone")
                  and e["verb"] != "undo" and (e["target"] == ev["target"] or ev["target"] in (e.get("changed") or []))]
         if later:
