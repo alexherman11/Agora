@@ -36,7 +36,7 @@ Everything here is prototype code. The left column is what later work should pre
 |---|---|
 | Subject, appearance and surface are distinct things | Pickle persistence and file locks |
 | Every change is a command line that records an undoable event | Worktree merge by replaying command lines |
-| Look before you act, judged per thing and aspect | Rules, scripts and the clock stored outside the event log |
+| Look before you act, judged per thing and aspect | The clock stored outside the event log (rules became notes in a1027; scripts retired into verbs) |
 | Verbs and selections are one language shared by every command | World verbs as text macros (no expression language yet) |
 | A lens, a style and a world verb are notes in the world, not code | The lens vocabulary beyond its core words; the hand-written windowed shell |
 | One scene, two printers: text and pixels come from the same tree | The house's relay (tool-less residents whose `>` lines are run for them) |
@@ -61,7 +61,7 @@ python screen.py frontier --as me facts porch/main 2 shot   # the painter in hea
 - Flags:
   - `--window <name>` gives one actor a second reader;
   - `--reset`;
-  - `--dump` prints a JSON snapshot, with rules, scripts and the clock;
+  - `--dump` prints a JSON snapshot, with the clock and each rule's state (its note's id, home, author, fired, failed, skipped, broken; a1027);
   - `--shape` prints the desk without ids.
 - The default actor is `jeff`. Actor names are lowercased labels that the caller supplies; nothing authenticates them.
 
@@ -157,13 +157,13 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 `explore.py` on stdin, `POST /api/do` on the server, a gesture in the painter, a resident's `>` line and a world verb's steps all carry the same kind of line.
 - Commands may be joined with `;` or newlines. They run in order and stop at the first refusal; earlier steps are not rolled back.
 - A call runs at most 4 `read` or `examine` commands; the rest are listed as not run.
-- A `script` line keeps its `;`.
+- A `script` line keeps its `;` (and is refused whole: scripts are verbs now, a1027).
 
 | Family | Commands |
 |---|---|
-| Reading | `look [id] [:1-:4]` (`look` alone, in a world with rooms: your room, narrated; `look <room>` with no depth: that room, narrated from where you are; see Rooms), `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts`, `vars`, `help` (`?`) |
+| Reading | `look [id] [:1-:4]` (`look` alone, in a world with rooms: your room, narrated; `look <room>` with no depth: that room, narrated from where you are; see Rooms), `open` / `close`, `read id [#n\|#name\|:3\|:full\|tail=n]`, `examine` (`x`, `ex`), `where`, `verbs`, `pivot`, `find`, `table <sel> [cols= by=]`, `compare`, `history [id]` (last 12), `why`, `rows <source>`, `scene <lens>`, `export`, `rules`, `scripts` (only says scripts are verbs now, a1027), `vars`, `help` (`?`) |
 | Changing | `do <verb> <target> k=v`, `undo [eN]`; pair verbs `swap`, `beside`, `match`, `link`; world verbs (`<word> …`, `do <word> …`, `use <id> …`) |
-| Defining | `rule when … do …`, `rule on <verb> [by=] do …`, `rule drop rN`; `script <name> = …`, `script drop`, `run`; `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
+| Defining | rules and verbs are notes (see Rules and World verbs; `rule`, `script` and `run` only name that door, a1027); `set <name> = <id\|title>`; `clock [YYYY-MM-DD\|now\|follow]` |
 | Moving | `go <room> [:1]`, `go`, `rest [:1]` (see Rooms) |
 | Branching | `worktree`, `worktree fork\|diff\|merge <name>` |
 | External | `sync`, `launch` (harness) |
@@ -201,36 +201,38 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 
 ```text
 kind:note|task  tag:x  in:f04  title:agenda  ?word+word  prop:status=done  prop:k
-comments:open  comments:any  links:a04  parts:a30  part-of:a20  unanswered:alex
+comments:open  comments:any  links:a04  parts:a30  part-of:a20  answers:a1006  answered-by:a1008  unanswered:alex
 due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 ```
 
 - Terms joined by commas or spaces are ANDed.
-- `parts:` and `part-of:` follow only `part-of` links, in one direction.
-- `in:`, `also:`, `links:`, `parts:` and `part-of:` accept a title or a `$handle`.
+- `parts:` and `part-of:` follow only `part-of` links, in one direction; `answers:` and `answered-by:` (a1027) follow only `answers` links the same way: `answered-by:a1008` is what a1008 answers, `answers:a1006` is what answers a1006.
+- `in:`, `also:`, `links:`, `parts:`, `part-of:`, `answers:` and `answered-by:` accept a title or a `$handle`.
 - A target may also be one id, a unique quoted title, `desk`/`root`, or a handle:
   - `$<name>`, a handle set by `set` or `create … as=`;
-  - or any blank that names a thing (below).
-- **Blanks** (a806, rooms step 2a; `blanks.py`, the one filler for typed lines, world verbs, scripts and rules alike): `$here` the room you are in (in a rule, the rule's home: the room it was saved in, a990); `$here.<prop>` a prop of it (`$here.talk`, `$here.describe`; refused, naming the room, when it has none); `$new` the thing made most recently earlier in this reply, of any kind (of several made by one line, the last; refused when nothing earlier in this reply made anything; a new reply starts fresh, so it never reaches back; the receipt ends `($new = a850)`; a948: in a reply where `$new` is not yet used, the first receipt of a line that made something ends `(next lines in this reply can call it $new)`, once per reply, where a guessed id would otherwise come next); `$today` the clock's date; `$me`; `$<handle>`; in a verb or script `$1 $2 $1.title $*` (and `$this` in a verb); in a rule `$item`, the thing it fired on, and `$item.title`. They are filled after the line is parsed, as values, once: in targets, selections, and k=v values that name things (`do prop f581 describe=$new` stores and prints `describe=a789`); a read's words too (`look $new`, `go $here`). Text is words by default (a965; `blanks.fill_arg`): in a typed `do` line an argument the verb's own list declares as text (`<str>`, as `help append` prints `line=<str>`; today `line= text= title= old= new= words=`) is never filled, one it declares as a target, selection, id or date is (`into=$here`, `query=kind:note,in:$here`), and any other (a prop value, untyped, including `wake=` and a create's extra props) fills only when the whole value is one blank (`describe=$new`), never a blank inside other words (`next='write $today in the log'` stays as typed). Inside a verb, script or rule (templates their author wrote) every value is filled, and a filled value is never filled again. A typed `$item` refuses (`Did you mean $new…?`); `$5` is not a blank; an unknown `$name` refuses; nothing stores a blank's own name. A reply is the lines of one call (explore.py, the desk tool, one painter request) or of one resident's reply: explore.py, deskd and the house pass a `reply` token with each line, and what was made is kept per reader and reply (`DeskKnife._made`). A literal dollar sign is written with a backslash before it, in both; `\$today` stays literal.
+  - or any blank that names a thing (below);
+  - or `corner:<name>` (a1027): the corner whose `actor=` is that name, someone's sill; `no sill for '<name>'` when there is none. It is the one place a name becomes a room (`desk._resolve`), so when persons have ids (a1016) this is what changes.
+- **Blanks** (a806, rooms step 2a; `blanks.py`, the one filler for typed lines, world verbs and rules alike): `$here` the room you are in (in a rule, the rule's home: the room holding its note, a990, a1027); `$here.<prop>` a prop of it (`$here.talk`, `$here.describe`; refused, naming the room, when it has none); `$new` the thing made most recently earlier in this reply, of any kind (of several made by one line, the last; refused when nothing earlier in this reply made anything; a new reply starts fresh, so it never reaches back; the receipt ends `($new = a850)`; a948: in a reply where `$new` is not yet used, the first receipt of a line that made something ends `(next lines in this reply can call it $new)`, once per reply, where a guessed id would otherwise come next); `$today` the clock's date; `$me`; `$<handle>`; in a verb `$1 $2 $*` and `$this`; in a rule `$item`, the thing it fired on; and a part of any thing a blank names (a1027; `blanks._part`): `.title` its title, `.maker` who made it (the actor of its create), `.<prop>` one of its props (`$item.asked_by`, `$1.status`), refused naming the thing when it has none. They are filled after the line is parsed, as values, once: in targets, selections, and k=v values that name things (`do prop f581 describe=$new` stores and prints `describe=a789`); a read's words too (`look $new`, `go $here`). Text is words by default (a965; `blanks.fill_arg`): in a typed `do` line an argument the verb's own list declares as text (`<str>`, as `help append` prints `line=<str>`; today `line= text= title= old= new= words=`) is never filled, one it declares as a target, selection, id or date is (`into=$here`, `query=kind:note,in:$here`), and any other (a prop value, untyped, including `wake=` and a create's extra props) fills only when the whole value is one blank (`describe=$new`), never a blank inside other words (`next='write $today in the log'` stays as typed). Inside a verb or rule (templates their author wrote) every value is filled, and a filled value is never filled again. A typed `$item` refuses (`Did you mean $new…?`); `$5` is not a blank; an unknown `$name` refuses; nothing stores a blank's own name. A reply is the lines of one call (explore.py, the desk tool, one painter request) or of one resident's reply: explore.py, deskd and the house pass a `reply` token with each line, and what was made is kept per reader and reply (`DeskKnife._made`). A literal dollar sign is written with a backslash before it, in both; `\$today` stays literal.
 - An unknown `word:` term is refused with the list of known terms. `prop:k>v` is not a comparison: it is read as a prop name and matches nothing (see Evidence).
 
 **Rules.**
-- `rule when <selection> do <verb> …` fires once on each thing that enters the selection; `now=1` includes current matches.
-- `rule on <verb> [by=<actor>] do …` fires on each such event. It ignores events made by rules, and it treats `edit` as append, retitle or rewrite.
+- **A rule is a note tagged `rule`** (a1027), placed in the room it acts from. Its text is one line (`#` lines describe it): `when <selection> do <verb> …` fires once on each thing that enters the selection (a thing that leaves it is forgotten, so entering again fires again: a commission landed, reverted and landed again is due a live check twice; `now=1` includes what matches when it is saved); `on <verb> [by=<actor>] do …` fires on each such event. It ignores events made by rules, and it treats `edit` as append, retitle or rewrite.
 - Rules also run on clock changes and after `!` injections.
-- A rule records its `author`, the actor who defined it (a656; rules defined before then carry none).
+- A rule's `author` is whoever last chose what it does (a1027, Juniper c1075): its note's maker, or the last to write its text or tag it `rule` (`DeskKnife._rule_author`, read from the log; an undone event counts for nothing). When someone else writes it, their receipt says `this rule now acts as you (it acted as juniper)`.
 - **A rule acts as its author** (a687, decided in a683 by Sable, Juniper and Pike: a rule is a standing act its author chose, so crediting whoever tripped it misleads). While it fires, the world's actor is the author (`desk_knife.py` `_run_rules`), so its events say `by=<author>`, carry `via "rule rN"`, `cause` and `tripped_by=<tripper>`, and a chat line it adds is signed `Author: …` with no `via`. What it prints and marks meanwhile is recorded for the tripper (`_firing_observer`), who sees it on their receipt: `~ r2 fired on a697 as sable: ok prop a697 last=pike`.
 - The author was not there, so the deed is theirs but unseen (`rule_did_unseen` in `desk.py`): it makes them stale on what it changed (see The world), a bare `undo` skips it, and their next `!!` line names it: `e898 your rule r2 did prop a697 last=pike (tripped by pike)` (in the grouped form, `your rule r2: …`). The tripper's `!!` line leaves it out; anyone else's reads `e898 prop a697 by sable via rule r2`. `why` reads `sable by rule r2, tripped by pike`.
-- A rule with no author (defined before a656) runs as whoever tripped it, exactly as before: its events are signed by the tripper, carry no `tripped_by`, and its chat line reads `Pike, via rule r3: …`. Defining it again gives it an author.
+- A rule with no recorded author (a note made before its world's log began) runs as whoever tripped it: its events are signed by the tripper, carry no `tripped_by`, and its chat line reads `Pike, via rule a1060: …`. Writing its text again gives it an author. (Rule ids are now their notes' ids, so `via rule a1060`; the `r2` in the examples above is from before a1027.)
 - **Known obligation, not built:** there is no permission layer. When one exists, a firing must be checked against its author's rights at firing time, not the tripper's and not the rights the author had when defining it (a683).
 - Cascades stop after three passes.
 - A rule is a template (a806): its target, values and selection are filled by the one filler each time it fires (`$item`, `$item.title`, `$today`; in a `when` selection `$today` now follows the clock instead of freezing when the rule is defined). `$new` refuses: a rule has no earlier line.
-- **A rule lives in the room it was saved in** (a990, rooms step 2b): `home`, the room its author stood in when defining it (none for someone placed nowhere, or rules defined before). It stands there from then on, wherever its author goes or sleeps: `$here` in it is that room (in its selection, target and values; a rule with no home refuses `$here`, saying why), and a bare verb word in its action means that room's verb. `rules` says `lives in Lounge f182`, and so does `examine rN`; `rule home rN <room>` moves it on purpose, judged there like a save (a990 (5), Juniper c996: where a rule lives should be seen and changed on purpose. Rules are desk attributes, not placed notes, so the room at save, meant as the fallback for something with no place, is every rule's home today).
-- The action may be a verb made in the world (a990): `rule when tag:messy do tidy` (its words after the word; `$item` when none are given), or `do use <verb id> [words]`. It runs through `verbs.try_line` with the rule's context innermost, so it is found from the rule's home, strictly: at fire time a word only another room answers refuses (`~ r3 could not tidy a1013: tidy is at hand in …`).
-- A rule is checked when defined: a bad term, a specialized verb with no world verb answering it, and a missing script are refused, and a world verb's word that only another room has is refused naming the door (`write use a995 [words]`); a destination such as `into=` is not checked.
+- **A rule lives in the room holding its note** (a990 (5), finished by a1027; `verbs.room_holding`), wherever its author goes or sleeps: `$here` in it is that room (in its selection, target and values; a rule in no room refuses `$here`, saying why), and a bare verb word in its action means that room's verb. Move the note and it lives there, judged there like a save: the mover's receipt says `~ rule a1060 saved: … (lives in Lounge (f182); acts as juniper)`, or `saved broken` when its word is not at hand there. `rules` and `examine <rule note>` say where it lives.
+- The action may be a verb made in the world (a990): `when tag:messy do tidy` (its words after the word; `$item` when none are given), or `do use <verb id> [words]`. It runs through `verbs.try_line` with the rule's context innermost, so it is found from the rule's home, strictly: at fire time a word only another room answers refuses (`~ r3 could not tidy a1013: tidy is at hand in …`).
+- **A rule is checked whenever its text, home or author changes** (a1027; `DeskKnife._rule_parse`, `_rules_sync`), strict to its stored text: a bad term, an unknown verb, a blank a rule doesn't have (`$new`, `$itme`), a misspelled term in a selection target (not read as a prop), `run`, and a world verb's word that only another room has (naming the door, `write use a995 [words]`). A rule that fails is still saved, **broken**, with the reason (`~ rule a1066 saved broken: craete is not a verb here…`), and never fires, never running an earlier version (a598). A valid one re-arms: what matches then counts as handled, so a fix never sets off a flood. A destination such as `into=` and the rest of a selection target are not checked. A selection target that matches nothing is nothing to do, not a refusal.
+- **Quiet** (Alex, a585; Juniper c1075): a narrated look never lists rule notes; the tree marks them (`· rule`, `· rule, broken (rules says why)`), since the tree is the builder's inventory of a room. `rules` lists every one: its note's id and title, where it lives, who it acts as, how often it fired, failed (with the last reason) or was skipped, and whether it is broken; `examine <rule note>` says the same. A firing that finds no sill (`corner:<name>` with no such corner) is counted as skipped, quietly, and not printed. Undo of the command that set rules off undoes their firings, and its receipt names them (`…, and 4 rule consequence(s): a1060, a1062, a1064`).
+- `rule when …` and `rule on …` typed refuse, printing the exact line to write instead: `do create $here kind=note tags=rule title="<what it does>" text="when …"`; `rule drop` and `rule home` say to remove or move the note.
 - `why <id>` shows the events that placed a thing and the rule that would act on it next.
 
-**Scripts.** `script <name> = <cmd>; <cmd>` with `$1 $2 $1.title $*` and every other blank (see Blanks); run with `run <name> args`, whose words are filled where `run` is said (`run tidy $new`). A script lives in the room it was saved in (a990; `DeskKnife.script_homes`, none for scripts saved before or by someone placed nowhere; `scripts` says `(lives in Lounge f182)`; `script home <name> <room>` moves it on purpose, judged there like a save): its bare verb words mean that room's verbs, whoever runs it from wherever. When defined, only that is checked: a step whose word only another room's verb answers refuses the save, naming the door (`script t1 not saved: tidy is at hand in …`). `$me` is filled in a script since a806 (F2 said it was not). A rule may run a script; a script a rule runs acts as the rule's author.
+**Scripts are retired into verbs** (a1027): a script was a verb nobody declared. `script` and `run` refuse, and `scripts` says so, naming the door: `scripts are verbs now: make a note tagged verb (help verbs); run X is just X` (`run arrive is just arrive (nothing answers to arrive yet: make it a verb, or just look)`). The one script the house had, `arrive`, printed the old tree; it was dropped, not rewritten, since every wake ends in `look` (the house's default wake is `look`). A world that still holds old scripts says so in `scripts`; they never run, and `export` no longer writes them.
 
 **Views.** `do create <surface> kind=view title=X query=<selection>` makes a view; with `cols=` (and `by=`, `desc=`) it prints as a table. You can't move a thing into a view, create inside one, or tile, group or sort one.
 
@@ -251,9 +253,9 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 - `clock follow` tracks the wall date and reports the days that passed.
 - `age<N` and `age>N` need a clock.
 
-Rule, script and clock definitions are desk attributes, not events. Only a rule records an author (above); none of them appear in `history`, and they can't be undone, but a worktree carries them and a merge replays them. Lenses, styles and world verbs, by contrast, are ordinary notes.
+The clock is a desk attribute, not an event: it is not in `history` and can't be undone, but a worktree carries it and a merge replays it. Rules (since a1027), lenses, styles and world verbs are ordinary notes.
 
-**Worktrees.** `worktree fork <name>` copies the session into `<session>@<name>`, with a journal of the command lines made there, including `rule`, `script` and `clock` lines.
+**Worktrees.** `worktree fork <name>` copies the session into `<session>@<name>`, with a journal of the command lines made there, including `clock` lines (a rule is a note, so it is journaled like any act).
 - `worktree diff` shows those lines beside what the base did since (`!` = both touched it).
 - `merge` replays the journal on a trial copy of the base. It remaps created ids, signs each command by its author, and is all or nothing.
 - A command is refused when the base has changed an overlapping aspect of anything the command touched. The journal records what a command touched by id as it ran, however the command named it (title, handle, selection or world verb). The base's creates and comments are ignored.
@@ -275,8 +277,8 @@ A verb anyone can make, with no Python (`verbs.py`, the first tier of live build
 - **A verb's word is not a name** (a990 (4), Pike e1804, F25): verb notes stay out of title resolution (`desk._resolve`), so `read tidy` never means a verb note and two rooms' tidies never make it ambiguous; it refuses with `'tidy' is a verb's word, not a name for a thing: the verb note is a995 …`. A verb note is reached by its id, or through `help` and `examine`.
 - **Lookup** (`verbs.find`), nearest first: carried by you, then on a thing named among the words, then the room the line stands in and each room around it (a990), then the house. Two verbs at one level refuse and name both. It is tried only after the built-ins fail: when the first word is no command, or for `do <word>` when `<word>` isn't a built-in verb or is one of the retired specialized words (`tidy reply stack …`, a990: a world verb answers those before the desk's refusal, and `help <word>` describes it). `use <id> [words]` names a verb exactly, from anywhere, and refuses one that someone else carries.
 - **Nothing at hand, but another room has one** (a990; Pike e1782, Sable e1786: forgiving to people, strict to stored text): a typed line runs it while it is the only one; two or more refuse naming every door: `tidy is at hand in Lounge (f182, use a995) and Board (f155, use a1001): go there, or use <id> [words]`. A stored line never guesses: it refuses naming the doors even when there is one.
-- **Where a line stands** (`verbs.standing`): a typed line where its typer is (`rooms.room_of`; Alex, placed nowhere, has no room level); a template in its own home, never where its author or caller stands: a verb's lines where the verb lives (`verbs.home`: its room, or the room holding the thing it is on; carried and house verbs have none), a script or rule in the room it was saved in, a lens gesture in the room holding its lens (deskd sets `desk._act_home` from the painted lens's id). The template kinds carry it in `blanks.Ctx.home`.
-- **Stored text names its door when saved** (a990 (2); `verbs.check_lines`): each step of a script, a rule's world-verb action, a wake line set with `do prop <corner> wake=`, and a verb's own lines is judged where it will live; a bare word that only another room's verb answers refuses the save, naming the door (`write use a995 [words]`). A word nothing answers is left alone, as before. A verb is judged after any act that makes or changes it (its word, where it lives, its lines: `verbs.state` / `check_change` around `DeskKnife.cmd_do_knife`), and a refused act is taken back whole (`verbs.rollback`: its events undone and dropped, so nothing changed). The same check refuses a second verb with one word in one room: `a1001 would be a second tidy in Lounge (f182): a995 already answers to tidy there…`. Not judged: a lens's gestures when the lens is saved (a lens act is only strict at run time), and a verb's lines again when the thing it is on moves to another room.
+- **Where a line stands** (`verbs.standing`): a typed line where its typer is (`rooms.room_of`; Alex, placed nowhere, has no room level); a template in its own home, never where its author or caller stands: a verb's lines where the verb lives (`verbs.home`: its room, or the room holding the thing it is on; carried and house verbs have none), a rule in the room holding its note (a1027), a lens gesture in the room holding its lens (deskd sets `desk._act_home` from the painted lens's id). The template kinds carry it in `blanks.Ctx.home`.
+- **Stored text names its door when saved** (a990 (2); `verbs.check_lines`): a rule's world-verb action, a wake line set with `do prop <corner> wake=`, and a verb's own lines are judged where they will live; a bare word that only another room's verb answers refuses the save, naming the door (`write use a995 [words]`), except that a rule is saved broken instead (a1027: a rule that fails its check is kept, says why and never fires). A word nothing answers is left alone, as before. A verb is judged after any act that makes or changes it (its word, where it lives, its lines: `verbs.state` / `check_change` around `DeskKnife.cmd_do_knife`), and a refused act is taken back whole (`verbs.rollback`: its events undone and dropped, so nothing changed). The same check refuses a second verb with one word in one room: `a1001 would be a second tidy in Lounge (f182): a995 already answers to tidy there…`. Not judged: a lens's gestures when the lens is saved (a lens act is only strict at run time), and a verb's lines again when the thing it is on moves to another room.
 - **Blanks:**
   - `$1 $2 …` refuse when there are too few words;
   - `$1.title`;
@@ -321,7 +323,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
 | `text <template>` | Words (template names below); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
-| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>` (`item who said index at`, where `at` is the line's time from its append event: `08:15` today, `29 Sep 22:38` otherwise), `inbox:<name>` (every chat line for that person, newest first: `item chat who said at open index eid`. A line counts when its chat's members name the person (a direct chat), or it calls @name outside quotes; @everyone and @all don't count, so it is narrower than what reaches a resident (Alex, 30 Sep). `open` is `yes` until the person writes in that chat after it; rows are keyed by `eid`, the event that added the line), `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, newest first: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`). An empty repeat prints `(empty)` |
+| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>` (`item who said index at`, where `at` is the line's time from its append event: `08:15` today, `29 Sep 22:38` otherwise), `inbox:<name>` (every chat line for that person, oldest first like a chat, so a lens shows the newest with clamp last N, scroll end: `item chat who said at open index eid`. A line counts when its chat's members name the person (a direct chat), or it calls @name outside quotes; @everyone and @all don't count, so it is narrower than what reaches a resident (Alex, 30 Sep). `open` is `yes` until the person writes in that chat after it; rows are keyed by `eid`, the event that added the line), `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, oldest first like a chat: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`). An empty repeat prints `(empty)` |
 | `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
 | `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
 | `over $<list>` | Repeat over a list field or derived rows; `$it` is each value |
@@ -395,7 +397,7 @@ A gesture is a desk command written in the lens, and `do` is implied unless the 
 - `on menu "<label>" do <command>` adds an entry to the part's own menu. The painter opens it on a right-click or the menu key anywhere on the part (the innermost part with entries), and an entry sends its line as a click does. Editable text, a part with no entries, and Shift with the right-click keep the browser's menu. Escape, a press outside or a scroll closes it; the arrow keys move through it.
 - `on drop <part> do <one command>` runs on the receiver. `$carried` is filled by deskd with the carried item's id.
 
-The painter fills only the first occurrence of each name. Click and edit lines may still batch with `;` and may `run` a script.
+The painter fills only the first occurrence of each name. Click and edit lines may still batch with `;` and may say a world verb's word (a `run` line refuses since a1027: scripts are verbs now).
 
 **What a gesture carries.** Each painted gesture is sent with `observed`:
 - `item` and `rev`;
@@ -453,7 +455,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 - A new actor starts with nothing seen, and `jeff` uses the session's own slot.
 - The shell polls `/api/events` every 1.5 s. The painter polls `/api/scene?view=painter` every 1.5 s and `/api/version` every 5 s, and reloads the page when the code changed, unless someone is typing or holding a part.
 
-**Sessions.** A session is one file, `sessions/<name>.pickle`, holding the whole Python desk: world, rules, scripts, clock, per-actor state, observations and the last-good lenses.
+**Sessions.** A session is one file, `sessions/<name>.pickle`, holding the whole Python desk: world, each rule note's state (what it has handled, how often it fired; `DeskKnife._rulestate`, a1027), clock, per-actor state, observations and the last-good lenses.
 - Every request that names a session, reads included, loads it under `sessions/<name>.lock` and acts. deskd saves only when the request changed something: it compares the pickled desk before and after, so a painter's poll writes nothing.
 - A request for an unknown session with a valid name creates it.
 - The lock holds the holder's pid. A waiter treats a lock under a second old as busy and does not open it. Only an older lock is read, and it is removed if its pid is dead or it is over 60 s old. A waiter gives up after 60 s (`could not take … lock`) and never proceeds without the lock. A holder releases with `explore.release_lock`: it removes only its own lock, and retries briefly when Windows refuses to delete a file another process has open.
@@ -511,7 +513,7 @@ Two pages paint the same world.
 **A resident** is any surface with `role=resident`, its corner. Its props:
 - `actor`, the name it is given. A corner without one has status `unnamed` and is never started.
 - `want=awake|rest`.
-- `wake`, the desk line run on each wake (default `run arrive`).
+- `wake`, the desk line run on each wake (default `look`, a1027: the old `run arrive` printed the old tree, and scripts are retired into verbs).
 - An optional `model`.
 
 **The process.**
@@ -527,7 +529,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --sys
 - A refused line stops the lines after it. The receipt says how many and which (`stopped: N later line(s) not run ... Not run: a | b`). A refused line that contains a `;` also says that one `>` line is one command.
 - A line that no command and no verb in the world answers (a quote such as `> I think...`, or prose with an apostrophe) gets `MISS unknown command ...`. It changed nothing, so the lines after it still run. The house logs each miss, as actor `house` so it wakes no one, as a line in the chat with prop `role=misses` ("Misses"). The house makes that chat on first need, beside Wishes: `<actor>, <date time>, reply <n> in <corner>: > <the whole line>`. The receipt ends `~ house: N line(s) after > that nothing answered, logged in <id> (Misses): ...`. `verbs.record_miss` still writes `reaches/<world>.jsonl` as well.
 - A reply with no `>` line whose lines begin with a desk command word runs nothing. It gets one notice: `nothing ran: only lines beginning with > act (N lines looked like commands)`. The notice counts toward the quiet limit.
-- The house's own lines keep `;` as a separator: wake strings, the status line, and scripts and verbs run by a line.
+- The house's own lines keep `;` as a separator: wake strings, the status line, and verbs run by a line.
 
 **Welcome and waking.**
 - The welcome (the placed note "The door", with `$me` replaced by the name) prefixes the first message after a fresh start, a lost conversation, or a `compact_boundary` event (a compaction).
@@ -644,11 +646,11 @@ A refusing lens is listed but doesn't fail health.
 | `world.py` | 973 | Subjects, appearances, surfaces, links, comments, geometry (and `DESK_GEOMETRY=choices`), events, `apply`, `undo`, chat signing |
 | `desk.py` | 1087 | Outline notation, the seen fence and its aspect table, the blind-replace check, `;` batching, reading commands, `undo`, `do`, the world-verb fallthrough |
 | `desk_moo.py` | 267 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
-| `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules, scripts, clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
+| `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules (notes tagged `rule`: checked, armed, fired; a1027), clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
 | `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms |
-| `knife.py` | 263 | The selection language (with `unanswered:`) and pair verbs |
+| `knife.py` | 263 | The selection language (with `unanswered:`, `answers:`, `answered-by:`) and pair verbs |
 | `verbs.py` | 445 | World verbs: finding (nearest first, rooms as namespaces, doors), where a line stands, stored text judged when saved, running, reaches (their blanks are filled by `blanks.py`). a990's proof is `test_room_verbs.py`; `sweep_rooms.py` tries every built-in from every room |
-| `blanks.py` | 240 | The one filler (a806): `$here $here.<prop> $new $today $me $<handle>`, `$1 $* $this` in verbs and scripts, `$item` in rules; a backslash before a dollar sign keeps it literal; `help blanks` |
+| `blanks.py` | 240 | The one filler (a806): `$here $here.<prop> $new $today $me $<handle>`, `$1 $* $this` in verbs, `$item` in rules, a thing's parts `.title .maker .<prop>` (a1027); a backslash before a dollar sign keeps it literal; `help blanks` |
 | `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
 | `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
 | `rooms.py` | 437 | Rooms (a678, a806, a948): what a room is, where each actor is (derived from `go` events), `go`, `rest` (home, `via=rest`), the narrated `look` and `look <room>`, the date line, presence (asleep, resting, plain) |
@@ -676,6 +678,7 @@ Which file for which change:
 | Change | Where it goes |
 |---|---|
 | A verb anyone can use | A note tagged `verb` in the world |
+| The desk acting on its own | A note tagged `rule`, placed in the room it acts from (a1027; `test_rules.py` checks it) |
 | A new primitive or undo kind | `world.py` and `moo.py` |
 | A new command | `desk_knife.py` |
 | A new lens word | See "How the language grows" |
@@ -703,7 +706,7 @@ Which file for which change:
 *The fence and undo:*
 - A selection target skips the "not looked yet" refusal, and pair verbs never check staleness (read).
 - Via deskd, the CLI does not stop at a refusal.
-- A `;` batch half-applies, and a `script` definition makes no event, so a bare `undo` reverts an older change.
+- A `;` batch half-applies. (A `script` definition made no event, so a bare `undo` reverted an older change; scripts are retired since a1027, and a rule is a note, made by an event.)
 
 *Worktrees and export:*
 - `export` does not replay: an unplaced subject and its props are dropped, and repeated placements make titles ambiguous.
@@ -751,7 +754,7 @@ In priority order, from an attempt to describe a calendar in this framework.
 4. **Gestures carry pixels and one field.** An `edit` can run any verb, including a `create` titled with `$value`, and a drop onto a derived day row can carry `$it.date`. Nothing maps a position to a date.
 5. **Two interfaces that do not meet.** The windowed shell and the lens painter are separate pages. The lens page has a desk terminal beside it.
 6. **Text entry is whole-field**, committed on blur, Enter or Ctrl-Enter. Drafts survive a refusal or a reload. The prose native is still unwired.
-7. **Definitions are not uniform.** Lenses, styles and world verbs are notes. Rules, scripts and the clock are not: they have no history or undo, though worktrees carry them.
+7. **Definitions are nearly uniform.** Lenses, styles, world verbs and (since a1027) rules are notes; scripts are retired into verbs. The clock is not: it has no history or undo, though worktrees carry it.
 8. **No durable store, no identity, few pass/fail tests** for the command layer. The instruments (`test_journal.py`, `suite/`) drive it but don't gate.
 
 ## Under study
@@ -784,7 +787,7 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - A gesture or rule yields one proposal, applied whole or not at all and previewed first, including the rules it sets off.
 - Only `on drop` is limited to one command today. Decisions 3 and 4 are not enforced.
 
-**For "everything that changes behavior is visible".** *Style: built* (a world note). Rules, scripts and the clock remain desk attributes. The last-good cache is kept, and named in `def`.
+**For "everything that changes behavior is visible".** *Style: built* (a world note). Rules are notes since a1027: checked whenever their text, home or author changes, broken with a reason, never running a last good version. Scripts are retired into verbs. The clock remains a desk attribute. The last-good cache is kept, and named in `def`.
 
 **For "extending gets cheaper": the library and new intermediate kinds.** *Not built.* The proposed bar for a new kind:
 - two unrelated tasks need it;
@@ -829,4 +832,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2067. Edit it there; a direct edit here makes the next export stop and warn. sha1:1a32433ee14c -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2178. Edit it there; a direct edit here makes the next export stop and warn. sha1:3bffe97aef4b -->

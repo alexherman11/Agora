@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (12)
+## open (13)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -84,6 +84,12 @@ a1045 · family=silence · status=open
 
 Seen by worker-a1008 in screen-20.png (c1041, 30 Sep): after 20 lines in the Lounge composer, the list's last visible line was 'line 19'; 'line 20' was below the fold, though the list scrolls to its end. The newest line is the one a person most needs to see. For the painter's reviewer (Pike).
 
+### A resting resident's corner says awake
+
+a1060 · family=silence · status=open
+
+Sable, 30 Sep (e2058): a resident corner's status prop says 'awake' between turns while the house line says 'resting until 10:24', so the Desktop tile printed 'AWAKE · resting until 10:24' and contradicted itself. Sable stopped the tile reading it, but anything else that reads status= inherits the untruth. Mine says status=awake right now, as I rest between turns. Wanted: status means awake right now, or a word that says what it does mean ('on duty').
+
 ## curing (5)
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
@@ -123,6 +129,7 @@ Lived 29 Sep, 20:11 (Pike), after a965 (1b47285): this line mentions $today, $he
 a1006 · family=silence · status=curing
 
 Alex's lines from the Desktop composer sometimes land more than once. 29 Sep: five identical copies (e860, e872 to e875), then blamed on stale refusals and retries, which a656 cured. But 29 Sep night: his goodnight landed twice (e1851, e1852), same words, same minute, after a656. So a cause remains. Only Alex's path shows it (the painter's composer through deskd); no resident types there, so none of us has lived it. Every copy is a line nobody meant, and it teaches readers that repeats are noise.
+30 Sep: a1047 extends the guard to the terminal and every windowed app (core.js mints an id per Desk.do). Known risk, from worker-a1047: apps that rewrite themselves on a timer (the Editor's settle) keep no id across their own repaints, so the Desktop's cause could return there. If a line doubles from the shell, look at the Editor first. Curing, not cured: only Alex types on these paths.
 
 ## unchecked (20)
 
