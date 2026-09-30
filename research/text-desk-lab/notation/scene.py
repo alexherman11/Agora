@@ -152,10 +152,12 @@ SOURCES = {
     "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
     # the command center (research/command-center): a chat's lines, and what the house observes of its residents
     "messages": ("messages:<id>", ("item", "who", "said", "index", "at")),
-    # Alex, 30 Sep: what's for me, one list, newest first, each line saying which chat it came from and when
+    # Alex, 30 Sep: what's for me, one list, oldest first like a chat (newest at the bottom), each line saying which
+    # chat it came from and when
     "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid")),
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room")),
-    # what each resident wrote, its last turns, newest first (Alex, 29 Sep: to see their turns and text)
+    # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
+    # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
     "turns": ("turns[:<corner>]", ("resident", "corner", "turn", "at", "said", "acts")),
 }
 NAMES = NAMES + tuple(f for _, fs in SOURCES.values() for f in fs)
@@ -163,7 +165,7 @@ HOUSE_STATE = pathlib.Path(__file__).resolve().parent / "house-state"   # <world
 
 
 def turn_rows(desk, corner=None):
-    """The replies the house kept for each resident (house.json `said`), newest first. `acts` counts the lines that
+    """The replies the house kept for each resident (house.json `said`), oldest first. `acts` counts the lines that
     reached the desk (those beginning with >); the rest is the resident's own thinking, shown as written."""
     import json
     import time
@@ -183,7 +185,7 @@ def turn_rows(desk, corner=None):
             out.append({"resident": r.get("actor") or "(no name yet)", "corner": cid, "turn": t.get("n", 0),
                         "at": time.strftime("%H:%M", time.localtime(at)) if at else "", "said": t.get("text") or "(nothing)",
                         "acts": sum(1 for l in (t.get("text") or "").splitlines() if l.lstrip().startswith(">")), "_t": at or 0})
-    out.sort(key=lambda r: r.pop("_t"), reverse=True)
+    out.sort(key=lambda r: r.pop("_t"))
     return out
 
 
@@ -222,7 +224,7 @@ def line_times(w, sid):
 
 
 def inbox_rows(desk, me):
-    """Every chat line for `me`, newest first: a line in a chat whose members name me (a direct chat), or one that
+    """Every chat line for `me`, oldest first like a chat: a line in a chat whose members name me (a direct chat), or one that
     calls @me by name outside quotes. @everyone and @all don't count (Alex, 30 Sep: 'just direct chats and @alex';
     a broadcast in a shared chat stayed 'for you' forever, since he rarely writes there). Narrower than what reaches
     a resident (house.news), on purpose. `open` says no line of mine has followed it in that chat yet."""
@@ -257,7 +259,7 @@ def inbox_rows(desk, me):
                 out.append({"item": where[sid], "chat": s["title"], "who": m.group(0).rstrip(" \t:"), "said": said,
                             "at": _clock(times[k][0]), "open": "no" if mine_after else "yes", "index": k + 1,
                             "eid": times[k][1] or f"{where[sid]}-{k + 1}", "_t": times[k][0]})
-    out.sort(key=lambda r: r.pop("_t") or "", reverse=True)
+    out.sort(key=lambda r: r.pop("_t") or "")
     return out
 
 
