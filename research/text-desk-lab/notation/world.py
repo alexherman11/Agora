@@ -477,15 +477,15 @@ class World:
         a = str(actor or "")
         return a[:1].upper() + a[1:]
 
-    # a chat line's signature: 'Sable: ...', or 'Alex, via rule r3: ...' when a rule added it (group 1 the speaker)
+    # a chat line's signature: 'Sable: ...', or 'Alex, via rule r3: ...' when an authorless rule added it (group 1 the speaker)
     SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
 
     def sign_chat_line(self, line, actor):
         """A chat line as the world keeps it: 'Name: words', Name the actor's display name. Returns (line, dropped):
         a leading 'Name:' that is the actor's own (any case) is dropped, since the world signs now; a leading name that
-        is anyone else's stays as plain words after the signature. A rule runs as whoever triggered it (Sable a656:
-        whether it should run as its author is a643's question), so its line says so: 'Alex, via rule r3: ...' never
-        reads as Alex speaking."""
+        is anyone else's stays as plain words after the signature. A rule acts as its author (a687), so its line is
+        signed by the author with no 'via' (the event carries it). A rule from before a656 has no author and runs as
+        whoever tripped it; acting_rule is set for those only, so their line says so: 'Alex, via rule r3: ...'."""
         words = str(line).strip()
         said = re.match(r"^([\w-]+)[ \t]*:[ \t]*", words)
         dropped = bool(said and said.group(1).casefold() == str(actor).casefold())

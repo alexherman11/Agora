@@ -68,6 +68,12 @@ def event_aspects(e):
     return aspects_of(e["verb"], e.get("args"))
 
 
+def rule_did_unseen(e, me):
+    """An event a rule did as `me`, its author, while someone else tripped it (a687). The author did not watch it
+    happen, so it is not on their receipts: it counts as someone else's deed for their fence and their !! line."""
+    return e["by"] == me and e.get("tripped_by") not in (None, me)
+
+
 def aspects_meet(a, b):
     """Do two aspect sets overlap? Either side unknown (None) counts as everything."""
     return a is None or b is None or bool(a & b)
@@ -346,8 +352,9 @@ class Desk:
         subj = n.get("subject") if n else None
         mywin = getattr(self, "_window", "") or ""
         for k, e in enumerate(w.events[since:], since):
-            if e.get("undone") or (e["by"] == w.me and (others_only or e.get("window", "") == mywin)):
-                continue                      # my own deeds from this window are already on my receipts
+            if e.get("undone") or (e["by"] == w.me and (others_only or e.get("window", "") == mywin)
+                                   and not rule_did_unseen(e, w.me)):
+                continue                      # my own deeds from this window are already on my receipts; my rule's, tripped by another, are not
             if e["verb"] == "undo":
                 # Sable's baseline (3): an undo's target is an event id, so the fence never saw what it reverted. It
                 # touches what the reverted event touched, on the same aspects.
@@ -367,6 +374,8 @@ class Desk:
         return None
 
     def _observer(self):
+        if getattr(self, "_firing_observer", None):
+            return self._firing_observer   # a rule acting as its author: what is printed meanwhile is the tripper's to have seen (a687)
         win = getattr(self, "_window", "") or ""
         return self.world.me + ("/" + win if win else "")
 
@@ -379,7 +388,7 @@ class Desk:
         for name in [nid] + ([n["subject"]] if n and n.get("subject") else []):    # a print of the appearance or of its subject
             v = idx.get((obs or self._observer(), name))
             if v is None:
-                v = idx.get((self.world.me, name))
+                v = idx.get(((obs or self._observer()).split("/")[0], name))
             if v is None:
                 continue
             for a, k in ({"*": v} if isinstance(v, int) else v).items():
@@ -635,14 +644,30 @@ class Desk:
         return "\n".join(lines)
 
     def delta_header(self):
-        evs = [e for e in self.world.events[self.last_event_seen:] if e["by"] != self.world.me]
+        me = self.world.me
+        # a rule acts as its author (a687): its tripper saw it on their receipt, its author did not
+        evs = [e for e in self.world.events[self.last_event_seen:]
+               if (e["by"] != me and e.get("tripped_by") != me) or rule_did_unseen(e, me)]
         self.last_event_seen = len(self.world.events)
         if not evs:
             return ""
+
+        def rule_of(e):
+            return str(e.get("via") or "").split(" ", 1)[-1] if e.get("tripped_by") else None
+
         if len(evs) <= 4:
-            parts = [f"{e['id']} {e['verb']} {e['target']} by {e['by']}" for e in evs]
-            return "!! since your last look: " + "; ".join(parts) + "\n"
-        w, me = self.world, self.world.me
+            def part(e):
+                if rule_did_unseen(e, me):
+                    args = {k: (v if len(str(v)) <= 60 else str(v)[:57] + "…") for k, v in (e.get("args") or {}).items()}
+                    verb = e["verb"]
+                    if verb == "edit":       # the log records append/retitle/rewrite as edit; say the verb a person used
+                        verb, args = next(((v, {"line" if k == "append" else k: args[k]}) for k, v in
+                                           (("append", "append"), ("title", "retitle"), ("text", "rewrite")) if k in args), (verb, args))
+                    return (f"{e['id']} your rule {rule_of(e)} did {verb} {e['target']} {self._fmt_args(args)}".rstrip()
+                            + f" (tripped by {e['tripped_by']})")
+                return f"{e['id']} {e['verb']} {e['target']} by {e['by']}" + (f" via rule {rule_of(e)}" if rule_of(e) else "")
+            return "!! since your last look: " + "; ".join(part(e) for e in evs) + "\n"
+        w = self.world
         mine = {e["undo"].get("delete_subject") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
         mine |= {e["undo"].get("delete") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
         lines, to_me, undone = {}, [], []
@@ -655,7 +680,8 @@ class Desk:
             if where in w.nodes and w.nodes[where]["type"] == "appearance":
                 where = w.nodes[where]["parent"]
             name = w.title(w.nodes[where]) if where in w.nodes else (w.subjects[where]["title"] if where in w.subjects else where)
-            lines.setdefault(e["by"], {}).setdefault((e["verb"], name), []).append(e["id"])
+            who = f"your rule {rule_of(e)}" if rule_did_unseen(e, me) else e["by"]
+            lines.setdefault(who, {}).setdefault((e["verb"], name), []).append(e["id"])
         out = [f"!! since your last look: {len(evs)} changes by {', '.join(lines)} ({evs[0]['id']}..{evs[-1]['id']}; history lists them)"]
         for e in to_me:   # never folded: someone answered you
             t = w.subjects[e["target"]]["title"] if e["target"] in w.subjects else e["target"]
@@ -888,7 +914,8 @@ class Desk:
 
     def cmd_undo(self, eid):
         if not eid:
-            mine = [e for e in self.world.events if e["by"] == self.world.me and e["verb"] != "undo" and not e.get("undone")]
+            mine = [e for e in self.world.events if e["by"] == self.world.me and e["verb"] != "undo" and not e.get("undone")
+                    and not rule_did_unseen(e, self.world.me)]   # a687: your rule's firing, tripped by another, undoes their command
             if not mine:
                 raise Refusal("nothing of yours to undo")
             eid = mine[-1]["id"]   # bare undo: your latest change

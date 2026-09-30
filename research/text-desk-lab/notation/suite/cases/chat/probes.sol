@@ -11,4 +11,8 @@ probe two-speak-unread
 probe stale-rewrite-refused
 probe own-name-once
 probe verb-signs-caller
-probe rule-says-via
+# a687: a rule acts as its author
+probe rule-acts-as-author
+probe author-told-your-rule
+probe author-fenced-by-rule
+probe authorless-rule-as-before
