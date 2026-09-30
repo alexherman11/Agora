@@ -274,6 +274,21 @@ class DeskKnife(DeskMoo):
             if len(self.rules) == before:
                 raise Refusal(f"no rule {rid}; rules lists them")
             return f"ok dropped {rid}"
+        if argv and argv[0] == "home":
+            # a990 (5), Juniper c996: a rule's home is seen (rules, examine rN) and changed on purpose, never by where
+            # its author happens to walk. The move is judged like a save: its world verb must be at hand there
+            if len(argv) != 3:
+                raise Refusal("rule home rN <room>   (the room a rule lives in: its $here, and where its bare verb word is looked up)")
+            r = next((x for x in self.rules or [] if x["id"] == argv[1]), None)
+            if r is None:
+                raise Refusal(f"no rule {argv[1]}; rules lists them")
+            import rooms
+            import verbs
+            fid = rooms.resolve(self.world, argv[2], self.world.me)
+            if r.get("world") and r["verb"] != "use":
+                verbs.find(self, r["verb"], [a for a in r.get("args") or [] if "=" not in a], self.world.me, at=(fid, True))
+            r["home"] = fid
+            return f"ok {r['id']} lives in {self.world.nodes[fid]['title']} ({fid}) now"
         if len(argv) >= 4 and argv[0] == "on":
             # rule on <verb> [by=<actor>] do <verb> [k=v ...]: fires on each such event, on the event's thing
             i = argv.index("do") if "do" in argv else -1
@@ -695,6 +710,21 @@ class DeskKnife(DeskMoo):
             del self.scripts[name]
             (self.script_homes or {}).pop(name, None)
             return f"ok dropped script {name}"
+        if arg.startswith("home "):
+            # a990 (5): a script's home is changed on purpose, and judged there like a save
+            import rooms
+            import verbs
+            words = arg.split()
+            if len(words) != 3 or words[1] not in (self.scripts or {}):
+                raise Refusal("script home <name> <room>   (scripts lists them)")
+            fid = rooms.resolve(self.world, words[2], self.world.me)
+            try:
+                verbs.check_lines(self, self.scripts[words[1]], fid)
+            except Refusal as e:
+                raise Refusal(f"script {words[1]} not moved: {e}")
+            self.script_homes = dict(self.script_homes or {})
+            self.script_homes[words[1]] = fid
+            return f"ok script {words[1]} lives in {self.world.nodes[fid]['title']} ({fid}) now"
         name, eq, body = arg.partition("=")
         name, body = name.strip(), body.strip()
         if not eq or not name or not body:
@@ -1187,7 +1217,8 @@ class DeskKnife(DeskMoo):
   or use <verb id> [words]
   A rule is a template: its values are filled when it fires ($item, $today; help blanks). A rule lives in the room
   you save it in, wherever you go after: $here is that room, and a bare verb word means that room's verb. Saving
-  one whose word only another room has is refused, naming the door (use <id>). $new refuses: a rule has no earlier
+  one whose word only another room has is refused, naming the door (use <id>). examine rN shows where it lives;
+  rule home rN <room> moves it there on purpose (judged there like a save). $new refuses: a rule has no earlier
   line.
   rules              list them, with how often each fired      rule drop rN   remove one
   A rule's actions print as ~ lines after your command's receipt; undo of your command undoes them too.
@@ -1201,6 +1232,7 @@ class DeskKnife(DeskMoo):
   scripts                                        list them
   A script lives in the room you save it in: its bare verb words mean that room's verbs, whoever runs it from
   wherever. One whose word only another room has is refused when saved, naming the door (use <id>).
+  script home <name> <room> moves where it lives, on purpose (judged there like a save).
   e.g. script morning = clock $1; look Overdue; look Today; find age<1""",
         "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
@@ -1294,6 +1326,15 @@ class DeskKnife(DeskMoo):
         return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(knife.SPECIALIZED) | set(moo.REGISTRY) | self._verb_names()
 
     def cmd_examine(self, ident):
+        rule = next((r for r in self.rules or [] if r["id"] == ident), None) if ident else None
+        if rule is not None:
+            # a990 (5): a rule is no thing on a surface, but where it lives is seen
+            w, home = self.world, rule.get("home")
+            return (f"{rule['id']}: rule {'' if rule.get('on') else 'when '}{rule['sel']} do {self._action_text(rule)}   "
+                    f"(fired {rule.get('fired', 0)}x, by {rule.get('author') or '?'})\n  "
+                    + (f"lives in {w.nodes[home]['title']} ({home}): its $here, and where its bare verb words are looked up"
+                       if home in w.nodes else "lives in no room (saved before rules had homes, or by someone placed nowhere)")
+                    + f"\n  rule home {rule['id']} <room> moves it; rule drop {rule['id']} removes it")
         nid = self._resolve(ident or "desk")
         if nid in self.world.subjects:
             return self.cmd_pivot(nid)

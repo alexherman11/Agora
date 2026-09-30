@@ -208,6 +208,23 @@ got = reply("pike", f"look {x} :1", f"do tag {x} add=messy")
 check("... and while its author is asleep in her corner", rooms.asleep(W, "juniper") and prop(x, "tidied") == "lounge", got[-1])
 W.nodes[CORNER]["props"]["want"] = "awake"
 
+# (5), Juniper c996: where a rule lives is seen and changed on purpose (rules are no placed notes yet: the room it was
+# saved in is the fallback, and so every rule's home today)
+t, e = said("juniper", f"examine {rid}")
+check("examine rN shows where the rule lives", not e and f"lives in Lounge ({LOUNGE})" in t, e or t)
+t, e = said("juniper", f"rule home {rid} corner")
+check("rule home to a room where tidy is not at hand is refused, naming the doors", f"use {LT}" in e, e or t)
+t, e = said("juniper", f"rule home {rid} board")
+check("rule home to the Board is accepted", not e and f"lives in Board ({BOARD})" in t, e or t)
+x = make("pike", BOARD, "mess after the move")
+reply("pike", f"look {x} :1", f"do tag {x} add=messy")
+check("... and the rule now runs the Board's tidy", prop(x, "tidied") == "board", prop(x, "tidied"))
+reply("juniper", f"rule home {rid} lounge")
+t, e = said("juniper", "script home t2 corner")
+check("script home to a room where tidy is not at hand is refused", "not moved" in e and f"use {LT}" in e, e or t)
+t, e = said("juniper", "script home t2 board")
+check("script home to the Board is accepted, and scripts says so", not e and f"(lives in Board {BOARD})" in said("juniper", "scripts")[0], e or t)
+
 # a rule living elsewhere whose word lost its room: Pike's corner had a tidy when he saved it, then it went
 PC = rooms.corner_of(W, "pike")
 goto("pike", PC)
