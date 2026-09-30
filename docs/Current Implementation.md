@@ -479,7 +479,7 @@ Two pages paint the same world.
   - carry and drop work: a press becomes a carry once it moves 5px, from anywhere on the card (its fold handle included); a press that doesn't move stays a click. A copy of the card follows the pointer, so a scrolling lane can't clip it;
   - code prints as runs;
   - `paint.semantic` marks buttons and groups.
-- `term.js` (76) is a desk terminal in the right-hand pane by default. It sends lines to `/api/do` and keeps its history in localStorage. × closes it and the painter takes the full width; "▸ terminal" (top right) or Ctrl+` opens it again. Open or closed is remembered per world in the browser.
+- `term.js` (94) is a desk terminal in the right-hand pane by default. It sends lines to `/api/do` and keeps its history in localStorage. Each Enter on new words mints a gesture id (a1047); if the answer is lost, the line goes back into the input holding that id (kept in localStorage over a reload), and Enter on it untouched resends the same press, so deskd answers `already done, as eN` if the first got through. Typing in the line or walking the history lets the id go: the same words sent again on purpose are a new line. × closes it and the painter takes the full width; "▸ terminal" (top right) or Ctrl+` opens it again. Open or closed is remembered per world in the browser.
 
 **The windowed shell** (`index.html`, `shell.js`, `core.js`, `apps/`) has a dock, draggable windows, and three hand-written apps: Notes, Editor and Together (`apps/third.js`).
 - A window is an appearance on the `<actor> screen` surface:
@@ -490,6 +490,7 @@ Two pages paint the same world.
 - Other `* screen` surfaces show as "<who> has N open".
 - Each app implements `text(ctx)`, what a text-only inhabitant reads for that window.
 - Apps prefix `look <id>;` to their commands, so their gestures are not fenced against what was on screen.
+- Every `Desk.do(line)` is one press with its own gesture id (a1047), minted in `core.js`, so no app mints or forgets one. A request that never came back is sent again with the same id, after 0.5 s and 2 s; an answer that came back, even a broken one, is never sent twice. `Desk.do(line, {gesture})` retries a press by its id, and the answer carries `gesture`. Apps don't yet carry an id of their own across a repaint (the Editor's settle, Notes' drags): each call is a new press.
 - The shell loads `calm.style` as a file, and its style panel edits page memory only.
 
 `desk-shell/natives/prose.js` is an 80-line prose editor loaded nowhere. It reads the old node shape, from before `paint`, and the compiler refuses `native` and `settle`.
@@ -588,7 +589,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
   - Its system prompt is Claude Code's own, plus `AGENTS.md` verbatim, then the worker protocol. The protocol asks it to keep *Current Implementation* true (see Landing). It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
 - The worker's desk tool (`desk_mcp.py`, as `worker-<cid>`) acts in the live world.
 - It talks through comments on its commission, and those comments come back to it as messages.
-- It can see the painter: `screen.py <world> --as <who> STEP ...` copies the world (removed after), serves it with the caller's own `desk-shell/` from a deskd on a free port, drives headless Chrome over the DevTools protocol, and runs steps: `facts [prefix] [depth]` (each painted part's size, scrolls or cut, folded, off screen), `shot [file.png]`, `click`, `right`, `menu`, `choose`, `type`, `key`, `drag`, `scroll`, `wait`, `text`. Parts are named by data-key (`<key>/handle` for a fold's handle). `--live` points at the keeper's deskd instead, where a press is a real act.
+- It can see the painter: `screen.py <world> --as <who> STEP ...` copies the world (removed after), serves it with the caller's own `desk-shell/` from a deskd on a free port, drives headless Chrome over the DevTools protocol, and runs steps: `facts [prefix] [depth]` (each painted part's size, scrolls or cut, folded, off screen), `shot [file.png]`, `click`, `right`, `menu`, `choose`, `type`, `key`, `drag`, `scroll`, `wait`, `text`, `answer <text>` (the next prompt() or confirm() is answered so; unanswered ones are dismissed), `events [n]`, `resend [k]` (post again, unchanged, a body the page sent), `restart`/`stop`/`start` (the throwaway deskd). Parts are named by data-key (`<key>/handle` for a fold's handle), or by a CSS selector starting `#` or `.` for a part with no key. `--term` keeps the desk terminal beside the lens (hidden by default); `--page shell` opens the windowed shell (`index.html`) instead of the painter. `--live` points at the keeper's deskd instead, where a press is a real act.
 - After the house restarts, a commission underway (`working`, `waiting` or `ready`) whose worktree still exists is resumed on the worker's saved session. A turn the restart cut short is said to it again, and it hears only what it has not heard.
 - It says it is done by committing and setting `commission=ready`.
 
@@ -828,4 +829,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2036. Edit it there; a direct edit here makes the next export stop and warn. sha1:539bd7fd9c3d -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2067. Edit it there; a direct edit here makes the next export stop and warn. sha1:1a32433ee14c -->
