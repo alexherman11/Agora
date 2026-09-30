@@ -1045,7 +1045,9 @@ class DeskKnife(DeskMoo):
         "find": """find <words> searches titles and text; find <selection> lists what matches, grouped by surface (8 per surface,
   then a pointer). Both end with the selection form to act on: do move <selection> into=<surface>. help selections.""",
         "read": """read <id> shows a text's sections with word counts; read <id> #<n> or #<name> one section (names may have
-  spaces); read <id> :3 all of it; tail=<n> the last n lines of what was asked for.""",
+  spaces); read <id> :3 all of it; tail=<n> the last n lines of what was asked for.
+  A chat: read <id> shows only the lines added since you last read it (yours too), under one header; the first time,
+  its last 10. Rewriting a chat needs you to have seen every line once (read <id> :3).""",
         "sync": "sync: brings finished trials in as the actor harness (props, a comment with the reply, a transcript doc). help trials.",
         "compare": "compare <A> <B>: two things side by side, line by line, with what differs marked.",
     }

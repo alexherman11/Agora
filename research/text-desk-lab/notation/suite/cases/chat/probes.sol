@@ -16,3 +16,6 @@ probe rule-acts-as-author
 probe author-told-your-rule
 probe author-fenced-by-rule
 probe authorless-rule-as-before
+# a744: read <chat> shows what is new to you
+probe catch-up-alternating
+probe first-read-fenced
