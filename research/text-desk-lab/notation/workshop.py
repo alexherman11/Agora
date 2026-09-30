@@ -149,6 +149,12 @@ class Workshop:
                     self.finish(cid, wk, keep_branch=True)
                 continue
             if state == "asked" and not wk:
+                # 29 Sep: the house restarts on new code only when no one is mid-turn, and it started the next commission
+                # in the pass after each landing, so with a queue it never restarted (a678's rest-goes-home never ran
+                # live). After a landing that changed code, the next worker waits for the restart: it then runs, and
+                # branches from, the code that landed.
+                if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
+                    continue
                 running = sum(1 for x in self.workers.values() if x.alive())
                 if running < int(cfg.get("workers", "1")):
                     self.begin(w, cid, s, cfg)
