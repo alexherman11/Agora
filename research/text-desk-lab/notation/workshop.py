@@ -209,10 +209,28 @@ class Workshop:
         return out
 
     # ---- a worker's life ---------------------------------------------------------------------------------------
+    @staticmethod
+    def real_tree(tree):
+        """A worktree git knows, not a folder that only looks like one. 30 Sep (a1161, found by Sable and worker-a1062):
+        a remove that left its empty folder behind made the next begin skip `worktree add`, and a worker started in a
+        plain folder inside the main repo, where every git command it runs acts on the main checkout."""
+        if not (tree / ".git").exists():
+            return False
+        listed = git("worktree", "list", "--porcelain").stdout or ""
+        return any(Path(l[9:].strip()).resolve() == tree.resolve() for l in listed.splitlines() if l.startswith("worktree "))
+
     def begin(self, w, cid, s, cfg):
         asked_by = self.asked_by(w, s)
         branch, tree = f"worker/{cid}", TREES / cid
         TREES.mkdir(exist_ok=True)
+        if tree.exists() and not self.real_tree(tree):
+            try:
+                tree.rmdir()                       # an empty folder a remove left behind: clear it and make the worktree
+            except OSError:
+                self.set_state(cid, "failed")
+                self.say(cid, f"the house will not start a worker here: {tree} is a folder but not a worktree git knows, "
+                              "and it isn't empty. A person must look at it before this is asked again.")
+                return
         if not tree.exists():
             r = git("worktree", "add", str(tree), "-b", branch, "HEAD")
             if r.returncode and "already exists" in (r.stderr or ""):
@@ -221,6 +239,10 @@ class Workshop:
                 self.set_state(cid, "failed")
                 self.say(cid, f"the house could not make a worktree for this: {r.stderr.strip()[:300]}")
                 return
+        if not self.real_tree(tree):               # never start a worker anywhere but its own worktree
+            self.set_state(cid, "failed")
+            self.say(cid, f"the house made {tree} but git does not list it as a worktree, so no worker was started there.")
+            return
         try:                              # a copy of the world to try things on, inside the worktree it may touch
             import shutil
             shutil.copyfile(HERE / "sessions" / f"{self.house.world}.pickle",
@@ -242,6 +264,12 @@ class Workshop:
         heard (the cursor was saved), and a turn the restart cut short is said to it again. Without a saved session it
         is left for a person to re-ask (commission=asked)."""
         props = s.get("props") or {}
+        if not self.real_tree(TREES / cid):
+            # a1161: never resume into a folder that isn't its worktree; ask again, and begin makes it anew on the kept branch
+            self.set_state(cid, "asked")
+            self.say(cid, "its worktree was gone when the house restarted, so it is asked again: the next worker starts in "
+                          "a fresh worktree on the same branch.")
+            return None
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", props.get("asked_by") or self.asked_by(w, s))
         if not wk.state.get("session"):
             return None
@@ -272,6 +300,10 @@ class Workshop:
         self.workers.pop(cid, None)
         if wk.tree.exists():
             git("worktree", "remove", "--force", str(wk.tree))
+            try:
+                wk.tree.rmdir()        # a1161: on Windows the remove can leave the empty folder, which looked like a worktree
+            except OSError:
+                pass
         if not keep_branch:
             git("branch", "-D", wk.branch)
 
