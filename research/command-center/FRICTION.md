@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (9)
+## open (10)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -18,6 +18,14 @@ Checked 29 Sep (Pike): still open, and it's use versus mention (a916) seen early
 a852 · family=identity · status=open · f=F3
 
 A resident chooses its name on its first pass, but every act is signed with an actor string, and the desk prints that string everywhere (history, receipts, chat lines). A name chosen after the first act would split one resident across two actors. Decision for now: the name is chosen at the door, before any act, and becomes the identity. A later rename needs actors to be things whose title is their name, printed by title.
+
+### F25. A verb's title is also a name (worked around; the fix is open)
+
+a896 · family=identity · status=open · f=F25
+
+Making the house verb `handbook` (a608) as a note titled `handbook` broke `look Handbook` for everyone (ran): titles work as names, case-insensitively, so the word named two things, `'Handbook' names 2 things: f193, a608; use an id`. The arrive script and the Handbook's own map use names like this, so a verb titled like any existing thing silently breaks that name everywhere. Worked around by titling the verb `handbook|hb` (an alias title, which no longer equals the word) and naming the shelf by id in its body. The fix belongs to the verbs draft's "checked when saved" step: either a verb's word stays out of title resolution (verbs are found by lookup, never as things to act on), or saving a verb whose word is already a thing's title is refused with both named. I lean toward the first: a verb's word is a verb, not a noun.
+Checked 29 Sep (Pike): open, and urgent for a990 (rooms as namespaces for verbs). Two rooms each growing a tidy means two notes titled 'tidy', so read tidy or look tidy becomes ambiguous even if verb lookup is namespaced. The first team's lean still looks right: a verb's word is a verb, not a noun. Verb words stay out of title resolution.
+Too late for a990 (a worker had it). Check after a990 lands: make a room verb whose word is also some thing's title (or two rooms each with a tidy), then try read and look by that word. If a name breaks, this is the next step's first line.
 
 ### The answer is behind the wrong door (help <kind>)
 
@@ -99,23 +107,13 @@ More, 29 Sep: Pike's own line on a775 (e1430), explaining this, said the word an
 Fourth case (Sable, e1650, from worker-a951's c958): replace's new= filled blanks, so writing about the room's talk blank in new= was refused (Home has no talk=), and only a backslash got it through. Typed words in new= should be literal, like line= and text=.
 Lived 29 Sep, 20:11 (Pike), after a965 (1b47285): this line mentions $today, $here and $new with no backslashes. If you're reading them as words and not as a date, an id and a room, the typed-text half is cured.
 
-## unchecked (24)
+## unchecked (22)
 
 ### F4. A child agent inherits its launcher's Claude environment (fixed in the house)
 
 a854 · family=unsorted · status=unchecked · f=F4
 
 Launched from this session, `claude -p` inherits `CLAUDE_CODE_ENTRYPOINT=claude-desktop` and about twenty other `CLAUDE_*` variables, including this session's messaging socket and token. With them, every turn made one or two extra model calls: a "post-turn summary" whose own system prompt begins "A user kicked off a Claude Code agent to do a coding task". It never entered the agent's context, but it doubled the calls and framed the agent as a coding task. With the variables removed, one request per turn and no summary (fake model, 28 Sep). The house starts every resident with every `CLAUDE*` variable removed. The summary is worth having for the command center; if we want it, we write our own, from the world.
-
-### F5. A second actor can never set a new prop on a thing someone else built (fixed)
-
-a856 · family=unsorted · status=unchecked · f=F5
-
-The house looked at a resident's corner and set `actor=testa`; the desk refused: "stale: f571 changed since you last saw it (e515 create by claude)". Two faults in the fence (`desk._touched_by_others`), both from the per-aspect work of 25 Sep:
-- Creating a note inside a surface was judged as touching every aspect of the surface, its props included. It changes only what the surface holds.
-- A prop that does not exist yet was never printed, so its "last seen" was the beginning of time and no look could ever clear it. But a print that lists all of a thing's props shows the absent ones too; absence is a value (Sable's R6).
-
-Fix (desk.py): when the fence judges a surface, a `create` into it touches `contents`; the outline line and `read` mark `prop:*`, and a prop aspect is judged from the later of its own last print and the last `prop:*` print. A first attempt put `create -> contents` in `aspects_of` itself; the trip then refused a creator's rewrite of its own new note ("you have not seen a22's text"), because a creator's receipt marks the new thing seen with the create's aspects. The special case belongs to the fence judging the surface, not to the event. Checked: test_scene 20 pass; goldens 82 same; trip, budget, reads, attacks, workspace, host identical to HEAD; Sable's harness tally 9/1/1/1; soundness 0 unsound.
 
 ### F7. A style was a file the painter fetched, so nothing in the world could restyle anything (fixed)
 
@@ -253,12 +251,6 @@ a892 · family=unsorted · status=unchecked · f=F23
 What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
 Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
 
-### F25. A verb's title is also a name (worked around; the fix is open)
-
-a896 · family=unsorted · status=unchecked · f=F25
-
-Making the house verb `handbook` (a608) as a note titled `handbook` broke `look Handbook` for everyone (ran): titles work as names, case-insensitively, so the word named two things, `'Handbook' names 2 things: f193, a608; use an id`. The arrive script and the Handbook's own map use names like this, so a verb titled like any existing thing silently breaks that name everywhere. Worked around by titling the verb `handbook|hb` (an alias title, which no longer equals the word) and naming the shelf by id in its body. The fix belongs to the verbs draft's "checked when saved" step: either a verb's word stays out of title resolution (verbs are found by lookup, never as things to act on), or saving a verb whose word is already a thing's title is refused with both named. I lean toward the first: a verb's word is a verb, not a noun.
-
 ### F27. Names are given, and the welcome comes whenever a resident enters (Alex's direction)
 
 a900 · family=unsorted · status=unchecked · f=F27
@@ -384,7 +376,7 @@ Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary lin
 
 Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
-## cured (11)
+## cured (12)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -392,6 +384,17 @@ a848 · family=habit · status=cured · f=F1
 
 `moo.v_reply` prefixes an unsigned line with `Alex: ` before appending. Since Juniper's a484 fix, `append` on a chat signs every line with its actor unless the line is already signed with the actor's own name, so a resident's reply becomes `Ember: Alex: ...`. `moo.unanswered` also assumes the reader is `alex`. Chat was written for one person talking to JEFF. Fixed (moo.py): `reply` leaves the line unsigned so `append` signs it with its actor, and `unanswered` is judged for the reader (`w.me`). The knife desk has no `reply`; the porch answers with `append`. For finding waiting chats there is now a selection term, `unanswered:<name>`: chats whose trailing lines are by others (knife.py).
 Checked 29 Sep (Pike): the first team's F1 is what a656 cured (a754 in Rough spots): the world signs chat lines with the actor, lived by Pike at e884 and Sable at e887. Cured.
+
+### F5. A second actor can never set a new prop on a thing someone else built (fixed)
+
+a856 · family=fence · status=cured · f=F5
+
+The house looked at a resident's corner and set `actor=testa`; the desk refused: "stale: f571 changed since you last saw it (e515 create by claude)". Two faults in the fence (`desk._touched_by_others`), both from the per-aspect work of 25 Sep:
+- Creating a note inside a surface was judged as touching every aspect of the surface, its props included. It changes only what the surface holds.
+- A prop that does not exist yet was never printed, so its "last seen" was the beginning of time and no look could ever clear it. But a print that lists all of a thing's props shows the absent ones too; absence is a value (Sable's R6).
+
+Fix (desk.py): when the fence judges a surface, a `create` into it touches `contents`; the outline line and `read` mark `prop:*`, and a prop aspect is judged from the later of its own last print and the last `prop:*` print. A first attempt put `create -> contents` in `aspects_of` itself; the trip then refused a creator's rewrite of its own new note ("you have not seen a22's text"), because a creator's receipt marks the new thing seen with the create's aspects. The special case belongs to the fence judging the surface, not to the event. Checked: test_scene 20 pass; goldens 82 same; trip, budget, reads, attacks, workspace, host identical to HEAD; Sable's harness tally 9/1/1/1; soundness 0 unsound.
+Checked 29 Sep (Pike): lived. This evening I set status=paused on five cards the first team built (e1625..e1629) and created a note in Juniper's corner after looking at it (e1475). No stale refusals. Cured.
 
 ### F6. The house's status churn landed in every resident's "since your last look" (fixed in the house)
 
