@@ -14,8 +14,10 @@ world verbs, scripts and rules all fill their blanks here, the same way:
 
 Where they are filled: after the line is parsed, in the values themselves (a target, a selection, a k=v value), so a
 filled value is never read again as desk words or filled a second time ($* may carry '$here' or 'a; b "hi"' through
-untouched). Text a person types (line=, text=, title=) stays as typed: talk about blanks must never become ids. Only
-inside a verb body, a script or a rule, which its author wrote as a template, are text values filled too. A literal
+untouched). Text is words by default (a965): in a typed line an argument the verb declares as text (help append:
+line=<str>) is never filled, and a prop value (untyped) fills only when the whole value is one blank; targets,
+selections and ids are filled. Only inside a verb body, a script or a rule, which its author wrote as a template, are
+text values filled too. A literal
 dollar sign is written \\$ anywhere. A blank that can't be filled refuses; it is never stored as its own name.
 
 $new is kept per reader and per reply: each line that makes something records it, and the later lines of the same
@@ -28,7 +30,6 @@ import re
 from world import Refusal
 
 LIT = ""          # a \$ in the line, kept out of shlex's way until it lands in a value as a plain $
-TEXT_KEYS = ("line", "text", "title", "wake")   # words a person types (wake: desk words run later): literal when typed
 BLANK = re.compile(re.escape(LIT) + r"|\$(\*|\d+|[A-Za-z_][A-Za-z0-9_]*)((?:\.[A-Za-z_][A-Za-z0-9_-]*)?)")
 WORD = re.compile(r"^\$(\d+|[A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_-]*)?$")
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
@@ -195,6 +196,33 @@ def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
     return out
 
 
+ARG = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*)=(<[^>]*>|[^\s\]|]+)")
+PROSE = ("<str>", "<text>")
+
+
+def arg_kinds(verb):
+    """{key: 'prose' | 'value'} from the verb's own argument list, the one help <verb> prints (append: line=<str>).
+    A key it doesn't declare, and every key of prop, is a prop: untyped."""
+    import moo
+    v = moo.REGISTRY.get(verb if verb in moo.REGISTRY else moo.SYNONYMS.get(verb, verb))    # create is a verb, not group
+    if v is None or v.name == "prop":
+        return {}
+    return {k: "prose" if spec in PROSE else "value" for k, spec in ARG.findall(v.args or "")}
+
+
+def fill_arg(desk, verb, key, value):
+    """One k=v value of a do line (a965, inverting a806's list of text keys). Typed: an argument the verb declares as
+    text (<str>) is prose, never filled; one it declares as a target, selection, id or date is filled; any other (a
+    prop) fills only when the whole value is one blank (describe=$new), never a blank inside other words. In a
+    template (a verb body, script or rule, written as one) every value is filled."""
+    if ctx_of(desk).template:
+        return fill(desk, value)
+    kind = arg_kinds(verb).get(key, "prop")
+    if kind == "prose" or (kind == "prop" and not WORD.match(str(value))):
+        return literal(value)
+    return fill(desk, value)
+
+
 def show(desk, line, ctx=None):
     """A template line as it will run, for a receipt: each blank that can be filled now shows its value; one that
     can't shows as written (the step that uses it says why)."""
@@ -232,9 +260,10 @@ HELP = """blanks: words beginning with $ that the desk fills with a value when t
   $today         the clock's date          $me   who you are          $<name>   a handle (help handles)
   in a verb or script: $1 $2 .. its words ($1.title a thing's title), $* the rest of the line exactly as said,
                  $this the thing a verb lives on        in a rule: $item the thing it fired on, $item.title its title
-  They are filled in targets and in k=v values that name things: do prop f581 describe=$new, do move a12 into=$here.
-  Words you type stay as typed: line=, text= and title= are never filled in a typed line, so a chat line about
-  $here keeps its words. Inside a verb, a script or a rule (templates their author wrote), text values are filled
+  Text is words by default: an argument a verb declares as text (help append: line=<str>; old= new= title= text=)
+  is never filled in a typed line, so a chat line about $here keeps its words. Targets, selections and ids are
+  filled: do move a12 into=$here. A prop value fills only when the whole value is one blank (do prop f581
+  describe=$new); a blank inside other words (next="check $today") stays as typed. Inside a verb, a script or a rule (templates their author wrote), text values are filled
   too, once: what a blank becomes is never filled again. A literal dollar sign is \\$, in both.
   A blank that can't be filled refuses; nothing stores a blank's own name. A receipt shows the value, not the blank.
   e.g. do create $here kind=note title=Plan   then   do link $new $here.describe"""

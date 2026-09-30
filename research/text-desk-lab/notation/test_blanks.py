@@ -80,11 +80,27 @@ CORNER = sorted(f for f in ROOMS if (W.nodes[f].get("props") or {}).get("role") 
 ME = W.nodes[CORNER]["props"]["actor"]
 print(f"world {WORLD} (in memory): rooms {LOUNGE} {BOARD} with talk, {NOTALK} without; home {HOME}; acting as {ME}")
 
+VERBS = {s["title"] for s in W.subjects.values() if "verb" in s["tags"]}
+
+
+def own(word):
+    """A verb name of the test's own that no verb in the world already answers to (a965: the world grew a say, a939,
+    and a second house-wide say made every say line ambiguous). A test must not break because the world grew."""
+    n, name = 0, word
+    while name in VERBS:
+        n += 1
+        name = f"{word}{n}"
+    VERBS.add(name)
+    return name
+
+
+SAY, PLAN, TWO = own("say"), own("plan-here"), own("two-notes")
+
 # 1. say, written once as a world verb, lands in the talk of the room you are in, signed
 got = reply("claude", f"look {HOME} :1",
-            f'do create {HOME} kind=note title=say tags=verb on=house '
+            f'do create {HOME} kind=note title={SAY} tags=verb on=house '
             f'text="# say something in the room you are in\\ndo append $here.talk line=\\"$*\\""')
-say = next(s for s in W.subjects.values() if s["title"] == "say" and "verb" in s["tags"])
+say = next(s for s in W.subjects.values() if s["title"] == SAY and "verb" in s["tags"])
 check("the say verb is stored as written ($here.talk and $* not filled in typed text)",
       "$here.talk" in say["text"] and '"$*"' in say["text"], got)
 
@@ -94,18 +110,18 @@ def last_line(fid):
 
 
 for room in (LOUNGE, BOARD):
-    got = reply(ME, f"go {room} :1", "say hello from here")
-    check(f"say in {W.nodes[room]['title']} lands in its talk ({TALK[room]}), signed",
+    got = reply(ME, f"go {room} :1", f"{SAY} hello from here")
+    check(f"{SAY} in {W.nodes[room]['title']} lands in its talk ({TALK[room]}), signed",
           last_line(room) == f"{W.display_name(ME)}: hello from here", (got, last_line(room)))
-got = reply(ME, f"go {BOARD} :1", 'say a; b "hi" and $here and \\$new')
-check('say a; b "hi" lands verbatim, semicolon and quotes intact, $here in the words untouched',
+got = reply(ME, f"go {BOARD} :1", f'{SAY} a; b "hi" and $here and \\$new')
+check(f'{SAY} a; b "hi" lands verbatim, semicolon and quotes intact, $here in the words untouched',
       last_line(BOARD) == f'{W.display_name(ME)}: a; b "hi" and $here and $new', (got, last_line(BOARD)))
-got = reply(ME, f"go {BOARD} :1", "say it's fine")
-check("say it's fine (an apostrophe) is words, not an open quote",
+got = reply(ME, f"go {BOARD} :1", f"{SAY} it's fine")
+check(f"{SAY} it's fine (an apostrophe) is words, not an open quote",
       last_line(BOARD) == f"{W.display_name(ME)}: it's fine", (got, last_line(BOARD)))
 before = {f: text_of(TALK[f]) for f in talky}
-got = reply(ME, f"go {NOTALK} :1", "say anyone here?")
-check("say in a room with no talk= refuses, saying so, and nothing lands",
+got = reply(ME, f"go {NOTALK} :1", f"{SAY} anyone here?")
+check(f"{SAY} in a room with no talk= refuses, saying so, and nothing lands",
       got[-1][2] and "has no talk=" in got[-1][2] and before == {f: text_of(TALK[f]) for f in talky}, got)
 
 # 2. create then prop describe=$new, in one reply; the receipt shows the value
@@ -117,17 +133,17 @@ check("the receipt says testdesc=<id>, never the blank", f"testdesc={made}" in g
 
 # 3. the same lines pasted into a verb body do the same thing
 reply("claude", f"look {HOME} :1",
-      f'do create {HOME} kind=note title=plan-here tags=verb on=house '
+      f'do create {HOME} kind=note title={PLAN} tags=verb on=house '
       f'text="# a plan note in the room you are in, described\\ndo create $here kind=note title=Plan2\\ndo prop $here testdesc2=$new"')
-got = reply(ME, f"go {CORNER} :1", f"look {CORNER} :1", "plan-here")
+got = reply(ME, f"go {CORNER} :1", f"look {CORNER} :1", PLAN)
 made2 = next((a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Plan2"), None)
 check("the same lines as a verb body: $new in step 2 is what step 1 made", made2 and props(CORNER).get("testdesc2") == made2, got)
-got = reply(ME, f"look {CORNER} :1", "plan-here", f"do prop {CORNER} testdesc3=$new")
+got = reply(ME, f"look {CORNER} :1", PLAN, f"do prop {CORNER} testdesc3=$new")
 made3 = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Plan2"][-1]
 check("what a verb made is the caller's $new on the next line of the reply", props(CORNER).get("testdesc3") == made3, got)
 reply("claude", f"look {HOME} :1",
-      f'do create {HOME} kind=note title=two-notes tags=verb on=house text="do create $here kind=note title=First\\ndo create $here kind=note title=Second"')
-got = reply(ME, f"look {CORNER} :1", "two-notes", f"do prop {CORNER} last=$new")
+      f'do create {HOME} kind=note title={TWO} tags=verb on=house text="do create $here kind=note title=First\\ndo create $here kind=note title=Second"')
+got = reply(ME, f"look {CORNER} :1", TWO, f"do prop {CORNER} last=$new")
 second = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Second"][-1]
 check("a verb that made two things: the caller's $new is the last", props(CORNER).get("last") == second, got)
 
@@ -157,6 +173,29 @@ check("a typed chat line with $here, $new and the today-blank is stored exactly 
 got = reply(ME, f"look {CORNER} :1", f"do prop {CORNER} price=$5", f"do prop {CORNER} spot=$here", f"do prop {CORNER} lit=\\$here")
 check("in a value: $5 is a price, $here is filled, \\$here is literal",
       props(CORNER).get("price") == "$5" and props(CORNER).get("spot") == rooms.room_of(W, ME) and props(CORNER).get("lit") == "$here", got)
+
+# 5b. text is words by default (a965): the verb's own argument list says what is prose. A resident writes about the
+# blanks and then corrects it, in a reply where $new has a value, so nothing stays literal merely because it couldn't
+# be filled
+got = reply(ME, f"look {CORNER} :1", f'do create {CORNER} kind=note title="Blank notes" text="use $new after a create"',
+            'do replace $new old="use $new after a create" new="use $new after a create; $today is the date, $here.talk the chat"',
+            f"do prop {CORNER} describe=$new")
+bn = next((a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Blank notes"), None)
+check("replace old= and new= with blanks in them are stored as typed (the verb declares them <str>)",
+      bn and text_of(bn) == "use $new after a create; $today is the date, $here.talk the chat", got)
+check("prop describe=$new, the whole value one blank, still fills", bn and props(CORNER).get("describe") == bn, got)
+got = reply(ME, f"look {CORNER} :1", f'do prop {CORNER} next="write $today into the log, then tell $here"',
+            f"do prop {CORNER} when=$today")
+check("a prop next= holding a sentence with blanks inside stays exactly as typed",
+      props(CORNER).get("next") == "write $today into the log, then tell $here", got)
+check("a prop whose whole value is one blank (when=$today) fills", props(CORNER).get("when") == D.today, (got, D.today))
+got = reply(ME, f"go {LOUNGE} :1", f"read {chat}", f"do append {chat} line=$here")
+check("a prose argument that is one whole blank (line=$here) is still words",
+      text_of(chat).splitlines()[-1] == f"{W.display_name(ME)}: $here", got)
+got = reply(ME, f"look {CORNER} :1", f'do create {CORNER} kind=view title="Here now" query=kind:note,in:$here')
+view = next((f for f in W.nodes if W.nodes[f].get("layout") == "view" and W.nodes[f].get("title") == "Here now"), None)
+check("a declared selection (create query=<selection>) with a blank inside is filled",
+      view and W.nodes[view].get("query") == f"kind:note,in:{rooms.room_of(W, ME)}", (got, view and W.nodes[view].get("query")))
 
 # 6. rules: $item is the thing it fired on; $here and $new refuse, saying why
 got = reply(ME, f"rule on create by={ME} do prop tagged=$item.title")
