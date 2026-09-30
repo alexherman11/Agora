@@ -62,6 +62,13 @@ import explore       # noqa: E402  _alive(): is a pid still running
 import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
+# a916, use versus mention: words inside backticks or quotes are talked about, never addressed. A single quote counts
+# only as a quote, not as the apostrophe inside a word (I'd, Pike's).
+QUOTED = re.compile(r"`[^`]*`|\"[^\"\n]*\"|(?<![\w])'[^'\n]*'(?![\w])")
+
+
+def unquoted(text):
+    return QUOTED.sub(" ", str(text))
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "plan", "apply", "export", "sync", "x", "ex", "?"}
@@ -519,6 +526,7 @@ class House:
         inbox, urgent = r.state.setdefault("inbox", []), False
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
         called = re.compile(rf"@({re.escape(actor)}|everyone|all)\b", re.I)
+        named = re.compile(rf"@({re.escape(actor)})\b", re.I)     # outside a chat line only a name reaches (a916)
         for e in w.events[start:]:
             if e.get("by") in (actor, "house") or e.get("undone"):
                 continue
@@ -534,17 +542,20 @@ class House:
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                     urgent = True
                 elif "all" in members or actor in members:
-                    now_ = bool(called.search(said))
+                    now_ = bool(called.search(unquoted(said)))
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
                     urgent = urgent or now_
                 continue
+            # a916, as Sable, Pike and Juniper agreed: outside a chat line, @everyone and @all never reach anyone (a
+            # broadcast from a document edit is almost never meant; a chat line is the place for it), @name in a note,
+            # task or comment still reaches that person, and nothing inside quotes or backticks counts
+            heard_in = unquoted(said)
             if "text" in args and e["verb"] == "edit":
-                # Pike a611: rewriting a note that already said @everyone (a lens's hint) reached every resident as a
-                # mention. A mention in a rewritten text counts only when the new text says it more often than the old.
-                old = str(((e.get("undo") or {}).get("restore_subject") or {}).get("text", ""))
-                if len(called.findall(str(args["text"]))) <= len(called.findall(old)):
-                    said = " ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str))
-            m = called.search(said)
+                # Pike a611: rewriting a note that already named you is not news; only a mention the new text adds is
+                old = unquoted(((e.get("undo") or {}).get("restore_subject") or {}).get("text", ""))
+                if len(named.findall(unquoted(args["text"]))) <= len(named.findall(old)):
+                    heard_in = unquoted(" ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str)))
+            m = named.search(heard_in)
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
                 inbox.append(f"~ {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")

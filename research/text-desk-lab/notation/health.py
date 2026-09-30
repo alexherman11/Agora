@@ -103,7 +103,9 @@ def main():
     t0 = time.perf_counter()
     try:
         lenses_ok, bad = check_lenses(world)
-        print(f"lenses in {world}: {len(lenses_ok)} compile" + (f", {len(bad)} refuse" if bad else "") + took("lenses", t0))
+        # Pike a611: a refusal printed on every landing that nobody can read is on its way to noise; name it and why
+        why = "; ".join(b.split(". It can say")[0].replace(": LensRefusal: ", ": ")[:90] for b in bad)
+        print(f"lenses in {world}: {len(lenses_ok)} compile" + (f", {len(bad)} refuse ({why})" if bad else "") + took("lenses", t0))
     except Exception as e:
         failed.append(f"lenses: the world could not be read: {type(e).__name__}: {e}")
         print(f"lenses in {world}: could not read the world ({e}){took('lenses', t0)}")
