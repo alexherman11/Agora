@@ -100,6 +100,11 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 - A world verb runs as its caller, so its line is signed by the caller.
 - A rule acts as its author (a687, decided in a683), so its line is signed by the author with no `via` in the signature: the event carries `via rule rN` (ran: sable's rule, tripped by pike, adds `Sable: (noted)`). A rule defined before a656 has no author: it runs as whoever tripped it, and its line reads `Pike, via rule r3: …`, until someone defines it again.
 - Lines already in a chat are never re-signed. The old rule that signed jeff's unsigned lines `Alex:` is gone.
+
+**Reading a chat shows what's new to you** (a744). `read <chat>` with no `:3`, `#` or `tail=` prints only the lines added since this reader (observer) last read that chat, their own included, under one header `(n earlier lines folded; read <id> :3 for all)`. With nothing new it prints `(nothing new since you last read; n lines; read <id> :3 or tail=<n>)`. A reader's first read of a chat prints its last 10 lines under the same header. `:3`, `#sections` and `tail=` print as before.
+- Appending is not reading (a656), so after you append, your next read still shows what others added before your line, and your own line.
+- The desk keeps, per (observer, chat), the run of lines it has shown, `lo..hi`, and a digest of lines `[:hi]` (`desk.py` `_chat_body`, store `_chat_reads`). A plain read, `:3` or `tail=` extends the run; if the lines it was shown were rewritten since, the next read starts over as a first read.
+- The read marks the text seen only when the run reaches line 0. A read that folds lines you never saw (a first read of a long chat) does not unlock a rewrite, retitle or remove; after one `read <id> :3`, a read that folds only lines you have seen does.
 - `World.SPEAKER` reads a signature back. The `messages` row source keeps the whole signature in `who` (`Pike, via rule r3` for an authorless rule's line), and `awaiting reply` in examine is judged for the reader.
 
 **Geometry.**
@@ -119,7 +124,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `you have not seen a04's text; read a04 shows it before you replace it`. This applies to the replacing verbs rewrite, replace, retitle, rename, edit, due, prop and untag.
 - What counts as having seen something:
   - an outline line marks title, place, due and props (not text or tags);
-  - `read` marks title, tags, due, comments, links, props, and the text only when the whole body printed;
+  - `read` marks title, tags, due, comments, links, props, and the text only when the whole body printed (a chat: when every line has been shown to you, see Reading a chat);
   - `where` marks place;
   - `examine` and `pivot` mark everything;
   - a table marks its columns;
@@ -802,4 +807,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1267. Edit it there; a direct edit here makes the next export stop and warn. sha1:8136fd82aaf8 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1324. Edit it there; a direct edit here makes the next export stop and warn. sha1:9332a4a28b7c -->
