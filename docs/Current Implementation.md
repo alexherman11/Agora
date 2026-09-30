@@ -317,11 +317,11 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | Word | Meaning |
 |---|---|
 | `column` `row` `free` `grid <tracks>` `cells` | Layout. Tracks are in `fr` or `fit`, and a track may be `<n>gap` |
-| `gap`, `scroll none\|scroll\|end`, `fold ["label"] [open] [float] [handle <role>]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event, folded to begin with unless `open`; `float` draws the open contents over the page below the handle (a menu: it opens for a moment, and Escape or a press outside closes it); a folded part gives up its `share`; the label is a template filled like text (`fold "$title"`); the painter's fold handle wears the role named by `handle <role>`, else `fold` (`menu` when floating), over `tool`; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
+| `gap`, `scroll none\|scroll\|end`, `fold ["label"] [open] [float] [handle <role>]`, `measure <n>ch`, `verbatim`, `lines <min>..<max>`, `share <w>`, `hint "…"`, `plain`, `peek` | Paint words, passed to the painter. `fold` is the viewer's own toggle, with no event, folded to begin with unless `open`; `float` draws the open contents over the page below the handle (a menu: it opens for a moment, and Escape or a press outside closes it); a folded part gives up its `share` and hides its children, except a child marked `peek`, which stays shown under the handle as the folded part's summary (a1032: a resident's Now cards on a folded Desktop tile; `help lens`); the label is a template filled like text (`fold "$title"`); the painter's fold handle wears the role named by `handle <role>`, else `fold` (`menu` when floating), over `tool`; `plain` turns off code runs. `share` is a child's weight along its parent's axis; on the root it takes the window's height, and a grid with a share divides its height among its rows, so a `scroll` inside it scrolls within the window instead of the page growing |
 | `role <name>` | Look, by a role from the lens's style; an unknown role is refused with the list |
 | `text <template>` | Words (template names below); quote to keep commas and hashes |
 | `clamp <N>` | At most N lines, or N repeats; both printers say how many are left |
-| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>`, `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, newest first: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`). An empty repeat prints `(empty)` |
+| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>` (`item who said index at`, where `at` is the line's time from its append event: `08:15` today, `29 Sep 22:38` otherwise), `inbox:<name>` (every chat line for that person, newest first: `item chat who said at open index eid`. A line counts when its chat's members name the person (a direct chat), or it calls @name outside quotes; @everyone and @all don't count, so it is narrower than what reaches a resident (Alex, 30 Sep). `open` is `yes` until the person writes in that chat after it; rows are keyed by `eid`, the event that added the line), `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, newest first: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`). An empty repeat prints `(empty)` |
 | `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
 | `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
 | `over $<list>` | Repeat over a list field or derived rows; `$it` is each value |
@@ -339,6 +339,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
   - `$n` survives only as a prop name.
 - Any prop of the thing: `$place` prints `read place=…`, or `(no place)` when missing.
 - Frame fields `$f.x` and lets.
+- A selection (`of`, `the`, `only when <selection>`) is filled from fields, frames and host names, not from the thing's props: a bare `$actor` there stays the literal word and matches nothing, silently. Name the repeat (`of … as r`) and write `$r.actor` (a1032).
 - `$it`, `$it.n`, `$it.date` from derived rows.
 - Host names `$me $today $session`.
 - Freshness names:
@@ -405,7 +406,9 @@ The painter fills only the first occurrence of each name. Click and edit lines m
 - the whole `def` closure;
 - for a drop, `carried` and `receiver`.
 
-**What deskd checks** (`/api/do`, in order):
+It also carries `gesture` (a1008), an id minted at the press. An edit's id lives on its draft (kept in localStorage with it) until the draft is answered or its words change, so a retry after a lost answer, from a re-made composer or a reloaded page, resends the same id; a click, drag, drop or menu entry mints one per press. After a lost answer the next poll repaints even an unchanged scene, so the kept draft shows both sides and can be sent again. After a successful edit, a reused element still showing the sent words is reset to its paint (the words stayed in the Lounge composer and its next blur sent them again: e1851, e1852).
+
+**What deskd checks** (`/api/do`, in order; first, a `gesture` id already on an event is answered `already done, as eN` and nothing else is judged or done):
 1. A gesture from a fallback frame is refused: "it is for reading".
 2. Part identity: a gesture is admitted when its part still hashes the same, even if the lens changed elsewhere. It is refused only when the part changed and the lens moved. Every closure member is checked.
 3. For a drop: the carried thing ("changed while it was in the air"), then the receiver's revision, reads and part.
@@ -439,7 +442,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 | `GET /api/style?session&as&name` | A style's source from the world, else the seed file (`name` defaults to `calm`) |
 | `GET /api/version` | `{code}`: git HEAD when deskd started. Loads no session |
 | `GET /api/events?session&since` | `{events, total}`, without undo records |
-| `POST /api/do` | `{session, as, line, observed?}` returns `{text, error, events_total, line, as, created, events}`. `error` is the first `ERR` line. An empty line is 400. `worktree …` lines go to worktree.py |
+| `POST /api/do` | `{session, as, line, observed?, gesture?}` returns `{text, error, events_total, line, as, created, events}`. `error` is the first `ERR` line. `gesture` (a1008) is an id of at most 80 characters; it is recorded on every event the line made, and a later post with the same id does nothing and answers `already done, as eN: …` with `events: []` and `already: [ids]`, before any fence and across restarts (the id lives on the event, in the world). Dedupe is by id only, never by words. An empty line is 400. `worktree …` lines go to worktree.py |
 | `POST /api/observe` | `{session, as, lens, at, viewport, facts}`, capped at 400 facts; returns `{ok, kept}` |
 | anything else | GET: a static file from `desk-shell/`. POST: 404 |
 
@@ -464,15 +467,16 @@ Two pages paint the same world.
 
 **The lens painter** (`lens.html`, which loads `style/style.js`, `viewer.js`, `lens.js` and `term.js`) is the generic painter.
 - It reads the paint contract (key, paint, acts, fence) and knows no app, kind, colour or size.
-- `lens.js` is 256 lines. It draws a fold's handle with its label (`▸ turns`); clicking it is the viewer's own toggle, kept in the browser, never an event.
-- `viewer.js` (155) keeps continuity:
+- `lens.js` is 349 lines (30 Sep, a1008). It draws a fold's handle with its label (`▸ turns`); clicking it is the viewer's own toggle, kept in the browser, never an event.
+- `viewer.js` (164) keeps continuity:
   - unchanged elements are kept by key, so a reader's selection survives another person's act;
   - drafts survive a refusal, a reload or a closed tab (localStorage `lens-drafts:…`), and so do folds;
   - a refused draft is shown with both sides;
+  - a draft keeps its gesture id (a1008) until it is answered or its words change, so every retry of it is one intent;
   - it posts observations.
 - Also in the painter:
   - cards move by keyboard;
-  - carry and drop work;
+  - carry and drop work: a press becomes a carry once it moves 5px, from anywhere on the card (its fold handle included); a press that doesn't move stays a click. A copy of the card follows the pointer, so a scrolling lane can't clip it;
   - code prints as runs;
   - `paint.semantic` marks buttons and groups.
 - `term.js` (76) is a desk terminal in the right-hand pane by default. It sends lines to `/api/do` and keeps its history in localStorage. × closes it and the painter takes the full width; "▸ terminal" (top right) or Ctrl+` opens it again. Open or closed is remembered per world in the browser.
@@ -824,4 +828,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e1835. Edit it there; a direct edit here makes the next export stop and warn. sha1:2f51ff2dff44 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2010. Edit it there; a direct edit here makes the next export stop and warn. sha1:83a41685d4c2 -->
