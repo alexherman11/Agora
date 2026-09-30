@@ -555,8 +555,8 @@ class House:
                 # nothing for a resident resting by choice, so it was refused as a no-op). A call ends a rest the
                 # resident chose, as an @name would; the house clears the prop once it's delivered (step).
                 # a1062: `wake <name>` sets the same prop, marked via=wake; the wake says who and why
-                how = "woke you (wake" if e.get("via") == "wake" else "called you from the Desktop ("
-                r.state.setdefault("calls", []).append({"by": e["by"], "text": f"~ {e['by']} {how}{', ' if e.get('via') == 'wake' else ''}{e['id']})"})
+                how = f"woke you (wake, {e['id']})" if e.get("via") == "wake" else f"called you from the Desktop ({e['id']})"
+                r.state.setdefault("calls", []).append({"by": e["by"], "text": f"~ {e['by']} {how}"})
                 urgent = True
                 continue
             at = str(e.get("at") or "")[11:16]
@@ -717,8 +717,9 @@ class House:
         news = "\n".join(([undelivered] if undelivered else []) + first + heard)
         lead += "".join(x + "\n" for x in first)
         r.send(lead + self.act(actor, line) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
-        if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:      # a1062: a call delivered by a wake is cleared too, so the
-            self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")     # next wake <name> is a change again
+        # a1062: a call delivered by a wake (a resident started from want=rest) is cleared too, so the next is a change
+        if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:
+            self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")
         self.set_status(r, corner, "awake")
 
     def after_turn(self, w, r, corner, actor, text):
