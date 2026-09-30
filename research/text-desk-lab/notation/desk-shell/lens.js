@@ -347,7 +347,9 @@
   const report = () => V.report(paint, sceneAt, carrying ? { [carrying.n.key]: "carried" + (carrying.over ? " over " + carrying.over.dataset.key : "") } : {}, q.get("share") === "attention");
   let scrolling; paint.addEventListener("scroll", () => { clearTimeout(scrolling); scrolling = setTimeout(report, 400); });
 
-  await refresh();
+  // 30 Sep: a page that loads while deskd restarts (it reloads itself for new code, just as the keeper restarts the
+  // server) got a failed first fetch; unguarded, it threw before the repaint loop below was set, and stayed blank
+  await refresh().catch(() => {});
   setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
   // live building (tier 2): when the code under the page changes, the page reloads itself, but never under someone's
   // hands. Drafts already survive a reload (viewer.js keeps them); a part in hand or a line being typed waits.
