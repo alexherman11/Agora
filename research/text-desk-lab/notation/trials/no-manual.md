@@ -147,7 +147,10 @@ word "view". The resident found it at once, so I read it as named.
 
 - **help answers by title, so a note can become a help entry.** Alder made `help view` answer by making a note titled
   "view", because `help room` worked that way through a664. It knew the risk ("help finds a note by title, the same
-  coincidence room relies on"). It's harmless here, but any note titled like a word becomes that word's help.
+  coincidence room relies on"). It's harmless here, but any note titled like a word becomes that word's help. Since run
+  2, a1595 has made help notes the design, found by title word in a Help binder (`role=help`). Run 2's code predates it.
+  A rerun would show whether a note titled `view` outside the binder still answers `help view`, and whether the binder
+  now has a `view` note.
 - **F17:** it read a880 itself at turn 4, before saying anything about the Board, so this run can't test F17 cleanly.
   It never described paused work as anyone being busy.
 - Nothing reached alder through a name (a1016). It read no comment that still names the trial.
