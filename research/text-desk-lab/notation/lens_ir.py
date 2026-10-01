@@ -157,13 +157,13 @@ def lower(root, parts):
               "bind": bind,
               "lets": [{"name": d, "interp": i, "inputs": ins} for d, i, ins in node["derive"]],
               "guard": guard,
-              "emit": {"layout": node["layout"], "role": node["role"], "text": node["text"], "clamp": node["clamp"],
+              "emit": {"layout": node["layout"], "role": node["role"], "role_when": list(node["role_when"]), "text": node["text"], "clamp": node["clamp"],
                        "at": node["at"], "spread": node.get("spread"), "props": node["props"],
                        **{k: node[k] for k in S.PAINT_WORDS if node.get(k) not in (None, False)}},
               "acts": [dict(a) for a in node["on"]],
               "place": node["lens"], "carry": node["carry"],
               "kids": [one(k) for k in node["kids"]],
-              "deps": {"emit": _deps(node["text"]), "guard": _deps(node["only"]),
+              "deps": {"emit": _deps(node["text"]), "guard": _deps(node["only"]), "role": _deps(*[c for _, c in node["role_when"]]),
                        "acts": [_deps(a["line"]) for a in node["on"]],
                        "lets": [_deps(*[x for x in ins if x.startswith("$")]) for _, _, ins in node["derive"]]}}
         return ir
@@ -317,6 +317,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 a["why"] = f"not {q}"
                 return a
         # --- emit
+        if em["role_when"]:             # a1105: the look follows the thing's state; each selection is a read in R
+            def sel(q):
+                named, ids = acc.select(q)
+                return [i for i, _ in named] if named is not None else ids
+            out["role"], why = S.role_of(em["role"], em["role_when"], ctx, track, sel)
+            if why:
+                out["since"] = why
         if em["at"] == "item" and ctx.get("item") in w.nodes:
             n = w.nodes[ctx["item"]]
             out["box"] = [n["x"], n["y"], n["w"], n["h"]]
