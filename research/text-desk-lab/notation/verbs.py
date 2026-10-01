@@ -525,19 +525,36 @@ def writer(w, key):
 def bind_unbound(desk):
     """Once per world (a1156): every stored line saved before bindings is bound to what it means now, as its writer,
     so nothing made from now on can take it over. A word nothing answers now stays unbound and fails when it runs,
-    saying why; it is never left to be found later. Meaning is unchanged: a990 already looked strictly at run time."""
+    saying why; it is never left to be found later. Meaning is unchanged: a990 already looked strictly at run time.
+    Juniper c1421: it is not done quietly: one event by the house, `bind`, names every holder it bound, so history and
+    the !! line show it, and undo takes the bindings back (the lines then look strictly at run time, as before)."""
     w = desk.world
     if getattr(w, "_binds_version", 0) >= 1:
         return
     w._binds_version = 1
-    me = w.me
+    me, done = w.me, []          # [(key, label, what it kept before)]
     try:
         for key, (kind, text) in stored_texts(w).items():
             if binding_of(w, key, text) is None and line_words(desk, kind, text):
+                obj = w.subjects[key[1]] if key[0] == "s" else w.nodes[key[1]]
+                prev = __import__("copy").deepcopy(obj.get("binds"))
                 w.me = writer(w, key) or me
-                keep_binding(w, key, bind_text(desk, kind, text, holder_home(w, key, kind), w.me))
+                entry = bind_text(desk, kind, text, holder_home(w, key, kind), w.me)
+                keep_binding(w, key, entry)
+                done.append((key, holder_label(w, key, kind), prev, w.me, entry))
     finally:
         w.me = me
+    if not done:
+        return
+    ids = [(_aid(w, w.subjects[k[1]]) if k[0] == "s" else k[1]) for k, *_ in done]
+    said = "; ".join(f"{label} as {who}: " + (", ".join(f"{wd} → {r.get('at', 'the thing it is used on')}"
+                                                       for wd, r in e["words"].items()) or "nothing")
+                     + ("".join(f", {wd} unbound" for wd in e["missing"]))
+                     for _k, label, _p, who, e in done)
+    ev = w._event("bind", ids[0], {"holders": ids}, {"restore_binds": [(k[0], k[1], p) for k, _l, p, _w, _e in done]},
+                  actor="house", note=f"a1156: bound {len(done)} stored line holder(s) saved before bindings, each as "
+                                      f"its writer, to what it meant then: {said}")
+    ev["changed"] = ids
 
 
 def lens_binds(w, sids):

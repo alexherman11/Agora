@@ -101,6 +101,20 @@ TRASH = next(s for s in verbs.all_verbs(W) if verbs._names(s["title"]) == ["tras
 TA = W.appearances_of(TRASH["id"])[0]
 check("before the first line after landing, no stored line here is bound",
       not any(s.get("binds") for s in W.subjects.values()) and lens_acts, [s["title"] for s in lens_acts])
+n0 = len(W.events)
+last("juniper", "look")
+cc = [s for s in lens_acts if s.get("binds")]
+bev = [e for e in W.events[n0:] if e["verb"] == "bind"]
+check("it is one event by the house, naming every holder it bound (Juniper c1421: never quietly)",
+      len(bev) == 1 and bev[0]["by"] == "house" and all(W.appearances_of(s["id"])[0] in bev[0]["args"]["holders"] for s in cc),
+      W.events[n0:])
+if bev:
+    print("     " + bev[0]["note"][:260])
+t, e = last("sable", f"history {W.appearances_of(cc[0]['id'])[0]}") if cc else ("", "")
+check("... and history on a bound lens shows it", "bind" in t and "house" in t, e or t)
+t, e = last("juniper", f"undo {bev[0]['id']}") if bev else ("", "no event")
+check("undo of it takes the bindings back", not e and not any(s.get("binds") for s in cc), e or t)
+W._binds_version = 0
 last("juniper", "look")
 cc = [s for s in lens_acts if s.get("binds")]
 check("after it, every lens whose acts use a world verb is bound, to the verb it meant (trash)",

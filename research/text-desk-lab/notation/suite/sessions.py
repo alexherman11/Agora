@@ -72,6 +72,9 @@ def prints_at(rev):
         # recorded: following the wall clock would move today, run the day's rules and print an arrival line, none
         # of which is the compiler's doing.
         desk.follow = False
+        # a1156: likewise the one-time binding of stored lines saved before bindings (verbs.bind_unbound) is a change
+        # to a living world, recorded as a house event; a frozen world is printed as it was frozen
+        world._binds_version = 1
         for title in lens_titles(desk):
             try:
                 r = desk.dispatch("desk", {"line": f"scene {title}"})
