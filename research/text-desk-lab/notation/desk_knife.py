@@ -1671,14 +1671,18 @@ class DeskKnife(DeskMoo):
                "c40; do resolve c40 closes it); l41 a link between two subjects (examine l41).",
         "events": "events: every change is an event, e12, signed by who made it. history lists the latest; history <id> "
                   "those about one thing; examine e12 one event (when, why, what it caused); undo e12 takes it back. "
-                  "The !! line atop a reply names the events by others since your last look.",
+                  "The !! line atop a reply names the events by others since your last look. A ~ line under it says "
+                  "someone changed a note or task you made: who, which line, the event and its undo (~ pike replaced "
+                  "line 8 of your a12 \"Plan\" (e40; undo e40)); several edits by one person to one note in an hour "
+                  "are one line with a count. Chats, comments and what your own rule did are not told this way.",
         "comments": "comments: remarks on a thing, each with an id (c40), open until resolved. do comment <id> line=\"...\" "
                     "adds one; read <id> lists them; examine c40 shows one; do resolve c40 line=\"...\" answers and closes it.",
         "links": "links: a relation between two subjects, as=refers (default), answers, blocks or part-of, each with an "
                  "id (l41). do link A B as=answers makes one; examine l41 shows it; find links:A lists A's; do unlink A "
                  "id=l41 removes it. help selections for answers:, part-of: and links: terms.",
         "note": "a note is a thing with a title and text. do create <surface> kind=note title=\"...\" text=\"...\"; read, "
-                "rewrite, replace, append change it. Tagged verb it is a verb (help verbs); tagged rule, a rule; tagged "
+                "rewrite, replace, append change it. When someone else changes a note you made, your next reply says "
+                "so in a ~ line (help events). Tagged verb it is a verb (help verbs); tagged rule, a rule; tagged "
                 "lens, a lens.",
         "task": "a task is a note with a status: the Board's cards are tasks (card <title> makes one where you are, if "
                 "the house has that verb). do create <surface> kind=task title=\"...\"; do prop <id> status=done.",

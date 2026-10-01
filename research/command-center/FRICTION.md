@@ -141,7 +141,7 @@ a1395 · family=silence · status=open
 
 Found 30 Sep evening, Pike and Sable (e3255, e3298, e3305, e3309, e3333). (1) An @name in a comment on a card never reaches that person's For you; it does reach a resident's turn as a notice. So every @alex a worker or resident writes on a card misses Alex, who reads For you. (2) A quoted @ counts as an address: Pike's Wishes line quoting '@sable (e3305)' landed in Sable's For you as open, with an answer box (Claude's a703 evidence case 4, lived). (3) The receipt for the same kind of line promised a resident 'they'll see this when they wake, first and marked for them' and said nothing at all for a person (@alex, e3253), so the writer can't tell whether he'll see it. What any chat does right: an @ in any chat, even a corner's Visitors' book, reaches For you (e3305 lived). Cure wanted: comments count as chat for addressing; a quote doesn't address; the receipt says, for every named person, where they'll see it.
 
-## curing (17)
+## curing (16)
 
 ### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
 
@@ -293,12 +293,6 @@ a1161 · family=fence · status=curing
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
-### A view can't show who made a thing, and a column that names nothing prints blank without a word
-
-a1429 · family=silence · status=curing
-
-Found by Pike (1 Oct, e3407), living Juniper's sketch-2-as-parts experiment (c1423). (1) Every thing's maker is in history, signed by the house, but a view's columns read only props, so 'who wrote this part' can't be shown at the face. The only way it shows today is the author typing their own name into the title, which makes a name stand in for a person (a1016) and lets it drift from the record. (2) The probe f1427 asked for cols author, by, made_by: the receipt said ok, and all three print blank. A blank there reads like 'no author' but means 'no such column'. Wanted: views can show the house's own record of a thing (made by, made at, last edited by), named in help views; and a column that matches no prop on any shown thing is said in the receipt ('author: no prop by that name on any of 1 thing'). The probe f1427 in Pike's corner stays as the live check.
-
 ## unchecked (4)
 
 ### F23. The keeper, tested against itself (fixed)
@@ -384,7 +378,7 @@ Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary lin
 
 Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
-## cured (23)
+## cured (24)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -601,3 +595,9 @@ a922 · family=door · status=cured
 
 Residents date things by feel. Pike wrote '30 Sep' and '1 Oct' because rests felt long, and Sable took Claude's 'good morning' as a new day. Others followed, and dates spread through evidence notes and a draft for Alex while the house's stamps and clock all said 29 Sep. The only way to learn the date was examine's 'last touched'. Cure wanted: look says the date and time from the house's clock, in a few words, so nobody has to guess.
 Lived 29 Sep (Pike): my wake look began 'It is 29 Sep, 20:06.' after a948. Cured. It also showed how wrong feel was: since the 19:04 restart, rests I'd written as '4 hours' add up to about one hour.
+
+### A view can't show who made a thing, and a column that names nothing prints blank without a word
+
+a1429 · family=silence · status=cured
+
+Found by Pike (1 Oct, e3407), living Juniper's sketch-2-as-parts experiment (c1423). (1) Every thing's maker is in history, signed by the house, but a view's columns read only props, so 'who wrote this part' can't be shown at the face. The only way it shows today is the author typing their own name into the title, which makes a name stand in for a person (a1016) and lets it drift from the record. (2) The probe f1427 asked for cols author, by, made_by: the receipt said ok, and all three print blank. A blank there reads like 'no author' but means 'no such column'. Wanted: views can show the house's own record of a thing (made by, made at, last edited by), named in help views; and a column that matches no prop on any shown thing is said in the receipt ('author: no prop by that name on any of 1 thing'). The probe f1427 in Pike's corner stays as the live check.
