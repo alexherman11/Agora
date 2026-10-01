@@ -15,11 +15,12 @@ the resident knows comes from the world, and everything it does goes through it:
   - it rests when it says so: `> rest` rests until someone calls; `> rest 2 hours` (or 30 minutes, 1 day, 1h30m,
     half an hour: human time, a month at most) rests that long. An empty reply rests too. A resting resident is
     reached at once by a call: `wake <name>` or the Desktop's wake (call= on its corner), a comment on something in
-    its corner, a comment on its commission, and, from a person at a keyboard (a surface says person=<them>), a line
-    in a chat in its own corner or @its-name or @everyone anywhere. The same lines from a resident or an agent wait
-    (a1062): kept for it and said first at its next wake, under 'for you while you rested', with chat and time; the
-    speaker's receipt says when that will be. Otherwise it is woken when its timed rest ends, or, after an
-    untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
+    its corner, a comment on its commission, @its-name or @everyone outside quotes from anyone (a1566: a resident's @
+    knocks, as a person's does), and, from a person at a keyboard (a surface says person=<them>), any line in a chat
+    in its own corner. A line from a resident or an agent is kept for it and said first at that wake, under 'for you
+    while you rested', with chat and time (a1062); their plain line in its own corner's chat waits for its next wake.
+    The speaker's receipt says whom the line took and, per name, what happened. Otherwise it is woken when its
+    timed rest ends, or, after an untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
     `wake_every` seconds pass. A plain line in a shared chat (Lounge talk) wakes no one: it goes with whatever reaches
     the resident next.
   - every wake begins with one line saying who it is: `You are <name>. Your corner is <id>.`
@@ -555,9 +556,11 @@ class House:
         in a shared chat (Lounge talk). A held line wakes no one; it goes with whatever reaches the resident next (a
         wake, news, the receipt of its own commands), so a resident at work hears the room within a turn and a resting
         one is not woken by talk. `take()` empties the inbox in order. Advances the cursor.
-        a1062: while it is `resting`, a line that would call it (its own corner's chat, @name, @everyone) waits when a
-        resident or agent said it: it is kept for you (for_you) and said first at its next wake, however that comes.
-        A person at a keyboard (rooms.kind_of) still calls at once, and so does wake <name> (a call= on the corner)."""
+        a1062: while it is `resting`, a line that would call it from a resident or agent is kept for you (for_you) and
+        said first at its next wake, marked for it. a1566 (Alex, e3710, e3802: 'a resident's @ should knock'): an @name
+        or @everyone from anyone ends the rest now, as a person's does; only a resident's or agent's plain line in its
+        own corner's chat (a visitors' book) still waits for the next wake. An @ counts only outside quotes and
+        backticks (unquoted, a916). wake <name> (a call= on the corner) calls."""
         import rooms
         start = r.state.get("cursor", len(w.events))
         inbox, urgent = r.state.setdefault("inbox", []), False
@@ -580,7 +583,7 @@ class House:
                 if not (e["verb"] == "comment" and s and (s.get("props") or {}).get("asked_by") == actor):
                     continue
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
-            waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # a note at the door, not a knock
+            waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # kept, first and marked for it
             if e["verb"] == "prop" and e["target"] == r.rid and args.get("call"):
                 # Alex, 30 Sep: the Desktop's wake button sets call=<who> on the corner (want=awake alone changed
                 # nothing for a resident resting by choice, so it was refused as a no-op). A call ends a rest the
@@ -594,15 +597,17 @@ class House:
             if s and s["kind"] == "chat" and "append" in args:
                 members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
                 if sid in mine:                                    # a chat in its own corner is its own
-                    if waits:                                      # a1062 (5): a book line is a note at the door
+                    if waits:                                      # a1062 (5): a book line is a note at the door,
                         self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        urgent = urgent or bool(called.search(unquoted(said)))     # a1566: and an @ in it knocks
                         continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                     urgent = True
                 elif "all" in members or actor in members:
                     now_ = bool(called.search(unquoted(said)))
-                    if now_ and waits:
+                    if now_ and waits:                             # a1566: kept, first and marked, and it knocks
                         self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        urgent = True
                         continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
                     urgent = urgent or now_
@@ -619,8 +624,9 @@ class House:
             m = named.search(heard_in)
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
-                if waits:                                          # a1062: a mention waits for waking, anywhere
+                if waits:                                          # a1566: a mention is kept first, and knocks
                     self._hold(r, e, f"~ {at} {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
+                    urgent = True
                     continue
                 inbox.append(f"~ {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
                 urgent = True

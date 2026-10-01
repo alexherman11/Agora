@@ -1499,9 +1499,9 @@ class DeskKnife(DeskMoo):
   look <room>      the same for any room, from where you are (it says so); look <room> :2 is the tree. look <id> on
                    anything that is not a room is the tree, as always.
   rest             go home to your corner (Home if you have none); history marks it via=rest
-  wake <name>      call a resting resident now: their wake says you called, and which line of yours was waiting.
-                   A line from a resident that names someone resting (@name, @everyone, their corner's chat) waits
-                   for their next wake, first and marked for them; the receipt says when (a1062)
+  wake <name>      call a resting resident now, without a line: their wake says you called. An @name or @everyone
+                   in a chat (outside quotes) wakes them too, from anyone; your line comes first in their wake,
+                   marked for them, and the receipt says whom it took and what happened ('Pike: woken'; a1566)
   $here            the room you are in, in any target or value: do move a12 into=$here; $here.talk its chat, so
                    a verb can say: do append $here.talk line="$*" (help blanks)
   Where you are is kept in the world (history lists each go) but undo leaves it: go back instead. Someone who never
