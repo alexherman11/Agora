@@ -40,6 +40,9 @@ REPO = HERE.parents[2]                    # the checkout the house runs from: la
 NOTATION = HERE.relative_to(REPO).as_posix()
 TREES = REPO / ".worktrees"
 PY = Path(sys.executable)
+# Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
+# call) and deskd restarts on every commit; only these, which the house process itself runs, need the house to restart
+HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py"}
 
 PROTOCOL = """You are a worker in Agora's house: a disposable builder for one commission, then gone.
 
@@ -117,6 +120,7 @@ class Workshop:
         self.house = house
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
+        self.held = {}                 # commission -> the uncommitted files its landing is waiting on (said once)
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -331,6 +335,19 @@ class Workshop:
 
     def land(self, w, cid, s, wk):
         """Between passes: merge, check, keep or revert. Every outcome is said on the commission."""
+        # Alex, 30 Sep: code is edited by hand in the main checkout while the house runs. A landing merges there and
+        # runs health on what is on disk, so a half-made edit could fail a good landing (and its revert) or pass a bad
+        # one. While tracked code there has uncommitted changes, the landing waits (still ready), and says so once.
+        dirty = [l[3:] for l in (git("status", "--porcelain", "--untracked-files=no").stdout or "").splitlines()
+                 if l[3:].endswith((".py", ".js", ".html", ".css")) and "/sessions/" not in l]
+        if dirty:
+            if self.held.get(cid) != dirty:
+                self.held[cid] = dirty
+                self.say(cid, "ready, and waiting to land: the main checkout has uncommitted edits to "
+                              + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
+                              + ". It lands on the first pass after they are committed or put back.")
+            return
+        self.held.pop(cid, None)
         self.set_state(cid, "landing")
         changed = [p for p in git("diff", "--name-only", f"HEAD...{wk.branch}").stdout.split() if p]
         banned = [p for p in changed if p.startswith(f"{NOTATION}/sessions/") or p.endswith(".env") or p == ".env"]
@@ -368,7 +385,7 @@ class Workshop:
         self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(after.get("text", "").splitlines())[:600]
                  + self.export_docs(cid))
         self.finish(cid, wk, keep_branch=False)
-        if any(p.endswith(".py") for p in changed):
+        if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
             self.restart_wanted = True
 
 
@@ -376,7 +393,13 @@ class Worker:
     """A worker's process, stream and transcript: the resident's machinery (house.Resident), launched with tools."""
 
     def __new__(cls, house, cid, tree, branch, asked_by):
-        import house as H
+        # 30 Sep: house.py runs as __main__, so `import house` inside the running house loaded a SECOND copy from
+        # disk, and an edit made since the house started ran beside the old code (the QUOTED import error)
+        H = sys.modules.get("house")
+        if H is None and hasattr(sys.modules["__main__"], "Resident"):
+            H = sys.modules["__main__"]
+        if H is None:
+            import house as H
 
         class _Worker(H.Resident):
             def start(self, model, world, s):
