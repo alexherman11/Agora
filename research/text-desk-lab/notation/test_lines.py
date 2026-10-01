@@ -151,7 +151,9 @@ t = say("alex", f"read {TALK} :3")
 check("read of the chat shows the line as edited", f"the parser is in, tested  (edited, {pid})" in t, t[-400:])
 t = say("alex", f"examine {pid}")
 check("examine shows who edited it and the words before", "· edited" in t and "edited by alex" in t and "the parser is in\n" in t + "\n", t)
-check("messages rows say edited", any(r["line"] == pid and r["edited"] == "edited" for r in scene.rows(D, f"messages:{TALK}")), "")
+check("messages rows say edited, in the field and in the words the screen paints",
+      any(r["line"] == pid and r["edited"] == "edited" and r["said"].endswith(f"tested  (edited, {pid})")
+          for r in scene.rows(D, f"messages:{TALK}")), scene.rows(D, f"messages:{TALK}")[-3:])
 t = say("alex", f'do rewrite {TALK} text="Alex: nothing was said"')
 check("a rewrite that drops lines is refused, pointing at replace or undo", "ERR" in t and "replace old=" in t, t)
 

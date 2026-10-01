@@ -406,9 +406,11 @@ def text_lines(w, sid):
     out = []
     for line in s["lines"]:
         e = w.event_by_id(line.get("ev"))
-        for l in line["text"].split("\n"):
-            if l.strip():
-                out.append((l, line, (e.get("at", ""), e["id"]) if e else ("", "")))
+        parts = [l for l in line["text"].split("\n") if l.strip()]
+        for k, l in enumerate(parts):
+            if line.get("edited") and k == len(parts) - 1:
+                l += f"  (edited, {line['id']})"        # as read prints it: a change to what was said is never silent
+            out.append((l, line, (e.get("at", ""), e["id"]) if e else ("", "")))
     return out
 
 
