@@ -1,4 +1,4 @@
-scene editor · for golden · world @126
+scene editor · for golden · world @126 · no style=; using the default (calm)
   ~ moss is looking: 660x760 at scroll 0,0 · painted world @126 · reported 15:36:20
   window [window] column
     bar [titlebar] row

@@ -1,4 +1,4 @@
-scene desktop · for golden · world @128
+scene desktop · for golden · world @128 · no style=; using the default (calm)
   desk [desk] column
     bar [bar] row
       apps "a desktop made of lenses · 4 installed" [meta] · 4 of tag:lens

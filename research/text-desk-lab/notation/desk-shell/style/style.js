@@ -246,7 +246,7 @@ const Style = (() => {
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";
     // A CSS animation starts when its part is painted, so a part repainted or unfolded later would be out of step.
     // Each one is pinned to the page's clock as it starts: the same moment is the same point of the fade everywhere.
-    if (!pinned) { pinned = true; document.addEventListener("animationstart", e => {
+    if (!pinned && document.addEventListener) { pinned = true; document.addEventListener("animationstart", e => {
       if (e.animationName === "r-pulse") e.target.getAnimations().forEach(a => { if (a.animationName === "r-pulse") a.startTime = 0; });
     }, true); }
     // The ramp, named, so an app can say a size instead of inventing one:

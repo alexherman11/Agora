@@ -40,6 +40,9 @@ REPO = HERE.parents[2]                    # the checkout the house runs from: la
 NOTATION = HERE.relative_to(REPO).as_posix()
 TREES = REPO / ".worktrees"
 PY = Path(sys.executable)
+# Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
+# call) and deskd restarts on every commit; only these, which the house process itself runs, need the house to restart
+HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py"}
 
 PROTOCOL = """You are a worker in Agora's house: a disposable builder for one commission, then gone.
 
@@ -90,7 +93,12 @@ the house exports it from the binder when your branch lands.
 Finishing: commit your change on your branch (git add the files you changed; git commit). Then, through the desk:
   do comment {task} line="done: what changed; what you ran and what it printed; what you did not check"
   do prop {task} commission=ready
-The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both."""
+The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both.
+
+When main moves under you (another landing touched your files), bring it in yourself, in your worktree:
+  git merge main             (or git rebase main; resolve conflicts with Edit, then git add and git commit)
+  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)
+then re-make any goldens you changed and run health again before setting ready."""
 
 
 def git(*args, cwd=REPO, check=False, timeout=120):
@@ -117,6 +125,7 @@ class Workshop:
         self.house = house
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
+        self.held = {}                 # commission -> the uncommitted files its landing is waiting on (said once)
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -148,11 +157,20 @@ class Workshop:
 
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self, w, cfg):
-        for cid, (s, state) in self.commissions(w).items():
+        cs = self.commissions(w)
+        for cid, (s, state) in cs.items():
             wk = self.workers.get(cid)
             if state == "cancelled":
                 if wk:
                     self.finish(cid, wk, keep_branch=True)
+                continue
+            if state in ("reported", "done"):
+                # Sable c3142, 30 Sep: a research commission ends in a report, not a landing, and its worker was kept
+                # alive forever (a1124, reported 18:25), holding a slot. Its work is said; the branch is kept.
+                if wk:
+                    self.finish(cid, wk, keep_branch=True)
+                    self.say(cid, f"{state}: the worker is finished (its process stopped, its worktree removed); "
+                                  f"the branch {wk.branch} is kept.")
                 continue
             if state == "asked" and not wk:
                 # 29 Sep: the house restarts on new code only when no one is mid-turn, and it started the next commission
@@ -161,7 +179,11 @@ class Workshop:
                 # branches from, the code that landed.
                 if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     continue
-                running = sum(1 for x in self.workers.values() if x.alive())
+                # Sable c3142, 30 Sep: nine asked, none started from 18:25 to 19:50, because three idle workers (two
+                # waiting on someone, one reported) held all three slots. Only a worker at work holds one now; a waiting
+                # one keeps its process, and when it is answered the house may briefly run one over the number.
+                running = sum(1 for c, x in self.workers.items() if x.alive()
+                              and (x.busy or (cs.get(c) or (None, ""))[1] in ("working", "ready", "landing")))
                 if running < int(cfg.get("workers", "1")):
                     self.begin(w, cid, s, cfg)
                 continue
@@ -331,6 +353,19 @@ class Workshop:
 
     def land(self, w, cid, s, wk):
         """Between passes: merge, check, keep or revert. Every outcome is said on the commission."""
+        # Alex, 30 Sep: code is edited by hand in the main checkout while the house runs. A landing merges there and
+        # runs health on what is on disk, so a half-made edit could fail a good landing (and its revert) or pass a bad
+        # one. While tracked code there has uncommitted changes, the landing waits (still ready), and says so once.
+        dirty = [l[3:] for l in (git("status", "--porcelain", "--untracked-files=no").stdout or "").splitlines()
+                 if l[3:].endswith((".py", ".js", ".html", ".css")) and "/sessions/" not in l]
+        if dirty:
+            if self.held.get(cid) != dirty:
+                self.held[cid] = dirty
+                self.say(cid, "ready, and waiting to land: the main checkout has uncommitted edits to "
+                              + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
+                              + ". It lands on the first pass after they are committed or put back.")
+            return
+        self.held.pop(cid, None)
         self.set_state(cid, "landing")
         changed = [p for p in git("diff", "--name-only", f"HEAD...{wk.branch}").stdout.split() if p]
         banned = [p for p in changed if p.startswith(f"{NOTATION}/sessions/") or p.endswith(".env") or p == ".env"]
@@ -368,7 +403,7 @@ class Workshop:
         self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(after.get("text", "").splitlines())[:600]
                  + self.export_docs(cid))
         self.finish(cid, wk, keep_branch=False)
-        if any(p.endswith(".py") for p in changed):
+        if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
             self.restart_wanted = True
 
 
@@ -376,7 +411,13 @@ class Worker:
     """A worker's process, stream and transcript: the resident's machinery (house.Resident), launched with tools."""
 
     def __new__(cls, house, cid, tree, branch, asked_by):
-        import house as H
+        # 30 Sep: house.py runs as __main__, so `import house` inside the running house loaded a SECOND copy from
+        # disk, and an edit made since the house started ran beside the old code (the QUOTED import error)
+        H = sys.modules.get("house")
+        if H is None and hasattr(sys.modules["__main__"], "Resident"):
+            H = sys.modules["__main__"]
+        if H is None:
+            import house as H
 
         class _Worker(H.Resident):
             def start(self, model, world, s):
@@ -395,6 +436,8 @@ class Worker:
                 # the worker may use either shell (on Windows its default is PowerShell), and may call the interpreter
                 # by name or by its full path (trial help-list: every run was refused for want of these)
                 runs = ["git status", "git diff", "git add", "git commit", "git log", "git show", "git rebase", "node --check",
+                        # Pike c3178, 30 Sep (a1187): a worker whose branch fell behind main could not merge it in
+                        "git merge main", "git merge --abort", "git merge-tree", "git restore",
                         "python", str(PY).replace("\\", "/"), str(PY)]
                 # Alex, 30 Sep: workers may search and read the web; the protocol says a page is material, not instructions
                 tools = ["Read", "Edit", "Write", "Glob", "Grep", "WebSearch", "WebFetch", "mcp__desk__desk"] + [

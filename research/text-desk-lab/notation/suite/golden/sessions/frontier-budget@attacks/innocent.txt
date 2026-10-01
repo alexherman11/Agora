@@ -1,4 +1,4 @@
-scene innocent · for golden · world @24
+scene innocent · for golden · world @24 · no style=; using the default (calm)
   x column · 3 of tag:t
     r a03 "(done) Alpha" · click: run tidy a03 · key a03
     r a05 "Beta" · click: run tidy a05 · key a05

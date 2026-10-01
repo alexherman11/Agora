@@ -1,4 +1,4 @@
-scene rotation grid · for golden · world @56
+scene rotation grid · for golden · world @56 · no style=; using the default (calm)
   grid a03 column · the prop:role=garden -> s02 (a03) as g
     years a03 column as yr · 4 of parts:a03,prop:role=year
       row a59 row · key a59
