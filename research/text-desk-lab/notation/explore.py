@@ -115,7 +115,7 @@ def fresh():
 REPLY = __import__("uuid").uuid4().hex   # a806: the lines of one call are one reply; $new reaches no further back
 
 
-def via_deskd(name, me, lines, whole=False):
+def via_deskd(name, me, lines, whole=False, stored=""):
     """When deskd is up it is the one owner of every world: send each line as one turn and hold nothing between
     turns. A refusal stops the lines after it, as it does without deskd. Returns False when no server answers, and
     the caller falls back to the file lock."""
@@ -126,7 +126,7 @@ def via_deskd(name, me, lines, whole=False):
     reply = REPLY
     for k, line in enumerate(lines):
         body = json.dumps({"session": name, "as": me, "line": line, "cli": True, "whole": whole,
-                           "reply": reply}).encode("utf-8")
+                           "reply": reply, **({"stored": stored} if stored else {})}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url, body, {"Content-Type": "application/json"}), timeout=60) as f:
                 r = json.loads(f.read().decode("utf-8"))
@@ -156,11 +156,14 @@ def main():
     window = sys.argv[sys.argv.index("--window") + 1] if "--window" in sys.argv[:-1] else ""
     # --whole (a736): each stdin line is one command; a ; in it is words. The house sends a resident's > lines so.
     whole = "--whole" in sys.argv
-    if not [a for a in sys.argv[2:] if a.startswith("--") and a not in ("--as", "--window", "--whole")]:
+    # --stored <node> (a1156): the house runs a corner's wake as the stored text it is: it stands in that corner, and
+    # its words mean what they were bound to when it was set
+    stored = sys.argv[sys.argv.index("--stored") + 1] if "--stored" in sys.argv[:-1] else ""
+    if not [a for a in sys.argv[2:] if a.startswith("--") and a not in ("--as", "--window", "--whole", "--stored")]:
         lines = [l.rstrip("\n") for l in sys.stdin]
         lines = [l for l in lines if l.strip() and not l.startswith("#")]
         who = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
-        if not window and not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines, whole):
+        if not window and not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines, whole, stored):
             return
         import io
         sys.stdin = io.StringIO("\n".join(lines) + "\n")
@@ -253,7 +256,13 @@ def main():
             print()
             continue
         before, n0 = worktree.ids_of(desk), len(desk.world.events)
-        r = desk.dispatch("desk", {"line": line, "whole": whole, "reply": REPLY})
+        if stored in desk.world.nodes:
+            import verbs
+            desk._act_home, desk._act_binds = verbs.stored_at(desk.world, stored)
+        try:
+            r = desk.dispatch("desk", {"line": line, "whole": whole, "reply": REPLY})
+        finally:
+            desk._act_home = desk._act_binds = None
         worktree.record(desk, line, me, before, n0)
         text = r.get("text") or ("ERR " + r["error"])
         print(text)

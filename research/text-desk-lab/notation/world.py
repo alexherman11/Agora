@@ -963,6 +963,16 @@ class World:
                 c["resolved"] = False
                 c["replies"] = c["replies"][:-1] if c["replies"] else []
                 owner["rev"] += 1
+        elif "restore_binds" in u:
+            # a1156: the one-time binding of stored lines saved before bindings; undo puts back what each holder kept
+            for kind, hid, prev in deepcopy(u["restore_binds"]):
+                obj = (self.subjects if kind == "s" else self.nodes).get(hid)
+                if obj is None:
+                    continue
+                if prev is None:
+                    obj.pop("binds", None)
+                else:
+                    obj["binds"] = prev
         elif "drop_link" in u:
             self.links = [l for l in self.links if l["id"] != u["drop_link"]]
         elif "restore_link" in u:

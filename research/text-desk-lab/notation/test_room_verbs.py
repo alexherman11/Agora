@@ -218,17 +218,20 @@ W.nodes[CORNER]["props"]["want"] = "awake"
 # (5), Juniper c996, finished by a1027: where a rule lives is the room holding its note, seen and moved on purpose
 t = reply("juniper", f"examine {rid}")[-1][1]
 check("examine on the rule note shows where the rule lives", f"lives in Lounge ({LOUNGE})" in t, t)
+# a1156 changed what a move does: the rule's words were bound when it was written, so moving the note moves its home
+# ($here) and keeps its words. Whoever moves it never changes what someone else's rule does (Pike, a1147)
 got = reply("juniper", f"look {rid} :1", f"look {CORNER} :1", f"do move {rid} into={CORNER}")
-check("moving the note to a room where tidy is not at hand makes it broken, naming the doors",
-      not got[-1][2] and "saved broken" in got[-1][1] and f"use {LT}" in got[-1][1], got[-1])
-x = make("pike", BOARD, "mess while broken")
+check("moving the note to a room where tidy is not at hand keeps it working: its tidy is still the Lounge's",
+      not got[-1][2] and "saved broken" not in got[-1][1] and f"lives in Juniper's corner ({CORNER})" in got[-1][1], got[-1])
+x = make("pike", BOARD, "mess after a move")
 reply("pike", f"look {x} :1", f"do tag {x} add=messy")
-check("... and while broken it never fires", prop(x, "tidied") is None, prop(x, "tidied"))
+check("... and it still runs the Lounge's tidy, the one it was bound to", prop(x, "tidied") == "lounge", prop(x, "tidied"))
 got = reply("juniper", f"look {rid} :1", f"look {BOARD} :1", f"do move {rid} into={BOARD}")
 check("moving it to the Board saves it there", not got[-1][2] and f"lives in Board ({BOARD})" in got[-1][1], got[-1])
 x = make("pike", BOARD, "mess after the move")
 reply("pike", f"look {x} :1", f"do tag {x} add=messy")
-check("... and the rule now runs the Board's tidy", prop(x, "tidied") == "board", prop(x, "tidied"))
+check("... and the rule still runs the Lounge's tidy, though the Board has its own (bound, a1156)",
+      prop(x, "tidied") == "lounge", prop(x, "tidied"))
 reply("juniper", f"look {rid} :1", f"look {LOUNGE} :1", f"do move {rid} into={LOUNGE}")
 
 # a rule living elsewhere whose word lost its room: Pike's corner had a tidy when he saved it, then it went
@@ -242,13 +245,13 @@ reply("pike", f"look {PT} :1", f"do remove {PT}")
 x = make("sable", BOARD, "orphan")
 got = reply("sable", f"look {x} :1", f"do tag {x} add=pikemess")
 note = next((l for l in got[-1][1].splitlines() if "could not" in l), "")
-check("a rule living elsewhere calling bare tidy refuses at run time, naming the doors (it never guesses)",
-      prop(x, "tidied") is None and f"use {LT}" in note and f"Board ({BOARD}" in note, got[-1])
+check("a rule whose bound tidy went refuses at run time, saying so (it never finds another tidy; a1156)",
+      prop(x, "tidied") is None and f"tidy {PT} is gone; this line was bound to it" in note, got[-1])
 print("     " + note.strip())
 
 goto("juniper", LOUNGE)
 SP = make("juniper", LOUNGE, "spruce", f"tags=verb on={LOUNGE}")
-got = reply("juniper", f"look {SP} :1", f'do rewrite {SP} text="tidy $1"')
+got = reply("juniper", f"read {SP} :3", f'do rewrite {SP} text="tidy $1"')
 check("a Lounge verb whose lines say bare tidy saves (tidy is at hand where it lives)", not got[-1][2], got[-1])
 goto("pike", BOARD)
 reply("pike", f"look {bnote} :1", f"do prop {bnote} tidied=no")

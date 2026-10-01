@@ -290,7 +290,18 @@ class DeskKnife(DeskMoo):
         return lines
 
     def _rule_parse(self, s, home):
-        """-> (the rule, None) or (None, why it is broken). Strict to the stored text, judged where the rule lives."""
+        """-> (the rule, None) or (None, why it is broken). Strict to the stored text, judged where the rule lives;
+        a1156: a world verb's word is the verb it was bound to when the rule was saved."""
+        import verbs
+        self._parse_binds = verbs.binding_of(self.world, ("s", s["id"]), s["text"])
+        try:
+            return self._rule_parse_in(s, home)
+        finally:
+            self._parse_binds = None
+
+    _parse_binds = None
+
+    def _rule_parse_in(self, s, home):
         lines = self._rule_line(s)
         if not lines:
             return None, f"its text holds no rule yet: one line, {self.RULE_FORM}"
@@ -349,7 +360,8 @@ class DeskKnife(DeskMoo):
         for sid, s in live.items():
             aid = w.appearances_of(sid)[0]
             home, author = verbs.room_holding(w, sid), self._rule_author(sid)
-            sig = (s["text"], home, author)
+            b = verbs.binding_of(w, ("s", sid), s["text"])
+            sig = (s["text"], home, author, repr(sorted((b or {}).get("words", {}).items())) if b else None)
             prev = states.get(sid)
             if prev is not None and prev["sig"] == sig:
                 prev["id"] = aid
@@ -411,7 +423,7 @@ class DeskKnife(DeskMoo):
         import verbs
         w, r = self.world, (self._rulestate or {}).get(sid)
         s, home = w.subjects[sid], verbs.room_holding(w, sid)
-        if r is not None and r["sig"] == (s["text"], home, self._rule_author(sid)):
+        if r is not None and r["sig"][:3] == (s["text"], home, self._rule_author(sid)):
             broken = r["broken"]
         else:
             # judged afresh, never stored: the act printing this line has not synced the rules yet, and its receipt
@@ -562,6 +574,15 @@ class DeskKnife(DeskMoo):
                 if not s or "verb" not in (s.get("tags") or []):
                     raise Refusal(f"{args[0]} is not a verb (a note tagged verb)")
                 return {"verb": "use", "world": True, "args": args, "kv": kv, "target": None}
+            b = self._parse_binds
+            if b is not None and verb in b["words"]:
+                rec = b["words"][verb]
+                if not rec.get("thing") and verbs._verb_named(self.world, rec["id"]) is None:
+                    raise Refusal(f"{verb} {rec['at']} is gone; this rule was bound to it. A rule never finds another "
+                                  f"{verb} on its own: save it again to bind it to one that is here, or use <id>")
+                return {"verb": verb, "world": True, "args": args, "kv": kv, "target": None}
+            if b is not None and verb in b["missing"]:
+                raise Refusal(b["missing"][verb])        # a1156: decided when it was saved, never looked up again
             if verb in {n for s in verbs.all_verbs(self.world) for n in verbs._names(s["title"])}:
                 verbs.find(self, verb, [a for a in args if "=" not in a], self.world.me, at=(home, True))
                 return {"verb": verb, "world": True, "args": args, "kv": kv, "target": None}
@@ -596,7 +617,10 @@ class DeskKnife(DeskMoo):
     def _fire(self, r, i):
         """Run rule r's action on thing i; returns one receipt line. A rule is a template its author wrote: every
         value is filled by the one filler, $item being the thing it fired on (a806)."""
+        import verbs
         ctx = blanks.Ctx("rule", item=i, name=r["id"], home=r.get("home"))
+        s = self.world.subjects.get(r.get("sid"))
+        ctx.binds = verbs.binding_of(self.world, ("s", s["id"]), s["text"]) if s else None     # a1156
         self._ctxs = (self._ctxs or []) + [ctx]
         try:
             return self._fire_in(r, i, ctx)
@@ -1033,6 +1057,9 @@ class DeskKnife(DeskMoo):
                 self._ctxs = None
 
     def _one_filled(self, args, name, whole, top):
+        if top:
+            import verbs
+            verbs.bind_unbound(self)      # a1156: once per world, lines saved before bindings bind to what they mean now
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
@@ -1330,8 +1357,9 @@ class DeskKnife(DeskMoo):
   A rule is a template: its values are filled when it fires: $item the thing it fired on, $item.title,
   $item.<prop> one of its props, $item.maker who made it, $today, $here (help blanks). corner:<name> is the corner
   whose actor= is that name: a sill (a missing one is skipped quietly, and rules counts it).
-  It lives in the room holding its note: $here is that room, a bare verb word means that room's verb. Move the note
-  and it lives there. It acts as whoever last chose what it does: its maker, or the last to write its text or tag
+  It lives in the room holding its note: $here is that room. A verb word made in the world is bound when the rule is
+  saved, to the verb it means there then (the receipt says which); moving the note moves $here, never its words.
+  A bound verb that is removed makes the rule fail, saying so; it never finds another. It acts as whoever last chose what it does: its maker, or the last to write its text or tag
   it rule (their receipt says so). It is checked whenever its text, home or author changes; one that fails is saved
   broken, says why, and never fires until fixed. When it is (re)saved, what already matches counts as handled.
   Quiet: a narrated look never lists rules; the tree marks them. rules lists every one: its home, who it acts as,
@@ -1504,6 +1532,8 @@ class DeskKnife(DeskMoo):
                 if r is not None:
                     out.append("  a rule (its home is the room holding it; move the note to move it):")
                     out += self._rule_lines(r)
+            import verbs
+            out += verbs.binding_lines(w, ("s", s["id"]), s["text"])     # a1156: what its stored words are bound to
             if s["kind"] == "chat":
                 pend = moo.unanswered(w, s["id"], str(w.me or "alex").lower())
                 out.append("  awaiting reply: " + " | ".join(pend) if pend else "  nothing awaiting a reply")
@@ -1518,6 +1548,9 @@ class DeskKnife(DeskMoo):
                     apps_o = w.appearances_of(other)
                     out.append(f"  link {l['id']}: " + (f"{l['kind']} → " if l["from"] == s["id"] else f"← {l['kind']} from ")
                                + f"{other} \"{ot}\"" + (f" (at {', '.join(apps_o)})" if apps_o else ""))
+        if (n.get("props") or {}).get("wake"):
+            import verbs
+            out += verbs.binding_lines(w, ("n", nid), str(n["props"]["wake"]), indent="  wake: ")
         out.append("  where: " + self._where_line(nid))
         if self.today:
             d = w.last_day(nid)
@@ -1583,31 +1616,27 @@ class DeskKnife(DeskMoo):
                           f"matches its words (help selections)")
 
     def cmd_do_knife(self, verb, positional, kv):
-        """a990: an act that makes or changes a verb (its word, where it lives, its lines) is judged as stored text
-        once it is done, and taken back whole if refused: a second verb with one word in one room, or lines whose bare
-        word isn't at hand where the verb lives. A wake line is judged in the corner it is set on, before."""
-        import rooms
+        """a990: an act that makes or changes a verb (its word, where it lives, its lines) is judged once it is done,
+        and taken back whole if refused. a1156: a verb's word may not be a built-in's, nor one another verb answers
+        where it would live (unless it says overrides=); and every stored line the act saved (a verb's lines, a rule, a
+        lens's acts, a wake) is bound where it stands: a word nothing answers there is refused (a rule: saved broken),
+        and a verb whose lines changed tells the authors of the lines bound to it."""
         import verbs
         w = self.world
         if verb == "prop" and "query" in kv and positional:
             self._check_view_query(positional[0], kv["query"])
-        if verb == "prop" and kv.get("wake") and positional:
-            try:
-                nid = self._resolve(positional[0], allow_subject=False)
-            except Refusal:
-                nid = None
-            if nid and rooms.is_room(w, nid):
-                try:
-                    verbs.check_lines(self, kv["wake"], nid)
-                except Refusal as e:
-                    raise Refusal(f"a wake line is stored text, judged in the corner it is set on: {e}")
-        before, n0 = verbs.state(w), len(w.events)
+        before, texts, n0 = verbs.state(w), verbs.stored_texts(w), len(w.events)
         out = self._do_knife(verb, positional, kv)
-        bad = verbs.check_change(self, before) if len(w.events) > n0 else None
+        if len(w.events) == n0:
+            return out
+        bad = verbs.check_change(self, before)
+        notes = []
+        if not bad:
+            bad, notes = verbs.after_act(self, texts)
         if bad:
             verbs.rollback(self, n0)
             raise Refusal(bad + ". Nothing was changed")
-        return out
+        return out + "".join("\n" + n for n in notes)
 
     def _do_knife(self, verb, positional, kv):
         w = self.world

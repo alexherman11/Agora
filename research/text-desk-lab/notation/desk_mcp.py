@@ -108,6 +108,9 @@ def run_desk(args):
     cmd = [PY, str(HERE / "explore.py"), session, "--as", who] + (["--window", window] if window else [])
     if args.get("whole"):       # a736: the house's own flag, not the tool's: each line is one command, ; is words
         cmd.append("--whole")
+    stored = str(args.get("stored") or "").strip()
+    if stored and re.fullmatch(r"[fa]\d+", stored):     # a1156: the house's own too: a corner's wake, run as stored text
+        cmd += ["--stored", stored]
     try:
         r = subprocess.run(cmd, cwd=HERE, input="\n".join(lines) + "\n", capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=120,
