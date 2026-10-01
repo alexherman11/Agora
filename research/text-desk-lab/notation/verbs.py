@@ -871,29 +871,4 @@ def miss(word):
             f"tagged verb (help verbs)")
 
 
-HELP = """verbs: capabilities that live in the world, made by anyone, as notes.
-  A verb is a note tagged verb. Its title is the word (sweep, or sweep|brush); its text is desk command lines,
-  one per line; lines starting with # describe it. $1 $2 .. are the words after it, $* the rest of the line
-  exactly as said (quotes and ; included), $1.title a thing's title, $me whoever uses it, $this the thing it lives
-  on, and every blank a typed line has ($here, $here.talk, $new, $today: help blanks). A verb is a template, so its
-  text values are filled too, once: a $here in what the caller said stays as they said it.
-  Where it lives (prop on):  none = carried by its maker only (a draft)   on=<id> = on that thing
-                             on=<room> = in that room (and rooms inside it)   on=house = everyone
-  Using one: just say it (sweep porch), or do sweep porch. use <verb id> [words] names exactly which, from anywhere.
-  A bare word is looked for nearest first: what you carry, the things you named, the room you are in and the rooms
-  around it, the house. A room's verb typed from elsewhere runs while it is the only one; if several rooms have one,
-  you are told every door (go there, or use <id>). Two verbs with one word in one room are refused when made.
-  Stored lines stand in their own home: a verb's lines where the verb lives, a rule in the room holding its note,
-  a lens gesture in its lens's room, a wake in its corner. Their words are bound when they are saved: each word
-  means the verb it meant then, and the receipt says which (examine shows it). A word nothing answers there, or one
-  only another room has, is refused when saved (a rule: saved broken). A bound line never looks again: a verb made
-  later with the word changes nothing, moving the note keeps its words, and a bound verb that is removed makes
-  the line fail saying so. Changing a verb's lines leaves a note on the sill of each author whose lines use it.
-  A verb never takes a word the desk answers (append, prop, look ...), nor one another verb answers where it would
-  live, unless it says so: overrides=<that verb's id>. Then a typed word there runs it, and the receipt names both.
-  Scripts were verbs nobody declared, and are retired (a1027): run X is just X.
-  A verb's title is a word, not a name: read, look and do reach a verb note by its id, never by its title.
-  help <word> explains a verb you can use; examine <thing> lists the verbs on it, and the ones at hand in your room;
-  help with a word it doesn't know lists every verb at hand where you are (a1308). Nothing lists them all.
-  e.g. do create Home kind=note title=wave tags=verb text="# wave to someone in Porch talk\\ndo append a570 line=\\"*waves at $1*\\""
-       wave thimble          (only you can, until: do prop <its id> on=house)"""
+# a1595: help blanks / help verbs live in the world now, as notes in the Help binder (helpnotes.py)
