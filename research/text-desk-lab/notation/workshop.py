@@ -152,11 +152,20 @@ class Workshop:
 
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self, w, cfg):
-        for cid, (s, state) in self.commissions(w).items():
+        cs = self.commissions(w)
+        for cid, (s, state) in cs.items():
             wk = self.workers.get(cid)
             if state == "cancelled":
                 if wk:
                     self.finish(cid, wk, keep_branch=True)
+                continue
+            if state in ("reported", "done"):
+                # Sable c3142, 30 Sep: a research commission ends in a report, not a landing, and its worker was kept
+                # alive forever (a1124, reported 18:25), holding a slot. Its work is said; the branch is kept.
+                if wk:
+                    self.finish(cid, wk, keep_branch=True)
+                    self.say(cid, f"{state}: the worker is finished (its process stopped, its worktree removed); "
+                                  f"the branch {wk.branch} is kept.")
                 continue
             if state == "asked" and not wk:
                 # 29 Sep: the house restarts on new code only when no one is mid-turn, and it started the next commission
@@ -165,7 +174,11 @@ class Workshop:
                 # branches from, the code that landed.
                 if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     continue
-                running = sum(1 for x in self.workers.values() if x.alive())
+                # Sable c3142, 30 Sep: nine asked, none started from 18:25 to 19:50, because three idle workers (two
+                # waiting on someone, one reported) held all three slots. Only a worker at work holds one now; a waiting
+                # one keeps its process, and when it is answered the house may briefly run one over the number.
+                running = sum(1 for c, x in self.workers.items() if x.alive()
+                              and (x.busy or (cs.get(c) or (None, ""))[1] in ("working", "ready", "landing")))
                 if running < int(cfg.get("workers", "1")):
                     self.begin(w, cid, s, cfg)
                 continue
