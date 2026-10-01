@@ -274,7 +274,7 @@
   function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: new Map(rs.map(r => [r.dataset.key, r._n.fence])) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
   function put(r) {
     const c = carrying; if (!c) return;
-    over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = "";
+    over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = ""; c.el.style.animation = "";
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
     if (!r || r.contains(c.el)) { V.hold = null; c.el.focus(); return; }
@@ -286,7 +286,7 @@
     const b = el.getBoundingClientRect(), g = el.cloneNode(true);
     g.querySelectorAll("[data-key]").forEach(x => x.removeAttribute("data-key")); g.removeAttribute("data-key");
     Object.assign(g.style, { position: "fixed", left: b.left + "px", top: b.top + "px", width: b.width + "px", margin: 0,
-      pointerEvents: "none", zIndex: 30, opacity: .92, boxShadow: "0 6px 18px rgba(0,0,0,.25)" });
+      pointerEvents: "none", zIndex: 30, opacity: .92, animation: "none", boxShadow: "0 6px 18px rgba(0,0,0,.25)" });
     document.body.appendChild(g); return g;
   }
   function carries(el, n) {
@@ -304,7 +304,7 @@
         if (m.pointerId !== pid) return;
         if (!c) {
           if (Math.hypot(m.clientX - x0, m.clientY - y0) < 5 || carrying) return;
-          take(el); c = carrying; c.ghost = ghost(el); el.style.opacity = ".35";
+          take(el); c = carrying; c.ghost = ghost(el); el.style.opacity = ".35"; el.style.animation = "none";   // a1140: the dim wins over a pulse
           document.body.style.userSelect = "none"; getSelection().removeAllRanges();
         }
         c.ghost.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px)`; over(at(m));

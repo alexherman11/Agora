@@ -141,6 +141,26 @@ def style_roles(desk, name):
     return {l.split()[1] for l in st["text"].splitlines() if l.startswith("role ") and len(l.split()) > 1}
 
 
+def pulsing_roles(desk, name):
+    """a1140: the roles whose words include `pulse` in the style the painter installs for a lens (its style=, else calm).
+    The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving. Read with
+    the painter's own parse (style_parse, below); a style the painter refuses paints nothing, so nothing pulses."""
+    st = style_source(desk, name or "calm") or {}
+    try:
+        roles = style_parse(st.get("text") or "")["roles"]
+    except LensRefusal:
+        return set()
+    return {n for n, r in roles.items() if "pulse" in r["props"]}
+
+
+def mark_pulse(node, roles):
+    """Set `pulse` on every node whose role pulses. Printer-side only: emit() never sends it to the painter."""
+    if roles and node.get("role") in roles:
+        node["pulse"] = True
+    for k in node.get("kids") or []:
+        mark_pulse(k, roles)
+
+
 # a1101 (Pike e2213: "appending style roles says ok but never says the style still parses"): the painter's own parse
 # and property reader (desk-shell/style/style.js: parse, check, resolveTokens, prop), mirrored line for line so an edit's
 # receipt can say what the painter will do with it. test_scene checks this mirror against node running style.js.
@@ -260,6 +280,8 @@ def _style_prop_ok(p, T):
             if re.search(r"\s\d+(\.\d+)?$", p) and not re.search(r"[x/]\s*\d+(\.\d+)?$", p):
                 return False, "a bare number is not on the scale: say gap, gap xN or gap /N"
             return False, "names no token of the right kind"
+    if p == "pulse":                               # a1140: the one motion
+        return True, ""
     if re.match(r"^text\b", p):
         if T.get(p.split()[0] if p.startswith("text.") else "text") != "text":
             return False, "names no text token"
@@ -1590,7 +1612,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 cut += f" (~clamp {n['clamp']}: the painter clamps wrapped lines and may show less)"
             bits.append('"' + body + '"' + cut)
         if n["role"]:
-            bits.append(f"[{n['role']}, since {n['since']}]" if n.get("since") else f"[{n['role']}]")
+            r = n["role"] + (" pulse" if n.get("pulse") else "")          # a1140: the print says what the eye sees move
+            bits.append(f"[{r}, since {n['since']}]" if n.get("since") else f"[{r}]")
         if n["layout"]:
             bits.append(n["layout"] + (" " + " ".join(n["tracks"]) if n.get("tracks") else ""))
         for wd in ("gap", "scroll", "measure", "share"):

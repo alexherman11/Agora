@@ -633,6 +633,7 @@ def scene_for(desk, name, part=None):
     if name:                                  # F7: which style paints this lens, and which revision of it
         st = S.style_source(desk, name) or {}
         sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
+    S.mark_pulse(sc, S.pulsing_roles(desk, name))   # a1140: the painter installs this one style for the whole scene
     sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
     roots = None
     if part:
