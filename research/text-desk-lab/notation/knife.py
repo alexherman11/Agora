@@ -42,8 +42,9 @@ def _leaves(w, fid):
     return out
 
 
-def parse_selection(w, token):
-    """Return (ids, description) or None if token is a plain id."""
+def parse_selection(w, token, trash=False):
+    """Return (ids, description) or None if token is a plain id. What is inside a Trash (moo.trash_surfaces) is left out
+    unless an in: term names the Trash or a surface inside it, or trash=True (a1327)."""
     token = token.strip().strip('"')
     if token in w.nodes or token in w.subjects or token in ("desk", "root") or token.lower().startswith("corner:"):
         return None     # corner:<name> is one thing, a resident's corner (a1027), not a selection
@@ -186,12 +187,25 @@ def parse_selection(w, token):
         else:
             raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>; -term leaves out")
     for n in neg:
-        r = parse_selection(w, n)
+        r = parse_selection(w, n, trash=True)
         if r is None:
             raise Refusal(f"-{n}: {n!r} is not a selection term")
         out = set(r[0])
         cands = [c for c in cands if c not in out]
+    bins = [] if trash else moo.trash_surfaces(w)
+    if bins and not any(t.startswith("in:") and (t[3:] in bins or any(w._is_inside(t[3:], b) for b in bins)) for t in terms):
+        gone = {i for b in bins for i in _leaves(w, b)}
+        cands = [c for c in cands if c not in gone]
     return cands, token
+
+
+def trash_left_out(w, token):
+    """a1327: how many things a selection left out because they are in a Trash, and the Trash ids. -> (n, bins)"""
+    bins = moo.trash_surfaces(w)
+    if not bins:
+        return 0, []
+    every, kept = parse_selection(w, token, trash=True), parse_selection(w, token)
+    return (len(every[0]) - len(kept[0]) if every and kept else 0), bins
 
 
 def general_verbs_by_origin(w, nid):

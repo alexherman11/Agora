@@ -210,6 +210,7 @@ due<2026-09-20  due>today  age>7  age<3  hidden  also:a18  a20,a22  -tag:done
 ```
 
 - Terms joined by commas or spaces are ANDed.
+- **The Trash is left out** (a1327; Pike e2979, e3086; Sable e3080): a Trash is a surface with prop `trash=yes` (`moo.trash_surfaces`; today f1170, where the house's `trash` verb a1174 moves). Every selection (a verb's target, `find`, a view, a rule's trigger, a lens's `of`) leaves out what is inside one, unless one of its own `in:` terms names a Trash or a surface inside it (`find in:f1170`); a negated term (`-in:…`) never brings it back (`knife.parse_selection(trash=)`). A plain id or an id list is not a selection and is never left out. A Trash's own `look` lists its contents. `find`, `table` and a view's line say what was left out when it is more than none: `10 matches · 1 in the Trash left out (add in:f1170 to see them)` (`knife.trash_left_out`, `DeskKnife._trash_note`). Every selection now reads its members' `place` (`lens_ir.term_aspects`). A thing moved out of a Trash (`move`, `put into=`, a selection move, `swap`/`beside`) is live again (`moo.with_untrash`): when no appearance of its subject is left in one and it says `status=trashed`, one more step in the same command sets a task's `status=open` and removes a non-task's `status`; the receipt says `out of the Trash: status=open (was trashed)`, and `undo` takes back both. A plain word `find` is not a selection and still lists trashed things, each with `in f1170`.
 - `parts:` and `part-of:` follow only `part-of` links, in one direction; `answers:` and `answered-by:` (a1027) follow only `answers` links the same way: `answered-by:a1008` is what a1008 answers, `answers:a1006` is what answers a1006.
 - `in:`, `also:`, `links:`, `parts:`, `part-of:`, `answers:` and `answered-by:` accept a title or a `$handle`.
 - A target may also be one id, a unique quoted title, `desk`/`root`, or a handle:
@@ -854,4 +855,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3484. Edit it there; a direct edit here makes the next export stop and warn. sha1:4dd493f1baa7 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3568. Edit it there; a direct edit here makes the next export stop and warn. sha1:3f8526513b76 -->
