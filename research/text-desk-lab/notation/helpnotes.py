@@ -122,7 +122,7 @@ def verb_spec(desk, name, known=False):
     open_ = "any other key" in (v.args or "") or "k=v" in (v.args or "")
     try:
         f = inspect.getsourcefile(v.run).replace("\\", "/").rsplit("/", 1)[-1]
-        where = f"{f}:{inspect.getsourcelines(v.run)[1] - 1}"
+        where = f"{f}:{inspect.getsourcelines(v.run)[1]}"      # a decorated function's first line is its @verb
     except (OSError, TypeError):
         where = "moo.REGISTRY"
     return keys, open_, where
