@@ -1426,7 +1426,7 @@ class DeskKnife(DeskMoo):
                 name, rest = scene.split_scene_arg(self, arg)
                 if rest == "ok":
                     import lens_ir
-                    return lens_ir.check(self, scene.find_lens(self, name))[1]
+                    return lens_ir.check(self, scene.find_lens(self, name), ages=True)[1]
                 sc, text = scene.scene_for(self, name, rest)
             except scene.LensRefusal as e:
                 raise Refusal(str(e))

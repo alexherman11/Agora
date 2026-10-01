@@ -1575,6 +1575,72 @@ def _slug(s):
     return re.sub(r"[^\w-]+", "-", str(s).strip().lower()).strip("-")[:40] or "-"
 
 
+def _ago(iso):
+    import datetime
+    try:
+        s = int((datetime.datetime.now() - datetime.datetime.fromisoformat(iso)).total_seconds())
+    except (TypeError, ValueError):
+        return "at an unknown time"
+    return (f"{max(s, 0)} s" if s < 90 else f"{s // 60} min" if s < 5400 else f"{s // 3600} h" if s < 172800 else f"{s // 86400} days") + " ago"
+
+
+def judge_views(desk, views, closure, style_rev):
+    """a1473: whether each viewer's sizes are of the lens as it stands. A painter reports the frame (each lens in the
+    closure at its revision) and the style revision it painted; anything else now means its boxes are of an older lens.
+    The edit is named: the first event after the paint's world that touched a lens in the closure or its style.
+    -> {viewer: copy of the view with "paint": {"state": current|stale|unknown, "edit": words or None, "age": words}}"""
+    w = desk.world
+    frame = ".".join(f"{c['id']}r{c['rev']}" for c in closure)
+    ids = set()
+    for sid in [c["id"] for c in closure] + ([style_rev.rsplit("r", 1)[0]] if style_rev and style_rev[:1] == "s" else []):
+        ids.add(sid)
+        ids.update(w.appearances_of(sid))
+    out = {}
+    for a, v in views.items():
+        v = dict(v)
+        if "boxes" in v:
+            p = v.get("painted") or {}
+            state = "unknown" if not p else "current" if (p.get("frame"), p.get("style")) == (frame, style_rev or "seed") else "stale"
+            edit = None
+            if state == "stale":
+                evs = [e for e in w.events[v.get("at", 0):] if e.get("target") in ids] or \
+                      [e for e in reversed(w.events) if e.get("target") in ids][:1]
+                if evs:
+                    e = evs[0]
+                    edit = ("your" if e.get("by") == w.me else f"{e.get('by')}'s") + f" edit at {e['id']}" + (f" (and {len(evs) - 1} more)" if len(evs) > 1 else "")
+                else:
+                    edit = f"a change to the lens (painted {p.get('frame')}, now {frame})"
+            v["paint"] = {"state": state, "edit": edit, "age": _ago(v.get("time"))}
+        out[a] = v
+    return out
+
+
+def box_words(b):
+    """A painter's box ("320x840 scroll sh=2400", "hidden") as words for a part's line."""
+    if b == "hidden":
+        return "not drawn (folded or hidden)"
+    m = re.match(r"(\d+)x(\d+)", b or "")
+    if not m:
+        return f"box {b!r} (unreadable)"
+    wd, ht = int(m.group(1)), int(m.group(2))
+    kv = dict(re.findall(r"(\w+)=([\d/]+)", b))
+    out = f"{wd}x{ht}px"
+    if ht == 0 or wd == 0:
+        out += f" ({'0 high' if ht == 0 else '0 wide'}: nothing visible)"
+    over = " and ".join(x for x in (f"{kv['sh']} high" if "sh" in kv else "", f"{kv['sw']} wide" if "sw" in kv else "") if x)
+    if over:
+        mode = next((x for x in ("scroll", "clip", "spill") if f" {x}" in b), "spill")
+        out += {"scroll": f", scrolls: contents {over}", "clip": f", clipped: contents {over}",
+                "spill": f", contents spill out of it: {over}"}[mode]
+    if "cut" in kv:
+        n, of = kv["cut"].split("/")
+        out += f", {n} of {of} parts cut off"
+    if "out" in kv:
+        n, of = kv["out"].split("/")
+        out += f", {n} of {of} parts scrolled out of view"
+    return out
+
+
 def to_text(scene, name, who, at, roots=None, part=None):
     """The scene as text. `roots` (a1101): print only these nodes and what is inside them, each under its full key."""
     lines = [f"scene {name}" + (f" · part {part}: {len(roots)} match" + ("es" if len(roots) != 1 else "") if roots is not None else "")
@@ -1585,8 +1651,17 @@ def to_text(scene, name, who, at, roots=None, part=None):
         # Pike a561: since 0477e78 a viewer publishes attention (viewport, scroll) only when they allow it; say so
         where = (f"is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')}" if vp.get("w") is not None
                  else "has this open; attention not shared")
+        pa = v.get("paint")
         lines.append(f"  ~ {a} {where} · painted world @{v.get('at')}"
-                     + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}")
+                     + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}"
+                     + (f" ({pa['age']}) · " + {"current": "sizes are of the lens as it stands",
+                                                "stale": f"painted before {pa['edit']}: sizes are of the old lens",
+                                                "unknown": "its painter did not say which revision it painted"}[pa["state"]] if pa else ""))
+    sized = [v for v in views.values() if v.get("paint")]
+    if sized and all(v["paint"]["state"] == "stale" for v in sized):
+        lines.append(f"  ! no viewer has painted this lens since {sized[0]['paint']['edit']}; the sizes below are of the old lens")
+    elif not sized and part is not None:
+        lines.append("  ~ no painted sizes: no viewer has this lens open with a painter that reports them (screen.py paints a copy)")
 
     def rv(v, top=120):
         """A read value on one line: newlines become ` / ` as in a body, and a long one is cut and says so (Juniper,
@@ -1684,6 +1759,11 @@ def to_text(scene, name, who, at, roots=None, part=None):
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):
                 bits.append(f"~ {a}: {v['facts'][n['key']]}")
+            if v.get("paint"):           # a1473: the box this part was painted at, from that viewer's last report
+                b = (v.get("boxes") or {}).get(n["key"])
+                old = " before the edit" if v["paint"]["state"] == "stale" else ""
+                if not (b == "hidden" and pkey and v["boxes"].get(pkey) == "hidden"):     # said once, at the top one
+                    bits.append(f"~ {a}{old}: " + (box_words(b) if b else "not in the paint"))
         # Juniper (key form, 25 Sep), Pike's C4 gap: the occurrence key was painted as data-key and never printed. The
         # segment is the key below the parent's; a fixed part's segment is its own name and prints nothing.
         seg = n["key"][len(pkey) + 1:] if pkey and n["key"].startswith(pkey + "/") else n["key"]
