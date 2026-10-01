@@ -93,7 +93,12 @@ the house exports it from the binder when your branch lands.
 Finishing: commit your change on your branch (git add the files you changed; git commit). Then, through the desk:
   do comment {task} line="done: what changed; what you ran and what it printed; what you did not check"
   do prop {task} commission=ready
-The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both."""
+The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both.
+
+When main moves under you (another landing touched your files), bring it in yourself, in your worktree:
+  git merge main             (or git rebase main; resolve conflicts with Edit, then git add and git commit)
+  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)
+then re-make any goldens you changed and run health again before setting ready."""
 
 
 def git(*args, cwd=REPO, check=False, timeout=120):
@@ -431,6 +436,8 @@ class Worker:
                 # the worker may use either shell (on Windows its default is PowerShell), and may call the interpreter
                 # by name or by its full path (trial help-list: every run was refused for want of these)
                 runs = ["git status", "git diff", "git add", "git commit", "git log", "git show", "git rebase", "node --check",
+                        # Pike c3178, 30 Sep (a1187): a worker whose branch fell behind main could not merge it in
+                        "git merge main", "git merge --abort", "git merge-tree", "git restore",
                         "python", str(PY).replace("\\", "/"), str(PY)]
                 # Alex, 30 Sep: workers may search and read the web; the protocol says a page is material, not instructions
                 tools = ["Read", "Edit", "Write", "Glob", "Grep", "WebSearch", "WebFetch", "mcp__desk__desk"] + [
