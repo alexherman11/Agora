@@ -590,6 +590,8 @@ class Desk:
             kids = []
             m = self.view_matches(nid)
             bits.append("query not evaluable" if m is None else f"{len(m)} match" + ("es" if len(m) != 1 else ""))
+            if m is not None and hasattr(self, "_trash_note"):
+                bits.append(self._trash_note(n.get("query", "")))      # a1327: never a silent leaving out
         elif n["type"] == "surface":
             kids = w.children(nid)
             head = f"{nid} surface \"{n['title']}\" {n['layout']}"

@@ -93,7 +93,7 @@ def term_aspects(q):
     """The aspects of a member that selection `q`'s terms read (sable-8 amended R_g: a `bind many` instance is a member
     while these hold). -> (subject aspects, appearance aspects). `kind` and `age` are not aspects any verb declares;
     a kind change would go unfenced here, and age moves only with the clock."""
-    subj, app = set(), set()
+    subj, app = set(), {"place"}       # a1327: every selection leaves out what is in a Trash, so a member's place counts
     for t in [x for x in re.split(r"[,\s]+", q.strip()) if x]:
         t = t[1:] if t.startswith("-") else t
         if t.startswith("tag:"):

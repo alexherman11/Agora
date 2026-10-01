@@ -35,6 +35,8 @@ SELECTION_HELP = """selections: a target can be one id, or a selection that name
   -tag:fixed         leaves out what the term would select (any term may be negated)
   a20,a22            an explicit list
 combine terms with commas (AND): kind:image,in:f04. The receipt lists everything the verb touched.
+the Trash (a surface with prop trash=yes) is left out of every selection unless an in: term names it or a surface in
+it; find and views say how many they left out. A thing moved out of the Trash loses status=trashed (a task's is open).
 find <selection> lists what it matches, grouped by surface: find kind:image   find tag:harbor,in:f04   find hidden
 e.g. do move ?harbor into=f02 one=1     do raise hidden,in:f04     do group kind:image,in:f04 as=column title=Pictures"""
 
@@ -463,9 +465,11 @@ class DeskKnife(DeskMoo):
         if sel is None:
             raise Refusal(f"{' '.join(words)!r} is not a selection (help selections)")
         ids, desc = sel
+        aside = self._trash_note(" ".join(words))
+        aside = f"; {aside}" if aside else ""
         if not ids:
-            return f"table {desc}: nothing matches"
-        return "\n".join([f"table {desc}: {len(ids)} row(s)"] + self._table_lines(ids, kv.get("cols"), kv.get("by"), kv.get("desc")))
+            return f"table {desc}: nothing matches" + aside
+        return "\n".join([f"table {desc}: {len(ids)} row(s)" + aside] +self._table_lines(ids, kv.get("cols"), kv.get("by"), kv.get("desc")))
 
     def _table_lines(self, ids, cols_spec, by, desc_flag):
         """Header, one row per thing, and a columns hint; shared by table and by views with cols=."""
@@ -1123,18 +1127,27 @@ class DeskKnife(DeskMoo):
     def _parse_selection(self, token):
         return knife.parse_selection(self.world, self._selection_terms(token.strip()))
 
+    def _trash_note(self, token):
+        """a1327: what a selection left out because it is in the Trash, said so the leaving out is never silent."""
+        try:
+            n, bins = knife.trash_left_out(self.world, self._selection_terms(token.strip()))
+        except Refusal:
+            return ""
+        return f"{n} in the Trash left out (add in:{bins[0]} to see them)" if n else ""
+
     def cmd_find(self, words):
         # round 11b: find also takes a selection, which is the scalable listing view (examine is one thing in depth)
         sel = self._parse_selection(words) if words.strip() else None
         if sel is not None:
             ids, desc = sel
+            aside = self._trash_note(words)
             if not ids:
-                return f"find {desc}: nothing matches"
+                return f"find {desc}: nothing matches" + (f"; {aside}" if aside else "")
             w = self.world
             by_parent = {}
             for i in ids:
                 by_parent.setdefault(w.nodes[i]["parent"], []).append(i)
-            out = [f"find {desc}: {len(ids)} thing(s)"]
+            out = [f"find {desc}: {len(ids)} thing(s)" + (f"; {aside}" if aside else "")]
             cap = 8
             for p, kids in by_parent.items():
                 out.append(f"  in {p} \"{w.title(w.nodes[p])}\":")

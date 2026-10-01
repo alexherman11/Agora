@@ -96,7 +96,39 @@ def _prim(w, verb, nid, args):
 
 @verb("move", ["thing"], "Put this somewhere else.", "into=<surface> | before=<id> | after=<id> | to=<x>,<y> | by=<dx>,<dy>", "do move a04 into=f02")
 def v_move(w, nid, a):
-    return _prim(w, "move", nid, a)
+    was = in_trash(w, nid)
+    r = _prim(w, "move", nid, a)
+    return with_untrash(w, nid, r, was)
+
+
+# a1327 (Pike e2979, e3086; Sable e3080): a Trash is a surface with prop trash=yes; the house's trash verb (a1174) moves
+# into it. What is inside one is left out of every selection that doesn't name it (knife.parse_selection), and a thing
+# moved out of it is live again: status=trashed goes, and a task's status is open.
+def trash_surfaces(w):
+    return [n["id"] for n in w.nodes.values() if n["type"] == "surface" and (n.get("props") or {}).get("trash") == "yes"]
+
+
+def in_trash(w, nid, bins=None):
+    bins = trash_surfaces(w) if bins is None else bins
+    return nid in w.nodes and any(w._is_inside(nid, t) for t in bins)
+
+
+def with_untrash(w, nid, r, was):
+    """After a move of `nid` that was in a Trash (`was`): if it (and every other appearance of its subject) is out now
+    and still says status=trashed, one more step clears it, as the same command, so undo takes both back."""
+    n = w.nodes.get(nid)
+    if not was or not r.get("event") or not n or in_trash(w, nid):
+        return r
+    if n["type"] == "appearance" and any(in_trash(w, x) for x in w.appearances_of(n["subject"])):
+        return r
+    if props_of(w, nid).get("status") != "trashed":
+        return r
+    task = n["type"] == "appearance" and w.subjects[n["subject"]]["kind"] == "task"
+    p = v_prop(w, nid, {"status": "open"} if task else {"remove": "status"})
+    note = "out of the Trash: " + ("status=open (was trashed)" if task else "status=trashed removed")
+    return dict(r, events=(r.get("events") or [r["event"]]) + [p["event"]],
+                changed=sorted(set(r.get("changed", [])) | set(p.get("changed", []))),
+                note="; ".join(x for x in (r.get("note"), note) if x))
 
 
 @verb("place", ["subject"], "Put a subject on a surface as a new appearance; its other appearances stay where they are.",
@@ -383,9 +415,12 @@ def _compose(w, steps):
     """Run (verb, nid, args) steps; return one receipt naming all events. Abort and undo on refusal."""
     events, changed = [], []
     for verb, nid, args in steps:
+        was = verb == "move" and in_trash(w, nid)
         try:
             try:
                 r = w.apply(verb, nid, None, args)
+                if was:
+                    r = with_untrash(w, nid, r, was)
             except Refusal as e:
                 if "is not a verb of" in str(e) and verb in REGISTRY:   # registry verbs (tag, prop, due ...) over a selection
                     r = REGISTRY[verb].run(w, nid, dict(args))
@@ -398,7 +433,7 @@ def _compose(w, steps):
                 except Refusal:
                     pass
             raise Refusal(f"stopped at {verb} {nid}: {e}; earlier steps undone")
-        events.append(r["event"])
+        events += r["events"] if was and r.get("events") else [r["event"]]
         changed += r.get("changed", [])
     return {"ok": True, "event": events[-1] if events else None, "events": events, "changed": sorted(set(changed))}
 
