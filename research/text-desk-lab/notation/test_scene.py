@@ -442,6 +442,31 @@ def test_replace_changes_one_exact_passage():
     assert "stale" in do(f'do replace {nid} old="a : column" new="a : row"', "juniper")
 
 
+def test_what_you_made_you_have_seen():
+    """a1190: a create's maker has seen all it wrote (title, text, tags, props), so a rewrite of their own text= needs
+    no read; someone who only looked at it is still fenced. A 30 Sep change (create touches only its parent's
+    contents) had marked the new thing seen for contents alone, and the maker's next rewrite was refused."""
+    import explore, re
+    d = explore.fresh()
+    slots = {}
+
+    def do(line, who):
+        slots[d.world.me] = (d.seen, d.open, d.last_event_seen)
+        d.seen, d.open, d.last_event_seen = slots.get(who) or ({}, {d.world.root}, len(d.world.events))
+        d.world.me = who
+        r = d.dispatch("desk", {"line": line})
+        return r.get("text") or ("ERR " + str(r.get("error")))
+
+    root = d.world.root
+    do("look", "juniper")
+    nid = re.search(r"created (a\d+)", do(f"do create {root} kind=note title=tidy tags=verb text=x", "juniper")).group(1)
+    do(f"look {nid} :1", "juniper")
+    assert do(f"do rewrite {nid} text=y", "juniper").startswith("ok"), "the maker rewrites the text they typed"
+    do(f"look {nid} :1", "pike")
+    assert "have not seen" in do(f"do rewrite {nid} text=z", "pike"), "a look is not a read for anyone else"
+    assert do(f"do prop {root} mood=calm", "juniper").startswith("ok"), "a create still leaves its parent's props unstaled"
+
+
 def test_rooms_go_look_and_replay():
     """a678, rooms step 1: where you are is a world fact (a go event), a bare look narrates your room, undo leaves
     walking alone, the !! line folds it, and a worktree merge replays it."""

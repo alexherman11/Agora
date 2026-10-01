@@ -1,15 +1,14 @@
 """test_room_look (a948, rooms step 2c): look tells the truth: a room by name, the date, who's really here, and a
 create's receipt that teaches $new.
 
-    python test_room_look.py [world]        default frontier-try
+    python test_room_look.py
 
-Loads the world into memory and never saves it: every desk line runs through the desk's own dispatch, as explore.py
-and deskd call it, with a reply token per reply (the harness of test_blanks.py). The house's observations are faked in
-a temporary house-state directory; the real one is never touched.
+Builds its own small world in memory (roomworld.py, a1190) and never saves it: every desk line runs through the
+desk's own dispatch, as explore.py and deskd call it, with a reply token per reply (the harness of test_blanks.py). The
+house's observations are faked in a temporary house-state directory; the real one is never touched.
 """
 import json
 import os
-import pickle
 import re
 import sys
 import tempfile
@@ -22,7 +21,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
+import roomworld   # noqa: E402
+
 fails = []
 
 
@@ -32,9 +32,8 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -70,15 +69,20 @@ def here_line(text):
     return next((l for l in text.splitlines() if l.startswith(("Here", "No one"))), "")
 
 
+def here_names(text):
+    """The 'Here: a, b.' line as a set: its order follows the corners' ids, which is not what these checks are about."""
+    line = here_line(text)
+    return set(line.split(":", 1)[1].strip().rstrip(".").split(", ")) if ":" in line else set()
+
+
 import rooms   # noqa: E402
 import scene   # noqa: E402
 
-HOME = rooms.home_room(W)
-room = lambda title: next(f for f in rooms.all_rooms(W) if W.nodes[f]["title"] == title)
-LOUNGE, BOARD = room("Lounge"), room("Board")
-TALK = W.nodes[LOUNGE]["props"]["talk"]
-corner = {a: rooms.corner_of(W, a) for a in ("juniper", "pike", "sable")}
-print(f"world {WORLD} (in memory): Home {HOME}, Lounge {LOUNGE} (talk {TALK}), Board {BOARD}, corners {corner}")
+HOME, LOUNGE, BOARD = R.HOME, R.LOUNGE, R.BOARD
+check("(setup) Home is the outermost room", rooms.home_room(W) == HOME)
+TALK = R.TALK[LOUNGE]
+corner = dict(R.corner)
+print(f"built world (in memory): Home {HOME}, Lounge {LOUNGE} (talk {TALK}), Board {BOARD}, corners {corner}")
 
 # 0. every wake still works: each resident's wake line, as the house sends it, runs whole
 for a, c in corner.items():
@@ -112,7 +116,7 @@ check("look corner with no corner of your own names the corners", "names" in out
 
 # 2. the tree is still there: with a depth, and for anything that is not a room
 out = said("juniper", "look Board :2")
-check("look Board :2 prints the tree as before", out[1].startswith(f"{BOARD} surface \"Board\"") and "\n  a157" in out[1], out)
+check("look Board :2 prints the tree as before", out[1].startswith(f"{BOARD} surface \"Board\"") and f"\n  {R.describe[BOARD]}" in out[1], out)
 note = next(k["id"] for k in W.children(LOUNGE) if W.nodes[k["id"]]["type"] == "appearance")
 out = said("juniper", f"look {note}")
 check("look <a note> is unchanged", out[1].startswith(f"{note} "), out)
@@ -121,7 +125,7 @@ check("look <a word that names nothing> refuses as before", "no such id" in out[
 out = said("alex", f"look {LOUNGE}")
 check("Alex, who is not placed, keeps the tree for look <room>", out[1].startswith(f"{LOUNGE} surface"), out)
 
-# 3. the date line: the desk's clock, the one $today and age< read
+# 3. the date line: the desk's clock, the one $today and age< read (roomworld sets clock follow, as the live world is)
 out = said("juniper", "look")
 now = datetime.now()
 today = D.today
@@ -154,7 +158,8 @@ try:
     reply("alex", f"look {corner['juniper']} :1", f"do prop {corner['juniper']} want=rest")
     out = said("claude", "look lounge")[1]
     check("from elsewhere: 'Here: Sable, Pike (resting).' and 'Juniper is asleep here.'",
-          here_line(out) == "Here: Sable, Pike (resting)." and "Juniper is asleep here." in out, out)
+          here_line(out).startswith("Here: ") and here_names(out) == {"Sable", "Pike (resting)"}
+          and "Juniper is asleep here." in out, out)
     out = said("pike", "look")[1]
     check("in the room: 'Here with you: Sable.' (Sable mid-turn is plain), Juniper asleep",
           "Here with you: Sable." in out and "Juniper is asleep here." in out, out)
@@ -174,7 +179,7 @@ finally:
     scene.HOUSE_STATE = old
 out = said("claude", "look lounge")[1]
 check("with no house state (a copy, a test world), residents are named plain, as before",
-      here_line(out) == "Here: Sable, Pike." and "Juniper is asleep here." in out, out)
+      here_line(out).startswith("Here: ") and here_names(out) == {"Sable", "Pike"} and "Juniper is asleep here." in out, out)
 reply("alex", f"look {corner['juniper']} :1", f"do prop {corner['juniper']} want=awake")
 
 # 5. a948 (7): a look <room> from elsewhere counts the talk lines it prints whole as read, through a951's rule

@@ -1,13 +1,16 @@
 """test_blanks (a806, rooms step 2a): the one filler, $here and $new, presence, and rest going home.
 
-    python test_blanks.py [world]        default frontier-try
+    python test_blanks.py
 
-Part 1 loads the world into memory and never saves it: every desk line runs through the desk's own dispatch, as
-explore.py and deskd call it, with a reply token per reply. Part 2 drives the house's own rest path (House.rest, as
-after a resident says > rest) with DESKD off, so it CHANGES the world it is given: give it a -try copy.
+Part 1 builds its own small world in memory (roomworld.py, a1190, without its say: the test writes its own) and every
+desk line runs through the desk's own dispatch, as explore.py and deskd call it, with a reply token per reply. Part 2
+drives the house's own rest path (House.rest, as after a resident says > rest) with DESKD off, which runs explore.py
+on a world by name: so the built world is saved as sessions/roomworld-blanks-<pid>-try.pickle for it, and that file,
+its lock and its house-state directory are removed afterwards (as screen.py does with its copies).
 """
 import os
 import pickle
+import shutil
 import sys
 import time
 import uuid
@@ -18,7 +21,9 @@ sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 os.environ.setdefault("HOUSE_CLAUDE", "claude")     # the house looks for a claude binary; none is started here
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
+import roomworld   # noqa: E402
+
+WORLD = f"roomworld-blanks-{os.getpid()}-try"
 fails = []
 
 
@@ -28,9 +33,8 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+D, R = roomworld.build(say=False)
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -69,16 +73,12 @@ import rooms   # noqa: E402
 
 t0 = time.time()
 BEFORE = {sid: (s["title"], s["text"]) for sid, s in W.subjects.items()}
-ROOMS = rooms.all_rooms(W)
-talky = [f for f in ROOMS if (W.nodes[f].get("props") or {}).get("talk") and (W.nodes[f].get("props") or {}).get("role") == "room"]
-quiet = [f for f in ROOMS if not (W.nodes[f].get("props") or {}).get("talk")]
-assert len(talky) >= 2 and quiet, f"this test wants two rooms with talk= and one without: {ROOMS}"
-LOUNGE, BOARD, NOTALK = talky[0], talky[1], quiet[0]
-TALK = {f: W.nodes[f]["props"]["talk"] for f in talky}
-HOME = rooms.home_room(W)
-CORNER = sorted(f for f in ROOMS if (W.nodes[f].get("props") or {}).get("role") == "resident")[0]
-ME = W.nodes[CORNER]["props"]["actor"]
-print(f"world {WORLD} (in memory): rooms {LOUNGE} {BOARD} with talk, {NOTALK} without; home {HOME}; acting as {ME}")
+LOUNGE, BOARD, NOTALK, HOME = R.LOUNGE, R.BOARD, R.ARCHIVE, R.HOME
+talky = [LOUNGE, BOARD]
+TALK = dict(R.TALK)
+ME = "juniper"
+CORNER = R.corner[ME]
+print(f"built world (in memory): rooms {LOUNGE} {BOARD} with talk, {NOTALK} without; home {HOME}; acting as {ME}")
 
 VERBS = {s["title"] for s in W.subjects.values() if "verb" in s["tags"]}
 
@@ -188,7 +188,7 @@ got = reply(ME, f"look {CORNER} :1", f'do prop {CORNER} next="write $today into 
             f"do prop {CORNER} when=$today")
 check("a prop next= holding a sentence with blanks inside stays exactly as typed",
       props(CORNER).get("next") == "write $today into the log, then tell $here", got)
-check("a prop whose whole value is one blank (when=$today) fills", props(CORNER).get("when") == D.today, (got, D.today))
+check("a prop whose whole value is one blank (when=$today) fills", D.today and props(CORNER).get("when") == D.today, (got, D.today))
 got = reply(ME, f"go {LOUNGE} :1", f"read {chat}", f"do append {chat} line=$here")
 check("a prose argument that is one whole blank (line=$here) is still words",
       text_of(chat).splitlines()[-1] == f"{W.display_name(ME)}: $here", got)
@@ -225,8 +225,8 @@ check("$here in a rule is the rule's home, the room holding its note (a990, a102
 be("worker-test")
 look = D.dispatch("desk", {"line": f"go {HOME}"})["text"]
 check("Jeff shows as here in Home", "Jeff" in look.split("Here with you:")[-1].split("\n")[0] if "Here with you:" in look else False, look)
-other = sorted(f for f in ROOMS if (W.nodes[f].get("props") or {}).get("role") == "resident")[1]
-pal = W.nodes[other]["props"]["actor"]
+pal = "pike"
+other = R.corner[pal]
 reply(pal, f"go {BOARD} :1")
 W.nodes[other]["props"]["status"] = "asleep"
 look = reply("worker-test", f"go {BOARD}")[-1][1]
@@ -255,11 +255,12 @@ check("export writes no bare blank", not _re.search(r"(?<!\\)\$(here|new|item|to
       _re.findall(r".{30}(?<!\\)\$(?:here|new|item|today)\b.{10}", exp)[:3])
 print(f"part 1: {time.time() - t0:.0f} s (in memory; nothing saved)")
 
-# part 2: the house's own rest, through the desk process, on the -try world
-if not WORLD.endswith("-try"):
-    print("skip part 2: it changes the world, and this is not a -try copy")
-else:
-    import house   # noqa: E402
+# part 2: the house's own rest, through the desk process, on a saved copy of the built world (removed after)
+import house   # noqa: E402
+saved = HERE / "sessions" / f"{WORLD}.pickle"
+D._session = WORLD
+saved.write_bytes(pickle.dumps(D))
+try:
     H = house.House(WORLD)
     w = H.load()
     H.act(ME, f"go {BOARD} :1")
@@ -270,6 +271,10 @@ else:
     last = [e for e in w.events if e["verb"] == "go" and e["by"] == ME][-1]
     check("the house's rest (as after > rest) takes the resident home to its corner, via=rest",
           rooms.room_of(w, ME) == CORNER and last.get("via") == "rest" and last["args"]["to"] == CORNER, last)
+finally:
+    for p in (saved, saved.with_suffix(".lock")):
+        p.unlink(missing_ok=True)
+    shutil.rmtree(house.STATE / WORLD, ignore_errors=True)
 
 print(f"{len(fails)} failed" if fails else "all passed", f"({time.time() - t0:.0f} s, world {WORLD})")
 sys.exit(1 if fails else 0)

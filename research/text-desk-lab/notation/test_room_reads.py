@@ -1,13 +1,12 @@
 """test_room_reads (a951, talk step 3a3): the lines a room's look prints whole are read; its hint names the world's
 speaking verb.
 
-    python test_room_reads.py [world]        default frontier-try
+    python test_room_reads.py
 
-Loads the world into memory and never saves it: every desk line runs through the desk's own dispatch, as explore.py
-and deskd call it, with a reply token per reply (the harness of test_blanks.py).
+Builds its own small world in memory (roomworld.py, a1190) and never saves it: every desk line runs through the
+desk's own dispatch, as explore.py and deskd call it, with a reply token per reply (the harness of test_blanks.py).
 """
 import os
-import pickle
 import sys
 import uuid
 from pathlib import Path
@@ -16,7 +15,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
+import roomworld   # noqa: E402
+
 fails = []
 
 
@@ -26,9 +26,8 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -54,16 +53,19 @@ def reply(me, *lines):
 import rooms   # noqa: E402
 import verbs   # noqa: E402
 
-HOME = rooms.home_room(W)
-talky = [f for f in rooms.all_rooms(W) if (W.nodes[f].get("props") or {}).get("role") == "room" and (W.nodes[f].get("props") or {}).get("talk")]
-LOUNGE = next(f for f in talky if W.nodes[f]["title"] == "Lounge")
-TALK = W.nodes[LOUNGE]["props"]["talk"]
+HOME, LOUNGE = R.HOME, R.LOUNGE
+TALK = R.TALK[LOUNGE]
 ME, OTHER = "pike", "juniper"
 speakers = [s for s in verbs.all_verbs(W) if verbs.where(W, s)[0] == "house" and "say" in verbs._names(s["title"])]
-print(f"world {WORLD} (in memory): Lounge {LOUNGE} talk {TALK}; house verbs answering to say: "
+print(f"built world (in memory): Lounge {LOUNGE} talk {TALK}; house verbs answering to say: "
       + ", ".join(W.appearances_of(s["id"])[0] for s in speakers))
+check("(setup) one house verb answers to say", len(speakers) == 1, speakers)
 reply(OTHER, f"go {LOUNGE} :1")
 LONG = " ".join(["word"] * 50)
+# the Lounge as residents leave it: lines Pike never read, the last one too long for a look to print whole
+for k in range(4):
+    reply("sable", f'do append {TALK} line="Sable: an older line {k}"')
+reply("sable", f'do append {TALK} line="Sable: {LONG}"')
 
 
 def behind(out):
@@ -79,6 +81,7 @@ check(f"the Lounge as it is ({cuts} of its shown lines cut): the receipt says no
       + (f", and {cuts} shown cut" if cuts else ""),
       "haven't seen" not in got[-1][1] and "haven't read" not in got[-1][1]
       and ((f"{cuts} line" in got[-1][1] and "shown cut" in got[-1][1]) if cuts else "shown cut" not in got[-1][1]), (shown, got))
+reply(ME, f"read {TALK}")       # caught up: the counts below are of lines made after this (a1190)
 
 # 1. look, then say: nothing new since the look, so the receipt names no one else's lines
 for k in range(3):

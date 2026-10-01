@@ -264,9 +264,13 @@ class DeskMoo(Desk):
         waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
         if waits:
             out += f"\n  {waits}"    # a1062: who this line calls is resting, and when they'll see it
+        made = str(r.get("created") or "").split()[:1]
         for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:
-                self._mark_rev(c, aspects_of(name, kv))    # your own change: the aspects you wrote are seen, the others are not
+                # your own change: the aspects you wrote are seen, the others are not. What a create made is all yours
+                # (a1190: create's aspects narrowed to the parent's contents on 30 Sep, and its maker was then refused
+                # a rewrite of the text= they had just typed)
+                self._mark_rev(c, None if c in made else aspects_of(name, kv))
         if nid in w.nodes:
             if not behind:
                 self._mark_rev(nid, aspects_of(name, kv))

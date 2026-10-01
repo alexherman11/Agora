@@ -1,13 +1,12 @@
 """test_room_verbs (a990, rooms step 2b): rooms show their verbs and are namespaces for new ones (show, don't lock).
 
-    python test_room_verbs.py [world]        default frontier-try
+    python test_room_verbs.py
 
-Loads the world into memory and never saves it (the harness of test_room_look.py). The Desktop is marked the way the
-live world will be (do prop <Desktop> verbs=layout); two rooms each grow a world verb named tidy, and nothing else in
-the house changes to allow it. Each check is a line of the commission's 'done when'.
+Builds its own small world in memory (roomworld.py, a1190) and never saves it (the harness of test_room_look.py). The
+Desktop is marked the way the live world is (do prop <Desktop> verbs=layout); two rooms each grow a world verb named
+tidy, and nothing else in the house changes to allow it. Each check is a line of the commission's 'done when'.
 """
 import os
-import pickle
 import sys
 import uuid
 from pathlib import Path
@@ -16,7 +15,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
+import roomworld   # noqa: E402
+
 fails = []
 
 
@@ -26,9 +26,8 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -51,6 +50,14 @@ def reply(me, *lines):
     return out
 
 
+def must(me, *lines):
+    """A setup step: a refusal here stops the test, saying so (a1190: a refused rewrite left each tidy saying only 'x',
+    and 15 checks failed for a reason none of them named)."""
+    got = reply(me, *lines)
+    assert not got[-1][2], f"setup refused: {got[-1]}"
+    return got
+
+
 def said(me, line):
     """One line in its own reply -> (text, error), without the '!! since your last look' catch-up."""
     _, text, err = reply(me, line)[-1]
@@ -61,11 +68,10 @@ def said(me, line):
 import rooms   # noqa: E402
 import verbs   # noqa: E402
 
-room = lambda title: next(f for f in rooms.all_rooms(W) if W.nodes[f]["title"] == title)
-LOUNGE, BOARD, DESKTOP, ARCHIVE = room("Lounge"), room("Board"), room("Desktop"), room("Archive")
-CORNER = rooms.corner_of(W, "juniper")
-NOTE = "a333"                      # a note in the Lounge
-print(f"world {WORLD} (in memory): Lounge {LOUNGE}, Board {BOARD}, Desktop {DESKTOP}, Juniper's corner {CORNER}")
+LOUNGE, BOARD, DESKTOP, ARCHIVE = R.LOUNGE, R.BOARD, R.DESKTOP, R.ARCHIVE
+CORNER = R.corner["juniper"]
+NOTE = R.NOTE                      # a note in the Lounge
+print(f"built world (in memory): Lounge {LOUNGE}, Board {BOARD}, Desktop {DESKTOP}, Juniper's corner {CORNER}")
 
 
 def goto(me, fid):
@@ -111,7 +117,7 @@ check("verbs <note> in the Lounge is shorter", len(vb.split()) < len(vb0.split()
 check("verbs <note> in the Lounge: move keeps into/before/after, no to=/by=, no resize; the pointer line",
       "move into=<surface> | before=<id> | after=<id>" in vb and "to=<x>" not in vb and "resize" not in vb
       and "layout verbs are at hand on the Desktop" in vb, vb)
-sx, _ = said("juniper", "examine f177")
+sx, _ = said("juniper", f"examine {R.SHELF}")
 check("examine a surface in the Lounge leaves out tile and untile", " tile " not in sx and "untile" not in sx, sx)
 
 goto("juniper", DESKTOP)
@@ -128,7 +134,7 @@ check("a layout verb typed in the Lounge still works (shown, not locked)", not g
 
 # ---- (2) a room is a namespace -------------------------------------------------------------------------------
 LT = make("juniper", LOUNGE, "tidy", f"tags=verb on={LOUNGE}")
-reply("juniper", f"look {LT} :1", f'do rewrite {LT} text="# tidy, the Lounge\'s\\ndo prop $1 tidied=lounge"')
+must("juniper", f"look {LT} :1", f'do rewrite {LT} text="# tidy, the Lounge\'s\\ndo prop $1 tidied=lounge"')
 check("the Lounge grows a world verb named tidy (on=<room>)", verbs.where(W, W.subjects[W.nodes[LT]["subject"]]) == ("room", LOUNGE))
 t, e = said("juniper", f"examine {NOTE}")
 check("examine in the Lounge shows it at hand", f"at hand in Lounge, made in the world: tidy ({LT})" in t, t)
@@ -145,7 +151,7 @@ got = reply("juniper", f"look {NOTE} :1", f"tidy {NOTE}")
 check("bare tidy typed from a corner runs the Lounge's while it is the only one", not got[-1][2] and prop(NOTE, "tidied") == "lounge", got[-1])
 
 BT = make("pike", BOARD, "tidy", f"tags=verb on={BOARD}")
-reply("pike", f"look {BT} :1", f'do rewrite {BT} text="do prop $1 tidied=board"')
+must("pike", f"look {BT} :1", f'do rewrite {BT} text="do prop $1 tidied=board"')
 got = reply("juniper", f"look {NOTE} :1", f"tidy {NOTE}")
 err = got[-1][2]
 check("with two, bare tidy from a corner refuses naming both doors",
@@ -188,7 +194,7 @@ t, e = said("juniper", f'do prop {CORNER} wake="read a583 :3; look; tidy {NOTE}"
 check("a wake line calling bare tidy, set on a corner, is refused naming the doors", "wake line is stored text" in e and f"use {LT}" in e, e)
 HV = make("juniper", CORNER, "neaten")
 n0 = len(W.events)
-got = reply("juniper", f"look {HV} :1", f'do rewrite {HV} text="tidy $1"', )
+must("juniper", f"look {HV} :1", f'do rewrite {HV} text="tidy $1"')
 got2 = reply("juniper", f"look {HV} :1", f"do tag {HV} add=verb", f"do prop {HV} on=house")
 check("a house verb whose lines say bare tidy is refused when it becomes a verb, naming the doors",
       got2[-1][2] and "stored text" in got2[-1][2] and f"use {LT}" in got2[-1][2], got2)
@@ -229,7 +235,7 @@ reply("juniper", f"look {rid} :1", f"look {LOUNGE} :1", f"do move {rid} into={LO
 PC = rooms.corner_of(W, "pike")
 goto("pike", PC)
 PT = make("pike", PC, "tidy", f"tags=verb on={PC}")
-reply("pike", f"look {PT} :1", f'do rewrite {PT} text="do prop $1 tidied=pike"')
+must("pike", f"look {PT} :1", f'do rewrite {PT} text="do prop $1 tidied=pike"')
 pr, t, e = rule_in("pike", PC, "Pike's mess", "when tag:pikemess do tidy")
 check("Pike saves a rule in his corner while tidy is at hand there", not e and "saved:" in t, e or t)
 reply("pike", f"look {PT} :1", f"do remove {PT}")
@@ -271,7 +277,7 @@ try:
 finally:
     D._act_home = None
 check("a lens act living elsewhere refuses naming the doors", "use " + LT in (r.get("error") or ""), r)
-D._act_home = (verbs.room_holding(W, "s588"),)     # the command center's lens lives on the Desktop
+D._act_home = (DESKTOP,)          # a painter gesture from a lens on the Desktop (the live command center's home)
 try:
     r = D.dispatch("desk", {"line": f"look {bnote} :1; do resize {bnote} to=200x100; do fold {bnote}", "whole": False})
 finally:
