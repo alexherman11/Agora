@@ -810,9 +810,9 @@ def _refs_of(node):
     out = []
     srcs = [("text", node["text"] or ""), ("only", node["only"] or ""), ("of", node["of"] or ""), ("the", node["the"] or ""),
             ("lens", node["lens"] or "")]
-    srcs += [("role", c) for _, c in node["role_when"]]
     srcs += [("derive", x) for _, _, ins in node["derive"] for x in ins]
     srcs += [("on", a["line"]) for a in node["on"]]
+    srcs += [("role", c) for _, c in node["role_when"]]          # a1105: a role's test reads names like `only when`
     for word, text in srcs:
         for a, b in _VAR.findall(text):
             out.append((word, a, b))
@@ -1567,7 +1567,7 @@ def _compile(desk, s, stack, count, closure):
 # drawn, never compared. Provenance (the, derived, test, read, freads, frames, captured, members, states, missing, of,
 # cut) stays on the node for the printer and need not travel to the painter.
 # ---------------------------------------------------------------------------------------------------------------------
-PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views", "since")
+PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views")
 
 
 def emit(node):
