@@ -481,7 +481,75 @@ class DeskKnife(DeskMoo):
         ids, desc = sel
         if not ids:
             return f"table {desc}: nothing matches"
-        return "\n".join([f"table {desc}: {len(ids)} row(s)"] + self._table_lines(ids, kv.get("cols"), kv.get("by"), kv.get("desc")))
+        lines = self._table_lines(ids, kv.get("cols"), kv.get("by"), kv.get("desc"))
+        notes = self._column_notes(ids, kv.get("cols") or ",".join(self.HOUSE_COLS))   # without cols=, a shadowed prop
+        return "\n".join([f"table {desc}: {len(ids)} row(s)"] + lines + ["  " + x for x in notes])
+
+    # a1431: four columns the house answers from its own events, never from props: who made a thing and when (its
+    # create), who last changed it and when (the latest edit: its text, title, props, tags, due, a checked item, a put).
+    # A comment, a link or a move is not an edit. An undone event counts for nothing.
+    HOUSE_COLS = ("made_by", "made_at", "edited_by", "edited_at")
+    TABLE_COLS = ("id", "title", "kind", "tags", "due", "in", "age", "words")
+
+    def _house_record(self, ids):
+        """-> {shown id: {house column: value}}, read from the event log in one pass."""
+        w = self.world
+        key = {}
+        for i in ids:
+            key[i] = i
+            sid = w.nodes[i].get("subject")
+            if sid:
+                key[sid] = i
+        rec = {i: {} for i in ids}
+        stamp = lambda e: (e.get("at") or "").replace("T", " ")[:16] or e.get("day") or ""   # noqa: E731
+        def put(i, kind, e):
+            rec[i][kind + "_by"], rec[i][kind + "_at"] = e.get("by") or "", stamp(e)
+        for e in w.events:
+            if e.get("undone") or e["verb"] == "undo":
+                continue
+            u = e.get("undo") if isinstance(e.get("undo"), dict) else {}
+            if e["verb"] in ("create", "group"):
+                made = u.get("delete")
+                hit = key.get(u.get("delete_subject")) or key.get(made) or key.get((w.nodes.get(made) or {}).get("subject"))
+                if hit and "made_by" not in rec[hit]:
+                    put(hit, "made", e)
+                continue
+            if "restore_subject" in u:
+                hit = key.get(u["restore_subject"].get("id"))
+            elif u.get("restore_subjects"):
+                hit = key.get(u["restore_subjects"][0].get("id"))   # a put: the card put, not the ones renumbered quietly
+            elif "restore_props" in u:
+                hit = key.get(u["restore_props"][0])
+            elif e["verb"] in ("rename", "prop") and "restore" in u:
+                hit = key.get(e["target"])
+            else:
+                hit = None
+            if hit:
+                put(hit, "edited", e)
+        return rec
+
+    def _column_notes(self, ids, cols_spec):
+        """a1431: what a receipt says about the columns asked for: a column that names nothing on any shown thing, and
+        a prop that a house column shadows."""
+        w = self.world
+        cols = [c.strip() for c in str(cols_spec or "").split(",") if c.strip()]
+        held = {}
+        for i in ids:
+            sid = w.nodes[i].get("subject")
+            for k in ((w.subjects[sid].get("props") if sid else None) or {}):
+                held[k] = held.get(k, 0) + 1
+        n = len(ids)
+        things = f"{n} thing" + ("" if n == 1 else "s")
+        out = []
+        missing = [c for c in dict.fromkeys(cols) if c not in self.TABLE_COLS and c not in self.HOUSE_COLS and c not in held]
+        if missing:
+            out.append(f"{', '.join(missing)}: nothing by {'that name' if len(missing) == 1 else 'those names'} on any of "
+                       f"{things}; house columns are {', '.join(self.HOUSE_COLS)}")
+        for c in dict.fromkeys(cols):
+            if c in self.HOUSE_COLS and c in held:
+                out.append(f"{c}: the house's record, not the prop {c}= that {held[c]} of {things} "
+                           f"{'has' if held[c] == 1 else 'have'} (prop:{c}= still selects by it)")
+        return out
 
     def _table_lines(self, ids, cols_spec, by, desc_flag):
         """Header, one row per thing, and a columns hint; shared by table and by views with cols=."""
@@ -506,8 +574,11 @@ class DeskKnife(DeskMoo):
                 cols.append("due")
             if any((subj(i) or {}).get("tags") for i in ids):
                 cols.append("tags")
+        house = self._house_record(ids) if set(cols) & set(self.HOUSE_COLS) else {}
         def cell(i, c):
             n, s = w.nodes[i], subj(i)
+            if c in self.HOUSE_COLS:
+                return house[i].get(c, "")
             if c == "id":
                 return i
             if c == "title":
@@ -526,7 +597,7 @@ class DeskKnife(DeskMoo):
                 d = w.last_day(i)
                 return str(w.days_between(d, self.today)) if d and self.today else ""
             return str(((s or {}).get("props") or {}).get(c, ""))
-        shown = [{"title": "title", "tags": "tags", "due": "due", "in": "place"}.get(c, None if c in ("id", "kind", "words", "age") else f"prop:{c}") for c in cols]
+        shown = [{"title": "title", "tags": "tags", "due": "due", "in": "place"}.get(c, None if c in ("id", "kind", "words", "age") + self.HOUSE_COLS else f"prop:{c}") for c in cols]
         shown = [a for a in shown if a]
         for i in ids:                       # Juniper (reads case): a table that printed status has shown status
             self._mark_seen(i, shown)
@@ -549,7 +620,8 @@ class DeskKnife(DeskMoo):
         def fmt(row):
             return "  " + "  ".join(str(v)[:widths[k]].ljust(widths[k]) for k, v in enumerate(row)).rstrip()
         out = [fmt(header)] + [fmt(r) for r in rows]
-        out.append("  columns: id title kind tags due in age words, and any prop; cols= picks, by= sorts (desc=1)")
+        out.append("  columns: id title kind tags due in age words, made_by made_at edited_by edited_at (the house's record), "
+                   "and any prop; cols= picks, by= sorts (desc=1)")
         return out
 
     def _rule_selection(self, sel, home=None):
@@ -1377,7 +1449,9 @@ class DeskKnife(DeskMoo):
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
   do prop <view> query=<selection>    changes what it shows (judged as find judges a selection; undo takes it back)
-  with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)""",
+  with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)
+  house columns: made_by made_at (its create) and edited_by edited_at (its latest edit), read from the house's own
+  record, never from props. The create's receipt names a column that matches nothing on any thing shown""",
         "scene": """scene <lens>: print the scene a lens makes of the world right now. The painter in the browser draws the very
   same tree, so this is what the other person sees: each part, its words, its role, its place, and the desk
   command each gesture would send. A lens is a note tagged lens; its text is the description (grammar: the
@@ -1419,6 +1493,8 @@ class DeskKnife(DeskMoo):
         "why": "why <id>: the events that put a thing where it is (by whom, via which rule, because of what) and which rule would act on it next.",
         "table": """table <selection> [cols=a,b,c] [by=col] [desc=1]: one row per matching thing, props side by side.
   columns: id title kind tags due in age words, and any prop name; without cols= every prop present is a column.
+  house columns made_by made_at edited_by edited_at come from the house's record (its create, its latest edit), never
+  from props; a column that names nothing on any row is said after the table.
   e.g. table kind:trial cols=task,model,score,calls by=calls desc=1      table in:Today cols=due,age""",
         "find": """find <words> searches titles and text; find <selection> lists what matches, grouped by surface (8 per surface,
   then a pointer). Both end with the selection form to act on: do move <selection> into=<surface>. help selections.""",
@@ -1787,6 +1863,10 @@ class DeskKnife(DeskMoo):
         if bad:
             verbs.rollback(self, n0)
             raise Refusal(bad + ". Nothing was changed")
+        made = w.nodes.get(w.last_created) or {}
+        if verb == "create" and made.get("layout") == "view" and made.get("cols"):
+            # a1431: a column that names nothing would print empty at every look; its receipt says so once
+            notes += ["  " + x for x in self._column_notes(self.view_matches(made["id"]) or [], made["cols"])]
         return out + "".join("\n" + n for n in notes)
 
     def _do_knife(self, verb, positional, kv):
