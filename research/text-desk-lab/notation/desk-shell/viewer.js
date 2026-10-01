@@ -120,10 +120,28 @@ const Viewer = (session, who, lens, said, status) => {
     // Sable c480: attention is private until the person publishes it. Paint facts (a clamp cut, a box overflowing) are
     // about the lens and always go; attention facts (viewport, out of view, unsent drafts, the thing carried) go only when
     // the person allows it, for now by share=attention in the page's address, until there is a control they can see.
-    report(paint, at, extra, attention) {
-      const vp = paint.getBoundingClientRect(), facts = attention ? { ...extra } : {};
+    // a1473 (Sable's a1266: lanes shrank to their titles and no text could tell): each painted part's box goes too,
+    // "WxH", with "sh=" / "sw=" when its contents are taller / wider than it, "cut=n/m" when n of its m parts are clipped
+    // by a box that does not scroll, "out=n/m" (attention only: it depends on where it is scrolled) for one that does,
+    // and "hidden" when it is not drawn (inside a fold). `painted` is the lens frame and style revision it was painted at.
+    report(paint, at, extra, attention, painted) {
+      const vp = paint.getBoundingClientRect(), facts = attention ? { ...extra } : {}, boxes = {};
       for (const el of paint.querySelectorAll("[data-key]")) {
         const r = el.getBoundingClientRect(), f = [];
+        if (!el.getClientRects().length) boxes[el.dataset.key] = "hidden";
+        else {
+          let b = `${Math.round(r.width)}x${Math.round(r.height)}`;
+          const tall = el.scrollHeight > el.clientHeight + 1, wide = el.scrollWidth > el.clientWidth + 1;
+          if (tall || wide) {
+            const s = getComputedStyle(el), o = s.overflowX + s.overflowY, scrolls = /auto|scroll/.test(o), clips = scrolls || /hidden|clip/.test(o);
+            b += (scrolls ? " scroll" : clips ? " clip" : " spill") + (tall ? ` sh=${el.scrollHeight}` : "") + (wide ? ` sw=${el.scrollWidth}` : "");
+            const kids = [...el.children].filter(c => c.dataset.key && c.getClientRects().length);
+            const n = clips ? kids.filter(c => { const k = c.getBoundingClientRect(); return k.bottom > r.bottom + 1 || k.right > r.right + 1 || k.top < r.top - 1 || k.left < r.left - 1; }).length : 0;
+            if (n && !scrolls) b += ` cut=${n}/${kids.length}`;
+            if (n && scrolls && attention) b += ` out=${n}/${kids.length}`;
+          }
+          boxes[el.dataset.key] = b;
+        }
         if (el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1) f.push("cut by the clamp");
         if (el.classList.contains("boxed") && el.scrollHeight > el.clientHeight + 1) f.push("contents overflow the box");
         if (attention && el.classList.contains("boxed") && (r.bottom < vp.top || r.top > vp.bottom || r.right < vp.left || r.left > vp.right)) f.push("out of view");
@@ -132,7 +150,7 @@ const Viewer = (session, who, lens, said, status) => {
         if (f.length) facts[el.dataset.key] = f.join(", ");
       }
       const view = attention ? { viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } } : {};
-      const body = JSON.stringify({ session, as: who, lens, at, facts, ...view });
+      const body = JSON.stringify({ session, as: who, lens, at, facts, boxes, painted: painted || null, ...view });
       if (body !== told) { told = body; fetch("/api/observe", { method: "POST", body }); }
     },
     // Pike (run 1, Alex's workspace): everything repaints but the part in hand; focus, caret and selection are put back

@@ -351,8 +351,12 @@
     V.show(r.text); report();
   }
 
-  const report = () => V.report(paint, sceneAt, carrying ? { [carrying.n.key]: "carried" + (carrying.over ? " over " + carrying.over.dataset.key : "") } : {}, q.get("share") === "attention");
-  let scrolling; paint.addEventListener("scroll", () => { clearTimeout(scrolling); scrolling = setTimeout(report, 400); });
+  const report = () => V.report(paint, sceneAt, carrying ? { [carrying.n.key]: "carried" + (carrying.over ? " over " + carrying.over.dataset.key : "") } : {}, q.get("share") === "attention",
+    def && { frame: def.frame, style: def.style_rev || "seed" });
+  // a1473: boxes change without a new scene (a fold, the window, the fonts arriving), so those report too
+  let scrolling; const later = () => { clearTimeout(scrolling); scrolling = setTimeout(report, 400); };
+  paint.addEventListener("scroll", later); addEventListener("resize", later); paint.addEventListener("click", later);
+  if (document.fonts) document.fonts.ready.then(later);
 
   // 30 Sep: a page that loads while deskd restarts (it reloads itself for new code, just as the keeper restarts the
   // server) got a failed first fetch; unguarded, it threw before the repaint loop below was set, and stayed blank

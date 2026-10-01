@@ -734,6 +734,43 @@ def test_scene_for_one_part_and_ok():
         tmp.unlink(missing_ok=True)
 
 
+def test_scene_prints_painted_boxes_and_their_age():
+    """a1473: a painter's report carries each part's box and the lens frame it painted; scene prints the box on the
+    part's line, marks 0 high, and after an edit says the sizes are of the old lens until a painter reports again."""
+    import deskd
+    tmp = _scratch("_test_boxes")
+    try:
+        with deskd.Session("_test_boxes", "jeff") as desk:
+            say = lambda line: (lambda r: r.get("text") or r.get("error"))(desk.dispatch("desk", {"line": line}))   # noqa: E731
+            say("look")
+            say('do create f01 kind=note tags=lens title=boxy text="root : column\\n  a : text \\"seen\\"\\n  z : row"')
+            assert "no painted sizes" in say("scene boxy root"), "with no report, the part print says there are no sizes"
+            sc, _ = scene.scene_for(desk, "boxy")
+
+            def paint(boxes, sc=sc):          # what deskd's /api/observe keeps for a painter that reported
+                desk._views = {"alex": {"lens": "boxy", "at": len(desk.world.events), "time": "2026-10-01T09:00:00", "viewport": None,
+                                        "facts": {}, "boxes": boxes, "painted": {"frame": sc["def"]["frame"], "style": "seed"}}}
+            paint({"root": "900x40", "root/a": "900x40", "root/z": "900x0"})
+            out = say("scene boxy root")
+            assert "sizes are of the lens as it stands" in out and "~ alex: 900x40px" in out, out
+            assert "z row ~ alex: 900x0px (0 high: nothing visible)" in out, out
+            assert "painted sizes, oldest first: alex " in say("scene boxy ok") and "(current)" in say("scene boxy ok")
+            aid = desk.world.appearances_of([s for s in desk.world.subjects.values() if s["title"] == "boxy"][0]["id"])[0]
+            say(f"read {aid} :3")
+            say(f'do replace {aid} old="z : row" new="z : row\\n  b : text \\"more\\""')
+            out = say("scene boxy root")
+            assert "painted before your edit at e" in out and "! no viewer has painted this lens since your edit" in out, out
+            assert "~ alex before the edit: not in the paint" in out, "a part the old paint did not have says so"
+            assert "(before your edit at e" in say("scene boxy ok")
+            paint({"root": "900x60 scroll sh=300", "root/a": "hidden", "root/z": "0x10", "root/b": "900x20 clip sh=80 cut=2/5"},
+                  scene.scene_for(desk, "boxy")[0])
+            out = say("scene boxy root")
+            assert "as it stands" in out and "scrolls: contents 300 high" in out and "not drawn (folded or hidden)" in out, out
+            assert "0x10px (0 wide: nothing visible)" in out and "clipped: contents 80 high, 2 of 5 parts cut off" in out, out
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 STYLE_SAMPLES = [
     "token paper = #EEE\ntoken ink = #111\ntoken gap = 8\ntoken text = plex 14/1.5\ntoken line = ink at 70%\n"
     "role a : on paper, ink, text down 2, pad gap, pad top gap, corner 3, corner gap, lift 1, lift gap, edge line\n"

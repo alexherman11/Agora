@@ -39,7 +39,10 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     events [n]                   the world's last n events (default 5): id, verb, by, gesture, and the line's words
     resend [k]                   post again, unchanged, the k-th last gesture this page sent (default 1: the last);
                                  prints deskd's answer. A retry after a lost answer, as the painter would make it
-    restart | stop | start       stop the throwaway deskd and/or start it again on the same port (not with --live);
+    desk <line>                  run one desk line as --as in the world this page shows, and print its answer: e.g.
+                                 desk "scene command-center open" reads the sizes this page just reported (a1473);
+                                 with --live it is a real act in the real world
+    restart | stop | start      stop the throwaway deskd and/or start it again on the same port (not with --live);
                                  a press while it is stopped is a lost answer, as when deskd restarts mid-send
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
@@ -174,7 +177,7 @@ class Page:
 
 
 STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
-         "css", "blur", "events", "resend", "restart", "stop", "start")
+         "css", "blur", "events", "resend", "desk", "restart", "stop", "start")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
 SENDS_JS = """(() => { const f = window.fetch; window.__sends = [];
   window.fetch = (u, o) => { if (String(u).startsWith('/api/do') && o && o.body) window.__sends.push(o.body); return f(u, o); }; })();"""
@@ -336,6 +339,14 @@ async def run(url, steps, size, shots, restart=None, still=False):
                         const r = await (await fetch('/api/do', {{method: 'POST', body: b}})).json();
                         return 'resent ' + JSON.stringify(JSON.parse(b).gesture || null) + ': ' + JSON.stringify({{text: r.text, error: r.error, events: r.events}}); }})()""")
                     print(r)
+                elif s == "desk":                           # a1473: read the scene text beside the paint it reported
+                    line = arg()
+                    i += 1
+                    await asyncio.sleep(0.6)                # the painter's reports wait 400 ms for things to settle
+                    r = await p.js(f"""(async () => {{ const q = new URLSearchParams(location.search);
+                        const r = await (await fetch('/api/do', {{method: 'POST', body: JSON.stringify({{session: q.get('session'), as: q.get('as') || 'alex', line: {json.dumps(line)}}})}})).json();
+                        return (r.error ? 'ERR ' + r.error + '\\n' : '') + (r.text || ''); }})()""")
+                    print(f"desk> {line}\n{r}")
                 elif s in ("restart", "stop", "start"):
                     if not restart:
                         raise RuntimeError(f"{s}: only the throwaway deskd can be stopped or started (not with --live)")

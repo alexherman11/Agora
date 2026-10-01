@@ -573,7 +573,7 @@ def style_note(desk, s):
     return f"style {name}" + (f" (does not parse: {c['refusal']})" if c["refusal"] else "")
 
 
-def check(desk, s):
+def check(desk, s, ages=False):
     """-> (compiles, one line): whether lens `s` (a subject) compiles as its text stands now, its node count against the
     budget, what paints it, and a refusal with its line. The fallback to the last good version is reported, not shown."""
     closure, count = [], [0]
@@ -586,7 +586,21 @@ def check(desk, s):
         c = fallen[0]
         return False, (f"lens {s['title']} does not compile" + (f" (inner lens {c['lens']})" if c["id"] != s["id"] else "")
                        + f": {c['refusal']}{_quote_line(c.get('refused_in'), c['refusal'])}; its painter shows the last version that did, gestures off")
-    return True, f"lens {s['title']} compiles: {count[0]} of {S.BUDGET} nodes · {style_note(desk, s)}"
+    return True, f"lens {s['title']} compiles: {count[0]} of {S.BUDGET} nodes · {style_note(desk, s)}" + (paint_ages(desk, s, closure) if ages else "")
+
+
+def paint_ages(desk, s, closure):
+    """a1473, for `scene <lens> ok`: how old each viewer's report of sizes is, the oldest first, and whether it is of the
+    lens as it stands."""
+    name = (s.get("props") or {}).get("style")
+    rev = (S.style_source(desk, name) or {}).get("rev", "") if name else ""
+    vs = S.judge_views(desk, {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}, closure, rev)
+    vs = sorted(((a, v) for a, v in vs.items() if v.get("paint")), key=lambda av: str(av[1].get("time")))
+    if not vs:
+        return " · painted sizes: none reported (no viewer has it open with a painter that reports them)"
+    say = {"current": "current", "stale": None, "unknown": "revision unknown"}
+    return " · painted sizes, oldest first: " + "; ".join(
+        f"{a} {v['paint']['age']} ({say[v['paint']['state']] or 'before ' + v['paint']['edit']})" for a, v in vs)
 
 
 def find_parts(sc, path):
@@ -634,7 +648,8 @@ def scene_for(desk, name, part=None):
         st = S.style_source(desk, name) or {}
         sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
     S.mark_pulse(sc, S.pulsing_roles(desk, name))   # a1140: the painter installs this one style for the whole scene
-    sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
+    sc["views"] = S.judge_views(desk, {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()},
+                                closure, sc["def"].get("style_rev"))
     roots = None
     if part:
         roots = find_parts(sc, part)
