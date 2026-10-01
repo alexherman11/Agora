@@ -111,6 +111,18 @@ msgs = scene.rows(D, f"messages:{TALK}")
 check("messages rows carry each line's id and who it addresses",
       any(r["line"] == mid and r["to"] == "pike, juniper" for r in msgs), msgs[-6:])
 
+# ---- lines are reachable when asked: the lines row source (Juniper c1695) ---------------------------------------
+t = say("alex", f"rows lines:{TALK}")
+check("rows lines:<chat> lists the chat's lines, with by, at and to",
+      re.search(rf"line={mid} · who=Sable · by=sable · at=\S+ · to='pike, juniper'", t) is not None, t[:1200])
+check("rows lines (no chat) lists every chat's lines", say("alex", "rows lines").count("line=m") > t.count("line=m"), "")
+say("alex", f"look {R.HOME} :1")
+say("alex", f'do create {R.HOME} kind=note title=lines-for-me tags=lens text="page : column, of lines, each l\\n'
+            f'l : text \\"$said\\", only when $to has $me"')
+t = say("sable", "scene lines-for-me")
+check("a lens can show 'lines where to has $me' over the lines source (no Python row source of its own)",
+      "the parser is in" in t and "quoted" not in t and "could you look" not in t, t[:1500])
+
 # ---- the house's say verb reads @ the same way ------------------------------------------------------------------
 say("juniper", f"go {R.LOUNGE} :1")
 t = say("juniper", "say @pike the couches are new")

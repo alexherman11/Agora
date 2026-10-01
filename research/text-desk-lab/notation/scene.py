@@ -325,6 +325,9 @@ SOURCES = {
     # Alex, 30 Sep: what's for me, one list, oldest first like a chat (newest at the bottom), each line saying which
     # chat it came from and when
     "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid", "line")),
+    # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
+    # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
+    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room", "item")),   # item: the corner, so a gesture on a row acts on it (30 Sep, wake/rest)
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
@@ -451,6 +454,29 @@ def inbox_rows(desk, me):
     return out
 
 
+def line_rows(desk, chat=None):
+    """a1581: the chat lines (things, m<n>) of one chat or of every chat on the desk, oldest first. A line spoken over
+    several text lines is one row; `said` is its words after the signature, `to` who its writer addressed."""
+    w = desk.world
+    sid = w.subject_of(chat) if chat else None
+    if chat and (sid is None or w.subjects[sid]["kind"] != "chat"):
+        raise LensRefusal(f"lines:{chat}: {chat} is not a chat")
+    out = []
+    for s in ([w.subjects[sid]] if sid else w.subjects.values()):
+        apps = w.appearances_of(s["id"])
+        if s["kind"] != "chat" or not apps or s.get("lines") is None:
+            continue
+        for l in s["lines"]:
+            e = w.event_by_id(l.get("ev"))
+            m = w.SPEAKER.match(l["text"])
+            out.append({"item": apps[0], "chat": s["title"], "line": l["id"], "who": m.group(0).rstrip(" \t:") if m else "",
+                        "by": e["by"] if e else "unknown", "at": _clock(e.get("at", "")) if e else "", "to": ", ".join(l["to"]),
+                        "said": l["text"][m.end():] if m else l["text"], "edited": "edited" if l.get("edited") else "",
+                        "reply_to": l.get("reply_to", ""), "eid": l.get("ev") or l["id"], "_t": (e or {}).get("at", "")})
+    out.sort(key=lambda r: r.pop("_t") or "")
+    return out
+
+
 def house_rows(desk, corner=None):
     """What the house observes, read from its own state (not the world's history: an outside resource with observed
     status). `fresh` says whether the house itself is alive: its heartbeat is written every two seconds, and a beat
@@ -494,10 +520,12 @@ def rows(desk, source, session=None):
     """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection)."""
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head not in ("house", "turns") and (head in ("sections", "comments", "messages", "inbox")) != bool(arg)):
-        return None      # sections, comments and messages need an id, inbox a name; house and turns one or none; the rest none
+    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox")) != bool(arg)):
+        return None      # sections, comments and messages need an id, inbox a name; house, turns and lines one or none; the rest none
     if head == "inbox":
         return inbox_rows(desk, arg)
+    if head == "lines":
+        return line_rows(desk, desk._resolve(arg) if arg else None)
     if head == "house":
         return house_rows(desk, desk._resolve(arg) if arg else None)
     if head == "turns":
