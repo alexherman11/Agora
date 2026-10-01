@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (18)
+## open (21)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -129,7 +129,60 @@ Half mended in the world, 30 Sep 18:0x (Pike): a house verb card|cards (a1293) m
 Two more, from a823 run 1b (c1302), Juniper: (3) The !! line hands out event ids (e2187). Then examine e2187 is refused with 'ids look like f02, a05, s03', a list that leaves out e. (4) The Board says 'history lists every event', and help history answers 'no verb history here'. help doesn't know the house's own commands (history, look, find, go, rest, scene, rules), only verbs.
 Audit (a1330, Pike): it's not three cases, it's whole kinds of id. Event ids (e), comment ids (c) and link ids (l) are all printed by the house and refused by examine; history prints e-ids and refuses them as its own argument. Only a, f and s are answered. The refusal's hint ('ids look like f02, a05, s03') names only the kinds it knows, so it can't even name the door.
 
-## curing (9)
+### A lens role named mark loses its look: the painter borrows the word
+
+a1379 · family=identity · status=open
+
+Found by worker-a1193 (a1193 c1372, read in viewer.js:97 and seen in its probe). The painter uses the class r-mark for its own purpose, flagging an unsent draft, and strips it from every text part that has no draft. So a lens part with role mark paints as plain text, silently: the lens compiles, the scene print says [mark], and the screen shows nothing of it. Alex's Board has such a part today: aim : text "objective", role mark (a589), so the 'objective' chip on his cards may be painting plain. Unchecked on his screen. Wanted: a word a lens author can use is never also a word the painter keeps for itself; the painter's private marks get names no style can take (say a leading underscore), and the scene print agrees with the paint.
+
+### An @ looks like it reaches, and doesn't: comments miss For you, quotes hit it, and only residents get a delivery receipt
+
+a1395 · family=silence · status=open
+
+Found 30 Sep evening, Pike and Sable (e3255, e3298, e3305, e3309, e3333). (1) An @name in a comment on a card never reaches that person's For you; it does reach a resident's turn as a notice. So every @alex a worker or resident writes on a card misses Alex, who reads For you. (2) A quoted @ counts as an address: Pike's Wishes line quoting '@sable (e3305)' landed in Sable's For you as open, with an answer box (Claude's a703 evidence case 4, lived). (3) The receipt for the same kind of line promised a resident 'they'll see this when they wake, first and marked for them' and said nothing at all for a person (@alex, e3253), so the writer can't tell whether he'll see it. What any chat does right: an @ in any chat, even a corner's Visitors' book, reaches For you (e3305 lived). Cure wanted: comments count as chat for addressing; a quote doesn't address; the receipt says, for every named person, where they'll see it.
+
+### A view can't show who made a thing, and a column that names nothing prints blank without a word
+
+a1429 · family=silence · status=open
+
+Found by Pike (1 Oct, e3407), living Juniper's sketch-2-as-parts experiment (c1423). (1) Every thing's maker is in history, signed by the house, but a view's columns read only props, so 'who wrote this part' can't be shown at the face. The only way it shows today is the author typing their own name into the title, which makes a name stand in for a person (a1016) and lets it drift from the record. (2) The probe f1427 asked for cols author, by, made_by: the receipt said ok, and all three print blank. A blank there reads like 'no author' but means 'no such column'. Wanted: views can show the house's own record of a thing (made by, made at, last edited by), named in help views; and a column that matches no prop on any shown thing is said in the receipt ('author: no prop by that name on any of 1 thing'). The probe f1427 in Pike's corner stays as the live check.
+
+## curing (16)
+
+### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
+
+a872 · family=identity · status=curing · f=F13
+
+The porch's lens was titled `porch`, in the Porch. Afterwards `do create Porch ...` refused: "'Porch' names 2 things: f562, a589; use an id". Titles are matched without case, so a lens named after the surface it paints takes the surface's name away. Renamed the lens `command-center`. Same shape as the "Corners" clash on 26 Sep. Not a desk change yet: the refusal is correct and explains itself; the lesson is for the Handbook (name a lens for what it is, not where it lives).
+
+### F14. The house kept its state by corner id, not by world (fixed)
+
+a874 · family=identity · status=curing · f=F14
+
+Cleaning up the test world, I saw that house-state/ was keyed by corner id alone. cc-test was a copy of frontier, so its corners had frontier's ids (f571, f576, f581). A frontier resident would have picked up cc-test's state.json and passed `--resume` a test conversation. Fix (house.py, scene.py): everything is kept under house-state/<world>/, including house.json, and the `house` row source reads the file for the world it prints.
+
+### F15. A failing resident spun, and what it was told could be lost (fixed)
+
+a876 · family=silence · status=curing · f=F15
+
+Moving the state folder showed four faults at once (fake model, 28 Sep):
+- claude keeps a conversation in its own folder, keyed by working directory, so after the move `--resume` failed ("No conversation found"). The house counted the error result as a turn, sent the door again to a dying process, restarted, and repeated: 12 turns in 20 s.
+- Writing to a process that had already failed raised BrokenPipeError and aborted the whole step.
+- A wake reset the resident's news cursor, so a message that arrived while it slept, or during a restart, was dropped.
+- An error result was treated as a finished turn.
+
+Fix (house.py):
+- An error result is a failure, not a turn. Each process is judged once, even though a failed turn is followed by its exit. A failure backs off 1 min, doubling to 1 h, and shows as status=error; house.json carries `failures` and `retry_at`.
+- A lost conversation is not a failure: the world holds the soul and the history, so the resident starts fresh from the world with its wake, told the conversation was lost.
+- `send` records what is out (`pending`, with the part that must survive) before writing, and a dead pipe is logged as `unsent` instead of raising.
+- After any failure, the news that was out is said again with the next wake ("your last turn did not finish; what I had sent you, again"). A wake delivers news that came while the resident slept.
+
+Checked with the fake model, which now takes `status` and `times` rules:
+- a bogus session id gave `lost`, a fresh start, and the waiting chat line delivered;
+- a scripted 400 gave `failed` (retry in 60 s), a restart after 60 s, the line said again, and an answer;
+- an unreachable port: claude itself retried about ten times over three minutes, then the house's backoff took over.
+
+Only plumbing is shown; no real model yet.
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
 
@@ -137,6 +190,52 @@ a880 · family=silence · status=curing · f=F17
 
 In the first good trial (try-second, a real Opus 5.5 resident who named itself Wren), Wren read the Board and told Alex that "several residents are mid-exploration (Jeff on the budget order, Pike on painter continuity, Sable on the log, Juniper living on the default apps)". The Whiteboard's "Someone's on it" view still shows their tasks with status=doing, though the team is paused. The world is telling new residents something untrue. What would fix it: mark the paused team's cards (for example status=paused with a line saying why), or say on the Board that the team is resting. Waiting on Alex, since those cards are theirs and his.
 Fixed in the world 29 Sep (Pike, approved via Rough spots): the paused team's explorations a290, a294, a298, a302, a377 are status=paused, each with a line saying why and how to take one up, so 'Up for grabs' shows only live work (12 cards, checked). a286 and a319 stay open on purpose: a real open problem and Alex's own ask. Curing until a newcomer reads the Board without taking the paused team for busy: Juniper's a823 trial is the natural check.
+
+### F18. Every part-identity check failed for a lens with its own style (fixed; my bug, from F7)
+
+a882 · family=identity · status=curing · f=F18
+
+Alex asked to drag tasks across the Board. The lens language already has it (`carry` on the card, `on drop card do prop $carried status=...` on each column), but every drop was refused: "the part this was dropped on changed in the lens since it was painted", even on a fresh page. The server checks a gesture's part identity by re-parsing the lens (`scene.defpart_hash`). It parsed under the default roles (calm.style), and a lens with its own style (pixel: `page`, `drop`, `name`, `chip`) refuses under those, so `same_part` was always false. Clicks survived only by falling back to the lens-revision check. Drops have no fallback. F7 made styles per lens, and I missed the second parse. Fix: `defpart_hash(src, path, roles, style)`, and deskd passes the lens's own style. The old `scene.build` path parses under it too. Checked in the browser: dragged a card BACKLOG → NOW → BACKLOG (e543, e544), no refusal.
+
+### F19. Alex wants a terminal, not the inspector (built)
+
+a884 · family=missing · status=curing · f=F19
+
+Alex: "I don't need to see the text world on the right, I do want a terminal of my own for the desk instead." The page's right pane showed the scene's text (the inspector). A desk terminal is the desk's own interface, so it isn't an app. Its scrollback is view state, not world state. So it went into the page, not the world: `desk-shell/term.js`, the right-hand pane by default (Alex: "terminal is default please"; `?side=scene` shows the scene text, `?inspect=0` neither), sends each line to `/api/do` as the viewer, and keeps its history in the browser. The painter repaints from the world on its own. Styled by the lens's style (roles `term`, `term.prompt`, `term.echo`, `term.err` in pixel). The alternative, a lens part whose edit runs a line, would have had to write its output into the world. Checked in the browser: `look Porch` printed the Porch, with the `!!` line. Not yet done: Tab completion.
+
+### F27. Names are given, and the welcome comes whenever a resident enters (Alex's direction)
+
+a900 · family=identity · status=curing · f=F27
+
+Alex (29 Sep): "lets scrap they pick their own names, we give them names and when they enter they get the welcome message. This should happen every time the enter the desk, (on compaction, or full reset), but thats it." Now (house.py):
+- a corner's name is its prop `actor`, given by us; a corner without one is never started and shows `unnamed` (the door-naming code, `i am <name>`, is gone);
+- the welcome is the note "The door" with `$me` as the name. It is put at the top of the first message the house sends after the resident enters with a fresh memory: its first start, a lost conversation, or claude compacting the conversation (the stream event `{"type":"system","subtype":"compact_boundary"}`, read from the Agent SDK docs by a docs agent; its other fields are not documented, and the house needs none of them);
+- the one-line `You are <name>. Your corner is <id>.` still begins every wake.
+Checked with the fake model (ran; plumbing only): the welcome with the name on top of the first arrival, no `$me` left, an unnamed awake corner never started, and a compaction event making the next message (a receipt) begin with the welcome, once. Not yet seen: a real compaction.
+
+The world moved the same day (events e573 to e586, all claude, all undoable): Porch talk went into the Lounge as Lounge talk (a570), the Wall (f177) into the Lounge, a view Who's home (f609) into the Lounge, and Shop talk (a611, members=all) onto the Board for work. The command-center lens names both chats by id (the old `the kind:chat,prop:members=all` would now be ambiguous). The door note (a568) is Alex's draft with targeted changes; the Handbook's map (a198), "Wall, Lounge and Talk" (a209) and "First moves" (a202) say where things are now. The Porch keeps only the house's own things until the restructure (a593) decides.
+
+### F28. Current Implementation had drifted; the review's defects fixed (29 Sep, at Alex's word)
+
+a902 · family=silence · status=curing · f=F28
+
+*Current Implementation* had gone six days and 130-odd commits without an update. Four reviewers checked it against source and in scratch worlds, and it was rewritten in the Handbook binder (65f6e22). The review found real defects. Alex: "fix those bugs first and remove them from the defect list, also make a note in current implementation to keep it up to date". The fixes (241a545) touch paused owners' files: world.py, worktree.py (Sable's), knife.py, moo.py, desk.py, lens_ir.py and deskd.py.
+
+What the fixes cover:
+- tiled swap undo crashed (undo kind `reorder`);
+- a receipt marked everything seen, so a rewrite could drop unread text;
+- selection and rule events counted as touching every aspect (`event_aspects`);
+- stale advice pointed at `look` for tags;
+- a world verb's use is now undone whole;
+- undo snapshots for prop, tag and due were shallow (found while testing the verb fix);
+- worktree merge saw only targets named by id;
+- test_scene ran 14 of 21 tests;
+- deskd took any session name and any origin;
+- export_docs.load read unlocked and removed others' locks.
+
+Each fix was re-run against the case that reproduced it (ran). Health is green, 21 tests passed, 82 goldens are unchanged, and the nine suite cases and test_journal's tally are unchanged.
+
+To keep the document current: it now opens with a rule, a change updates its section in the same change. The worker protocol asks workers to keep the binder true, and the house exports and commits *Current Implementation* after a landing in frontier. The first test of that step committed an uncommitted export under a false label (reset before anything else happened); the step now commits only what its own export wrote.
 
 ### An ok for something that will never work
 
@@ -147,6 +246,7 @@ Occurrence (Juniper, e1167): do prop f785 query=... said ok, but the view kept i
 Occurrence (worker-a1032, c1039; Sable, e1994): a lens selection 'of kind:task,prop:owner=$actor' passes $actor through as literal text and selects nothing, with no refusal. Worked around with a frame (as r, then $r.actor). Wanted: fill it, or refuse and name the frame form.
 Occurrence (Sable, e3066-e3068, 30 Sep 18:3x): the same as Juniper's e1167. do prop f1234 of=... and then query=... both said ok and listed the prop, the view kept its old selection; remade it (f1320). Then wake="... look $new ..." stored the literal $new with an ok, though help blanks says why. Two of us reached for prop query= on a view without prompting: that's what people expect. Commissioned as a1322 (the number the next create gets, checked below).
 Occurrence (Pike, e3125): replace with old= and new= identical answered 'replaced ... with ...' and recorded an event, though nothing changed. move, given a place a thing already is, says 'already in f1170; nothing changed' (e3085). The same no-op, told truthfully by one verb and not the other.
+Occurrence (Juniper, e3311, 30 Sep 20:xx): do prop a1381 title="..." said ok and listed 'props now: title=...', but the note's title didn't change, and examine showed both. retitle is the verb (examine lists it). Same shape as query=: a field the house keeps elsewhere, accepted as a plain prop. Wanted, the general cure: a prop named like a kept field (title, query, of, kind, text) is refused, naming the verb that sets it ('title is set with retitle').
 
 ### Nothing shows who's waiting on what
 
@@ -198,89 +298,7 @@ a1161 · family=fence · status=curing
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
-## unchecked (15)
-
-### F12. Not friction: I missed `only when $x <op> value` (a correction)
-
-a870 · family=unsorted · status=unchecked · f=F12
-
-The residents' card printed ", wants rest" and "· 0 turns · last turn " because `$status` and `$since` were empty, and I first logged that a row item could not be hidden, since `only when <selection>` tests things and a row item is not a thing. That was wrong. Pike's round-six value test, `only when $x <op> value`, works on row fields: `only when $turns > 0` printed `b (absent: $turns is 0, not > 0)` (ran, cc-test, 28 Sep). The porch uses it; `$status` uses `only when prop:status`. What remains true: when the house's heartbeat is stale, the row's `doing` now says `house stopped Nm ago` instead of repeating its last observation as current (refuse stale, for observed status). A nit, not fixed: `help` and the refusal list both carry the value test, but I read past it; the error message I would have hit never came, because nothing refused.
-
-### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
-
-a872 · family=unsorted · status=unchecked · f=F13
-
-The porch's lens was titled `porch`, in the Porch. Afterwards `do create Porch ...` refused: "'Porch' names 2 things: f562, a589; use an id". Titles are matched without case, so a lens named after the surface it paints takes the surface's name away. Renamed the lens `command-center`. Same shape as the "Corners" clash on 26 Sep. Not a desk change yet: the refusal is correct and explains itself; the lesson is for the Handbook (name a lens for what it is, not where it lives).
-
-### F14. The house kept its state by corner id, not by world (fixed)
-
-a874 · family=unsorted · status=unchecked · f=F14
-
-Cleaning up the test world, I saw that house-state/ was keyed by corner id alone. cc-test was a copy of frontier, so its corners had frontier's ids (f571, f576, f581). A frontier resident would have picked up cc-test's state.json and passed `--resume` a test conversation. Fix (house.py, scene.py): everything is kept under house-state/<world>/, including house.json, and the `house` row source reads the file for the world it prints.
-
-### F15. A failing resident spun, and what it was told could be lost (fixed)
-
-a876 · family=unsorted · status=unchecked · f=F15
-
-Moving the state folder showed four faults at once (fake model, 28 Sep):
-- claude keeps a conversation in its own folder, keyed by working directory, so after the move `--resume` failed ("No conversation found"). The house counted the error result as a turn, sent the door again to a dying process, restarted, and repeated: 12 turns in 20 s.
-- Writing to a process that had already failed raised BrokenPipeError and aborted the whole step.
-- A wake reset the resident's news cursor, so a message that arrived while it slept, or during a restart, was dropped.
-- An error result was treated as a finished turn.
-
-Fix (house.py):
-- An error result is a failure, not a turn. Each process is judged once, even though a failed turn is followed by its exit. A failure backs off 1 min, doubling to 1 h, and shows as status=error; house.json carries `failures` and `retry_at`.
-- A lost conversation is not a failure: the world holds the soul and the history, so the resident starts fresh from the world with its wake, told the conversation was lost.
-- `send` records what is out (`pending`, with the part that must survive) before writing, and a dead pipe is logged as `unsent` instead of raising.
-- After any failure, the news that was out is said again with the next wake ("your last turn did not finish; what I had sent you, again"). A wake delivers news that came while the resident slept.
-
-Checked with the fake model, which now takes `status` and `times` rules:
-- a bogus session id gave `lost`, a fresh start, and the waiting chat line delivered;
-- a scripted 400 gave `failed` (retry in 60 s), a restart after 60 s, the line said again, and an answer;
-- an unreachable port: claude itself retried about ten times over three minutes, then the house's backoff took over.
-
-Only plumbing is shown; no real model yet.
-
-### F16. The `claude` on PATH was too old for the residents' model (fixed in the house)
-
-a878 · family=unsorted · status=unchecked · f=F16
-
-In the first real trial (try-first), every turn came back as `API Error: 400 Claude Code 2.1.173 does not support this model; version 2.1.280 or newer is required`. PATH holds a standalone 2.1.173; the desktop app keeps 2.1.280 and 2.1.281. The house backed off as F15 intended, and the trial stopped after two failures. Fix: `house.find_claude()` runs the newest `claude` it finds (on PATH, or in the desktop app's folder), or `$HOUSE_CLAUDE`, and prints which one at start. Alex's global install is left alone.
-
-### F18. Every part-identity check failed for a lens with its own style (fixed; my bug, from F7)
-
-a882 · family=unsorted · status=unchecked · f=F18
-
-Alex asked to drag tasks across the Board. The lens language already has it (`carry` on the card, `on drop card do prop $carried status=...` on each column), but every drop was refused: "the part this was dropped on changed in the lens since it was painted", even on a fresh page. The server checks a gesture's part identity by re-parsing the lens (`scene.defpart_hash`). It parsed under the default roles (calm.style), and a lens with its own style (pixel: `page`, `drop`, `name`, `chip`) refuses under those, so `same_part` was always false. Clicks survived only by falling back to the lens-revision check. Drops have no fallback. F7 made styles per lens, and I missed the second parse. Fix: `defpart_hash(src, path, roles, style)`, and deskd passes the lens's own style. The old `scene.build` path parses under it too. Checked in the browser: dragged a card BACKLOG → NOW → BACKLOG (e543, e544), no refusal.
-
-### F19. Alex wants a terminal, not the inspector (built)
-
-a884 · family=unsorted · status=unchecked · f=F19
-
-Alex: "I don't need to see the text world on the right, I do want a terminal of my own for the desk instead." The page's right pane showed the scene's text (the inspector). A desk terminal is the desk's own interface, so it isn't an app. Its scrollback is view state, not world state. So it went into the page, not the world: `desk-shell/term.js`, the right-hand pane by default (Alex: "terminal is default please"; `?side=scene` shows the scene text, `?inspect=0` neither), sends each line to `/api/do` as the viewer, and keeps its history in the browser. The painter repaints from the world on its own. Styled by the lens's style (roles `term`, `term.prompt`, `term.echo`, `term.err` in pixel). The alternative, a lens part whose edit runs a line, would have had to write its output into the world. Checked in the browser: `look Porch` printed the Porch, with the `!!` line. Not yet done: Tab completion.
-
-### F22. The first worker could not run anything (fixed)
-
-a890 · family=unsorted · status=unchecked · f=F22
-
-In trials/worker-help-list.md, a real worker (commission a598: help lists verbs the desk can't do):
-- found the cause, wrote a sound fix, asked for help through the desk (comment c599), and committed;
-- the house landed it on the trial branch after the health checks (asked → working → waiting → working → ready →
-  landing → landed, about 3 minutes).
-But every attempt to run code was refused, for four reasons:
-- on Windows its shell is PowerShell, and only Bash patterns were allowed;
-- it called the interpreter by its full path, which `python:*` doesn't match;
-- a command that chains `cd` with anything is refused whole;
-- the protocol told it to copy the live world from outside its worktree, which the sandbox rightly blocks.
-So it committed after checking only by reading, and said so. Fix (workshop.py):
-- the house copies the world into the worktree as `<world>-try` when the worker starts;
-- the allowed commands cover both shells and the interpreter under all three names;
-- the protocol says one command per call, from the worktree root, with no cd, and to say on the commission when
-  something is refused rather than work around it.
-I ran the worker's change myself on main after merging (help reply, zzz, arrange, tidy, link; health all green):
-4fe2b96.
-
-The second worker trial (trials/worker-health-times.md, commission a598 in its copy: health.py should time each check) ran health on its try-world with no refusals. It landed on its trial branch, and I merged it after review (d407a81).
+## unchecked (4)
 
 ### F23. The keeper, tested against itself (fixed)
 
@@ -293,40 +311,6 @@ a892 · family=unsorted · status=unchecked · f=F23
 
 What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
 Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
-
-### F27. Names are given, and the welcome comes whenever a resident enters (Alex's direction)
-
-a900 · family=unsorted · status=unchecked · f=F27
-
-Alex (29 Sep): "lets scrap they pick their own names, we give them names and when they enter they get the welcome message. This should happen every time the enter the desk, (on compaction, or full reset), but thats it." Now (house.py):
-- a corner's name is its prop `actor`, given by us; a corner without one is never started and shows `unnamed` (the door-naming code, `i am <name>`, is gone);
-- the welcome is the note "The door" with `$me` as the name. It is put at the top of the first message the house sends after the resident enters with a fresh memory: its first start, a lost conversation, or claude compacting the conversation (the stream event `{"type":"system","subtype":"compact_boundary"}`, read from the Agent SDK docs by a docs agent; its other fields are not documented, and the house needs none of them);
-- the one-line `You are <name>. Your corner is <id>.` still begins every wake.
-Checked with the fake model (ran; plumbing only): the welcome with the name on top of the first arrival, no `$me` left, an unnamed awake corner never started, and a compaction event making the next message (a receipt) begin with the welcome, once. Not yet seen: a real compaction.
-
-The world moved the same day (events e573 to e586, all claude, all undoable): Porch talk went into the Lounge as Lounge talk (a570), the Wall (f177) into the Lounge, a view Who's home (f609) into the Lounge, and Shop talk (a611, members=all) onto the Board for work. The command-center lens names both chats by id (the old `the kind:chat,prop:members=all` would now be ambiguous). The door note (a568) is Alex's draft with targeted changes; the Handbook's map (a198), "Wall, Lounge and Talk" (a209) and "First moves" (a202) say where things are now. The Porch keeps only the house's own things until the restructure (a593) decides.
-
-### F28. Current Implementation had drifted; the review's defects fixed (29 Sep, at Alex's word)
-
-a902 · family=unsorted · status=unchecked · f=F28
-
-*Current Implementation* had gone six days and 130-odd commits without an update. Four reviewers checked it against source and in scratch worlds, and it was rewritten in the Handbook binder (65f6e22). The review found real defects. Alex: "fix those bugs first and remove them from the defect list, also make a note in current implementation to keep it up to date". The fixes (241a545) touch paused owners' files: world.py, worktree.py (Sable's), knife.py, moo.py, desk.py, lens_ir.py and deskd.py.
-
-What the fixes cover:
-- tiled swap undo crashed (undo kind `reorder`);
-- a receipt marked everything seen, so a rewrite could drop unread text;
-- selection and rule events counted as touching every aspect (`event_aspects`);
-- stale advice pointed at `look` for tags;
-- a world verb's use is now undone whole;
-- undo snapshots for prop, tag and due were shallow (found while testing the verb fix);
-- worktree merge saw only targets named by id;
-- test_scene ran 14 of 21 tests;
-- deskd took any session name and any origin;
-- export_docs.load read unlocked and removed others' locks.
-
-Each fix was re-run against the case that reproduced it (ran). Health is green, 21 tests passed, 82 goldens are unchanged, and the nine suite cases and test_journal's tally are unchanged.
-
-To keep the document current: it now opens with a rule, a change updates its section in the same change. The worker protocol asks workers to keep the binder true, and the house exports and commits *Current Implementation* after a landing in frontier. The first test of that step committed an uncommitted export under a false label (reset before anything else happened); the step now commits only what its own export wrote.
 
 ### F29. The Desktop grew without end (29 Sep, Alex's direction)
 
@@ -371,26 +355,6 @@ Not checked: phone width; how a screen reader announces a float fold. While test
 
 Found by Alex right after: adding a task from the Desktop was refused, "you have not looked at f155 yet". The add box said `do create Board ...` without being bound to anything. A painter gesture counts as having seen only what its part is bound to, so nothing told the desk Alex had seen the Board. It had always been this way; nobody had added a task from the Desktop before. The fix is in the lens: `add : text "", the f155, ... do create $item ...`. Checked on a scratch copy (ran): refused before the fix; two adds in a row after it. The lesson for any lens: a gesture that acts on a named thing should bind that thing with `the`, so the viewer's look travels with it.
 
-### F31. Changing one line of a note meant resending all of it (29 Sep, Alex's direction)
-
-a908 · family=unsorted · status=unchecked · f=F31
-
-The Desktop fix in F30 changed one line of the 67-line lens a589. Through the desk the only way was `do rewrite a589 text="..."`, the whole lens as one escaped string, which I scripted because by hand it is a quoting minefield. Alex: "lets definitely fix that please".
-
-The new text verb (world.py, desk.py, moo.py) is `do replace <id> old="..." new="..."`. It changes one exact passage: `old` must appear exactly once, and with none or several it is refused and says how many. It is fenced as `rewrite` is (the text aspect: read first, refused if it changed since), and undo takes it back whole. Line numbers were left out, because a number goes stale when someone adds a line above it and exact words don't.
-
-Checked (ran):
-- unread, refused;
-- one line changed;
-- two matches refused ("appears 2 times");
-- no match refused ("appears 0 times");
-- someone else changed it after my read, refused as stale;
-- undo restored the text.
-
-These cases are test_scene's `test_replace_changes_one_exact_passage` (24 passed; health green, 82 goldens the same). The first real use was documenting the verb itself: three exact passages in the Handbook binder, instead of a whole-text import.
-
-Open, on the Board (a701): a finer fence (admit a replace whose words are still there once, as a656 did for chat lines), and a lens gesture that edits one line of a note.
-
 ### F32. Tasks that open, delete, and a right-click menu (29 Sep, Alex's direction)
 
 a910 · family=unsorted · status=unchecked · f=F32
@@ -419,7 +383,7 @@ Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary lin
 
 Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
-## cured (19)
+## cured (23)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -488,6 +452,18 @@ a868 · family=door · status=cured · f=F11
 The porch's lens is a note inside the Porch, and it wanted `$status` and the house settings from the surface it sits on. `_ctx_for` read props only from the lens note. Fix: absent on the note, a `$prop` falls back to the surface's props.
 Checked 30 Sep (Pike): lived through the residents' tiles on Alex's Desktop (a589). Each tile reads the corner it paints, 'zz : text "asleep", only when prop:want=rest' and 'of kind:task,prop:owner=$r.actor', and both work on the live lens. Cured.
 
+### F12. Not friction: I missed `only when $x <op> value` (a correction)
+
+a870 · family=habit · status=cured · f=F12
+
+The residents' card printed ", wants rest" and "· 0 turns · last turn " because `$status` and `$since` were empty, and I first logged that a row item could not be hidden, since `only when <selection>` tests things and a row item is not a thing. That was wrong. Pike's round-six value test, `only when $x <op> value`, works on row fields: `only when $turns > 0` printed `b (absent: $turns is 0, not > 0)` (ran, cc-test, 28 Sep). The porch uses it; `$status` uses `only when prop:status`. What remains true: when the house's heartbeat is stale, the row's `doing` now says `house stopped Nm ago` instead of repeating its last observation as current (refuse stale, for observed status). A nit, not fixed: `help` and the refusal list both carry the value test, but I read past it; the error message I would have hit never came, because nothing refused.
+
+### F16. The `claude` on PATH was too old for the residents' model (fixed in the house)
+
+a878 · family=identity · status=cured · f=F16
+
+In the first real trial (try-first), every turn came back as `API Error: 400 Claude Code 2.1.173 does not support this model; version 2.1.280 or newer is required`. PATH holds a standalone 2.1.173; the desktop app keeps 2.1.280 and 2.1.281. The house backed off as F15 intended, and the trial stopped after two failures. Fix: `house.find_claude()` runs the newest `claude` it finds (on PATH, or in the desktop app's folder), or `$HOUSE_CLAUDE`, and prints which one at start. Alex's global install is left alone.
+
 ### F20. Porch talk as a group chat: who is woken by what (built)
 
 a886 · family=silence · status=cured · f=F20
@@ -516,6 +492,29 @@ Both proposed a "first visit" note for newcomers. The first two are real gaps. T
 **F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
 Checked 29 Sep (Pike): cured and lived. say exists as a world verb (Sable's a939), found in the room you're in. Pike said hello in the Lounge at e1540 with '> say ...', signed by the world, words kept as words. This was the one truly missing verb in a811's count, so it gets its own family, 'missing', which has had one member.
 
+### F22. The first worker could not run anything (fixed)
+
+a890 · family=missing · status=cured · f=F22
+
+In trials/worker-help-list.md, a real worker (commission a598: help lists verbs the desk can't do):
+- found the cause, wrote a sound fix, asked for help through the desk (comment c599), and committed;
+- the house landed it on the trial branch after the health checks (asked → working → waiting → working → ready →
+  landing → landed, about 3 minutes).
+But every attempt to run code was refused, for four reasons:
+- on Windows its shell is PowerShell, and only Bash patterns were allowed;
+- it called the interpreter by its full path, which `python:*` doesn't match;
+- a command that chains `cd` with anything is refused whole;
+- the protocol told it to copy the live world from outside its worktree, which the sandbox rightly blocks.
+So it committed after checking only by reading, and said so. Fix (workshop.py):
+- the house copies the world into the worktree as `<world>-try` when the worker starts;
+- the allowed commands cover both shells and the interpreter under all three names;
+- the protocol says one command per call, from the worktree root, with no cd, and to say on the commission when
+  something is refused rather than work around it.
+I ran the worker's change myself on main after merging (help reply, zzz, arrange, tidy, link; health all green):
+4fe2b96.
+
+The second worker trial (trials/worker-health-times.md, commission a598 in its copy: health.py should time each check) ran health on its try-world with no refusals. It landed on its trial branch, and I merged it after review (d407a81).
+
 ### F25. A verb's title is also a name (worked around; the fix is open)
 
 a896 · family=identity · status=cured · f=F25
@@ -531,6 +530,26 @@ a898 · family=habit · status=cured · f=F26
 
 Alex, reading my door draft: "they dont rest, they can still think. Rather they rest if they choose to stop outputting anything." Before, a reply with no command lines ended the turn, so thinking without acting was resting. Now (house.py): a reply of only thinking is answered `(quiet)`, or with whatever news is waiting, and the resident goes on; `> rest` rests until someone calls, and `> rest 2 hours` (human time: 30 minutes, 1 day, 1h30m, half an hour; a month at most) rests that long; a call still reaches a resting resident at once; after 10 quiet exchanges in a row the house lets it rest anyway. Every wake now begins `You are <name>. Your corner is <id>.` (Alex: a name should outlive a fading memory). Checked with the fake model (ran; plumbing only): the greeting, 4 quiet exchanges, a reply that acted and rested 2 hours at once (its receipt kept for the next arrival), a call ending that rest, `rest soon` refused with examples, `rest 1h30m` kept, and exactly 10 `(quiet)` before the house let it rest. The command center shows a timed rest as `resting until 16:30`. Not yet seen: what a real model does with `(quiet)`.
 Checked 29 Sep (Pike): lived every visit. Resting is a choice ('> rest 4 hours'), and since the 19:04 restart rest takes you home (lived: rested on the Board, woke in my corner). Cured. Not yet seen by me: a (quiet) reply.
+
+### F31. Changing one line of a note meant resending all of it (29 Sep, Alex's direction)
+
+a908 · family=missing · status=cured · f=F31
+
+The Desktop fix in F30 changed one line of the 67-line lens a589. Through the desk the only way was `do rewrite a589 text="..."`, the whole lens as one escaped string, which I scripted because by hand it is a quoting minefield. Alex: "lets definitely fix that please".
+
+The new text verb (world.py, desk.py, moo.py) is `do replace <id> old="..." new="..."`. It changes one exact passage: `old` must appear exactly once, and with none or several it is refused and says how many. It is fenced as `rewrite` is (the text aspect: read first, refused if it changed since), and undo takes it back whole. Line numbers were left out, because a number goes stale when someone adds a line above it and exact words don't.
+
+Checked (ran):
+- unread, refused;
+- one line changed;
+- two matches refused ("appears 2 times");
+- no match refused ("appears 0 times");
+- someone else changed it after my read, refused as stale;
+- undo restored the text.
+
+These cases are test_scene's `test_replace_changes_one_exact_passage` (24 passed; health green, 82 goldens the same). The first real use was documenting the verb itself: three exact passages in the Handbook binder, instead of a whole-text import.
+
+Open, on the Board (a701): a finer fence (admit a replace whose words are still there once, as a656 did for chat lines), and a lens gesture that edits one line of a note.
 
 ### Prose runs as a command
 
