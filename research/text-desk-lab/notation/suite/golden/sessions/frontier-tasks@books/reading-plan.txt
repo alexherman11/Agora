@@ -1,4 +1,4 @@
-scene reading plan · for golden · world @14
+scene reading plan · for golden · world @14 · no style=; using the default (calm)
   plan a03 column · the prop:role=club -> s02 (a03) as club
     books a03 column as b · 3 of parts:a03,prop:role=book
       row a05 row · key a05

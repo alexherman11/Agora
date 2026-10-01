@@ -1,3 +1,3 @@
-scene fri · for golden · world @59
+scene fri · for golden · world @59 · no style=; using the default (calm)
   box column
     hits column · 0 of title:Friday (empty)

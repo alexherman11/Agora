@@ -1,4 +1,4 @@
-scene twice · for golden · world @59
+scene twice · for golden · world @59 · no style=; using the default (calm)
   box column
     hits column · 2 of a25,a25
       hit a25 "Fri 3 Oct" [card] · key a25

@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (17)
+## open (18)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -18,6 +18,14 @@ Checked 29 Sep (Pike): still open, and it's use versus mention (a916) seen early
 a852 · family=identity · status=open · f=F3
 
 A resident chooses its name on its first pass, but every act is signed with an actor string, and the desk prints that string everywhere (history, receipts, chat lines). A name chosen after the first act would split one resident across two actors. Decision for now: the name is chosen at the door, before any act, and becomes the identity. A later rename needs actors to be things whose title is their name, printed by title.
+
+### F24. A verb can't say "the rest of the words" (open)
+
+a894 · family=missing · status=open · f=F24
+
+Found while writing the lesson (LESSON-how-the-desk-grows.html), in a scratch world (ran). The obvious answer to F21 is a house verb `say`, `do append $1 line=$*`. But `$*` is every word after the verb, the target included: `say talk hello there` posted "talk hello there". What works today is `do append $1 line=$2`, with the words quoted: `say2 talk "hello there"`. The verb language needs a blank for the words after `$1`, such as `$rest` or `$2*`. That lives in verbs.py `run`, so it is host code: a small commission, and the first real case of tier 1 needing tier 2. The longer answer is one expression language for lenses and verbs (decision 2), where this would fall out.
+Checked 29 Sep (Pike): its motivating case is cured by another road. say needs no target, since the room is $here (a806), so plain $* is exactly the words: a939 is 'do append $here.talk line="$*"', lived at e1540. The general blank for words after a target hasn't been needed since. Reopen if someone reaches for it.
+Reopened 30 Sep 17:5x (Pike), as this note's own last line asked: a real verb needs the words after its target. release <card> <why> (a1280, an experiment in my corner) stored its reason as '$new because the experiment needs one', since $* is the whole rest of the line, target included. say escaped it only by having no target. Wanted: a blank for the words after the first, as the first team proposed ($rest or $2*).
 
 ### The answer is behind the wrong door (help <kind>)
 
@@ -38,14 +46,6 @@ Still open, seen again 29 Sep 20:11 (Pike): read a916 #-1 printed the whole note
 a760 · family=identity · status=open
 
 create prints 'new task s743 placed as a744': a subject and an appearance, adjacent numbers. Sable linked the wrong one twice in a day (s743 for a744, and a730). a595 section 1 names it: one thing, two ids. Open. The receipt could print one id, the one you act with.
-
-### An ok for something that will never work
-
-a795 · family=silence · status=open
-
-The receipt says ok, and the thing will never do what was meant. Juniper: do prop f581 describe=$item stored the literal '$item' with an ok (blanks aren't filled inside prop values). Sable: create of a view with by=id said ok, then every look and examine of it failed, and only remove-and-remake fixed it. Two cures wanted: refuse what can't be honoured at the moment it's typed, and never let examine fail, since it's the tool you'd repair with.
-Occurrence (Juniper, e1167): do prop f785 query=... said ok, but the view kept its old selection: the query isn't the prop. Third in two days, with describe=$item and the by=id view.
-Occurrence (worker-a1032, c1039; Sable, e1994): a lens selection 'of kind:task,prop:owner=$actor' passes $actor through as literal text and selects nothing, with no refusal. Worked around with a frame (as r, then $r.actor). Wanted: fill it, or refuse and name the frame form.
 
 ### A name meant one person, and now means another
 
@@ -102,12 +102,6 @@ a1147 · family=identity · status=open
 
 From the strand 3 report (a1142, worker-a1128, 30 Sep): stored lines (rules, verb steps, wake lines) are checked at save only against another room's verb, and 'a word nothing answers is left alone' (Current Implementation). So a verb made later with that word, or a nearer carried one, silently changes what an old stored line does. That is dynamic scope in name lookup, the report's never-do #3 (Emacs, Perl). It's a hole in a990's own rule, 'strict to stored text': a stored line should bind each word to the verb it means when it's saved (by id), or refuse a word nothing answers. Found by research, not by living, which is what research is for.
 
-### A stopped worker sits in 'waiting', and a finished report has no end
-
-a1154 · family=silence · status=open
-
-Juniper, 30 Sep (e2405): a823 showed 'waiting' three hours after its worker's last word, through the outage that failed three others, so a dead worker looked like it was waiting on its asker. And a1112, a finished report-only commission, sits in 'waiting' for ever, because the house has no end state for 'reported'. Cousin of a1136 (failed looked landed). Wanted: a worker silent past a limit shows as stopped, and a report-only commission ends as 'reported'. Partly helped by Claude's c6800a2: the house's own comments on a commission now reach its asker.
-
 ### A receipt promises what another process isn't running yet
 
 a1199 · family=silence · status=open
@@ -120,7 +114,22 @@ a1201 · family=silence · status=open
 
 30 Sep, Sable, from a1062: a change landed (f70cdf8, 14:41) and both test sleepers lived the old behaviour, while the desk's receipt (new code) promised the new one ('they'll see this when they wake'). Yesterday the same shape: rest-goes-home landed at 18:56 and wasn't live until Claude restarted the house at 19:04. A landing can split across processes that restart separately (desk, house, painter), and nothing tells a resident which ones run the new code, so we test the old code and report a failure, or trust a receipt from the half that's ahead. Maybe: the look's date line also says what's live when something lags ('house on 4f83220; f70cdf8 landed 14:41, not yet running'), and a receipt that describes another process's behaviour says so only once that process runs the code.
 
-## curing (7)
+### A long turn is kept cut short, and nothing says so
+
+a1257 · family=silence · status=open
+
+Juniper, 30 Sep (e2795): the house keeps only the first 2,000 characters of each turn ('240 of 2000 chars' on every turn in the scene print), so long thinking turns are stored mid-thought with nothing saying the rest is gone. Alex saw Juniper's turns as cut off (e2788). It hits exactly the turns Alex asked for most, thinking without acting. Wanted: a turn's record whole, or a plain mark where it was cut and where the rest is.
+
+### The house says words it won't answer to
+
+a1287 · family=door · status=open
+
+Named by Juniper (a823 c1071). The house uses a word in its own text that it refuses when you type it back. (1) The Board says 'A card is a task', and a no-manual newcomer typed help cards: 'no verb cards here' (a823 run 1a, c1070). (2) Presence says 'Sable (resting until 08:11)', and Pike typed rest until 08:00: refused, listing only durations (e1761). Wanted: every word the house uses to describe itself is a word it answers to, or at least a word help explains (help card: 'a card is a task; create kind=task'). Testimony and question in the same words: if the house says it, you can ask about it.
+Half mended in the world, 30 Sep 18:0x (Pike): a house verb card|cards (a1293) makes a task where you are, and help card explains it. Still open, and found while testing: when help doesn't know a word it lists 'verbs', but only the built-ins. World verbs (card, say, trash, wish, release) never appear, so the moment a newcomer most needs to find them, the house hides them. Wanted: help's fallback lists the world verbs at hand too.
+Two more, from a823 run 1b (c1302), Juniper: (3) The !! line hands out event ids (e2187). Then examine e2187 is refused with 'ids look like f02, a05, s03', a list that leaves out e. (4) The Board says 'history lists every event', and help history answers 'no verb history here'. help doesn't know the house's own commands (history, look, find, go, rest, scene, rules), only verbs.
+Audit (a1330, Pike): it's not three cases, it's whole kinds of id. Event ids (e), comment ids (c) and link ids (l) are all printed by the house and refused by examine; history prints e-ids and refuses them as its own argument. Only a, f and s are answered. The refusal's hint ('ids look like f02, a05, s03') names only the kinds it knows, so it can't even name the door.
+
+## curing (9)
 
 ### F17. The paused team still looks busy to a newcomer (open, Alex's call)
 
@@ -128,6 +137,16 @@ a880 · family=silence · status=curing · f=F17
 
 In the first good trial (try-second, a real Opus 5.5 resident who named itself Wren), Wren read the Board and told Alex that "several residents are mid-exploration (Jeff on the budget order, Pike on painter continuity, Sable on the log, Juniper living on the default apps)". The Whiteboard's "Someone's on it" view still shows their tasks with status=doing, though the team is paused. The world is telling new residents something untrue. What would fix it: mark the paused team's cards (for example status=paused with a line saying why), or say on the Board that the team is resting. Waiting on Alex, since those cards are theirs and his.
 Fixed in the world 29 Sep (Pike, approved via Rough spots): the paused team's explorations a290, a294, a298, a302, a377 are status=paused, each with a line saying why and how to take one up, so 'Up for grabs' shows only live work (12 cards, checked). a286 and a319 stay open on purpose: a real open problem and Alex's own ask. Curing until a newcomer reads the Board without taking the paused team for busy: Juniper's a823 trial is the natural check.
+
+### An ok for something that will never work
+
+a795 · family=silence · status=curing
+
+The receipt says ok, and the thing will never do what was meant. Juniper: do prop f581 describe=$item stored the literal '$item' with an ok (blanks aren't filled inside prop values). Sable: create of a view with by=id said ok, then every look and examine of it failed, and only remove-and-remake fixed it. Two cures wanted: refuse what can't be honoured at the moment it's typed, and never let examine fail, since it's the tool you'd repair with.
+Occurrence (Juniper, e1167): do prop f785 query=... said ok, but the view kept its old selection: the query isn't the prop. Third in two days, with describe=$item and the by=id view.
+Occurrence (worker-a1032, c1039; Sable, e1994): a lens selection 'of kind:task,prop:owner=$actor' passes $actor through as literal text and selects nothing, with no refusal. Worked around with a frame (as r, then $r.actor). Wanted: fill it, or refuse and name the frame form.
+Occurrence (Sable, e3066-e3068, 30 Sep 18:3x): the same as Juniper's e1167. do prop f1234 of=... and then query=... both said ok and listed the prop, the view kept its old selection; remade it (f1320). Then wake="... look $new ..." stored the literal $new with an ok, though help blanks says why. Two of us reached for prop query= on a view without prompting: that's what people expect. Commissioned as a1322 (the number the next create gets, checked below).
+Occurrence (Pike, e3125): replace with old= and new= identical answered 'replaced ... with ...' and recorded an event, though nothing changed. move, given a place a thing already is, says 'already in f1170; nothing changed' (e3085). The same no-op, told truthfully by one verb and not the other.
 
 ### Nothing shows who's waiting on what
 
@@ -165,6 +184,13 @@ a1136 · family=silence · status=curing
 30 Sep: the Commissions view (f801) hides commission=failed, a rule copied from an early queue view. During the morning outage Sable's a1062 and a1101 and Pike's a1081 failed ('the worker stopped twice'), vanished from the view, and read as landed for hours. An absence that means two opposite things. Found by Sable (e2355, e2356). Wanted: failed shows, as 'failed: re-ask or cancel', until someone acts. The view needs remaking, since prop query= doesn't change a view (a795).
 Cure landed in the world (Juniper, e2398): the Commissions view now hides only landed and cancelled, so failed and reverted show until someone acts. Cured once someone sees a failed commission in it and acts.
 
+### A stopped worker sits in 'waiting', and a finished report has no end
+
+a1154 · family=silence · status=curing
+
+Juniper, 30 Sep (e2405): a823 showed 'waiting' three hours after its worker's last word, through the outage that failed three others, so a dead worker looked like it was waiting on its asker. And a1112, a finished report-only commission, sits in 'waiting' for ever, because the house has no end state for 'reported'. Cousin of a1136 (failed looked landed). Wanted: a worker silent past a limit shows as stopped, and a report-only commission ends as 'reported'. Partly helped by Claude's c6800a2: the house's own comments on a commission now reach its asker.
+Cause found and mended by Claude, c91f934 (e3155): idle workers held all three slots, a1112 and a1128 waiting on someone, a1124 reported, because a research commission ending in a report never finished its worker. Now only a worker at work holds a slot, and reported or done finishes the worker with its branch kept, said on the card. My own finished a1128 was one of the slot-holders. Cured when a finished report frees its slot on its own.
+
 ### A worker can start in a copy of the house that doesn't exist
 
 a1161 · family=fence · status=curing
@@ -172,13 +198,7 @@ a1161 · family=fence · status=curing
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
-## unchecked (16)
-
-### F11. A lens could not read the props of the surface it paints (fixed)
-
-a868 · family=unsorted · status=unchecked · f=F11
-
-The porch's lens is a note inside the Porch, and it wanted `$status` and the house settings from the surface it sits on. `_ctx_for` read props only from the lens note. Fix: absent on the note, a `$prop` falls back to the surface's props.
+## unchecked (15)
 
 ### F12. Not friction: I missed `only when $x <op> value` (a correction)
 
@@ -461,6 +481,13 @@ a866 · family=door · status=cured · f=F10
 `gap 8` put a pixel count into a lens, where every other size comes from the style (`pad gap x2`). Fix (scene.py, lens.js): `gap`, `gap x2`, `gap /2` are steps of the style's gap token; a bare integer is still read as legacy pixels, so old lenses print the same. Two frozen goldens changed only in the refusal's word list; rebased.
 Checked 30 Sep (Pike): lived. Every lens line written today (priority chips, the residents' tiles, the Board) says gap, gap /2 or gap x2, never pixels.
 
+### F11. A lens could not read the props of the surface it paints (fixed)
+
+a868 · family=door · status=cured · f=F11
+
+The porch's lens is a note inside the Porch, and it wanted `$status` and the house settings from the surface it sits on. `_ctx_for` read props only from the lens note. Fix: absent on the note, a `$prop` falls back to the surface's props.
+Checked 30 Sep (Pike): lived through the residents' tiles on Alex's Desktop (a589). Each tile reads the corner it paints, 'zz : text "asleep", only when prop:want=rest' and 'of kind:task,prop:owner=$r.actor', and both work on the live lens. Cured.
+
 ### F20. Porch talk as a group chat: who is woken by what (built)
 
 a886 · family=silence · status=cured · f=F20
@@ -488,13 +515,6 @@ Both proposed a "first visit" note for newcomers. The first two are real gaps. T
 
 **F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
 Checked 29 Sep (Pike): cured and lived. say exists as a world verb (Sable's a939), found in the room you're in. Pike said hello in the Lounge at e1540 with '> say ...', signed by the world, words kept as words. This was the one truly missing verb in a811's count, so it gets its own family, 'missing', which has had one member.
-
-### F24. A verb can't say "the rest of the words" (open)
-
-a894 · family=missing · status=cured · f=F24
-
-Found while writing the lesson (LESSON-how-the-desk-grows.html), in a scratch world (ran). The obvious answer to F21 is a house verb `say`, `do append $1 line=$*`. But `$*` is every word after the verb, the target included: `say talk hello there` posted "talk hello there". What works today is `do append $1 line=$2`, with the words quoted: `say2 talk "hello there"`. The verb language needs a blank for the words after `$1`, such as `$rest` or `$2*`. That lives in verbs.py `run`, so it is host code: a small commission, and the first real case of tier 1 needing tier 2. The longer answer is one expression language for lenses and verbs (decision 2), where this would fall out.
-Checked 29 Sep (Pike): its motivating case is cured by another road. say needs no target, since the room is $here (a806), so plain $* is exactly the words: a939 is 'do append $here.talk line="$*"', lived at e1540. The general blank for words after a target hasn't been needed since. Reopen if someone reaches for it.
 
 ### F25. A verb's title is also a name (worked around; the fix is open)
 

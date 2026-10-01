@@ -26,7 +26,11 @@ An unindented name defines a part; the first one is the root.
                                  comments:<id> actors events worktrees (`rows <source>` prints them). An empty
                                  repeat prints (empty); it never looks like a full one
     over $tags                   repeat over a list field of the current thing; $it is each value
-    each <part>                  what to instantiate for each repeated thing; $count is the count, on and under the repeat ($n still works on the repeat itself)
+    each <part>                  what to instantiate for each repeated thing. $count is the repeat's true size (before
+                                 any clamp), on the repeat, in each instance and in its fixed kids; $n on the repeat
+                                 itself is how many it shows
+    count <selection>            $count is how many things a selection (or a row source) finds, without drawing them:
+                                 rested : text "$count paused", count kind:task,prop:status=paused. Printed `· count 7 of ...`
     at item                      take x,y,w,h from the thing's own appearance in the world (parent must be free)
     spread x <a> step <n|$prop> to <max>   place repeated parts along an axis (also y). $prop is a numeric prop of the
                                  lens note itself: do prop <lens> spacing=210. Computed presentation, never written back
@@ -135,6 +139,146 @@ def style_roles(desk, name):
     if st is None:
         raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
     return {l.split()[1] for l in st["text"].splitlines() if l.startswith("role ") and len(l.split()) > 1}
+
+
+# a1101 (Pike e2213: "appending style roles says ok but never says the style still parses"): the painter's own parse
+# and property reader (desk-shell/style/style.js: parse, check, resolveTokens, prop), mirrored line for line so an edit's
+# receipt can say what the painter will do with it. test_scene checks this mirror against node running style.js.
+_HEX = re.compile(r"^#[0-9a-fA-F]{3,8}$")
+
+
+def style_parse(src):
+    """-> {tokens, roles: {name: {props, line}}, clauses, fonts, themes} or raises LensRefusal('line N: ...') as
+    Style.parse throws a Refusal."""
+    out = {"tokens": {}, "roles": {}, "clauses": [], "fonts": {}, "themes": {}}
+    theme = None
+    for n, raw in enumerate(re.split(r"\r?\n", src), 1):
+        indented = bool(re.match(r"^\s+\S", raw))
+        s = re.sub(r"\s+#\s.*$", "", raw.strip()).strip()
+        if not s or (s.startswith("#") and not re.match(r"^#[0-9a-fA-F]{3,8}\b", s)):
+            continue
+        m = re.match(r"^theme\s+(\S+)\s+of\s+(\S+)$", s)
+        if m:
+            theme = m.group(1)
+            out["themes"][theme] = {"of": m.group(2), "tokens": {}, "line": n}
+            continue
+        m = re.match(r"^font\s+([\w-]+)\s*=\s*(.+)$", s)
+        if m:
+            theme = None
+            out["fonts"][m.group(1)] = n
+            continue
+        m = re.match(r"^token\s+([\w.]+)\s*=\s*(.+)$", s)
+        if m:
+            if theme and indented:
+                out["themes"][theme]["tokens"][m.group(1)] = m.group(2).strip()
+            else:
+                theme = None
+                out["tokens"][m.group(1)] = m.group(2).strip()
+            continue
+        if theme and indented and re.match(r"^(role|when|present)\s", s):
+            raise LensRefusal(f"line {n}: a theme may redefine tokens, not roles ({s.split()[1]!r})")
+        if re.match(r"^present\s", s):
+            raise LensRefusal(f"line {n}: `present` was removed. A lens says which parts are drawn")
+        if re.match(r"^(role|when)\s", s):
+            at, kw = s.rfind(" : "), s.split()[0]
+            if at < 0:
+                raise LensRefusal(f'line {n}: a {kw} line needs " : " with spaces before its properties: {kw} <name> : <property>, <property>')
+            head, body = re.sub(r"^\w+\s+", "", s[:at], count=1).strip(), s[at + 3:].strip()
+            theme = None
+            hx = re.search(r"#[0-9a-fA-F]{3,8}\b", body)
+            if hx:
+                raise LensRefusal(f"line {n}: colours are named here; {hx.group(0)!r} may only appear on a token line")
+            px = re.search(r"\b(\d+(?:\.\d+)?)px\b", body)
+            if px:
+                raise LensRefusal(f"line {n}: {px.group(0)} is not on the scale; lengths are gap, gap xN, gap /N, or an em")
+            props = [x.strip() for x in body.split(",") if x.strip()]
+            if kw == "role":
+                out["roles"][head] = {"props": props, "line": n}
+            else:
+                out["clauses"].append({"sel": head, "props": props, "line": n})
+            continue
+        raise LensRefusal(f'line {n}: not a token, role, clause, font or theme line: "{s}"')
+    return out
+
+
+def _style_tokens(st):
+    """Style.js resolveTokens, as types only: name -> 'colour' | 'length' | 'text' | 'word' | None."""
+    raw, done = dict(st["tokens"]), {}
+
+    def get(name, seen):
+        if name in done:
+            return done[name]
+        if name not in raw or name in seen:
+            return None
+        seen.add(name)
+        v = raw[name].strip()
+        if _HEX.match(v):
+            done[name] = "colour"
+            return "colour"
+        m = re.match(r"^([\w.]+)\s+at\s+([\d.]+)%?$", v)
+        if m:
+            base = get(m.group(1), seen)
+            paper = bool(_HEX.match(raw.get("paper", ""))) or get("paper", {"__"})
+            if base == "colour" and paper:
+                done[name] = "colour"
+                return "colour"
+        if re.match(r"^\d+(\.\d+)?$", v):
+            done[name] = "length"
+        elif re.match(r"^([\w-]+)\s+([\d.]+)/([\d.]+)$", v):
+            done[name] = "text"
+        else:
+            done[name] = "word"
+        return done[name]
+    return {k: get(k, set()) for k in raw}
+
+
+def _style_prop_ok(p, T):
+    """Whether style.js prop() can read property `p` (it returns css or a part), under token types T. -> (ok, why)."""
+    def ln(e):
+        m = re.match(r"^([\w.]+)\s*x\s*([\d.]+)$", e) or re.match(r"^([\w.]+)\s*/\s*([\d.]+)$", e) or re.match(r"^([\w.]+)$", e)
+        if m and T.get(m.group(1)) == "length":
+            return "n"
+        return "em" if re.match(r"^([\d.]+)em$", e) else None
+
+    def col(e):
+        m = re.match(r"^([\w.]+)\s+at\s+([\d.]+)%?$", e)
+        if m and T.get(m.group(1)) == "colour" and T.get("paper"):
+            return True
+        return T.get(e) == "colour"
+    for pat, fn in ((r"^(show|hide)\s+\w+$", lambda m: True), (r"^on\s+(.+)$", lambda m: col(m.group(1))),
+                    (r"^([\w.]+)\s*->\s*(.+)$", lambda m: col(m.group(2))), (r"^edge\s+(.+)$", lambda m: col(m.group(1))),
+                    (r"^border\s+(top|right|bottom|left)\s+(.+)$", lambda m: col(m.group(2))),
+                    (r"^corner\s+(.+)$", lambda m: ln(m.group(1)) == "n"), (r"^pad\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
+                    (r"^space\s+(above|below)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^between\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
+                    (r"^width\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^lift\s+(.+)$", lambda m: ln(m.group(1)) == "n" and T.get("ink") == "colour")):
+        m = re.match(pat, p)
+        if m:
+            if fn(m):
+                return True, ""
+            if re.match(r"^pad\s+(top|right|bottom|left)\s", p):
+                return False, "style.js reads `pad` before `pad <side>`, so a side is never reached (a painter bug)"
+            if re.search(r"\s\d+(\.\d+)?$", p) and not re.search(r"[x/]\s*\d+(\.\d+)?$", p):
+                return False, "a bare number is not on the scale: say gap, gap xN or gap /N"
+            return False, "names no token of the right kind"
+    if re.match(r"^text\b", p):
+        if T.get(p.split()[0] if p.startswith("text.") else "text") != "text":
+            return False, "names no text token"
+        m = re.search(r"\bat\s+([\d.]+)\b", p)
+        return (False, f'"text at {m.group(1)}" is not a step of the ramp') if m else (True, "")
+    return (True, "") if col(p) else (False, "is no property and no colour token")
+
+
+def style_check(src):
+    """-> {"refusal": str or None, "roles": n, "tokens": n, "unread": [(role, prop, line, why)]}: what the painter
+    will make of this style text."""
+    try:
+        st = style_parse(src)
+    except LensRefusal as e:
+        return {"refusal": str(e), "roles": 0, "tokens": 0, "unread": []}
+    T = _style_tokens(st)
+    unread = [(name, p, r["line"], why) for name, r in st["roles"].items() for p in r["props"]
+              for ok, why in [_style_prop_ok(p, T)] if not ok]
+    return {"refusal": None, "roles": len(st["roles"]), "tokens": len(st["tokens"]), "unread": unread}
 
 
 def _cmd_value(v):
@@ -513,11 +657,18 @@ def _w_carry(node, p, val, n, env):
 
 
 def _w_role(node, p, val, n, env):
-    if not re.fullmatch(r"[\w.-]+", val):
-        raise LensRefusal(f"line {n}: `role <name>`; got {p!r}")
+    # a1105 (Alex: 'objectives should have a light highlight on the whole card'): `role <name> when <selection>` lets a
+    # part's look follow its thing's state. Several may follow the plain role; the first that holds wins, the scene
+    # prints which and why, and a part none holds for keeps its plain role. The test is `only when`'s, either kind.
+    val, _, cond = val.partition(" when ")
+    if not re.fullmatch(r"[\w.-]+", val) or (_ and not cond.strip()):
+        raise LensRefusal(f"line {n}: `role <name>` or `role <name> when <selection | $x <op> value>`; got {p!r}")
     if env["roles"] is not None and val not in env["roles"]:
         raise LensRefusal(f"line {n}: no role {val!r} in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
-    node["role"] = val
+    if _:
+        node["role_when"].append((val, cond.strip()))
+    else:
+        node["role"] = val
 
 
 def _w_each(node, p, val, n, env):
@@ -561,6 +712,12 @@ def _w_by(node, p, val, n, env):
     if not re.fullmatch(r"[\w.-]+( [\w.-]+)*", val or ""):
         raise LensRefusal(f"line {n}: `by <prop>[, <prop>]` on a repeat; got {p!r}")
     node["by"] = (node["by"] or []) + val.split()
+
+
+def _w_count(node, p, val, n, env):
+    if not val.strip():
+        raise LensRefusal(f"line {n}: `count <selection or row source>`; got {p!r}")
+    node["count"] = val.strip()       # a1101: '7 paused', without drawing the seven
 
 
 def _w_over(node, p, val, n, env):
@@ -671,13 +828,14 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "peek": ("peek", _w_peek),
     "carry": ("carry", _w_carry),
-    "role": ("role <name>", _w_role),
+    "role": ("role <name> [when <selection | $x <op> value>]", _w_role),
     "text": ('text "..."', _w_text),
     "clamp": ("clamp [last] <n>", _w_clamp),
     "the": ("the <selection> [as <frame>]", _w_the),
     "of": ("of <selection> [as <frame>]", _w_of),
     "over": ("over $<rows> [as <frame>]", _w_over),
     "by": ("by <prop>[, <prop>]", _w_by),
+    "count": ("count <selection>", _w_count),
     "as": ("as <frame>", _w_as),
     "each": ("each <part>", _w_each),
     "at": ("at item", _w_at),
@@ -701,6 +859,8 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `of`/`over` repeats something; say what with `each <part>`")
     if node["the"] and (node["each"] or node["of"] or node["over"]):
         raise LensRefusal(f"line {n}: `the` names exactly one thing; it cannot repeat (drop `each`, `of` or `over`)")
+    if node["count"] and (node["of"] or node["over"]):
+        raise LensRefusal(f"line {n}: a repeat already has $count, its true size; `count` is for a part that repeats nothing")
     if node["as"] and (node["as"] in NAMES or node["as"] in ("value", "x", "y")):
         raise LensRefusal(f"line {n}: `as {node['as']}` would shadow a built-in name; choose another frame name")
     if node["as"] and not (node["the"] or node["of"] or node["over"]):
@@ -723,10 +883,10 @@ def parse(src, roles=None, style=None):
         name, colon, rest = line.strip().partition(" : ")
         if not colon or not re.fullmatch(r"[\w-]+", name):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
-        node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
+        node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False, "by": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -802,9 +962,10 @@ def _refs_of(node):
     """Every $name and $frame.field this part's own words use, with the word they sit in."""
     out = []
     srcs = [("text", node["text"] or ""), ("only", node["only"] or ""), ("of", node["of"] or ""), ("the", node["the"] or ""),
-            ("lens", node["lens"] or "")]
+            ("lens", node["lens"] or ""), ("count", node["count"] or "")]
     srcs += [("derive", x) for _, _, ins in node["derive"] for x in ins]
     srcs += [("on", a["line"]) for a in node["on"]]
+    srcs += [("role", c) for _, c in node["role_when"]]          # a1105: a role's test reads names like `only when`
     for word, text in srcs:
         for a, b in _VAR.findall(text):
             out.append((word, a, b))
@@ -852,6 +1013,31 @@ def classify(name, scope):
     if name in scope["frames"]:
         return "frame"
     return "prop"
+
+
+def role_of(role, role_when, ctx, track, select):
+    """a1105: the role a part takes here and why. `role_when` is [(name, condition)] in the lens's order; the first that
+    holds for this part's thing wins, else the plain role. A condition is a selection (judged as `only when` judges one:
+    the thing is among what it finds, or, with no thing, it finds anything) or a value test, where a missing value does
+    not hold. `select(q)` -> ids. -> (role, why or None)."""
+    for name, cond in role_when:
+        vt = _VALUE_TEST.fullmatch(cond)
+        if vt:
+            ref, op, rhs = vt.group(1), vt.group(2), vt.group(3).strip('"')
+            vctx = dict(ctx.get("_props") or {})
+            vctx.update(ctx)
+            left = _fill(ref, vctx, track)
+            right = _fill(rhs, vctx, track) if "$" in rhs else rhs
+            gone = [x for x, v in ((ref, left), (rhs, right)) if x.startswith("$") and (v == x or v == "")]
+            if not gone and _compare(left, op, right):
+                return name, f"{ref} is {left} {op} {right}"
+            continue
+        q = _fill(cond, ctx)
+        ids = select(q)
+        t = ctx.get("item") or ctx.get("id")
+        if ((t in ids or ctx.get("id") in ids) if t else bool(ids)):
+            return name, q
+    return role, None
 
 
 def _walk(node):
@@ -1192,6 +1378,11 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                            why=(f"no {gone[0].lstrip('$')}" if gone else f"{ref} is {left}, not {op} {right}"))
                 return out
             out["test"] = f"{ref} is {left} {op} {right}"
+        if node["role_when"]:
+            out["role"], why = role_of(node["role"], node["role_when"], ctx, track,
+                                       lambda q: (desk._parse_selection(q) or [[]])[0])
+            if why:
+                out["since"] = why
         if node["at"] == "item" and ctx.get("item") in w.nodes:
             n = w.nodes[ctx["item"]]
             out["box"] = [n["x"], n["y"], n["w"], n["h"]]
@@ -1357,8 +1548,10 @@ def _slug(s):
     return re.sub(r"[^\w-]+", "-", str(s).strip().lower()).strip("-")[:40] or "-"
 
 
-def to_text(scene, name, who, at):
-    lines = [f"scene {name} · for {who} · world @{at}"]
+def to_text(scene, name, who, at, roots=None, part=None):
+    """The scene as text. `roots` (a1101): print only these nodes and what is inside them, each under its full key."""
+    lines = [f"scene {name}" + (f" · part {part}: {len(roots)} match" + ("es" if len(roots) != 1 else "") if roots is not None else "")
+             + f" · for {who} · world @{at}"]
     views = scene.get("views") or {}
     for a, v in views.items():
         vp = v.get("viewport") or {}
@@ -1377,7 +1570,7 @@ def to_text(scene, name, who, at):
     def pr(n, d, pkey=None):
         bits = [n["part"]]
         if n.get("absent"):
-            why = n.get("why") or f"not {n['absent']}"
+            why = rv(n.get("why") or f"not {n['absent']}", 80)      # a1101: a value test quoted a whole message
             lines.append("  " * d + f"{n['part']} {n.get('item') or ''} (absent: {why})".replace("  (", " ("))
             return
         if n.get("item"):
@@ -1397,7 +1590,7 @@ def to_text(scene, name, who, at):
                 cut += f" (~clamp {n['clamp']}: the painter clamps wrapped lines and may show less)"
             bits.append('"' + body + '"' + cut)
         if n["role"]:
-            bits.append(f"[{n['role']}]")
+            bits.append(f"[{n['role']}, since {n['since']}]" if n.get("since") else f"[{n['role']}]")
         if n["layout"]:
             bits.append(n["layout"] + (" " + " ".join(n["tracks"]) if n.get("tracks") else ""))
         for wd in ("gap", "scroll", "measure", "share"):
@@ -1451,6 +1644,8 @@ def to_text(scene, name, who, at):
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):
                 bits.append("(" + ", ".join(n["states"]) + ")")
+        if n.get("counted"):
+            bits.append(f"· count {n['counted'][1]} of {n['counted'][0]}")
         if n.get("test"):
             bits.append(f"· only when {n['test']}")
         for a in n["acts"]:
@@ -1470,7 +1665,11 @@ def to_text(scene, name, who, at):
         for k in n["kids"]:
             pr(k, d + 1, n["key"])
 
-    pr(scene, 1)
+    if roots is None:
+        pr(scene, 1)
+    for r in roots or []:
+        lines.append(f"  = {r['key']}")
+        pr(r, 2, r["key"].rsplit("/", 1)[0] if "/" in r["key"] else None)
     return "\n".join(lines)
 
 
@@ -1529,7 +1728,7 @@ def _compile(desk, s, stack, count, closure):
 # drawn, never compared. Provenance (the, derived, test, read, freads, frames, captured, members, states, missing, of,
 # cut) stays on the node for the printer and need not travel to the painter.
 # ---------------------------------------------------------------------------------------------------------------------
-PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views")
+PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views", "counted", "size")
 
 
 def emit(node):
@@ -1623,14 +1822,38 @@ def _identity():
     return {"compiler": h(here / "scene.py"), "style": h(here / "desk-shell" / "style" / "calm.style")}
 
 
-def scene_for(desk, name):
+def split_scene_arg(desk, arg):
+    """a1101: `scene <lens> [<part path> | ok]` -> (lens name, rest or None). The name may be quoted, or bare with
+    spaces; a bare line that names a lens whole is the lens (a lens titled `scratch lens` is not lens `scratch`)."""
+    import shlex
+    arg = arg.strip()
+    if arg[:1] in "\"'":
+        try:
+            words = shlex.split(arg)
+        except ValueError as e:
+            raise LensRefusal(f"scene: could not read the lens name: {e}")
+        if len(words) > 2:
+            raise LensRefusal(f"scene <lens> [<part path> | ok]; got {len(words) - 1} words after the name")
+        return words[0], (words[1] if len(words) > 1 else None)
+    try:
+        find_lens(desk, arg)
+        return arg, None
+    except LensRefusal:
+        if " " not in arg:
+            raise
+    name, _, rest = arg.rpartition(" ")
+    find_lens(desk, name.strip())           # refuses as `scene <that name>` would
+    return name.strip(), rest
+
+
+def scene_for(desk, name, part=None):
     """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
     accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
     whose whole closure is current; a fallback frame is for reading. The old evaluator below (build) stays for one
     stage as the reference the goldens were made with; Juniper's check judged the switch at 82 same."""
     import lens_ir
-    return lens_ir.scene_for(desk, name)
+    return lens_ir.scene_for(desk, name, part)
 
 
 def scene_for_old(desk, name):

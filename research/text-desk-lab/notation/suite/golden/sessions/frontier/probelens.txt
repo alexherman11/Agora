@@ -1,4 +1,4 @@
-scene probelens · for golden · world @336
+scene probelens · for golden · world @336 · no style=; using the default (calm)
   root column
     list · 1 of tag:probe
       card a122 "Probe bed has 6 beds" · read beds=6 · key a122

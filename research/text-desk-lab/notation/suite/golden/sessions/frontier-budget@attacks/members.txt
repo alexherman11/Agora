@@ -1,4 +1,4 @@
-scene members · for golden · world @24
+scene members · for golden · world @24 · no style=; using the default (calm)
   x column · 3 of tag:t
     r a03 "(done) Alpha" · key a03
     r a05 "Beta" · key a05

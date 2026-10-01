@@ -1,4 +1,4 @@
-scene notes · for golden · world @128
+scene notes · for golden · world @128 · no style=; using the default (calm)
   ~ alex is looking: 257x597 at scroll 0,0 · painted world @126 (behind) · reported 15:31:12
   ~ rook is looking: 660x760 at scroll 0,0 · painted world @127 (behind) · reported 15:38:25
   window [window] column

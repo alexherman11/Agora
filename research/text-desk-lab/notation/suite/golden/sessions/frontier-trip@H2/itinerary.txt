@@ -1,4 +1,4 @@
-scene itinerary · for golden · world @37
+scene itinerary · for golden · world @37 · no style=; using the default (calm)
   itin a03 column · the prop:role=trip -> s02 (a03) as trip
     rows a03 column as stop · 6 of parts:a03
       row a05 row · date = day-n(2026-10-10, 1) = 2026-10-10 · read trip s02 start=2026-10-10; stop s04 tripday=1 · key a05

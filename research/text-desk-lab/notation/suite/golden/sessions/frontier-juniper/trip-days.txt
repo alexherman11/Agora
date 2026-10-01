@@ -1,4 +1,4 @@
-scene trip days · for golden · world @64
+scene trip days · for golden · world @64 · no style=; using the default (calm)
   cal row
     d1 [sheet] column
       head "Day 1" [heading]

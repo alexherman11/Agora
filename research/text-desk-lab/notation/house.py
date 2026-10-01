@@ -81,11 +81,27 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": ""}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
+# Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
+# only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
+# turns to end (no new one starts), then goes: a turn it cuts is said again when the resumed conversation next wakes
+RESTART_GRACE = 90
 ANOTHER = 76         # the exit code for "another house already runs this world": keeper does not fight it
 
 
 def now():
     return time.time()
+
+
+def limit_reset(detail):
+    """'You've hit your session limit · resets 5:30pm (...)' -> the next 5:30pm as a time, else None. 30 Sep: residents
+    stopped by the limit at 15:06 backed off to an hour at a time and were still waiting at 17:39, after it reset."""
+    m = re.search(r"limit\b.*?resets (\d{1,2})(?::(\d\d))?\s*([ap]m)", detail or "", re.I)
+    if not m:
+        return None
+    h = int(m.group(1)) % 12 + (12 if m.group(3).lower() == "pm" else 0)
+    t = time.localtime()
+    at = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, h, int(m.group(2) or 0), 0, 0, 0, -1))
+    return at if at > now() - 60 else at + 86400
 
 
 def find_claude():
@@ -308,6 +324,12 @@ class Resident:
 
     # ---- the process -----------------------------------------------------------------------------------------
     def start(self, model):
+        # 30 Sep: a turn the last process never finished (a restart cut it) is said again at the next wake, with why;
+        # before, only a failed turn was carried, and a restart dropped what it had been told
+        cut = (self.state.pop("pending", None) or {}).get("carry")
+        if cut:
+            self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + cut).strip("\n")
+            self.state["cut_by_restart"] = True
         claude = self.house.claude
         cmd = [claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
@@ -664,6 +686,11 @@ class House:
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if not r.alive():
+                if props.get("call") and r.state.get("retry_at", 0) > now():
+                    # a press of wake overrides a back-off, once: the call is used up, so a failure after it backs off again
+                    r.state.pop("retry_at")
+                    r.log("retry", {"why": f"called by {props['call']} while backing off"})
+                    self.act("house", f"look {rid} :1; do prop {rid} remove=call")
                 if r.state.get("retry_at", 0) > now():
                     self.set_status(r, corner, "error")
                     continue
@@ -718,7 +745,11 @@ class House:
         lead = f"You are {actor}. Your corner is {r.rid}.\n" + lead
         undelivered = r.state.pop("undelivered", "")
         if undelivered:
-            lead += "(your last turn did not finish; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
+            # a resident acts only through > lines the house runs after its turn, so a cut turn ran none of them
+            why = ("the house restarted for new code while you were answering; your conversation is resumed, but that "
+                   "answer never reached me and none of its > lines ran" if r.state.pop("cut_by_restart", None)
+                   else "your last turn did not finish")
+            lead += f"({why}; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
         r.state["woke"] = now()
         # what came while it slept is said with the wake, not dropped; a1062: a line kept for it (or that would have
         # called it, from a resident) comes first, marked for it, before the wake's own look
@@ -822,7 +853,9 @@ class House:
             r.save()
             return
         n = r.state.get("failures", 0) + 1
-        r.state["failures"], r.state["retry_at"] = n, now() + min(60 * 2 ** (n - 1), 3600)
+        reset = limit_reset((why or {}).get("detail") if isinstance(why, dict) else "")
+        # a usage limit is not the resident failing: try again a minute after the reset it names, not on a doubling
+        r.state["failures"], r.state["retry_at"] = n, (reset + 60 if reset else now() + min(60 * 2 ** (n - 1), 3600))
         r.log("failed", {"why": why, "failures": n, "retry_in": int(r.state["retry_at"] - now())})
         r.save()
         self.set_status(r, corner, "error")
@@ -865,37 +898,55 @@ class House:
         print(f"house: world {self.world}, claude {self.claude_version} ({self.claude})"
               + (f", fake model on {self.fake}" if self.fake else ""), flush=True)
         # 30 Sep: a commit by hand (not a landing) that changed the lab's Python left the house on old code for hours,
-        # and once half-imported new code (the QUOTED import error). Any commit that changes a .py here now asks for
-        # the same drained restart a landing does. Checked every 30 passes (about a minute).
+        # and once half-imported new code (the QUOTED import error). A commit that changes a file the house runs
+        # (workshop.HOUSE_FILES) asks for the same restart a landing does. Checked every 30 passes (about a minute).
         def head():
             r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True, text=True)
             return r.stdout.strip() if r.returncode == 0 else ""
         started_on, passes = head(), 0
+        checked_on = started_on       # the HEAD-watch's baseline; started_on stays what this process imported
         try:
             while True:
                 try:
                     self.step()
                 except Exception as e:
                     print(f"house: step failed: {type(e).__name__}: {e}", flush=True)
+                    # the house still holds the world.py/desk.py it started with (export_docs.load unpickles in this
+                    # process); if newer code is committed under a failing step, that may be why: restart onto it
+                    if started_on and not self.workshop.restart_wanted and head() not in ("", started_on):
+                        print("house: a step failed and the code has changed since I started; restarting onto it", flush=True)
+                        self.workshop.restart_wanted = True
                 passes += 1
                 if started_on and passes % 30 == 0 and not self.workshop.restart_wanted:
                     now_on = head()
-                    if now_on and now_on != started_on:
-                        d = subprocess.run(["git", "diff", "--name-only", started_on, now_on, "--", "."], cwd=HERE,
+                    if now_on and now_on != checked_on:
+                        d = subprocess.run(["git", "diff", "--name-only", checked_on, now_on, "--", "."], cwd=HERE,
                                            capture_output=True, text=True).stdout.split()
-                        if any(p.endswith(".py") for p in d):
-                            print(f"house: the code under me changed ({started_on[:7]} -> {now_on[:7]}); restarting when no one is mid-turn", flush=True)
+                        if any(Path(p).name in workshop.HOUSE_FILES for p in d):
+                            print(f"house: the code under me changed ({checked_on[:7]} -> {now_on[:7]}); restarting within {RESTART_GRACE} s", flush=True)
                             self.workshop.restart_wanted = True
-                if (self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER")
-                        and not any(r.busy for r in self.residents.values())
-                        and not any(x.busy for x in self.workshop.workers.values())):
-                    print("house: the code changed (a landing or a commit); restarting on it", flush=True)
-                    self.exit_code = RESTART
-                    break
+                        else:
+                            checked_on = now_on       # nothing the house runs changed: deskd and the next command have it
+                if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
+                    self.restart_since = getattr(self, "restart_since", None) or now()
+                    busy = ([r.rid for r in self.residents.values() if r.busy]
+                            + [c for c, x in self.workshop.workers.items() if x.busy])
+                    if not busy or now() - self.restart_since >= RESTART_GRACE:
+                        print("house: the code changed; restarting on it"
+                              + (f" (cutting {', '.join(busy)}: each resumes, and is told)" if busy else ""), flush=True)
+                        self.exit_code = RESTART
+                        break
                 time.sleep(2)
         except KeyboardInterrupt:
             pass
         finally:
+            everyone = list(self.residents.values()) + list(self.workshop.workers.values())
+            for x in everyone:          # every pipe closed first, so the waits in stop() overlap (not 20 s each)
+                try:
+                    if x.proc:
+                        x.proc.stdin.close()
+                except Exception:
+                    pass
             for r in self.residents.values():
                 r.stop()
             for x in list(self.workshop.workers.values()):

@@ -1,4 +1,4 @@
-scene reading · for golden · world @59
+scene reading · for golden · world @59 · no style=; using the default (calm)
   cal a48 row · the tag:readplan -> s47 (a48) as trip
     days a48 row · days = days-from(2026-10-05, 2026-10-07) = 3 rows · read trip s47 start=2026-10-05 end=2026-10-07 · 3
       day a48 [sheet] column · key 1

@@ -35,7 +35,7 @@ DESCRIPTION = (
     "Several commands per call, separated by ; or newlines: they run in order and stop at the first refusal "
     "(at most 4 read/examine per call). "
     "Reading: look [id|title] [:1-:4] (a room with no depth is narrated; :2 is its tree) · read id · examine id (its lines, comments, links and the verbs that apply now) · "
-    "find <words or selection> · history [id] · why id · table <selection> · scene <lens> · help [topic]. "
+    "find <words or selection> · history [id] · why id · table <selection> · scene <lens> [part path | ok] · help [topic]. "
     "Changing: do <verb> <target> k=v ... (quote values with spaces; \\n inside a value is a newline) · undo eN. "
     "Defining: verbs and rules are notes (help verbs, help rules), a view is do create <surface> kind=view query=..., clock. "
     "A target is an id, a unique title in quotes, or a selection (kind:task,prop:owner=you,in:Frontier). "
