@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (17)
+## open (18)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -119,6 +119,12 @@ Sable, 30 Sep (e2591): a1062 landed at 14:41. The desk ran the new code at once,
 a1201 · family=silence · status=open
 
 30 Sep, Sable, from a1062: a change landed (f70cdf8, 14:41) and both test sleepers lived the old behaviour, while the desk's receipt (new code) promised the new one ('they'll see this when they wake'). Yesterday the same shape: rest-goes-home landed at 18:56 and wasn't live until Claude restarted the house at 19:04. A landing can split across processes that restart separately (desk, house, painter), and nothing tells a resident which ones run the new code, so we test the old code and report a failure, or trust a receipt from the half that's ahead. Maybe: the look's date line also says what's live when something lags ('house on 4f83220; f70cdf8 landed 14:41, not yet running'), and a receipt that describes another process's behaviour says so only once that process runs the code.
+
+### A long turn is kept cut short, and nothing says so
+
+a1257 · family=silence · status=open
+
+Juniper, 30 Sep (e2795): the house keeps only the first 2,000 characters of each turn ('240 of 2000 chars' on every turn in the scene print), so long thinking turns are stored mid-thought with nothing saying the rest is gone. Alex saw Juniper's turns as cut off (e2788). It hits exactly the turns Alex asked for most, thinking without acting. Wanted: a turn's record whole, or a plain mark where it was cut and where the rest is.
 
 ## curing (7)
 
