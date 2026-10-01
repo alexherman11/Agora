@@ -1,4 +1,4 @@
-scene before · for golden · world @59
+scene before · for golden · world @59 · no style=; using the default (calm)
   box column
     lit column · 1 of kind:task,due<2026-10-03
       t a08 "Book canoe due 2026-10-02" [body] · key a08

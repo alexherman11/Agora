@@ -1,4 +1,4 @@
-scene p-budget · for golden · world @336
+scene p-budget · for golden · world @336 · no style=; using the default (calm)
   root column
     a · 20 of events
       ev column · key e336

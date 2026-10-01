@@ -1,4 +1,4 @@
-scene spacing · for golden · world @52
+scene spacing · for golden · world @52 · no style=; using the default (calm)
   window [window] column
     bar [titlebar] row
       name "spacing · 4 cards" [windowname] · 4 of tag:spacing-demo

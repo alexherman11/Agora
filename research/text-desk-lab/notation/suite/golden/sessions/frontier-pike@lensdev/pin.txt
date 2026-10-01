@@ -1,4 +1,4 @@
-scene pin · for golden · world @51
+scene pin · for golden · world @51 · no style=; using the default (calm)
   box column
     hits column · 2 of s03,a36
       hit a25 "Fri 3 Oct day " [card] (no tripday) · key a25

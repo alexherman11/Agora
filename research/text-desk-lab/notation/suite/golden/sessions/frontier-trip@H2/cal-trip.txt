@@ -1,4 +1,4 @@
-scene cal trip · for golden · world @37
+scene cal trip · for golden · world @37 · no style=; using the default (calm)
   cal a03 row · the prop:role=trip -> s02 (a03) as trip
     days a03 row · days = days-from(2026-10-10, 2026-10-11) = 2 rows · read trip s02 start=2026-10-10 end=2026-10-11 · 2
       day a03 [sheet] column · key 1

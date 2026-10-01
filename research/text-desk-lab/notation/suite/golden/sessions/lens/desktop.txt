@@ -1,4 +1,4 @@
-scene desktop · for golden · world @126
+scene desktop · for golden · world @126 · no style=; using the default (calm)
   ~ iris is looking: 694x723 at scroll 0,0 · painted world @126 · reported 15:39:25
   desk [desk] column
     bar [bar] row

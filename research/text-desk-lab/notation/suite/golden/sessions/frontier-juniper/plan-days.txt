@@ -1,4 +1,4 @@
-scene plan days · for golden · world @64
+scene plan days · for golden · world @64 · no style=; using the default (calm)
   cal row · 3 of sections:a25
     day a25 [sheet] column · key before-the-first-heading
       head a25 "(before the first heading)" [heading]

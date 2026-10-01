@@ -1,4 +1,4 @@
-scene present · for golden · world @24
+scene present · for golden · world @24 · no style=; using the default (calm)
   x column · days = days-from(2026-10-14, 2026-10-17) = 4 rows · 4
     d row · key 1
       day "2026-10-14:" · read it date=2026-10-14

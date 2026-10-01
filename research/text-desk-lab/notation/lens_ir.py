@@ -161,7 +161,7 @@ def lower(root, parts):
                        "at": node["at"], "spread": node.get("spread"), "props": node["props"],
                        **{k: node[k] for k in S.PAINT_WORDS if node.get(k) not in (None, False)}},
               "acts": [dict(a) for a in node["on"]],
-              "place": node["lens"], "carry": node["carry"],
+              "place": node["lens"], "carry": node["carry"], "count": node.get("count"),
               "kids": [one(k) for k in node["kids"]],
               "deps": {"emit": _deps(node["text"]), "guard": _deps(node["only"]),
                        "acts": [_deps(a["line"]) for a in node["on"]],
@@ -281,6 +281,16 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["captured"] = [{"field": k, "value": v, "now": live, "same": (str(live) == str(v))} for k, v, live in ctx["_captured"]]
         if the_state not in ("live",) and not the_state.startswith("->"):
             return out
+        # --- count (a1101): the size of a selection or row source, as $count, without drawing its members
+        if node["count"]:
+            q = S._fill(node["count"], ctx, track)
+            rs = acc.rows(q) if q.partition(":")[0] in S.SOURCES else None
+            if rs is None:
+                named, ids = acc.select(q)
+                ids = [i for i, _ in named] if named is not None else ids
+                cb.append(["select", q, list(ids)])      # a gesture here was offered under this membership
+            ctx["count"] = len(rs) if rs is not None else len(ids)
+            out["counted"] = (q, ctx["count"])
         # --- lets
         for let in node["lets"]:
             dctx = dict(ctx.get("_props") or {})
@@ -326,7 +336,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             missing = [p for p in em["props"] if p not in pv and p not in ctx]
             fill_ctx = {p: "" for p in missing}
             fill_ctx.update(pv)
-            fill_ctx.update({k: v for k, v in ctx.items() if k != "n"} if (b and b["kind"] == "many") else ctx)
+            fill_ctx.update({k: v for k, v in ctx.items() if k not in ("n", "count")} if (b and b["kind"] == "many") else ctx)
             out["text"] = S._fill(em["text"], fill_ctx, track)
             if em["props"]:
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
@@ -456,6 +466,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         out["kids"].append(cut)
             else:
                 rows_over = ctx.get("_" + b["over"], [])
+                total = len(rows_over)
                 dcb = cb + frame_reads()
                 for k, v in enumerate(rows_over):
                     if isinstance(v, dict):
@@ -475,8 +486,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
             for k, kid in enumerate(out["kids"][:out["n"]]):
                 spread_of(node, k, kid)
+            out["size"] = total
             if out["text"] is not None:
-                out["text"] = out["text"].replace("$n", str(out["n"]))
+                out["text"] = re.sub(r"\$count\b", str(total), out["text"].replace("$n", str(out["n"])))    # a1101: the true size
         # --- placed lens
         if node["place"]:
             inner = S._fill(node["place"], ctx)
@@ -489,7 +501,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["lens"] = inner
         # --- fixed kids
         for kid in node["kids"]:
-            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("n", ctx.get("count", ""))), f"{key}/{kid['part']}", em["layout"], chain, cb))
+            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("size", ctx.get("count", ""))), f"{key}/{kid['part']}", em["layout"], chain, cb))
         return out
 
     sc = make(irs[root], {}, root, cb=cb)
@@ -518,20 +530,89 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
         good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
         return sc
     except S.LensRefusal as e:
+        if getattr(e, "lens", None) is None:
+            e.lens = s            # the innermost lens that refused, so a check can quote its line
         g = good.get(s["id"])
         g = {"text": g, "rev": None} if isinstance(g, str) else g
         if not g:
             raise
         del closure[mark:]
-        entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e))
+        entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e), refused_in=e.lens)
         sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc)
         stamp(sc)
         sc["broken"] = f"lens {s['title']}: {e}"
         return sc
 
 
-def scene_for(desk, name):
-    """-> (scene, text), as scene.scene_for, through the staged pipeline."""
+def _quote_line(s, msg):
+    """a1101: a refusal that names a line quotes it, from the lens it came from."""
+    import re as _re
+    m = _re.match(r"line (\d+):", msg or "")
+    lines = (s or {}).get("text", "").splitlines()
+    if not m or not 0 < int(m.group(1)) <= len(lines):
+        return ""
+    return f" | {s['title']} line {m.group(1)}: {lines[int(m.group(1)) - 1].strip()[:160]}"
+
+
+def style_note(desk, s):
+    """What paints lens `s`: '· style pixel', or the default said out loud (a1101: a missing style= was silent)."""
+    name = (s.get("props") or {}).get("style")
+    if not name:
+        return "no style=; using the default (calm)"
+    st = S.style_source(desk, name)
+    if st is None:
+        return f"style {name}: no such style"
+    c = S.style_check(st["text"])
+    return f"style {name}" + (f" (does not parse: {c['refusal']})" if c["refusal"] else "")
+
+
+def check(desk, s):
+    """-> (compiles, one line): whether lens `s` (a subject) compiles as its text stands now, its node count against the
+    budget, what paints it, and a refusal with its line. The fallback to the last good version is reported, not shown."""
+    closure, count = [], [0]
+    try:
+        compile_lens(desk, s, (s["title"].lower(),), count, closure, Accessor(desk))
+    except S.LensRefusal as e:
+        return False, f"lens {s['title']} does not compile: {e}{_quote_line(getattr(e, 'lens', None) or s, str(e))}"
+    fallen = [c for c in closure if c["status"] == "fallback"]
+    if fallen:
+        c = fallen[0]
+        return False, (f"lens {s['title']} does not compile" + (f" (inner lens {c['lens']})" if c["id"] != s["id"] else "")
+                       + f": {c['refusal']}{_quote_line(c.get('refused_in'), c['refusal'])}; its painter shows the last version that did, gestures off")
+    return True, f"lens {s['title']} compiles: {count[0]} of {S.BUDGET} nodes · {style_note(desk, s)}"
+
+
+def find_parts(sc, path):
+    """a1101: the nodes a part path names, topmost first. Each segment matches a part's name or its key segment, along a
+    chain that ends at the node (people, people/list, list/f571, porch/main/people)."""
+    segs = [x for x in path.strip("/").split("/") if x]
+    hits = []
+
+    def walk(n, chain, pkey):
+        seg = n["key"][len(pkey) + 1:] if pkey and n["key"].startswith(pkey + "/") else n["key"]
+        chain = chain + [(n.get("part"), seg)]
+        tail = chain[-len(segs):]
+        if len(tail) == len(segs) and all(sg in (p, k) for sg, (p, k) in zip(segs, tail)):
+            hits.append(n)
+            return
+        for k in n.get("kids") or []:
+            walk(k, chain, n["key"])
+    walk(sc, [], None)
+    return hits
+
+
+def part_names(sc):
+    out, stack = set(), [sc]
+    while stack:
+        n = stack.pop()
+        out.add(n.get("part"))
+        stack += n.get("kids") or []
+    return sorted(x for x in out if x)
+
+
+def scene_for(desk, name, part=None):
+    """-> (scene, text), as scene.scene_for, through the staged pipeline. With `part`, the text is only the parts that
+    path names (find_parts) and what is inside them; scene["printed"] lists those nodes."""
     s = S.find_lens(desk, name)
     closure = []
     acc = Accessor(desk)
@@ -546,7 +627,16 @@ def scene_for(desk, name):
         st = S.style_source(desk, name) or {}
         sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
     sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
-    text = S.to_text(sc, s["title"], desk.world.me, at)
+    roots = None
+    if part:
+        roots = find_parts(sc, part)
+        if not roots:
+            raise S.LensRefusal(f"no part {part!r} in the scene of {s['title']}. Its parts: {' '.join(part_names(sc))}")
+        sc["printed"] = roots
+    text = S.to_text(sc, s["title"], desk.world.me, at, roots=roots, part=part)
+    if not (s.get("props") or {}).get("style"):
+        head, _, rest = text.partition("\n")
+        text = head + " · " + style_note(desk, s) + ("\n" + rest if rest else "")
     if fallen:
         head = "".join(f"! lens {c['lens']} no longer compiles: {c['refusal']}\n" for c in fallen)
         text = head + "! showing the last version that did; gestures are off until it compiles. Fix it with rewrite, or undo.\n" + text

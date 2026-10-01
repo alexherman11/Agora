@@ -1,4 +1,4 @@
-scene split · for golden · world @36
+scene split · for golden · world @36 · no style=; using the default (calm)
   split a03 column · the prop:role=house -> s02 (a03) as h
     head a03 "Month from 2026-11-01" [heading] · read h s02 month=2026-11-01
     bills a03 column as b · 4 of parts:a03,prop:role=bill

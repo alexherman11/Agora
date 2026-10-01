@@ -1,2 +1,2 @@
-scene lease · for golden · world @24
+scene lease · for golden · world @24 · no style=; using the default (calm)
   x column · days: (uninterpretable: days-from: 2026-09-01 to 2027-09-30 is not a span of at most a year) · 0 (empty)
