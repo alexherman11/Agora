@@ -5,6 +5,8 @@
 Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
   - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
+  - the rooms tests pass (test_room_verbs, test_room_look, test_room_reads, test_blanks), each on a small world it
+    builds itself (roomworld.py), so a failure is the code's and not today's world's
   - the Python mirror of style.js that style receipts use (scene.style_check) agrees with style.js under node, on
     test_scene's samples, calm.style and every style note in <world>; without node the line says it was not checked
   - the frozen session prints are unchanged in the golden form (suite/sessions.py --check)
@@ -24,6 +26,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+ROOM_TESTS = ("test_room_verbs.py", "test_room_look.py", "test_room_reads.py", "test_blanks.py")
 
 
 def check_python():
@@ -130,6 +133,17 @@ def main():
         print(f"test_scene: {last}{took('test_scene', t0)}")
         if code:
             failed.append(f"test_scene: {last}")
+        # a1190 (Sable e2546; strand 3's lesson a1142): the rooms tests build their own world (roomworld.py), so a
+        # failure here is the code's, and it shows at the landing that causes it instead of drifting where no one looks
+        t0 = time.perf_counter()
+        outs = []
+        for name in ROOM_TESTS:
+            code, out = run([name], timeout=300)
+            last = (out.strip().splitlines() or ["?"])[-1]
+            outs.append(f"{Path(name).stem}: {last}")
+            if code:
+                failed.append(f"{Path(name).stem}: {last}"[:300])
+        print(f"room tests: {'; '.join(outs)}{took('room tests', t0)}")
         # Pike a611, 30 Sep: some painter rules live only in CSS (peek's nesting, a1032), and only a browser can test
         # them. When one is here, every test_*_paint.py runs (about 3 s each); without one, the line says so
         t0 = time.perf_counter()
