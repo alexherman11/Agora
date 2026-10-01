@@ -69,7 +69,10 @@
     }
     if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
     if (p.kind === "frame") frames(el, n, p);
-    if (p.share != null) { el.style.flex = `${p.share} 1 0`; el.style.minWidth = el.style.minHeight = "0"; }   // a weight, as a track is
+    // a weight, as a track is; in a row, a share also fills the row's height (lens.html: .l-row > [data-share]). 1 Oct:
+    // Sable's a1266 made the Board's lanes a row of shares (was grid 1 1 1), rows align on baselines, and every lane
+    // shrank to its title, so each lane's scrolling list was 0 high and Alex's Board looked empty
+    if (p.share != null) { el.style.flex = `${p.share} 1 0`; el.style.minWidth = el.style.minHeight = "0"; el.dataset.share = "1"; }
     // a grid given a share is bounded, so it divides its height among its rows and its cells fill them; a cell with
     // `scroll` then scrolls inside the window instead of the page growing (Alex, 29 Sep: the window is bounded)
     if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }

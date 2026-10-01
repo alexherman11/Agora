@@ -35,6 +35,7 @@
   #said { white-space: pre; margin: 0; }
   .l-column { display: flex; flex-direction: column; }
   .l-row { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; }
+  .l-row > [data-share] { align-self: stretch; }   /* a part given a share of a row fills its height (lens.js) */
   .l-grid { display: grid; align-items: start; }
   .l-grid > [data-key] { min-width: 0; }
   .l-cells { display: contents; }
