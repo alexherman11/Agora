@@ -372,6 +372,14 @@ class DeskKnife(DeskMoo):
             if prev is not None and prev["sig"] == sig:
                 prev["id"] = aid
                 continue
+            if prev is not None and prev["sig"][:3] == sig[:3]:
+                # 1 Oct (Juniper e3531): only its bound words changed, or the code that computes the sig did (a1156 made
+                # it four parts, so every rule re-armed on its first pass and a1087 counted a1156's own landing as
+                # handled). Re-read it, but keep what it has handled and its cursor: re-arming is for a rule its
+                # author changed, never a silent swallow of what is entering now
+                rule, broken = self._rule_parse(s, home)
+                prev.update({"id": aid, "sig": sig, "broken": broken, **(rule or {})})
+                continue
             prev = prev or {}
             rule, broken = self._rule_parse(s, home)
             st = {"id": aid, "sid": sid, "sig": sig, "home": home, "author": author, "broken": broken, "done": set(),
