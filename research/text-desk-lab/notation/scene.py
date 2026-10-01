@@ -137,6 +137,28 @@ def style_roles(desk, name):
     return {l.split()[1] for l in st["text"].splitlines() if l.startswith("role ") and len(l.split()) > 1}
 
 
+def pulsing_roles(desk, name):
+    """a1140: the roles whose words include `pulse` in the style the painter installs for a lens (its style=, else calm).
+    The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving."""
+    st = style_source(desk, name or "calm") or {}
+    out = set()
+    for l in (st.get("text") or "").splitlines():
+        l = re.sub(r"\s+#\s.*$", "", l.strip())
+        if l.startswith("role ") and " : " in l:
+            head, body = l.rsplit(" : ", 1)
+            if "pulse" in (w.strip() for w in body.split(",")):
+                out.add(head.split()[1])
+    return out
+
+
+def mark_pulse(node, roles):
+    """Set `pulse` on every node whose role pulses. Printer-side only: emit() never sends it to the painter."""
+    if roles and node.get("role") in roles:
+        node["pulse"] = True
+    for k in node.get("kids") or []:
+        mark_pulse(k, roles)
+
+
 def _cmd_value(v):
     """A value going inside a quoted desk command keeps its quotes and backslashes (Astra: `She said "yes"` lost them)."""
     return str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
@@ -1397,7 +1419,7 @@ def to_text(scene, name, who, at):
                 cut += f" (~clamp {n['clamp']}: the painter clamps wrapped lines and may show less)"
             bits.append('"' + body + '"' + cut)
         if n["role"]:
-            bits.append(f"[{n['role']}]")
+            bits.append(f"[{n['role']} pulse]" if n.get("pulse") else f"[{n['role']}]")
         if n["layout"]:
             bits.append(n["layout"] + (" " + " ".join(n["tracks"]) if n.get("tracks") else ""))
         for wd in ("gap", "scroll", "measure", "share"):

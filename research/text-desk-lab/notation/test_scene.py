@@ -72,6 +72,24 @@ def test_a_part_is_judged_under_its_lens_style():
         pass
 
 
+def test_a_pulsing_role_is_printed():
+    # a1140: the painter moves a role whose words include pulse; the print must say what the eye sees moving
+    text = ("token ink = #111111\nrole waiting : text down, ink, pulse   # waits on Alex\n"
+            "role pulsed : ink, pulse down\nrole chip : ink\n")
+    orig = scene.style_source
+    scene.style_source = lambda desk, name: {"text": text} if name == "pixel" else None
+    try:
+        assert scene.pulsing_roles(None, "pixel") == {"waiting"}      # `pulse down` is not the word pulse
+        assert scene.pulsing_roles(None, None) == set()               # no calm note, no seed under this stub
+    finally:
+        scene.style_source = orig
+    sc = {"role": "chip", "kids": [{"role": "waiting", "kids": []}]}
+    scene.mark_pulse(sc, {"waiting"})
+    assert not sc.get("pulse") and sc["kids"][0]["pulse"]
+    scene.emit(sc["kids"][0])
+    assert "pulse" not in sc["kids"][0]["paint"]                       # printer-side only: the role class carries it
+
+
 def test_a_read_is_judged_by_aspect():
     import deskd
     class W: pass
@@ -94,7 +112,7 @@ def test_a_read_is_judged_by_aspect():
 
 def test_a_repeat_records_its_membership_read():
     import deskd, shutil, pathlib
-    src, tmp = pathlib.Path("sessions/frontier-jeff-probe.pickle"), pathlib.Path("sessions/_test_probe.pickle")
+    src, tmp = deskd.SESSIONS / "frontier-jeff-probe.pickle", deskd.SESSIONS / "_test_probe.pickle"
     shutil.copy(src, tmp)          # a Session saves on exit; the committed scratch session must not change from a test
     try:
         with deskd.Session("_test_probe", "jeff") as desk:
@@ -106,8 +124,8 @@ def test_a_repeat_records_its_membership_read():
 
 
 def _scratch(name):
-    import shutil, pathlib
-    src, tmp = pathlib.Path("sessions/frontier-jeff-probe.pickle"), pathlib.Path(f"sessions/{name}.pickle")
+    import shutil, deskd           # anchored like deskd's own sessions, so the test runs from any directory
+    src, tmp = deskd.SESSIONS / "frontier-jeff-probe.pickle", deskd.SESSIONS / f"{name}.pickle"
     shutil.copy(src, tmp)
     return tmp
 

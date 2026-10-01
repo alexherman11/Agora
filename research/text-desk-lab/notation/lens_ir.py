@@ -545,6 +545,7 @@ def scene_for(desk, name):
     if name:                                  # F7: which style paints this lens, and which revision of it
         st = S.style_source(desk, name) or {}
         sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
+    S.mark_pulse(sc, S.pulsing_roles(desk, name))   # a1140: the painter installs this one style for the whole scene
     sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
     text = S.to_text(sc, s["title"], desk.world.me, at)
     if fallen:

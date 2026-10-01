@@ -7,7 +7,8 @@ and read back what it measured. The screenshot is a PNG a model can open with it
     python screen.py <world> --as <you> [--lens command-center] [--size 1500x900] [--live] [--term] [--page shell] STEP ...
 
 --term keeps the desk terminal beside the lens (it is hidden by default here); --page shell opens the windowed
-desktop (index.html: dock, windows, apps) instead of the painter.
+desktop (index.html: dock, windows, apps) instead of the painter. --reduced-motion looks as someone whose system asks
+for reduced motion (prefers-reduced-motion: reduce).
 
 By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served by a deskd on a free port
 from THIS directory's desk-shell/, so a worktree sees its own painter code and nothing you do reaches the shared world.
@@ -30,6 +31,9 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     answer <text>                the next prompt() or confirm() the page opens is answered with text, as a person
                                  typing into it would; a dialog with no answer set is dismissed (and said)
     text <part>                  the part's visible text
+    css <part[,part]> <property> each part's computed value of a CSS property now (e.g. opacity), and the animations
+                                 running on it, all read at one moment (a1140: a pulse is seen by measuring it twice,
+                                 a wait apart; two parts in one step show whether they are in phase)
     blur                         take focus off what has it (as a click on nothing would)
     events [n]                   the world's last n events (default 5): id, verb, by, gesture, and the line's words
     resend [k]                   post again, unchanged, the k-th last gesture this page sent (default 1: the last);
@@ -169,7 +173,7 @@ class Page:
 
 
 STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "scroll", "wait", "answer", "text",
-         "blur", "events", "resend", "restart", "stop", "start")
+         "css", "blur", "events", "resend", "restart", "stop", "start")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
 SENDS_JS = """(() => { const f = window.fetch; window.__sends = [];
   window.fetch = (u, o) => { if (String(u).startsWith('/api/do') && o && o.body) window.__sends.push(o.body); return f(u, o); }; })();"""
@@ -186,7 +190,7 @@ KEYS = {"Enter": (13, "\r"), "Escape": (27, ""), "Tab": (9, "\t"), "Backspace": 
         "ArrowDown": (40, ""), "ArrowUp": (38, ""), "ArrowLeft": (37, ""), "ArrowRight": (39, ""), "Space": (32, " ")}
 
 
-async def run(url, steps, size, shots, restart=None):
+async def run(url, steps, size, shots, restart=None, still=False):
     w, h = size
     exe = next((b for b in BROWSERS if Path(b).exists()), None)
     if not exe:
@@ -204,6 +208,8 @@ async def run(url, steps, size, shots, restart=None):
             p = Page(ws)
             await p.call("Page.enable")
             await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=1, mobile=False)
+            if still:
+                await p.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
             await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
             await p.call("Page.navigate", url=url)
             for _ in range(100):                          # the painter has drawn when a keyed part exists, or it refused
@@ -290,6 +296,12 @@ async def run(url, steps, size, shots, restart=None):
                     key = arg()
                     i += 1
                     print(await p.js(f"(() => {{ const e = document.querySelector('[data-key=\"{key}\"]'); return e ? e.innerText : 'no part {key}'; }})()"))
+                elif s == "css":
+                    key, prop = arg(), steps[i + 1]
+                    i += 2
+                    print(await p.js(f"""(() => {json.dumps(key.split(","))}.map(k => {{ const e = document.querySelector(`[data-key="${{k}}"]`);
+                        if (!e) return 'no part ' + k; const a = e.getAnimations().map(a => a.animationName || a.constructor.name);
+                        return k + ' {prop} ' + getComputedStyle(e).getPropertyValue({json.dumps(prop)}) + '; animations: ' + (a.join(', ') || 'none'); }}).join('\\n'))()"""))
                 elif s == "blur":
                     print("blurred " + str(await p.js("(() => { const a = document.activeElement; const k = a && a.dataset && a.dataset.key; if (a && a.blur) a.blur(); return k || (a ? a.tagName : 'nothing'); })()")))
                     await asyncio.sleep(1.2)
@@ -328,10 +340,12 @@ def main():
         print(__doc__)
         return
     world, who, lens, size, live, steps = a[0], None, "command-center", (1500, 900), False, []
-    page, term = "lens", False
+    page, term, still = "lens", False, False
     k = 1
     while k < len(a):
-        if a[k] == "--page":
+        if a[k] == "--reduced-motion":
+            still, k = True, k + 1
+        elif a[k] == "--page":
             page, k = a[k + 1], k + 2
             if page not in ("lens", "shell"):
                 raise SystemExit("screen: --page is lens (the painter, lens.html) or shell (the windowed desktop, index.html)")
@@ -380,7 +394,7 @@ def main():
             q = {"session": session, "as": who, "lens": lens, "view": "painter"} | ({} if term else {"inspect": "0"})
             q, what, file = urllib.parse.urlencode(q), f"lens {lens}" + (" with the terminal" if term else ""), "lens.html"
         print(f"screen: {'LIVE ' if live else 'a copy of '}{world} as {who}, {what}, {size[0]}x{size[1]}")
-        asyncio.run(run(f"http://127.0.0.1:{port}/{file}?{q}", steps, size, [0], restart))
+        asyncio.run(run(f"http://127.0.0.1:{port}/{file}?{q}", steps, size, [0], restart, still))
     finally:
         if srv:
             srv.terminate()

@@ -177,6 +177,12 @@ const Style = (() => {
       if (/\btracked\b/.test(p)) css["letter-spacing"] = "0.04em";
       return { css };
     }
+    // a1140 (Alex: "gentle flashing next to things that are waiting for me"): the language's one motion. The part fades
+    // between full and 60% opacity (Pike c1251: never faint enough to lose the words), 2.5s a cycle; no movement, size or
+    // colour. Its keyframes exist only for a viewer who has not asked for reduced motion (install), so for one who has,
+    // the animation names nothing and the part is still. Every pulse shares one phase (install): six waiting things
+    // breathe together as one signal, not six flickers out of step.
+    if (p === "pulse") return { css: { animation: "r-pulse 2.5s ease-in-out infinite" } };
     const c = colour(p, T); return c ? { css: { color: c } } : null;
   }
 
@@ -204,7 +210,7 @@ const Style = (() => {
   }
 
   // ---- installation: tokens become custom properties, roles become classes ----
-  let current = null, tokens = null, sheet = null, themeName = "", FONTS = {};
+  let current = null, tokens = null, sheet = null, themeName = "", FONTS = {}, pinned = false;
   const loaded = new Set();
   function family(f) {
     if (FONTS[f]) return `'${FONTS[f].face}', ${FONTS[f].fallback}`;
@@ -237,6 +243,12 @@ const Style = (() => {
       const lk = lookOf({ as: name }, st, T, { nodes: {} });
       out += `.r-${name.replace(/\./g, "_")}{${decl(lk.css)}}\n`;
     }
+    out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";
+    // A CSS animation starts when its part is painted, so a part repainted or unfolded later would be out of step.
+    // Each one is pinned to the page's clock as it starts: the same moment is the same point of the fade everywhere.
+    if (!pinned) { pinned = true; document.addEventListener("animationstart", e => {
+      if (e.animationName === "r-pulse") e.target.getAnimations().forEach(a => { if (a.animationName === "r-pulse") a.startTime = 0; });
+    }, true); }
     // The ramp, named, so an app can say a size instead of inventing one:
     //   font-size: var(--t-size-0)   is `text`;  --t-size--1 is `text down`;  --t-size-2 is `text up 2`.
     ramp().forEach(({ step, px }) => { out = out.replace(/^:root\{/, `:root{--t-size-${step}:${px}px;`); });
