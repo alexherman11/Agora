@@ -384,7 +384,8 @@ class DeskKnife(DeskMoo):
             rule, broken = self._rule_parse(s, home)
             st = {"id": aid, "sid": sid, "sig": sig, "home": home, "author": author, "broken": broken, "done": set(),
                   "cursor": len(w.events), "last_fail": prev.get("last_fail"), "last_skip": prev.get("last_skip"),
-                  **{k: prev.get(k, 0) for k in ("fired", "failed", "skipped")}, **(rule or {})}
+                  "last_stop": prev.get("last_stop"),
+                  **{k: prev.get(k, 0) for k in ("fired", "failed", "skipped", "stopped")}, **(rule or {})}
             already = []
             if not broken and not st.get("on") and not st.get("now"):
                 try:
@@ -428,7 +429,9 @@ class DeskKnife(DeskMoo):
             head += f" · BROKEN: {r['broken']}. It never fires until its text is fixed"
         else:
             head += (f" · fired {r['fired']}x" + (f" · failed {r['failed']}x (last: {r['last_fail']})" if r["failed"] else "")
-                     + (f" · skipped {r['skipped']}x (last: {r['last_skip']})" if r["skipped"] else ""))
+                     + (f" · skipped {r['skipped']}x (last: {r['last_skip']})" if r["skipped"] else "")
+                     + (f" · stopped by the {self.ROUNDS}-round bound {r['stopped']}x (last: {r['last_stop']})"
+                        if r.get("stopped") else ""))
         text = self._rule_line(s)
         return [head] + [f"{indent}    {l}" for l in text[:3]]
 
@@ -838,6 +841,54 @@ class DeskKnife(DeskMoo):
             door += f" (nothing answers to {name} yet: make it a verb, or just look)"
         raise Refusal(door)
 
+    def _rule_event_targets(self, r, evs):
+        """An event rule's targets among events evs: each matching event names the thing to act on."""
+        targets = []
+        for e in evs:
+            # the log records append/retitle/rewrite as "edit"; name the event by the verb a person would use
+            said = e["verb"]
+            if said == "edit":
+                a = e.get("args") or {}
+                said = "append" if "append" in a else "retitle" if "title" in a else "rewrite"
+            if (said != r["on"] and e.get("via") != r["on"]) or (r["by"] and e["by"] != r["by"]) \
+                    or str(e.get("via", "")).startswith("rule "):
+                continue
+            t = e["target"]
+            if e["verb"] == "create" and isinstance(e.get("undo"), dict) and e["undo"].get("delete"):
+                t = e["undo"]["delete"]   # a create happens to the new thing, not to the surface it landed in
+            if t in self.world.subjects:
+                apps = self.world.appearances_of(t)
+                t = apps[0] if apps else None
+            if t in self.world.nodes:
+                targets.append(t)
+        return targets
+
+    def _rule_in_place(self, r, i):
+        """A move rule whose thing is already where it would put it: not a firing."""
+        if r["verb"] == "move" and r["kv"].get("into"):
+            try:
+                # a990: into=$here is the rule's home, not the room of whoever tripped it
+                into = blanks.fill(self, r["kv"]["into"], ctx=blanks.Ctx("rule", item=i, home=r.get("home")))
+                return self._resolve(into, allow_subject=False) == self.world.nodes[i]["parent"]
+            except Refusal:
+                pass
+        return False
+
+    def _rule_pending(self, r):
+        """What rule r would fire on in another round, judged without firing or changing its state (a1388)."""
+        if r.get("on"):
+            ids = self._rule_event_targets(r, self.world.events[r["cursor"]:])
+            done = set()
+        else:
+            try:
+                ids = self._rule_selection(r["sel"], r.get("home"))[0]
+            except Refusal:
+                return []
+            done = r["done"]
+        return [i for i in dict.fromkeys(ids) if i not in done and i in self.world.nodes and not self._rule_in_place(r, i)]
+
+    ROUNDS = 3   # a rule's action may make another rule fire; each act runs at most this many rounds of rules
+
     def _run_rules(self, cause=None):
         if self._in_rules:
             return
@@ -845,33 +896,16 @@ class DeskKnife(DeskMoo):
         if not active:
             return
         self._in_rules = True
+        chain = []   # (round, rule, thing) for each firing in this run, so a stopped chain can be told whole
         try:
-            for _ in range(3):   # a rule's action may make another rule fire; bounded
+            for rnd in range(1, self.ROUNDS + 1):
                 fired = False
                 for r in active:
                     if r.get("on"):
                         # event rule: each new matching event names the thing to act on
                         evs = self.world.events[r["cursor"]:]
                         r["cursor"] = len(self.world.events)
-                        targets = []
-                        for e in evs:
-                            # the log records append/retitle/rewrite as "edit"; name the event by the verb a person would use
-                            said = e["verb"]
-                            if said == "edit":
-                                a = e.get("args") or {}
-                                said = "append" if "append" in a else "retitle" if "title" in a else "rewrite"
-                            if (said != r["on"] and e.get("via") != r["on"]) or (r["by"] and e["by"] != r["by"]) \
-                                    or str(e.get("via", "")).startswith("rule "):
-                                continue
-                            t = e["target"]
-                            if e["verb"] == "create" and isinstance(e.get("undo"), dict) and e["undo"].get("delete"):
-                                t = e["undo"]["delete"]   # a create happens to the new thing, not to the surface it landed in
-                            if t in self.world.subjects:
-                                apps = self.world.appearances_of(t)
-                                t = apps[0] if apps else None
-                            if t in self.world.nodes:
-                                targets.append(t)
-                        ids, desc = targets, r["sel"]
+                        ids, desc = self._rule_event_targets(r, evs), r["sel"]
                         r["done"] = set()   # an event rule fires every time
                     else:
                         try:
@@ -886,14 +920,8 @@ class DeskKnife(DeskMoo):
                         if i in r["done"] or i not in self.world.nodes:
                             continue
                         r["done"].add(i)
-                        if r["verb"] == "move" and r["kv"].get("into"):
-                            try:
-                                # a990: into=$here is the rule's home, not the room of whoever tripped it
-                                into = blanks.fill(self, r["kv"]["into"], ctx=blanks.Ctx("rule", item=i, home=r.get("home")))
-                                if self._resolve(into, allow_subject=False) == self.world.nodes[i]["parent"]:
-                                    continue   # already where the rule would put it: not a firing
-                            except Refusal:
-                                pass
+                        if self._rule_in_place(r, i):
+                            continue
                         n0 = len(self.world.events)
                         revs0 = {k: v["rev"] for k, v in list(self.world.nodes.items()) + list(self.world.subjects.items())}
                         self._mark_seen(i)
@@ -911,6 +939,7 @@ class DeskKnife(DeskMoo):
                             if receipt is not None:     # None: its selection target matched nothing, nothing to do
                                 r["fired"] += 1
                                 fired = True
+                                chain.append((rnd, r, i))
                                 self._note(f"~ {r['id']} fired on {i}" + (f" as {author}" if author and author != tripper else "")
                                            + ": " + receipt)
                         except Refusal as e:
@@ -938,8 +967,60 @@ class DeskKnife(DeskMoo):
                                 self._mark_seen(k)
                 if not fired:
                     break
+            else:
+                self._rules_stopped(active, chain, cause)
         finally:
             self._in_rules = False
+
+    def _rules_stopped(self, active, chain, cause):
+        """a1388 (Claude e3229, Pike a1356): the last round still fired, so the bound may have cut a chain. What would
+        fire in another round is not run; it is said on the receipt, counted on each stopped rule, and told on the sill
+        of each author whose rule is in the chain (once per rule until its text changes)."""
+        import rooms
+        w, tripper = self.world, self.world.me
+        stopped = [(r, ids) for r in active for ids in [self._rule_pending(r)] if ids]
+        if not stopped:
+            return      # the chain ended in the last round: nothing was cut
+        names = lambda ids: ", ".join(ids[:5]) + (f" and {len(ids) - 5} more" if len(ids) > 5 else "")
+        what = "; ".join(f"{r['id']} on {names(ids)}, by {r.get('author') or '?'}" for r, ids in stopped)
+        for r, ids in stopped:
+            r["stopped"] = r.get("stopped", 0) + 1
+            r["last_stop"] = f"on {names(ids)}, set off by {tripper}" + (f" ({cause})" if cause else "")
+        said = (f"~ rules still firing after {self.ROUNDS} rounds: {what}; not run. Each act runs at most "
+                f"{self.ROUNDS} rounds of rules (a round runs each rule once, in the order they were made); what was "
+                f"stopped fires on the next change if it still matches. rules counts each stop")
+        steps = [f"round {rnd}: {r['id']} on {i} (as {r.get('author') or '?'})" for rnd, r, i in chain]
+        steps += [f"stopped: {r['id']} on {names(ids)} (as {r.get('author') or '?'})" for r, ids in stopped]
+        mine = {}
+        for r in [r for _, r, _ in chain] + [r for r, _ in stopped]:
+            if r.get("author") and not r.get("told_stop"):
+                mine.setdefault(r["author"], {})[r["id"]] = r
+        made, told = w.last_created, []
+        for who, rs in sorted(mine.items()):
+            for r in rs.values():
+                r["told_stop"] = True       # kept in the rule's state; a re-save starts it fresh
+            if who == tripper:
+                continue                    # the ~ line above is theirs to read
+            fid = rooms.corner_of(w, who)
+            if not fid:
+                told.append(f"{who} has no sill to tell")
+                continue
+            yours = "\n".join(f"- {r['id']} \"{w.subjects[r['sid']]['title']}\""
+                              + (" was stopped: it would still fire on " + names(ids) if ids else " fired in it")
+                              for r in rs.values() for ids in [next((x for s, x in stopped if s is r), [])])
+            text = (f"An act by {tripper}" + (f" ({cause})" if cause else "") + f" set off rules that were still firing "
+                    f"after {self.ROUNDS} rounds, so the desk stopped them: each act runs at most {self.ROUNDS} rounds of "
+                    f"rules. What was stopped was not run; it fires on the next change if it still matches.\n"
+                    f"Your rules in it:\n{yours}\nThe chain:\n" + "\n".join(f"- {s}" for s in steps)
+                    + "\nA chain longer than the bound, or rules that undo each other, both end here. rules counts each stop; "
+                      "you are told once per rule until its text changes.")
+            w.apply("create", fid, None, {"kind": "note", "title": f"your rules were stopped after {self.ROUNDS} rounds",
+                                          "text": text}, tripper)
+            told.append(f"{who} ({w.last_created})")
+        w.last_created = made
+        if told:
+            said += "\n  told on their sills: " + ", ".join(told)
+        self._note(said)
 
     def _visual_notes(self, n0, styles0=None):
         """a1101 (Pike e2213, Juniper e2201): an edit to a style or a lens says its effect, not only that the text
@@ -1008,7 +1089,7 @@ class DeskKnife(DeskMoo):
         snap["rules"] = [{"id": r["id"], "text": " ".join(self._rule_line(self.world.subjects[r["sid"]])[:1]),
                           "on": r.get("on"), "by": r.get("by"), "author": r.get("author"), "home": r.get("home"),
                           "when": None if r.get("on") else r.get("sel"), "verb": r.get("verb"), "broken": r["broken"],
-                          "fired": r.get("fired", 0), "failed": r.get("failed", 0), "skipped": r.get("skipped", 0)}
+                          "fired": r.get("fired", 0), "failed": r.get("failed", 0), "skipped": r.get("skipped", 0), "stopped": r.get("stopped", 0)}
                          for r in (self._rulestate or {}).values()]
         snap["clock"] = {"today": self.today, "follow": bool(self.follow)}
         return snap
@@ -1388,8 +1469,13 @@ class DeskKnife(DeskMoo):
   it rule (their receipt says so). It is checked whenever its text, home or author changes; one that fails is saved
   broken, says why, and never fires until fixed. When it is (re)saved, what already matches counts as handled.
   Quiet: a narrated look never lists rules; the tree marks them. rules lists every one: its home, who it acts as,
-  how often it fired, failed or was skipped, and whether it is broken; examine <rule note> says the same.
+  how often it fired, failed, was skipped or stopped by the bound, and whether it is broken; examine <rule note>
+  says the same.
   A rule's actions print as ~ lines after your command's receipt; undo of your command undoes them too.
+  Rules can trip rules, in rounds: a round runs each rule once, in the order they were made, and each act runs at
+  most 3. When a fourth would still fire something, it is not run: a ~ line says which rules, on what, by whom
+  (they fire on the next change if it still matches), each such rule counts a stop, and each author whose rule is
+  in the chain gets a note on their sill naming their rules and the chain, once per rule until its text changes.
   why <id> shows how a thing got where it is and which rule would act on it next.
   e.g. do create $here kind=note tags=rule title="Fixed goes to Done" text="when tag:fixed do move into=Done\"""",
         "scripts": """scripts are verbs now: a script was a verb nobody declared. Make a note tagged verb (help verbs), and
