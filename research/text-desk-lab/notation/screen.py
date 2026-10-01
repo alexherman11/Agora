@@ -26,6 +26,7 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     type <text>                  click into nothing first; types into what has focus (click the part first)
     key <Enter|Escape|Tab|ArrowDown|...>
     drag <part> <part|x,y>       press on the first, move, release on the second
+    hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there
     scroll <part> <dy>           scroll a part by dy pixels
     wait <ms>
     answer <text>                the next prompt() or confirm() the page opens is answered with text, as a person
@@ -172,7 +173,7 @@ class Page:
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "scroll", "wait", "answer", "text",
+STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
          "css", "blur", "events", "resend", "restart", "stop", "start")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
 SENDS_JS = """(() => { const f = window.fetch; window.__sends = [];
@@ -281,6 +282,23 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await p.mouse("mouseReleased", x1, y1, "left", 0)
                     await asyncio.sleep(1.5)
                     print(f"dragged {round(x0)},{round(y0)} -> {round(x1)},{round(y1)}")
+                elif s == "hold":                           # a1140: a drag stopped in the air, to look at it mid-carry
+                    x0, y0 = await p.where(arg())
+                    x1, y1 = await p.where(steps[i + 1])
+                    i += 2
+                    await p.mouse("mouseMoved", x0, y0, "none", 0)
+                    await p.mouse("mousePressed", x0, y0, "left", 1)
+                    for t in range(1, 11):
+                        await p.mouse("mouseMoved", x0 + (x1 - x0) * t / 10, y0 + (y1 - y0) * t / 10, "left", 1)
+                        await asyncio.sleep(0.03)
+                    p.held = (x1, y1)
+                    print(f"holding at {round(x1)},{round(y1)} (from {round(x0)},{round(y0)})")
+                elif s == "release":
+                    x1, y1 = getattr(p, "held", None) or (0, 0)
+                    await p.mouse("mouseReleased", x1, y1, "left", 0)
+                    p.held = None
+                    await asyncio.sleep(1.5)
+                    print(f"released at {round(x1)},{round(y1)}")
                 elif s == "scroll":
                     key, dy = arg(), steps[i + 1]
                     i += 2
