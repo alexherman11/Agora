@@ -524,6 +524,89 @@ def test_what_you_made_you_have_seen():
     assert do(f"do prop {root} mood=calm", "juniper").startswith("ok"), "a create still leaves its parent's props unstaled"
 
 
+def test_edits_to_what_you_made_are_told():
+    """a1471 (sketch2, c1439 c1450): when someone else changes a note or task you made, your next reply says so in a
+    ~ line of its own (who, which line, the event, its undo), not in the !! counts. Your own edits, a chat line and
+    a comment are not told so; ten quick edits by one person are one line; edits an hour apart are two."""
+    import explore, re
+    d = explore.fresh()
+    slots = {}
+
+    def do(line, who):
+        slots[d.world.me] = (d.seen, d.open, d.last_event_seen)
+        d.seen, d.open, d.last_event_seen = slots.get(who) or ({}, {d.world.root}, len(d.world.events))
+        d.world.me = who
+        r = d.dispatch("desk", {"line": line})
+        return r.get("text") or ("ERR " + str(r.get("error")))
+
+    def ev(out):
+        return re.search(r"\b(e\d+)\b", out).group(1)
+
+    def head(out):
+        return [l for l in out.splitlines() if l.startswith(("!!", "~ "))]
+
+    root = d.world.root
+    do("look", "juniper")
+    words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"]
+    steps = "\\n".join(words)
+    part = re.search(r"created (a\d+)", do(f'do create {root} kind=note title="Sketch 2" text="{steps}"', "juniper")).group(1)
+    talk = re.search(r"created (a\d+)", do(f"do create {root} kind=chat title=Talk", "juniper")).group(1)
+    do("look", "pike")
+    pikes = re.search(r"created (a\d+)", do(f"do create {root} kind=note title=Mine text=x", "pike")).group(1)
+    do("look", "juniper")
+    # one line replaced by someone else: the maker hears it, in its own line, and nothing is counted under !!
+    do(f"read {part}", "pike")
+    e1 = ev(do(f'do replace {part} old="hotel" new="HOTEL"', "pike"))
+    got = head(do("look", "juniper"))
+    assert got == [f'~ pike replaced line 8 of your {part} "Sketch 2" ({e1}; undo {e1})'], got
+    # the editor is not the maker: they hear it as a change by someone, not as an edit to theirs
+    do(f"read {part}", "juniper")
+    do(f'do replace {part} old="bravo" new="BRAVO"', "juniper")
+    got = head(do("look", "pike"))
+    assert got and got[0].startswith("!!") and not any(l.startswith("~") for l in got), got
+    # my own edits never show to me
+    assert not head(do("look", "juniper")), "your own edit is not told back to you"
+    # a chat line, a comment, an edit to someone else's note: nothing new for the maker in a ~ line
+    do(f'do append {talk} line="hello"', "pike")
+    do(f'do comment {part} line="nice"', "pike")
+    do(f"read {pikes}", "pike")
+    do(f'do replace {pikes} old="x" new="y"', "pike")
+    got = head(do("look", "juniper"))
+    assert got and got[0].startswith("!!") and not any(l.startswith("~") for l in got), got
+    # an append and a retitle say what they did
+    do(f"read {part}", "pike")
+    e2 = ev(do(f'do append {part} line="kilo"', "pike"))
+    got = head(do("look", "juniper"))
+    assert got == [f'~ pike appended line 11 to your {part} "Sketch 2" ({e2}; undo {e2})'], got
+    e3 = ev(do(f'do retitle {part} title="Sketch 2 · the test language"', "pike"))
+    got = head(do("look", "juniper"))
+    assert got == [f'~ pike retitled your {part} "Sketch 2 · the test language" (was "Sketch 2"; {e3}; undo {e3})'], got
+    # ten quick edits fold into one line, with a count and the latest's undo
+    ids = []
+    for i in range(10):
+        do(f"read {part}", "pike")
+        old = words[i].upper() if i in (1, 7) else words[i]
+        out = do(f'do replace {part} old="{old}" new="n{i + 1}."', "pike")
+        assert out.startswith("ok"), out
+        ids.append(ev(out))
+    got = head(do("look", "juniper"))
+    assert len(got) == 1 and got[0].startswith(f'~ pike edited your {part} "Sketch 2 · the test language" 10 times (replaced lines 1-10; '), got
+    assert got[0].endswith(f"{ids[0]}..{ids[-1]}; undo {ids[-1]} takes back the latest)"), got
+    assert do(f"undo {ids[-1]}", "juniper").startswith("ok"), "the maker can take back the latest"
+    # an hour apart: two lines
+    do(f"read {part}", "pike")
+    a = ev(do(f'do replace {part} old="n1." new="t1"', "pike"))
+    b = ev(do(f'do replace {part} old="n2." new="t2"', "pike"))
+    for e in d.world.events:
+        if e["id"] == a:
+            e["at"] = "2026-10-01T08:00:00"
+        if e["id"] == b:
+            e["at"] = "2026-10-01T10:00:00"
+    got = [l for l in head(do("look", "juniper")) if l.startswith("~")]
+    assert len(got) == 2 and "line 1 " in got[0] and "line 2 " in got[1], got
+    assert "~ pike replaced line 8" in do("help events", "juniper")
+
+
 def test_rooms_go_look_and_replay():
     """a678, rooms step 1: where you are is a world fact (a go event), a bare look narrates your room, undo leaves
     walking alone, the !! line folds it, and a worktree merge replays it."""

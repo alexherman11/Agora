@@ -105,6 +105,44 @@ def rule_did_unseen(e, me):
     return e["by"] == me and e.get("tripped_by") not in (None, me)
 
 
+def _within_hour(first, e):
+    """a1471: does e fall within an hour of first? An event without a wall time counts as within."""
+    from datetime import datetime
+    try:
+        return abs((datetime.fromisoformat(e["at"]) - datetime.fromisoformat(first["at"])).total_seconds()) < 3600
+    except (KeyError, TypeError, ValueError):
+        return True
+
+
+def _line_change(old, new):
+    """a1471: which lines of a text a change touched -> (word, line numbers in the new text, or the old for removed)."""
+    import difflib
+    a, b = old.splitlines(), new.splitlines()
+    ops = [op for op in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes() if op[0] != "equal"]
+    if not ops:
+        return "rewrote", []
+    touched = sum(max(i2 - i1, j2 - j1) for _, i1, i2, j1, j2 in ops)
+    if touched > 3 and touched * 2 > max(len(a), len(b)):
+        return "rewrote", []
+    if len(ops) == 1:
+        tag, i1, i2, j1, j2 = ops[0]
+        if tag == "insert":
+            return "added", list(range(j1 + 1, j2 + 1))
+        if tag == "delete":
+            return "removed", list(range(i1 + 1, i2 + 1))
+        return "replaced", list(range(j1 + 1, j2 + 1))
+    return "changed", sorted({n for _, i1, i2, j1, j2 in ops for n in (range(j1 + 1, j2 + 1) if j2 > j1 else [j1 + 1])})
+
+
+def _numbered(noun, nums):
+    """line 8 · lines 3-5 · lines 3, 8, 12 · lines 3, 8, 12, 15, 20 and 4 more"""
+    if len(nums) == 1:
+        return f"{noun} {nums[0]}"
+    if nums == list(range(nums[0], nums[-1] + 1)):
+        return f"{noun}s {nums[0]}-{nums[-1]}"
+    return f"{noun}s " + ", ".join(map(str, nums[:5])) + (f" and {len(nums) - 5} more" if len(nums) > 5 else "")
+
+
 def aspects_meet(a, b):
     """Do two aspect sets overlap? Either side unknown (None) counts as everything."""
     return a is None or b is None or bool(a & b)
@@ -750,8 +788,11 @@ class Desk:
         # a678 (6): walking folds, at most one line per actor, their latest room
         latest = {e["by"]: e for e in evs if e["verb"] == "go"}
         evs = [e for e in evs if e["verb"] != "go" or latest.get(e["by"]) is e]
+        yours, told = self.edits_to_yours(evs)      # a1471: an edit to what you made has its own line, not a count
+        evs = [e for e in evs if e["id"] not in told]
+        yours = "".join(l + "\n" for l in yours)
         if not evs:
-            return ""
+            return yours
 
         def rule_of(e):
             return str(e.get("via") or "").split(" ", 1)[-1] if e.get("tripped_by") else None
@@ -773,7 +814,7 @@ class Desk:
                     return (f"{e['id']} your rule {rule_of(e)} did {verb} {e['target']} {self._fmt_args(args)}".rstrip()
                             + f" (tripped by {e['tripped_by']})")
                 return f"{e['id']} {e['verb']} {e['target']} by {e['by']}" + (f" via rule {rule_of(e)}" if rule_of(e) else "")
-            return "!! since your last look: " + "; ".join(part(e) for e in evs) + "\n"
+            return "!! since your last look: " + "; ".join(part(e) for e in evs) + "\n" + yours
         w = self.world
         mine = {e["undo"].get("delete_subject") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
         mine |= {e["undo"].get("delete") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
@@ -803,7 +844,90 @@ class Desk:
             out.append(f"   {by}: " + ", ".join(f"{len(ids)} {verb} in {name}" if len(ids) > 1 else f"{verb} in {name}" for (verb, name), ids in top)
                        + (f", +{len(groups) - 4} more kinds" if len(groups) > 4 else "")
                        + ((", now " if groups else "now ") + f"in {moved[by]}" if by in moved else ""))
-        return "\n".join(out) + "\n"
+        return "\n".join(out) + "\n" + yours
+
+    def edits_to_yours(self, evs):
+        """a1471 (sketch2, c1439 c1450): a note or task is something its maker stands behind, so when someone else
+        changes its text or title the maker hears it in a line of its own: who, which line, the event, and its undo.
+        Several edits by one person to one note within an hour are one line with a count. Chats, comments and what the
+        maker's own rule did (rule_did_unseen) are not told here: those were already the maker's or the room's.
+        -> (lines, ids of the events they tell)."""
+        w, me = self.world, self.world.me
+        cand = []
+        for e in evs:
+            if e["verb"] not in ("edit", "check") or e.get("undone") or e["by"] == me:
+                continue
+            sid = e["target"] if e["target"] in w.subjects else (w.nodes.get(e["target"]) or {}).get("subject")
+            if sid in w.subjects and w.subjects[sid]["kind"] in ("note", "task"):
+                cand.append((e, sid))
+        if not cand:
+            return [], set()
+        want = {sid for _, sid in cand}
+        maker = {}
+        for e in w.events:
+            u = e.get("undo")
+            if e["verb"] == "create" and isinstance(u, dict) and u.get("delete_subject") in want:
+                maker[u["delete_subject"]] = e["by"]
+        runs = []          # [(by, sid, [events])], one per person, note and hour
+        for e, sid in cand:
+            if maker.get(sid) != me:
+                continue
+            run = next((r for r in runs if r[0] == e["by"] and r[1] == sid and _within_hour(r[2][0], e)), None)
+            if run:
+                run[2].append(e)
+            else:
+                runs.append((e["by"], sid, [e]))
+        lines, told = [], set()
+        for by, sid, run in runs:
+            s, last = w.subjects[sid], run[-1]
+            aid = last["target"] if last["target"] in w.nodes else next(iter(w.appearances_of(sid)), sid)
+            rule = str(last.get("via") or "")
+            who = by + (f"'s rule {rule.split(' ', 1)[-1]}" if rule.startswith("rule") else "")
+            title = s["title"] if len(s["title"]) <= 60 else s["title"][:57] + "…"
+            told |= {e["id"] for e in run}
+            if len(run) == 1:
+                word, nums, was = self._edit_said(last)
+                if was is not None:
+                    lines.append(f'~ {who} retitled your {aid} "{title}" (was "{was}"; {last["id"]}; undo {last["id"]})')
+                    continue
+                prep = {"added": "to", "appended": "to", "removed": "from"}.get(word, "of")
+                lines.append(f"~ {who} {word} " + (f"{nums} {prep} " if nums else "") + f'your {aid} "{title}" '
+                             f'({last["id"]}; undo {last["id"]})')
+                continue
+            said = {}
+            for e in run:
+                word, nums, _ = self._edit_said(e, bare=True)
+                said.setdefault(word, set()).update(nums or ())
+            what = ", ".join(word + (" " + _numbered("line" if word not in ("checked", "unchecked") else "item", sorted(n))
+                                     if n else "") for word, n in said.items())
+            lines.append(f'~ {who} edited your {aid} "{title}" {len(run)} times ({what}; {run[0]["id"]}..{last["id"]}; '
+                         f'undo {last["id"]} takes back the latest)')
+        return lines, told
+
+    def _edit_said(self, e, bare=False):
+        """What one edit did, as its maker would want it said -> (word, "line 8" | numbers if bare | None, old title | None)."""
+        a = e.get("args") or {}
+        before = (e.get("undo") or {}).get("restore_subject") or {}
+        old = str(before.get("text", ""))
+        noun = "line"
+        if e["verb"] == "check":
+            k = str(a.get("item", ""))
+            items = self.world.checklist(old)
+            try:
+                word = "checked" if "- [ ]" in items[int(k) - 1][1] else "unchecked"
+            except (ValueError, IndexError):
+                word = "checked"
+            nums, noun = ([int(k)] if k.isdigit() else []), "item"
+        elif "append" in a:
+            n = len(old.rstrip("\n").splitlines()) + 1
+            word, nums = "appended", list(range(n, n + len(str(a["append"]).splitlines() or [""])))
+        elif "text" in a:
+            word, nums = _line_change(old, str(a["text"]))
+        else:
+            return "retitled", None, (None if bare else str(before.get("title", "")))
+        if bare:
+            return word, nums, None
+        return word, (_numbered(noun, nums) if nums else None), None
 
     # ---- commands ---------------------------------------------------
     def cmd_look(self, target, level):
