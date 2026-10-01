@@ -1,2 +1,2 @@
-scene probe-1c · for golden · world @336
+scene probe-1c · for golden · world @336 · no style=; using the default (calm)
   root "hi" column · click: run tidy $item

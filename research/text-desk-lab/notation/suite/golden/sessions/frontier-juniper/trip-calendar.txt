@@ -1,4 +1,4 @@
-scene trip calendar · for golden · world @64
+scene trip calendar · for golden · world @64 · no style=; using the default (calm)
   cal row
     sat [sheet] column
       head "Sat Oct 10" [heading]

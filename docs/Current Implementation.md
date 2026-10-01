@@ -330,6 +330,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 | `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
 | `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
 | `over $<list>` | Repeat over a list field or derived rows; `$it` is each value |
+| `count <selection>` | On a part that repeats nothing (a1101): `$count` is how many things the selection (or a row source) finds, without drawing them, on the part and below it, and before its guard, so `only when $count > 0` works. Prints `· count N of <selection>`; a gesture here is fenced on that membership. Refused on an `of`/`over` repeat, which has its own `$count`. The Board: `rested : text "$count paused", count kind:task,prop:status=paused` |
 | `by <prop>[, <prop>]` | On an `of` repeat (a1081, for a1069): its members in the order of those props, numbers ascending, then words, a missing value last; ties keep the selection's order, which is the order the appearances were made (a row source sorts by its fields). Applied in the scene, before `clamp`, so `scene`, `look` and the painter show one order, and the repeat prints `· N of <selection> by <props>`. The names after the comma are more props, so a prop named like a lens word (`role`, `text`) can't follow `by` there. A clamped repeat's membership read records the props, and deskd re-orders before comparing the prefix. Refused without `of`. The Desktop's lanes: `of kind:task,prop:status=doing, by priority, rank` |
 | `derive <name> = <interp> <inputs>` | A named calculation from a closed list: `day-n`, `days-from`, `day-or-time`, `weekday`, `week-of`, `time`, `date`. It prints its inputs and result |
 | `capture <field>=<value>` | Use this value instead of following; prints `(now X: differs)` when the world has moved on. Kept out of the fence |
@@ -341,8 +342,8 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 
 **Template names.**
 - Fields: `$title $text $kind $due $tags $id $item $count`.
-  - `$count` is the size of the nearest repeat.
-  - `$n` survives only as a prop name.
+  - `$count` is the true size of the nearest repeat, before any clamp, on the repeat itself, in each instance and in its fixed kids (a1101: the fixed kids had the shown size), or the size a `count <selection>` found.
+  - `$n`, on a repeat's own text, is how many it shows; elsewhere it is a prop name.
 - Any prop of the thing: `$place` prints `read place=…`, or `(no place)` when missing.
 - Frame fields `$f.x` and lets.
 - A selection (`of`, `the`, `only when <selection>`) is filled from fields, frames and host names, not from the thing's props: a bare `$actor` there stays the literal word and matches nothing, silently. Name the repeat (`of … as r`) and write `$r.actor` (a1032).
@@ -360,9 +361,16 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) is kept as the re
 - `runs N code`, for code spans and fences, which become runs at print;
 - `(absent: why)`;
 - `· only when …`;
-- 240- and 120-character cuts.
+- `· count N of <selection>`;
+- 240- and 120-character cuts, and an `(absent: …)` reason cut at 80 (a1101: a value test quoted each whole message).
 
-A scene has a budget of 1500 nodes. There is no escape to HTML, CSS or script, and no arithmetic or general `if`. Anything else is refused with its line number.
+The first line is `scene <lens> · for <who> · world @N`, ending `· no style=; using the default (calm)` when the lens has no `style=` prop (a1101: the fallback was silent).
+
+**Scoped and checked (a1101).** `scene <lens> <part path>` prints only the parts the path names and what is inside them, each under `= <its full key>`, and the header says `part <path>: N match(es)`. A path is `/`-separated segments, each matching a part's name or its key segment, anchored at the node's end (`lens_ir.find_parts`): `people`, `people/list`, `list/f571`, `porch/main/people`. No match is refused with the lens's part names. Only what is printed is marked seen. `scene <lens> ok` (`lens_ir.check`) is one line: `lens L compiles: N of <budget> nodes · style pixel` (or the no-style note, or `(does not parse: …)`), else `lens L does not compile: <refusal> | L line N: <that line>`, naming an inner lens when it is the one that refused, and saying that its painter shows the last version that did. The lens name may be quoted or bare, spaces and all (`scene.split_scene_arg`: the whole line names a lens first, else the last word is the path or `ok`).
+
+**Receipts (a1101).** After a top-level command whose events touched a placed lens or a style note (text, title, tags, `prop:style`, or its creation), `desk_knife._visual_notes` adds `~` lines to the receipt. A lens: `~ lens L compiles: …`, or `~ ! lens L does not compile: …`, as `scene L ok`. A style: `~ style S parses: R roles, T tokens`, or `does not parse: line N: …` (the painter keeps the last version that parsed); then the props the painter draws nothing for, the ones this line added each by name (`- new: role chip2 'on markk' (line 74): names no token of the right kind`), the ones already there counted by cause; then `lenses using it: <titles>; all compile`, or `now refusing: N` with a `! lens … does not compile` line for each. A style is judged by `scene.style_check`, which mirrors `style.js` (`parse`, `check`, `resolveTokens`, `prop`) line for line; `test_scene.py` runs the real file under node (`desk-shell/checks/style-read.js`) on the same samples and compares. On 30 Sep the pixel style had 15 such props: `corner 3`, `lift 1` and the like (a bare number is no length there), and `pad top gap` (style.js reads `pad` before `pad <side>`, a painter bug).
+
+A scene has a budget of 5000 nodes (`scene.BUDGET`; 1500 until 30 Sep, a guard against runaway repeats, never a measured limit). There is no escape to HTML, CSS or script, and no arithmetic or general `if`. Anything else is refused with its line number.
 
 **Resilience.** A lens that stops compiling keeps showing its last version that did, and says so first:
 ```text
@@ -622,9 +630,10 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 **Health** (`health.py <world> [--json]`), in order:
 1. every `*.py` compiles;
 2. `node --check` passes on `desk-shell/*.js` and `style/*.js`;
-3. `test_scene.py` passes;
-4. `suite/sessions.py --check` shows 0 golden differences;
-5. every placed lens compiles.
+3. `test_scene.py` passes, and every `test_*_paint.py` when a browser is here (the line says how many were not run without one);
+4. the style mirror: `scene.style_check`, the Python copy of `style.js`'s parse and property reader that style receipts use, agrees with `style.js` run under node (`desk-shell/checks/style-read.js`) on `test_scene.py`'s samples, `calm.style` and every style note in the world (a1101, at Sable's ask c1212: two parsers of one language drift unseen). Without node the line says the mirror was not checked;
+5. `suite/sessions.py --check` shows 0 golden differences;
+6. every placed lens compiles.
 
 A refusing lens is listed but doesn't fail health.
 
@@ -652,13 +661,13 @@ A refusing lens is listed but doesn't fail health.
 | `world.py` | 973 | Subjects, appearances, surfaces, links, comments, geometry (and `DESK_GEOMETRY=choices`), events, `apply`, `undo`, chat signing |
 | `desk.py` | 1087 | Outline notation, the seen fence and its aspect table, the blind-replace check, `;` batching, reading commands, `undo`, `do`, the world-verb fallthrough |
 | `desk_moo.py` | 267 | Verbs by kind from the registry, `examine`, `help <verb>`, `verbs` |
-| `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules (notes tagged `rule`: checked, armed, fired; a1027), clock, handles, tables, views, `export`, `rows`, `scene`, help topics, world-verb dispatch in `do` |
+| `desk_knife.py` | 1244 | The live desk: selections as targets, pair verbs, rules (notes tagged `rule`: checked, armed, fired; a1027), clock, handles, tables, views, `export`, `rows`, `scene`, the style and lens receipts (`_visual_notes`, a1101), help topics, world-verb dispatch in `do` |
 | `moo.py` | 536 | The verb registry: declarations, kind inheritance, composed verbs, synonyms; the one sort key a lens's `by` and `put above=` share (`order_value`, `order_by`; a1081) |
 | `knife.py` | 263 | The selection language (with `unanswered:`, `answers:`, `answered-by:`) and pair verbs |
 | `verbs.py` | 445 | World verbs: finding (nearest first, rooms as namespaces, doors), where a line stands, stored text judged when saved, running, reaches (their blanks are filled by `blanks.py`). a990's proof is `test_room_verbs.py`; `sweep_rooms.py` tries every built-in from every room |
 | `blanks.py` | 240 | The one filler (a806): `$here $here.<prop> $new $today $me $<handle>`, `$1 $* $this` in verbs, `$item` in rules, a thing's parts `.title .maker .<prop>` (a1027); a backslash before a dollar sign keeps it literal; `help blanks` |
-| `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world; the reference evaluator |
-| `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure |
+| `scene.py` | 1473 | Lens grammar (`WORDS`), resolve, emit, the text printer, row sources, styles from the world and `style_check` (style.js's parse and property reader, mirrored for receipts; a1101), `split_scene_arg`; the reference evaluator |
+| `lens_ir.py` | 529 | Lowering, the evaluator over the Accessor, `compile_lens` and the definition closure, `check` (`scene <lens> ok`) and `find_parts` (`scene <lens> <part path>`; a1101) |
 | `rooms.py` | 437 | Rooms (a678, a806, a948): what a room is, where each actor is (derived from `go` events), `go`, `rest` (home, `via=rest`), `wake <name>` (a call, a1062), the narrated `look` and `look <room>`, the date line, presence (asleep, resting, plain), what kind a speaker is (`kind_of`: resident, person, agent), who a chat line calls and the receipt's line for those resting (`called_by_line`, `waiting_note`; a1062) |
 | `worktree.py` | 212 | Fork, journal, diff, all-or-nothing replay merge |
 | `explore.py` | 257 | CLI: forward to deskd or run under the pid lock (`take_lock`, `release_lock`); atomic save; `--window --dump --shape --reset`; `!actor` injection |
@@ -668,6 +677,7 @@ A refusing lens is listed but doesn't fail health.
 | `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
 | `health.py` | 119 | The checks a landing must pass |
 | `try_house.py`, `try_worker.py`, `fake_model.py` | 463 | Trials and a fake model |
+| `trial_resident.py` | 364 | One resident alone, run by `house.House` itself (no workshop, one corner) in a copy of a world, with its state and working directory under the system temp folder: `setup` hides the Handbook's grammar binders and every sentence naming the trial, `run`, `report` (each > line and what came back). a823's no-manual trial; records in `trials/` |
 | `desk_mcp.py` | 176 | The desk as an MCP tool |
 | `export_docs.py`, `handbook_docs.py`, `docs_sync.py` | 313 | The documents |
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
@@ -677,7 +687,7 @@ A refusing lens is listed but doesn't fail health.
 | `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 544 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
-| `desk-shell/checks/` | 1823 + 884 | Iris's browser checks and results, Rook's defect list, and Pike's continuity instrument (`continuity/run.mjs`, with 13 results) |
+| `desk-shell/checks/` | 1823 + 884 | Iris's browser checks and results, Rook's defect list, and Pike's continuity instrument (`continuity/run.mjs`, with 13 results); `style-read.js` runs `style.js` under node for `test_scene.py`'s check of `scene.style_check` (a1101) |
 
 Which file for which change:
 
@@ -838,4 +848,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2628. Edit it there; a direct edit here makes the next export stop and warn. sha1:fc76d369b0f9 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3026. Edit it there; a direct edit here makes the next export stop and warn. sha1:9e956b1d4d31 -->

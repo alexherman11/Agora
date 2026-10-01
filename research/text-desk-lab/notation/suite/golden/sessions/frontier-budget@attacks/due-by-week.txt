@@ -1,4 +1,4 @@
-scene due by week · for golden · world @24
+scene due by week · for golden · world @24 · no style=; using the default (calm)
   x column as a · 3 of tag:t
     r a03 "(done) Alpha due 2026-09-30" · d = day-n(2026-10-01, 0) = 2026-09-30 · read a s02 start=2026-10-01 week=0 · key a03
     r a05 "Beta due 2027-01-07" · d = day-n(2026-10-01, 99) = 2027-01-07 · read a s04 start=2026-10-01 week=99 · key a05

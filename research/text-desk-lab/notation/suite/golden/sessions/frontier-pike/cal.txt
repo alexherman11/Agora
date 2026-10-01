@@ -1,4 +1,4 @@
-scene cal · for golden · world @59
+scene cal · for golden · world @59 · no style=; using the default (calm)
   cal a32 row · the tag:trip -> s31 (a32) as trip
     days a32 row · days = days-from(2026-10-10, 2026-10-12) = 3 rows · read trip s31 start=2026-10-10 end=2026-10-12 · 3
       day a32 [sheet] column · key 1

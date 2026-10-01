@@ -1,4 +1,4 @@
-scene plan · for golden · world @59
+scene plan · for golden · world @59 · no style=; using the default (calm)
   board [sheet] free
     days free · 2 of tag:day
       day a06 [card] at 300,8 300x160 = spills-parent, under a25 · drag: do move a06 to=$x,$y · key a06

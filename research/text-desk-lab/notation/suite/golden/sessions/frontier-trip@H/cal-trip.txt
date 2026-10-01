@@ -1,4 +1,4 @@
-scene cal trip · for golden · world @31
+scene cal trip · for golden · world @31 · no style=; using the default (calm)
   cal row · 1 of a03
     trip a03 row · key a03
       d1 a03 [sheet] column

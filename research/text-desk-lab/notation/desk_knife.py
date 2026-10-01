@@ -7,7 +7,7 @@ import blanks
 import harness   # registers launch; provides sync
 import knife
 import moo
-from desk import rule_did_unseen, unescape_value
+from desk import aspects_meet, event_aspects, rule_did_unseen, unescape_value
 from desk_moo import DeskMoo, HELP_MOO
 from world import Refusal
 
@@ -901,6 +901,64 @@ class DeskKnife(DeskMoo):
         finally:
             self._in_rules = False
 
+    def _visual_notes(self, n0, styles0=None):
+        """a1101 (Pike e2213, Juniper e2201): an edit to a style or a lens says its effect, not only that the text
+        changed. A style: whether it parses as the painter parses it, the props the painter cannot read, and each lens
+        using it that now refuses. A lens: whether it compiles (lens_ir.check). ~ lines after the receipt."""
+        import lens_ir
+        import scene
+        w = self.world
+        touched = []
+        for e in w.events[n0:]:
+            if e.get("undone") or not aspects_meet(event_aspects(e), {"text", "title", "tags", "prop:style", "contents"}):
+                continue
+            for i in [e.get("target")] + list(e.get("changed") or []):
+                sid = (w.nodes.get(i) or {}).get("subject") or (i if i in w.subjects else None)
+                if sid and sid not in touched:
+                    touched.append(sid)
+        lenses = [s for s in w.subjects.values() if "lens" in (s.get("tags") or []) and w.appearances_of(s["id"])]
+        checked = set()
+        for sid in touched:
+            s = w.subjects[sid]
+            tags = s.get("tags") or []
+            if "style" in tags:
+                c = scene.style_check(s["text"])
+                using = [x for x in lenses if str((x.get("props") or {}).get("style", "")).lower() == s["title"].lower()]
+                if c["refusal"]:
+                    said = (f"~ style {s['title']} does not parse: {c['refusal']}. The painter keeps the last version that "
+                            f"parsed (none, on a fresh load: unstyled); fix it with replace, or undo")
+                else:
+                    said = f"~ style {s['title']} parses: {c['roles']} roles, {c['tokens']} tokens"
+                    if c["unread"]:
+                        # new ones (by this line) whole, each on its line; the ones it already had, counted by cause
+                        was = (styles0 or {}).get(sid)
+                        old = {(r, p) for r, p, _l, _w in scene.style_check(was)["unread"]} if was is not None else set()
+                        new = [u for u in c["unread"] if (u[0], u[1]) not in old]
+                        said += f"; the painter draws nothing for {len(c['unread'])} prop(s)"
+                        said += "".join(f"\n  - new: role {r} `{p}` (line {ln}): {why}" for r, p, ln, why in new[:8])
+                        if len(new) > 8:
+                            said += f"\n  - and {len(new) - 8} more new"
+                        byw = {}
+                        for r, p, _ln, why in c["unread"]:
+                            if (r, p) in old:
+                                byw.setdefault(why, []).append(p)
+                        for why, ps in byw.items():
+                            said += f"\n  - already there, {len(ps)}: {why}: " + ", ".join(f"`{p}`" for p in dict.fromkeys(ps))
+                bad = []
+                for x in using:
+                    ok, line = lens_ir.check(self, x)
+                    checked.add(x["id"])
+                    if not ok:
+                        bad.append(line)
+                said += (f"\n  lenses using it: {', '.join(x['title'] for x in using)}; "
+                         + ("all compile" if not bad else f"now refusing: {len(bad)}")) if using \
+                    else "\n  no placed lens says style=" + s["title"]
+                self._note(said + "".join(f"\n  ! {b}" for b in bad))
+            if "lens" in tags and sid not in checked and w.appearances_of(sid):
+                checked.add(sid)
+                ok, line = lens_ir.check(self, s)
+                self._note(("~ " if ok else "~ ! ") + line)
+
     def _note(self, text):
         self._rule_notes = (self._rule_notes or []) + [text]
 
@@ -979,6 +1037,8 @@ class DeskKnife(DeskMoo):
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
         n0 = len(self.world.events)
+        # a1101: each style as it stood before this line, so its receipt can say which unreadable props are new
+        styles0 = {s["id"]: s["text"] for s in self.world.subjects.values() if "style" in (s.get("tags") or [])} if top else {}
         ctx, self._filled_new = self._ctxs[-1], None
         r = super()._one(args, name, whole)
         if self._filled_new:
@@ -1002,6 +1062,8 @@ class DeskKnife(DeskMoo):
             # after the receipt is composed, so the receipt describes the command, then the rules; the command's
             # last event is the cause of whatever the rules do, so one undo takes both back
             self._run_rules(cause=self.world.events[-1]["id"])
+            if top:
+                self._visual_notes(n0, styles0)
         if self._rule_notes:
             key = "text" if "text" in r else "error"
             r[key] = r[key] + "\n" + "\n".join(self._rule_notes)
@@ -1154,9 +1216,13 @@ class DeskKnife(DeskMoo):
             # the same tree the painter draws, printed: what is shown, where, and what each gesture would do
             import scene
             if not arg.strip():
-                raise Refusal("scene <lens name>. A lens is a note tagged lens; help scene")
+                raise Refusal("scene <lens name> [<part path> | ok]. A lens is a note tagged lens; help scene")
             try:
-                sc, text = scene.scene_for(self, arg.strip())
+                name, rest = scene.split_scene_arg(self, arg)
+                if rest == "ok":
+                    import lens_ir
+                    return lens_ir.check(self, scene.find_lens(self, name))[1]
+                sc, text = scene.scene_for(self, name, rest)
             except scene.LensRefusal as e:
                 raise Refusal(str(e))
             w = self.world
@@ -1172,7 +1238,8 @@ class DeskKnife(DeskMoo):
                         self._mark_seen(fid, asp)
                 for k in n.get("kids") or []:
                     walk(k)
-            walk(sc)
+            for n in sc.get("printed") or [sc]:      # a1101: only what was printed has been seen
+                walk(n)
             return text
         if cmd == "clock":
             return self.cmd_clock(arg)
@@ -1279,7 +1346,19 @@ class DeskKnife(DeskMoo):
         "scene": """scene <lens>: print the scene a lens makes of the world right now. The painter in the browser draws the very
   same tree, so this is what the other person sees: each part, its words, its role, its place, and the desk
   command each gesture would send. A lens is a note tagged lens; its text is the description (grammar: the
-  docstring of scene.py). Edit a lens with rewrite like any note; the picture follows.""",
+  docstring of scene.py; help lens). Edit a lens with rewrite like any note; the picture follows.
+  scene <lens> <part path>   only that part and what is inside it, each match under its full key (= porch/main/people).
+                   A path is part names or key segments, matched at the end: people, people/list, list/f571.
+                   Only what it prints counts as seen.
+  scene <lens> ok  one line: compiles, its node count against the budget, and its style; or the refusal
+                   with the lens line it names.
+  The name may be quoted ("scratch lens") or bare, spaces and all. A lens with no style= says so on the scene's
+  first line (no style=; using the default (calm)); do prop <lens> style=<name> chooses one.
+  Receipts: editing a lens (create, rewrite, replace, append, prop, tag) adds a ~ line: compiles, or the refusal.
+  Editing a style (a note tagged style) says whether it parses as the painter parses it, the props the painter
+  draws nothing for (new ones by name, the rest counted), and every placed lens with style=<it> that now refuses.
+  count <selection>, on a part, is how many things match without drawing them: text "$count paused",
+  count kind:task,prop:status=paused. On a repeat, $count is its true size before any clamp and $n what it shows.""",
         "worktree": """worktree: work apart from a shared desk, then come back as commands.
   worktree fork <name>    copy this world into <session>@<name>; enter it as its own session
   worktree                list them (inside one: where it came from and how much is journalled)

@@ -1,4 +1,4 @@
-scene meetings · for golden · world @20
+scene meetings · for golden · world @20 · no style=; using the default (calm)
   m a03 column · the prop:role=term -> s02 (a03) as term
     days a03 column · days = days-from(2027-03-29, 2027-06-11) = 75 rows · read term s02 start=2027-03-29 end=2027-06-11 · 75
       day a03 row · wd = weekday(2027-03-29) = Mon · read it date=2027-03-29 · only when $wd is Mon = Mon · key 1

@@ -1,4 +1,4 @@
-scene mondays · for golden · world @24
+scene mondays · for golden · world @24 · no style=; using the default (calm)
   x column · days = days-from(2026-10-01, 2026-10-14) = 14 rows · 14
     d (absent: $wd is Thu, not = Mon)
     d (absent: $wd is Fri, not = Mon)
