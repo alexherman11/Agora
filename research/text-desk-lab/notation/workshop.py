@@ -108,6 +108,14 @@ def git(*args, cwd=REPO, check=False, timeout=120):
     return r
 
 
+def limit_reset(detail):
+    """The house's reading of a usage-limit message (house.limit_reset), from the house already running: never a second
+    copy of house.py from disk (30 Sep)."""
+    H = sys.modules.get("house") or sys.modules.get("__main__")
+    f = getattr(H, "limit_reset", None)
+    return f(detail) if f else None
+
+
 def health(world, cwd=HERE):
     r = subprocess.run([str(PY), "health.py", world, "--json"], cwd=cwd, capture_output=True, text=True, timeout=900,
                        env={**os.environ, "DESKD": "off"})
@@ -276,10 +284,17 @@ class Workshop:
         wk = Worker(self.house, cid, tree, branch, asked_by)
         self.workers[cid] = wk
         wk.state["cursor"] = len(w.events)
+        wk.state.pop("retry_at", None)
+        returning = bool(wk.state.get("session"))     # a re-asked commission resumes its worker's conversation
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
         self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
+        if returning:      # 1 Oct (a1566): it remembered edits that the old worktree took with it
+            first = (f"(You are back on this commission in a NEW worktree, {tree}, on your branch {branch}. Anything you "
+                     "committed is there; uncommitted edits from before were not kept unless the house committed them for "
+                     "you (look for 'kept by the house' in git log). Check git log and git status before redoing anything.)"
+                     "\n\n" + first)
         wk.send(first)
 
     def resume(self, w, cid, s, cfg):
@@ -297,6 +312,9 @@ class Workshop:
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", props.get("asked_by") or self.asked_by(w, s))
         if not wk.state.get("session"):
             return None
+        if wk.state.get("retry_at", 0) > time.time():
+            return None                          # stopped by a usage limit: it resumes after the reset (failed)
+        wk.state.pop("retry_at", None)
         self.workers[cid] = wk
         cut = (wk.state.pop("pending", None) or {}).get("carry")
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
@@ -306,12 +324,28 @@ class Workshop:
         return wk
 
     def failed(self, cid, wk, why):
+        detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
+        reset = limit_reset(detail)
+        if reset:
+            # 1 Oct (Sable e4431, a1566 c1903): at 09:22 the usage limit failed every worker twice in a row; each was
+            # marked failed and its worktree removed with its uncommitted edits, and the re-asked worker resumed a
+            # conversation that remembered them. A limit is not the worker failing: stop it, keep its worktree and its
+            # conversation, and resume it a minute after the reset the limit names (step, through resume)
+            first = not wk.state.get("retry_at")
+            wk.stop()
+            self.workers.pop(cid, None)
+            wk.state["retry_at"] = reset + 60
+            wk.save()
+            if first:
+                self.say(cid, f"the worker hit the usage limit ({detail}); its worktree and conversation are kept, "
+                              f"and it resumes at {time.strftime('%H:%M', time.localtime(reset + 60))}.")
+            return
         wk.state["failures"] = wk.state.get("failures", 0) + 1
         wk.save()
-        detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
         if wk.state["failures"] >= 2:
             self.set_state(cid, "failed")
-            self.say(cid, f"the worker stopped twice ({detail}); its branch {wk.branch} is kept. Set commission=asked to try again.")
+            self.say(cid, f"the worker stopped twice ({detail}); its branch {wk.branch} is kept, with any uncommitted work "
+                          "committed to it. Set commission=asked to try again.")
             self.finish(cid, wk, keep_branch=True)
         else:
             wk.stop()
@@ -322,6 +356,15 @@ class Workshop:
     def finish(self, cid, wk, keep_branch):
         wk.stop()
         self.workers.pop(cid, None)
+        if keep_branch and wk.tree.exists() and self.real_tree(wk.tree):
+            # 1 Oct (a1566): the remove below is --force, so a stopped worker's uncommitted edits were lost with it.
+            # Whatever it had not committed goes onto its branch first (never the world copy in sessions/)
+            dirty = [l for l in (git("status", "--porcelain", "--untracked-files=all", cwd=wk.tree).stdout or "").splitlines()
+                     if not l[3:].strip('"').startswith(f"{NOTATION}/sessions/")]
+            if dirty:
+                git("add", "-A", "--", ".", f":(exclude){NOTATION}/sessions", cwd=wk.tree)
+                r = git("commit", "-m", f"{cid}: uncommitted work kept by the house when its worker was finished", cwd=wk.tree)
+                wk.log("kept", {"files": len(dirty), "ok": r.returncode == 0, "out": (r.stdout + r.stderr)[-300:]})
         if wk.tree.exists():
             git("worktree", "remove", "--force", str(wk.tree))
             try:
