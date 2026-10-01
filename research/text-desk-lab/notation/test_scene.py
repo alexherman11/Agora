@@ -517,7 +517,8 @@ def test_what_you_made_you_have_seen():
     do("look", "juniper")
     nid = re.search(r"created (a\d+)", do(f"do create {root} kind=note title=tidy tags=verb text=x", "juniper")).group(1)
     do(f"look {nid} :1", "juniper")
-    assert do(f"do rewrite {nid} text=y", "juniper").startswith("ok"), "the maker rewrites the text they typed"
+    # a1156: a verb's lines are stored text, bound when saved, so the new text is a step something answers (look)
+    assert do(f"do rewrite {nid} text=look", "juniper").startswith("ok"), "the maker rewrites the text they typed"
     do(f"look {nid} :1", "pike")
     assert "have not seen" in do(f"do rewrite {nid} text=z", "pike"), "a look is not a read for anyone else"
     assert do(f"do prop {root} mood=calm", "juniper").startswith("ok"), "a create still leaves its parent's props unstaled"
