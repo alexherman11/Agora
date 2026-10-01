@@ -131,6 +131,9 @@ class DeskMoo(Desk):
                 + (f"  args: {v.args}\n" if v.args else "") + f"  e.g. {v.example}")
 
     def cmd_examine(self, ident):
+        rec = self.record_text(ident) if ident else None     # a1308: an event, comment or link id
+        if rec:
+            return rec
         nid = self._resolve(ident or "desk")
         if nid in self.world.subjects:
             return self.cmd_pivot(nid)

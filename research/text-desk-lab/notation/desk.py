@@ -23,17 +23,25 @@ HELP = """commands (one per call):
   verbs id               what you can do to id, with argument forms
   pivot id               appearance -> its subject and every place it appears; subject -> appearances
   find words             search titles and text
-  history [id]           recent events (with undo ids)
+  history [id]           recent events (with undo ids); history e12 one event, what it caused, its undo
   do verb id k=v ...     change something. e.g. do move a04 into=f02   do append a03 line="new item"
   undo eN                revert an event
   plan / apply           (apply variant only) paste an edited outline; the desk diffs it into ops
-ids: f.. surface, a.. appearance, s.. subject, e.. event. quote values with spaces."""
+ids: f.. surface, a.. appearance, s.. subject, e.. event, c.. comment, l.. link. quote values with spaces."""
 
 
 class Unanswered(Refusal):
     """Nothing answers the line's first word: no command, no verb in the world. For a resident's > line (whole) it is a
     miss, not a refusal: it changed nothing, so the lines after it still run (Sable, a736 c742)."""
 
+
+# a1308: every kind of id the house prints, and what each names. A refusal that lists some of them can't name the door
+# to the rest (s1286: 'ids look like f02, a05, s03' left out the e-ids every !! line hands out)
+ID_HINT = ("ids: f02 a surface or room, a05 a thing on one, s03 what a thing says (its subject), e12 an event, c40 a "
+           "comment, l41 a link; use look or find")
+RECORD_KINDS = {"e": "an event", "c": "a comment", "l": "a link"}
+RECORD_ID = re.compile(r"^([ecl])(\d+)$")
+HASH = re.compile(r"^[0-9a-f]{7,40}$")
 
 BASE_COMMANDS = {"help", "?", "look", "open", "close", "read", "where", "verbs", "pivot", "find", "history", "undo",
                  "do", "plan", "apply"}
@@ -380,7 +388,30 @@ class Desk:
         if verbish:
             raise Refusal(f"{ident!r} is a verb's word, not a name for a thing: the verb note is {', '.join(verbish)} "
                           f"(help {ident} explains it; read or change it by its id)")
-        raise Refusal(f"no such id {ident!r} (ids look like f02, a05, s03; use look or find)")
+        rec = self._record(ident)
+        if rec:
+            # a1308: an event, comment or link id the house printed is never 'no such id'; this command can't take it,
+            # and the refusal names the ones that do
+            raise Refusal(f"{ident} is {RECORD_KINDS[rec[0]]}, not a thing on the desk: examine {ident} or history "
+                          f"{ident} shows it" + {"c": f"; do resolve {ident} closes it", "l": f"; do unlink <one end> "
+                                                 f"id={ident} removes it"}.get(rec[0], ""))
+        m = RECORD_ID.match(ident)
+        if m:
+            last = self.world.events[-1]["id"] if m.group(1) == "e" and self.world.events else None
+            raise Refusal(f"no {RECORD_KINDS[m.group(1)].split(' ', 1)[1]} {ident} in this world"
+                          + (f" (the latest event is {last}; history lists the recent ones)" if last else
+                             " (it may have been undone or removed: history shows what happened)") + f". {ID_HINT}")
+        if re.fullmatch(r"[afs]\d+", ident):
+            # a1308: an id the world once held (the Handbook still names some) is not 'no such id': say where it went
+            last = next((e for e in reversed(self.world.events) if e["target"] == ident
+                         or (e.get("undo") or {}).get("delete") == ident), None)
+            if last is not None:
+                raise Refusal(f"{ident} is not in the world now; its last event was {last['id']} ({last['verb']} by "
+                              f"{last['by']}): examine {last['id']} shows it; history {ident} lists what happened to it")
+        if HASH.match(ident) and any(ch.isdigit() for ch in ident) and not ident.isdigit():
+            raise Refusal(f"no such id {ident!r}: it looks like a commit (the code's history, kept in git, outside the "
+                          f"world); a landed card's comments say what it changed. {ID_HINT}")
+        raise Refusal(f"no such id {ident!r} ({ID_HINT})")
 
     def _touched_by_others(self, nid, fields=None, others_only=True):
         """Has a deed named this thing, its subject, or (for a surface) its membership since I last saw it, on an ASPECT
@@ -774,6 +805,9 @@ class Desk:
 
     # ---- commands ---------------------------------------------------
     def cmd_look(self, target, level):
+        rec = self.record_text(target) if target else None
+        if rec:
+            return rec
         nid = self._resolve(target or "desk")
         header = ""
         if nid in self.world.subjects:
@@ -830,6 +864,9 @@ class Desk:
         return self.outline(self.world.nodes[nid]["parent"] or nid, 2)
 
     def cmd_read(self, ident, section=None, full=False, tail=None):
+        rec = self.record_text(ident) if ident else None
+        if rec:
+            return rec
         nid = self._resolve(ident)
         w = self.world
         if nid in w.subjects:
@@ -1055,6 +1092,9 @@ class Desk:
         return f"{nid} verbs:\n" + "\n".join(f"  {k} {sig}".rstrip() for k, sig in v.items())
 
     def cmd_pivot(self, ident):
+        rec = self.record_text(ident) if ident else None
+        if rec:
+            return rec
         nid = self._resolve(ident)
         w = self.world
         if nid in w.subjects:
@@ -1103,17 +1143,135 @@ class Desk:
 
     def cmd_history(self, ident):
         evs = self.world.events
-        if ident:
-            nid = self._resolve(ident)
-            evs = [e for e in evs if e["target"] == nid or nid in (e.get("args") or {}).values()]
+        if ident and self._record(ident):
+            evs = self._record_events(ident)          # a1308: history takes back the ids it prints
+        elif ident:
+            try:
+                nid = self._resolve(ident)
+            except Refusal:
+                nid = ident.strip().lstrip("@")       # a thing no longer here still has its history
+                if not any(e["target"] == nid for e in evs):
+                    raise
+            evs =[e for e in evs if e["target"] == nid or nid in (e.get("args") or {}).values()]
         evs = evs[-12:]
         if not evs:
             return "no events yet"
-        return "\n".join(
-            f"{e['id']} {e['verb']} {e['target']} {self._fmt_args(e['args'])} by {e['by']}"
-            + (f" via {e['via']}" if e.get("via") and e["via"] != e["verb"] else "")
-            + (f" (verb {e['verb_run']})" if e.get("verb_run") else "") + (" (undone)" if e.get("undone") else "")
-            for e in evs)
+        return "\n".join(self._history_line(e) for e in evs)
+
+    def _history_line(self, e):
+        return (f"{e['id']} {e['verb']} {e['target']} {self._fmt_args(e['args'])} by {e['by']}"
+                + (f" via {e['via']}" if e.get("via") and e["via"] != e["verb"] else "")
+                + (f" (verb {e['verb_run']})" if e.get("verb_run") else "") + (" (undone)" if e.get("undone") else ""))
+
+    # ---- a1308: the ids the house prints that name no thing: events, comments, links ------------------------------
+    def _record(self, ident):
+        """-> (kind, the record or None, the event that made or removed it or None) for an e/c/l id this world has
+        printed, or None. A comment or link that was undone or unlinked is still known, by the event that took it away."""
+        m = RECORD_ID.match(str(ident or "").strip().lstrip("@"))
+        if not m:
+            return None
+        w, rid, kind = self.world, m.group(0), m.group(1)
+        if kind == "e":
+            ev = next((e for e in reversed(w.events) if e["id"] == rid), None)
+            return ("e", ev, ev) if ev else None
+        if kind == "c":
+            owner, c = w.find_comment(rid)
+            made = next((e for e in w.events if (e.get("undo") or {}).get("drop_comment") == rid), None)
+            if c is not None:
+                return "c", (owner, c), made
+            return ("c", None, made) if made else None
+        link = next((l for l in w.links if l["id"] == rid), None)
+        made = next((e for e in w.events if (e.get("undo") or {}).get("drop_link") == rid), None)
+        if link is not None:
+            return "l", link, made
+        gone = next((e for e in reversed(w.events) if ((e.get("undo") or {}).get("restore_link") or {}).get("id") == rid), None)
+        return ("l", None, gone or made) if (gone or made) else None
+
+    def _record_events(self, ident):
+        """The events about an e/c/l id: an event with what it caused and its undo; a comment's or link's making,
+        closing and removal."""
+        w, rid = self.world, ident.strip().lstrip("@")
+        if rid.startswith("e"):
+            return [e for e in w.events if e["id"] == rid or e.get("cause") == rid
+                    or (e["verb"] == "undo" and e["target"] == rid)]
+        mine, ids = [], set()
+        for e in w.events:
+            u, a = e.get("undo") or {}, e.get("args") or {}
+            if (rid in (u.get("drop_comment"), u.get("reopen"), u.get("drop_link")) or a.get("id") == rid
+                    or (u.get("restore_link") or {}).get("id") == rid or (e["verb"] == "undo" and e["target"] in ids)):
+                mine.append(e)
+                ids.add(e["id"])
+        return mine
+
+    def _title_line(self, ident):
+        """`a12 note "Title"` for any node or subject id, or the id alone when it is gone."""
+        w = self.world
+        if ident in w.nodes:
+            n = w.nodes[ident]
+            return f"{ident} {w.subjects[n['subject']]['kind'] if n.get('subject') else 'surface'} \"{w.title(n)}\""
+        if ident in w.subjects:
+            s = w.subjects[ident]
+            apps = w.appearances_of(ident)
+            return f"{ident} {s['kind']} \"{s['title']}\"" + (f" (at {', '.join(apps)})" if apps else " (on no surface)")
+        return f"{ident} (no longer here)"
+
+    def record_text(self, ident):
+        """a1308: what look, read and examine of an event, comment or link id print, or None for any other id.
+        An event: the line history prints for it, then when, on what, why, what it caused and how to take it back."""
+        rec = self._record(ident)
+        if not rec:
+            return None
+        kind, obj, ev = rec
+        w = self.world
+        rid = ident.strip().lstrip("@")
+        out = []
+        if kind == "e":
+            e = obj
+            out.append(self._history_line(e))
+            out.append(f"  an event: {e['by']} did {e['verb']}" + (f" at {str(e.get('at'))[:16].replace('T', ' ')}"
+                                                                  if e.get("at") else "") + f", on {self._title_line(e['target'])}")
+            for k, v in (e.get("args") or {}).items():
+                v = str(v)
+                out.append(f"    {k}: " + (v if len(v) <= 400 else v[:400] + f"… ({len(v.split())} words; read {e['target']})"))
+            if e.get("tripped_by") and e["tripped_by"] != e["by"]:
+                out.append(f"  tripped by {e['tripped_by']} (a rule acting as {e['by']})")
+            if e.get("cause"):
+                out.append(f"  because of {e['cause']} (examine {e['cause']})")
+            caused = [x["id"] for x in w.events if x.get("cause") == rid]
+            if caused:
+                out.append("  it caused: " + " ".join(caused[:12]) + (f" (+{len(caused) - 12})" if len(caused) > 12 else ""))
+            changed = [c for c in (e.get("changed") or []) if c != e["target"]]
+            if changed:
+                out.append("  it also changed: " + " ".join(changed[:12]))
+            if e.get("undone"):
+                out.append("  undone since (history " + rid + " shows the undo)")
+            elif e["verb"] != "undo":
+                out.append(f"  undo {rid} takes it back; history {rid} lists it with what it caused")
+            return "\n".join(out)
+        if kind == "c":
+            if obj is None:
+                return (f"{rid}: a comment that is no longer here; it was made by {ev['id']} ({ev['by']} on "
+                        f"{self._title_line(ev['target'])}), then undone. history {rid} shows both")
+            owner, c = obj
+            out.append(f"{rid} comment by {c['by']} on {self._title_line(owner['id'])} · "
+                       + ("resolved" if c["resolved"] else "open"))
+            out.append("  " + c["text"].replace("\n", "\n  "))
+            for r in c.get("replies") or []:
+                out.append(f"    {r['by']}: {r['text']}")
+            if ev:
+                out.append(f"  made by {ev['id']}" + (f" at {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else ""))
+            out.append(f"  read {(w.appearances_of(owner['id']) or [owner['id']])[0]} shows every comment on it"
+                       + ("" if c["resolved"] else f"; do resolve {rid} line=\"...\" answers and closes it"))
+            return "\n".join(out)
+        if obj is None:
+            return (f"{rid}: a link that is no longer here (" + (f"{ev['verb']} {ev['id']} by {ev['by']}" if ev else "?")
+                    + f"). history {rid} shows what happened to it")
+        out.append(f"{rid} link: {self._title_line(obj['from'])} {obj['kind']} → {self._title_line(obj['to'])}")
+        if ev:
+            out.append(f"  made by {ev['id']} ({ev['by']}" + (f", {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else "") + ")")
+        end = (w.appearances_of(obj["from"]) or [obj["from"]])[0]
+        out.append(f"  do unlink {end} id={rid} removes it; find links:{end} lists what {end} is linked to")
+        return "\n".join(out)
 
     def _fmt_args(self, args):
         def one(k, v):
