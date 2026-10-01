@@ -31,7 +31,8 @@ is; a verb's lines and a rule where THEY live, never where their author or calle
 its lens lives in; a wake in its corner.
 
 `help <word>` explains a verb you can use; `examine <thing>` lists the verbs on a thing, and the verbs of the room
-you are in; nothing lists every verb in the house. You find verbs by trying them, by examining things, or by
+you are in; `help` with a word it doesn't know lists every verb at hand where you are (a1308, Pike's a1299); nothing
+lists every verb in the house. You find verbs by trying them, by examining things, or by
 watching someone use one. A verb's title is a word, not a name: `read tidy` never means a verb note (a990 (4)).
 
 Building one is editing a note: one event, with an author, undoable, fenced like any edit, live at once, with no
@@ -892,7 +893,7 @@ HELP = """verbs: capabilities that live in the world, made by anyone, as notes.
   live, unless it says so: overrides=<that verb's id>. Then a typed word there runs it, and the receipt names both.
   Scripts were verbs nobody declared, and are retired (a1027): run X is just X.
   A verb's title is a word, not a name: read, look and do reach a verb note by its id, never by its title.
-  help <word> explains a verb you can use; examine <thing> lists the verbs on it, and the ones at hand in your room.
-  Nothing lists them all.
+  help <word> explains a verb you can use; examine <thing> lists the verbs on it, and the ones at hand in your room;
+  help with a word it doesn't know lists every verb at hand where you are (a1308). Nothing lists them all.
   e.g. do create Home kind=note title=wave tags=verb text="# wave to someone in Porch talk\\ndo append a570 line=\\"*waves at $1*\\""
        wave thimble          (only you can, until: do prop <its id> on=house)"""

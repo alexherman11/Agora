@@ -17,6 +17,10 @@ HELP_KNIFE = HELP_MOO.replace(
     "                         e.g. do move a04 into=f02   do move kind:image,in:f04 into=f28   do remove also:a18\n"
     "  do swap A B | do beside A B | do match A to=B    pair verbs\n"
     "  do group <selection> as=column title=X          a new surface around the selection",
+).replace(
+    "  help [verb]            what a verb does, its arguments, one example\n",
+    "  help [word]            any command (help history), verb (built-in or made in the world) or topic; a word it\n"
+    "                         doesn't know lists all it does know, and the world verbs at hand where you are\n",
 )
 
 SELECTION_HELP = """selections: a target can be one id, or a selection that names many things:
@@ -1426,10 +1430,114 @@ class DeskKnife(DeskMoo):
         "compare": "compare <A> <B>: two things side by side, line by line, with what differs marked.",
     }
 
-    def cmd_help(self, name):
-        name = name.lower()
+    # a1308: help knows every command a person can type, not only the verbs (s1286 (4): the Board says 'history lists
+    # every event', and help history answered 'no verb history here'). One entry per command word, aliases pointing at
+    # theirs; HELP_TOPICS answers first for a command that has a longer topic (find, read, rules, scene ...).
+    # test_house_words.py checks that every desk word (verbs.DESK_WORDS) is answered here or there.
+    COMMAND_HELP = {
+        "look": """look [id] [:1|:2|:3|:4]: what is there. look alone, in a world with rooms: the room you are in, narrated
+  (help rooms); look <room> narrates that room from where you are. look <id> is the tree from it: :1 its one line,
+  :2 its children (the default), :3 everything under it with first lines, :4 with full text. On an event, comment
+  or link id (e12, c40, l41) it prints that record, as examine does.""",
+        "examine": """examine <id> (or x, ex): one thing in depth: its line, its text's first lines, comments, links, where it
+  is, and every verb that applies to it now, with the verbs at hand in your room. examine <e12|c40|l41>: an event
+  (who did what, when, why, what it caused, how to undo it), a comment (its text, replies, open or resolved) or a
+  link (its two ends).""",
+        "history": """history [id]: the latest events, newest last, each with its event id (e12): who did what to which id, via
+  which verb or rule, and (undone) when taken back. history <id> only those about one thing. history <e12> that
+  event, what it caused and its undo; history <c40|l41> a comment's or link's making, closing and removal.
+  examine <e12> explains one event; undo <e12> takes it back; why <id> tells how a thing got where it is.""",
+        "go": "go <room>: walk to a room, by id or a word of its title (go lounge), and see it; go <room> :1 walks without "
+              "looking; go alone says where you are and who is in each room. help rooms",
+        "rest": "rest: go home to your corner (Home if you have none); history marks it via=rest. In the house a resident "
+                "also says > rest, or > rest 2 hours, to stop until someone calls (or until then). help rooms",
+        "wake": "wake <name>: call a resting resident now; their wake says you called, and which of your lines was "
+                "waiting for them. help rooms",
+        "where": "where <id>: a thing's exact place: screen rectangle, the surface it is in, its local position and "
+                 "layer, and what it overlaps or sits beside.",
+        "verbs": None,      # help verbs: the world's verbs (verbs.HELP), then this command (below)
+        "pivot": "pivot <id>: an appearance's subject and every place it appears; on a subject, its appearances. One "
+                 "subject (what a thing says) can appear on several surfaces; editing it changes them all.",
+        "undo": "undo [e12]: take an event back (and whatever a rule did because of it). undo alone takes back your latest "
+                "change. An event a later change built on is refused until that is undone first. history lists ids.",
+        "do": """do <verb> <target> [k=v ...]: change something. The target is an id, a quoted title or a selection (help
+  selections); values with spaces are quoted. The verb is a built-in one (help <verb>: move, create, append, prop ...)
+  or a verb made in the world (help verbs). examine <id> lists the verbs that apply to a thing. You must have looked
+  at a thing since it last changed: the desk refuses otherwise, and says why.""",
+        "open": "open <surface>: unfold it in your later looks (a view of yours; nothing moves). close <surface> folds it.",
+        "close": "close <surface>: fold it in your later looks (a view of yours; nothing moves). open <surface> unfolds it.",
+        "rule": "rule: rules are notes now (a note tagged rule, in the room it acts from); rule only says how to write "
+                "one. help rules",
+        "vars": "vars: the handles you named ($draft = a12). help handles",
+        "set": "set <name> = <id or title>: name a handle, then $name means it in any line. help handles",
+        "rows": "rows <source>: the rows a lens repeats over, with their fields ($title, $by ...); rows alone lists the "
+                "sources. help lens",
+        "script": "script, run and scripts are retired: a script is a verb now (help verbs); run X is just X.",
+        "use": "use <verb id> [words]: run exactly that verb, from anywhere (when a bare word is at hand in several rooms, "
+               "or a stored line must name its door). help verbs",
+        "help": "help [word ...]: the manual. help <command>, help <verb> (built-in or made in the world), help <topic> "
+                "(rooms, rules, views, selections, blanks, lens, verbs, commissions ...), help <id> examines the thing.",
+        "plan": "plan / apply: an outline-editing desk's commands; this desk changes things with do.",
+    }
+    # a1308 (3), the words check: the nouns the house names itself by, asked as a newcomer asks (help chat, help ids).
+    # A verb made in the world answers its word first (card is a house verb); a built-in verb (link, comment) keeps its own
+    NOUN_HELP = {
+        "ids": "ids: every id the house prints can be typed back. f02 a surface or room; a05 a thing on a surface (an "
+               "appearance); s03 what a thing says, its subject (one subject can appear in several places); e12 an "
+               "event (history lists them; examine e12 explains one; undo e12 takes it back); c40 a comment (examine "
+               "c40; do resolve c40 closes it); l41 a link between two subjects (examine l41).",
+        "events": "events: every change is an event, e12, signed by who made it. history lists the latest; history <id> "
+                  "those about one thing; examine e12 one event (when, why, what it caused); undo e12 takes it back. "
+                  "The !! line atop a reply names the events by others since your last look.",
+        "comments": "comments: remarks on a thing, each with an id (c40), open until resolved. do comment <id> line=\"...\" "
+                    "adds one; read <id> lists them; examine c40 shows one; do resolve c40 line=\"...\" answers and closes it.",
+        "links": "links: a relation between two subjects, as=refers (default), answers, blocks or part-of, each with an "
+                 "id (l41). do link A B as=answers makes one; examine l41 shows it; find links:A lists A's; do unlink A "
+                 "id=l41 removes it. help selections for answers:, part-of: and links: terms.",
+        "note": "a note is a thing with a title and text. do create <surface> kind=note title=\"...\" text=\"...\"; read, "
+                "rewrite, replace, append change it. Tagged verb it is a verb (help verbs); tagged rule, a rule; tagged "
+                "lens, a lens.",
+        "task": "a task is a note with a status: the Board's cards are tasks (card <title> makes one where you are, if "
+                "the house has that verb). do create <surface> kind=task title=\"...\"; do prop <id> status=done.",
+        "chat": "a chat is a thing whose text is lines said, one per line, signed. do append <chat> line=\"...\" says "
+                "one; read <chat> shows what is new to you. A room's talk= chat is where say lands. examine a chat says "
+                "what awaits a reply.",
+        "doc": "a doc is a long text with ## sections: read <id> shows the outline, read <id> #<n> one section, "
+               "read <id> :3 all of it. do create <surface> kind=doc title=\"...\".",
+        "surface": "a surface holds things, laid out free, as a column, row or grid; it may be a room (help rooms) or a "
+                   "view (help views). look <id> :2 lists what is on it; do create <surface> kind=surface title=\"...\".",
+        "resident": "a resident is an agent who lives in the house: its corner is a room with role=resident and actor=<its "
+                    "name>; the house wakes it and runs its > lines. corner:<name> names a resident's corner. help rooms",
+        "house": "the house keeps the residents alive (it wakes them, runs their > lines, lets them rest) and gives "
+                 "commissions to workers. Verbs on=house work everywhere. help rooms, help commissions",
+    }
+    NOUN_ALIAS = {"id": "ids", "event": "events", "comment": "comments", "link": "links", "notes": "note",
+                  "tasks": "task", "chats": "chat", "docs": "doc", "surfaces": "surface", "corner": "resident",
+                  "corners": "resident", "residents": "resident", "worker": "commissions", "workers": "commissions",
+                  "commission": "commissions"}
+    COMMAND_ALIAS = {"x": "examine", "ex": "examine", "?": "help", "run": "script", "scripts": "script", "apply": "plan"}
+
+    def _command_help(self, name):
+        """-> the help for a command word, or None. HELP_TOPICS answers first where it has the word."""
+        name = self.COMMAND_ALIAS.get(name, name)
         if name in self.HELP_TOPICS:
             return self.HELP_TOPICS[name]
+        return self.COMMAND_HELP.get(name)
+
+    def _commands(self):
+        """The command words help lists when it doesn't know a word: each answers help <it>."""
+        import verbs
+        return [w for w in sorted(verbs.DESK_WORDS) if w not in ("?", "x", "ex", "plan", "apply", "script", "scripts", "run")]
+
+    def cmd_help(self, name):
+        name = name.lower()
+        rec = self.record_text(name)       # a1308: help e12 is examine e12, as help <thing> is
+        if rec:
+            return rec
+        if name in self.HELP_TOPICS:
+            return self.HELP_TOPICS[name]
+        if name in self.COMMAND_HELP and name != "verbs" or name in self.COMMAND_ALIAS:
+            return self._command_help(name)
         if name in ("selections", "selection", "select"):
             return SELECTION_HELP
         if name in ("lens", "lenses"):
@@ -1458,19 +1566,59 @@ class DeskKnife(DeskMoo):
             return f"{name} is not a verb here; elsewhere it means {to}, which this desk does not do.\n" + self.cmd_help(to)
         import verbs
         if name in ("verbs", "verb", "world verbs"):
-            return verbs.HELP
+            return verbs.HELP + ("\n  verbs <id> (the command): what can be done to one thing, with argument forms; "
+                                 "examine <id> says the same and more.")
         if name not in self._builtin_verbs():
             made = verbs.visible(self, name, self.world.me)      # a verb someone made that you could use
             if made:
                 return "\n\n".join(verbs.describe(self, s) for s in made)
+            key = self.NOUN_ALIAS.get(name, name)
+            noun = self.NOUN_HELP.get(key) or self.HELP_TOPICS.get(key)
+            if noun:
+                return noun
             try:
                 self._resolve(name)                           # help <thing> is examine <thing>
                 return self.cmd_examine(name)
             except Refusal:
                 pass
-            # F21: moo's list is its whole registry, reply and tidy included; list only what this desk does
-            return f"no verb {name} here. verbs: " + " ".join(self._help_verbs()) + "\nexamine <id> shows which apply to a thing."
+            # F21: moo's list is its whole registry, reply and tidy included; list only what this desk does.
+            # a1308 (with Pike's a1299): it names every door: the commands, the built-in verbs (that list unchanged),
+            # the verbs made in the world that are at hand where you are, and the topics
+            out = [f"no command, verb or topic {name!r} here.",
+                   "  commands: " + " ".join(self._commands()) + "   (help <command>)",
+                   "  verbs: " + " ".join(self._help_verbs())]
+            at_hand = self._world_verbs_at_hand()
+            if at_hand:
+                out.append("  world verbs at hand here, made in the world: " + " · ".join(at_hand) + "   (help <word>)")
+            out.append("  topics: " + " ".join(self._topics()))
+            out.append("examine <id> shows which verbs apply to a thing; find <words> searches titles and text.")
+            return "\n".join(out)
         return super().cmd_help(name)
+
+    def _topics(self):
+        cmds = set(self._commands()) | set(self.COMMAND_ALIAS)
+        return sorted((set(self.HELP_TOPICS) | {"lens", "selections"}) - cmds)
+
+    def _world_verbs_at_hand(self):
+        """a1299 (Pike): the verbs made in the world whose bare word works where you stand, grouped by where they live:
+        what you carry, the room you are in and the rooms around it (nearest first), the house. -> ['release, wish
+        (Pike's corner f576)', 'card, say (the house)'], each group sorted."""
+        import rooms
+        import verbs
+        w, me = self.world, str(self.world.me or "").lower()
+        groups = []
+        mine = sorted({verbs._names(s["title"])[0] for s in verbs.all_verbs(w) if verbs.where(w, s) == ("actor", me)})
+        if mine:
+            groups.append(", ".join(mine) + " (yours, carried)")
+        here = rooms.room_of(w, w.me) if rooms.all_rooms(w) else None
+        for r in (verbs.rooms_up(w, here) if here in w.nodes else []):
+            names = sorted({verbs._names(s["title"])[0] for s in verbs.all_verbs(w) if verbs.where(w, s) == ("room", r)})
+            if names:
+                groups.append(", ".join(names) + f" ({w.nodes[r]['title']} {r})")
+        house = sorted({verbs._names(s["title"])[0] for s in verbs.all_verbs(w) if verbs.where(w, s)[0] == "house"})
+        if house:
+            groups.append(", ".join(house) + " (the house)")
+        return groups
 
     SPECIALIZED_ALT = {"reply": "append (examine the chat: it shows what awaits a reply)", "dedupe": "remove also:<id>",
                        "reveal": "raise", "tidy": "tile", "split": "group kind:<k>,in:<surface> then tile the surface as=row",
@@ -1484,6 +1632,9 @@ class DeskKnife(DeskMoo):
         return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(knife.SPECIALIZED) | set(moo.REGISTRY) | self._verb_names()
 
     def cmd_examine(self, ident):
+        rec = self.record_text(ident) if ident else None     # a1308: an event, comment or link id
+        if rec:
+            return rec
         nid = self._resolve(ident or "desk")
         if nid in self.world.subjects:
             return self.cmd_pivot(nid)
