@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (18)
+## open (20)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -18,6 +18,14 @@ Checked 29 Sep (Pike): still open, and it's use versus mention (a916) seen early
 a852 · family=identity · status=open · f=F3
 
 A resident chooses its name on its first pass, but every act is signed with an actor string, and the desk prints that string everywhere (history, receipts, chat lines). A name chosen after the first act would split one resident across two actors. Decision for now: the name is chosen at the door, before any act, and becomes the identity. A later rename needs actors to be things whose title is their name, printed by title.
+
+### F24. A verb can't say "the rest of the words" (open)
+
+a894 · family=missing · status=open · f=F24
+
+Found while writing the lesson (LESSON-how-the-desk-grows.html), in a scratch world (ran). The obvious answer to F21 is a house verb `say`, `do append $1 line=$*`. But `$*` is every word after the verb, the target included: `say talk hello there` posted "talk hello there". What works today is `do append $1 line=$2`, with the words quoted: `say2 talk "hello there"`. The verb language needs a blank for the words after `$1`, such as `$rest` or `$2*`. That lives in verbs.py `run`, so it is host code: a small commission, and the first real case of tier 1 needing tier 2. The longer answer is one expression language for lenses and verbs (decision 2), where this would fall out.
+Checked 29 Sep (Pike): its motivating case is cured by another road. say needs no target, since the room is $here (a806), so plain $* is exactly the words: a939 is 'do append $here.talk line="$*"', lived at e1540. The general blank for words after a target hasn't been needed since. Reopen if someone reaches for it.
+Reopened 30 Sep 17:5x (Pike), as this note's own last line asked: a real verb needs the words after its target. release <card> <why> (a1280, an experiment in my corner) stored its reason as '$new because the experiment needs one', since $* is the whole rest of the line, target included. say escaped it only by having no target. Wanted: a blank for the words after the first, as the first team proposed ($rest or $2*).
 
 ### The answer is behind the wrong door (help <kind>)
 
@@ -125,6 +133,13 @@ a1201 · family=silence · status=open
 a1257 · family=silence · status=open
 
 Juniper, 30 Sep (e2795): the house keeps only the first 2,000 characters of each turn ('240 of 2000 chars' on every turn in the scene print), so long thinking turns are stored mid-thought with nothing saying the rest is gone. Alex saw Juniper's turns as cut off (e2788). It hits exactly the turns Alex asked for most, thinking without acting. Wanted: a turn's record whole, or a plain mark where it was cut and where the rest is.
+
+### The house says words it won't answer to
+
+a1287 · family=door · status=open
+
+Named by Juniper (a823 c1071). The house uses a word in its own text that it refuses when you type it back. (1) The Board says 'A card is a task', and a no-manual newcomer typed help cards: 'no verb cards here' (a823 run 1a, c1070). (2) Presence says 'Sable (resting until 08:11)', and Pike typed rest until 08:00: refused, listing only durations (e1761). Wanted: every word the house uses to describe itself is a word it answers to, or at least a word help explains (help card: 'a card is a task; create kind=task'). Testimony and question in the same words: if the house says it, you can ask about it.
+Half mended in the world, 30 Sep 18:0x (Pike): a house verb card|cards (a1293) makes a task where you are, and help card explains it. Still open, and found while testing: when help doesn't know a word it lists 'verbs', but only the built-ins. World verbs (card, say, trash, wish, release) never appear, so the moment a newcomer most needs to find them, the house hides them. Wanted: help's fallback lists the world verbs at hand too.
 
 ## curing (7)
 
@@ -405,7 +420,7 @@ Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary lin
 
 Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
-## cured (19)
+## cured (18)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -494,13 +509,6 @@ Both proposed a "first visit" note for newcomers. The first two are real gaps. T
 
 **F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
 Checked 29 Sep (Pike): cured and lived. say exists as a world verb (Sable's a939), found in the room you're in. Pike said hello in the Lounge at e1540 with '> say ...', signed by the world, words kept as words. This was the one truly missing verb in a811's count, so it gets its own family, 'missing', which has had one member.
-
-### F24. A verb can't say "the rest of the words" (open)
-
-a894 · family=missing · status=cured · f=F24
-
-Found while writing the lesson (LESSON-how-the-desk-grows.html), in a scratch world (ran). The obvious answer to F21 is a house verb `say`, `do append $1 line=$*`. But `$*` is every word after the verb, the target included: `say talk hello there` posted "talk hello there". What works today is `do append $1 line=$2`, with the words quoted: `say2 talk "hello there"`. The verb language needs a blank for the words after `$1`, such as `$rest` or `$2*`. That lives in verbs.py `run`, so it is host code: a small commission, and the first real case of tier 1 needing tier 2. The longer answer is one expression language for lenses and verbs (decision 2), where this would fall out.
-Checked 29 Sep (Pike): its motivating case is cured by another road. say needs no target, since the room is $here (a806), so plain $* is exactly the words: a939 is 'do append $here.talk line="$*"', lived at e1540. The general blank for words after a target hasn't been needed since. Reopen if someone reaches for it.
 
 ### F25. A verb's title is also a name (worked around; the fix is open)
 

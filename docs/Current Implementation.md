@@ -677,6 +677,7 @@ A refusing lens is listed but doesn't fail health.
 | `keeper.py` | 118 | Keeps deskd and the house on the current code; reverts a breaking landing |
 | `health.py` | 119 | The checks a landing must pass |
 | `try_house.py`, `try_worker.py`, `fake_model.py` | 463 | Trials and a fake model |
+| `trial_resident.py` | 364 | One resident alone, run by `house.House` itself (no workshop, one corner) in a copy of a world, with its state and working directory under the system temp folder: `setup` hides the Handbook's grammar binders and every sentence naming the trial, `run`, `report` (each > line and what came back). a823's no-manual trial; records in `trials/` |
 | `desk_mcp.py` | 176 | The desk as an MCP tool |
 | `export_docs.py`, `handbook_docs.py`, `docs_sync.py` | 313 | The documents |
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
@@ -847,4 +848,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e2949. Edit it there; a direct edit here makes the next export stop and warn. sha1:0a07044b93b8 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3026. Edit it there; a direct edit here makes the next export stop and warn. sha1:9e956b1d4d31 -->
