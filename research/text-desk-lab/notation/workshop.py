@@ -133,7 +133,6 @@ class Workshop:
         self.house = house
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
-        self.held = {}                 # commission -> the uncommitted files its landing is waiting on (said once)
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -402,13 +401,21 @@ class Workshop:
         dirty = [l[3:] for l in (git("status", "--porcelain", "--untracked-files=no").stdout or "").splitlines()
                  if l[3:].endswith((".py", ".js", ".html", ".css")) and "/sessions/" not in l]
         if dirty:
-            if self.held.get(cid) != dirty:
-                self.held[cid] = dirty
-                self.say(cid, "ready, and waiting to land: the main checkout has uncommitted edits to "
-                              + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
-                              + ". It lands on the first pass after they are committed or put back.")
+            # said once per set of files, remembered in the worker's own state: kept in memory it was said again by
+            # every new house, and each saying woke the asker (Juniper e4478, 1 Oct: four times in a morning)
+            line = ("ready, and waiting to land: the main checkout has uncommitted edits to "
+                    + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
+                    + ". It lands on the first pass after they are committed or put back.")
+            said = [e for e in w.events if e["by"] == "house" and e["verb"] == "comment" and e["target"] in (cid, s["id"])]
+            last = " ".join(str(v) for v in (said[-1].get("args") or {}).values() if isinstance(v, str)) if said else ""
+            if wk.state.get("held") != dirty and line not in last:
+                self.say(cid, line)
+            if wk.state.get("held") != dirty:
+                wk.state["held"] = dirty
+                wk.save()
             return
-        self.held.pop(cid, None)
+        if wk.state.pop("held", None) is not None:
+            wk.save()
         self.set_state(cid, "landing")
         changed = [p for p in git("diff", "--name-only", f"HEAD...{wk.branch}").stdout.split() if p]
         banned = [p for p in changed if p.startswith(f"{NOTATION}/sessions/") or p.endswith(".env") or p == ".env"]
