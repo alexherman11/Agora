@@ -320,10 +320,11 @@ SOURCES = {
     "events": ("events", ("eid", "verb", "target", "by", "at", "merged")),
     "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
     # the command center (research/command-center): a chat's lines, and what the house observes of its residents
-    "messages": ("messages:<id>", ("item", "who", "said", "index", "at")),
+    # a1581: line is the chat line (a thing, m<n>) the text line belongs to, to who it addresses, edited 'edited' or ''
+    "messages": ("messages:<id>", ("item", "who", "said", "index", "at", "line", "to", "edited")),
     # Alex, 30 Sep: what's for me, one list, oldest first like a chat (newest at the bottom), each line saying which
     # chat it came from and when
-    "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid")),
+    "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid", "line")),
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room", "item")),   # item: the corner, so a gesture on a row acts on it (30 Sep, wake/rest)
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
@@ -392,6 +393,22 @@ def line_times(w, sid):
             for l in w.subjects[sid]["text"].splitlines() if l.strip()]
 
 
+def text_lines(w, sid):
+    """a1581: chat `sid`'s non-blank text lines, each with the chat line (the thing) it belongs to and when that was
+    said, read from the event that made it -> [(text, line or None, (iso, eid))]. A chat with no lines (one from
+    before a1581) is matched by its words, as line_times always did."""
+    s = w.subjects[sid]
+    if s.get("lines") is None:
+        return [(l, None, t) for l, t in zip([l for l in s["text"].splitlines() if l.strip()], line_times(w, sid))]
+    out = []
+    for line in s["lines"]:
+        e = w.event_by_id(line.get("ev"))
+        for l in line["text"].split("\n"):
+            if l.strip():
+                out.append((l, line, (e.get("at", ""), e["id"]) if e else ("", "")))
+    return out
+
+
 def inbox_rows(desk, me):
     """Every chat line for `me`, oldest first like a chat: a line in a chat whose members name me (a direct chat), or one that
     calls @me by name outside quotes. @everyone and @all don't count (Alex, 30 Sep: 'just direct chats and @alex';
@@ -413,21 +430,23 @@ def inbox_rows(desk, me):
             continue
         members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
         direct = me in members and "all" not in members
-        lines = [l for l in s["text"].splitlines() if l.strip()]
-        times = line_times(w, sid)
+        tl = text_lines(w, sid)
         mine_after = False                  # walking back from the end: has a line of mine come after this one?
-        for k in range(len(lines) - 1, -1, -1):
-            m = w.SPEAKER.match(lines[k])
+        for k in range(len(tl) - 1, -1, -1):
+            text, line, (at, eid) = tl[k]
+            m = w.SPEAKER.match(text)
             who = m.group(1).lower() if m else ""
             if who == me:
                 mine_after = True
                 continue
-            said = lines[k][m.end():] if m else lines[k]
-            if who and (direct or called.search(unquoted(said))):
+            said = text[m.end():] if m else text
+            # a1581: a line is for me when its writer addressed me (its stored to=), never by searching its words; a
+            # chat from before lines (no line) is still read by its words. A direct chat is for me by its membership.
+            if who and (direct or (me in line["to"] if line is not None else called.search(unquoted(said)))):
                 # eid keys the row (the line's own event), so a line keeps its place in the painter as newer ones arrive
                 out.append({"item": where[sid], "chat": s["title"], "who": m.group(0).rstrip(" \t:"), "said": said,
-                            "at": _clock(times[k][0]), "open": "no" if mine_after else "yes", "index": k + 1,
-                            "eid": times[k][1] or f"{where[sid]}-{k + 1}", "_t": times[k][0]})
+                            "at": _clock(at), "open": "no" if mine_after else "yes", "index": k + 1,
+                            "eid": eid or f"{where[sid]}-{k + 1}", "line": line["id"] if line else "", "_t": at})
     out.sort(key=lambda r: r.pop("_t") or "")
     return out
 
@@ -498,11 +517,12 @@ def rows(desk, source, session=None):
         # a chat's lines: each is signed by its speaker (world.apply signs a chat line with its actor); a line a rule
         # added keeps its whole signature in who ('Alex, via rule r3'), so it never reads as Alex speaking
         out = []
-        times = line_times(w, s["id"]) if s["kind"] == "chat" else []
-        for k, line in enumerate((l for l in s["text"].splitlines() if l.strip()), 1):
-            m = w.SPEAKER.match(line)
-            out.append({"item": nid, "who": m.group(0).rstrip(" \t:") if m else "", "said": line[m.end():] if m else line, "index": k,
-                        "at": _clock(times[k - 1][0]) if k <= len(times) else ""})
+        tl = text_lines(w, s["id"]) if s["kind"] == "chat" else [(l, None, ("", "")) for l in s["text"].splitlines() if l.strip()]
+        for k, (text, line, (at, _eid)) in enumerate(tl, 1):
+            m = w.SPEAKER.match(text)
+            out.append({"item": nid, "who": m.group(0).rstrip(" \t:") if m else "", "said": text[m.end():] if m else text, "index": k,
+                        "at": _clock(at), "line": line["id"] if line else "", "to": ", ".join(line["to"]) if line else "",
+                        "edited": "edited" if line and line.get("edited") else ""})
         return out
     if head == "events":
         return [{"eid": e["id"], "verb": e["verb"], "target": e["target"], "by": e["by"], "at": e.get("at", e.get("day", "")),

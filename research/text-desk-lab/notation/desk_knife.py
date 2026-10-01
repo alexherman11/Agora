@@ -1229,6 +1229,8 @@ class DeskKnife(DeskMoo):
         if top:
             import verbs
             verbs.bind_unbound(self)      # a1156: once per world, lines saved before bindings bind to what they mean now
+            for sid in self.world.chats_without_lines():
+                self.world.chat_lines(sid)        # a1581: once per chat, its lines become things (one event each)
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
