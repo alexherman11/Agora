@@ -199,6 +199,44 @@ def test_carry_and_drop_shape():
         tmp.unlink(missing_ok=True)
 
 
+def test_role_when_follows_state():
+    """a1105: `role <name> when <selection | value test>`; the first that holds wins, else the plain role, and the
+    scene prints the role it chose and why. Both evaluators agree."""
+    refused("root : column, role card, role card.plain when", "role <name> when")
+    refused("root : column, role card, role nosuch when prop:x=1", "no role 'nosuch'")
+    try:
+        scene.resolve(*scene.parse('root : column, of kind:task, each c\nc : text "a", role card when $nobody.x = 1'))
+        raise AssertionError("a role's test read a frame no part names")
+    except scene.LensRefusal as e:
+        assert "no part above" in str(e), e
+    _, parts = scene.parse("root : column, role card, role mark when prop:aim=open, role sheet when $n > 2")
+    assert parts["root"]["role"] == "card" and parts["root"]["role_when"] == [("mark", "prop:aim=open"), ("sheet", "$n > 2")]
+    import deskd, lens_ir
+    tmp = _scratch("_test_rolewhen")
+    try:
+        with deskd.Session("_test_rolewhen", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=task title=Plain")
+            desk.repl("do create f01 kind=task title=Aim aim=open")
+            desk.repl("do create f01 kind=task title=Both aim=open weight=9")
+            src = chr(10).join(["root : column, of kind:task, each c",
+                                'c : text "$title", role card, role mark when prop:aim=open,prop:weight=9, role sheet when prop:aim=open, role said when $weight > 3'])
+            for sc in (lens_ir.evaluate(desk, src), scene.build(desk, src)):
+                got = {k["text"]: (k["role"], k.get("since")) for k in sc["kids"]}
+                assert got == {"Plain": ("card", None), "Aim": ("sheet", "prop:aim=open"), "Both": ("mark", "prop:aim=open,prop:weight=9")}, got
+                scene.emit(sc)
+                assert [k["paint"].get("role") for k in sc["kids"]] == ["card", "sheet", "mark"]
+                text = scene.to_text(sc, "t", "jeff", 0)
+                assert '"Aim" [sheet, since prop:aim=open]' in text and '"Plain" [card]' in text, text
+            sc = lens_ir.evaluate(desk, src.replace("role mark when prop:aim=open,prop:weight=9, role sheet when prop:aim=open, ", ""))
+            got = {k["text"]: (k["role"], k.get("since")) for k in sc["kids"]}
+            assert got == {"Plain": ("card", None), "Aim": ("card", None), "Both": ("said", "$weight is 9 > 3")}, got
+            sc = lens_ir.evaluate(desk, "root : column, role mark when kind:task,title:Nothing-here")
+            assert sc["role"] is None and "since" not in sc          # no plain role, nothing holds: no role
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_resolve_judges_frames_before_evaluation():
     src = chr(10).join(["root : column, of tag:trip as trip, each day", "day : text \"$trip.start\"", "loose : text \"$nobody.start\""])
     root, parts = scene.parse(src)
@@ -682,6 +720,8 @@ def test_style_check_agrees_with_the_painter():
 
 
 if __name__ == "__main__":
+    import os
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from
     n = 0
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

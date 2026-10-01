@@ -657,11 +657,18 @@ def _w_carry(node, p, val, n, env):
 
 
 def _w_role(node, p, val, n, env):
-    if not re.fullmatch(r"[\w.-]+", val):
-        raise LensRefusal(f"line {n}: `role <name>`; got {p!r}")
+    # a1105 (Alex: 'objectives should have a light highlight on the whole card'): `role <name> when <selection>` lets a
+    # part's look follow its thing's state. Several may follow the plain role; the first that holds wins, the scene
+    # prints which and why, and a part none holds for keeps its plain role. The test is `only when`'s, either kind.
+    val, _, cond = val.partition(" when ")
+    if not re.fullmatch(r"[\w.-]+", val) or (_ and not cond.strip()):
+        raise LensRefusal(f"line {n}: `role <name>` or `role <name> when <selection | $x <op> value>`; got {p!r}")
     if env["roles"] is not None and val not in env["roles"]:
         raise LensRefusal(f"line {n}: no role {val!r} in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
-    node["role"] = val
+    if _:
+        node["role_when"].append((val, cond.strip()))
+    else:
+        node["role"] = val
 
 
 def _w_each(node, p, val, n, env):
@@ -821,7 +828,7 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "peek": ("peek", _w_peek),
     "carry": ("carry", _w_carry),
-    "role": ("role <name>", _w_role),
+    "role": ("role <name> [when <selection | $x <op> value>]", _w_role),
     "text": ('text "..."', _w_text),
     "clamp": ("clamp [last] <n>", _w_clamp),
     "the": ("the <selection> [as <frame>]", _w_the),
@@ -876,7 +883,7 @@ def parse(src, roles=None, style=None):
         name, colon, rest = line.strip().partition(" : ")
         if not colon or not re.fullmatch(r"[\w-]+", name):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
-        node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "text": None, "clamp": None,
+        node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False, "by": None,
                 "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "count": None}
@@ -958,6 +965,7 @@ def _refs_of(node):
             ("lens", node["lens"] or ""), ("count", node["count"] or "")]
     srcs += [("derive", x) for _, _, ins in node["derive"] for x in ins]
     srcs += [("on", a["line"]) for a in node["on"]]
+    srcs += [("role", c) for _, c in node["role_when"]]          # a1105: a role's test reads names like `only when`
     for word, text in srcs:
         for a, b in _VAR.findall(text):
             out.append((word, a, b))
@@ -1005,6 +1013,31 @@ def classify(name, scope):
     if name in scope["frames"]:
         return "frame"
     return "prop"
+
+
+def role_of(role, role_when, ctx, track, select):
+    """a1105: the role a part takes here and why. `role_when` is [(name, condition)] in the lens's order; the first that
+    holds for this part's thing wins, else the plain role. A condition is a selection (judged as `only when` judges one:
+    the thing is among what it finds, or, with no thing, it finds anything) or a value test, where a missing value does
+    not hold. `select(q)` -> ids. -> (role, why or None)."""
+    for name, cond in role_when:
+        vt = _VALUE_TEST.fullmatch(cond)
+        if vt:
+            ref, op, rhs = vt.group(1), vt.group(2), vt.group(3).strip('"')
+            vctx = dict(ctx.get("_props") or {})
+            vctx.update(ctx)
+            left = _fill(ref, vctx, track)
+            right = _fill(rhs, vctx, track) if "$" in rhs else rhs
+            gone = [x for x, v in ((ref, left), (rhs, right)) if x.startswith("$") and (v == x or v == "")]
+            if not gone and _compare(left, op, right):
+                return name, f"{ref} is {left} {op} {right}"
+            continue
+        q = _fill(cond, ctx)
+        ids = select(q)
+        t = ctx.get("item") or ctx.get("id")
+        if ((t in ids or ctx.get("id") in ids) if t else bool(ids)):
+            return name, q
+    return role, None
 
 
 def _walk(node):
@@ -1345,6 +1378,11 @@ def build(desk, src, stack=(), count=None, props=None, closure=None):
                            why=(f"no {gone[0].lstrip('$')}" if gone else f"{ref} is {left}, not {op} {right}"))
                 return out
             out["test"] = f"{ref} is {left} {op} {right}"
+        if node["role_when"]:
+            out["role"], why = role_of(node["role"], node["role_when"], ctx, track,
+                                       lambda q: (desk._parse_selection(q) or [[]])[0])
+            if why:
+                out["since"] = why
         if node["at"] == "item" and ctx.get("item") in w.nodes:
             n = w.nodes[ctx["item"]]
             out["box"] = [n["x"], n["y"], n["w"], n["h"]]
@@ -1552,7 +1590,7 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 cut += f" (~clamp {n['clamp']}: the painter clamps wrapped lines and may show less)"
             bits.append('"' + body + '"' + cut)
         if n["role"]:
-            bits.append(f"[{n['role']}]")
+            bits.append(f"[{n['role']}, since {n['since']}]" if n.get("since") else f"[{n['role']}]")
         if n["layout"]:
             bits.append(n["layout"] + (" " + " ".join(n["tracks"]) if n.get("tracks") else ""))
         for wd in ("gap", "scroll", "measure", "share"):
