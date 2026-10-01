@@ -1276,12 +1276,14 @@ class DeskKnife(DeskMoo):
             # a806: each value is filled once, after parsing: targets always; each k=v by what the verb's own
             # argument list says it is (a965: text is words by default; blanks.fill_arg)
             positional = [blanks.fill(self, unescape_value(a)) for a in argv[1:] if is_target(a)]   # titles carry escapes too
-            kv = {}
+            kv, kept = {}, []
             for a in argv[1:]:
                 if "=" in a and not is_target(a):
                     k, _, v = a.partition("=")
+                    kept += blanks.kept(self, verb, k, unescape_value(v))
                     kv[k] = blanks.fill_arg(self, verb, k, unescape_value(v))
-            return self.cmd_do_knife(verb, positional, kv)
+            out = self.cmd_do_knife(verb, positional, kv)
+            return out + "\n  " + blanks.kept_note(kept) if kept else out
         return super().repl(line)
 
     HELP_TOPICS = {
@@ -1346,6 +1348,7 @@ class DeskKnife(DeskMoo):
         "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
   whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
   do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
+  do prop <view> query=<selection>    changes what it shows (judged as find judges a selection; undo takes it back)
   with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)""",
         "scene": """scene <lens>: print the scene a lens makes of the world right now. The painter in the browser draws the very
   same tree, so this is what the other person sees: each part, its words, its role, its place, and the desk
@@ -1714,6 +1717,22 @@ class DeskKnife(DeskMoo):
         if stale:
             raise Refusal("stale: " + ", ".join(stale) + "; look at them again before acting")
 
+    def _check_view_query(self, target, query):
+        """a1322: prop query= on a view changes what it shows, so the selection is judged as find judges one, before
+        anything is stored. On anything else the world's prop refuses it (moo.v_prop), naming what query is."""
+        if self._parse_selection(target) is not None:
+            raise Refusal("prop query= changes one view's selection at a time; name the view by its id")
+        nid = self._resolve(target, allow_subject=False)
+        n = self.world.nodes.get(nid) or {}
+        if n.get("layout") != "view":
+            return
+        q = str(query).strip()
+        if not q:
+            raise Refusal("a view needs query=<selection>, e.g. query=kind:task,due<today")
+        if self._parse_selection(q) is None:          # a term that doesn't parse has already refused, as in find
+            raise Refusal(f"{q!r} is not a selection, so a view of it would show nothing; ?{q.replace(' ', '+')} "
+                          f"matches its words (help selections)")
+
     def cmd_do_knife(self, verb, positional, kv):
         """a990: an act that makes or changes a verb (its word, where it lives, its lines) is judged as stored text
         once it is done, and taken back whole if refused: a second verb with one word in one room, or lines whose bare
@@ -1721,6 +1740,8 @@ class DeskKnife(DeskMoo):
         import rooms
         import verbs
         w = self.world
+        if verb == "prop" and "query" in kv and positional:
+            self._check_view_query(positional[0], kv["query"])
         if verb == "prop" and kv.get("wake") and positional:
             try:
                 nid = self._resolve(positional[0], allow_subject=False)

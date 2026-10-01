@@ -239,10 +239,30 @@ def fill_arg(desk, verb, key, value):
     template (a verb body, script or rule, written as one) every value is filled."""
     if ctx_of(desk).template:
         return fill(desk, value)
-    kind = arg_kinds(verb).get(key, "prop")
+    kind = _kind(verb, key)
     if kind == "prose" or (kind == "prop" and not WORD.match(str(value))):
         return literal(value)
     return fill(desk, value)
+
+
+def _kind(verb, key):
+    if verb == "prop" and key == "query":
+        return "value"          # a1322: a view's query is a selection, filled as every selection is
+    return arg_kinds(verb).get(key, "prop")
+
+
+def kept(desk, verb, key, value):
+    """a1322: the blanks a typed prop value keeps as its own words (wake="look $new"), so the receipt can say so: an
+    ok must not hide a blank that will never fill. [] in a template, for text, or for a whole-value blank."""
+    if ctx_of(desk).template or _kind(verb, key) != "prop" or WORD.match(str(value)):
+        return []
+    return [m.group(0) for m in BLANK.finditer(str(value))
+            if m.group(1) and m.group(1) != "*" and not m.group(1).isdigit()]
+
+
+def kept_note(words):
+    return (f"{', '.join(dict.fromkeys(words))} kept as typed: a blank fills only when the whole value is one blank "
+            f"(help blanks)") if words else ""
 
 
 def show(desk, line, ctx=None):
@@ -288,7 +308,7 @@ HELP = """blanks: words beginning with $ that the desk fills with a value when t
   Text is words by default: an argument a verb declares as text (help append: line=<str>; old= new= title= text=)
   is never filled in a typed line, so a chat line about $here keeps its words. Targets, selections and ids are
   filled: do move a12 into=$here. A prop value fills only when the whole value is one blank (do prop f581
-  describe=$new); a blank inside other words (next="check $today") stays as typed. Inside a verb, a script or a rule (templates their author wrote), text values are filled
+  describe=$new); a blank inside other words (next="check $today") stays as typed, and the receipt says so. Inside a verb, a script or a rule (templates their author wrote), text values are filled
   too, once: what a blank becomes is never filled again. A literal dollar sign is \\$, in both.
   A blank that can't be filled refuses; nothing stores a blank's own name. A receipt shows the value, not the blank.
   e.g. do create $here kind=note title=Plan   then   do link $new $here.describe"""

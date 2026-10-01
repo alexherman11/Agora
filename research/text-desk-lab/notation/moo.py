@@ -548,11 +548,19 @@ def v_done(w, nid, a):
     return _prim(w, "retitle", nid, {"title": "✓ " + t})
 
 
-@verb("prop", ["appearance", "surface"], "Set or clear named properties on this thing (k=v ...; remove=k). prop:k=v selects by them.",
-      "k=v ... | remove=k", "do prop a12 model=gpt-5.6-sol status=queued")
+@verb("prop", ["appearance", "surface"], "Set or clear named properties on this thing (k=v ...; remove=k). prop:k=v selects by them. "
+      "On a view, query=<selection> changes what it shows. A field kept elsewhere (title text kind due tags) is refused, naming its verb.",
+      "k=v ... | remove=k","do prop a12 model=gpt-5.6-sol status=queued")
 def v_prop(w, nid, a):
     actor = a.pop("_by", None) or w.me
     here = str(a.pop("at", "")) == "appearance"
+    view = w.nodes[nid].get("layout") == "view"
+    for k in a:
+        why = _field(w, nid, k, view)
+        if why:
+            raise Refusal(why)
+    if view and "query" in a:
+        return _requery(w, nid, a, actor)
     if w.nodes[nid]["type"] == "surface" or here:
         # a surface has no subject: its properties (owner=alex ...) live on the surface itself.
         # at=appearance puts them on this one appearance instead of on the subject every appearance shares.
@@ -593,6 +601,57 @@ def v_prop(w, nid, a):
     ev = w._event("prop", nid, dict(a, **({"remove": ",".join(rem)} if rem else {})), {"restore_subject": before}, actor)
     return {"ok": True, "event": ev["id"], "changed": [s["id"]] + w.appearances_of(s["id"]),
             "note": "props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)")}
+
+
+def _field(w, nid, k, view):
+    """a1322 (Juniper c1393): a prop named like a field the house keeps elsewhere is refused, naming the verb that
+    changes the field. An ok there stored a shadow prop that nothing reads. remove= still clears an old one."""
+    n = w.nodes[nid]
+    surface = n["type"] == "surface"
+    what = "a view" if view else "a surface" if surface else f"a {w.subjects[n['subject']]['kind']}"
+    if k == "title":
+        return f"title is not a prop: do {'rename' if surface else 'retitle'} {nid} title=<str> changes the title"
+    if k == "text":
+        if surface:
+            return f"text is not a prop, and {nid} is {what}: it has a title (do rename) but no text"
+        return (f"text is not a prop: do rewrite {nid} text=<str> changes the text (or replace old= new=, "
+                f"append line=)")
+    if k == "kind":
+        return f"kind is not a prop: {nid} is {what}, set when it was made; no verb changes it (make a new one)"
+    if k == "due":
+        return f"due is not a prop: do due {nid} on=YYYY-MM-DD (or clear=1) changes the date"
+    if k == "tags":
+        return f"tags is not a prop: do tag {nid} add=a,b (or remove=a,b) changes the tags"
+    if k == "of":
+        return (f"of is how a view reads aloud, not a prop: do prop {nid} query=<selection> changes what it shows"
+                if view else f"of is not a prop: a view reads 'of <selection>'; {nid} is {what}, not a view")
+    if k == "query" and not view:
+        return (f"query is a view's selection, not a prop; {nid} is {what}, not a view "
+                f"(do create <surface> kind=view title=<str> query=<selection>)")
+    return None
+
+
+def _requery(w, nid, a, actor):
+    """a1322: prop query= on a view changes its selection; the next look evaluates the new one. Other k=v on the same
+    line are props, as ever. The desk judged the selection first (desk_knife._check_view_query)."""
+    n = w.nodes[nid]
+    a = dict(a)             # the caller's k=v stay whole: its receipt echoes query=, and marks prop:query seen
+    q = str(a.pop("query")).strip()
+    if not q:
+        raise Refusal("a view needs query=<selection>, e.g. query=kind:task,due<today")
+    props = n.setdefault("props", {})
+    rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]
+    if q == n.get("query") and all(props.get(k) == str(v) for k, v in a.items()) and not [k for k in rem if k in props]:
+        raise Refusal(f"{nid} already shows {q}; nothing to change")
+    before, was = deepcopy(n), n.get("query")
+    n["query"] = q
+    for k in rem:
+        props.pop(k, None)
+    for k, v in a.items():
+        props[k] = str(v)
+    w._bump(nid)
+    ev = w._event("prop", nid, dict(a, query=q, **({"remove": ",".join(rem)} if rem else {})), {"restore": before}, actor)
+    return {"ok": True, "event": ev["id"], "changed": [nid], "note": f"selection was {was}; now {q}"}
 
 
 @verb("tag", ["appearance"], "Add or remove tags on this thing's subject. Tags are what tag: selects and rules watch.",
