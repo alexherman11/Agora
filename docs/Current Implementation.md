@@ -129,7 +129,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
   - `examine` and `pivot` mark everything;
   - a table marks its columns;
   - `scene` marks what each node printed;
-  - your own act marks the aspects it wrote, and its receipt marks nothing more.
+  - your own act marks the aspects it wrote, and its receipt marks nothing more. What a `create` made it marks whole (title, text, tags, props: its maker wrote all of it), while the surface it was made in is marked for `contents` only (a1190: the `contents` change of 30 Sep had marked the made thing for `contents` too, and its maker was refused a rewrite of the `text=` they had just typed).
 - An aspect never printed is judged from event 0.
 - A recorded event is judged by the verb it carried out (`event_aspects` in `desk.py`), including one made through a selection or by a rule.
 - A change to one prop never blocks a change to another, and the same prop still refuses.
@@ -438,7 +438,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 - `desk-shell/style/calm.style` is only the seed, used when the world has no note of that name.
 - The style defines:
   - tokens, the only place a colour or number appears;
-  - roles built from tokens;
+  - roles built from tokens. One role word is motion: `pulse` fades the part between full and 60% opacity, 2.5 s a cycle, every pulse on the page in one phase (a1140). For a viewer whose system asks for reduced motion it does nothing and the part is still. The scene print marks such a part `[<role> pulse]`;
   - `font <name> = Family, fallback` lines;
   - `when <selection>` clauses;
   - themes.
@@ -605,7 +605,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
   - Its system prompt is Claude Code's own, plus `AGENTS.md` verbatim, then the worker protocol. The protocol asks it to keep *Current Implementation* true (see Landing). It forbids touching `sessions/` or `.env`, pushing, deleting what it didn't make, and editing `jeff.md`.
 - The worker's desk tool (`desk_mcp.py`, as `worker-<cid>`) acts in the live world.
 - It talks through comments on its commission, and those comments come back to it as messages.
-- It can see the painter: `screen.py <world> --as <who> STEP ...` copies the world (removed after), serves it with the caller's own `desk-shell/` from a deskd on a free port, drives headless Chrome over the DevTools protocol, and runs steps: `facts [prefix] [depth]` (each painted part's size, scrolls or cut, folded, off screen), `shot [file.png]`, `click`, `right`, `menu`, `choose`, `type`, `key`, `drag`, `scroll`, `wait`, `text`, `answer <text>` (the next prompt() or confirm() is answered so; unanswered ones are dismissed), `events [n]`, `resend [k]` (post again, unchanged, a body the page sent), `restart`/`stop`/`start` (the throwaway deskd). Parts are named by data-key (`<key>/handle` for a fold's handle), or by a CSS selector starting `#` or `.` for a part with no key. `--term` keeps the desk terminal beside the lens (hidden by default); `--page shell` opens the windowed shell (`index.html`) instead of the painter. `--live` points at the keeper's deskd instead, where a press is a real act.
+- It can see the painter: `screen.py <world> --as <who> STEP ...` copies the world (removed after), serves it with the caller's own `desk-shell/` from a deskd on a free port, drives headless Chrome over the DevTools protocol, and runs steps: `facts [prefix] [depth]` (each painted part's size, scrolls or cut, folded, off screen), `shot [file.png]`, `click`, `right`, `menu`, `choose`, `type`, `key`, `drag`, `scroll`, `wait`, `text`, `css <part[,part]> <property>` (each part's computed value, e.g. opacity, read at one moment, and the animations on it), `answer <text>` (the next prompt() or confirm() is answered so; unanswered ones are dismissed), `events [n]`, `resend [k]` (post again, unchanged, a body the page sent), `restart`/`stop`/`start` (the throwaway deskd). Parts are named by data-key (`<key>/handle` for a fold's handle), or by a CSS selector starting `#` or `.` for a part with no key. `--term` keeps the desk terminal beside the lens (hidden by default); `--page shell` opens the windowed shell (`index.html`) instead of the painter. `--reduced-motion` looks as someone whose system asks for reduced motion. `--live` points at the keeper's deskd instead, where a press is a real act.
 - After the house restarts, a commission underway (`working`, `waiting` or `ready`) whose worktree still exists is resumed on the worker's saved session. A turn the restart cut short is said to it again, and it hears only what it has not heard.
 - It says it is done by committing and setting `commission=ready`.
 
@@ -630,7 +630,7 @@ claude -p … --permission-mode acceptEdits --allowedTools Read Edit Write Glob 
 **Health** (`health.py <world> [--json]`), in order:
 1. every `*.py` compiles;
 2. `node --check` passes on `desk-shell/*.js` and `style/*.js`;
-3. `test_scene.py` passes, and every `test_*_paint.py` when a browser is here (the line says how many were not run without one);
+3. `test_scene.py` passes; then the rooms tests (`test_room_verbs`, `test_room_look`, `test_room_reads`, `test_blanks`), each on a small world it builds itself with `roomworld.py`, so a failure is the code's and not the day's world's (a1190; `test_blanks` saves its built world as `sessions/roomworld-blanks-<pid>-try.pickle` for the house's own rest path and removes it, its lock and its house-state after); and every `test_*_paint.py` when a browser is here (the line says how many were not run without one);
 4. the style mirror: `scene.style_check`, the Python copy of `style.js`'s parse and property reader that style receipts use, agrees with `style.js` run under node (`desk-shell/checks/style-read.js`) on `test_scene.py`'s samples, `calm.style` and every style note in the world (a1101, at Sable's ask c1212: two parsers of one language drift unseen). Without node the line says the mirror was not checked;
 5. `suite/sessions.py --check` shows 0 golden differences;
 6. every placed lens compiles.
@@ -683,7 +683,8 @@ A refusing lens is listed but doesn't fail health.
 | `journal.py` | 335 | Sable's standalone operation-journal prototype. Nothing running imports it; `test_journal.py` does |
 | `harness.py`, `run.py`, `tasks.py`, `jeffx.py` | 1083 | Model trials as desk things. `jeffx.py` imports a transport from `C:/Projects/Agora/local/…`, outside this repo, and `runs/` is parked |
 | `play.py`, `playground.py` | 128 | An older play loop and page. `playground.py` imports `tasks` from the old copy in `C:/Projects/Agora` |
-| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `test_waiting.py`, `test_lanes.py` (a1081: `by`, `put above=`, twenty puts, `put` still `move` elsewhere), `golden_prints.py`, `suite/` | 382, 839, 153, 223, 210, 190, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
+| `roomworld.py` | 105 | The small world the rooms tests build for themselves (a1190): Home with Board, Lounge, Desktop, Archive, three corners, their talks and a house `say`, made through desk lines in memory |
+| `test_scene.py`, `test_journal.py`, `test_reaching.py`, `test_blanks.py`, `test_room_verbs.py`, `test_room_look.py`, `test_room_reads.py` (these four on `roomworld.py`, run by health), `test_waiting.py`, `test_lanes.py` (a1081: `by`, `put above=`, twenty puts, `put` still `move` elsewhere), `golden_prints.py`, `suite/` | 382, 839, 153, 223, 210, 190, 35, 1765 | Tests and instruments (see Evidence); `suite/` is Python files only |
 | `desk-shell/lens.js`, `viewer.js`, `term.js`, `lens.html` | 544 | The lens painter, continuity, the desk terminal |
 | `desk-shell/style/calm.style`, `style.js` | 409 | The seed style and the style compiler |
 | `desk-shell/shell.js`, `core.js`, `apps/*.js`, `index.html`, `shell.css` | 2024 | The windowed shell and its three apps |
@@ -848,4 +849,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3240. Edit it there; a direct edit here makes the next export stop and warn. sha1:bbf51610e99d -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3277. Edit it there; a direct edit here makes the next export stop and warn. sha1:be71c3dcce4e -->
