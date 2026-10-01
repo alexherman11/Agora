@@ -392,6 +392,7 @@ A scene has a budget of 5000 nodes (`scene.BUDGET`; 1500 until 30 Sep, a guard a
   - `cut by the clamp` and `contents overflow the box` are always reported;
   - viewport, `out of view`, unsent drafts, folds and the carried thing are reported only with `?share=attention`.
 - Without that, the text printer says the viewer `has this open; attention not shared`.
+- Painted boxes (a1473). The report also carries each painted part's box, always: `WxH`, then `scroll`, `clip` or `spill` with `sh=`/`sw=` when its contents are taller or wider than it, `cut=n/m` when n of its m parts are clipped by a box that does not scroll, `out=n/m` (only with `?share=attention`, since it depends on the scroll position) for one that does, or `hidden` when it is not drawn (inside a fold); and `painted`, the lens frame (`def.frame`) and style revision it was painted at. deskd keeps up to 6000 boxes per viewer. The painter reports after each paint and again, 400 ms after, on a scroll, a resize, a click (a fold) and the fonts arriving. `scene.judge_views` compares `painted` with the frame now: the header line for that viewer ends `(N min ago) · sizes are of the lens as it stands`, or `· painted before your edit at e3617: sizes are of the old lens` (the first event after the paint that touched a lens in the closure or its style), and when every viewer is behind, `! no viewer has painted this lens since …`. Each part's line gets `~ alex: 188x741px, scrolls: contents 1832 high`, `(0 high: nothing visible)` / `(0 wide: …)`, `not drawn (folded or hidden)` (once, at the topmost), `not in the paint`, or `~ alex before the edit: …`. A part print with no viewer reporting says `no painted sizes`. `scene <lens> ok` ends `· painted sizes, oldest first: alex 4 min ago (current); …`. A viewer whose painter predates this has no boxes and prints as before. `screen.py`'s `desk <line>` step runs a desk line in the copy it paints, so a worker reads the sizes its own headless page reported.
 
 **How the language grows.** The growth rules from the design studio are argued positions, not checks. The painter's line ceiling is under review ("Alex rejected the cap", in `lens.js`'s header) and is already exceeded. Alex's direction: no cap on the compiler or the painter, but neither may grow linearly.
 
@@ -463,7 +464,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 | `GET /api/version` | `{code}`: git HEAD when deskd started. Loads no session |
 | `GET /api/events?session&since` | `{events, total}`, without undo records |
 | `POST /api/do` | `{session, as, line, observed?, gesture?}` returns `{text, error, events_total, line, as, created, events}`. `error` is the first `ERR` line. `gesture` (a1008) is an id of at most 80 characters; it is recorded on every event the line made, and a later post with the same id does nothing and answers `already done, as eN: …` with `events: []` and `already: [ids]`, before any fence and across restarts (the id lives on the event, in the world). Dedupe is by id only, never by words. An empty line is 400. `worktree …` lines go to worktree.py |
-| `POST /api/observe` | `{session, as, lens, at, viewport, facts}`, capped at 400 facts; returns `{ok, kept}` |
+| `POST /api/observe` | `{session, as, lens, at, viewport, facts, boxes, painted}`, capped at 400 facts and 6000 boxes (a1473: each painted part's box and the lens frame and style revision it was painted at; see Lenses, Facts and observations); returns `{ok, kept}`. A report that changed writes the world file, since `desk._views` lives in the pickle |
 | anything else | GET: a static file from `desk-shell/`. POST: 404 |
 
 - The server is a `ThreadingHTTPServer` on 127.0.0.1. API replies are `no-store`; every reply also says `no-cache`, so a browser rechecks the painter's files and a page reloaded for new code gets it.
@@ -856,4 +857,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3705. Edit it there; a direct edit here makes the next export stop and warn. sha1:4d51a07b4311 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e3737. Edit it there; a direct edit here makes the next export stop and warn. sha1:c8c01716d4e3 -->
