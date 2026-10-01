@@ -29,8 +29,9 @@ It stops at the resident's --rests'th rest (with an objective open the house wak
 is how a second rest can come), after --turns turns or --minutes minutes, or when a file named `stop` appears in its
 state folder (a worker may not be allowed to kill a process). --resume carries on a run that was cut off.
 
-report writes every reply (thinking and > lines), what each > line got back (ok, MISS, ERR, not run, and NOHELP for
-a help that knew no such word, which answers without the ERR a refusal carries), the first > lines of the visit, and
+report writes every reply (thinking and > lines), what each > line got back (ok, MISS, ERR, not run, NOHELP for a
+help that knew no such word, which answers without the ERR a refusal carries, and held for lines sent with a rest,
+which ran but whose receipt waits for the next wake), the first > lines of the visit, and
 the thinking lines that reach for something (I'd like to, is there a way, ...), for a person to judge. Families and
 goal attribution are judgments, left to the reader.
 """
@@ -281,13 +282,17 @@ def outcomes(cmds, answer):
     for c in cmds:
         key = c if c in blocks else next((k for k in blocks if k.split("\n")[0] == c.split("\n")[0]), None)
         body = [l for l in blocks.get(key, []) if l.strip()] if key else None
-        if key is None:
-            res.append((c, "rest" if re.match(r"rest\b", c) else "not run", ""))
+        if key is None and re.match(r"rest\b", c):
+            res.append((c, "rest", ""))
+        elif key is None and str(answer or "").startswith("(rested"):
+            res.append((c, "held", "ran; the house holds its receipt for the next wake (lines before a rest)"))
+        elif key is None:
+            res.append((c, "not run", ""))
         elif body and body[0].startswith("MISS"):
             res.append((c, "MISS", body[0]))
         elif body and body[0].startswith("ERR"):
             res.append((c, "ERR", body[0]))
-        elif body and re.match(r"help\b", c) and re.match(r"no (verb|help|topic)\b", body[0]):
+        elif body and re.match(r"help\b", c) and re.match(r"no (verb|help|topic|command)\b", body[0]):
             res.append((c, "NOHELP", body[0]))
         else:
             res.append((c, "ok", body[0] if body else ""))

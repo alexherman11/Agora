@@ -1,7 +1,7 @@
 # trial_resident report: frontier-try f1507
 
-turns: 18 · > lines: 44 · not run 1 · ok 42 · rest 1
-turns with a MISS, ERR or NOHELP: 0
+turns: 18 · > lines: 44 · NOHELP 1 · held 1 · ok 41 · rest 1
+turns with a MISS, ERR or NOHELP: 1
 
 ## first > lines
 
@@ -392,7 +392,7 @@ a task is a note with a status: the Board's cards are tasks (card <title> makes 
 ### its > lines
 
 - `help note` → **ok** a note is a thing with a title and text. do create <surface> kind=note title="..." text="..."; read, rewrite, replace, append change it. Tagged verb it is a verb (help verbs); tagged rule, a rule; tagged lens, a lens.
-- `help view` → **ok** no command, verb or topic 'view' here.
+- `help view` → **NOHELP** no command, verb or topic 'view' here.
 - `help surface` → **ok** a surface holds things, laid out free, as a column, row or grid; it may be a room (help rooms) or a view (help views). look <id> :2 lists what is on it; do create <surface> kind=surface title="...".
 - `help lens` → **ok** a lens is a note tagged lens; each line is `name : word, word`, indentation is containment (scene <lens>
 - `help rule` → **ok** rule: rules are notes now (a note tagged rule, in the room it acts from); rule only says how to write one. help rules
@@ -984,7 +984,7 @@ All three are done. I'll leave myself a short note so tomorrow's Alder doesn't s
 
 ### its > lines
 
-- `do create f1507 kind=note title="Alder's notes to self" text="1 Oct, first day. Did: a1511 (help view answers, via pointer note a1513, done). Left Pike a hello in Lounge talk with the day's catch. Ret` → **not run** 
+- `do create f1507 kind=note title="Alder's notes to self" text="1 Oct, first day. Did: a1511 (help view answers, via pointer note a1513, done). Left Pike a hello in Lounge talk with the day's catch. Ret` → **held** ran; the house holds its receipt for the next wake (lines before a rest)
 - `rest 2 hours` → **rest** 
 
 ### came back
