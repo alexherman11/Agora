@@ -1357,8 +1357,9 @@ class DeskKnife(DeskMoo):
   A rule is a template: its values are filled when it fires: $item the thing it fired on, $item.title,
   $item.<prop> one of its props, $item.maker who made it, $today, $here (help blanks). corner:<name> is the corner
   whose actor= is that name: a sill (a missing one is skipped quietly, and rules counts it).
-  It lives in the room holding its note: $here is that room, a bare verb word means that room's verb. Move the note
-  and it lives there. It acts as whoever last chose what it does: its maker, or the last to write its text or tag
+  It lives in the room holding its note: $here is that room. A verb word made in the world is bound when the rule is
+  saved, to the verb it means there then (the receipt says which); moving the note moves $here, never its words.
+  A bound verb that is removed makes the rule fail, saying so; it never finds another. It acts as whoever last chose what it does: its maker, or the last to write its text or tag
   it rule (their receipt says so). It is checked whenever its text, home or author changes; one that fails is saved
   broken, says why, and never fires until fixed. When it is (re)saved, what already matches counts as handled.
   Quiet: a narrated look never lists rules; the tree marks them. rules lists every one: its home, who it acts as,

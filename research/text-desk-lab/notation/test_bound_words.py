@@ -162,10 +162,10 @@ check("the rule saved before the override still runs the house polish: a verb ma
 # ---- (1) a stored word nothing answers is refused at save ---------------------------------------------------------
 R2, t, e = make("sable", LOUNGE, "frob them", "when tag:frobby do frobnicate", "tags=rule")
 check("a rule saved with a word nothing answers is refused (saved broken), naming the way in",
-      "saved broken" in t and "nothing answers to frobnicate" in t and "make the verb first" in t, e or t)
+      "saved broken" in t and "frobnicate is not a verb here" in t and "make the verb first" in t, e or t)
 print("     " + next(l for l in t.splitlines() if "saved broken" in l)[:220])
 VB, t, e = make("sable", LOUNGE, "frobwrap", "frobnicate $1", f"tags=verb on={LOUNGE}")
-check("a verb whose lines say a word nothing answers is refused when made", not VB and "nothing answers to frobnicate" in e, e or t)
+check("a verb whose lines say a word nothing answers is refused when made", not VB and "frobnicate is not a verb here" in e, e or t)
 t, e = last("sable", f"look {JC} :1", f'do prop {JC} wake="look; frobnicate"')
 check("a wake line with a word nothing answers is refused when set", "wake line is stored text" in e and "frobnicate" in e, e or t)
 FV, t, e = make("juniper", JC, "frobnicate", "do prop $1 frobbed=yes", "tags=verb on=house")

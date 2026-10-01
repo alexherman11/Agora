@@ -23,10 +23,12 @@ A room is a namespace (Sable e1758). A bare word is looked for nearest first: wh
 the room the line stands in and the rooms around it, the house. From anywhere else a room's verb is reached by
 naming it, `use <id>`. Forgiving to people, strict to stored text (Pike e1782, Sable e1786): a person typing a room
 verb's word from elsewhere gets it while it is the only one, and on a tie is told every door; a stored line (a rule,
-a wake line, a verb's own lines) must name its door when it is saved if its word isn't at hand where it lives (a rule
-that doesn't is saved broken, a1027), and at run time it never guesses. A second verb with the same word in the same
-room is refused when it is made. Where a line stands (`standing`): a typed line where its typer is; a verb's lines
-and a rule where THEY live, never where their author or caller stands; a lens gesture in the room its lens lives in.
+a wake line, a verb's own lines, a lens act) is bound when it is saved (a1156): each word means the verb it meant
+where the line lives, and at run time it never looks again. A word nothing answers there is refused at save (a rule
+is saved broken, a1027). A verb never takes a built-in's word, nor a word another verb answers where it would live
+unless it says overrides=<that verb> (Juniper c1337). Where a line stands (`standing`): a typed line where its typer
+is; a verb's lines and a rule where THEY live, never where their author or caller stands; a lens gesture in the room
+its lens lives in; a wake in its corner.
 
 `help <word>` explains a verb you can use; `examine <thing>` lists the verbs on a thing, and the verbs of the room
 you are in; nothing lists every verb in the house. You find verbs by trying them, by examining things, or by
@@ -864,8 +866,13 @@ HELP = """verbs: capabilities that live in the world, made by anyone, as notes.
   around it, the house. A room's verb typed from elsewhere runs while it is the only one; if several rooms have one,
   you are told every door (go there, or use <id>). Two verbs with one word in one room are refused when made.
   Stored lines stand in their own home: a verb's lines where the verb lives, a rule in the room holding its note,
-  a lens gesture in its lens's room. They must name their door when saved (use <id>) if their word is only at
-  hand in another room (a rule that doesn't is saved broken), and at run time they never guess.
+  a lens gesture in its lens's room, a wake in its corner. Their words are bound when they are saved: each word
+  means the verb it meant then, and the receipt says which (examine shows it). A word nothing answers there, or one
+  only another room has, is refused when saved (a rule: saved broken). A bound line never looks again: a verb made
+  later with the word changes nothing, moving the note keeps its words, and a bound verb that is removed makes
+  the line fail saying so. Changing a verb's lines leaves a note on the sill of each author whose lines use it.
+  A verb never takes a word the desk answers (append, prop, look ...), nor one another verb answers where it would
+  live, unless it says so: overrides=<that verb's id>. Then a typed word there runs it, and the receipt names both.
   Scripts were verbs nobody declared, and are retired (a1027): run X is just X.
   A verb's title is a word, not a name: read, look and do reach a verb note by its id, never by its title.
   help <word> explains a verb you can use; examine <thing> lists the verbs on it, and the ones at hand in your room.
