@@ -204,7 +204,7 @@ def unmarked_in(reply):
     return n
 
 
-def deskd_do(world, who, text, whole=False):
+def deskd_do(world, who, text, whole=False, stored=None):
     """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
     or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736)."""
     import urllib.error
@@ -215,7 +215,8 @@ def deskd_do(world, who, text, whole=False):
     lines, out = desk_mcp.split_lines(text), []
     reply = __import__("uuid").uuid4().hex      # a806: one reply's lines share it, so $new names what the line before made
     for k, line in enumerate(lines):
-        body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply}).encode("utf-8")
+        body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply,
+                           **({"stored": stored} if stored else {})}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
                                         timeout=120) as f:
@@ -471,14 +472,15 @@ class House:
             self.desk, self.mtime = export_docs.load(self.world), m
         return self.desk.world
 
-    def act(self, who, line, whole=False):
+    def act(self, who, line, whole=False, stored=None):
         """Desk lines as `who`. Through deskd when it is up, so residents and the painter run the same code (one host);
         otherwise the same path a desk tool call takes, one fresh process per call. whole (a736): each line is one
         command, a ; in it is words; for a resident's > lines. The house's own lines (wake strings) keep ; as a
-        separator."""
-        text = deskd_do(self.world, who, line, whole)
+        separator. stored (a1156): the node whose stored line this is (a corner, for its wake): it stands there and
+        its words mean what they were bound to when it was set."""
+        text = deskd_do(self.world, who, line, whole, stored)
         if text is None:
-            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole})
+            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored})
         return text
 
     def misses(self, r, actor, lines):
@@ -759,7 +761,8 @@ class House:
         heard = self.take(r)
         news = "\n".join(([undelivered] if undelivered else []) + first + heard)
         lead += "".join(x + "\n" for x in first)
-        r.send(lead + self.act(actor, line) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
+        stored = r.rid if (corner.get("props") or {}).get("wake") else None      # a1156: a wake is stored text
+        r.send(lead + self.act(actor, line, stored=stored) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
         # a1062: a call delivered by a wake (a resident started from want=rest) is cleared too, so the next is a change
         if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:
             self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")

@@ -457,11 +457,17 @@ class Handler(SimpleHTTPRequestHandler):
                 # the room its lens lives in, strictly, never from where the person clicking is
                 import verbs
                 desk._act_home = (verbs.room_holding(desk.world, lens_id),) if lens_id in desk.world.subjects else None
+                # a1156: and its words mean what they were bound to when the lens was saved (the lenses it was built
+                # from too, the painted one first); a wake the house sends (stored=<corner>) stands in its corner
+                desk._act_binds = verbs.lens_binds(desk.world, [lens_id] + [c.get("id") for c in (ob.get("def") or {}).get("closure") or []]) \
+                    if desk._act_home else None
+                if body.get("stored") in desk.world.nodes:
+                    desk._act_home, desk._act_binds = verbs.stored_at(desk.world, body["stored"])
                 try:
                     r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
                                                "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
                 finally:
-                    desk._act_home = None
+                    desk._act_home = desk._act_binds = None
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably

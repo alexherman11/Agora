@@ -813,6 +813,11 @@ def _w_only(node, p, val, n, env):
     node["only"] = val[5:].strip()      # Wren, Flint: the desk's own selection decides; a value test is judged after derives
 
 
+# the desk's own commands a gesture may begin with; any other first word is a verb, and gets `do ` (verbs.py binds the
+# words of these lines when a lens is saved, a1156, and reads them by this same list)
+ACT_COMMANDS = ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold", "go")
+
+
 def _w_on(node, p, val, n, env):
     g, do, cmd = val.partition(" do ")
     drop_part = label = None
@@ -830,7 +835,7 @@ def _w_on(node, p, val, n, env):
         raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
     # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
     # unless it begins with one of the desk's own reading or session commands.
-    if cmd.split(" ")[0] not in ("do", "look", "read", "examine", "find", "undo", "run", "scene", "rows", "worktree", "open", "fold", "go"):
+    if cmd.split(" ")[0] not in ACT_COMMANDS:
         cmd = "do " + cmd
     node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {})})
 

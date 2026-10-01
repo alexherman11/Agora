@@ -43,6 +43,7 @@ KNOWN = ("$here $here.<prop> $new $today $me, a handle you set ($name); in a ver
 
 class Ctx:
     """Where a line is being filled. kind: typed | verb | script | rule."""
+    binds = None            # a1156: a template's binding (verbs.bind_text), kept with its lines when they were saved
 
     def __init__(self, kind, args=None, rest="", me=None, this=None, item=None, name="", prev=None, home=None):
         self.kind, self.args, self.rest, self.me, self.this, self.item, self.name = kind, args, rest, me, this, item, name

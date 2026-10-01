@@ -160,8 +160,13 @@ def find(desk, word, words, me, at=None):
     room the line stands in and the rooms around it (a990), the house. Two verbs answering at the same level refuse
     with both named: the desk never picks one. Nothing at hand, but a room elsewhere has one: a typed line gets it
     while it is the only one; a stored line, or a tie, is refused naming every door. `at`: (room, stored), else
-    standing(desk)."""
+    standing(desk). a1156: a stored line that was bound when saved never looks: its word means the verb it was bound
+    to (bound_find); only a typed line, or a stored line saved before bindings, looks here."""
     w, word, me = desk.world, word.lower(), (me or "").lower()
+    if at is None:
+        entry = bound(desk)
+        if entry is not None:
+            return bound_find(desk, word, words, me, entry)
     here, stored = standing(desk) if at is None else at
     chain = rooms_up(w, here) if here in w.nodes else []
     named = _thing_names(desk, words)
@@ -221,49 +226,99 @@ def _world_word(desk, step):
     return None if word in DESK_WORDS else (word, argv[1:])
 
 
-def check_lines(desk, text, room):
-    """Refuse (Refusal) when a step of stored `text` says a bare word that no verb at hand in `room` answers, while a
-    verb in another room does: the line must name its door (use <id>). A word nothing answers is left alone, as it
-    always was (a verb may come later, and then the line refuses at run time, naming the doors)."""
-    import desk as desk_mod
-    w = desk.world
-    names = {n for s in all_verbs(w) for n in _names(s["title"])}
-    for line in text.splitlines():
-        if line.strip().startswith("#"):
-            continue
-        for step in desk_mod.split_batch(line):
-            hit = _world_word(desk, step)
-            if hit and hit[0] in names:
-                find(desk, hit[0], [x for x in hit[1] if "=" not in x], w.me, at=(room, True))
+def builtin_words(desk):
+    """a1156 (4): the words the desk itself answers (its commands, its verbs and their synonyms). A world verb never
+    takes one. The retired built-ins (tidy, reply, stack ...) are not among them: this desk only refuses those, and a
+    world verb may answer them (a990)."""
+    import knife
+    return (set(desk._builtin_verbs()) | DESK_WORDS) - set(knife.SPECIALIZED)
+
+
+def _desc(w, s):
+    kind, val = where(w, s)
+    return {"actor": f"carried by {val}", "house": "on the house", "thing": f"on {val}",
+            "room": f"in {_room_name(w, val)}"}[kind]
+
+
+def _aid(w, s):
+    apps = w.appearances_of(s["id"])
+    return apps[0] if apps else s["id"]
+
+
+def _verb_named(w, ident):
+    """The verb subject an id names (its appearance or its subject), placed and tagged verb, or None."""
+    ident = str(ident or "").strip().lstrip("@")
+    sid = (w.nodes.get(ident) or {}).get("subject") or ident
+    s = w.subjects.get(sid)
+    return s if s and "verb" in (s.get("tags") or []) and w.appearances_of(sid) else None
+
+
+def answering(w, word, s):
+    """a1156 (4): the other verbs that answer `word` at hand where verb `s` would live, so that `s` would take the word
+    over there: the house, the rooms around its room (its own included), its thing, and for a carried verb what its
+    maker carries and what is at hand where the maker stands. A verb farther out (a house verb, when `s` is on a room)
+    is what `s` would stand over; one nearer still wins, and is not taken over."""
+    import rooms
+    kind, val = where(w, s)
+    if kind == "room":
+        fid = val
+    elif kind == "thing":
+        fid = room_holding(w, val)
+    elif kind == "actor":
+        fid = rooms.room_of(w, val) if rooms.all_rooms(w) else None
+    else:
+        fid = None
+    places = {("room", r) for r in (rooms_up(w, fid) if fid in w.nodes else [])} | {("house", None)}
+    if kind in ("actor", "thing"):
+        places.add((kind, val))
+    return [o for o in all_verbs(w) if o["id"] != s["id"] and word in _names(o["title"]) and where(w, o) in places]
 
 
 def state(w):
-    """Each verb note's words, where it lives and its lines: what a change to a verb is judged against."""
-    return {s["id"]: (tuple(_names(s["title"])), where(w, s), s["text"]) for s in all_verbs(w)}
+    """Each verb note's words, where it lives, its lines and what it overrides: what a change to a verb is judged
+    against."""
+    return {s["id"]: (tuple(_names(s["title"])), where(w, s), s["text"], str((s.get("props") or {}).get("overrides", "")))
+            for s in all_verbs(w)}
 
 
 def check_change(desk, before):
-    """After an act: each verb made or changed (its word, where it lives, its lines) is judged as stored text.
-    -> None, or why it is refused: a second verb with the same word in one room, or lines whose bare word isn't at
-    hand where the verb lives."""
+    """After an act: each verb made, renamed or moved is judged for its words (a1156 (4)): a built-in's word is refused,
+    and so is a word another verb already answers where it would live, unless it says overrides=<that verb>. Its lines
+    are judged as stored text when they are bound (after_act). -> None, or why it is refused."""
     w = desk.world
+    builtin = builtin_words(desk)
     for sid, st in state(w).items():
-        if before.get(sid) == st:
-            continue
-        s, (kind, val) = w.subjects[sid], st[1]
-        me = w.appearances_of(sid)[0]
-        if kind == "room":
-            for o in all_verbs(w):
-                same = set(st[0]) & set(_names(o["title"]))
-                if o["id"] != sid and same and where(w, o) == ("room", val):
-                    word = sorted(same)[0]
-                    return (f"{me} would be a second {word} in {_room_name(w, val)}: {w.appearances_of(o['id'])[0]} already "
-                            f"answers to {word} there, and a bare {word} there must mean one verb. Give it another word, "
-                            f"or put it on another room")
-        try:
-            check_lines(desk, s["text"], home(w, s))
-        except Refusal as e:
-            return f"the verb {me}'s lines are stored text, judged where it lives: {e}"
+        old = before.get(sid)
+        if old == st or (old is not None and old[:2] == st[:2] and old[3] == st[3]):
+            continue                            # only its lines changed: they are bound in after_act
+        s, me = w.subjects[sid], _aid(w, w.subjects[sid])
+        for word in st[0]:
+            if word in builtin:
+                return (f"{me} would answer to {word}, a word the desk itself answers (do {word} ...): a verb made in the "
+                        f"world never takes a built-in's word, so {word} means one thing everywhere (a1156). Give it "
+                        f"another word")
+        ov_said = st[3].strip()
+        ov = _verb_named(w, ov_said) if ov_said else None
+        if ov_said and ov is None:
+            return f"{me} says overrides={ov_said}, which is no verb (a placed note tagged verb): name the verb it stands over by its id"
+        stood = False
+        for word in st[0]:
+            for o in answering(w, word, s):
+                kind, val = where(w, s)
+                if kind == "room" and where(w, o) == (kind, val):
+                    return (f"{me} would be a second {word} in {_room_name(w, val)}: {_aid(w, o)} already answers to "
+                            f"{word} there, and a bare {word} there must mean one verb. Give it another word, or put it "
+                            f"on another room")
+                if ov is not None and o["id"] == ov["id"]:
+                    stood = True
+                    continue
+                return (f"{me} would answer to {word} {_desc(w, s)}, where {_aid(w, o)} ({_desc(w, o)}, made by "
+                        f"{_author(w, o['id']) or '?'}) already answers to {word}: a word is never quietly taken over "
+                        f"(a1156). To stand over it there on purpose, say so: overrides={_aid(w, o)} on {me} (a typed "
+                        f"{word} there then names both); or give it another word")
+        if ov is not None and not stood:
+            return (f"{me} says overrides={ov_said}, but {_aid(w, ov)} does not answer to "
+                    f"{' or '.join(st[0])} where {me} would live ({_desc(w, s)}): there is nothing to stand over")
     return None
 
 
@@ -274,6 +329,365 @@ def rollback(desk, n0):
         if e["verb"] != "undo" and not e.get("undone"):
             w.undo(e["id"])
     del w.events[n0:]
+
+
+# ---- a1156: a stored line's words are bound when it is saved ------------------------------------------------------
+# A stored line (a verb's lines, a rule, a lens's acts, a corner's wake) is judged when it is saved, while its author is
+# there: each bare word that reaches for a verb made in the world is bound to the verb it means right then, and the
+# binding is kept with the line's holder (the note, or the corner for a wake). At run time a bound line never looks
+# again: a verb made later with the same word changes nothing, and a bound verb that is gone fails loudly. A word
+# nothing answers is refused at save (a rule is saved broken, as a990's rules always were). Changing a verb's lines
+# leaves a note on the sill of every other author whose lines are bound to it (Unison's lesson, a1142). Typed lines
+# are untouched: a person's bare word is looked up when they type it, as always.
+
+KEEP_WAKES = 8          # a corner keeps the bindings of its last few wake lines, so an undo of a wake finds its own
+
+
+def holder_kind(s):
+    tags = s.get("tags") or []
+    return next((k for k in ("verb", "rule", "lens") if k in tags), None)
+
+
+def stored_texts(w):
+    """-> {key: (kind, text)} for every placed holder of stored lines: ('s', subject id) for a verb, rule or lens note,
+    ('n', node id) for a node with a wake line."""
+    out = {}
+    for s in w.subjects.values():
+        kind = holder_kind(s)
+        if kind and w.appearances_of(s["id"]):
+            out[("s", s["id"])] = (kind, s["text"])
+    for n in w.nodes.values():
+        wake = (n.get("props") or {}).get("wake")
+        if wake:
+            out[("n", n["id"])] = ("wake", str(wake))
+    return out
+
+
+def holder_home(w, key, kind):
+    """Where a holder's lines stand (a990 (3)): a verb's where it lives, a rule's or a lens's in the room holding its
+    note, a wake in its corner."""
+    if key[0] == "n":
+        import rooms
+        return key[1] if rooms.is_room(w, key[1]) else room_holding(w, key[1])
+    s = w.subjects[key[1]]
+    return home(w, s) if kind == "verb" else room_holding(w, s["id"])
+
+
+def holder_label(w, key, kind):
+    if key[0] == "n":
+        return f"the wake on {key[1]}"
+    s = w.subjects.get(key[1])
+    return f"{kind} {_aid(w, s) if s else key[1]}" + (f' "{s["title"]}"' if s and kind != "verb" else "")
+
+
+def _rule_steps(text):
+    """The action of a rule (`when ... do X` / `on ... do X`), as one `do X ...` step; `use <id>` names its verb."""
+    out = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            argv = shlex.split(line)
+        except ValueError:
+            argv = line.split()
+        if "do" in argv[1:]:
+            act = argv[argv.index("do", 1) + 1:]
+            if act and act[0].lower() != "use":
+                out.append("do " + " ".join(shlex.quote(a) for a in act))
+    return out
+
+
+def _lens_steps(text):
+    """Each desk command a lens's gestures send (`on click do ...`), read as the lens compiler reads them."""
+    import desk as desk_mod
+    import scene
+    out = []
+    for raw in text.splitlines():
+        line = scene._outside_quotes(raw, " # ")[0]
+        _name, colon, rest = line.strip().partition(" : ")
+        if not colon:
+            continue
+        for p in scene._outside_quotes(rest, ", "):
+            p = p.strip()
+            if p.startswith("on ") and " do " in p:
+                cmd = p.partition(" do ")[2].strip()
+                if cmd.split(" ")[0] not in scene.ACT_COMMANDS:
+                    cmd = "do " + cmd
+                out += desk_mod.split_batch(cmd)
+    return out
+
+
+def line_words(desk, kind, text):
+    """-> [(word, its words, the step)] for each step of stored text whose word reaches for a verb made in the world."""
+    import desk as desk_mod
+    if kind == "rule":
+        steps = _rule_steps(text)
+    elif kind == "lens":
+        steps = _lens_steps(text)
+    else:
+        steps = [st for line in text.splitlines() if line.strip() and not line.strip().startswith("#")
+                 for st in desk_mod.split_batch(line)]
+    out = []
+    for st in steps:
+        hit = _world_word(desk, st)
+        if hit:
+            out.append((hit[0], hit[1], st.strip()))
+    return out
+
+
+def bind_text(desk, kind, text, here, me):
+    """-> the binding of stored `text` standing in `here`, saved by `me`: {text, words: {word: {id, at} | {thing}},
+    missing: {word: why}, by}. A word is bound to what a stored line standing there means by it now (a990's strict
+    lookup); a word that only a verb on the thing it is used on can answer ($1, $item) is bound as such."""
+    w = desk.world
+    entry = {"text": text, "words": {}, "missing": {}, "by": me, "lines": {}}
+    builtin = builtin_words(desk)
+    for word, args, step in line_words(desk, kind, text):
+        entry["lines"].setdefault(word, []).append(step)
+        if word in entry["words"] or word in entry["missing"]:
+            continue
+        if word.startswith("$"):
+            entry["missing"][word] = (f"{step!r}: a stored line's verb word can't be a blank, or it would mean whatever "
+                                      f"it is filled with; name the verb (its word, or use <id>)")
+            continue
+        if word in builtin:
+            entry["missing"][word] = f"{step!r}: {word} is the desk's own verb; a stored line says do {word} ..."
+            continue
+        try:
+            hit = find(desk, word, [a for a in args if "=" not in a], me, at=(here, True))
+        except Refusal as e:
+            entry["missing"][word] = str(e)
+            continue
+        if hit:
+            entry["words"][word] = {"id": hit[0]["id"], "at": _aid(w, hit[0])}
+        elif any(where(w, s)[0] == "thing" and word in _names(s["title"]) for s in all_verbs(w)) \
+                and any(a.startswith("$") for a in args):
+            entry["words"][word] = {"thing": True}      # a verb that lives on a thing: the thing it is used on answers
+        else:
+            import knife
+            entry["missing"][word] = (f"{word} is not a verb here: nothing answers to it where this line lives "
+                                      f"({_room_name(w, here) if here else 'no room: it lives on the house or is carried'}), "
+                                      f"neither a general verb ({' '.join(knife.GENERAL)}) nor one made in the world. "
+                                      f"A stored line's words are bound when it is saved, so a verb made later never takes "
+                                      f"one over: make the verb first (help verbs), then save the line; or name one: use <id>")
+    return entry
+
+
+def binding_of(w, key, text):
+    """The binding kept for this holder's current `text`, or None (saved before bindings, a1156)."""
+    if key[0] == "s":
+        b = (w.subjects.get(key[1]) or {}).get("binds")
+        return b if b and b.get("text") == text else None
+    for b in reversed((w.nodes.get(key[1]) or {}).get("binds") or []):
+        if b.get("text") == text:
+            return b
+    return None
+
+
+def keep_binding(w, key, entry):
+    """Kept with the holder, outside its props: a subject's binding is restored with it by undo (restore_subject);
+    a corner keeps its last few wake bindings by text, since undo restores only its props."""
+    if key[0] == "s":
+        s = w.subjects[key[1]]
+        if entry["words"] or entry["missing"]:
+            s["binds"] = entry
+        else:
+            s.pop("binds", None)
+        return
+    n = w.nodes[key[1]]
+    kept = [b for b in (n.get("binds") or []) if b.get("text") != entry["text"]]
+    n["binds"] = (kept + ([entry] if entry["words"] or entry["missing"] else []))[-KEEP_WAKES:]
+
+
+def writer(w, key):
+    """Who last wrote this holder's lines: its maker, or the last to change its text (a wake: to set it)."""
+    if key[0] == "s":
+        sid = key[1]
+        ids, who = {sid} | set(w.appearances_of(sid)), None
+        for e in w.events:
+            if e.get("undone") or e["verb"] == "undo":
+                continue
+            a = e.get("args") or {}
+            if e["verb"] == "create" and isinstance(e.get("undo"), dict):
+                made = e["undo"].get("delete")
+                if made in ids or (made in w.nodes and w.nodes[made].get("subject") == sid):
+                    who = e["by"]
+            elif e["target"] in ids and e["verb"] == "edit" and ("text" in a or "append" in a):
+                who = e["by"]
+        return who
+    return next((e["by"] for e in reversed(w.events) if e["target"] == key[1] and e["verb"] == "prop"
+                 and "wake" in (e.get("args") or {}) and not e.get("undone")), None)
+
+
+def bind_unbound(desk):
+    """Once per world (a1156): every stored line saved before bindings is bound to what it means now, as its writer,
+    so nothing made from now on can take it over. A word nothing answers now stays unbound and fails when it runs,
+    saying why; it is never left to be found later. Meaning is unchanged: a990 already looked strictly at run time."""
+    w = desk.world
+    if getattr(w, "_binds_version", 0) >= 1:
+        return
+    w._binds_version = 1
+    me = w.me
+    try:
+        for key, (kind, text) in stored_texts(w).items():
+            if binding_of(w, key, text) is None and line_words(desk, kind, text):
+                w.me = writer(w, key) or me
+                keep_binding(w, key, bind_text(desk, kind, text, holder_home(w, key, kind), w.me))
+    finally:
+        w.me = me
+
+
+def lens_binds(w, sids):
+    """A lens act's binding: the painted lens's, then the lenses it was built from (the first to bind a word wins).
+    None when none of them was bound (saved before bindings: a990's strict lookup)."""
+    merged, any_ = {"text": None, "words": {}, "missing": {}, "by": None, "lines": {}}, False
+    for sid in sids:
+        s = w.subjects.get(sid)
+        b = binding_of(w, ("s", sid), s["text"]) if s else None
+        if b:
+            any_ = True
+            for k in ("words", "missing"):
+                for wd, v in b[k].items():
+                    if wd not in merged["words"] and wd not in merged["missing"]:
+                        merged[k][wd] = v
+    return merged if any_ else None
+
+
+def stored_at(w, nid):
+    """-> (_act_home, _act_binds) for running a node's wake line as the stored text it is (house.py sends stored=)."""
+    import rooms
+    here = nid if rooms.is_room(w, nid) else room_holding(w, nid)
+    wake = str(((w.nodes.get(nid) or {}).get("props") or {}).get("wake") or "")
+    return (here,), binding_of(w, ("n", nid), wake)
+
+
+def bound(desk):
+    """The binding of the stored line being run now, or None: a typed line, or one saved before bindings (then a990's
+    strict lookup, as before). The innermost template's (a verb's lines, a rule), else a lens act's or a wake's."""
+    for c in reversed(getattr(desk, "_ctxs", None) or []):
+        if c.template:
+            return getattr(c, "binds", None)
+    if getattr(desk, "_act_home", None):
+        return getattr(desk, "_act_binds", None)
+    return None
+
+
+def bound_find(desk, word, words, me, entry):
+    """A bound line's word: the verb it was bound to, or a loud refusal. It never finds another verb with the word."""
+    w = desk.world
+    rec = entry["words"].get(word)
+    if rec is None:
+        why = entry["missing"].get(word)
+        raise Refusal(f"this line was saved with no verb for {word}" + (f" ({why})" if why else "")
+                      + f": a stored line never looks again, so nothing made later answers it. Make the verb, then save "
+                        f"the line again (or name one: use <id>)")
+    if rec.get("thing"):
+        named = _thing_names(desk, words)
+        hits = [(s, where(w, s)[1]) for s in all_verbs(w) if word in _names(s["title"]) and where(w, s)[0] == "thing"
+                and (where(w, s)[1] in named or (w.nodes.get(where(w, s)[1]) or {}).get("subject") in named)]
+        if len(hits) != 1:
+            raise Refusal(f"{word} was bound to the verb on the thing it is used on, and "
+                          + ("no thing named here carries one" if not hits else f"{len(hits)} things named here do"))
+        return hits[0][0], "bound", hits[0][1]
+    s = _verb_named(w, rec["id"])
+    if s is None:
+        raise Refusal(f"{word} {rec['at']} is gone; this line was bound to it. A stored line never finds another {word} "
+                      f"on its own: save the line again to bind it to one that is here, or name one: use <id>")
+    kind, val = where(w, s)
+    if kind == "actor" and val != me:
+        raise Refusal(f"{word} {rec['at']} is carried by {val}; only they can use it (this line was bound to it)")
+    return s, "bound", (val if kind in ("thing", "room") else None)
+
+
+def _bound_to(w, vsid):
+    """Every holder whose kept binding uses verb `vsid` -> [(key, kind, entry, words)]."""
+    out = []
+    for key, (kind, text) in stored_texts(w).items():
+        b = binding_of(w, key, text)
+        used = [wd for wd, rec in ((b or {}).get("words") or {}).items() if rec.get("id") == vsid]
+        if used and key != ("s", vsid):
+            out.append((key, kind, b, used))
+    return out
+
+
+def tell_users(desk, vsid):
+    """a1156 (3): a verb's lines changed. Each other author whose stored lines are bound to it gets a note on their
+    sill naming those lines; the editor's own are named on the receipt. -> receipt lines."""
+    import rooms
+    w = desk.world
+    s, me = w.subjects[vsid], w.me
+    word, aid = _names(s["title"])[0], _aid(w, s)
+    by = {}
+    for key, kind, b, used in _bound_to(w, vsid):
+        lines = [l for wd in used for l in (b.get("lines") or {}).get(wd, [])]
+        by.setdefault(b.get("by") or "?", []).append(f"{holder_label(w, key, kind)}: " + " | ".join(lines))
+    out, made = [], w.last_created
+    for who, items in sorted(by.items()):
+        if who == me:
+            out.append(f"~ {word} {aid} changed; these of yours use it: " + "; ".join(items))
+            continue
+        fid = rooms.corner_of(w, who)
+        if not fid:
+            out.append(f"~ {word} {aid} changed; {who} has lines that use it and no sill to tell: " + "; ".join(items))
+            continue
+        text = (f"{me} changed the lines of {word} ({aid}). These of yours are bound to it, so they now do what it does "
+                f"now:\n" + "\n".join(f"- {i}" for i in items)
+                + f"\nread {aid} shows it; nothing of yours was changed")
+        w.apply("create", fid, None, {"kind": "note", "title": f"{word} changed; these of yours use it", "text": text}, me)
+        out.append(f"~ {word} {aid} changed: a note on {who}'s sill ({w.last_created}) names their {len(items)} line(s) that use it")
+    w.last_created = made
+    return out
+
+
+def after_act(desk, before):
+    """a1156: after an act, each holder whose lines were saved (made, changed, or newly tagged) is bound where its lines
+    stand. -> (why it is refused, or None; receipt lines). A verb's, a lens's or a wake's line with a word nothing
+    answers is refused (nothing changes); a rule is kept, and saved broken by the rules (a1027)."""
+    w = desk.world
+    notes, changed_verbs = [], []
+    for key, (kind, text) in stored_texts(w).items():
+        if before.get(key) == (kind, text):
+            continue
+        entry = bind_text(desk, kind, text, holder_home(w, key, kind), w.me)
+        if entry["missing"] and kind != "rule":
+            why = next(iter(entry["missing"].values()))
+            aid = key[1] if key[0] == "n" else _aid(w, w.subjects[key[1]])
+            what = {"verb": f"the verb {aid}'s lines are stored text, judged where it lives",
+                    "lens": f"the lens {aid}'s acts are stored text, judged in the room holding it",
+                    "wake": "a wake line is stored text, judged in the corner it is set on"}[kind]
+            return f"{what}: {why}", []
+        keep_binding(w, key, entry)
+        if entry["words"]:
+            notes.append(f"~ {holder_label(w, key, kind)}: its words are bound (a1156): " + ", ".join(
+                f"{wd} → {rec['at']}" if not rec.get("thing") else f"{wd} → the verb on the thing it is used on"
+                for wd, rec in entry["words"].items()))
+        old = before.get(key)
+        if kind == "verb" and old is not None and old[0] == "verb" and _steps(old[1]) != _steps(text):
+            changed_verbs.append(key[1])
+    for vsid in changed_verbs:
+        notes += tell_users(desk, vsid)
+    return None, notes
+
+
+def binding_lines(w, key, text, indent="  "):
+    """What examine and help say of a holder's binding."""
+    b = binding_of(w, key, text)
+    if not b:
+        return []
+    out = []
+    if b["words"]:
+        parts = []
+        for wd, rec in b["words"].items():
+            if rec.get("thing"):
+                parts.append(f"{wd} → the verb on the thing it is used on")
+                continue
+            s = _verb_named(w, rec["id"])
+            parts.append(f"{wd} → {rec['at']}" + ("" if s else " (gone: these lines fail until saved again)"))
+        out.append(f"{indent}its words are bound (saved by {b.get('by') or '?'}): " + ", ".join(parts))
+    for wd in b["missing"]:
+        out.append(f"{indent}{wd} is bound to nothing: nothing answered it when these lines were saved")
+    return out
 
 
 def visible(desk, word, me):
@@ -313,6 +727,9 @@ def describe(desk, s):
             f"{_author(w, s['id']) or '?'}, {home})\n"
             + ("".join(f"  {d}\n" for d in doc) if doc else "")
             + "  does:\n" + "".join(f"    {l}\n" for l in steps)
+            + "".join(l + "\n" for l in binding_lines(w, ("s", s["id"]), s["text"]))
+            + (f"  stands over {(s.get('props') or {})['overrides']} where it lives (overrides=)\n"
+               if (s.get("props") or {}).get("overrides") else "")
             + "  read it, change it or move it like any note (its prop on= says where it lives)")
 
 
@@ -344,7 +761,18 @@ def run(desk, s, words, me, this=None, rest=None):
         raise Refusal(f"{name} needs {need[-1]} word(s) after it; got {len(words)}. help {name}")
     ctx = blanks.Ctx("verb", args=[blanks.word(desk, x) for x in words], me=me, this=this, name=name,
                      rest=" ".join(words) if rest is None else rest, home=home(w, s))
+    ctx.binds = binding_of(w, ("s", s["id"]), s["text"])       # a1156: its own lines mean what they meant when saved
     tag = f"{name} {w.appearances_of(s['id'])[0]}"
+    ov_said = str((s.get("props") or {}).get("overrides", "")).strip()
+    if ov_said:
+        # Juniper c1337: a verb standing over another says so on every receipt; if that one is gone or renamed, the
+        # override fails loudly, like a bound line (a1156 (2))
+        o = _verb_named(w, ov_said)
+        if o is None or not set(_names(o["title"])) & set(_names(s["title"])):
+            raise Refusal(f"{tag} overrides {ov_said}, which is " + ("gone" if o is None else f"now {o['title']!r}")
+                          + f"; the override fails until it is said again: do prop {_aid(w, s)} overrides=<the verb it "
+                            f"stands over>, or remove=overrides")
+        tag += f" {_desc(w, s)}, over {name} {_aid(w, o)} {_desc(w, o)}"
     shown = blanks.show(desk, body, ctx)
     n0 = len(w.events)
     desk._verb_depth = depth + 1
