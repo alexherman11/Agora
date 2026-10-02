@@ -677,7 +677,7 @@ class Desk:
             geo = self._geom(nid) if n["parent"] else f"{n['w']}x{n['h']}"
             bits.append(geo)
             if n.get("props"):
-                bits.append(" ".join(f"{k}={v}" for k, v in n["props"].items()))
+                bits.append(" ".join(f"{k}={v}" for k, v in persons.shown_props(w, n["props"]).items()))
             bits.append(f"{len(kids)} inside" if kids else "empty")
             if kids and n["layout"] != "free":
                 axis = "h" if n["layout"] == "column" else "w"
@@ -714,7 +714,7 @@ class Desk:
                 st = promises.state(w, s["id"])
                 bits.append(promises.phrase(w, st) + (f" · about {st['about']}" if st["about"] else ""))
             elif s.get("props"):
-                bits.append(" ".join(f"{k}={v}" for k, v in s["props"].items() if k not in ("label", "started")))
+                bits.append(" ".join(f"{k}={v}" for k, v in persons.shown_props(w, s["props"]).items() if k not in ("label", "started")))
             if s["kind"] in ("note", "task", "chat", "doc", "trial"):
                 bits.append(f"{len(s['text'].split())}w")
             if n["folded"]:
@@ -1024,7 +1024,7 @@ class Desk:
             head += f" · due {s['due']}"
         props = s.get("props") or {}
         if props:        # Astra awareness, Juniper (juniper-8 c): read hid a task's status and awaiting; it prints them, and so has read them
-            head += " · " + " ".join(f"{k}={v}" for k, v in props.items())
+            head += " · " + " ".join(f"{k}={v}" for k, v in persons.shown_props(w, props).items())
         secs = w.sections(s["text"])
         named = [(h, b) for h, b in secs if h]
         body = s["text"]
@@ -1492,7 +1492,7 @@ class Desk:
 
     def _fmt_args(self, args):
         def one(k, v):
-            v = str(v)
+            v = str(persons.shown(self.world, v))      # a1590: a person id prints as the person's name
             if len(v) > 200:     # Moss: the receipt echoed the whole document back. Say its size; `read` has the rest.
                 return f"{k}=<{len(v.split())} words, {len(v.splitlines())} lines, begins {v[:40]!r}>"
             return f"{k}={v!r}" if " " in v else f"{k}={v}"

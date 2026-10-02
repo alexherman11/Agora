@@ -82,6 +82,9 @@ def all_rooms(w):
 
 def corner_of(w, actor):
     a = str(actor or "").lower()
+    import persons
+    if persons.is_pid(w, a):          # a1590: a person prop may hold the person (corner:p2919)
+        return persons.corner(w, a)
     for fid, n in w.nodes.items():
         p = n.get("props") or {}
         if n["type"] == "surface" and p.get("role") == "resident" and str(p.get("actor", "")).lower() == a and a:
@@ -183,9 +186,10 @@ def kind_of(w, actor):
         return "agent"
     if corner_of(w, a):
         return "resident"
+    import persons
     for n in w.nodes.values():
-        if n["type"] == "surface" and a in {x.strip().lower() for x in str((n.get("props") or {}).get("person", "")).split(",")}:
-            return "person"
+        if n["type"] == "surface" and persons.holds(w, (n.get("props") or {}).get("person", ""), a):
+            return "person"        # a1590: person= holds the person (Alex's p id), read by person
     return "agent"
 
 
@@ -526,7 +530,8 @@ def item_line(desk, nid):
         return f"{nid} {kind} \"{title}\"" + (f" · {k} inside" if k else " · empty")
     s = w.subjects[n["subject"]]
     p = s.get("props") or {}
-    bits = [x for x in (p.get("status"), f"owner {p['owner']}" if p.get("owner") else "", f"due {s['due']}" if s.get("due") else "") if x]
+    import persons
+    bits = [x for x in (p.get("status"), f"owner {persons.shown(w, p['owner'])}" if p.get("owner") else "", f"due {s['due']}" if s.get("due") else "") if x]
     return f"{nid} {s['kind']} \"{title}\"" + (" · " + " · ".join(bits) if bits else "")
 
 

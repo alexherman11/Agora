@@ -532,7 +532,11 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
         for k in node.get("kids") or []:
             stamp(k)
     try:
-        sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
+        import persons
+        import verbs
+        b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
+        with persons.reading(desk, (b or {}).get("persons")):
+            sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
         stamp(sc)
         good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
         return sc

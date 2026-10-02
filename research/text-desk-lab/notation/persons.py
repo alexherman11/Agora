@@ -10,8 +10,14 @@ person's name, with a mark only where two persons have borne it: 'pike, first' i
 bearer is never marked.
 
 Forgiving to people, strict to stored text (a990): a typed name means today's bearer and names the door to an earlier
-one (pike,first); a person id always means that person. Stored names in props, queries and chat signatures are not
-read through persons yet: that is phase 2 (a1590), so nothing migrates twice.
+one (pike,first); a person id always means that person.
+
+Phase 2 (a1590): stored names become persons when saved. A prop that names a person (PERSON_KEYS: owner=, asked_by=,
+person=) holds the person's id, and prints as their name (`shown`), so people type and read names as before and the
+store holds who they meant. A stored line's names (a view's query, a rule, a lens, a wake, a verb's lines) are bound to
+persons when the line is saved, in the binding a1156 keeps with it (its `persons`), and a selection read for that line
+means those persons; $me is never bound. `migrate` binds everything saved before this, once, each name to the person
+who bore it when it was written, found by its event's time. Chat signatures are a1581's; promises' to= are a1576's.
 
 Nothing here runs until `person begin` has made the persons of a world (once, by one undoable event). Before that,
 and in every world that never runs it, every function here answers as the names did: who= is absent, a label is by=.
@@ -463,3 +469,301 @@ def listing(w):
 
 
 # a1595: help person is a note in the Help binder (helpnotes.py); the arguments are DeskKnife.USAGE["person"]
+
+
+# ---- phase 2 (a1590): stored names become persons when saved --------------------------------------------------------
+
+PERSON_KEYS = ("owner", "asked_by", "person")          # props whose value names a person (person=: a1062's Desktop)
+TERMS = ("held-by", "asked-of", "owed-to", "asked-by", "awaits", "offered-to")     # promise terms that name one (a1587)
+_ORD = "|".join(ORDINALS + ("last",))
+_DOOR = rf"[\w-]+(?:,[ \t]*(?:{_ORD})\b)?"            # a name, with its door mark when it has one (juniper,first)
+STORED = re.compile(rf"(?<![\w])(?:prop:)?({'|'.join(PERSON_KEYS)})=\"?({_DOOR})|(?<![\w-])({'|'.join(TERMS)}):({_DOOR})")
+
+
+def is_pid(w, v):
+    v = str(v or "").strip()
+    return bool(PID.match(v)) and is_person(w, v)
+
+
+def words(v):
+    """A prop value's names: split at commas, except the comma of a door mark (juniper,first is one name)."""
+    return [x.strip() for x in re.split(rf",(?![ \t]*(?:{_ORD})\b)", str(v or "")) if x.strip()]
+
+
+def key(word):
+    """How a bound word is kept: lower case, its door mark closed up (juniper, first -> juniper,first)."""
+    return re.sub(r",\s+", ",", str(word or "").strip().lstrip("@").strip("\"'").lower())
+
+
+def shown(w, v):
+    """A stored value as people read it: each person id in it is the person's name, with its door mark where two
+    persons bore it (juniper,first, which typed back means the same person). Anything else prints as it is."""
+    if v is None or not on(w):
+        return v
+    parts = words(v)
+    if not any(is_pid(w, p) for p in parts):
+        return v
+    return ",".join(door(w, p) if is_pid(w, p) else p for p in parts)
+
+
+def shown_props(w, props):
+    return {k: shown(w, v) for k, v in (props or {}).items()} if on(w) else dict(props or {})
+
+
+def resolve(w, word, binds=None):
+    """A name in a prop value or a selection -> (person id, a note for the receipt) or (None, ""). A person id is that
+    person; a word the stored line being read was bound to at save is that person ("bound"); else a typed name: today's
+    bearer, naming the door to an earlier one."""
+    raw = str(word or "").strip().lstrip("@").strip("\"'")
+    if is_pid(w, raw):
+        return raw, ""
+    if binds and key(raw) in binds and is_pid(w, binds[key(raw)]):
+        return binds[key(raw)], "bound"
+    hit = typed(w, raw)
+    return hit if hit else (None, "")
+
+
+def store_args(w, kv, binds=None):
+    """Before an act sets props (create, prop): each name in a person prop becomes the person's id, so the store holds
+    who was meant. Typing doesn't change: owner=juniper is today's Juniper. -> receipt lines (a door to another bearer,
+    or a name no one bears, kept as a word)."""
+    if not on(w):
+        return []
+    notes = []
+    for k in PERSON_KEYS:
+        if k not in kv or not str(kv[k]).strip():
+            continue
+        out = []
+        for x in words(kv[k]):
+            if x.startswith("$") or norm(x) in NOT_PERSONS:
+                out.append(x)
+                continue
+            pid, how = resolve(w, x, binds)
+            if pid:
+                out.append(pid)
+                if how and how != "bound":
+                    notes.append(f"~ {k}={x}: {how}")
+            else:
+                out.append(x)
+                notes.append(f"~ {k}={x}: no one here bears the name {x}, so it is kept as a word and names no person "
+                             f"(a1590: a person prop holds a person; person lists them)")
+        kv[k] = ",".join(out)
+    return notes
+
+
+def matches(w, have, want, binds=None):
+    """prop:<person key>=<want> against a stored value: the same person (by id), or, for a value kept as a word (no
+    one bore it when it was set), the same word."""
+    pid = resolve(w, want, binds)[0] if on(w) else None
+    for x in words(have):
+        if x == want or (pid and x == pid):
+            return True
+    return False
+
+
+def holds(w, value, who):
+    """Does a person prop's value (person=alex,sable; owner=p2917) name `who` (a name, read as today's bearer, or a
+    person id)? By words in a world without persons."""
+    want = str(who or "").strip().lower()
+    pid = want if is_pid(w, want) else (today(w, want) if want and on(w) else None)
+    return any(x.lower() == want or (pid and x == pid) for x in words(value))
+
+
+def stored_words(text):
+    """The names a stored line names persons by: prop:owner=juniper, owner=juniper in a do line, held-by:pike ... ($me
+    and awaits:any are never bound)."""
+    out = []
+    for m in STORED.finditer(str(text or "")):
+        wd = key(m.group(2) or m.group(4))
+        if wd and wd != "any" and wd not in out and norm(wd) not in NOT_PERSONS:
+            out.append(wd)
+    return out
+
+
+def bind_words(w, text, k=None):
+    """-> {word: person id} for the names in stored `text`: as its writer means them now (k None: today's bearer, when
+    it is saved), or as they were meant at event number k (the migration). A name no one bears is left unbound."""
+    out = {}
+    if not on(w):
+        return out
+    for wd in stored_words(text):
+        name, _, mark = wd.partition(",")
+        if is_pid(w, wd):
+            pid = wd
+        elif k is None or mark:
+            pid = resolve(w, wd)[0]
+        else:
+            pid = at(w, name, k)
+        if pid:
+            out[wd] = pid
+    return out
+
+
+def bound_note(w, binds):
+    return ", ".join(f"{wd} → {label(w, pid)} ({pid})" for wd, pid in (binds or {}).items())
+
+
+class reading:
+    """`with persons.reading(desk, binds):` a selection read inside means these bound persons (a view's query, a lens)."""
+
+    def __init__(self, desk, binds):
+        self.desk, self.binds = desk, binds
+
+    def __enter__(self):
+        st = getattr(self.desk, "_pstack", None)
+        if st is None:
+            st = self.desk._pstack = []
+        st.append(dict(self.binds or {}))
+
+    def __exit__(self, *a):
+        self.desk._pstack.pop()
+
+
+def active(desk):
+    """The persons of the stored line being read now, or None (a typed line: today's bearers)."""
+    st = getattr(desk, "_pstack", None)
+    if st:
+        return st[-1]
+    import verbs
+    b = verbs.bound(desk) or getattr(desk, "_parse_binds", None)
+    return (b or {}).get("persons") if b else None
+
+
+# ---- the migration, once per world ----------------------------------------------------------------------------------
+
+def _set_at(w, ids, k):
+    """The number of the latest live event that set prop k on any of ids, or None."""
+    for e in reversed(w.events):
+        if e.get("undone") or e["verb"] == "undo":
+            continue
+        a = e.get("args") or {}
+        if k not in a:
+            continue
+        made = (e.get("undo") or {}).get("delete") if isinstance(e.get("undo"), dict) else None
+        if e["target"] in ids or made in ids:
+            return _num(e["id"])
+    return None
+
+
+def _written_at(w, hkey):
+    """The number of the event that wrote a stored line holder's current text (made it, or last changed it)."""
+    kind, hid = hkey
+    for e in reversed(w.events):
+        if e.get("undone") or e["verb"] == "undo":
+            continue
+        a = e.get("args") or {}
+        made = (e.get("undo") or {}).get("delete") if isinstance(e.get("undo"), dict) else None
+        if kind == "s":
+            ids = {hid} | set(w.appearances_of(hid))
+            if (e["verb"] == "create" and (made in ids or (made in w.nodes and w.nodes[made].get("subject") == hid))) \
+                    or (e["target"] in ids and e["verb"] in ("edit", "rewrite", "replace", "append")
+                        and ("text" in a or "append" in a or "new" in a or "line" in a)):
+                return _num(e["id"])
+        elif kind == "q":
+            if "query" in a and (e["target"] == hid or made == hid):
+                return _num(e["id"])
+        elif e["target"] == hid and "wake" in a:
+            return _num(e["id"])
+    return None
+
+
+def migrate(desk):
+    """a1590 (3): once per world, after its persons are made. Every person prop and every stored line saved before
+    this binds each name to the person who bore it when it was written, found by its event's time: never guessed, and
+    never today's bearer by default. A name with no event to time it is left as it is and named. One event by the house,
+    undoable; its note counts what bound to an earlier person, and names each."""
+    import verbs
+    from copy import deepcopy
+    w = desk.world
+    if getattr(w, "_persons_version", 0) >= 2 or not on(w):
+        return None
+    w._persons_version = 2
+    props_before, binds_before, earlier, untimed, changed = [], [], [], [], []
+    nprops = nlines = 0
+    for kind, obj in [("s", s) for s in w.subjects.values() if s.get("kind") != "person"] + \
+                     [("n", n) for n in w.nodes.values() if n["type"] == "surface"]:
+        props = obj.get("props") or {}
+        todo = [k for k in PERSON_KEYS if props.get(k) and not all(is_pid(w, x) for x in words(props[k]))]
+        if not todo:
+            continue
+        ids = {obj["id"]} | (set(w.appearances_of(obj["id"])) if kind == "s" else set())
+        prev, did = dict(props), False
+        for k in todo:
+            n = _set_at(w, ids, k)
+            out = []
+            for x in words(props[k]):
+                name, _, mark = key(x).partition(",")
+                if is_pid(w, x) or norm(x) in NOT_PERSONS or not index(w).bearers(name):
+                    out.append(x)
+                    continue
+                if n is None:
+                    untimed.append(f"{obj['id']} {k}={x}")
+                    out.append(x)
+                    continue
+                pid = resolve(w, x)[0] if mark else at(w, name, n)
+                if not pid:
+                    out.append(x)
+                    continue
+                out.append(pid)
+                did = True
+                nprops += 1
+                if pid != today(w, name):
+                    shown_id = (w.appearances_of(obj["id"]) or [obj["id"]])[0] if kind == "s" else obj["id"]
+                    earlier.append(f"{shown_id} {k}={x} (set e{n}) → {label(w, pid)} ({pid})")
+            if out != words(props[k]):
+                props[k] = ",".join(out)
+        if did:
+            props_before.append((kind, obj["id"], prev))
+            changed.append(obj["id"])
+    for hkey, (hkind, text) in verbs.stored_texts(w).items():
+        found = stored_words(text)
+        if not found:
+            continue
+        b = verbs.binding_of(w, hkey, text)
+        if b and b.get("persons") is not None:
+            continue
+        n = _written_at(w, hkey)
+        if n is None:
+            untimed.append(f"{verbs.holder_label(w, hkey, hkind)}: {', '.join(found)}")
+            continue
+        binds = bind_words(w, text, n)
+        if not binds:
+            continue
+        holder = w.subjects[hkey[1]] if hkey[0] == "s" else w.nodes[hkey[1]]
+        binds_before.append((hkey[0], hkey[1], deepcopy(holder.get("qbinds" if hkey[0] == "q" else "binds"))))
+        entry = deepcopy(b) if b else {"text": text, "words": {}, "missing": {}, "by": None, "lines": {}}
+        entry["persons"] = binds
+        verbs.keep_binding(w, hkey, entry)
+        nlines += 1
+        changed.append(hkey[1])
+        for wd, pid in binds.items():
+            if pid != today(w, wd.partition(",")[0]):
+                earlier.append(f"{verbs.holder_label(w, hkey, hkind)} (written e{n}): {wd} → {label(w, pid)} ({pid})")
+    if not (props_before or binds_before or untimed):
+        return None
+    _cache.pop(w, None)
+    note = (f"a1590: stored names became persons, each the person who bore the name when it was written: {nprops} "
+            f"name(s) in props, {nlines} stored line(s). {len(earlier)} bound to an earlier person"
+            + (": " + "; ".join(earlier) if earlier else "")
+            + (f". {len(untimed)} left as they were, with no event to time them: " + "; ".join(untimed) if untimed else ""))
+    ev = w._event("person", "persons", {"bound": nprops, "lines": nlines, "earlier": len(earlier)},
+                  {"persons_migrate": {"props": props_before, "binds": binds_before}}, actor="house", note=note)
+    ev["changed"] = sorted(set(changed))
+    return ev
+
+
+def unmigrate(w, data):
+    """The undo of migrate: each prop and binding as it was. It never runs again (the world remembers it ran)."""
+    for kind, oid, prev in data.get("props") or []:
+        obj = (w.subjects if kind == "s" else w.nodes).get(oid)
+        if obj is not None:
+            obj["props"] = dict(prev)
+    for kind, oid, prev in data.get("binds") or []:
+        obj = (w.subjects if kind == "s" else w.nodes).get(oid)
+        if obj is None:
+            continue
+        slot = "qbinds" if kind == "q" else "binds"
+        if prev is None:
+            obj.pop(slot, None)
+        else:
+            obj[slot] = prev
