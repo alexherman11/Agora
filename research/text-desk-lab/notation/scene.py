@@ -324,7 +324,7 @@ SOURCES = {
     "messages": ("messages:<id>", ("item", "who", "said", "index", "at", "line", "to", "edited")),
     # Alex, 30 Sep: what's for me, one list, oldest first like a chat (newest at the bottom), each line saying which
     # chat it came from and when
-    "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid", "line")),
+    "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid", "line", "before")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
     "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),
@@ -418,8 +418,13 @@ def inbox_rows(desk, me):
     """Every chat line for `me`, oldest first like a chat: a line in a chat whose members name me (a direct chat), or one that
     calls @me by name outside quotes. @everyone and @all don't count (Alex, 30 Sep: 'just direct chats and @alex';
     a broadcast in a shared chat stayed 'for you' forever, since he rarely writes there). Narrower than what reaches
-    a resident (house.news), on purpose. `open` says no line of mine has followed it in that chat yet."""
+    a resident (house.news), on purpose. `open` says no line of mine has followed it in that chat yet.
+    a2692: one rule with the knock and the receipt (rooms.calls): nothing shows from a chat I can't read now, however
+    it was addressed. A line addressed to me before I could read its chat (I joined since) shows, and `before` says so,
+    since it never knocked me (Pike c2697: the knock is a happening, read as membership was; For you is a showing, read
+    as it is)."""
     import re
+    import rooms
     from world import unquoted
     w, me = desk.world, str(me or "").lower()
     if not me:
@@ -431,10 +436,9 @@ def inbox_rows(desk, me):
             where[n["subject"]] = nid
     out = []
     for sid, s in w.subjects.items():
-        if s["kind"] != "chat" or sid not in where:
+        if s["kind"] != "chat" or sid not in where or not rooms.can_read(w, s, me):
             continue
-        members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
-        direct = me in members and "all" not in members
+        direct = "all" not in rooms.members_of(s) and rooms.member(w, s, me)
         tl = text_lines(w, sid)
         mine_after = False                  # walking back from the end: has a line of mine come after this one?
         for k in range(len(tl) - 1, -1, -1):
@@ -447,11 +451,15 @@ def inbox_rows(desk, me):
             said = text[m.end():] if m else text
             # a1581: a line is for me when its writer addressed me (its stored to=), never by searching its words; a
             # chat from before lines (no line) is still read by its words. A direct chat is for me by its membership.
-            if who and (direct or (me in line["to"] if line is not None else called.search(unquoted(said)))):
+            named = (rooms.calls(w, s, [n for n in line["to"] if n not in rooms.EVERYONE], me) if line is not None
+                     else bool(called.search(unquoted(said))))
+            if who and (direct or named):
+                before = named and eid and not rooms.can_read(w, s, me, at=eid)
                 # eid keys the row (the line's own event), so a line keeps its place in the painter as newer ones arrive
                 out.append({"item": where[sid], "chat": s["title"], "who": m.group(0).rstrip(" \t:"), "said": said,
                             "at": _clock(at), "open": "no" if mine_after else "yes", "index": k + 1,
-                            "eid": eid or f"{where[sid]}-{k + 1}", "line": line["id"] if line else "", "_t": at})
+                            "eid": eid or f"{where[sid]}-{k + 1}", "line": line["id"] if line else "",
+                            "before": "addressed to you before you could read this chat" if before else "", "_t": at})
     out.sort(key=lambda r: r.pop("_t") or "")
     return out
 
