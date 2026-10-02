@@ -57,19 +57,18 @@ ADDRESS = re.compile(r"(?<![\w@])@([A-Za-z][\w]*(?:-[\w]+)*)")
 # address is its header, the run of @names that opens it, after the world's signature ('Juniper: ') and the writer's
 # own name if they typed one ('Juniper, @sable @pike: hi'), and a 'for' ('Claude, for @sable: ...'). Names in the run
 # may be parted by spaces, commas, 'and', 'or' or '&'; anything else ends it. An @ after the header is a mention: it
-# calls no one, quoted or not. The house reads comments and the lines a note edit adds by the same rule.
+# calls no one, quoted or not. Comments and note edits are not read by it yet (a2733).
 SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
 _HEAD_SEP = re.compile(r"(?:[\s,;&+]|\band\b|\bor\b)*", re.I)
 _HEAD_AT = re.compile(r"@([A-Za-z]\w*(?:-\w+)*)(?![\w@'’])")
 
 
-def header(text, writer=None, signed=True):
+def header(text, writer=None):
     """-> (names, end): the names a line's header addresses, lower-case, in order, each once, and where the header
-    ends in `text`. `writer` is whose own name may open it as a signature; a signed line ('Juniper: ...') says it.
-    signed=False for words the world did not sign (a comment, a note's line), where 'Owner: @pike' is no signature."""
+    ends in `text`. `writer` is whose own name may open it as a signature; a signed line ('Juniper: ...') says it."""
     t = str(text)
     i = 0
-    m = SPEAKER.match(t) if signed else None
+    m = SPEAKER.match(t)
     if m:
         writer, i = writer or m.group(1), m.end()
     if writer:

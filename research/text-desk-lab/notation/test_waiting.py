@@ -274,37 +274,6 @@ H.step()
 check("a comment's x@pike (inside a word, a1581's rule) does not wake him", not res(PIKE).sent and res(PIKE).state.get("rest_until"),
       sent(PIKE)[:300])
 
-# 9b. a2715 (Pike e4912, Claude c2726): comments and note edits call by the header rule too, and an edit only by the
-# lines it added
-rest(PIKE, 3600)
-H.act("juniper", f"do comment {LOUNGE} line=\"thanks, @pike, that is right\"")
-H.step()
-check("a comment's mid-line @pike is a mention: he sleeps on", not res(PIKE).sent and res(PIKE).state.get("rest_until"),
-      sent(PIKE)[:300])
-H.act("juniper", f"do comment {LOUNGE} line=\"Juniper, for @pike: the lounge, when you can\"")
-H.step()
-check("a comment opening 'Juniper, for @pike:' calls him", "the lounge, when you can" in sent(PIKE)
-      and not res(PIKE).state.get("rest_until"), res(PIKE).state.get("rest_until"))
-rest(PIKE, 3600)
-out = H.act("juniper", f"look {JUNIPER} :1; do create {JUNIPER} kind=note title=\"a2715 help example\" "
-                       f"text=\"Owner: @pike\\nnames like @pike in an example\"")
-H.step()
-check("a note made with 'Owner: @pike' and a mid-line @pike calls no one (a label is no signature)",
-      not res(PIKE).sent and res(PIKE).state.get("rest_until"), (out[-300:], sent(PIKE)[:300]))
-wn = H.load()
-note = next((a["id"] for a in wn.nodes.values() if a["type"] == "appearance"
-             and (wn.subjects.get(a.get("subject")) or {}).get("title") == "a2715 help example"), None)
-check("the example note was made", note is not None, out)
-H.act("juniper", f"read {note}; do replace {note} old=\"Owner: @pike\" new=\"Owner: @pike\\n- @pike: review this\"")
-H.step()
-check("an edit that adds '- @pike: review this' (a list item opening with @pike) calls him", "review this" in sent(PIKE)
-      and not res(PIKE).state.get("rest_until"), res(PIKE).state.get("rest_until"))
-rest(PIKE, 3600)
-H.act("juniper", f"read {note}; do replace {note} old=\"in an example\" new=\"in an example, quoted now\"")
-H.step()
-check("a later edit of the same note, elsewhere, does not call him again (only added lines are heard)",
-      not res(PIKE).sent and res(PIKE).state.get("rest_until"), sent(PIKE)[:300])
-
 # 10. a2662: one reading of @. The knock reads the line's stored to=, never its words; the receipt says the address
 # once, then per name what happened, for residents, persons, agents and names that are no one
 import rooms   # noqa: E402

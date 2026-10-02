@@ -57,7 +57,6 @@ import subprocess
 import sys
 import threading
 import time
-from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -80,7 +79,6 @@ except ImportError:
 
     def unquoted(text):
         return QUOTED.sub(" ", str(text))
-BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")     # a2715: a note's list item may open with one, then its header
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
@@ -589,32 +587,17 @@ class House:
         a1062: while it is `resting`, a line that would call it from a resident or agent is kept for you (for_you) and
         said first at its next wake, marked for it. a1566 (Alex, e3710, e3802: 'a resident's @ should knock'): an @name
         or @everyone from anyone ends the rest now, as a person's does; only a resident's or agent's plain line in its
-        own corner's chat (a visitors' book) still waits for the next wake. A chat line calls by its stored to=; a comment
-        or note edit by the @names that open its lines (a2715, world.header), an edit only by the lines it added.
-        wake <name> (a call= on the corner) calls."""
+        own corner's chat (a visitors' book) still waits for the next wake. An @ counts only outside quotes and
+        backticks (unquoted, a916). wake <name> (a call= on the corner) calls."""
         import rooms
         start = r.state.get("cursor", len(w.events))
         inbox, urgent = r.state.setdefault("inbox", []), False
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
 
-        try:
-            from world import header
-        except ImportError:          # a house still holding the world module from before a2715 (see the import above)
-            header = None
-
-        def named(text, by=None):
-            # outside a chat line only a name reaches (a916), read at hearing time: a comment or note has no stored to=.
-            # a2715 (Pike e4912): by the rule a chat line's address is, line by line: only the @names that open a line
-            # (world.header, after the writer's own name and an optional 'for') call; a note's line may open with a
-            # list bullet first. An @ later in a line is a mention.
-            if header is None:
-                return [m.group(0) for m in ADDRESS.finditer(unquoted(text)) if rooms.same_person(w, m.group(1), actor)]
-            out = []
-            for line in str(text).splitlines():
-                for n in header(BULLET.sub("", line, count=1), by, signed=False)[0]:
-                    if rooms.same_person(w, n, actor) and "@" + n not in out:
-                        out.append("@" + n)
-            return out
+        def named(text):
+            # outside a chat line only a name reaches (a916). a2662: read by the rule a chat line's address is
+            # (world.ADDRESS, outside quotes, never inside a word), at hearing time: a comment or note has no stored to= yet
+            return [m.group(0) for m in ADDRESS.finditer(unquoted(text)) if rooms.same_person(w, m.group(1), actor)]
         for e in w.events[start:]:
             if e.get("by") == actor or e.get("undone"):
                 continue
@@ -666,19 +649,13 @@ class House:
             # a916, as Sable, Pike and Juniper agreed: outside a chat line, @everyone and @all never reach anyone (a
             # broadcast from a document edit is almost never meant; a chat line is the place for it), @name in a note,
             # task or comment still reaches that person, and nothing inside quotes or backticks counts
-            heard_in = "\n".join(str(v) for v in args.values() if isinstance(v, str))
+            heard_in = said
             if "text" in args and e["verb"] == "edit":
-                # Pike a611: rewriting a note that already named you is not news. a2715 (Claude c2726): an edit is heard
-                # only by the lines it added or changed, never the whole text again on every save
-                was = Counter(str(((e.get("undo") or {}).get("restore_subject") or {}).get("text", "")).splitlines())
-                added = []
-                for line in str(args["text"]).splitlines():
-                    if was[line] > 0:
-                        was[line] -= 1
-                    else:
-                        added.append(line)
-                heard_in = "\n".join(added + [str(v) for k, v in args.items() if k != "text" and isinstance(v, str)])
-            m = named(heard_in, e.get("by"))
+                # Pike a611: rewriting a note that already named you is not news; only a mention the new text adds is
+                old = ((e.get("undo") or {}).get("restore_subject") or {}).get("text", "")
+                if len(named(args["text"])) <= len(named(old)):
+                    heard_in = " ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str))
+            m = named(heard_in)
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
                 if waits:                                          # a1566: a mention is kept first, and knocks
