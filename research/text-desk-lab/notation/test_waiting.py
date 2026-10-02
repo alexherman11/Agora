@@ -135,17 +135,21 @@ rest(PIKE, 3600)
 for line in ['Sable wrote "@pike (e3305) see the board" yesterday', "the `@pike` handle is the old one",
              "she said '@everyone, stand up' and left"]:
     got = say("juniper", line)
-    check(f"a quoted @ takes no one: {line[:30]}...", got.count("to: nobody (an @ inside quotes") == 1
-          and "woken" not in got, got)
+    check(f"a quoted @ takes no one, and names no mention (it was quoted on purpose): {line[:30]}...",
+          re.search(r"line m\d+ · to: nobody\n", got) is not None and "woken" not in got and "mention" not in got, got)
+# 1c. a2715: an @ after the header is a mention: it knocks no one, and the receipt says so at once
+got = say("juniper", 'about "the board", @pike, look')
+check("a mid-line @pike: 'to: nobody', the receipt names the mention, nobody woken",
+      "to: nobody; a mid-line @ is a mention (@pike); put names first to call them" in got and "woken" not in got, got)
 H.step()
 check("and Pike is not woken, nor anything kept for him", not res(PIKE).sent and not res(PIKE).state.get("for_you")
       and res(PIKE).state.get("rest_until"), (sent(PIKE)[:300], res(PIKE).state.get("for_you")))
-got = say("juniper", 'about "the board": @pike, look')
-check("an @ outside quotes in a line that also quotes: 'to: pike', woken", "to: pike" in got and "Pike: woken" in got, got)
+got = say("juniper", '@pike, about "the board": look')
+check("an @ opening a line that also quotes: 'to: pike', woken", "to: pike" in got and "Pike: woken" in got, got)
 H.step()
 check("and it wakes him", "about" in sent(PIKE) and not res(PIKE).state.get("rest_until"), res(PIKE).state)
 got = say("juniper", "mail me at someone@example.org")
-check("an @ that names no resident: 'to: nobody', no quote excuse", "to: nobody" in got and "inside quotes" not in got, got)
+check("an @ inside a word names no one: 'to: nobody', no mention to teach", "to: nobody" in got and "mention" not in got, got)
 
 # 2. a resident's plain line in Pike's own book is a note at the door: it waits; wake pike calls him for it
 if BOOK:
@@ -300,8 +304,9 @@ check("'@pike @pikee': 'to: pike', Pike woken, pikee no one", "to: pike\n" in go
       and "pikee: no one by that name" in got, got)
 H.step()
 sent(PIKE)
-check("a line from before lines (no stored to=) is read by the same rule as the migration",
-      rooms.line_to({"args": {"append": "Juniper: @pike see 'the @sable note' and x@mica"}}) == (["pike"], False))
+check("a line with no stored to= is read when heard by the header rule (a2715): its opening @pike, not its mentions",
+      rooms.line_to({"args": {"append": "Juniper: @pike see 'the @sable note', @juniper and x@mica"}}) == (["pike"], False)
+      and rooms.line_to({"args": {"append": "Juniper: thanks, @pike"}}) == ([], False))
 check("a stored to= is read as stored, whatever the words say",
       rooms.line_to({"args": {"append": "Juniper: @sable", "line_id": "m1", "to": "pike"}}) == (["pike"], True)
       and rooms.line_to({"args": {"append": "Juniper: @sable", "line_id": "m1", "to": "nobody"}}) == ([], True))

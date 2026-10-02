@@ -217,8 +217,8 @@ def someone(w, name):
 def line_to(e):
     """a2662: whom a chat line's append event addressed, as one reading for the house's knock and the speaker's
     receipt: the line's stored to= (a1581: the writer's word, kept on the event with its line_id), or, for a line with
-    no stored address (said before lines, or in a chat whose lines are not things), its words read by the same rule
-    the migration used (world.addressed). -> (names, stored)"""
+    no stored address (said before lines, or in a chat whose lines are not things), its words read when heard by the
+    header rule a new line's address is (world.addressed, a2715). -> (names, stored)"""
     from world import addressed, to_names
     args = e.get("args") or {}
     if "line_id" in args:
@@ -284,7 +284,7 @@ def waiting_note(desk, nid, text):
     resident or agent is shown first at that wake, marked for them. A person: 'Alex: a person; it waits in their For
     you'. An agent: not knocked, and where it waits. A name that is no one: 'pikee: no one by that name'."""
     import scene
-    from world import ADDRESS, addressed
+    from world import ADDRESS, MENTION_NOTE, addressed, mentions
     w = desk.world
     n = w.nodes.get(nid)
     sid = n.get("subject") if n else nid
@@ -292,7 +292,7 @@ def waiting_note(desk, nid, text):
     if not s or s["kind"] != "chat":
         return ""
     e = next((x for x in reversed(w.events) if x["target"] in (nid, sid) and "append" in (x.get("args") or {})), None)
-    to, stored = line_to(e) if e else (addressed(text), False)
+    to, stored = line_to(e) if e else (addressed(text, w.me), False)
     no_one = [a for a in to if not someone(w, a)]
     out = []
     if stored:
@@ -300,8 +300,10 @@ def waiting_note(desk, nid, text):
         no_one = to_names((e.get("args") or {}).get("no_one"))     # the world left them out of to=, and kept them here
     elif to or ADDRESS.search(str(text)):
         to = [a for a in to if a not in no_one]
-        out.append("to: " + (", ".join(to) or "nobody") + (" (read from its words: this line has no stored address)" if to
-                   else " (an @ inside quotes or backticks calls no one)" if not no_one else ""))
+        said = (e.get("args") or {}).get("append", "") if e else text
+        heard = mentions(said, None if e else w.me)
+        out.append("to: " + (", ".join(to) or "nobody") + (" (read from its words: this line has no stored address)" if to else "")
+                   + ("; " + MENTION_NOTE.format(", ".join("@" + a for a in heard)) if heard else ""))
     me = str(w.me).split("/")[0].lower()
     person = kind_of(w, w.me) == "person"
     marked = "" if person else ", first and marked for them"
