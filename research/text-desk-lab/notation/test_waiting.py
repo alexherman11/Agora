@@ -319,6 +319,12 @@ if "sable" not in rooms.members_of(talk) and "all" not in rooms.members_of(talk)
           "to: sable" in got and "Sable: can't read this chat" in got and "Sable: woken" not in got
           and not res(SABLE).sent and res(SABLE).state.get("rest_until"), (got, sent(SABLE)[:300]))
     sent(PIKE)
+    if "pike" not in rooms.members_of(talk):
+        rest(PIKE, 3600)
+        got = say("juniper", "@pike a word in your talk", TALK)
+        H.step()
+        check("but a chat in Pike's own corner is his, whatever its members say: Juniper's @pike there wakes him",
+              "Pike: woken" in got and "a word in your talk" in sent(PIKE) and not res(PIKE).state.get("rest_until"), got)
 else:
     print(f"skip Pike's talk lets Sable in (members={(talk.get('props') or {}).get('members')})")
 check("someone: resident, person, agent, everyone, and no one",

@@ -238,8 +238,9 @@ def member(w, s, actor):
 
 def can_read(w, s, actor):
     """a2662 (Sable c2682): a chat whose members= leaves `actor` out is private to its members; one with no members=
-    keeps no one out."""
-    return not (members_of(s) - {""}) or member(w, s, actor)
+    keeps no one out, and the chats in a resident's own corner are theirs (Talk with Alex, Pike says members=alex)."""
+    return not (members_of(s) - {""}) or member(w, s, actor) or \
+        any(same_person(w, o, actor) for o in book_owners(w, s.get("id")))
 
 
 def calls(w, s, to, actor):
