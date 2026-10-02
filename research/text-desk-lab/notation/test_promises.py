@@ -261,5 +261,38 @@ check("undo of the migration takes back what it made and what it caused, and put
 say("sable", "look :1")
 check("and it never runs again", len([e for e in W2.events if e["verb"] == "promises"]) == 2)
 
+# ---- a2986: a re-ask makes its asker's promise; an old ask, or a different promise about the card, never stops it -----
+D3, R3 = roomworld.build(say=False)        # a1590's life, shrunk: asked before promises, the ask taken back for an owe
+W3 = D3.world
+D, W = D3, W3
+K3 = create("pike", R3.BOARD, 'kind=task title="Persons 2" owner=pike asked_by=pike status=open')
+say("pike", f"look {K3} :1", f"do prop {K3} commission=asked")
+old_ask = W3.events[-1]["id"]
+say("pike", f"look {K3} :1", f'do prop {K3} owe="ask it when phase 1 lands" remove=commission')
+W3._promises_version = 0
+say("sable", "look :1")
+check("(the migration ran, and made the owe a promise, not a commission's)", promises.on(W3)
+      and len(promises.open_about(W3, W3.nodes[K3]["subject"])) == 1)
+p_owe = promises.open_about(W3, W3.nodes[K3]["subject"])[0]["aid"]
+say("pike", f"look {p_owe} :1", f"release {p_owe}")
+t = say("pike", f"look {K3} :1", f"do prop {K3} commission=asked")
+ask = [e for e in W3.events if e["verb"] == "prop" and (e.get("args") or {}).get("commission") == "asked"][-1]["id"]
+st3 = [st for st in (promises.state(W3, x) for x in promises.all_sids(W3))
+       if (promises.events(W3).get(st["made"]) or {}).get("cause") == ask and st["state"] == "open"]
+check("re-asking a card whose old ask came before promises makes the asker's promise, made by this ask (not the old one)",
+      "a commission is its asker's promise" in t and old_ask not in t and len(st3) == 1
+      and st3[0]["holder"]["name"] == "pike", (t, st3))
+K4 = create("pike", R3.BOARD, 'kind=task title="Persons 3" owner=pike asked_by=pike status=open')
+t = say("pike", f'promise to=pike "set {K4} commission=asked once phase 1 lands" about={K4}')
+check("(pike holds a different promise about the card)", "promise" in t and len(promises.open_about(W3, W3.nodes[K4]["subject"])) == 1, t)
+t = say("pike", f"look {K4} :1", f"do prop {K4} commission=asked")
+op = promises.open_about(W3, W3.nodes[K4]["subject"])
+check("asking a card about which the asker holds a different open promise still makes the commission's promise",
+      "a commission is its asker's promise" in t and len(op) == 2, (t, op))
+t = say("pike", f"look {K4} :1", f"do prop {K4} commission=working", f"do prop {K4} commission=asked")
+check("but a commission promise for this card already open is not made twice, and the receipt names it",
+      "a commission is its asker's promise" not in t and len(promises.open_about(W3, W3.nodes[K4]["subject"])) == 2
+      and re.search(r"no new promise: a\d+ already holds this commission", t), t)
+
 print(f"\n{len(fails)} failed" if fails else "\nall ok")
 sys.exit(1 if fails else 0)
