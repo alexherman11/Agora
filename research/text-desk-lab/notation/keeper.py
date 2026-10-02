@@ -3,10 +3,10 @@
     python keeper.py [world] [--port 8794]          default world: frontier
 
 It is meant to change rarely. It:
-  - runs deskd on the port and the house for the world, with DESKD pointing the house at that deskd (one host) and
-    HOUSE_KEEPER=1 so the house may ask to be restarted;
-  - restarts deskd whenever git HEAD moves (a landing, or anyone's commit), so the painter and the residents run the
-    code that is there; the painter reloads itself when it sees the new version;
+  - runs the door (door.py) on the port and the house for the world, with DESKD pointing the house at the door (one
+    host) and HOUSE_KEEPER=1 so the house may ask to be restarted;
+  - a1505: the door, not the keeper, runs deskd behind it and swaps it for one on the new code whenever git HEAD moves,
+    once the new one is healthy, so no page reloads and no call is cut. The keeper starts the door again if it dies;
   - restarts the house at once when it exits 75 (it asked, after a landing changed Python); restarts it with a
     pause when it dies otherwise;
   - if the house dies 3 times within 5 minutes of a landing (a commit whose subject begins "land "), reverts that
@@ -58,26 +58,21 @@ def main():
     port = sys.argv[sys.argv.index("--port") + 1] if "--port" in sys.argv[:-1] else "8794"
     env = {**os.environ, "DESKD": f"http://127.0.0.1:{port}", "HOUSE_KEEPER": "1"}
     head = git("rev-parse", "HEAD")
-    deskd, house = start(["deskd.py", port], name="deskd"), None
-    time.sleep(2)
+    door_args = ["door.py", port, "--world", world]
+    deskd, house = start(door_args, name="door"), None
+    time.sleep(8)                               # the door answers once its first deskd does
     house = start(["house.py", world], env, name="house")
-    log(f"keeper: world {world}, deskd on {port}, HEAD {head[:7]}")
+    log(f"keeper: world {world}, the door on {port} (deskd behind it), HEAD {head[:7]}")
     deaths, backoff_until, deskd_at, deskd_wait = [], 0.0, time.time(), 0.0
     try:
         while True:
             time.sleep(2)
-            now_head = git("rev-parse", "HEAD")
-            if now_head and now_head != head:
-                log(f"HEAD moved {head[:7]} -> {now_head[:7]} ({git('log', '-1', '--format=%s')[:80]}); restarting deskd")
-                head = now_head
-                stop(deskd)
-                deskd, deskd_at = start(["deskd.py", port], name="deskd"), time.time()
-            elif deskd.poll() is not None and time.time() >= deskd_wait:
+            if deskd.poll() is not None and time.time() >= deskd_wait:
                 quick = time.time() - deskd_at < 10
-                log(f"deskd exited ({deskd.returncode})" + ("; it ran under 10 s (is the port taken?): waiting 60 s" if quick else "; starting it again"))
+                log(f"the door exited ({deskd.returncode})" + ("; it ran under 10 s (is the port taken?): waiting 60 s" if quick else "; starting it again"))
                 if quick:
                     deskd_wait = time.time() + 60
-                deskd, deskd_at = start(["deskd.py", port], name="deskd"), time.time()
+                deskd, deskd_at = start(door_args, name="door"), time.time()
             if house is None:                          # waiting out a pause after a crash
                 if time.time() >= backoff_until:
                     house = start(["house.py", world], env, name="house")
