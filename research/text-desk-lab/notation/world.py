@@ -1035,12 +1035,20 @@ class World:
                         # a1581: the line is a thing. Who it addresses is the writer's word, stored now: to= said
                         # outright, else each @name outside quotes; never read again from the text later
                         to = to_names(line_args["to"]) if "to" in line_args else addressed(line)
+                        # a2662: a name that is no one ('@pikee') is not stored; it is kept on the event and said
+                        import rooms
+                        no_one = [n for n in to if not rooms.someone(self, n)]
+                        to = [n for n in to if n not in no_one]
+                        quoted = not to and not no_one and "to" not in line_args and bool(ADDRESS.search(line))
                         new_line = {"id": self._id("m"), "text": line.strip("\n"), "to": to, "ev": None}
                         if str(line_args.get("reply_to", "")).strip():
                             new_line["reply_to"] = str(line_args["reply_to"]).strip()
                         if key:
                             new_line["intent"] = key
                         args = dict(args, line_id=new_line["id"], to=",".join(to) or "nobody")
+                        if no_one:
+                            args["no_one"] = ",".join(no_one)
+                        new_line_why = " (an @ inside quotes or backticks calls no one)" if quoted else ""
                 s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
         elif verb == "place":
             dest = args.get("into")
@@ -1063,7 +1071,7 @@ class World:
         if new_line:
             new_line["ev"] = ev["id"]
             s["lines"].append(new_line)
-            note += f"\n  line {new_line['id']} · to: {', '.join(new_line['to']) or 'nobody'}"
+            note += f"\n  line {new_line['id']} · to: {', '.join(new_line['to']) or 'nobody'}{new_line_why}"
         if relined is not None:
             s["lines"] = [dict(l, edited=ev["id"]) if "edited" in l and l["edited"] is None else l for l in relined]
             changed_lines = [l["id"] for l in s["lines"] if l.get("edited") == ev["id"]]
