@@ -331,14 +331,17 @@ def v_unfold(w, nid, a):
 
 @verb("append", ["text"], "Add a line at the end of the text. Edits the subject: every appearance changes. "
       "On a chat the world signs the line with your name (type only your words; a 'Name:' of your own is dropped), "
-      "and adding a line is never refused as stale, since it replaces nothing; rewriting a chat is still fenced.",
-      "line=<str>", 'do append a18 line="4. Review"')
+      "and adding a line is never refused as stale, since it replaces nothing; rewriting a chat is still fenced. "
+      "A chat line is a thing (m<n>): who it addresses is each @name outside quotes, or to=<names> said outright "
+      "(to=nobody for no one); the receipt says which, and examine m<n> shows it.",
+      "line=<str> [to=<names>] [reply_to=<m id>]", 'do append a18 line="4. Review"')
 def v_append(w, nid, a):
     return _prim(w, "append", nid, a)
 
 
 CHAT_RULES = ("the world signs each line with who added it (type only your words); adding a line is never refused "
-              "as stale, rewriting the chat is")
+              "as stale, rewriting the chat is; each line is a thing (m<n>) that keeps who it addresses (@name outside "
+              "quotes, or to=), and a changed line shows 'edited' and keeps its words")
 
 
 def unanswered(w, sid, me="alex"):

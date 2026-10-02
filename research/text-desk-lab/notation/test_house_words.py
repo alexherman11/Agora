@@ -136,11 +136,24 @@ for word in words:
     if e or FALLBACK in t or t.startswith("no verb"):
         missing.append((word, (e or t)[:100]))
 check(f"help <command> explains each of the {len(words)} command words", not missing, missing)
+# a1595: help's words are notes in a Help binder; this world has none, so a command answers from the floor (its
+# arguments, from the code) and says its note is missing. The live world's notes are health's to check (helpnotes.py)
 t, e = one(ME, "help history")
-check("help history answers (the Board's 'history lists every event')", not e and t.startswith("history [id]"), (t, e))
-for noun in ("ids", "event", "comments", "chat", "task", "note", "corner", "card"):
+check("help history answers (the Board's 'history lists every event'): here, the floor, saying the note is missing",
+      not e and t.startswith("history [<id>]") and "no note says this yet" in t, (t, e))
+# the nouns are notes too: a Help binder with a note for each, as the live world has; a noun yields to a world verb
+reply(ME, f"look {R.HOME} :1", "do create $here kind=surface title=Help layout=column", "do prop $new role=help")
+HELPB = W.last_created if W.nodes.get(W.last_created, {}).get("type") == "surface" else \
+    next(n["id"] for n in W.nodes.values() if (n.get("props") or {}).get("role") == "help")
+for title in ("ids|id", "events|event", "comments", "chat|chats", "task|tasks", "note|notes",
+              "resident|residents|corner|corners", "card"):
+    reply(ME, f"look {HELPB} :1", f'do create {HELPB} kind=note title="{title}" text="about {title.split("|")[0]}"')
+for noun in ("ids", "event", "comments", "chat", "task", "note", "corner"):
     t, e = one(ME, f"help {noun}")
-    check(f"help {noun} answers", not e and FALLBACK not in t, (t, e))
+    check(f"help {noun} answers, from its note", not e and FALLBACK not in t and t.startswith("about "), (t, e))
+t, e = one(ME, "help card")
+check("help card: the house verb card answers, not the noun's note (a noun yields to a verb made in the world)",
+      not e and "card" in t and "about card" not in t, (t, e))
 
 # ---- 3. a word help doesn't know names every door (a1299) -----------------------------------------------------------
 builtin_line = "  verbs: " + " ".join(D._help_verbs())

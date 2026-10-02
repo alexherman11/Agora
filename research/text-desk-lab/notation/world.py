@@ -48,6 +48,28 @@ def unquoted(text):
     return QUOTED.sub(" ", str(text))
 
 
+# a1581 (a1570, lines as things): who a chat line addresses is the writer's word, read once when it is written: each
+# @name outside quotes and backticks (a916's rule above), never inside a word (an address like x@y.z names no one).
+# Stored on the line as `to`, a list of lower-case names; @everyone and @all are kept as written.
+ADDRESS = re.compile(r"(?<![\w@])@([A-Za-z][\w]*(?:-[\w]+)*)")
+
+
+def addressed(text):
+    """-> the names a line addresses, in the order written, each once."""
+    out = []
+    for m in ADDRESS.finditer(unquoted(text)):
+        name = m.group(1).lower()
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def to_names(value):
+    """A to= argument: 'sable,pike' or 'sable pike' -> ['sable', 'pike']; '', 'nobody' or 'none' -> []."""
+    names = [n.strip().lstrip("@").lower() for n in re.split(r"[,\s]+", str(value or "")) if n.strip()]
+    return [] if names in (["nobody"], ["none"]) else list(dict.fromkeys(names))
+
+
 class World:
     def __init__(self):
         self.subjects = {}
@@ -94,6 +116,117 @@ class World:
                 if c["id"] == cid:
                     return s, c
         return None, None
+
+    # ---- a1581: chat lines as things ------------------------------------------
+    # A chat keeps its lines in s["lines"], each {"id": "m<n>", "text": the line as the world signed it, "to": [names],
+    # "ev": the event that made it or None}, optionally "reply_to" (another line's id), "intent" (the press that made it,
+    # a1008), and once changed "edited" (the event) and "was" ([{"text", "ev"}], every earlier wording, oldest first).
+    # A line stores no by and no at (Pike, e3840): both are read from its event, so when persons land (a1568) nothing
+    # is migrated. The chat's text stays as stored, always the lines' texts joined by newlines, so everything that
+    # reads a chat reads it as before. A chat with no "lines" key is one from before a1581 (or one whose migration
+    # was undone): it reads and appends as it always did.
+    def find_line(self, mid):
+        """-> (chat subject, line) for a line id, or (None, None)."""
+        for s in self.subjects.values():
+            for l in s.get("lines") or ():
+                if l["id"] == mid:
+                    return s, l
+        return None, None
+
+    def event_by_id(self, eid):
+        if not eid:
+            return None
+        idx = getattr(self, "_ev_index", None)
+        if idx is None or idx[0] != len(self.events):
+            idx = self._ev_index = (len(self.events), {e["id"]: e for e in self.events})
+        return idx[1].get(eid)
+
+    def line_by_at(self, line):
+        """-> (by, at) of a line, read from the event that made it; ('unknown', 'unknown') when none can be found."""
+        e = self.event_by_id(line.get("ev"))
+        return (e["by"], e.get("at") or "unknown") if e else ("unknown", "unknown")
+
+    def _relined(self, s, new_text):
+        """The lines of chat `s` if its text became `new_text`, or None for a chat without lines. A line is testimony
+        (Sable c1579): a change that keeps the lines where they are changes each line's words in place, and the line
+        keeps every earlier wording; one that adds, drops or empties a line is refused, since it would rewrite what
+        someone said. The caller sets "edited" on the changed lines once its event exists."""
+        lines = s.get("lines")
+        if lines is None:
+            return None
+        new_text = str(new_text).strip("\n")
+        new = new_text.split("\n") if lines or new_text else []
+        spans = [len(l["text"].split("\n")) for l in lines]
+        how = ("a chat's lines are what people said: change the words of one with replace old=... new=... (it shows "
+               "'edited' and keeps the words before), or undo the event that added it")
+        if sum(spans) != len(new):
+            raise Refusal(f"that would {'add' if len(new) > sum(spans) else 'drop'} lines of the chat; {how}")
+        out, k = [], 0
+        for l, n in zip(lines, spans):
+            words = "\n".join(new[k:k + n])
+            k += n
+            l = deepcopy(l)
+            if words != l["text"]:
+                if not words.strip():
+                    raise Refusal(f"that would empty line {l['id']}; {how}")
+                l["was"] = list(l.get("was") or []) + [{"text": l["text"], "ev": l.get("edited") or l.get("ev")}]
+                l["text"], l["edited"] = words, None
+            out.append(l)
+        return out
+
+    def _intent_key(self):
+        """a1008 for lines (Sable c1579): the press a line came from, so one Enter never makes two lines. A press may
+        hold several lines (`do append ...; do append ...`): the second is keyed gesture#2, and so on."""
+        gid = getattr(self, "intent", None)
+        if not gid:
+            return None
+        self._intent_k = getattr(self, "_intent_k", 0) + 1
+        return gid if self._intent_k == 1 else f"{gid}#{self._intent_k}"
+
+    def chat_lines(self, sid):
+        """a1581: make chat `sid`'s lines things, once, from the text it holds: each line is matched to the append
+        event that made it, in order (the earliest unused append whose words are exactly these lines); a line no
+        event made is kept with ev None, so it says 'by unknown, at unknown', never a guess. Its address is read
+        by the same rule as a new line's. One event, by the house, said in history; undo puts the chat back.
+        -> the event, or None when the chat already has lines."""
+        s = self.subjects[sid]
+        if s["kind"] != "chat" or "lines" in s:
+            return None
+        apps = self.appearances_of(sid)
+        ids = {sid, *apps}
+        pool = [e for e in self.events if e["verb"] == "edit" and not e.get("undone") and isinstance(e.get("args"), dict)
+                and "append" in e["args"] and (e["target"] in ids or sid in (e.get("changed") or []))]
+        text = s["text"].strip("\n")
+        tl = text.split("\n") if text else []
+        lines, used, i = [], set(), 0
+        while i < len(tl):
+            hit = next((e for e in pool if e["id"] not in used
+                        and tl[i:i + len(str(e["args"]["append"]).split("\n"))] == str(e["args"]["append"]).split("\n")), None)
+            n = len(str(hit["args"]["append"]).split("\n")) if hit else 1
+            if hit:
+                used.add(hit["id"])
+            elif not tl[i].strip() and lines:
+                lines[-1]["text"] += "\n" + tl[i]      # a blank line no event made belongs to the line above it
+                i += 1
+                continue
+            words = "\n".join(tl[i:i + n])
+            lines.append({"id": self._id("m"), "text": words, "to": addressed(words), "ev": hit["id"] if hit else None})
+            i += n
+        before = deepcopy(s)
+        s["lines"] = lines           # the text is not touched: it is these lines joined (blank lines at its ends aside)
+        to = sum(1 for l in lines if l["to"])
+        unknown = sum(1 for l in lines if not l["ev"])
+        span = f"{lines[0]['id']}..{lines[-1]['id']}" if lines else "none"
+        ev = self._event("lines", apps[0] if apps else sid, {"lines": len(lines), "addressed": to, "unknown": unknown},
+                         {"restore_subject": before, "lines_declined": sid}, "house",
+                         note=f"a1581: the {len(lines)} line(s) of chat \"{s['title']}\" became things ({span}); "
+                              f"{to} address someone by @name outside quotes; {unknown} by unknown (no append event made them)")
+        ev["changed"] = [sid] + apps
+        return ev
+
+    def chats_without_lines(self):
+        declined = getattr(self, "_lines_declined", None) or set()
+        return [sid for sid, s in self.subjects.items() if s["kind"] == "chat" and "lines" not in s and sid not in declined]
 
     def add_link(self, a, b, kind, actor=None):
         actor = actor or self.me
@@ -730,6 +863,9 @@ class World:
             self.last_created = aid
             self._bump(target)
             ev = self._event(verb, target, args, {"delete": aid, "delete_subject": sid}, actor)
+            if kind == "chat":       # a1581: a chat's text= is its first line, made (and so signed) by this create
+                words = self.subjects[sid]["text"].strip("\n")
+                self.subjects[sid]["lines"] = [{"id": self._id("m"), "text": words, "to": addressed(words), "ev": ev["id"]}] if words else []
             r = {"ok": True, "event": ev["id"], "changed": [target, aid], "created": aid,
                  "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in props.items()) if props else "")
                          + ("; x= y= w= h= place a thing, they are not props (do prop " + aid + " y=... for a prop)" if {"x", "y", "w", "h"} & set(args) else "")}
@@ -789,12 +925,15 @@ class World:
                 raise Refusal(f"item= must be 1..{len(items)}")
             lines = s["text"].splitlines()
             lines[i] = l.replace("- [ ]", "- [x]", 1) if "- [ ]" in l else l.replace("- [x]", "- [ ]", 1)
+            relined = self._relined(s, "\n".join(lines))
             s["text"] = "\n".join(lines)
             s["rev"] += 1
             for a in apps:
                 self._bump(a)
             ev = self._event("check", via or sid, args, {"restore_subject": before}, actor)
             ev["changed"] = [sid] + apps
+            if relined is not None:
+                s["lines"] = [dict(l, edited=ev["id"]) if "edited" in l and l["edited"] is None else l for l in relined]
             return {"ok": True, "event": ev["id"], "changed": [sid] + apps, "note": f"item {k + 1} is now: {lines[i].strip()}"}
         if verb == "link":
             lid = self.add_link(sid, args.get("to", ""), args.get("as", "refers"), actor)
@@ -828,6 +967,7 @@ class World:
                     out.append(str(args.get("line", args.get("text", ""))))
             args = {"text": "\n".join(out)}
             verb = "edit"
+        line_args = {k: args[k] for k in ("to", "reply_to") if k in args}       # a1581: a chat line's own words
         if verb == "append":
             args = {"append": args.get("line", args.get("text", args.get("append", "")))}
             verb = "edit"
@@ -864,9 +1004,22 @@ class World:
             args = {"text": new}
             verb = "edit"
         signed_note = ""
+        relined, new_line, key = None, None, None
         if verb == "edit":
             if not any(k in args for k in ("title", "text", "append")):
                 raise Refusal("edit needs title=, text= or append=")
+            if "text" in args:
+                relined = self._relined(s, str(args["text"]))      # a1581: refused before anything changes
+            if "append" in args and s["kind"] == "chat" and "lines" in s:
+                key = self._intent_key()
+                done = next((l for c in self.subjects.values() for l in c.get("lines") or () if key and l.get("intent") == key), None)
+                if done:
+                    # Sable c1579: the line's identity is minted with the press, so a press sent twice is one line
+                    return {"ok": True, "event": None, "changed": [],
+                            "note": f"already said, as {done['id']} ({done.get('ev')}): this press made that line; nothing new was done"}
+                reply = str(line_args.get("reply_to", "")).strip()
+                if reply and self.find_line(reply)[1] is None:
+                    raise Refusal(f"reply_to={reply} is not a chat line's id (a line's id is m<n>: examine a chat's line, or read its receipt)")
             if "title" in args:
                 s["title"] = str(args["title"])
             if "text" in args:
@@ -882,6 +1035,24 @@ class World:
                     args = dict(args, append=line, signed=self.display_name(actor))
                     if dropped:
                         signed_note = "the world signs for you; your typed name was dropped"
+                    if "lines" in s:
+                        # a1581: the line is a thing. Who it addresses is the writer's word, stored now: to= said
+                        # outright, else each @name outside quotes; never read again from the text later
+                        to = to_names(line_args["to"]) if "to" in line_args else addressed(line)
+                        # a2662: a name that is no one ('@pikee') is not stored; it is kept on the event and said
+                        import rooms
+                        no_one = [n for n in to if not rooms.someone(self, n)]
+                        to = [n for n in to if n not in no_one]
+                        quoted = not to and not no_one and "to" not in line_args and bool(ADDRESS.search(line))
+                        new_line = {"id": self._id("m"), "text": line.strip("\n"), "to": to, "ev": None}
+                        if str(line_args.get("reply_to", "")).strip():
+                            new_line["reply_to"] = str(line_args["reply_to"]).strip()
+                        if key:
+                            new_line["intent"] = key
+                        args = dict(args, line_id=new_line["id"], to=",".join(to) or "nobody")
+                        if no_one:
+                            args["no_one"] = ",".join(no_one)
+                        new_line_why = " (an @ inside quotes or backticks calls no one)" if quoted else ""
                 s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
         elif verb == "place":
             dest = args.get("into")
@@ -901,6 +1072,15 @@ class World:
         note = f"subject {sid} changed; {len(apps)} appearance(s) now show the new content"
         if args.get("signed"):
             note += f"\n  said: {args['append']}" + (f"  ({signed_note})" if signed_note else "")
+        if new_line:
+            new_line["ev"] = ev["id"]
+            s["lines"].append(new_line)
+            note += f"\n  line {new_line['id']} · to: {', '.join(new_line['to']) or 'nobody'}{new_line_why}"
+        if relined is not None:
+            s["lines"] = [dict(l, edited=ev["id"]) if "edited" in l and l["edited"] is None else l for l in relined]
+            changed_lines = [l["id"] for l in s["lines"] if l.get("edited") == ev["id"]]
+            if changed_lines:
+                note += f"\n  edited line(s) {', '.join(changed_lines)}: each shows 'edited' and keeps its words before (examine {changed_lines[0]})"
         if replaced:
             # Juniper a651: a replace changes one passage; its receipt says which, not every line that now differs
             cut = lambda t: t if len(t) <= 240 else t[:120] + " … " + t[-100:]      # noqa: E731
@@ -954,6 +1134,8 @@ class World:
             self.subjects[r["id"]] = r
             for a in self.appearances_of(r["id"]):
                 self._bump(a)
+            if u.get("lines_declined"):          # a1581: an undone migration stays undone; the chat keeps no lines
+                self._lines_declined = (getattr(self, "_lines_declined", None) or set()) | {u["lines_declined"]}
         elif "restore_subjects" in u:
             for r in deepcopy(u["restore_subjects"]):
                 r["rev"] = self.subjects[r["id"]]["rev"] + 1

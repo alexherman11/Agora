@@ -604,7 +604,8 @@ def test_edits_to_what_you_made_are_told():
             e["at"] = "2026-10-01T10:00:00"
     got = [l for l in head(do("look", "juniper")) if l.startswith("~")]
     assert len(got) == 2 and "line 1 " in got[0] and "line 2 " in got[1], got
-    assert "~ pike replaced line 8" in do("help events", "juniper")
+    # a1595: help events (which shows this very line as its example) is a note in the world's Help binder now, and a
+    # world built here has none; what help prints is the binder's to say, and health's to hold to the code
 
 
 def test_rooms_go_look_and_replay():
