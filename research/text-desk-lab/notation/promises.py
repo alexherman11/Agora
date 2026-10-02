@@ -621,17 +621,29 @@ def asker_act(w, card_sid, name, used=()):
     return None
 
 
+def _is_commission(w, st, apps):
+    """a2986: is this promise a commission's for this card? Its making act set commission=asked on the card (an
+    asker's own earlier ask, the migration's), or was caused by an event that did. A promise merely about the card is
+    not (Pike's a2825 'set a1590 commission=asked once ...' is about the asking, not the commission's)."""
+    evs = events(w)
+    m = evs.get(st["made"]) or {}
+    return bool(m) and (_sets_asked(w, m, apps) or _sets_asked(w, evs.get(m.get("cause")) or {"verb": None}, apps))
+
+
 def _commission_asked(w, sid, e):
     """commission=asked on a card, by event e -> receipt lines. Owed to asked_by (else the card's maker); made by
     asked_by's own act of asking, or, when someone else set it for them, by no one: 'asked for X; held by no one'
-    until someone holds it by an act (accept, or X setting commission=asked themselves)."""
+    until someone holds it by an act (accept, or X setting commission=asked themselves). One commission, one promise:
+    nothing is made while a commission promise for this card is open; any other promise about it stops nothing."""
     s, card = w.subjects[sid], aid_of(w, sid)
     asked_by = persons.norm((s.get("props") or {}).get("asked_by") or "")
     setter = _person(w, e=e)
     asker = _person(w, asked_by) if asked_by else setter
     owed = _owed_for(w, sid, e["by"])
+    apps = set(w.appearances_of(sid))
     mine = [st for st in open_about(w, sid) if st["state"] == OPEN and same(st["owed"], _person(w, owed))
-            and (st["holder"] is None or same(st["holder"], asker) or same(st["holder"], setter))]
+            and (st["holder"] is None or same(st["holder"], asker) or same(st["holder"], setter))
+            and _is_commission(w, st, apps)]
     if mine:
         st = mine[0]
         if st["holder"] is None and same(setter, asker):
@@ -639,9 +651,9 @@ def _commission_asked(w, sid, e):
             st = state(w, st["sid"])
             return [f"~ you asked for {card} yourself: {st['aid']} is your promise now · {phrase(w, st)}"
                     f" (lived= on {card} is your report)"]
-        return []
+        return [f"~ no new promise: {st['aid']} already holds this commission · {phrase(w, st)}"]   # a2986, Sable c2993
     what, older = f"live what this lands: {s['title']}", None
-    if not asked_by:
+    if not asked_by or same(setter, asker):      # a2986: asked_by's own act is this one, never an older ask
         aid, _ = make(w, "promise", what, owed, card, e["by"], cause=e["id"])
     else:
         evs = events(w)
@@ -650,9 +662,7 @@ def _commission_asked(w, sid, e):
             if about_sid(w, st) == sid and st["made"]:
                 used |= {st["made"], (evs.get(st["made"]) or {}).get("cause")}
         mine_e = asker_act(w, sid, asked_by, used)
-        if mine_e is not None and mine_e["id"] == e["id"]:
-            aid, _ = make(w, "promise", what, owed, card, e["by"], cause=e["id"])
-        elif mine_e is not None:
+        if mine_e is not None:
             older = mine_e["id"]
             aid, _ = make(w, "promise", what, owed, card, "house", cause=e["id"], acts=[[mine_e["id"], "promise"]])
         else:
