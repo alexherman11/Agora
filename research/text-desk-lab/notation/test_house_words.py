@@ -75,14 +75,14 @@ EV = W.events[-1]["id"]                      # the link's event
 reply("jeff", f"look {R.HOME} :1", 'do create $here kind=note title=card|cards tags=verb on=house '
       'text="# card <title>: a task where you are\\ndo create $here kind=task title=\\"$*\\""')
 corner = R.corner["pike"]
-reply("pike", f"look {corner} :1", 'do create $here kind=note title=release tags=verb '
-      'text="# release: let go\\ndo append $here.talk line=\\"released\\""')
+reply("pike", f"look {corner} :1", 'do create $here kind=note title=wish tags=verb '     # a1587: release is the house's word now
+      'text="# wish: say a wish\\ndo append $here.talk line=\\"wished\\""')
 REL = W.nodes[W.last_created]["subject"] if W.last_created in W.nodes else None
 reply("pike", f"look {corner} :1", f"look {W.appearances_of(REL)[0]} :1", f"do prop {W.appearances_of(REL)[0]} on={corner}")
 GONE = reply(ME, f"look {R.SHELF} :1", 'do create $here kind=note title="Soon gone"')
 GONE = W.last_created
 reply(ME, f"look {GONE} :1", f"do remove {GONE}")
-print(f"built world (in memory): note {NOTE}, comment {CID}, link {LID} ({EV}), removed {GONE}, release {REL}")
+print(f"built world (in memory): note {NOTE}, comment {CID}, link {LID} ({EV}), removed {GONE}, wish {REL}")
 
 # ---- 1. every id kind, typed back -----------------------------------------------------------------------------------
 for cmd in ("examine", "look", "read", "x", "help"):
@@ -157,9 +157,9 @@ check("help <unknown> in the Lounge: says it doesn't know, lists commands, the b
       not e and t.startswith(FALLBACK) and "  commands: " in t and "history" in t.split("  commands: ")[1].splitlines()[0]
       and builtin_line in t.splitlines() and "  topics: " in t, t)
 check("... and lists say and card among the world verbs at hand, the house's", "card, say (the house)" in wv, wv)
-check("... and not release, which lives in Pike's corner", "release" not in wv, wv)
+check("... and not wish, which lives in Pike's corner", "wish" not in wv, wv)
 t, e, wv = fallback_in(corner)
-check("help <unknown> in Pike's corner also lists release, as its room's", "release (Pike's corner" in wv
+check("help <unknown> in Pike's corner also lists wish, as its room's", "wish (Pike's corner" in wv
       and "card, say (the house)" in wv, wv)
 t, e, wv = fallback_in(R.ARCHIVE)
 check("help <unknown> in a room with no verbs of its own lists only the house's",
