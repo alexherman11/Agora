@@ -2,13 +2,17 @@
 `put <card> above=<card>`, and a drop on a card answered by the card. (`put` was named `place` until Pike's c1202:
 one word, one meaning; `place` still makes a new appearance, and `put` with a move's arguments still moves.)
 
-    python test_lanes.py [world]        default frontier-try
+    python test_lanes.py
 
-Loads the world into memory and never saves it (the harness of test_room_verbs.py). The Desktop's lens (command-center)
-gets, in memory only, the lines the commission proposes for the live one: its lanes sorted, its cards drop targets.
+Builds its own small world (roomworld.py), in memory, never saved, and its own board of eight cards in two lanes.
+
+a3029: the last check read the live Desktop's lens (command-center), gave it the lines a1081 proposed, and held it
+under 1500 nodes. The lines have long been in the live lens, the budget is scene.BUDGET (5000 since 30 Sep), and the
+Desktop's size is the world's, not this code's: it failed at 1529. What a1081 owned is the cost of its own lines, so
+the check is now that: on a Desktop-shaped lens of this test's own, sorting the lanes and making the cards drop
+targets add no scene node at all, however many cards there are.
 """
 import os
-import pickle
 import random
 import re
 import sys
@@ -19,7 +23,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
 fails = []
 
 
@@ -29,9 +32,10 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+import roomworld  # noqa: E402
+
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 import lens_ir  # noqa: E402
 import moo      # noqa: E402
@@ -77,7 +81,7 @@ check("order: numbers ascending, words after them, a missing value last",
 # ---- a board of our own, on its own surface: four cards in each of two lanes ----------------------------------
 be("alex")
 said("alex", "look")
-home = W.root
+home = R.DESKTOP
 said("alex", f"look {home} :1", f'do group {home} title="Lanes test" as=column')
 F = W.last_created
 made = {}
@@ -210,21 +214,44 @@ check("place <card> into=<surface> still makes a new appearance", not err and le
 out, err = said("alex", f"look {nt}", f"look {red}", f"do put {nt} above={red}")
 check("put above= on a note is refused, naming why", bool(err) and "note" in err, (err, out))
 
-# ---- the Desktop's own lens, with the proposed lines, stays under the budget ------------------------------------
-cc = scene.find_lens(D, "command-center")
-src = cc["text"]
-src2 = src.replace("of kind:task,prop:status=open, scroll", "of kind:task,prop:status=open, by priority, rank, scroll") \
-          .replace("of kind:task,prop:status=doing, scroll", "of kind:task,prop:status=doing, by priority, rank, scroll") \
-          .replace("card : column, role task, carry,", "card : column, role task, carry, on drop card do put $carried above=$item,")
-check("the proposed lines change the Desktop's lens (the three lines are where this expects them)", src2.count("by priority, rank") == 2 and "above=$item" in src2)
+# ---- the lines a1081 added to the Desktop cost no scene node --------------------------------------------------------
+# a3029: a lens shaped as the Desktop's Board (lanes that scroll, a card that carries, folds and has menus), over this
+# test's own cards, without and with a1081's lines. The budget itself is scene.BUDGET's, and scene_for refuses past it
+DESK = f"""cols : row, gap
+  open : column, on drop card do put $carried status=open-t
+    ol : column, of kind:task,prop:status=open-t,in:{F}, SORT scroll scroll, each card
+  doing : column, on drop card do put $carried status=doing-t
+    dl : column, of kind:task,prop:status=doing-t,in:{F}, SORT scroll scroll, each card
+card : column, role card, carry, DROP on menu "start" do prop $item status=doing-t, on menu "priority 1" do prop $item priority=1
+  more : column, fold "$title"
+    tx : text "$text", role body
+  acts : row, gap
+    p1 : text "P1", role mark, only when prop:priority=1
+    go : text "start", role tool, on click do prop $item status=doing-t, only when prop:status=open-t
+"""
+said("alex", f"look {F} :1", f'do create {F} kind=note title="desk-shaped-plain" tags=lens text=x')
+W.subjects[W.nodes[W.last_created]["subject"]]["text"] = DESK.replace("SORT ", "").replace("DROP ", "")
+said("alex", f"look {F} :1", f'do create {F} kind=note title="desk-shaped-a1081" tags=lens text=x')
+W.subjects[W.nodes[W.last_created]["subject"]]["text"] = A1081 = DESK.replace("SORT ", "by priority, rank, ").replace(
+    "DROP ", "on drop card do put $carried above=$item, ")
+assert A1081.count("by priority, rank") == 2 and "above=$item" in A1081, A1081
+
+
 def count(n):
     return 1 + sum(count(k) for k in n.get("kids", []))
 
 
-n_before = count(scene.scene_for(D, "command-center")[0])
-W.subjects[cc["id"]]["text"] = src2
-sc, _ = scene.scene_for(D, "command-center")
-print(f"     command-center: {n_before} scene nodes as it is, {count(sc)} with the proposed lines")
-check("under 1500 nodes", count(sc) < 1500, count(sc))
+def both():
+    return count(scene.scene_for(D, "desk-shaped-plain")[0]), count(scene.scene_for(D, "desk-shaped-a1081")[0])
+
+
+plain, sorted_ = both()
+print(f"     a Desktop-shaped board over {len(W.children(F))} things: {plain} scene nodes plain, {sorted_} with a1081's lines")
+check("sorting the lanes and making every card a drop target add no scene node", plain == sorted_ and plain > 1, (plain, sorted_))
+for k in range(60):
+    said("alex", f"look {F} :1", f'do create {F} kind=task title="more {k}" status={("open", "doing")[k % 2]}-t priority={k % 3 + 1}')
+plain2, sorted2 = both()
+print(f"     ... and with 60 more cards: {plain2} plain, {sorted2} with them (scene.BUDGET is {scene.BUDGET})")
+check("... with 60 cards more, still none: the lines cost nothing per card", plain2 == sorted2 and plain2 > plain, (plain2, sorted2))
 print(("FAILED: " + ", ".join(fails)) if fails else "all passed")
 sys.exit(1 if fails else 0)
