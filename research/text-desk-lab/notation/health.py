@@ -6,7 +6,7 @@ Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
   - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
   - the rooms tests pass (test_room_verbs, test_room_look, test_room_reads, test_blanks, test_prop_fields,
-    test_house_words, test_house_cols, test_persons, test_lines), each on a small world it
+    test_house_words, test_house_cols, test_persons, test_lines, test_help_notes), each on a small world it
     builds itself (roomworld.py), so a failure is the code's and not today's world's
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - the Python mirror of style.js that style receipts use (scene.style_check) agrees with style.js under node, on
@@ -14,6 +14,9 @@ Checks, from this checkout:
   - the frozen session prints are unchanged in the golden form (suite/sessions.py --check)
   - every lens in <world> that the desk can find still compiles; the list of lenses that compile is printed, so a
     landing can be judged against the list from before it (a lens that was already broken is not the change's fault)
+  - the Help binder in <world> is true to this checkout's code (helpnotes.check, a1595): every command and built-in
+    verb has a note, each names the arguments the code takes and shows none it doesn't. Each problem is a failed entry
+    beginning "help note: "; the house excuses one that was there before the landing
 
 Prints one line per check, each ending in the seconds it took, then a total line; with --json, a last line
 {"ok": bool, "lenses_ok": [...], "failed": [...], "seconds": {check: s, ..., "total": s}}.
@@ -29,7 +32,19 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 ROOM_TESTS = ("test_room_verbs.py", "test_room_look.py", "test_room_reads.py", "test_blanks.py", "test_prop_fields.py",
-              "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_lines.py")
+              "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_lines.py",
+              "test_help_notes.py")
+HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
+
+
+def check_help(world):
+    """a1595: the Help binder in <world> against this checkout's code (helpnotes.check). -> (problems, notes count)."""
+    import export_docs
+    import helpnotes
+    desk = export_docs.load(world)
+    desk.world.me = "health"
+    desk.seen, desk.open = {}, {desk.world.root}
+    return helpnotes.check(desk), len(helpnotes.entries(desk.world))
 
 
 def check_python():
@@ -189,6 +204,18 @@ def main():
         print(f"session prints: {line}{took('session prints', t0)}")
         if code or " 0 differ in the golden form" not in line:
             failed.append(f"session prints: {line}")
+    # a1595: help's words are notes in the world's Help binder; the code must still be what they say. A problem names
+    # the note, who made it and last changed it, and the code's place. It fails health; the house excuses a problem the
+    # world already had before a landing (workshop.land), so a note's edit never reverts someone else's code
+    t0 = time.perf_counter()
+    try:
+        probs, n = check_help(world)
+        print(f"help notes in {world}: {n} notes, " + ("true to the code" if not probs else f"{len(probs)} FAILED")
+              + took("help notes", t0) + "".join(f"\n  {p}" for p in probs))
+        failed += [HELP_FAIL + p for p in probs]
+    except Exception as e:
+        failed.append(f"{HELP_FAIL}the world could not be read: {type(e).__name__}: {e}")
+        print(f"help notes in {world}: could not read the world ({e}){took('help notes', t0)}")
     lenses_ok, bad, expected = [], [], []
     t0 = time.perf_counter()
     try:

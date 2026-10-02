@@ -462,18 +462,4 @@ def listing(w):
     return f"{len(rows)} person(s):\n" + "\n".join(rows)
 
 
-HELP = """person: the people who act here, each a thing with one id for a life (a1568, a1016). A name is a label on a
-person, never the identity: two persons may bear one name in turn, and each keeps their own acts.
-  person                      lists every person: id, name, kind, how many acts
-  person <name or id>         one person (as examine does): names borne, acts, corner, doors to another bearer
-  person new <name> [kind=resident|human|agent|worker]
-                              a new person who bears <name> from now on; an earlier bearer keeps every act before
-  person <name or id> name=<new>
-                              renames that person; their acts, made_by and corner follow them (undo takes it back)
-  person begin [again=<name>:<event>,...] [paused=<name>,...]
-                              makes the persons of this world, once, from who has acted here. again= says a new person
-                              bore a name from that event on. One event; undo takes it back
-  A typed name means today's bearer, and names the door to an earlier one: examine pike, history pike,first. A person
-  id (p1895) always means that person. Every event records its person (who=); by= keeps the name it was signed with.
-  Printed, a person is their name, marked only where two persons have borne it: 'pike, first'.
-  Stored names (owner=, asked_by=, a view's query, a chat line's signature) are still names: phase 2 (a1590)."""
+# a1595: help person is a note in the Help binder (helpnotes.py); the arguments are DeskKnife.USAGE["person"]

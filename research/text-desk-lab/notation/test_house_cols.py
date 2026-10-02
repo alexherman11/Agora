@@ -100,8 +100,16 @@ say("juniper", "undo")
 txt = say("pike", "table tag:part cols=edited_by")[0][0]
 check("undone, the edit before it is the latest again", row(txt, B)[2:3] == ["pike"], txt)
 
+# a1595: help views is a note in the world's Help binder now; health holds it to naming the four (helpnotes.check)
+import helpnotes   # noqa: E402
+say("pike", f"look {P} :1", f"do create {P} kind=surface title=Help", "do prop $new role=help")
+HB = helpnotes.binder(W)
+say("pike", f"look {HB} :1", f'do create {HB} kind=note title=views text="views: house columns made_by made_at edited_by"')
+probs = [p for p in helpnotes.check(D) if '"views"' in p]
+check("a views note that leaves out edited_at is told so by the check, naming the code's columns",
+      len(probs) == 1 and "does not name the column edited_at (desk_knife.py HOUSE_COLS" in probs[0], probs)
 txt = say("pike", "help views")[0][0]
-check("help views lists the four", all(c in txt for c in ("made_by", "made_at", "edited_by", "edited_at")), txt)
+check("help views prints the note", txt.rstrip().endswith("views: house columns made_by made_at edited_by"), txt)
 
 print(f"\n{len(fails)} failed" if fails else "\nall passed")
 sys.exit(1 if fails else 0)

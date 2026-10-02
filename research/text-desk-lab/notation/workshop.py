@@ -446,8 +446,12 @@ class Workshop:
             return
         after = health(self.house.world)
         lost = sorted(set(before.get("lenses_ok") or []) - set(after.get("lenses_ok") or []))
-        if not after.get("ok") or lost:
-            reasons = list(after.get("failed") or []) + [f"lens {x} compiled before and no longer does" for x in lost]
+        # a1595: a help note's problem that was there before the merge is the world's, not this landing's (a note is
+        # edited in the world at any time); only a new one reverts
+        had = {f for f in before.get("failed") or [] if f.startswith("help note: ")}
+        reasons = [f for f in after.get("failed") or [] if f not in had]
+        if (not after.get("ok") and (reasons or not after.get("failed"))) or lost:
+            reasons += [f"lens {x} compiled before and no longer does" for x in lost]
             git("revert", "-m", "1", "--no-edit", "HEAD")
             self.set_state(cid, "reverted")
             self.say(cid, "landed, then reverted: " + "; ".join(reasons)[:1500] + f". The branch {wk.branch} is kept; fix it and set ready again.")

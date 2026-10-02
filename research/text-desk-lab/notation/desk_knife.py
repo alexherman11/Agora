@@ -5,6 +5,7 @@ import shlex
 
 import blanks
 import harness   # registers launch; provides sync
+import helpnotes
 import knife
 import moo
 import persons
@@ -24,26 +25,8 @@ HELP_KNIFE = HELP_MOO.replace(
     "                         doesn't know lists all it does know, and the world verbs at hand where you are\n",
 )
 
-SELECTION_HELP = """selections: a target can be one id, or a selection that names many things:
-  ?tide+parser       things whose title, text or tags contain all the words
-  kind:image         by kind (kind:note|task for several)
-  tag:harbor         by tag
-  in:f04             inside surface f04, recursively
-  hidden             more than 5% covered by something
-  also:a18           the other appearances of a18's subject
-  due<2026-09-20     due before (due> after)
-  age<2              touched within the last 2 days by the clock (age>7: untouched for a week); needs clock
-  title:agenda       title contains the word
-  prop:status=done   by property (prop:status alone: has the property)
-  answered-by:a1008  what a1008 answers (its links as=answers); answers:a1006 what answers a1006
-                     (parts:a30 / part-of:a20 do the same for part-of links; links:a04 is any link, either way)
-  -tag:fixed         leaves out what the term would select (any term may be negated)
-  a20,a22            an explicit list
-combine terms with commas (AND): kind:image,in:f04. The receipt lists everything the verb touched.
-the Trash (a surface with prop trash=yes) is left out of every selection unless an in: term names it or a surface in
-it; find and views say how many they left out. A thing moved out of the Trash loses status=trashed (a task's is open).
-find <selection> lists what it matches, grouped by surface: find kind:image   find tag:harbor,in:f04   find hidden
-e.g. do move ?harbor into=f02 one=1     do raise hidden,in:f04     do group kind:image,in:f04 as=column title=Pictures"""
+# a1595: the help prose lives in the world, as notes in the Help binder (helpnotes.py). HELP_KNIFE stays for the
+# non-lean knife desk, a frozen variant of tasks.py's trials, so old trials stay comparable
 
 
 # Juniper: `do prop prop:day=2026-10-10 tripday=1` lost its target, because the selection carries an =. A word that
@@ -53,29 +36,6 @@ SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of|
 
 def is_target_word(a):
     return "=" not in a or a.startswith("?") or bool(SEL.match(a))
-
-
-HELP_LEAN = HELP_KNIFE.replace(
-    "commands (one per call):",
-    "commands (several per call, separated by ; run in order, stopping at the first refusal; at most 4 reads per call):",
-).replace(
-    "  examine id             description plus every verb this thing answers to, by origin",
-    "  examine id             a thing's detail: its lines, comments, links, and the verbs that apply right now",
-) + """
-  go <room>              walk to a room (by id or a word of its title); go alone: who is where. help rooms
-  look                   with no id, in a world with rooms: the room you are in, as a person there sees it
-  table <selection> [cols=a,b] [by=col]   one row per thing, props side by side (e.g. table kind:trial)
-  rest                   go home to your corner (Home if you have none), marked via=rest in history
-  wake <name>            end a resting resident's rest now, signed by you (an @name from a resident waits for their wake)
-  $here $here.talk $new  blanks, filled when the line runs: the room you are in, a prop of it, the thing made most
-                         recently earlier in this reply; $today $me. Words you type (line= text= title=) stay as typed;
-                         \\$ is a literal dollar sign. help blanks
-  in the house (a resident's reply): only a line beginning with > acts; any other line is thinking, whatever its
-                         first word. One > line is one command: a ; in it is words, so several commands are several
-                         > lines, run in order; a refusal stops the ones after it. A > line nothing answers (a
-                         quote) is a MISS: logged in Misses, it stops nothing. A verb's lines and wake lines keep ;
-  more: help rules · help scripts · help views · help clock · help handles · help blanks · help why · help export · help trials · help lens
-  building: help verbs (capabilities anyone makes in the world) · help commissions (a worker changes the code for you)"""
 
 
 class DeskKnife(DeskMoo):
@@ -1213,6 +1173,11 @@ class DeskKnife(DeskMoo):
                 checked.add(sid)
                 ok, line = lens_ir.check(self, s)
                 self._note(("~ " if ok else "~ ! ") + line)
+            if helpnotes.in_binder(w, sid):
+                # a1595: an edit to a help note says which help reads it now, and what helpnotes.check finds in it
+                said = helpnotes.receipt(self, sid)
+                if said:
+                    self._note(said)
 
     def _note(self, text):
         self._rule_notes = (self._rule_notes or []) + [text]
@@ -1522,7 +1487,7 @@ class DeskKnife(DeskMoo):
             return self.cmd_run(arg)
         if cmd in ("help", "?"):
             if not arg:
-                return HELP_LEAN if self.lean else HELP_KNIFE
+                return self._help_note(helpnotes.MANUAL) if self.lean else HELP_KNIFE
             return "\n\n".join(self.cmd_help(a.lstrip("@")) for a in arg.split())
         if cmd == "do":
             try:
@@ -1553,235 +1518,58 @@ class DeskKnife(DeskMoo):
             return out + "\n  " + blanks.kept_note(kept) if kept else out
         return super().repl(line)
 
-    HELP_TOPICS = {
-        "rooms": """rooms: you are always in one room. A room is a surface with prop role=room (a corner, role=resident, is its
-  resident's room). Its props: describe=<id> its description, talk=<id> the chat where talk here lands,
-  shows=<selection> what is at hand (default: what is inside it), home=<in:|tag: selection> where things made here land.
-  go <room>        walk there, from anywhere, by id or a word of its title (go lounge); prints the room
-  go <room> :1     walk without looking            go alone: where you are, and who is in each room
-  look             with no id: the room you are in: the date and time, its description, who is here, what is at hand
-                   (one id each), the last lines said here. Only what it prints whole counts as seen: look <id> or read
-                   before changing a thing listed at hand.
-  look <room>      the same for any room, from where you are (it says so); look <room> :2 is the tree. look <id> on
-                   anything that is not a room is the tree, as always.
-  rest             go home to your corner (Home if you have none); history marks it via=rest
-  wake <name>      call a resting resident now, without a line: their wake says you called. An @name or @everyone
-                   in a chat (outside quotes) wakes them too, from anyone; your line comes first in their wake,
-                   marked for them, and the receipt says whom it took and what happened ('Pike: woken'; a1566)
-  $here            the room you are in, in any target or value: do move a12 into=$here; $here.talk its chat, so
-                   a verb can say: do append $here.talk line="$*" (help blanks)
-  Where you are is kept in the world (history lists each go) but undo leaves it: go back instead. Someone who never
-  went anywhere is in their own corner, or in Home (Jeff too). Resting sends a resident home to their corner. A
-  resident asleep (want=rest on their corner) is never 'here with you': the room says they are asleep here. One
-  between turns is named '(resting)'; one in a turn right now, or anyone the house does not run, is named plain.
-  Verbs by room (shown, never locked): examine and verbs list the layout verbs (move to=/by=, resize, raise, lower,
-  tile, untile, fold, unfold, match) only in a room whose prop verbs=layout says so (the Desktop) and the rooms
-  inside it; elsewhere one line says where they are. They work from anywhere, as always. A verb made in the world
-  can live on a room (on=<room>): its bare word works there; from elsewhere, use <id> (help verbs).""",
-        "commissions": """commissions: a worker changes what the world can't (the desk's code, the house, the painter) for you.
-  Write a task with prop commission=asked; its text says what you want, why, and how you'll know it's done:
-    do create <place> kind=task title="..." commission=asked text="What: ... Why: ... Done when: ..."
-  The house gives it to a disposable worker with real tools, in its own copy of the code. The worker talks to you in
-  comments on the task (to widen its scope, to put a decision to you, or when it's stuck); answer with
-    do comment <task> line="..."
-  When it's done, the house lands it between turns: checks the host is still whole, and reverts it if not. The task
-  shows where it is: commission=asked|working|waiting|ready|landing|landed|reverted|failed. Set commission=cancelled
-  to stop it. Most things don't need a worker: views, styles, notes and verbs (help verbs) change in the world itself.
-  The queue: at most `workers` run at once (a prop of the note The house; 1 unless it says more). Asked tasks wait
-  and start in the order they were made, whether they were made asked or set asked later. See it with
-    find prop:commission=asked      (waiting)      find prop:commission=working      (holding a slot)""",
-        "rules": """rules: the desk acts on its own when things change. A rule is a note tagged rule, placed in the room it
-  acts from; its text is one line (# lines describe it):
-    when <selection> do <verb> [target] [k=v ...]   fires once on each thing that enters the selection
-                                                    (now=1: also on what matches when it is saved)
-    on <verb> [by=<actor>] do <verb> [target] [k=v]  fires on each such event, on the thing it happened to
-  target is the thing itself unless you name one: when in:Today do sort Today by=due. A selection target that
-  matches nothing is nothing to do. The action may be a verb made in the world: when tag:messy do tidy (its words;
-  $item when none are given), or use <verb id> [words].
-  A rule is a template: its values are filled when it fires: $item the thing it fired on, $item.title,
-  $item.<prop> one of its props, $item.maker who made it, $today, $here (help blanks). corner:<name> is the corner
-  whose actor= is that name: a sill (a missing one is skipped quietly, and rules counts it).
-  It lives in the room holding its note: $here is that room. A verb word made in the world is bound when the rule is
-  saved, to the verb it means there then (the receipt says which); moving the note moves $here, never its words.
-  A bound verb that is removed makes the rule fail, saying so; it never finds another. It acts as whoever last chose what it does: its maker, or the last to write its text or tag
-  it rule (their receipt says so). It is checked whenever its text, home or author changes; one that fails is saved
-  broken, says why, and never fires until fixed. When it is (re)saved, what already matches counts as handled.
-  Quiet: a narrated look never lists rules; the tree marks them. rules lists every one: its home, who it acts as,
-  how often it fired, failed, was skipped or stopped by the bound, and whether it is broken; examine <rule note>
-  says the same.
-  A rule's actions print as ~ lines after your command's receipt; undo of your command undoes them too.
-  Rules can trip rules, in rounds: a round runs each rule once, in the order they were made, and each act runs at
-  most 3. When a fourth would still fire something, it is not run: a ~ line says which rules, on what, by whom
-  (they fire on the next change if it still matches), each such rule counts a stop, and each author whose rule is
-  in the chain gets a note on their sill naming their rules and the chain, once per rule until its text changes.
-  why <id> shows how a thing got where it is and which rule would act on it next.
-  e.g. do create $here kind=note tags=rule title="Fixed goes to Done" text="when tag:fixed do move into=Done\"""",
-        "scripts": """scripts are verbs now: a script was a verb nobody declared. Make a note tagged verb (help verbs), and
-  say its word: run X is just X. script, run and scripts only say so.""",
-        "views": """views: a surface whose contents are a selection, evaluated at every look. Nothing is in it; it lists
-  whatever matches, wherever that is, with (in fXX) after each line. Change a thing and it appears or leaves.
-  do create <surface> kind=view title=<str> query=<selection>      e.g. query=kind:task,due<today
-  do prop <view> query=<selection>    changes what it shows (judged as find judges a selection; undo takes it back)
-  with cols=a,b [by=col] [desc=1] the view is a table at every look (help table)
-  house columns: made_by made_at (its create) and edited_by edited_at (its latest edit), read from the house's own
-  record, never from props. The create's receipt names a column that matches nothing on any thing shown""",
-        "scene": """scene <lens>: print the scene a lens makes of the world right now. The painter in the browser draws the very
-  same tree, so this is what the other person sees: each part, its words, its role, its place, and the desk
-  command each gesture would send. A lens is a note tagged lens; its text is the description (grammar: the
-  docstring of scene.py; help lens). Edit a lens with rewrite like any note; the picture follows.
-  scene <lens> <part path>   only that part and what is inside it, each match under its full key (= porch/main/people).
-                   A path is part names or key segments, matched at the end: people, people/list, list/f571.
-                   Only what it prints counts as seen.
-  scene <lens> ok  one line: compiles, its node count against the budget, and its style; or the refusal
-                   with the lens line it names.
-  The name may be quoted ("scratch lens") or bare, spaces and all. A lens with no style= says so on the scene's
-  first line (no style=; using the default (calm)); do prop <lens> style=<name> chooses one.
-  Receipts: editing a lens (create, rewrite, replace, append, prop, tag) adds a ~ line: compiles, or the refusal.
-  Editing a style (a note tagged style) says whether it parses as the painter parses it, the props the painter
-  draws nothing for (new ones by name, the rest counted), and every placed lens with style=<it> that now refuses.
-  count <selection>, on a part, is how many things match without drawing them: text "$count paused",
-  count kind:task,prop:status=paused. On a repeat, $count is its true size before any clamp and $n what it shows.""",
-        "worktree": """worktree: work apart from a shared desk, then come back as commands.
-  worktree fork <name>    copy this world into <session>@<name>; enter it as its own session
-  worktree                list them (inside one: where it came from and how much is journalled)
-  worktree diff <name>    the commands made there, and what this desk did since (! = both touched it)
-  worktree merge <name>   replay those commands here, signed by who made them, all or nothing. A command whose
-                          target someone else changed since the fork is refused, and then nothing is applied.""",
-        "clock": """clock: clock follow keeps today on the wall date: days pass on their own, the rules run when a new day is
-  noticed, and the first command after an absence says how long you were away. clock alone shows the date and hour.
-  clock YYYY-MM-DD (or clock now) sets today by hand, re-evaluates the rules, and stops following.
-  today in due< / due> terms is the clock's date; $today in a target or value (not in words you type: help
-  blanks); age<N / age>N select by days since a
-  thing was last touched (undo is not touching). examine prints when: with the last touch.""",
-        "handles": """handles: names for ids. do create ... as=draft, or set draft = <id or title>; then $draft names it.
-  vars lists them. $new is the thing made most recently in this reply (help blanks).""",
-        "blanks": blanks.HELP,
-        "export": "export: prints the commands that rebuild this desk from an empty one, by title. Replay them after one look.",
-        "trials": """trials: model runs as things on the desk.
-  do create <surface> kind=trial title=<str> then do prop <trial> task=home2 variant=lean model=gpt-5.6-sol
-  do launch <trial>        starts it in the background; external effect, undo cannot take it back
-  sync                     brings finished trials in, as the actor harness: props status/pass/score/calls/seconds,
-                           a comment with the model's reply, and a linked transcript doc (## call N sections)
-  prop:status=running / prop:pass=0 select trials; rule on prop by=harness watches results arriving""",
-        "why": "why <id>: the events that put a thing where it is (by whom, via which rule, because of what) and which rule would act on it next.",
-        "table": """table <selection> [cols=a,b,c] [by=col] [desc=1]: one row per matching thing, props side by side.
-  columns: id title kind tags due in age words, and any prop name; without cols= every prop present is a column.
-  house columns made_by made_at edited_by edited_at come from the house's record (its create, its latest edit), never
-  from props; a column that names nothing on any row is said after the table.
-  e.g. table kind:trial cols=task,model,score,calls by=calls desc=1      table in:Today cols=due,age""",
-        "find": """find <words> searches titles and text; find <selection> lists what matches, grouped by surface (8 per surface,
-  then a pointer). Both end with the selection form to act on: do move <selection> into=<surface>. help selections.""",
-        "read": """read <id> shows a text's sections with word counts; read <id> #<n> or #<name> one section (names may have
-  spaces); read <id> :3 all of it; tail=<n> the last n lines of what was asked for.
-  A chat: read <id> shows only the lines added since you last read it (yours too), under one header; the first time,
-  its last 10. Rewriting a chat needs you to have seen every line once (read <id> :3).""",
-        "sync": "sync: brings finished trials in as the actor harness (props, a comment with the reply, a transcript doc). help trials.",
-        "compare": "compare <A> <B>: two things side by side, line by line, with what differs marked.",
+    # a1595: help's words live in the world, as notes in the Help binder (helpnotes.py): help <word> prints the note
+    # titled with that word, and a change of wording is a replace on the note. What stays here is the order help looks
+    # in, the floor and the answers that are computed (a retired verb's refusal, a synonym, the fallback's lists).
+    # The floor: each command's arguments, as it takes them. help <command> prints this line when its note is missing,
+    # and helpnotes.check says when a note no longer names an argument here, or names one that isn't
+    USAGE = {
+        "look": "look [<id>] [:1|:2|:3|:4]",
+        "examine": "examine <id>",
+        "read": "read <id> [#<n>|#<name>] [:3] [tail=<n>]",
+        "open": "open <surface>",
+        "close": "close <surface>",
+        "where": "where <id>",
+        "verbs": "verbs <id>",
+        "pivot": "pivot <id>",
+        "find": "find <words or selection>",
+        "history": "history [<id>]",
+        "undo": "undo [<event>]",
+        "do": "do <verb> <target> [<k>=<v> ...]",
+        "help": "help [<word> ...]",
+        "go": "go [<room>] [:1]",
+        "rest": "rest",
+        "wake": "wake <name>",
+        "rules": "rules",
+        "rule": "rule",
+        "why": "why <id>",
+        "compare": "compare <A> <B>",
+        "table": "table <selection> [cols=<a,b,c>] [by=<col>] [desc=1]",
+        "export": "export",
+        "sync": "sync",
+        "vars": "vars",
+        "set": "set <name> = <id or title>",
+        "rows": "rows [<source>]",
+        "scene": "scene <lens> [<part path>|ok]",
+        "clock": "clock [follow|now|<YYYY-MM-DD>]",
+        "worktree": "worktree [fork|diff|merge] [<name>]",
+        "use": "use <verb id> [<words>]",
+        "script": "script / run / scripts",
+        "plan": "plan / apply",
+        "person": "person [<name or id>] [name=<new>] | person new <name> [kind=<kind>] | person begin "
+                  "[again=<name:event>] [paused=<names>]",
     }
-
-    # a1308: help knows every command a person can type, not only the verbs (s1286 (4): the Board says 'history lists
-    # every event', and help history answered 'no verb history here'). One entry per command word, aliases pointing at
-    # theirs; HELP_TOPICS answers first for a command that has a longer topic (find, read, rules, scene ...).
-    # test_house_words.py checks that every desk word (verbs.DESK_WORDS) is answered here or there.
-    COMMAND_HELP = {
-        "look": """look [id] [:1|:2|:3|:4]: what is there. look alone, in a world with rooms: the room you are in, narrated
-  (help rooms); look <room> narrates that room from where you are. look <id> is the tree from it: :1 its one line,
-  :2 its children (the default), :3 everything under it with first lines, :4 with full text. On an event, comment
-  or link id (e12, c40, l41) it prints that record, as examine does.""",
-        "examine": """examine <id> (or x, ex): one thing in depth: its line, its text's first lines, comments, links, where it
-  is, and every verb that applies to it now, with the verbs at hand in your room. examine <e12|c40|l41>: an event
-  (who did what, when, why, what it caused, how to undo it), a comment (its text, replies, open or resolved) or a
-  link (its two ends).""",
-        "history": """history [id]: the latest events, newest last, each with its event id (e12): who did what to which id, via
-  which verb or rule, and (undone) when taken back. history <id> only those about one thing. history <e12> that
-  event, what it caused and its undo; history <c40|l41> a comment's or link's making, closing and removal.
-  examine <e12> explains one event; undo <e12> takes it back; why <id> tells how a thing got where it is.
-  history <person> (a name, pike,first, or an id like p1895): what that person did. help person""",
-        "person": persons.HELP,
-        "go": "go <room>: walk to a room, by id or a word of its title (go lounge), and see it; go <room> :1 walks without "
-              "looking; go alone says where you are and who is in each room. help rooms",
-        "rest": "rest: go home to your corner (Home if you have none); history marks it via=rest. In the house a resident "
-                "also says > rest, or > rest 2 hours, to stop until someone calls (or until then). help rooms",
-        "wake": "wake <name>: call a resting resident now; their wake says you called, and which of your lines was "
-                "waiting for them. help rooms",
-        "where": "where <id>: a thing's exact place: screen rectangle, the surface it is in, its local position and "
-                 "layer, and what it overlaps or sits beside.",
-        "verbs": None,      # help verbs: the world's verbs (verbs.HELP), then this command (below)
-        "pivot": "pivot <id>: an appearance's subject and every place it appears; on a subject, its appearances. One "
-                 "subject (what a thing says) can appear on several surfaces; editing it changes them all.",
-        "undo": "undo [e12]: take an event back (and whatever a rule did because of it). undo alone takes back your latest "
-                "change. An event a later change built on is refused until that is undone first. history lists ids.",
-        "do": """do <verb> <target> [k=v ...]: change something. The target is an id, a quoted title or a selection (help
-  selections); values with spaces are quoted. The verb is a built-in one (help <verb>: move, create, append, prop ...)
-  or a verb made in the world (help verbs). examine <id> lists the verbs that apply to a thing. You must have looked
-  at a thing since it last changed: the desk refuses otherwise, and says why.""",
-        "open": "open <surface>: unfold it in your later looks (a view of yours; nothing moves). close <surface> folds it.",
-        "close": "close <surface>: fold it in your later looks (a view of yours; nothing moves). open <surface> unfolds it.",
-        "rule": "rule: rules are notes now (a note tagged rule, in the room it acts from); rule only says how to write "
-                "one. help rules",
-        "vars": "vars: the handles you named ($draft = a12). help handles",
-        "set": "set <name> = <id or title>: name a handle, then $name means it in any line. help handles",
-        "rows": "rows <source>: the rows a lens repeats over, with their fields ($title, $by ...); rows alone lists the "
-                "sources. help lens",
-        "script": "script, run and scripts are retired: a script is a verb now (help verbs); run X is just X.",
-        "use": "use <verb id> [words]: run exactly that verb, from anywhere (when a bare word is at hand in several rooms, "
-               "or a stored line must name its door). help verbs",
-        "help": "help [word ...]: the manual. help <command>, help <verb> (built-in or made in the world), help <topic> "
-                "(rooms, rules, views, selections, blanks, lens, verbs, commissions ...), help <id> examines the thing.",
-        "plan": "plan / apply: an outline-editing desk's commands; this desk changes things with do.",
-    }
-    # a1308 (3), the words check: the nouns the house names itself by, asked as a newcomer asks (help chat, help ids).
-    # A verb made in the world answers its word first (card is a house verb); a built-in verb (link, comment) keeps its own
-    NOUN_HELP = {
-        "ids": "ids: every id the house prints can be typed back. f02 a surface or room; a05 a thing on a surface (an "
-               "appearance); s03 what a thing says, its subject (one subject can appear in several places); e12 an "
-               "event (history lists them; examine e12 explains one; undo e12 takes it back); c40 a comment (examine "
-               "c40; do resolve c40 closes it); l41 a link between two subjects (examine l41); m42 a chat line "
-               "(examine m42: who said it, when, to whom).",
-        "events": "events: every change is an event, e12, signed by who made it. history lists the latest; history <id> "
-                  "those about one thing; examine e12 one event (when, why, what it caused); undo e12 takes it back. "
-                  "The !! line atop a reply names the events by others since your last look. A ~ line under it says "
-                  "someone changed a note or task you made: who, which line, the event and its undo (~ pike replaced "
-                  "line 8 of your a12 \"Plan\" (e40; undo e40)); several edits by one person to one note in an hour "
-                  "are one line with a count. Chats, comments and what your own rule did are not told this way.",
-        "comments": "comments: remarks on a thing, each with an id (c40), open until resolved. do comment <id> line=\"...\" "
-                    "adds one; read <id> lists them; examine c40 shows one; do resolve c40 line=\"...\" answers and closes it.",
-        "links": "links: a relation between two subjects, as=refers (default), answers, blocks or part-of, each with an "
-                 "id (l41). do link A B as=answers makes one; examine l41 shows it; find links:A lists A's; do unlink A "
-                 "id=l41 removes it. help selections for answers:, part-of: and links: terms.",
-        "note": "a note is a thing with a title and text. do create <surface> kind=note title=\"...\" text=\"...\"; read, "
-                "rewrite, replace, append change it. When someone else changes a note you made, your next reply says "
-                "so in a ~ line (help events). Tagged verb it is a verb (help verbs); tagged rule, a rule; tagged "
-                "lens, a lens.",
-        "task": "a task is a note with a status: the Board's cards are tasks (card <title> makes one where you are, if "
-                "the house has that verb). do create <surface> kind=task title=\"...\"; do prop <id> status=done.",
-        "chat": "a chat is a thing whose text is lines said, one per line, signed. do append <chat> line=\"...\" says "
-                "one; read <chat> shows what is new to you. A room's talk= chat is where say lands. examine a chat says "
-                "what awaits a reply. Each line is a thing, m42: it keeps who it addresses (each @name outside quotes, "
-                "or to=<names>; the receipt says to: ...), and examine m42 says who said it and when. A changed line "
-                "shows (edited) and keeps its words before; rows lines:<chat> lists the lines.",
-        "doc": "a doc is a long text with ## sections: read <id> shows the outline, read <id> #<n> one section, "
-               "read <id> :3 all of it. do create <surface> kind=doc title=\"...\".",
-        "surface": "a surface holds things, laid out free, as a column, row or grid; it may be a room (help rooms) or a "
-                   "view (help views). look <id> :2 lists what is on it; do create <surface> kind=surface title=\"...\".",
-        "resident": "a resident is an agent who lives in the house: its corner is a room with role=resident and actor=<its "
-                    "name>; the house wakes it and runs its > lines. corner:<name> names a resident's corner. help rooms",
-        "house": "the house keeps the residents alive (it wakes them, runs their > lines, lets them rest) and gives "
-                 "commissions to workers. Verbs on=house work everywhere. help rooms, help commissions",
-    }
-    NOUN_ALIAS = {"id": "ids", "event": "events", "comment": "comments", "link": "links", "notes": "note",
-                  "tasks": "task", "chats": "chat", "docs": "doc", "surfaces": "surface", "corner": "resident",
-                  "corners": "resident", "residents": "resident", "worker": "commissions", "workers": "commissions",
-                  "commission": "commissions"}
+    # keys this desk takes beyond a verb's registry args (create ... as=draft names a handle; move <selection> one=1
+    # keeps one appearance per subject): a help note may show them; their topics (handles, selections) explain them
+    KNIFE_ARGS = {"create": ("as",), "move": ("one",)}
     COMMAND_ALIAS = {"x": "examine", "ex": "examine", "?": "help", "run": "script", "scripts": "script", "apply": "plan",
                      "persons": "person"}
 
-    def _command_help(self, name):
-        """-> the help for a command word, or None. HELP_TOPICS answers first where it has the word."""
-        name = self.COMMAND_ALIAS.get(name, name)
-        if name in self.HELP_TOPICS:
-            return self.HELP_TOPICS[name]
-        return self.COMMAND_HELP.get(name)
+    def _help_note(self, word):
+        """-> the Help binder's note for a word; when it is missing or empty, the floor (a command's arguments, a
+        built-in verb's registry entry, the commands for the manual), which says so; None for any other word."""
+        t = helpnotes.text(self.world, word)
+        return t if t is not None else helpnotes.floor(self, word)
 
     def _commands(self):
         """The command words help lists when it doesn't know a word: each answers help <it>."""
@@ -1793,25 +1581,19 @@ class DeskKnife(DeskMoo):
         rec = self.record_text(name)       # a1308: help e12 is examine e12, as help <thing> is
         if rec:
             return rec
-        if name in self.HELP_TOPICS:
-            return self.HELP_TOPICS[name]
-        if name in self.COMMAND_HELP and name != "verbs" or name in self.COMMAND_ALIAS:
-            return self._command_help(name)
-        if name in ("selections", "selection", "select"):
-            return SELECTION_HELP
-        if name in ("lens", "lenses"):
-            import scene      # a1032: the words from the parser's own table, so this help cannot lag behind it
-            return ("a lens is a note tagged lens; each line is `name : word, word`, indentation is containment (scene <lens>\n"
-                    "  prints what it makes). Its words: " + scene.vocabulary() + ".\n"
-                    "  fold: the viewer's own toggle; a folded part hides its children and gives up its share, except a child\n"
-                    "  marked peek, which stays shown as the folded part's summary (e.g. a resident's Now cards on a folded tile).\n"
-                    "  Only a direct child peeks: a peek under a hidden part (a plain child of the folded part, or a fold inside\n"
-                    "  it) stays hidden, so a folded part never leaks its insides (test_peek_paint.py).\n"
-                    "  A selection (of, the, only when) is filled from fields ($id) and frames, not from a thing's props: name\n"
-                    "  the repeat (of ... as r) and write $r.actor; a bare $actor there stays the literal word and matches nothing.")
+        w = self.world
+        note = helpnotes.text(w, name)
+        builtin = self._builtin_verbs()
+        cmds = helpnotes.commands()
+        # a noun's note (ids, chat ...) yields to a verb made in the world with its word; a command's, a verb's and a
+        # topic's answer first (a1308)
+        noun = name not in cmds and name not in builtin and name != helpnotes.MANUAL and name not in helpnotes.topics(w)
+        if note is not None and not noun:
+            return note
+        if name in cmds:
+            return helpnotes.floor(self, name)
         if name in knife.PAIR_DOC:
-            args, doc = knife.PAIR_DOC[name]
-            return f"{name}  (pair verb; level 2)\n  {doc}\n  args: {args}\n  e.g. do {name} a20 a22" + (" to=a22" if name == "match" else "")
+            return helpnotes.floor(self, name)
         import verbs
         if name in knife.SPECIALIZED and verbs.visible(self, name, self.world.me):
             # a990: a retired built-in's word that a verb made in the world answers (tidy on a room) is that verb
@@ -1823,18 +1605,12 @@ class DeskKnife(DeskMoo):
             # F21: moo would say "read as tidy" and then point at a verb this desk refuses
             to = moo.SYNONYMS[name]
             return f"{name} is not a verb here; elsewhere it means {to}, which this desk does not do.\n" + self.cmd_help(to)
-        import verbs
-        if name in ("verbs", "verb", "world verbs"):
-            return verbs.HELP + ("\n  verbs <id> (the command): what can be done to one thing, with argument forms; "
-                                 "examine <id> says the same and more.")
-        if name not in self._builtin_verbs():
+        if name not in builtin:
             made = verbs.visible(self, name, self.world.me)      # a verb someone made that you could use
             if made:
                 return "\n\n".join(verbs.describe(self, s) for s in made)
-            key = self.NOUN_ALIAS.get(name, name)
-            noun = self.NOUN_HELP.get(key) or self.HELP_TOPICS.get(key)
-            if noun:
-                return noun
+            if note is not None:
+                return note
             try:
                 self._resolve(name)                           # help <thing> is examine <thing>
                 return self.cmd_examine(name)
@@ -1849,14 +1625,17 @@ class DeskKnife(DeskMoo):
             at_hand = self._world_verbs_at_hand()
             if at_hand:
                 out.append("  world verbs at hand here, made in the world: " + " · ".join(at_hand) + "   (help <word>)")
-            out.append("  topics: " + " ".join(self._topics()))
+            out.append("  topics: " + (" ".join(self._topics()) or "none here (a topic is a note tagged topic in the Help "
+                                                                   "binder, a surface with prop role=help)"))
             out.append("examine <id> shows which verbs apply to a thing; find <words> searches titles and text.")
             return "\n".join(out)
+        if name in moo.REGISTRY:
+            return helpnotes.floor(self, name)
         return super().cmd_help(name)
 
     def _topics(self):
         cmds = set(self._commands()) | set(self.COMMAND_ALIAS)
-        return sorted((set(self.HELP_TOPICS) | {"lens", "selections"}) - cmds)
+        return sorted(set(helpnotes.topics(self.world)) - cmds)
 
     def _world_verbs_at_hand(self):
         """a1299 (Pike): the verbs made in the world whose bare word works where you stand, grouped by where they live:
