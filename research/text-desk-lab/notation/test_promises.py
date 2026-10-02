@@ -96,7 +96,10 @@ W._promises_version = 0          # the world as it stood before a1587 landed
 n0 = len(W.events)
 t = say("sable", f"look {V1}")
 mig = [e for e in W.events[n0:] if e["verb"] == "promises"]
-check("one event by the house says the migration in history", len(mig) == 1 and mig[0]["by"] == "house", W.events[n0:])
+check("one event by the house says the migration in history; the due notes' retirement is its consequence",
+      len(mig) == 2 and all(e["by"] == "house" for e in mig) and mig[1].get("cause") == mig[0]["id"], W.events[n0:])
+check("a card the migration changed is not 'changed status' by it (it says which aspects it touched)",
+      "prop:status" not in __import__("desk").event_aspects(mig[0]))
 note = mig[0].get("note", "") if mig else ""
 check("the props go", not any(k in (W.subjects[W.nodes[x]["subject"]].get("props") or {}) for x in (A, C, E, N) for k in ("owe", "awaiting")))
 sts = {promises.state(W, s)["about"]: promises.state(W, s) for s in promises.all_sids(W)}
@@ -184,14 +187,23 @@ check("a rename moves nothing: who accepted and carried is read from events, and
       "accept by kestrel" in t and "carry by kestrel" in t and "pike" not in t.split("verbs:")[0].replace("Pike's", ""), t)
 t = say("juniper", f"undo")
 check("undo of an act puts it back (a decline undone is a request again)", "reverted" in t, t)
-n_before = len(promises.all_sids(W))
-mid = mig[0]["id"]
-W2 = __import__("copy").deepcopy(W)
-promises.unmigrate(W2, mig[0]["undo"]["promises_migrate"])
-check("the migration's undo takes back what it made, and puts the props back",
-      len(promises.all_sids(W2)) == n_before - len([s for s in mig[0]["undo"]["promises_migrate"]["subjects"]
-                                                     if W.subjects.get(s, {}).get("kind") == "promise"])
-      and (W2.subjects[W2.nodes[C]["subject"]].get("props") or {}).get("awaiting") == "pike")
+D2, R2 = roomworld.build(say=False)        # a world where nothing came after the migration, so undo may reach it
+W2 = D2.world
+D, W = D2, W2
+C2 = create("sable", R2.BOARD, 'kind=task title="Pulse" owner=sable status=doing')
+say("sable", f"look {C2} :1", f'do prop {C2} owe="Pike\'s review before landing" awaiting=pike')
+K2 = create("pike", R2.BOARD, 'kind=task title="Persons" owner=pike asked_by=pike status=open')
+say("pike", f"look {K2} :1", f"do prop {K2} commission=asked")
+DUE2 = create("house", R2.corner["pike"], f'kind=note title="Your live check is due: Persons" due_for={K2}')
+W2._promises_version = 0
+say("sable", "look :1")
+m2 = [e for e in W2.events if e["verb"] == "promises"]
+t = say("jeff", f"undo {m2[0]['id']}")
+check("undo of the migration takes back what it made and what it caused, and puts the props back",
+      "reverted" in t and not promises.all_sids(W2) and (W2.subjects[W2.nodes[C2]["subject"]].get("props") or {}).get("awaiting") == "pike"
+      and W2.subjects[W2.nodes[DUE2]["subject"]]["props"].get("status") != "done", t)
+say("sable", "look :1")
+check("and it never runs again", len([e for e in W2.events if e["verb"] == "promises"]) == 2)
 
 print(f"\n{len(fails)} failed" if fails else "\nall ok")
 sys.exit(1 if fails else 0)

@@ -85,6 +85,10 @@ def aspects_of(verb, args):
         # fenced as the other placement verbs are. Alex, 29 Sep: deleting a task from the Desktop was refused over an
         # owner removed hours before the page was painted, a change no view could show.
         return {"place"}
+    if verb == "promises" and a.get("aspects"):
+        # a1587: the migration says which aspects it touched (owe=, awaiting=, a view's query, a lens's text), so a card
+        # whose awaiting= went is not 'doing since' the migration
+        return set(a["aspects"])
     return None
 
 

@@ -816,7 +816,7 @@ def migrate(desk):
         if sid not in restore_s:
             restore_s[sid] = deepcopy(w.subjects[sid])
 
-    said, per = [], {}
+    said, per, retired, sills = [], {}, [], set()
     for it in items:
         acts = [[mig if a[0] == "MIG" else a[0]] + a[1:] for a in it["acts"]]
         aid, _ = make(w, it["form"], it["what"], it["to"], it.get("about"), quiet=True, acts=acts)   # None: no event says who
@@ -836,7 +836,7 @@ def migrate(desk):
                 w.subjects[ident]["rev"] += 1
                 said.append(f"{aid_of(w, ident)}: {val}= removed")
         elif kind == "retire-note":
-            keep_s(ident)
+            retired.append(deepcopy(w.subjects[ident]))       # its own event: these notes' status changes, nothing else's
             w.subjects[ident]["props"].update(status="done", next=f"now the asker's promise about {val} (a1587)")
             w.subjects[ident]["rev"] += 1
             said.append(f"{aid_of(w, ident)}: due note retired into the promise about {val}")
@@ -886,6 +886,7 @@ def migrate(desk):
                             f"from events ({mig}; help promises). Yours:\n" + "\n".join(lines))
         aid = w.place(sid, f, 8, 8, 300, 120)
         w._bump(f)
+        sills.add(f)
         made_nodes.append(aid)
         made_subjects.append(sid)
         said.append(f"told {who} on their sill ({aid})")
@@ -903,16 +904,24 @@ def migrate(desk):
         w.subjects[sid]["props"]["promise"] = st["aid"]
         aid = w.place(sid, f, 8, 8, 300, 120)
         w._bump(f)
+        sills.add(f)
         made_nodes.append(aid)
         made_subjects.append(sid)
         w.subjects[st["sid"]]["promise"]["acts"].append([mig, "asked-end"])
         said.append(f"{st['aid']}: its card {st['about']} has left the living; {holder} is asked once on their sill ({aid})")
     w.reflow(fid)
     n_p = sum(1 for i in items if i["form"] == "promise")
-    ev["args"] = {"promises": n_p, "requests": len(items) - n_p, "steps": len(steps)}
+    ev["args"] = {"promises": n_p, "requests": len(items) - n_p, "steps": len(steps),
+                  "aspects": ["prop:owe", "prop:awaiting", "prop:query", "prop:cols", "tags", "text", "contents"]}
     ev["undo"] = {"promises_migrate": {"nodes": made_nodes, "subjects": made_subjects,
                                        "restore_subjects": list(restore_s.values()), "restore_nodes": list(restore_n.values())}}
-    ev["changed"] = [fid] + list(restore_s) + list(restore_n)
+    ev["changed"] = [fid] + list(restore_s) + list(restore_n) + sorted(sills)
+    if retired:
+        ids = [aid_of(w, r["id"]) for r in retired]
+        ev2 = w._event("promises", ids[0], {"retired": len(retired), "aspects": ["prop:status", "prop:next"]},
+                       {"restore_subjects": retired}, "house",
+                       note=f"a1587: due notes retired into their commission's promise (done, next= names it): {', '.join(ids)}")
+        ev2["changed"], ev2["cause"], ev2["via"] = [r["id"] for r in retired], mig, VIA
     ev["note"] = (f"a1587: owe=, awaiting= and open due notes became {n_p} promise(s) and {len(items) - n_p} request(s), "
                   f"each made by whoever wrote it (its event), and their readers read promises: " + "; ".join(said))
 
