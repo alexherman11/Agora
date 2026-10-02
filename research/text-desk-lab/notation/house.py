@@ -589,9 +589,15 @@ class House:
         or @everyone from anyone ends the rest now, as a person's does; only a resident's or agent's plain line in its
         own corner's chat (a visitors' book) still waits for the next wake. An @ counts only outside quotes and
         backticks (unquoted, a916). wake <name> (a call= on the corner) calls."""
+        import persons
         import rooms
         start = r.state.get("cursor", len(w.events))
         inbox, urgent = r.state.setdefault("inbox", []), False
+
+        def asked(s):
+            # a1590: asked_by= holds the person once a world has persons (p2919), a name before: by person when it
+            # can, by name when it can't (Claude c2998 (1))
+            return bool(s) and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
 
         def named(text):
@@ -611,7 +617,7 @@ class House:
                 # your commission (landed, landed then reverted, the worker stopped, failed) reaches you as the worker's
                 # does; everything else the house writes is its bookkeeping. Sable's a1062 and a1101 failed this
                 # morning, and the only sign was their absence from a view that hides failures.
-                if not (e["verb"] == "comment" and s and (s.get("props") or {}).get("asked_by") == actor):
+                if not (e["verb"] == "comment" and asked(s)):
                     continue
             said = " ".join(str(v) for v in args.values() if isinstance(v, str))
             waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # kept, first and marked for it
@@ -667,7 +673,7 @@ class House:
             elif e["verb"] == "comment" and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
                 urgent = True
-            elif e["verb"] == "comment" and s and (s.get("props") or {}).get("asked_by") == actor:
+            elif e["verb"] == "comment" and asked(s):
                 inbox.append(f"~ {e['by']} on your commission \"{s['title']}\" ({e['id']}): {said[:1500]}")
                 urgent = True
         r.state["cursor"] = len(w.events)

@@ -88,6 +88,8 @@ def _person(w, name=None, e=None):
     if e is not None:
         n = persons.norm(e.get("by"))
         return {"pid": persons.of_event(w, e), "name": n}
+    if persons.is_pid(w, name):           # a1590: a person prop holds the person (asked_by=p2919)
+        return {"pid": str(name).strip(), "name": persons.name_now(w, str(name).strip())}
     n = persons.norm(name)
     return {"pid": persons.today(w, n) if n and persons.on(w) else None, "name": n}
 
@@ -248,13 +250,16 @@ def asked_of(w, card_sid):
     return ", ".join(names)
 
 
-def matching(w, term):
-    """A selection term over promises -> the set of subject ids it selects (cards, for awaits:)."""
+def matching(w, term, binds=None):
+    """A selection term over promises -> the set of subject ids it selects (cards, for awaits:). binds (a1590): the
+    persons a stored line's names were bound to when it was saved; a typed name is today's bearer (pike,first the
+    earlier one)."""
     key, _, val = term.partition(":")
     val = val.strip().lower()
     if not val:
         raise Refusal(f"{key}:<name>, e.g. {key}:sable" + (" (awaits:any for anyone)" if key == "awaits" else ""))
-    who = {"pid": None, "name": persons.norm(val)} if val == "any" else _person(w, val)
+    pid = persons.resolve(w, val, binds)[0] if val != "any" and persons.on(w) else None
+    who = {"pid": None, "name": persons.norm(val)} if val == "any" else (_person(w, pid) if pid else _person(w, val))
     hit = set()
     for sid in all_sids(w):
         st = state(w, sid)
@@ -570,6 +575,8 @@ def _owed_for(w, card_sid, writer):
     """Juniper c1585, Sable e4790 (a): owed to asked_by if set, else the card's maker, else its writer."""
     p = w.subjects[card_sid].get("props") or {}
     if p.get("asked_by"):
+        if persons.is_pid(w, p["asked_by"]):     # a1590: asked_by= holds the person; a promise's to= stays a name (a1576)
+            return persons.door(w, p["asked_by"].strip())
         return persons.norm(p["asked_by"])
     import blanks
     apps = set(w.appearances_of(card_sid))
@@ -595,11 +602,15 @@ def living(w, card_sid):
 
 def sill(w, name):
     import rooms
+    if persons.is_pid(w, name):           # a1590: asked_by= and to= may hold the person
+        fid = persons.corner(w, str(name).strip())
+        if fid:
+            return fid
     fid = rooms.corner_of(w, name)
     if fid:
         return fid
     for f, n in w.nodes.items():
-        if n["type"] == "surface" and persons.norm(name) in {x.strip().lower() for x in str((n.get("props") or {}).get("person", "")).split(",")}:
+        if n["type"] == "surface" and persons.holds(w, (n.get("props") or {}).get("person", ""), name):
             return f
     return None
 

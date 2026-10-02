@@ -856,6 +856,9 @@ class World:
                 raise Refusal(f"create does not take {', '.join(k + '=' for k in stray)} for a {kind}; it takes kind= title= "
                               f"(layout= for a surface; query= cols= for a view)")
             props = {k: str(args[k]) for k in stray}      # Juniper: an item with a date and a place is one command, not two
+            import persons
+            persons.store_args(self, props)             # a1590: a person prop holds the person (owner=juniper: today's)
+            args = dict(args, **{k: props[k] for k in persons.PERSON_KEYS if k in props})
             if kind not in ("note", "task", "chat", "image", "doc", "trial", "surface", "view"):
                 raise Refusal("kind= must be note, task, chat, image, doc, trial, surface or view")
             title = args.get("title")
@@ -917,7 +920,7 @@ class World:
                 first_to = [n for n in addressed(words, actor) if not rooms.same_person(self, n, str(actor).split("/")[0])]
                 self.subjects[sid]["lines"] = [{"id": self._id("m"), "text": words, "to": first_to, "ev": ev["id"]}] if words else []
             r = {"ok": True, "event": ev["id"], "changed": [target, aid], "created": aid,
-                 "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in props.items()) if props else "")
+                 "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in persons.shown_props(self, props).items()) if props else "")
                          + ("; x= y= w= h= place a thing, they are not props (do prop " + aid + " y=... for a prop)" if {"x", "y", "w", "h"} & set(args) else "")}
             if n["layout"] == "free" and not free:
                 r["note"] += f"; no free space, it covers things: move it or tile {target}"
@@ -1161,7 +1164,7 @@ class World:
             raise Refusal(ev["undo"]["refuse"].format(eid=event_id))
         # a1069: `place above=` changes several subjects in one event (the card, and the ranks it renumbered); a later
         # change to any of them stops the undo, as a later change to the target always did
-        mine = {ev["target"]} | (set(ev.get("changed") or []) if {"restore_subjects", "promises_migrate"} & set(ev.get("undo") or {}) else set())
+        mine = {ev["target"]} | (set(ev.get("changed") or []) if {"restore_subjects", "promises_migrate", "persons_migrate"} & set(ev.get("undo") or {}) else set())
         later = [e for e in self.events if int(e["id"][1:]) > int(event_id[1:]) and not e.get("undone")
                  and e["verb"] != "undo" and (e["target"] in mine or mine & set(e.get("changed") or []))]
         if later:
@@ -1219,6 +1222,9 @@ class World:
         elif "persons_begin" in u:
             import persons     # a1568: the persons go, and every who= with them
             persons.unbegin(self, u["persons_begin"])
+        elif "persons_migrate" in u:
+            import persons     # a1590: each prop and stored line's binding as it was; the migration never runs again
+            persons.unmigrate(self, u["persons_migrate"])
         elif "promises_migrate" in u:
             import promises    # a1587: what the migration made goes, what it changed comes back; it never runs again
             promises.unmigrate(self, u["promises_migrate"])

@@ -1323,7 +1323,8 @@ def _ctx_for(w, nid, state=None):
            "kind": s.get("kind", n["type"]), "due": s.get("due") or "", "tags": " ".join(s.get("tags") or []),
            "_tags": list(s.get("tags") or []),
            # F11: a surface's props live on the surface itself (a resident's corner carries status, want)
-           "_props": dict(s.get("props") or (n.get("props") if n.get("type") == "surface" else None) or {})}
+           # a1590: a person prop holds the person; a lens reads the name ($owner = $me holds for today's bearer)
+           "_props": __import__("persons").shown_props(w, s.get("props") or (n.get("props") if n.get("type") == "surface" else None) or {})}
     if s.get("id"):
         import promises      # a1587: who open requests about it ask, read from their events ($asked_of; '' for none)
         ctx["asked_of"] = promises.cell(w, s["id"], "asked_of") if promises.on(w) else ""
@@ -1867,7 +1868,11 @@ def _compile(desk, s, stack, count, closure):
         for k in node.get("kids") or []:
             stamp(k)
     try:
-        sc = build(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure)
+        import persons
+        import verbs
+        b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
+        with persons.reading(desk, (b or {}).get("persons")):
+            sc = build(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure)
         stamp(sc)
         good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
         return sc
