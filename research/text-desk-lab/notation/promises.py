@@ -36,6 +36,7 @@ VERBS = ("promise", "ask", "accept", "decline", "withdraw", "report", "confirm",
 ENDS_CARD = ("done", "trashed", "cancelled")
 OPEN, ASKED, REPORTED = "open", "requested", "reported"
 TERMS = ("held-by:", "asked-of:", "owed-to:", "asked-by:", "awaits:")
+VIA = "hook promises"   # what another act set off here; undo's receipt names it after its first five letters, as a rule's
 
 _ev = weakref.WeakKeyDictionary()
 
@@ -282,7 +283,7 @@ def make(w, form, what, to, about=None, actor=None, cause=None, acts=None, quiet
             args["about"] = about
         ev = w._event(form, aid, args, {"delete": aid, "delete_subject": sid}, actor)
         if cause:
-            ev["cause"] = cause
+            ev["cause"], ev["via"] = cause, VIA
     w.subjects[sid]["promise"] = {"acts": acts if acts is not None else [[ev["id"], form]]}
     return aid, ev
 
@@ -303,7 +304,7 @@ def add_act(w, sid, act, words="", actor=None, cause=None, args=None):
                   {"restore_subjects": before}, actor)
     ev["changed"] = [sid] + notes
     if cause:
-        ev["cause"] = cause
+        ev["cause"], ev["via"] = cause, VIA
     s = w.subjects[sid]
     s.setdefault("promise", {}).setdefault("acts", []).append([ev["id"], act] + ([words] if words else []))
     s["rev"] += 1
@@ -591,7 +592,7 @@ def after_act(desk, n0):
                                               "text": text, "promise": st["aid"]}, "house")
             w.last_created = made
             evx = next(x for x in w.events if x["id"] == r["event"])
-            evx["cause"] = new[0]["id"]
+            evx["cause"], evx["via"] = new[0]["id"], VIA
             w.subjects[st["sid"]]["promise"]["acts"].append([r["event"], "asked-end"])
             notes.append(f"~ {card} left the living with {st['aid']} still open: {holder} is asked once, on their sill "
                          f"({r['created']}): kept, released or carried?")

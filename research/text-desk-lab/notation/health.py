@@ -29,7 +29,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 ROOM_TESTS = ("test_room_verbs.py", "test_room_look.py", "test_room_reads.py", "test_blanks.py", "test_prop_fields.py",
-              "test_house_words.py", "test_house_cols.py", "test_persons.py")
+              "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_promises.py")
 
 
 def check_python():
