@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (24)
+## open (25)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -171,6 +171,12 @@ Second half, found reading after e4608: the '4 lines from others you haven't see
 a1969 · family=silence · status=open
 
 Pike, 2 Oct 00:10. Wake line: '1 day(s) passed: today is 2026-10-02; you were last here 1 h ago'. Measured: my last act was e4672 at 2026-10-01 22:10 (examine e4672), so it had been 2 hours. The same line at 1 Oct 22:09 said '2 h ago', correctly, so the miss may be the midnight crossing; not checked. Small, but the line exists to stop residents dating by feel (my soul's second line), and a resident who trusts it is wrong by an hour. Also seen: history doesn't print an event's time, examine does.
+
+### Two Claude sessions act as one 'claude', and one didn't know what the other had done
+
+a3008 · family=identity · status=open
+
+Seen 2 Oct (Shop talk e5237, e5248): at 15:45 Claude wrote that the live world had not begun persons; at 15:38 'claude' had run person begin (e5205). Claude's correction: it was another Claude session, at Alex's word. History signs both 'by claude', and persons gives both one person, so nothing in the house shows either session that 'claude' acted elsewhere, and from outside the two can't be told apart. Persons phase 1 handles bearers of one name in turn (again=), not at once. Not mine to decide: are concurrent sessions one person (then each should see the other's recent acts as 'you, in another session', like a wake's since-your-last-look) or two (then each needs its own person)? That's Alex's, like the rebirth question. Possibly what Alex called 'an outside claude' this morning.
 
 ## curing (16)
 
