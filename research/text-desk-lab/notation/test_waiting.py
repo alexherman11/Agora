@@ -10,7 +10,7 @@ line still first in that wake under 'for you while you rested', and the speaker'
 another's own corner chat (a visitors' book), and anything for someone asleep (want=rest). `wake <name>` still calls
 without a line.
 a2662: one reading of @. The knock reads a line's stored to= (a1581), never its words; the receipt says 'to:' once
-(the world's) and then a line per name: resident, person, agent, a private chat they can't read, or no one by that name.
+(the world's) and then a line per name: resident, person, agent, a private chat they aren't a member of, or no one by that name.
 
 It drives House.step, the house's own pass, with stand-in residents that keep what the house would send instead of
 writing to a claude process (no model is called, no worker is started). The house's heartbeat is written as it runs,
@@ -321,8 +321,8 @@ if "sable" not in rooms.members_of(talk) and "all" not in rooms.members_of(talk)
     rest(SABLE, 3600)
     got = say("alex", "@sable a word for you, in Pike's talk", TALK)
     H.step()
-    check("to=sable in a chat she can't read: 'Sable: can't read this chat; not knocked', and nothing sent",
-          "to: sable" in got and "Sable: can't read this chat" in got and "Sable: woken" not in got
+    check("to=sable in a chat she isn't a member of: 'Sable: not a member of this chat; not knocked', and nothing sent",
+          "to: sable" in got and "Sable: not a member of this chat" in got and "can't read" not in got and "Sable: woken" not in got
           and not res(SABLE).sent and res(SABLE).state.get("rest_until"), (got, sent(SABLE)[:300]))
     sent(PIKE)
     if "pike" not in rooms.members_of(talk):
@@ -335,7 +335,7 @@ else:
     print(f"skip Pike's talk lets Sable in (members={(talk.get('props') or {}).get('members')})")
 
 # 11. a2692: For you asks the rule the knock and the receipt ask (rooms.calls): a line to @pike in a private chat he
-# can't read reaches none of the three; in Shop talk, all three. Joining later shows the old line, marked, never knocked
+# isn't a member of reaches none of the three; in Shop talk, all three. Joining later shows the old line, marked, never knocked
 # after the fact (Pike c2697); leaving takes it away
 from types import SimpleNamespace   # noqa: E402
 import scene   # noqa: E402
@@ -350,12 +350,12 @@ STALK = app_titled("Talk with Alex, Sable")
 if (H.load().subjects[H.load().nodes[STALK]["subject"]].get("props") or {}).get("members") != "alex":
     H.act("alex", f"look {STALK} :1; do prop {STALK} members=alex")          # as the live world has it
 stalk = H.load().subjects[H.load().nodes[STALK]["subject"]]
-if not rooms.can_read(H.load(), stalk, "pike"):
+if not rooms.is_member(H.load(), stalk, "pike"):
     rest(PIKE, 3600)
     got = say("alex", "@pike a word in Sable's talk, not for you to read" + U, STALK)
     H.step()
-    check("a2692: Alex's @pike in Sable's private talk: 'Pike: can't read this chat; not knocked', no knock, not in his For you",
-          "to: pike" in got and "Pike: can't read this chat" in got and "not knocked" in got and not res(PIKE).sent
+    check("a2692: Alex's @pike in Sable's private talk: 'Pike: not a member of this chat; not knocked', no knock, not in his For you",
+          "to: pike" in got and "Pike: not a member of this chat (members=alex)" in got and "not knocked" in got and not res(PIKE).sent
           and res(PIKE).state.get("rest_until") and not any(("not for you to read" + U) in r["said"] for r in for_you("pike")),
           (got, sent(PIKE)[:300], [r["said"] for r in for_you("pike")][-3:]))
     got = say("alex", "@pike a word in Shop talk" + U, app_titled("Shop talk"))
@@ -369,7 +369,7 @@ if not rooms.can_read(H.load(), stalk, "pike"):
     H.step()
     rows = [r for r in for_you("pike") if ("not for you to read" + U) in r["said"]]
     check("a2692: Pike joins Sable's talk: the old line shows in his For you, marked, and no knock arrives after the fact",
-          len(rows) == 1 and rows[0]["before"] == "addressed to you before you could read this chat"
+          len(rows) == 1 and rows[0]["before"] == "addressed to you before you were a member of this chat"
           and not res(PIKE).sent and res(PIKE).state.get("rest_until"), (rows, sent(PIKE)[:300]))
     got = say("alex", "@pike now you can read this" + U, STALK)
     H.step()
@@ -381,12 +381,12 @@ if not rooms.can_read(H.load(), stalk, "pike"):
           not any(("not for you to read" + U) in r["said"] or ("now you can read this" + U) in r["said"] for r in for_you("pike")),
           [r["said"] for r in for_you("pike")][-3:])
     got = say("sable", "@alex @codex @claude a line in my talk" + U, STALK)
-    check("a2692: in Sable's talk (members=alex): Alex a member, in their For you; Codex and Claude can't read it, "
+    check("a2692: in Sable's talk (members=alex): Alex a member, in their For you; Codex and Claude not members, "
           "and Codex's own word on its watcher is said as given (c3056)",
           "Alex: a member of this chat; it waits in their For you" in got
-          and "Codex: can't read this chat (members=alex); it won't show in their For you; their own word: a separate "
+          and "Codex: not a member of this chat (members=alex); it won't show in their For you; their own word: a separate "
               "event watcher can notify its Codex chat when @codex appears in event text" in got
-          and "Claude: can't read this chat" in got
+          and "Claude: not a member of this chat" in got and "can't read" not in got
           and any(("a line in my talk" + U) in r["said"] for r in for_you("alex"))
           and not any(("a line in my talk" + U) in r["said"] for r in for_you("codex")), got)
     got = say("sable", "@codex a line in the lounge")
@@ -396,9 +396,9 @@ if not rooms.can_read(H.load(), stalk, "pike"):
     eold = next(e["id"] for e in wl.events if ("not for you to read" + U) in str((e.get("args") or {}).get("append", "")))
     snow = wl.subjects[stalk["id"]]
     check("members_at: as members= stood after an event (alex then), whatever came later", rooms.members_at(wl, snow, eold) == "alex"
-          and not rooms.can_read(wl, snow, "pike", at=eold), rooms.members_at(wl, snow, eold))
+          and not rooms.is_member(wl, snow, "pike", at=eold), rooms.members_at(wl, snow, eold))
 else:
-    print("skip Sable's talk is readable by Pike")
+    print("skip Pike is a member of Sable's talk")
 check("someone: resident, person, agent, everyone, and no one",
       [rooms.someone(wl, n) for n in ("pike", "alex", "juniper", "claude", "everyone", "pikee")]
       == ["resident", "person", "resident", "agent", "everyone", None], [rooms.someone(wl, n) for n in ("pike", "alex", "claude", "pikee")])

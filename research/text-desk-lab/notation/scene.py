@@ -419,8 +419,8 @@ def inbox_rows(desk, me):
     calls @me by name outside quotes. @everyone and @all don't count (Alex, 30 Sep: 'just direct chats and @alex';
     a broadcast in a shared chat stayed 'for you' forever, since he rarely writes there). Narrower than what reaches
     a resident (house.news), on purpose. `open` says no line of mine has followed it in that chat yet.
-    a2692: one rule with the knock and the receipt (rooms.calls): nothing shows from a chat I can't read now, however
-    it was addressed. A line addressed to me before I could read its chat (I joined since) shows, and `before` says so,
+    a2692: one rule with the knock and the receipt (rooms.calls): nothing shows from a chat I am not a member of now
+    (rooms.is_member), however it was addressed. A line addressed to me before I was a member (I joined since) shows, and `before` says so,
     since it never knocked me (Pike c2697: the knock is a happening, read as membership was; For you is a showing, read
     as it is)."""
     import re
@@ -436,7 +436,7 @@ def inbox_rows(desk, me):
             where[n["subject"]] = nid
     out = []
     for sid, s in w.subjects.items():
-        if s["kind"] != "chat" or sid not in where or not rooms.can_read(w, s, me):
+        if s["kind"] != "chat" or sid not in where or not rooms.is_member(w, s, me):
             continue
         direct = "all" not in rooms.members_of(s) and rooms.member(w, s, me)
         tl = text_lines(w, sid)
@@ -454,12 +454,12 @@ def inbox_rows(desk, me):
             named = (rooms.calls(w, s, [n for n in line["to"] if n not in rooms.EVERYONE], me) if line is not None
                      else bool(called.search(unquoted(said))))
             if who and (direct or named):
-                before = named and eid and not rooms.can_read(w, s, me, at=eid)
+                before = named and eid and not rooms.is_member(w, s, me, at=eid)
                 # eid keys the row (the line's own event), so a line keeps its place in the painter as newer ones arrive
                 out.append({"item": where[sid], "chat": s["title"], "who": m.group(0).rstrip(" \t:"), "said": said,
                             "at": _clock(at), "open": "no" if mine_after else "yes", "index": k + 1,
                             "eid": eid or f"{where[sid]}-{k + 1}", "line": line["id"] if line else "",
-                            "before": "addressed to you before you could read this chat" if before else "", "_t": at})
+                            "before": "addressed to you before you were a member of this chat" if before else "", "_t": at})
     out.sort(key=lambda r: r.pop("_t") or "")
     return out
 

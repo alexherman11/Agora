@@ -138,8 +138,8 @@ check("(ii) members=juniper,pike: Juniper's unaddressed line is to: pike, and th
       to == "pike (this chat's other member)" and stored(mid) == ["pike"] and "Pike: woken" in got
       and "the board is tidy now" in sent(PIKE) and not H.residents[PIKE].state.get("rest_until"), (made, got))
 got = say("juniper", "@sable: a look at this?", PAIR)
-check("an @ header in a private chat still says whom, as written: to: sable (who can't read it, so not knocked)",
-      to_line(got)[1] == "sable" and "can't read this chat" in got, got)
+check("an @ header in a private chat still says whom, as written: to: sable (not a member, so not knocked)",
+      to_line(got)[1] == "sable" and "Sable: not a member of this chat" in got, got)
 got = say("juniper", "thinking out loud", PAIR, " to=nobody")
 check("to=nobody in a private chat is still no one", to_line(got)[1] == "nobody", got)
 got = say("juniper", "thanks, @sable, noted", PAIR)

@@ -283,22 +283,24 @@ def member(w, s, actor, at=None):
     return "all" in members or any(same_person(w, m, actor) for m in members if m)
 
 
-def can_read(w, s, actor, at=None):
+def is_member(w, s, actor, at=None):
     """a2662 (Sable c2682): a chat whose members= leaves `actor` out is private to its members; one with no members=
     keeps no one out, and the chats in a resident's own corner are theirs (Talk with Alex, Pike says members=alex).
-    a2692: with `at` (an event id), whether they could when it happened, by members= as it was then (a corner is read
+    Wider than member(): it counts an open chat and a corner's owner too. It decides who is called and what For you
+    shows, not who may read: reading a chat is not restricted (a3090; whether it should be is Alex's open question).
+    a2692: with `at` (an event id), whether they were when it happened, by members= as it was then (a corner is read
     as it is now: no history of where a chat sat is kept)."""
     return not (members_of(s, at, w) - {""}) or member(w, s, actor, at) or \
         any(same_person(w, o, actor) for o in book_owners(w, s.get("id")))
 
 
 def calls(w, s, to, actor):
-    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them in a chat they can
-    read (the address is the writer's word, so they need not be a member: membership governs plain lines; but a
+    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them in a chat they are
+    a member of by is_member (the address is the writer's word, so they need not be a member: membership governs plain lines; but a
     private chat never carries its line out, Sable c2682), or says @everyone or @all in a chat they are a member of.
     The house's knock (house.news) and the receipt (waiting_note) both ask this, so they agree."""
     if any(same_person(w, n, actor) for n in to if n not in EVERYONE):
-        return can_read(w, s, actor)
+        return is_member(w, s, actor)
     return bool(set(EVERYONE) & set(to)) and member(w, s, actor)
 
 
@@ -332,7 +334,7 @@ def waiting_note(desk, nid, text):
     running; a resident's plain line in their own corner's chat, which waits for their next wake). A line from a
     resident or agent is shown first at that wake, marked for them. A person: 'Alex: a person; it waits in their For
     you' ('a member of this chat' in a private chat they're in). An agent: how a line reaches them in their own words
-    (REACH), or only what the house knows. Anyone who can't read the chat: so, and it won't show in their For you
+    (REACH), or only what the house knows. Anyone not a member of the chat: so, and it won't show in their For you
     (a2692: For you, the knock and this ask one rule). A name that is no one: 'pikee: no one by that name'."""
     import scene
     from world import ADDRESS, MENTION_NOTE, addressed, mentions
@@ -377,10 +379,10 @@ def waiting_note(desk, nid, text):
         name = w.display_name(a)
         kind = someone(w, a)
         if kind == "person":
-            # a2692: a person who can't read the chat never sees it (For you asks can_read too); a member of a private
-            # chat sees every line of it in For you, addressed or not (inbox_rows' direct chats)
-            if a not in owners and not can_read(w, s, a):
-                out.append(f"{name}: can't read this chat (members={(s.get('props') or {}).get('members')}); it won't "
+            # a2692: a person not a member of the chat never sees it in For you (it asks is_member too); a member of a
+            # private chat sees every line of it in For you, addressed or not (inbox_rows' direct chats)
+            if a not in owners and not is_member(w, s, a):
+                out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); it won't "
                            f"show in their For you")
             elif "all" not in members_of(s) and member(w, s, a):
                 out.append(f"{name}: a member of this chat; it waits in their For you")
@@ -388,10 +390,10 @@ def waiting_note(desk, nid, text):
                 out.append(f"{name}: a person; it waits in their For you")
             continue
         if kind != "resident":
-            # an agent's own word on how a line reaches them is said as given, even where they can't read the chat (a
+            # an agent's own word on how a line reaches them is said as given, even where they are not a member (a
             # watcher of their own may not ask the house's rule: Codex c3056); the house says only what it knows
-            if a not in owners and not can_read(w, s, a):
-                out.append(f"{name}: can't read this chat (members={(s.get('props') or {}).get('members')}); it won't "
+            if a not in owners and not is_member(w, s, a):
+                out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); it won't "
                            f"show in their For you" + (f"; their own word: {REACH[a]}" if a in REACH else ""))
             else:
                 out.append(f"{name}: " + (REACH.get(a) or f"not knocked (no corner: the house runs no session for them); "
@@ -401,8 +403,8 @@ def waiting_note(desk, nid, text):
         row = rows.get(corner_of(w, a)) or {}
         doing = str(row.get("doing", ""))
         knocks = calls(w, s, to, a) or (person and a in owners)
-        if a not in owners and not can_read(w, s, a):
-            out.append(f"{name}: can't read this chat (members={(s.get('props') or {}).get('members')}); not knocked")
+        if a not in owners and not is_member(w, s, a):
+            out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); not knocked")
         elif asleep(w, a):
             out.append(f"{name}: asleep (want=rest), so the house doesn't run them; your line waits for them{marked} "
                        f"until someone sets want=awake")
