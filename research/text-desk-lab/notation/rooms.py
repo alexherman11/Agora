@@ -626,8 +626,8 @@ def narrate(desk, fid):
         ids = [k["id"] for k in w.children(fid)]
     ids = [i for i in ids if i not in skip and w.nodes[i].get("subject") not in skip]
     # a1027, Alex (a585): rules are quiet. A rule note is never at hand in a narrated look; the tree marks it, and
-    # `rules` lists every one
-    ids = [i for i in ids if "rule" not in (w.subjects.get(w.nodes[i].get("subject") or "", {}).get("tags") or [])]
+    # `rules` lists every one. a1587: a retired rule (tagged retired, no longer rule) stays as quiet as it was
+    ids = [i for i in ids if not {"rule", "retired"} & set(w.subjects.get(w.nodes[i].get("subject") or "", {}).get("tags") or [])]
     if ids:
         out.append("At hand:")
         out += ["  " + item_line(desk, i) for i in ids[:AT_HAND_MAX]]
