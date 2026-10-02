@@ -115,7 +115,8 @@ talk_members = (H.load().subjects[H.load().nodes[TALK]["subject"]].get("props") 
 got = say("pike", "Alex, are you there?", TALK)
 mid, to = to_line(got)
 check("(i) in a members=alex chat, Pike's 'Alex, are you there?' is to: alex, and the receipt names why",
-      to == "alex (this chat's other member)" and stored(mid) == ["alex"] and "Alex: a person; it waits in their For you" in got,
+      to == "alex (this chat's other member)" and stored(mid) == ["alex"]
+      and "Alex: a member of this chat; it waits in their For you" in got,          # a2692: Sable's words
       (talk_members, got))
 rest(PIKE)
 got = say("alex", "yes, here", TALK)
