@@ -55,25 +55,30 @@ ADDRESS = re.compile(r"(?<![\w@])@([A-Za-z][\w]*(?:-[\w]+)*)")
 
 # a2715 (Pike e4870: 26 of 30 lines put every address first, 4 mid-line @s called someone by mistake): a line's
 # address is its header, the run of @names that opens it, after the world's signature ('Juniper: ') and the writer's
-# own name if they typed one ('Juniper, @sable @pike: hi'). Names in the run may be parted by spaces, commas, 'and',
-# 'or' or '&'; anything else ends it. An @ after the header is a mention: it calls no one, quoted or not.
+# own name if they typed one ('Juniper, @sable @pike: hi'), and a 'for' ('Claude, for @sable: ...'). Names in the run
+# may be parted by spaces, commas, 'and', 'or' or '&'; anything else ends it. An @ after the header is a mention: it
+# calls no one, quoted or not. The house reads comments and the lines a note edit adds by the same rule.
 SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
 _HEAD_SEP = re.compile(r"(?:[\s,;&+]|\band\b|\bor\b)*", re.I)
 _HEAD_AT = re.compile(r"@([A-Za-z]\w*(?:-\w+)*)(?![\w@'’])")
 
 
-def header(text, writer=None):
+def header(text, writer=None, signed=True):
     """-> (names, end): the names a line's header addresses, lower-case, in order, each once, and where the header
-    ends in `text`. `writer` is whose own name may open it as a signature; a signed line ('Juniper: ...') says it."""
+    ends in `text`. `writer` is whose own name may open it as a signature; a signed line ('Juniper: ...') says it.
+    signed=False for words the world did not sign (a comment, a note's line), where 'Owner: @pike' is no signature."""
     t = str(text)
     i = 0
-    m = SPEAKER.match(t)
+    m = SPEAKER.match(t) if signed else None
     if m:
         writer, i = writer or m.group(1), m.end()
     if writer:
         sig = re.compile(r"\s*" + re.escape(str(writer).split("/")[0]) + r"\s*[,:]", re.I).match(t, i)
         if sig:
             i = sig.end()
+    lead = re.compile(r"\s*for\s+(?=@)", re.I).match(t, i)      # Sable e4871: 'Claude, for @sable @pike: ...'
+    if lead:
+        i = lead.end()
     names = []
     while True:
         m = _HEAD_AT.match(t, _HEAD_SEP.match(t, i).end())

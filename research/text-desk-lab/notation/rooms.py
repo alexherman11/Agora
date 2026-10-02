@@ -217,8 +217,8 @@ def someone(w, name):
 def line_to(e):
     """a2662: whom a chat line's append event addressed, as one reading for the house's knock and the speaker's
     receipt: the line's stored to= (a1581: the writer's word, kept on the event with its line_id), or, for a line with
-    no stored address (said before lines, or in a chat whose lines are not things), its words read by the same rule
-    the migration used (world.addressed). -> (names, stored)"""
+    no stored address (said before lines, or in a chat whose lines are not things), its words read when heard by the
+    header rule a new line's address is (world.addressed, a2715). -> (names, stored)"""
     from world import addressed, to_names
     args = e.get("args") or {}
     if "line_id" in args:
