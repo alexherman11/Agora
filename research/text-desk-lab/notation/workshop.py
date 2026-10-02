@@ -315,10 +315,16 @@ class Workshop:
             return None                          # stopped by a usage limit: it resumes after the reset (failed)
         wk.state.pop("retry_at", None)
         self.workers[cid] = wk
-        cut = (wk.state.pop("pending", None) or {}).get("carry")
+        pending = wk.state.pop("pending", None) or {}
+        cut = pending.get("carry")
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        wk.state.pop("unanswered", None), wk.state.pop("unanswered_why", None)     # said here, not by a resident's wake
         wk.log("resume", {"session": wk.state["session"], "cut": bool(cut)})
-        if cut:
+        if cut and pending.get("delivered"):
+            # 1 Oct: the message is already in this conversation (claude keeps it even when the turn is cut)
+            wk.send("(the house restarted while you were working; your session is resumed. My last message to you is "
+                    "above, unanswered: carry on from there, checking what your last commands did first.)")
+        elif cut:
             wk.send("(the house restarted while you were working; your session is resumed. What you were last told:)\n\n" + cut)
         return wk
 

@@ -324,13 +324,23 @@ class Resident:
             f.write(json.dumps({"at": now(), "kind": kind, "data": data}, ensure_ascii=False) + "\n")
 
     # ---- the process -----------------------------------------------------------------------------------------
+    def hold_unanswered(self, pending, why):
+        """A turn that never finished. If its message reached the conversation (delivered) and the conversation goes
+        on, it is already there: count it, and the next wake says so in one line instead of sending it again (1 Oct:
+        every failed retry re-sent the whole wake into the same conversation, and they stacked, four and five deep).
+        Only what never arrived is carried to be sent in full."""
+        if pending.get("delivered") and self.state.get("session"):
+            self.state["unanswered"] = self.state.get("unanswered", 0) + 1
+            self.state["unanswered_why"] = why
+        elif pending.get("carry"):
+            self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + pending["carry"]).strip("\n")
+        self.save()
+
     def start(self, model):
-        # 30 Sep: a turn the last process never finished (a restart cut it) is said again at the next wake, with why;
-        # before, only a failed turn was carried, and a restart dropped what it had been told
-        cut = (self.state.pop("pending", None) or {}).get("carry")
-        if cut:
-            self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + cut).strip("\n")
-            self.state["cut_by_restart"] = True
+        # 30 Sep: a turn the last process never finished (a restart cut it) is said at the next wake, with why
+        pending = self.state.pop("pending", None)
+        if pending:
+            self.hold_unanswered(pending, "the house restarted for new code while you were answering")
         claude = self.house.claude
         cmd = [claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
@@ -395,6 +405,10 @@ class Resident:
             self.log("unsent", {"why": f"{type(e).__name__}: {e}", "kind": kind, "text": text})
             self.busy = False
             return
+        # 1 Oct (Sable e4659, Pike a1660, Juniper e4662): claude keeps a message it was sent in the conversation even
+        # when the turn then fails, so a delivered message is never sent again into the same conversation (see wake)
+        self.state["pending"]["delivered"] = True
+        self.save()
         self.log("sent", text)
         self.busy, self.reply = True, []
 
@@ -746,13 +760,26 @@ class House:
         # Alex (29 Sep): who they are, one line at the top of every arrival, so a name outlives a fading memory
         lead = f"You are {actor}. Your corner is {r.rid}.\n" + lead
         undelivered = r.state.pop("undelivered", "")
-        if undelivered:
-            # a resident acts only through > lines the house runs after its turn, so a cut turn ran none of them
-            why = ("the house restarted for new code while you were answering; your conversation is resumed, but that "
-                   "answer never reached me and none of its > lines ran" if r.state.pop("cut_by_restart", None)
-                   else "your last turn did not finish")
-            lead += f"({why}; what I had sent you, again:)\n" + undelivered + "\n(and your wake:)\n"
+        r.state.pop("cut_by_restart", None)              # older state: now said through unanswered
+        if undelivered:                                  # it never reached this conversation: said in full, once
+            lead += "(a message I had for you never reached you; here it is:)\n" + undelivered + "\n(and your wake:)\n"
+        unanswered, why_not = r.state.pop("unanswered", 0), r.state.pop("unanswered_why", "")
         r.state["woke"] = now()
+        if unanswered and not undelivered:
+            # 1 Oct (Sable e4659, Pike a1660, Juniper e4662): what was sent is already in this conversation, unanswered.
+            # One line says so, and only what is new since follows; the wake itself is not sent again, so failures
+            # never make the next turn longer. A resident acts only through > lines run after its turn, so none ran
+            self.news(self.load(), r, actor, resting=True)
+            callers = {c["by"] for c in r.state.get("calls") or []}
+            first, heard = self.first(r), self.take(r)
+            note = (f"(your last {unanswered} turn{'s' if unanswered != 1 else ''} did not finish: {why_not[:200]}. "
+                    f"What I sent you is above in this conversation, unanswered, and none of its > lines ran. "
+                    f"Answer the newest of it now; below is only what is new since.)")
+            r.send(lead + note + "".join("\n" + x for x in first + heard), "wake", carry="\n".join(first + heard))
+            if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:
+                self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")
+            self.set_status(r, corner, "awake")
+            return
         # what came while it slept is said with the wake, not dropped; a1062: a line kept for it (or that would have
         # called it, from a resident) comes first, marked for it, before the wake's own look
         self.news(self.load(), r, actor, resting=True)
@@ -847,14 +874,16 @@ class House:
         r.failed = True
         if r.alive():
             r.stop()
-        carry = (r.state.pop("pending", None) or {}).get("carry")
-        if carry:                                          # said again with the next wake, whatever the failure
-            r.state["undelivered"] = (r.state.get("undelivered", "") + "\n" + carry).strip("\n")
+        pending = r.state.pop("pending", None) or {}
+        carry = pending.get("carry")
         if r.lost_conversation():
             r.log("lost", {"session": r.state.pop("session", None)})
             r.state["lost"] = True
+            if carry:                                      # a fresh conversation has none of it: said again in full
+                r.state["undelivered"] = (r.state.get("undelivered", "") + "\n" + carry).strip("\n")
             r.save()
             return
+        r.hold_unanswered(pending, (why or {}).get("detail") if isinstance(why, dict) else "the process ended")
         n = r.state.get("failures", 0) + 1
         reset = limit_reset((why or {}).get("detail") if isinstance(why, dict) else "")
         # a usage limit is not the resident failing: try again a minute after the reset it names, not on a doubling
