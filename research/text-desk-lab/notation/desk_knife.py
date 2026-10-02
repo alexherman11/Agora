@@ -1291,6 +1291,8 @@ class DeskKnife(DeskMoo):
         if top:
             import verbs
             verbs.bind_unbound(self)      # a1156: once per world, lines saved before bindings bind to what they mean now
+            for sid in self.world.chats_without_lines():
+                self.world.chat_lines(sid)        # a1581: once per chat, its lines become things (one event each)
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
@@ -1734,7 +1736,8 @@ class DeskKnife(DeskMoo):
         "ids": "ids: every id the house prints can be typed back. f02 a surface or room; a05 a thing on a surface (an "
                "appearance); s03 what a thing says, its subject (one subject can appear in several places); e12 an "
                "event (history lists them; examine e12 explains one; undo e12 takes it back); c40 a comment (examine "
-               "c40; do resolve c40 closes it); l41 a link between two subjects (examine l41).",
+               "c40; do resolve c40 closes it); l41 a link between two subjects (examine l41); m42 a chat line "
+               "(examine m42: who said it, when, to whom).",
         "events": "events: every change is an event, e12, signed by who made it. history lists the latest; history <id> "
                   "those about one thing; examine e12 one event (when, why, what it caused); undo e12 takes it back. "
                   "The !! line atop a reply names the events by others since your last look. A ~ line under it says "
@@ -1754,7 +1757,9 @@ class DeskKnife(DeskMoo):
                 "the house has that verb). do create <surface> kind=task title=\"...\"; do prop <id> status=done.",
         "chat": "a chat is a thing whose text is lines said, one per line, signed. do append <chat> line=\"...\" says "
                 "one; read <chat> shows what is new to you. A room's talk= chat is where say lands. examine a chat says "
-                "what awaits a reply.",
+                "what awaits a reply. Each line is a thing, m42: it keeps who it addresses (each @name outside quotes, "
+                "or to=<names>; the receipt says to: ...), and examine m42 says who said it and when. A changed line "
+                "shows (edited) and keeps its words before; rows lines:<chat> lists the lines.",
         "doc": "a doc is a long text with ## sections: read <id> shows the outline, read <id> #<n> one section, "
                "read <id> :3 all of it. do create <surface> kind=doc title=\"...\".",
         "surface": "a surface holds things, laid out free, as a column, row or grid; it may be a room (help rooms) or a "

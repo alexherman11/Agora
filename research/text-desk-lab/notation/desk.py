@@ -39,9 +39,9 @@ class Unanswered(Refusal):
 # a1308: every kind of id the house prints, and what each names. A refusal that lists some of them can't name the door
 # to the rest (s1286: 'ids look like f02, a05, s03' left out the e-ids every !! line hands out)
 ID_HINT = ("ids: f02 a surface or room, a05 a thing on one, s03 what a thing says (its subject), e12 an event, c40 a "
-           "comment, l41 a link; use look or find")
-RECORD_KINDS = {"e": "an event", "c": "a comment", "l": "a link"}
-RECORD_ID = re.compile(r"^([ecl])(\d+)$")
+           "comment, l41 a link, m42 a chat line; use look or find")
+RECORD_KINDS = {"e": "an event", "c": "a comment", "l": "a link", "m": "a chat line"}
+RECORD_ID = re.compile(r"^([eclm])(\d+)$")
 HASH = re.compile(r"^[0-9a-f]{7,40}$")
 
 BASE_COMMANDS = {"help", "?", "look", "open", "close", "read", "where", "verbs", "pivot", "find", "history", "undo",
@@ -1045,8 +1045,8 @@ class Desk:
                 heading = next((l for l in reversed(cut) if l.startswith("## ")), None)   # the section the tail lines belong to
                 keep = [heading] if heading else []
                 body = "\n".join(keep + [f"(… {len(cut) - len(keep)} earlier line(s) folded; without tail= for all)"] + bl[-tail:])
-        if whole is None:
-            whole = body == s["text"]      # a section outline, one section or a tail is a partial read: the text is not seen
+        if whole is None:              # a section outline, one section or a tail is a partial read: the text is not seen
+            whole = body == (self._chat_text_shown(s) if s["kind"] == "chat" else s["text"])
         shown = ["title", "tags", "due", "comments", "links", "prop:*"] + [f"prop:{k}" for k in props] + (["text"] if whole else [])
         self._mark_seen(nid, shown)
         self._mark_seen(s["id"], shown)
@@ -1086,17 +1086,33 @@ class Desk:
             reads = self._chat_reads = {}
         obs = self._observer()
         rec = self._chat_run(s)             # None when rewritten since: what you were shown is gone
+        shown = self._chat_lines_shown(s)
         if full or tail:
             self._chat_shown(s, 0 if full else max(0, n - tail), ())
-            return s["text"], None
-        start = min((rec[1],) + rec[3]) if rec else max(0, n - self.CHAT_FIRST)
+            return self._chat_text_shown(s), None
+        start =min((rec[1],) + rec[3]) if rec else max(0, n - self.CHAT_FIRST)
         lo = rec[0] if rec else start
         reads[(obs, s["id"])] = (lo, n, dig(n), (), ())
         if rec and start == n:
             return f"(nothing new since you last read; {n} lines; read {nid} :3 or tail=<n>)", lo == 0
         if start == 0:
-            return s["text"], True
-        return "\n".join([f"({start} earlier lines folded; read {nid} :3 for all)"] + lines[start:]), lo == 0
+            return self._chat_text_shown(s), True
+        return "\n".join([f"({start} earlier lines folded; read {nid} :3 for all)"] + shown[start:]), lo == 0
+
+    @staticmethod
+    def _chat_lines_shown(s):
+        """a1581: the chat's text lines as a reader is shown them: a line someone changed ends '(edited, m<n>)', so a
+        change to what was said is never silent (examine m<n> keeps its words before). Others are as stored."""
+        lines = s["text"].splitlines()
+        k = 0
+        for l in s.get("lines") or ():
+            k += len(l["text"].split("\n"))
+            if l.get("edited") and 0 < k <= len(lines):
+                lines[k - 1] += f"  (edited, {l['id']})"
+        return lines
+
+    def _chat_text_shown(self, s):
+        return "\n".join(self._chat_lines_shown(s)) if any(l.get("edited") for l in s.get("lines") or ()) else s["text"]
 
     def _chat_made(self, cid):
         """a834: whoever makes a chat wrote its first lines, so they start that reader's run (else the maker's first
@@ -1323,7 +1339,14 @@ class Desk:
             if c is not None:
                 return "c", (owner, c), made
             return ("c", None, made) if made else None
-        link = next((l for l in w.links if l["id"] == rid), None)
+        if kind == "m":
+            # a1581: a chat line; one that is gone (its append undone) is still known by the event that made it
+            chat, line = w.find_line(rid)
+            if line is not None:
+                return "m", (chat, line), w.event_by_id(line.get("ev"))
+            made = next((e for e in reversed(w.events) if (e.get("args") or {}).get("line_id") == rid), None)
+            return ("m", None, made) if made else None
+        link =next((l for l in w.links if l["id"] == rid), None)
         made = next((e for e in w.events if (e.get("undo") or {}).get("drop_link") == rid), None)
         if link is not None:
             return "l", link, made
@@ -1337,6 +1360,14 @@ class Desk:
         if rid.startswith("e"):
             return [e for e in w.events if e["id"] == rid or e.get("cause") == rid
                     or (e["verb"] == "undo" and e["target"] == rid)]
+        if rid.startswith("m"):
+            # a1581: the line's making, every edit of it, and the event that made old lines things
+            chat, line = w.find_line(rid)
+            own = {line.get("ev"), line.get("edited")} | {x.get("ev") for x in line.get("was") or ()} if line else set()
+            own |= {e["id"] for e in w.events if (e.get("args") or {}).get("line_id") == rid}
+            ids = own - {None}
+            return [e for e in w.events if e["id"] in ids or (e["verb"] == "undo" and e["target"] in ids)
+                    or (chat is not None and e["verb"] == "lines" and chat["id"] in (e.get("changed") or ()))]
         mine, ids = [], set()
         for e in w.events:
             u, a = e.get("undo") or {}, e.get("args") or {}
@@ -1410,6 +1441,8 @@ class Desk:
             out.append(f"  read {(w.appearances_of(owner['id']) or [owner['id']])[0]} shows every comment on it"
                        + ("" if c["resolved"] else f"; do resolve {rid} line=\"...\" answers and closes it"))
             return "\n".join(out)
+        if kind == "m":
+            return self._line_text(rid, obj, ev)
         if obj is None:
             return (f"{rid}: a link that is no longer here (" + (f"{ev['verb']} {ev['id']} by {persons.by(w, ev)}" if ev else "?")
                     + f"). history {rid} shows what happened to it")
@@ -1418,6 +1451,35 @@ class Desk:
             out.append(f"  made by {ev['id']} ({persons.by(w, ev)}" + (f", {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else "") + ")")
         end = (w.appearances_of(obj["from"]) or [obj["from"]])[0]
         out.append(f"  do unlink {end} id={rid} removes it; find links:{end} lists what {end} is linked to")
+        return "\n".join(out)
+
+    def _line_text(self, rid, obj, ev):
+        """a1581: what examine, read and look print for a chat line: its chat, by and at (read from the event that made
+        it, or 'by unknown, at unknown'), who it addresses, its words, and, if it was changed, every earlier wording."""
+        w = self.world
+        when = lambda e: str(e.get("at"))[:16].replace("T", " ") if e and e.get("at") else "unknown"     # noqa: E731
+        if obj is None:
+            return (f"{rid}: a chat line that is no longer here; it was made by {ev['id']} ({persons.by(w, ev)} on "
+                    f"{self._title_line(ev['target'])}), then undone. history {rid} shows both")
+        chat, line = obj
+        apps = w.appearances_of(chat["id"])
+        by = f"by {persons.by(w, ev)} · at {when(ev)}" if ev else "by unknown, at unknown"    # a1568: the event's person
+        out = [f"{rid} a chat line in \"{chat['title']}\" ({chat['id']}" + (f", at {apps[0]}" if apps else "") + f") · {by}"
+               f" · to: {', '.join(line.get('to') or []) or 'nobody'}" + (" · edited" if line.get("edited") else "")]
+        out.append("  " + line["text"].replace("\n", "\n  "))
+        if ev:
+            out.append(f"  made by {ev['id']} ({ev['verb'] if ev['verb'] != 'edit' else 'append'})"
+                       + (f", from press {line['intent']}" if line.get("intent") else ""))
+        else:
+            out.append("  no event that made it could be found, so who said it and when are not known (a1581 kept it as it was)")
+        if line.get("reply_to"):
+            out.append(f"  in reply to {line['reply_to']} (examine {line['reply_to']})")
+        if line.get("was"):
+            e2 = w.event_by_id(line.get("edited"))
+            out.append(f"  edited by {persons.by(w, e2) if e2 else 'unknown'} at {when(e2)} ({line.get('edited')}); its words before, oldest first:")
+            for x in line["was"]:
+                out.append(f"    ({x.get('ev') or 'unknown'}) " + x["text"].replace("\n", "\n    "))
+        out.append(f"  read {apps[0] if apps else chat['id']} shows the chat; history {rid} lists what happened to this line")
         return "\n".join(out)
 
     def _fmt_args(self, args):
