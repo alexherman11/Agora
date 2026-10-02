@@ -705,11 +705,12 @@ class Desk:
                                                  p.get("score", ""),
                                                  f"{p['calls']} calls" if p.get("calls") else "",
                                                  f"{p['seconds']}s" if p.get("seconds") else ""] if x))
+            elif s["kind"] == "promise":
+                import promises     # a1587: how it stands, as it reads to you ('asked of you by sable'), not its to=
+                st = promises.state(w, s["id"])
+                bits.append(promises.phrase(w, st) + (f" · about {st['about']}" if st["about"] else ""))
             elif s.get("props"):
                 bits.append(" ".join(f"{k}={v}" for k, v in s["props"].items() if k not in ("label", "started")))
-            if s["kind"] == "promise":
-                import promises     # a1587: how it stands, as it reads to you ('asked of you by sable')
-                bits.append(promises.phrase(w, promises.state(w, s["id"])))
             if s["kind"] in ("note", "task", "chat", "doc", "trial"):
                 bits.append(f"{len(s['text'].split())}w")
             if n["folded"]:

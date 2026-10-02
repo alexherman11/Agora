@@ -152,15 +152,15 @@ def is_open(st):
     return st["state"] in (OPEN, ASKED)
 
 
-def phrase(w, st, reader=None):
+def phrase(w, st, reader=None, hints=True):
     """How a promise reads to this reader: 'asked of you by sable', 'you promised pike', 'reported by pike, not
-    confirmed', 'carried to you from pike'."""
+    confirmed', 'carried to you from pike'. hints=False leaves out the verb to type (a table's narrow column)."""
     r = reader or me(w)
     L = lambda p: "you" if same(p, r) else label(w, p)     # noqa: E731
     k = st["state"]
     if k == ASKED:
         if same(st["asked"], r):
-            return f"asked of you by {label(w, st['asker'])} (accept or decline {st['aid']})"
+            return f"asked of you by {label(w, st['asker'])}" + (f" (accept or decline {st['aid']})" if hints else "")
         return f"{L(st['asker'])} asked {label(w, st['asked'])}" + (", waiting for an answer" if same(st["asker"], r) else "")
     if k in ("declined", "withdrawn"):
         a, who, eid, _ = st["ended"]
@@ -185,7 +185,7 @@ def phrase(w, st, reader=None):
     a, who, eid, words = st["ended"]
     if k == REPORTED:
         if same(st["owed"], r):
-            return f"reported by {label(w, who)}, not confirmed (confirm {st['aid']} if it was kept)"
+            return f"reported by {label(w, who)}, not confirmed" + (f" (confirm {st['aid']} if it was kept)" if hints else "")
         return f"reported by {L(who)}, not confirmed by {label(w, st['owed'])}" + (f": {words}" if words else "")
     if k == "kept":
         if st["self"]:
@@ -246,18 +246,23 @@ def matching(w, term):
 
 # ---- acting --------------------------------------------------------------------------------------------------------
 
+def _new_surface(w):
+    """The Promises surface sits on no surface, as a person does (a1568): placing it anywhere in the tree reflows that
+    surface's row or column and squeezes what is there (ran: Home's row left ten things 0 px wide). It is reached by
+    its id, by find and views (kind:promise, held-by: ...), and by `promises`."""
+    fid = w.add_surface("Promises", None, "column", 0, 0, 640, 800)
+    w.nodes[fid]["props"] = {"role": "promises"}
+    return fid
+
+
 def ensure_surface(w):
-    """The Promises surface, made once in Home (the outermost room) by the house; -> (fid, event id or None)."""
+    """The Promises surface, made once by the house; -> (fid, event id or None)."""
     fid = surface(w)
     if fid:
         return fid, None
-    import rooms
-    rs = rooms.all_rooms(w)
-    home = rs[0] if rs else w.root
-    r = w.apply("create", home, None, {"kind": "surface", "title": "Promises", "layout": "column"}, "house")
-    fid = r["created"]
-    w.nodes[fid].setdefault("props", {})["role"] = "promises"
-    return fid, r["event"]
+    fid = _new_surface(w)
+    ev = w._event("promises", fid, {"surface": "made"}, {"delete": fid}, "house")
+    return fid, ev["id"]
 
 
 def make(w, form, what, to, about=None, actor=None, cause=None, acts=None, quiet=False):
@@ -798,15 +803,10 @@ def migrate(desk):
     items, steps = plan(w)
     if not items and not [s for s in steps if s[0] != "note"]:
         return
-    import rooms
-    rs = rooms.all_rooms(w)
-    home = rs[0] if rs else w.root
     fid = surface(w)
     made_nodes, made_subjects, restore_s, restore_n = [], [], {}, {}
     if not fid:
-        fid = w.add_surface("Promises", home, "column", 8, 8, 400, 300)
-        w.nodes[fid]["props"] = {"role": "promises"}
-        w.reflow(home)
+        fid = _new_surface(w)
         made_nodes.append(fid)
     ev = w._event("promises", fid, {}, {}, "house")
     mig = ev["id"]
@@ -961,7 +961,7 @@ def cell(w, sid, col):
         return ""
     st = state(w, sid)
     if col == "promise":
-        return phrase(w, st)
+        return phrase(w, st, hints=False)
     if col == "holder":
         return label(w, st["holder"]) if st["holder"] else ""
     if col == "owed":
