@@ -1,14 +1,18 @@
 """test_rules (a1027): rules become quiet notes; scripts retire into verbs.
 
-    python test_rules.py [world]        default frontier-try
+    python test_rules.py
 
-Loads the world into memory and never saves it (the harness of test_room_verbs.py). The rule the three residents
-asked for without comparing notes (Juniper e1957, Sable e1958, Pike e1959) is written as three rule notes, by
-juniper, in a Rules surface on the Board; then the house lands a commission, as it does (look; do prop
-commission=landed landed=<head>), and each line of the commission's 'done when' is checked.
+Builds its own small world (roomworld.py), in memory, never saved. The rule the three residents asked for without
+comparing notes (Juniper e1957, Sable e1958, Pike e1959) is written as three rule notes, by juniper, in a Rules
+surface on the Board; then the house lands a commission, as it does (look; do prop commission=landed landed=<head>),
+and each line of the commission's 'done when' is checked.
+
+a3029: until then it read a copy of the live world, and 'a narrated look never lists rule notes' failed once the
+Board held more than its look shows (the Rules surface fell into '+12 more'). What the live world lent it is made
+here: a Rough spots surface with an open spot claude found, a commission that landed before any rule, and the old
+script 'arrive' a world from before a1027 still holds.
 """
 import os
-import pickle
 import sys
 import uuid
 from pathlib import Path
@@ -17,7 +21,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
 fails = []
 
 
@@ -27,9 +30,10 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+import roomworld   # noqa: E402
+
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -61,17 +65,18 @@ def said(me, *lines):
 
 import rooms   # noqa: E402
 
-# rules already in the world would fire beside the ones written here: set them aside, in memory only (never saved)
-for _s in W.subjects.values():
-    if "rule" in (_s.get("tags") or []):
-        _s["tags"] = [t for t in _s["tags"] if t != "rule"]
-D._rulestate = None
-
-room = lambda title: next(f for f in rooms.all_rooms(W) if W.nodes[f]["title"] == title)
-BOARD, LOUNGE = room("Board"), room("Lounge")
-SPOTS = next(n["id"] for n in W.nodes.values() if n["type"] == "surface" and n["title"] == "Rough spots")
-SABLE, PIKE, JUNIPER = (rooms.corner_of(W, a) for a in ("sable", "pike", "juniper"))
-print(f"world {WORLD} (in memory): Board {BOARD}, Lounge {LOUNGE}, Rough spots {SPOTS}, corners {SABLE} {PIKE} {JUNIPER}")
+BOARD, LOUNGE = R.BOARD, R.LOUNGE
+SABLE, PIKE, JUNIPER = (R.corner[a] for a in ("sable", "pike", "juniper"))
+# what the live world lent this test until a3029, made here: Rough spots with an open spot claude found (claude has no
+# corner, so no sill), a commission the house landed before any rule was written, and an old script from before a1027
+reply("jeff", f"look {BOARD} :1", f'do create {BOARD} kind=surface title="Rough spots"')
+SPOTS = W.last_created
+reply("claude", f"look {SPOTS} :1", f'do create {SPOTS} kind=note title="A spot claude found" family=silence status=open text=x')
+OLD = reply("house", f"look {BOARD} :1", f'do create {BOARD} kind=task title="An old commission" asked_by=pike '
+            f'commission=landed landed=0000000 text=x')[-1]
+assert not OLD[2], OLD
+D.scripts = {"arrive": "look"}       # a world from before a1027 still holds its scripts; they never run
+print(f"world (built, in memory): Board {BOARD}, Lounge {LOUNGE}, Rough spots {SPOTS}, corners {SABLE} {PIKE} {JUNIPER}")
 
 
 def subj(nid):
@@ -125,8 +130,11 @@ typo4, tt4, _ = write_rule("juniper", "A typo in a target", R2.replace("answered
 check("a misspelled term in a selection target is broken too, not read as a prop", "saved broken" in tt4 and "answred-by" in tt4, tt4)
 
 # ---- quiet ------------------------------------------------------------------------------------------------------------
-t, e = said("juniper", "look")
-check("a narrated look never lists rule notes", not e and r1 not in t and "Rules" in t, e or t)
+# a3029: r1 sits inside the Rules surface, where a narrated look never reaches anyway; a rule note held by the Board
+# itself is the one the look must leave out, beside a card it must still list
+rq, tq, eq = write_rule("juniper", "A rule in the room itself", "when tag:quiet-probe do tag add=heard", where=BOARD)
+t, e = said("juniper", f"go {BOARD} :1", "look")
+check("a narrated look never lists rule notes", not e and rq not in t and r1 not in t and RULES in t and R.CARDS[0] in t, e or eq or t)
 t, e = said("juniper", f"look {RULES} :2")
 check("the tree marks them as rules, a broken one as broken", f"{r1} note" in t and "· rule ·" in t
       and "rule, broken (rules says why)" in t, t)
@@ -170,6 +178,8 @@ check("and the same note lands on the reporter's sill", len(psill) == 1, receipt
 check("the spot claude made goes curing too, and finds no sill: skipped quietly", prop(CLAUDE, "status") == "curing"
       and "no sill" not in receipt and "could not" not in receipt, receipt)
 check("never cured: cured stays a person's word", "cured" not in {prop(SPOT, "status"), prop(CLAUDE, "status")})
+check("the commission that landed before the rule was written fired nothing (it was counted as handled)",
+      not made_in(PIKE, "your live check is due: An old commission"), receipt)
 check("the broken rules did not fire", f"~ {typo} " not in receipt and f"~ {typo2} " not in receipt and f"~ {typo3} " not in receipt, receipt)
 t, e = said("pike", "rules")
 check("rules shows what fired, and the quiet skip", f"{r1} " in t and "fired 1x" in t and f"skipped 1x (last: {CLAUDE}, no sill for 'claude')" in t, t)
