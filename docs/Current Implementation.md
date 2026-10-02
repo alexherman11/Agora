@@ -105,7 +105,7 @@ Editing a subject changes every appearance of it. Moving or removing one appeara
 
 **Chat lines are things** (a1581; design a1570 with Pike's revision, e3840). Each line of a chat is kept in the chat's `lines` list as `{id: m<n>, text, to, ev}`.
 - `text` is the line as the world signed it. The chat's text is always its lines' texts joined by newlines, so every read of a chat, a744's run and the painter read it as before. A line spoken over several text lines is one line.
-- A line stores no author and no time: `by` and `at` are read from `ev`, the event that made it (`World.line_by_at`). A line no event made says `by unknown, at unknown`, never a guess.
+- A line stores no author and no time: `by` and `at` are read from `ev`, the event that made it (`World.line_by_at`), and `by` prints as that event's person (`persons.by`, a1568), so a renamed person's lines name them by their name now with nothing migrated, while the signature in the text stays as signed. A line no event made says `by unknown, at unknown`, never a guess.
 - `to` is who the writer addressed, lower-case names stored when the line is written and never read again from its words: `to=<names>` said outright (`to=nobody` for no one), else each `@name` outside quotes and backticks and not inside a word (`world.ADDRESS`, `addressed()`; a916's quoting rule). `@everyone` and `@all` are kept as written. The receipt says `line m<n> · to: sable, pike` or `to: nobody`, and the event carries `line_id` and `to`. `say` reads @ the same way, through the append it makes.
 - `reply_to=<m id>` on append keeps the line it answers (refused if it names no line).
 - One press, one line (a1008, Sable c1579): while deskd runs a press it puts the gesture on the world (`World.intent`). A line keeps it as `intent` (the second line in one press as `gesture#2`, and so on), and an append whose key a line already holds makes nothing and says `already said, as m<n>`. The id stays the desk's own `m<n>`; the gesture is the line's key.
@@ -907,4 +907,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e4692. Edit it there; a direct edit here makes the next export stop and warn. sha1:558c49ba244f -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e4767. Edit it there; a direct edit here makes the next export stop and warn. sha1:c5be7143af7b -->
