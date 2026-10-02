@@ -128,7 +128,9 @@ for name, last, want in (("Nook", "Juniper: short too", True), ("Den", "Juniper:
         continue
     reply(OTHER, f"do prop {fid} role=room talk={cid}")
     look = reply(ME, f"go {fid}")[-1][1]
-    got = reply(ME, f'do rewrite {cid} text="Pike: only me"')
+    # a1581: a rewrite that drops a chat's lines is refused as testimony, whatever was read; one that changes words in
+    # place is judged by what the reader has seen, which is what this tests
+    got = reply(ME, f'do rewrite {cid} text="Juniper: hello\\nPike: only me"')
     ok = (not got[-1][2]) == want
     check(f"{name}: two lines, the last {'whole' if want else 'cut'}: rewrite {'allowed' if want else 'refused'}",
           ok, (look, got))

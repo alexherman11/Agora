@@ -511,11 +511,15 @@ class Handler(SimpleHTTPRequestHandler):
                     if desk._act_home else None
                 if body.get("stored") in desk.world.nodes:
                     desk._act_home, desk._act_binds = verbs.stored_at(desk.world, body["stored"])
+                # a1581 (Sable c1579): a chat line keeps the press it came from, so the world itself refuses a second
+                # line from one Enter, whichever door brought it
+                desk.world.intent, desk.world._intent_k = gid, 0
                 try:
                     r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
                                                "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
                 finally:
                     desk._act_home = desk._act_binds = None
+                    desk.world.intent = None
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably

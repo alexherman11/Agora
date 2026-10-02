@@ -6,7 +6,7 @@ Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
   - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
   - the rooms tests pass (test_room_verbs, test_room_look, test_room_reads, test_blanks, test_prop_fields,
-    test_house_words, test_house_cols, test_persons, test_help_notes), each on a small world it
+    test_house_words, test_house_cols, test_persons, test_lines, test_help_notes), each on a small world it
     builds itself (roomworld.py), so a failure is the code's and not today's world's
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - the Python mirror of style.js that style receipts use (scene.style_check) agrees with style.js under node, on
@@ -32,7 +32,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 ROOM_TESTS = ("test_room_verbs.py", "test_room_look.py", "test_room_reads.py", "test_blanks.py", "test_prop_fields.py",
-              "test_house_words.py", "test_house_cols.py", "test_persons.py",
+              "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_lines.py",
               "test_help_notes.py")
 HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
 
