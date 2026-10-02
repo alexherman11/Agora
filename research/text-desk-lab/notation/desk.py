@@ -14,6 +14,7 @@ import shlex
 from copy import deepcopy
 
 from world import Refusal, SCREEN, World
+import persons
 
 HELP = """commands (one per call):
   look [id] [:1|:2|:3|:4] outline from id (default desk). :1 the line, :2 its children (default), :3 everything under it with first lines, :4 with full text
@@ -426,6 +427,11 @@ class Desk:
         if verbish:
             raise Refusal(f"{ident!r} is a verb's word, not a name for a thing: the verb note is {', '.join(verbish)} "
                           f"(help {ident} explains it; read or change it by its id)")
+        hit = persons.typed(self.world, ident) if allow_subject else None
+        if hit:
+            # a1568: a typed name is today's bearer; the door to an earlier one is said where the answer is printed
+            self._person_note = hit[1]
+            return hit[0]
         rec = self._record(ident)
         if rec:
             # a1308: an event, comment or link id the house printed is never 'no such id'; this command can't take it,
@@ -445,7 +451,7 @@ class Desk:
                          or (e.get("undo") or {}).get("delete") == ident), None)
             if last is not None:
                 raise Refusal(f"{ident} is not in the world now; its last event was {last['id']} ({last['verb']} by "
-                              f"{last['by']}): examine {last['id']} shows it; history {ident} lists what happened to it")
+                              f"{persons.by(self.world, last)}): examine {last['id']} shows it; history {ident} lists what happened to it")
         if HASH.match(ident) and any(ch.isdigit() for ch in ident) and not ident.isdigit():
             raise Refusal(f"no such id {ident!r}: it looks like a commit (the code's history, kept in git, outside the "
                           f"world); a landed card's comments say what it changed. {ID_HINT}")
@@ -484,7 +490,7 @@ class Desk:
         subj = n.get("subject") if n else None
         mywin = getattr(self, "_window", "") or ""
         for k, e in enumerate(w.events[since:], since):
-            if e.get("undone") or (e["by"] == w.me and (others_only or e.get("window", "") == mywin)
+            if e.get("undone") or (persons.mine(w, e) and (others_only or e.get("window", "") == mywin)
                                    and not rule_did_unseen(e, w.me)):
                 continue                      # my own deeds from this window are already on my receipts; my rule's, tripped by another, are not
             if e["verb"] == "undo":
@@ -781,13 +787,15 @@ class Desk:
 
     def delta_header(self):
         me = self.world.me
+        w = self.world
         # a rule acts as its author (a687): its tripper saw it on their receipt, its author did not
+        # a1568: 'mine' is by person once the world has persons, so a renamed person's own acts stay theirs
         evs = [e for e in self.world.events[self.last_event_seen:]
-               if (e["by"] != me and e.get("tripped_by") != me) or rule_did_unseen(e, me)]
+               if (not persons.mine(w, e) and e.get("tripped_by") != me) or rule_did_unseen(e, me)]
         self.last_event_seen = len(self.world.events)
         # a678 (6): walking folds, at most one line per actor, their latest room
-        latest = {e["by"]: e for e in evs if e["verb"] == "go"}
-        evs = [e for e in evs if e["verb"] != "go" or latest.get(e["by"]) is e]
+        latest = {persons.by(w, e): e for e in evs if e["verb"] == "go"}
+        evs = [e for e in evs if e["verb"] != "go" or latest.get(persons.by(w, e)) is e]
         yours, told = self.edits_to_yours(evs)      # a1471: an edit to what you made has its own line, not a count
         evs = [e for e in evs if e["id"] not in told]
         yours = "".join(l + "\n" for l in yours)
@@ -804,7 +812,7 @@ class Desk:
         if len(evs) <= 4:
             def part(e):
                 if e["verb"] == "go":
-                    return f"{e['id']} {e['by']} went to {went(e)}"
+                    return f"{e['id']} {persons.by(w, e)} went to {went(e)}"
                 if rule_did_unseen(e, me):
                     args = {k: (v if len(str(v)) <= 60 else str(v)[:57] + "…") for k, v in (e.get("args") or {}).items()}
                     verb = e["verb"]
@@ -813,17 +821,16 @@ class Desk:
                                            (("append", "append"), ("title", "retitle"), ("text", "rewrite")) if k in args), (verb, args))
                     return (f"{e['id']} your rule {rule_of(e)} did {verb} {e['target']} {self._fmt_args(args)}".rstrip()
                             + f" (tripped by {e['tripped_by']})")
-                return f"{e['id']} {e['verb']} {e['target']} by {e['by']}" + (f" via rule {rule_of(e)}" if rule_of(e) else "")
+                return f"{e['id']} {e['verb']} {e['target']} by {persons.by(w, e)}" + (f" via rule {rule_of(e)}" if rule_of(e) else "")
             return "!! since your last look: " + "; ".join(part(e) for e in evs) + "\n" + yours
-        w = self.world
-        mine = {e["undo"].get("delete_subject") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
-        mine |= {e["undo"].get("delete") for e in w.events if e["by"] == me and isinstance(e.get("undo"), dict)} - {None}
+        mine = {e["undo"].get("delete_subject") for e in w.events if persons.mine(w, e) and isinstance(e.get("undo"), dict)} - {None}
+        mine |= {e["undo"].get("delete") for e in w.events if persons.mine(w, e) and isinstance(e.get("undo"), dict)} - {None}
         lines, to_me, undone = {}, [], []
         moved = {}
         for e in evs:
             if e["verb"] == "go":
-                moved[e["by"]] = went(e)
-                lines.setdefault(e["by"], {})
+                moved[persons.by(w, e)] = went(e)
+                lines.setdefault(persons.by(w, e), {})
                 continue
             if e["verb"] == "undo":
                 undone.append(e)
@@ -833,12 +840,12 @@ class Desk:
             if where in w.nodes and w.nodes[where]["type"] == "appearance":
                 where = w.nodes[where]["parent"]
             name = w.title(w.nodes[where]) if where in w.nodes else (w.subjects[where]["title"] if where in w.subjects else where)
-            who = f"your rule {rule_of(e)}" if rule_did_unseen(e, me) else e["by"]
+            who = f"your rule {rule_of(e)}" if rule_did_unseen(e, me) else persons.by(w, e)
             lines.setdefault(who, {}).setdefault((e["verb"], name), []).append(e["id"])
         out = [f"!! since your last look: {len(evs)} changes by {', '.join(lines)} ({evs[0]['id']}..{evs[-1]['id']}; history lists them)"]
         for e in to_me:   # never folded: someone answered you
             t = w.subjects[e["target"]]["title"] if e["target"] in w.subjects else e["target"]
-            out.append(f"   {e['by']} commented on your \"{t}\"  [{e['id']}]")
+            out.append(f"   {persons.by(w, e)} commented on your \"{t}\"  [{e['id']}]")
         for by, groups in lines.items():
             top = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:4]
             out.append(f"   {by}: " + ", ".join(f"{len(ids)} {verb} in {name}" if len(ids) > 1 else f"{verb} in {name}" for (verb, name), ids in top)
@@ -855,7 +862,7 @@ class Desk:
         w, me = self.world, self.world.me
         cand = []
         for e in evs:
-            if e["verb"] not in ("edit", "check") or e.get("undone") or e["by"] == me:
+            if e["verb"] not in ("edit", "check") or e.get("undone") or persons.mine(w, e):
                 continue
             sid = e["target"] if e["target"] in w.subjects else (w.nodes.get(e["target"]) or {}).get("subject")
             if sid in w.subjects and w.subjects[sid]["kind"] in ("note", "task"):
@@ -867,16 +874,16 @@ class Desk:
         for e in w.events:
             u = e.get("undo")
             if e["verb"] == "create" and isinstance(u, dict) and u.get("delete_subject") in want:
-                maker[u["delete_subject"]] = e["by"]
+                maker[u["delete_subject"]] = e
         runs = []          # [(by, sid, [events])], one per person, note and hour
         for e, sid in cand:
-            if maker.get(sid) != me:
+            if sid not in maker or not persons.mine(w, maker[sid]):      # a1568: made by me, the person, not the name
                 continue
-            run = next((r for r in runs if r[0] == e["by"] and r[1] == sid and _within_hour(r[2][0], e)), None)
+            run = next((r for r in runs if r[0] == persons.by(w, e) and r[1] == sid and _within_hour(r[2][0], e)), None)
             if run:
                 run[2].append(e)
             else:
-                runs.append((e["by"], sid, [e]))
+                runs.append((persons.by(w, e), sid, [e]))
         lines, told = [], set()
         for by, sid, run in runs:
             s, last = w.subjects[sid], run[-1]
@@ -1047,9 +1054,9 @@ class Desk:
         if s.get("comments"):
             out += "\ncomments:"
             for c in s["comments"]:
-                out += f"\n  {c['id']} {c['by']}: {c['text']}" + (" (resolved)" if c["resolved"] else " (open)")
-                for r in c["replies"]:
-                    out += f"\n      {r['by']}: {r['text']}"
+                out += f"\n  {c['id']} {persons.comment_by(w, c)}: {c['text']}" + (" (resolved)" if c["resolved"] else " (open)")
+                for i, r in enumerate(c["replies"]):
+                    out += f"\n      {persons.reply_by(w, c, i)}: {r['text']}"
         links = w.links_of(s["id"])
         if links:
             out += "\nlinks:"
@@ -1239,6 +1246,9 @@ class Desk:
             return rec
         nid = self._resolve(ident)
         w = self.world
+        if persons.is_person(w, nid):
+            note, self._person_note = getattr(self, "_person_note", ""), ""
+            return persons.card(w, nid, note)
         if nid in w.subjects:
             sid = nid
         elif w.nodes[nid]["type"] == "appearance":
@@ -1294,6 +1304,13 @@ class Desk:
                 nid = ident.strip().lstrip("@")       # a thing no longer here still has its history
                 if not any(e["target"] == nid for e in evs):
                     raise
+            if persons.is_person(self.world, nid):
+                # a1568: a person's history is what they did (who=), and what was done to them (made, renamed)
+                note, self._person_note = getattr(self, "_person_note", ""), ""
+                evs = [e for e in evs if e.get("who") == nid or e["target"] == nid]
+                head = (f"history of {persons.label(self.world, nid)} ({nid}): " + (f"the latest 12 of {len(evs)} events"
+                        if len(evs) > 12 else f"{len(evs)} event(s)") + (f"; {note}" if note else ""))
+                return "\n".join([head] + [self._history_line(e) for e in evs[-12:]])
             evs =[e for e in evs if e["target"] == nid or nid in (e.get("args") or {}).values()]
         evs = evs[-12:]
         if not evs:
@@ -1301,7 +1318,7 @@ class Desk:
         return "\n".join(self._history_line(e) for e in evs)
 
     def _history_line(self, e):
-        return (f"{e['id']} {e['verb']} {e['target']} {self._fmt_args(e['args'])} by {e['by']}"
+        return (f"{e['id']} {e['verb']} {e['target']} {self._fmt_args(e['args'])} by {persons.by(self.world, e)}"
                 + (f" via {e['via']}" if e.get("via") and e["via"] != e["verb"] else "")
                 + (f" (verb {e['verb_run']})" if e.get("verb_run") else "") + (" (undone)" if e.get("undone") else ""))
 
@@ -1385,13 +1402,17 @@ class Desk:
         if kind == "e":
             e = obj
             out.append(self._history_line(e))
-            out.append(f"  an event: {e['by']} did {e['verb']}" + (f" at {str(e.get('at'))[:16].replace('T', ' ')}"
+            out.append(f"  an event: {persons.by(w, e)} did {e['verb']}" + (f" at {str(e.get('at'))[:16].replace('T', ' ')}"
                                                                   if e.get("at") else "") + f", on {self._title_line(e['target'])}")
+            if persons.of_event(w, e):
+                # a1568: the person, and the name the act was signed with when it differs from how they are printed now
+                pid = e["who"]
+                out.append(f"  by the person {pid} (examine {pid})" + (f"; signed {e['by']}" if persons.label(w, pid) != e["by"] else ""))
             for k, v in (e.get("args") or {}).items():
                 v = str(v)
                 out.append(f"    {k}: " + (v if len(v) <= 400 else v[:400] + f"… ({len(v.split())} words; read {e['target']})"))
             if e.get("tripped_by") and e["tripped_by"] != e["by"]:
-                out.append(f"  tripped by {e['tripped_by']} (a rule acting as {e['by']})")
+                out.append(f"  tripped by {persons.tripped(w, e)} (a rule acting as {persons.by(w, e)})")
             if e.get("cause"):
                 out.append(f"  because of {e['cause']} (examine {e['cause']})")
             caused = [x["id"] for x in w.events if x.get("cause") == rid]
@@ -1407,14 +1428,14 @@ class Desk:
             return "\n".join(out)
         if kind == "c":
             if obj is None:
-                return (f"{rid}: a comment that is no longer here; it was made by {ev['id']} ({ev['by']} on "
+                return (f"{rid}: a comment that is no longer here; it was made by {ev['id']} ({persons.by(w, ev)} on "
                         f"{self._title_line(ev['target'])}), then undone. history {rid} shows both")
             owner, c = obj
-            out.append(f"{rid} comment by {c['by']} on {self._title_line(owner['id'])} · "
+            out.append(f"{rid} comment by {persons.comment_by(w, c, ev)} on {self._title_line(owner['id'])} · "
                        + ("resolved" if c["resolved"] else "open"))
             out.append("  " + c["text"].replace("\n", "\n  "))
-            for r in c.get("replies") or []:
-                out.append(f"    {r['by']}: {r['text']}")
+            for i, r in enumerate(c.get("replies") or []):
+                out.append(f"    {persons.reply_by(w, c, i)}: {r['text']}")
             if ev:
                 out.append(f"  made by {ev['id']}" + (f" at {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else ""))
             out.append(f"  read {(w.appearances_of(owner['id']) or [owner['id']])[0]} shows every comment on it"
@@ -1423,11 +1444,11 @@ class Desk:
         if kind == "m":
             return self._line_text(rid, obj, ev)
         if obj is None:
-            return (f"{rid}: a link that is no longer here (" +(f"{ev['verb']} {ev['id']} by {ev['by']}" if ev else "?")
+            return (f"{rid}: a link that is no longer here (" + (f"{ev['verb']} {ev['id']} by {persons.by(w, ev)}" if ev else "?")
                     + f"). history {rid} shows what happened to it")
         out.append(f"{rid} link: {self._title_line(obj['from'])} {obj['kind']} → {self._title_line(obj['to'])}")
         if ev:
-            out.append(f"  made by {ev['id']} ({ev['by']}" + (f", {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else "") + ")")
+            out.append(f"  made by {ev['id']} ({persons.by(w, ev)}" + (f", {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else "") + ")")
         end = (w.appearances_of(obj["from"]) or [obj["from"]])[0]
         out.append(f"  do unlink {end} id={rid} removes it; find links:{end} lists what {end} is linked to")
         return "\n".join(out)
@@ -1438,11 +1459,11 @@ class Desk:
         w = self.world
         when = lambda e: str(e.get("at"))[:16].replace("T", " ") if e and e.get("at") else "unknown"     # noqa: E731
         if obj is None:
-            return (f"{rid}: a chat line that is no longer here; it was made by {ev['id']} ({ev['by']} on "
+            return (f"{rid}: a chat line that is no longer here; it was made by {ev['id']} ({persons.by(w, ev)} on "
                     f"{self._title_line(ev['target'])}), then undone. history {rid} shows both")
         chat, line = obj
         apps = w.appearances_of(chat["id"])
-        by = f"by {ev['by']} · at {when(ev)}" if ev else "by unknown, at unknown"
+        by = f"by {persons.by(w, ev)} · at {when(ev)}" if ev else "by unknown, at unknown"    # a1568: the event's person
         out = [f"{rid} a chat line in \"{chat['title']}\" ({chat['id']}" + (f", at {apps[0]}" if apps else "") + f") · {by}"
                f" · to: {', '.join(line.get('to') or []) or 'nobody'}" + (" · edited" if line.get("edited") else "")]
         out.append("  " + line["text"].replace("\n", "\n  "))
@@ -1455,7 +1476,7 @@ class Desk:
             out.append(f"  in reply to {line['reply_to']} (examine {line['reply_to']})")
         if line.get("was"):
             e2 = w.event_by_id(line.get("edited"))
-            out.append(f"  edited by {e2['by'] if e2 else 'unknown'} at {when(e2)} ({line.get('edited')}); its words before, oldest first:")
+            out.append(f"  edited by {persons.by(w, e2) if e2 else 'unknown'} at {when(e2)} ({line.get('edited')}); its words before, oldest first:")
             for x in line["was"]:
                 out.append(f"    ({x.get('ev') or 'unknown'}) " + x["text"].replace("\n", "\n    "))
         out.append(f"  read {apps[0] if apps else chat['id']} shows the chat; history {rid} lists what happened to this line")
@@ -1471,7 +1492,7 @@ class Desk:
 
     def cmd_undo(self, eid):
         if not eid:
-            mine = [e for e in self.world.events if e["by"] == self.world.me and e["verb"] != "undo" and not e.get("undone")
+            mine = [e for e in self.world.events if persons.mine(self.world, e) and e["verb"] != "undo" and not e.get("undone")
                     and not rule_did_unseen(e, self.world.me)   # a687: your rule's firing, tripped by another, undoes their command
                     and not (e.get("undo") or {}).get("refuse")]   # a678: walking is not a change; bare undo passes over it
             if not mine:
@@ -1549,7 +1570,7 @@ class Desk:
         behind = (seen != cur and adds) or seen is None     # a chat line lands; what I missed stays unread, and nothing is marked seen
         if seen != cur and not behind:
             recent = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
-            why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {recent[-1]['by']}" if recent else ""
+            why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {persons.by(w, recent[-1])}" if recent else ""
             raise Refusal(f"stale: {nid} changed since you last saw it{why}; {self._again(nid, aspects_of(verb, kv))} before acting")
         blind = self._blind(nid, verb, kv)
         if blind:

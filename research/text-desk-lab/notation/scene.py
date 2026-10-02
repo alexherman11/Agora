@@ -459,6 +459,7 @@ def inbox_rows(desk, me):
 def line_rows(desk, chat=None):
     """a1581: the chat lines (things, m<n>) of one chat or of every chat on the desk, oldest first. A line spoken over
     several text lines is one row; `said` is its words after the signature, `to` who its writer addressed."""
+    import persons
     w = desk.world
     sid = w.subject_of(chat) if chat else None
     if chat and (sid is None or w.subjects[sid]["kind"] != "chat"):
@@ -472,7 +473,8 @@ def line_rows(desk, chat=None):
             e = w.event_by_id(l.get("ev"))
             m = w.SPEAKER.match(l["text"])
             out.append({"item": apps[0], "chat": s["title"], "line": l["id"], "who": m.group(0).rstrip(" \t:") if m else "",
-                        "by": e["by"] if e else "unknown", "at": _clock(e.get("at", "")) if e else "", "to": ", ".join(l["to"]),
+                        "by": persons.by(w, e) if e else "unknown",      # a1568: the event's person, as printed
+                        "at": _clock(e.get("at", "")) if e else "", "to": ", ".join(l["to"]),
                         "said": l["text"][m.end():] if m else l["text"], "edited": "edited" if l.get("edited") else "",
                         "reply_to": l.get("reply_to", ""), "eid": l.get("ev") or l["id"], "_t": (e or {}).get("at", "")})
     out.sort(key=lambda r: r.pop("_t") or "")

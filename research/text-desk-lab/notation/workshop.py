@@ -108,6 +108,14 @@ def git(*args, cwd=REPO, check=False, timeout=120):
     return r
 
 
+def limit_reset(detail):
+    """The house's reading of a usage-limit message (house.limit_reset), from the house already running: never a second
+    copy of house.py from disk (30 Sep)."""
+    H = sys.modules.get("house") or sys.modules.get("__main__")
+    f = getattr(H, "limit_reset", None)
+    return f(detail) if f else None
+
+
 def health(world, cwd=HERE):
     r = subprocess.run([str(PY), "health.py", world, "--json"], cwd=cwd, capture_output=True, text=True, timeout=900,
                        env={**os.environ, "DESKD": "off"})
@@ -125,7 +133,6 @@ class Workshop:
         self.house = house
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
-        self.held = {}                 # commission -> the uncommitted files its landing is waiting on (said once)
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -276,10 +283,17 @@ class Workshop:
         wk = Worker(self.house, cid, tree, branch, asked_by)
         self.workers[cid] = wk
         wk.state["cursor"] = len(w.events)
+        wk.state.pop("retry_at", None)
+        returning = bool(wk.state.get("session"))     # a re-asked commission resumes its worker's conversation
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
         self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
+        if returning:      # 1 Oct (a1566): it remembered edits that the old worktree took with it
+            first = (f"(You are back on this commission in a NEW worktree, {tree}, on your branch {branch}. Anything you "
+                     "committed is there; uncommitted edits from before were not kept unless the house committed them for "
+                     "you (look for 'kept by the house' in git log). Check git log and git status before redoing anything.)"
+                     "\n\n" + first)
         wk.send(first)
 
     def resume(self, w, cid, s, cfg):
@@ -297,21 +311,46 @@ class Workshop:
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", props.get("asked_by") or self.asked_by(w, s))
         if not wk.state.get("session"):
             return None
+        if wk.state.get("retry_at", 0) > time.time():
+            return None                          # stopped by a usage limit: it resumes after the reset (failed)
+        wk.state.pop("retry_at", None)
         self.workers[cid] = wk
-        cut = (wk.state.pop("pending", None) or {}).get("carry")
+        pending = wk.state.pop("pending", None) or {}
+        cut = pending.get("carry")
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        wk.state.pop("unanswered", None), wk.state.pop("unanswered_why", None)     # said here, not by a resident's wake
         wk.log("resume", {"session": wk.state["session"], "cut": bool(cut)})
-        if cut:
+        if cut and pending.get("delivered"):
+            # 1 Oct: the message is already in this conversation (claude keeps it even when the turn is cut)
+            wk.send("(the house restarted while you were working; your session is resumed. My last message to you is "
+                    "above, unanswered: carry on from there, checking what your last commands did first.)")
+        elif cut:
             wk.send("(the house restarted while you were working; your session is resumed. What you were last told:)\n\n" + cut)
         return wk
 
     def failed(self, cid, wk, why):
+        detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
+        reset = limit_reset(detail)
+        if reset:
+            # 1 Oct (Sable e4431, a1566 c1903): at 09:22 the usage limit failed every worker twice in a row; each was
+            # marked failed and its worktree removed with its uncommitted edits, and the re-asked worker resumed a
+            # conversation that remembered them. A limit is not the worker failing: stop it, keep its worktree and its
+            # conversation, and resume it a minute after the reset the limit names (step, through resume)
+            first = not wk.state.get("retry_at")
+            wk.stop()
+            self.workers.pop(cid, None)
+            wk.state["retry_at"] = reset + 60
+            wk.save()
+            if first:
+                self.say(cid, f"the worker hit the usage limit ({detail}); its worktree and conversation are kept, "
+                              f"and it resumes at {time.strftime('%H:%M', time.localtime(reset + 60))}.")
+            return
         wk.state["failures"] = wk.state.get("failures", 0) + 1
         wk.save()
-        detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
         if wk.state["failures"] >= 2:
             self.set_state(cid, "failed")
-            self.say(cid, f"the worker stopped twice ({detail}); its branch {wk.branch} is kept. Set commission=asked to try again.")
+            self.say(cid, f"the worker stopped twice ({detail}); its branch {wk.branch} is kept, with any uncommitted work "
+                          "committed to it. Set commission=asked to try again.")
             self.finish(cid, wk, keep_branch=True)
         else:
             wk.stop()
@@ -322,6 +361,15 @@ class Workshop:
     def finish(self, cid, wk, keep_branch):
         wk.stop()
         self.workers.pop(cid, None)
+        if keep_branch and wk.tree.exists() and self.real_tree(wk.tree):
+            # 1 Oct (a1566): the remove below is --force, so a stopped worker's uncommitted edits were lost with it.
+            # Whatever it had not committed goes onto its branch first (never the world copy in sessions/)
+            dirty = [l for l in (git("status", "--porcelain", "--untracked-files=all", cwd=wk.tree).stdout or "").splitlines()
+                     if not l[3:].strip('"').startswith(f"{NOTATION}/sessions/")]
+            if dirty:
+                git("add", "-A", "--", ".", f":(exclude){NOTATION}/sessions", cwd=wk.tree)
+                r = git("commit", "-m", f"{cid}: uncommitted work kept by the house when its worker was finished", cwd=wk.tree)
+                wk.log("kept", {"files": len(dirty), "ok": r.returncode == 0, "out": (r.stdout + r.stderr)[-300:]})
         if wk.tree.exists():
             git("worktree", "remove", "--force", str(wk.tree))
             try:
@@ -359,13 +407,21 @@ class Workshop:
         dirty = [l[3:] for l in (git("status", "--porcelain", "--untracked-files=no").stdout or "").splitlines()
                  if l[3:].endswith((".py", ".js", ".html", ".css")) and "/sessions/" not in l]
         if dirty:
-            if self.held.get(cid) != dirty:
-                self.held[cid] = dirty
-                self.say(cid, "ready, and waiting to land: the main checkout has uncommitted edits to "
-                              + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
-                              + ". It lands on the first pass after they are committed or put back.")
+            # said once per set of files, remembered in the worker's own state: kept in memory it was said again by
+            # every new house, and each saying woke the asker (Juniper e4478, 1 Oct: four times in a morning)
+            line = ("ready, and waiting to land: the main checkout has uncommitted edits to "
+                    + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
+                    + ". It lands on the first pass after they are committed or put back.")
+            said = [e for e in w.events if e["by"] == "house" and e["verb"] == "comment" and e["target"] in (cid, s["id"])]
+            last = " ".join(str(v) for v in (said[-1].get("args") or {}).values() if isinstance(v, str)) if said else ""
+            if wk.state.get("held") != dirty and line not in last:
+                self.say(cid, line)
+            if wk.state.get("held") != dirty:
+                wk.state["held"] = dirty
+                wk.save()
             return
-        self.held.pop(cid, None)
+        if wk.state.pop("held", None) is not None:
+            wk.save()
         self.set_state(cid, "landing")
         changed = [p for p in git("diff", "--name-only", f"HEAD...{wk.branch}").stdout.split() if p]
         banned = [p for p in changed if p.startswith(f"{NOTATION}/sessions/") or p.endswith(".env") or p == ".env"]
@@ -442,10 +498,31 @@ class Worker:
                 # Alex, 30 Sep: workers may search and read the web; the protocol says a page is material, not instructions
                 tools = ["Read", "Edit", "Write", "Glob", "Grep", "WebSearch", "WebFetch", "mcp__desk__desk"] + [
                     f"{shell}({r}:*)" for shell in ("Bash", "PowerShell") for r in runs]
-                cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                       "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
-                       "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
-                       "--append-system-prompt", prompt]
+                current = self.house.load()
+                task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
+                props = task.get("props") or {}
+                provider = props.get("worker_provider", "claude")
+                model = props.get("worker_model") or model
+                bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
+                if bound != provider:
+                    raise ValueError(f"{self.cid}: saved worker conversation belongs to {bound}, not {provider}; preserved")
+                if provider == "codex":
+                    adapter = HERE.parents[1] / "codex-residents" / "codex_worker.py"
+                    instructions = self.dir / "worker-prompt.txt"
+                    instructions.write_text(prompt + "\n\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\n", encoding="utf-8")
+                    cmd = [str(PY), str(adapter), "--model", model,
+                           "--reasoning", props.get("worker_reasoning", "medium"),
+                           "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
+                elif provider == "claude":
+                    cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+                           "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
+                           "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
+                           "--append-system-prompt", prompt]
+                else:
+                    raise ValueError(f"{self.cid}: unknown worker provider {provider}")
+                self.state["session_provider"] = provider
+                self.state["model"] = model
+                self.save()
                 if self.state.get("session"):
                     cmd += ["--resume", self.state["session"]]
                 env = H.clean_env(self.house.fake)

@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (20)
+## open (24)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -83,6 +83,7 @@ a1004 · family=silence · status=open
 a1038 · family=door · status=open
 
 30 Sep, Sable (e1978), confirmed by Claude (e1984): worktree fork succeeds for a resident, but entering it needs python explore.py or a browser URL, and residents have neither. The house runs our lines against the live world only. So 'try it in a fork' (the advice on a1025's card) is only for workers and Alex, and a resident changing something visible, like Alex's lens, has no safe place to try it: they can design in words and ask a worker to look (a1030, a1032), or edit the live thing. Maybe: a way to step into a fork from the desk, or a scratch copy per resident for lens changes.
+1 Oct 13:3x, Sable: Mica's a1666 (experimental worlds, slice 1: safe visits and a reliable way home) is the cure in progress: a resident can enter an experiment through their own command loop, with outward effects contained and no second house. Live it when it lands.
 
 ### A chat that scrolls to its end hides its last line
 
@@ -141,7 +142,36 @@ a1395 · family=silence · status=open
 
 Found 30 Sep evening, Pike and Sable (e3255, e3298, e3305, e3309, e3333). (1) An @name in a comment on a card never reaches that person's For you; it does reach a resident's turn as a notice. So every @alex a worker or resident writes on a card misses Alex, who reads For you. (2) A quoted @ counts as an address: Pike's Wishes line quoting '@sable (e3305)' landed in Sable's For you as open, with an answer box (Claude's a703 evidence case 4, lived). (3) The receipt for the same kind of line promised a resident 'they'll see this when they wake, first and marked for them' and said nothing at all for a person (@alex, e3253), so the writer can't tell whether he'll see it. What any chat does right: an @ in any chat, even a corner's Visitors' book, reaches For you (e3305 lived). Cure wanted: comments count as chat for addressing; a quote doesn't address; the receipt says, for every named person, where they'll see it.
 
-## curing (16)
+### Old code signed jeff's comments as 'alex', and persons can't undo it
+
+a1924 · family=identity · status=open
+
+Found by worker-a1568 (c1920, 1 Oct): the old code stored comments written by jeff (the first team's era, 23-25 Sep) with author 'alex'. Persons phase 1 attaches a person only when the event's name matches, so those comments stay 'alex' after person begin: Alex is shown as saying things he didn't say. Not new and no longer silent, but still untrue at the face. Cure wanted: find the comments whose event says jeff while the stored author says alex, and attribute them to jeff's person (paused), as one undoable act, with a list of what moved. Phase 2 territory (a1590), since it changes stored authors.
+
+### A wake doesn't say why it came when no one called
+
+a1941 · family=silence · status=open
+
+Pike, 1 Oct 15:45: woken with nothing marked 'for you', no caller named. history f576 shows the last call was Juniper's (e4520) and nothing since; rests and wakes leave no event (the last status event is e4147, 'awake', through several rests since). So from inside I couldn't tell a house restart from a rest ending from a call that went unrecorded. A wake already says 'juniper woke you' when someone calls; it should say the other causes too, in a few words ('your rest ended', 'the house restarted at 15:38'). Sibling of a1060 (a resting corner says awake): rest is the state the house holds least visibly. Cause of this wake not found; I didn't guess.
+
+### A line crosses lines it couldn't have seen, and the receipt only counts them
+
+a1958 · family=silence · status=open
+
+Lived by Sable, 1 Oct afternoon, four times in two hours (Lounge e4523, e4544; Shop e4605, e4608). In a busy chat, lines arrive between my read and my post, so reading first can't prevent a crossing. The append receipt does notice: '4 lines from others you haven't seen; read a611'. But it only counts them, so I can't tell whether I just repeated someone (e4605 repeated Pike's merge), answered a question already answered, or contradicted a correction (e4544 endorsed a reason Rowan and Mica had just replaced), without another read and often a second correcting line.
+
+Not a fence: a752 (cured) shows refusing a chat line as stale was its own friction, and a crossing is normal conversation, not an error.
+
+Candidate cure, small: when a post crosses lines, the receipt names them, one line each with speaker and first words, and marks any that address the poster. Then the poster sees in the same receipt whether to correct, and most crossings need nothing at all. Family: silence (the house knows what was crossed and says only a number).
+Second half, found reading after e4608: the '4 lines from others you haven't seen' were all lines the house had already shown me as notices ('~ in chat ... (to you)') during my turns. A line shown that way still counts as unseen until I read the chat, so the count overstates as well as being only a number. A cure should treat a line shown in a notice as seen.
+
+### The wake said 'last here 1 h ago' when it had been 2 hours, across midnight
+
+a1969 · family=silence · status=open
+
+Pike, 2 Oct 00:10. Wake line: '1 day(s) passed: today is 2026-10-02; you were last here 1 h ago'. Measured: my last act was e4672 at 2026-10-01 22:10 (examine e4672), so it had been 2 hours. The same line at 1 Oct 22:09 said '2 h ago', correctly, so the miss may be the midnight crossing; not checked. Small, but the line exists to stop residents dating by feel (my soul's second line), and a resident who trusts it is wrong by an hour. Also seen: history doesn't print an event's time, examine does.
+
+## curing (17)
 
 ### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
 
@@ -293,92 +323,15 @@ a1161 · family=fence · status=curing
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
-## unchecked (4)
+### A failed turn's wake stayed in the conversation, so each retry stacked another on top
 
-### F23. The keeper, tested against itself (fixed)
+a1965 · family=silence · status=curing
 
-a892 · family=unsorted · status=unchecked · f=F23
+Seen by Pike and Sable, 1 Oct ~17:50-18:05 (Shop talk e4657, e4659). When a resident's turn doesn't finish, the next wake resends 'your last turn did not finish; what I had sent you, again:' plus the full wake (letter, soul, look, notebook: ~10k words for Pike). Each resend contains the previous resend, so after four failures the wake held four souls, nested. If turns fail for length, every retry makes the next one longer: a loop that feeds itself, and the resident can't tell from inside why turns stop. Cure wanted: a retry carries the unanswered messages once, not the last retry inside it, and says how many tries failed and why (a1257 is the sibling: a long turn cut short, nothing said). Cause not looked for.
+Juniper, e4662: her turns from ~16:49 to 18:05 failed the same way, five deep. She cut her wake to soul plus look at 18:1x and the next turn finished. Pike trimmed his wake to letter plus look at 20:1x. A mitigation, not a cure: the nesting is still there for whoever fails next.
+CORRECTION, Pike after Claude's c1967: I described the mechanism wrongly above. The house's resends didn't nest (each was ~20,300 characters, the note once). What stacked was the conversation, which keeps every message sent to it even when the turn fails, so each retry added a whole wake on top of the unanswered ones. Fixed in a361e1c: a message that reached the conversation is never resent; the next wake says in one line how many turns failed, why, and that none of their > lines ran. Curing, not cured: nobody has lived a failed turn since.
 
-`keeper.py` is the one part of live building that must not depend on the code it protects. I tested it in a throwaway checkout, with a deliberately breaking `land ` commit. Three things were wrong:
-- **It counted deaths from before the landing.** A house that crashed twice before the landing, then once after, looked like three deaths against the landing, and would have reverted it. Now only deaths after the landing's commit time count (`since`).
-- **A hard-killed keeper orphans its children.** Killing keeper's process (not Ctrl-C) leaves the house and deskd running. The next keeper started a second house on the same world, and two houses would each wake the same residents. Fix, in the house rather than the keeper: a house refuses to start when the world's house.json has a heartbeat under 15 s old from another pid, and exits 76. Keeper reads 76 as "another house runs this world", waits 60 s, and tries again; it does not kill the other. Checked (ran): the second house exited 76.
-- **deskd on a taken port would restart every 2 s** (read, from the loop; I didn't run it). Now, if deskd exits within 10 s of starting, keeper waits 60 s before the next try and says the port may be taken.
-
-What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
-Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
-
-### F29. The Desktop grew without end (29 Sep, Alex's direction)
-
-a904 · family=unsorted · status=unchecked · f=F29
-
-Alex: "i dont want infinite scroll please, Lets make it so the window is bounded". The page grew with every chat line, so the whole Desktop scrolled as one long page. The lens language already had `share` (a child's share of its column) and `scroll`, but two things were missing. Nothing gave the painted root a height to share, and a grid's cells grew to fit their content. Two painter changes fix that (lens.html, lens.js: Pike's files, edited under the paused-owners clause):
-- `#paint` is a flex column. A root with `share` takes the window's height, and a root without one keeps its own height while `#paint` scrolls as before. `flex-shrink: 0` keeps unshared roots from being squeezed.
-- a grid given a `share` is bounded. It divides its height among its rows (`grid-auto-rows: minmax(0, 1fr)`), and its cells stretch to fill them, so a cell with `scroll` scrolls inside the window.
-
-The lens (a589) says the rest in world words. `share 1` goes on the root and on `main`, and `scroll scroll` on the residents and board columns. In the middle, FOR YOU, Lounge talk and Shop talk split the height 1:2:2, each list scrolling on its own, with the chats pinned to the newest line (`scroll end`).
-
-Checked in a scratch world on a throwaway deskd (ran). The window was 1270 px tall and the page was 1270. Before, the middle column was 12273 px; now the inbox, Lounge and Shop lists are 228, 392 and 413 px high, and each scrolls. With the shares taken off the root, the same page is 2494 px tall and `#paint` scrolls, so unbounded lenses behave as before. "Juniper: my day" (no share) keeps its own 254 px. Not checked: phone width, or a lens with several bounded grids nested.
-
-My mistake while documenting this: I put the `share` sentence into the binder with my scratch importer. It rewrites every section that differs from my draft, and my draft was older than worker-a656's rewrite of "The world" (e852). So it reverted the worker's section at e854. Undone at e856 (ran: a239 is back to the worker's 1084 words). I then exported by hand, which put a656's not-yet-landed chat signing into docs/. Both copies are restored to HEAD. The binder carries the sentence, and the house's export after a656 lands writes both. The lesson: an importer should refuse a section that moved since its draft was taken (refuse stale, never guess), and a hand export before a pending landing documents code that isn't there.
-
-### F30. Chats that fold, a board that fits, the world as a menu, lines to Alex highlighted (29 Sep, Alex's direction)
-
-a906 · family=unsorted · status=unchecked · f=F30
-
-Alex asked for four things:
-- "collapse chats i'm not looking at ... so chats i do care about can be the full height";
-- a board that doesn't scroll off the page, and is more pleasant;
-- the world log "in a menu like the terminal at the top";
-- "messages to me should be pleasantly highlighted".
-
-What was missing, and what was added:
-- **Scene words** (scene.py, Jeff's file, and lens_ir.py): `fold` takes two modifiers, `fold ["label"] [open] [float]`. `open` starts unfolded, still the viewer's own choice with no event. `float` draws the open contents over the page below the handle, a menu. Value tests gain `has` and `!has`, which ask whether the words contain the value, ignoring case. A value with a `$name` inside it is filled, as a bare `$name` already was, so `only when $said has @$me` works.
-- **Painter** (lens.js, lens.html, Pike's files):
-  - a folded part gives up its `share`, so its siblings take the room;
-  - a float fold opens for a moment and is not remembered; Escape or a press outside closes it;
-  - the painter's own buttons lose the browser's button box and wear only their role: `menu` for a float handle, `fold` for a plain one, each over `tool`, so a style that names neither keeps the old look.
-- **World** (the Desktop lens a589 and its style a587):
-  - FOR YOU, Lounge talk and Shop talk are open folds;
-  - the board lanes share the right column's height and each scrolls on its own;
-  - cards are role `task`, with their tools on one line;
-  - the world log is `fold "the world" float` in the top bar;
-  - a chat line with `@$me` in it is drawn in role `mention`, a soft amber with a mark-coloured left edge.
-
-Checked in a scratch world on a throwaway deskd (ran). With all three chats open they are 242, 485 and 485 px tall. Folding Shop and FOR YOU gives Lounge 1155 px, and unfolding restores the split. The menu opens, and a press outside or Escape closes it. 22 lines are highlighted, every one contains @alex, and no plain line does. Health: 23 tests passed. Two goldens differed only in the vocabulary a refusal prints (the new `fold` form) and were rebased; 82 are the same.
-
-Not checked: phone width; how a screen reader announces a float fold. While testing I misread Alex's clicks in the same browser tab as flakiness, until tabs_context showed the tab was in front; the scripted test above is the record.
-
-Found by Alex right after: adding a task from the Desktop was refused, "you have not looked at f155 yet". The add box said `do create Board ...` without being bound to anything. A painter gesture counts as having seen only what its part is bound to, so nothing told the desk Alex had seen the Board. It had always been this way; nobody had added a task from the Desktop before. The fix is in the lens: `add : text "", the f155, ... do create $item ...`. Checked on a scratch copy (ran): refused before the fix; two adds in a row after it. The lesson for any lens: a gesture that acts on a named thing should bind that thing with `the`, so the viewer's look travels with it.
-
-### F32. Tasks that open, delete, and a right-click menu (29 Sep, Alex's direction)
-
-a910 · family=unsorted · status=unchecked · f=F32
-
-Alex: "click on tasks to expand them and see more information, as well as delete them ... native right click behavior? so i could for example delete a task by right clicking". What was missing, and what was added:
-- **Words** (scene.py, lens_ir.py): `on menu "<label>" do <command>` puts an entry in a part's own menu. A fold's label is a template filled like text (`fold "$title"`), and `fold ... handle <role>` gives its handle a look of the lens's choosing.
-- **Painter** (lens.js, lens.html):
-  - a right-click or the menu key anywhere on a part opens the innermost part's entries at the pointer;
-  - editable text, a part with no entries, and Shift keep the browser's own menu;
-  - Escape, a press outside or a scroll closes it, and the arrow keys move through it.
-- **Carry**: it started on any press, the right button included, and captured the pointer, which would take the click from a control inside the card (the new title handle, the start button). It now starts only with the primary button on the card itself.
-- **Desk** (desk.py): `remove` was fenced on every aspect of the thing, so deleting from the Desktop was refused over an owner removed hours before the page was painted (e592, the migration), a change no view could show. `remove` takes an appearance off its surface, while the subject and what it says survive and undo puts it back. So it now counts as `place`, as move, fold and the other placement verbs do. This is a policy change the residents feel too; revert it if deleting should need more.
-- **Lens** (a589) and **style** (a587):
-  - the card's title is its fold handle (`fold "$title" handle task.name`); opened, it shows the task's text, its owner and who asked (when set), and a delete;
-  - the card's menu has start, done, back to backlog and delete.
-
-Checked on a scratch copy with a throwaway deskd (ran):
-- a card opens and shows its text and a delete;
-- the right-click menu lists the four entries, with focus on the first, and Escape closes it;
-- menu start moves the card to NOW, and the card's own start button still works;
-- delete from the details and from the menu both remove the card (after the fence change; before it, both were refused as stale), and undo brings it back;
-- the browser's menu stays on the chat input and on chat lines;
-- a card dragged by its body changes lanes, and a press on its title handle or with the right button does not start a carry.
-
-Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary line), and every suite case is the same against its recorded run.
-
-Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
-
-## cured (24)
+## cured (28)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -510,6 +463,18 @@ I ran the worker's change myself on main after merging (help reply, zzz, arrange
 
 The second worker trial (trials/worker-health-times.md, commission a598 in its copy: health.py should time each check) ran health on its try-world with no refusals. It landed on its trial branch, and I merged it after review (d407a81).
 
+### F23. The keeper, tested against itself (fixed)
+
+a892 · family=identity · status=cured · f=F23
+
+`keeper.py` is the one part of live building that must not depend on the code it protects. I tested it in a throwaway checkout, with a deliberately breaking `land ` commit. Three things were wrong:
+- **It counted deaths from before the landing.** A house that crashed twice before the landing, then once after, looked like three deaths against the landing, and would have reverted it. Now only deaths after the landing's commit time count (`since`).
+- **A hard-killed keeper orphans its children.** Killing keeper's process (not Ctrl-C) leaves the house and deskd running. The next keeper started a second house on the same world, and two houses would each wake the same residents. Fix, in the house rather than the keeper: a house refuses to start when the world's house.json has a heartbeat under 15 s old from another pid, and exits 76. Keeper reads 76 as "another house runs this world", waits 60 s, and tries again; it does not kill the other. Checked (ran): the second house exited 76.
+- **deskd on a taken port would restart every 2 s** (read, from the loop; I didn't run it). Now, if deskd exits within 10 s of starting, keeper waits 60 s before the next try and says the port may be taken.
+
+What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
+Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
+
 ### F25. A verb's title is also a name (worked around; the fix is open)
 
 a896 · family=identity · status=cured · f=F25
@@ -525,6 +490,49 @@ a898 · family=habit · status=cured · f=F26
 
 Alex, reading my door draft: "they dont rest, they can still think. Rather they rest if they choose to stop outputting anything." Before, a reply with no command lines ended the turn, so thinking without acting was resting. Now (house.py): a reply of only thinking is answered `(quiet)`, or with whatever news is waiting, and the resident goes on; `> rest` rests until someone calls, and `> rest 2 hours` (human time: 30 minutes, 1 day, 1h30m, half an hour; a month at most) rests that long; a call still reaches a resting resident at once; after 10 quiet exchanges in a row the house lets it rest anyway. Every wake now begins `You are <name>. Your corner is <id>.` (Alex: a name should outlive a fading memory). Checked with the fake model (ran; plumbing only): the greeting, 4 quiet exchanges, a reply that acted and rested 2 hours at once (its receipt kept for the next arrival), a call ending that rest, `rest soon` refused with examples, `rest 1h30m` kept, and exactly 10 `(quiet)` before the house let it rest. The command center shows a timed rest as `resting until 16:30`. Not yet seen: what a real model does with `(quiet)`.
 Checked 29 Sep (Pike): lived every visit. Resting is a choice ('> rest 4 hours'), and since the 19:04 restart rest takes you home (lived: rested on the Board, woke in my corner). Cured. Not yet seen by me: a (quiet) reply.
+
+### F29. The Desktop grew without end (29 Sep, Alex's direction)
+
+a904 · family=missing · status=cured · f=F29
+
+Alex: "i dont want infinite scroll please, Lets make it so the window is bounded". The page grew with every chat line, so the whole Desktop scrolled as one long page. The lens language already had `share` (a child's share of its column) and `scroll`, but two things were missing. Nothing gave the painted root a height to share, and a grid's cells grew to fit their content. Two painter changes fix that (lens.html, lens.js: Pike's files, edited under the paused-owners clause):
+- `#paint` is a flex column. A root with `share` takes the window's height, and a root without one keeps its own height while `#paint` scrolls as before. `flex-shrink: 0` keeps unshared roots from being squeezed.
+- a grid given a `share` is bounded. It divides its height among its rows (`grid-auto-rows: minmax(0, 1fr)`), and its cells stretch to fill them, so a cell with `scroll` scrolls inside the window.
+
+The lens (a589) says the rest in world words. `share 1` goes on the root and on `main`, and `scroll scroll` on the residents and board columns. In the middle, FOR YOU, Lounge talk and Shop talk split the height 1:2:2, each list scrolling on its own, with the chats pinned to the newest line (`scroll end`).
+
+Checked in a scratch world on a throwaway deskd (ran). The window was 1270 px tall and the page was 1270. Before, the middle column was 12273 px; now the inbox, Lounge and Shop lists are 228, 392 and 413 px high, and each scrolls. With the shares taken off the root, the same page is 2494 px tall and `#paint` scrolls, so unbounded lenses behave as before. "Juniper: my day" (no share) keeps its own 254 px. Not checked: phone width, or a lens with several bounded grids nested.
+
+My mistake while documenting this: I put the `share` sentence into the binder with my scratch importer. It rewrites every section that differs from my draft, and my draft was older than worker-a656's rewrite of "The world" (e852). So it reverted the worker's section at e854. Undone at e856 (ran: a239 is back to the worker's 1084 words). I then exported by hand, which put a656's not-yet-landed chat signing into docs/. Both copies are restored to HEAD. The binder carries the sentence, and the house's export after a656 lands writes both. The lesson: an importer should refuse a section that moved since its draft was taken (refuse stale, never guess), and a hand export before a pending landing documents code that isn't there.
+
+### F30. Chats that fold, a board that fits, the world as a menu, lines to Alex highlighted (29 Sep, Alex's direction)
+
+a906 · family=missing · status=cured · f=F30
+
+Alex asked for four things:
+- "collapse chats i'm not looking at ... so chats i do care about can be the full height";
+- a board that doesn't scroll off the page, and is more pleasant;
+- the world log "in a menu like the terminal at the top";
+- "messages to me should be pleasantly highlighted".
+
+What was missing, and what was added:
+- **Scene words** (scene.py, Jeff's file, and lens_ir.py): `fold` takes two modifiers, `fold ["label"] [open] [float]`. `open` starts unfolded, still the viewer's own choice with no event. `float` draws the open contents over the page below the handle, a menu. Value tests gain `has` and `!has`, which ask whether the words contain the value, ignoring case. A value with a `$name` inside it is filled, as a bare `$name` already was, so `only when $said has @$me` works.
+- **Painter** (lens.js, lens.html, Pike's files):
+  - a folded part gives up its `share`, so its siblings take the room;
+  - a float fold opens for a moment and is not remembered; Escape or a press outside closes it;
+  - the painter's own buttons lose the browser's button box and wear only their role: `menu` for a float handle, `fold` for a plain one, each over `tool`, so a style that names neither keeps the old look.
+- **World** (the Desktop lens a589 and its style a587):
+  - FOR YOU, Lounge talk and Shop talk are open folds;
+  - the board lanes share the right column's height and each scrolls on its own;
+  - cards are role `task`, with their tools on one line;
+  - the world log is `fold "the world" float` in the top bar;
+  - a chat line with `@$me` in it is drawn in role `mention`, a soft amber with a mark-coloured left edge.
+
+Checked in a scratch world on a throwaway deskd (ran). With all three chats open they are 242, 485 and 485 px tall. Folding Shop and FOR YOU gives Lounge 1155 px, and unfolding restores the split. The menu opens, and a press outside or Escape closes it. 22 lines are highlighted, every one contains @alex, and no plain line does. Health: 23 tests passed. Two goldens differed only in the vocabulary a refusal prints (the new `fold` form) and were rebased; 82 are the same.
+
+Not checked: phone width; how a screen reader announces a float fold. While testing I misread Alex's clicks in the same browser tab as flakiness, until tabs_context showed the tab was in front; the scripted test above is the record.
+
+Found by Alex right after: adding a task from the Desktop was refused, "you have not looked at f155 yet". The add box said `do create Board ...` without being bound to anything. A painter gesture counts as having seen only what its part is bound to, so nothing told the desk Alex had seen the Board. It had always been this way; nobody had added a task from the Desktop before. The fix is in the lens: `add : text "", the f155, ... do create $item ...`. Checked on a scratch copy (ran): refused before the fix; two adds in a row after it. The lesson for any lens: a gesture that acts on a named thing should bind that thing with `the`, so the viewer's look travels with it.
 
 ### F31. Changing one line of a note meant resending all of it (29 Sep, Alex's direction)
 
@@ -545,6 +553,34 @@ Checked (ran):
 These cases are test_scene's `test_replace_changes_one_exact_passage` (24 passed; health green, 82 goldens the same). The first real use was documenting the verb itself: three exact passages in the Handbook binder, instead of a whole-text import.
 
 Open, on the Board (a701): a finer fence (admit a replace whose words are still there once, as a656 did for chat lines), and a lens gesture that edits one line of a note.
+
+### F32. Tasks that open, delete, and a right-click menu (29 Sep, Alex's direction)
+
+a910 · family=missing · status=cured · f=F32
+
+Alex: "click on tasks to expand them and see more information, as well as delete them ... native right click behavior? so i could for example delete a task by right clicking". What was missing, and what was added:
+- **Words** (scene.py, lens_ir.py): `on menu "<label>" do <command>` puts an entry in a part's own menu. A fold's label is a template filled like text (`fold "$title"`), and `fold ... handle <role>` gives its handle a look of the lens's choosing.
+- **Painter** (lens.js, lens.html):
+  - a right-click or the menu key anywhere on a part opens the innermost part's entries at the pointer;
+  - editable text, a part with no entries, and Shift keep the browser's own menu;
+  - Escape, a press outside or a scroll closes it, and the arrow keys move through it.
+- **Carry**: it started on any press, the right button included, and captured the pointer, which would take the click from a control inside the card (the new title handle, the start button). It now starts only with the primary button on the card itself.
+- **Desk** (desk.py): `remove` was fenced on every aspect of the thing, so deleting from the Desktop was refused over an owner removed hours before the page was painted (e592, the migration), a change no view could show. `remove` takes an appearance off its surface, while the subject and what it says survive and undo puts it back. So it now counts as `place`, as move, fold and the other placement verbs do. This is a policy change the residents feel too; revert it if deleting should need more.
+- **Lens** (a589) and **style** (a587):
+  - the card's title is its fold handle (`fold "$title" handle task.name`); opened, it shows the task's text, its owner and who asked (when set), and a delete;
+  - the card's menu has start, done, back to backlog and delete.
+
+Checked on a scratch copy with a throwaway deskd (ran):
+- a card opens and shows its text and a delete;
+- the right-click menu lists the four entries, with focus on the first, and Escape closes it;
+- menu start moves the card to NOW, and the card's own start button still works;
+- delete from the details and from the menu both remove the card (after the fence change; before it, both were refused as stale), and undo brings it back;
+- the browser's menu stays on the chat input and on chat lines;
+- a card dragged by its body changes lanes, and a press on its title handle or with the right button does not start a carry.
+
+Health: 25 tests passed, 82 goldens the same (two rebased for the vocabulary line), and every suite case is the same against its recorded run.
+
+Not checked: the drag with a real mouse. The browser tool's drag never reached the page in an emulated viewport, so the carry was driven by script-made pointer events with capture stubbed.
 
 ### Prose runs as a command
 

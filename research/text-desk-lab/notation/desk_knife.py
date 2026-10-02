@@ -7,6 +7,7 @@ import blanks
 import harness   # registers launch; provides sync
 import knife
 import moo
+import persons
 from desk import aspects_meet, event_aspects, rule_did_unseen, unescape_value
 from desk_moo import DeskMoo, HELP_MOO
 from world import Refusal
@@ -186,7 +187,7 @@ class DeskKnife(DeskMoo):
                 out.append(f"{indent}* … {len(tl) - limit} more line(s) folded; read {nid} for all")
         for c in s.get("comments", []):
             ct = c["text"] if len(c["text"]) <= 160 else c["text"][:160] + "… (read " + nid + " for all)"
-            out.append(f"{indent}* {c['id']} {c['by']} ({'resolved' if c['resolved'] else 'open'}): {ct}")
+            out.append(f"{indent}* {c['id']} {persons.comment_by(w, c)} ({'resolved' if c['resolved'] else 'open'}): {ct}")
         for l in w.links_of(s["id"]):
             other = l["to"] if l["from"] == s["id"] else l["from"]
             ot = w.subjects[other]["title"]
@@ -518,7 +519,7 @@ class DeskKnife(DeskMoo):
         rec = {i: {} for i in ids}
         stamp = lambda e: (e.get("at") or "").replace("T", " ")[:16] or e.get("day") or ""   # noqa: E731
         def put(i, kind, e):
-            rec[i][kind + "_by"], rec[i][kind + "_at"] = e.get("by") or "", stamp(e)
+            rec[i][kind + "_by"], rec[i][kind + "_at"] = persons.by(w, e), stamp(e)    # a1568: the person, by name
         for e in w.events:
             if e.get("undone") or e["verb"] == "undo":
                 continue
@@ -784,6 +785,62 @@ class DeskKnife(DeskMoo):
             out.append("  no differences in props, kind, due, text or tags")
         return "\n".join(out)
 
+    # ---- a1568: persons, a thing with one id for a life; names are labels on it ------------------------------------
+    def cmd_person(self, arg):
+        w = self.world
+        try:
+            argv = shlex.split(arg)
+        except ValueError as e:
+            raise Refusal(f"could not parse: {e}")
+        kv = dict(a.split("=", 1) for a in argv if "=" in a)
+        words = [a for a in argv if "=" not in a]
+        if not words and not kv:
+            return persons.listing(w)
+        if words[:1] == ["begin"]:
+            pairs = []
+            for x in [x for x in str(kv.pop("again", "")).split(",") if x.strip()]:
+                n, _, e = x.partition(":")
+                if not re.fullmatch(r"e\d+", e.strip()):
+                    raise Refusal(f"again= takes <name>:<event id>, e.g. again=pike:e718; not {x!r}")
+                pairs.append((n.strip(), e.strip()))
+            paused = [x for x in str(kv.pop("paused", "")).split(",") if x.strip()]
+            if kv or len(words) > 1:
+                raise Refusal("person begin [again=<name>:<event>,...] [paused=<name>,...]")
+            r = persons.begin(w, pairs, paused)
+            self._after_mutation()
+            twice = sorted({n for _, n, k in r["plan"] if k})
+            return (f"ok {r['event']}: {len(r['made'])} person(s) made; {r['stamped']} past events now name their person "
+                    f"(by= unchanged)" + (f"; borne by two persons: {', '.join(twice)}" if twice else "")
+                    + f". person lists them; undo {r['event']} takes it all back")
+        if not persons.on(w):
+            raise Refusal(persons.listing(w))
+        if words[:1] == ["new"]:
+            if len(words) != 2 or set(kv) - {"kind"}:
+                raise Refusal("person new <name> [kind=resident|human|agent|worker]")
+            r = persons.new(w, words[1], kv.get("kind"))
+            self._after_mutation()
+            self._mark_seen(r["created"])
+            pid = r["created"]
+            return (f"ok {r['event']}: a new person {pid} bears the name {words[1].lower()} from now on"
+                    + (f"; earlier: " + ", ".join(f"{persons.label(w, x)} ({x}), who keeps every act before {r['event']}"
+                                                    for x in r["earlier"]) if r["earlier"] else ""))
+        if len(words) != 1:
+            raise Refusal("person [<name or id> [name=<new>]] | person new <name> | person begin (help person)")
+        hit = persons.typed(w, words[0])
+        if not hit:
+            raise Refusal(f"no person called {words[0]!r} (person lists them all)")
+        pid, note = hit
+        if not kv:
+            self._mark_seen(pid)
+            return persons.card(w, pid, note)
+        if set(kv) != {"name"}:
+            raise Refusal("person <name or id> name=<new> renames; nothing else is changed here")
+        r = persons.rename(w, pid, kv["name"])
+        self._after_mutation()
+        self._mark_seen(pid)
+        return (f"ok {r['event']}: {pid} is now called {persons.label(w, pid)} (was {r['was']}); their acts, made_by "
+                f"and corner follow them. undo {r['event']} takes the name back")
+
     # ---- why: how a thing got where it is (round 11d; Terra: "where a rule will file a new item felt awkward")
     def cmd_why(self, ident):
         w = self.world
@@ -795,11 +852,11 @@ class DeskKnife(DeskMoo):
             return head + "\n  no recorded history: it was here before this session began"
         out = [head]
         for e in mine[-12:]:
-            who = e["by"]
+            who = persons.by(w, e)
             via = e.get("via")
             how = f" by rule {via.split()[1]}" if via and via.startswith("rule ") else (f" via {via}" if via else "")
-            if e.get("tripped_by") and e["tripped_by"] != who:
-                how += f", tripped by {e['tripped_by']}"
+            if e.get("tripped_by") and e["tripped_by"] != e["by"]:
+                how += f", tripped by {persons.tripped(w, e)}"
             cause = f" (because of {e['cause']})" if e.get("cause") else ""
             done = " (undone)" if e.get("undone") else ""
             args = {k: (v if len(str(v)) <= 120 else str(v)[:117] + "…") for k, v in (e.get("args") or {}).items()}   # a fold, declared
@@ -1031,6 +1088,11 @@ class DeskKnife(DeskMoo):
                             ev["via"] = f"rule {r['id']}"
                             if author:
                                 ev["tripped_by"] = tripper
+                                # a1568 (Pike, c1910): who= is whose rule ran (its author, resolved as it fired);
+                                # tripped_who is the person who set it off, kept apart, never folded into who=
+                                tw = persons.today(self.world, tripper) if persons.on(self.world) else None
+                                if tw and persons.norm(tripper) not in persons.NOT_PERSONS:
+                                    ev["tripped_who"] = tw
                             if cause:
                                 ev["cause"] = cause
                         # the rule is our own automation: what it changed counts as seen, like our own writes
@@ -1388,6 +1450,8 @@ class DeskKnife(DeskMoo):
                 fid = rooms.look_target(self, arg) if arg else rooms.room_of(self.world, self.world.me)
                 if fid:
                     return rooms.narrate(self, fid)
+        if cmd in ("person", "persons"):
+            return self.cmd_person(arg)
         if cmd == "rules":
             return self.cmd_rules()
         if cmd == "rule":
@@ -1631,7 +1695,9 @@ class DeskKnife(DeskMoo):
         "history": """history [id]: the latest events, newest last, each with its event id (e12): who did what to which id, via
   which verb or rule, and (undone) when taken back. history <id> only those about one thing. history <e12> that
   event, what it caused and its undo; history <c40|l41> a comment's or link's making, closing and removal.
-  examine <e12> explains one event; undo <e12> takes it back; why <id> tells how a thing got where it is.""",
+  examine <e12> explains one event; undo <e12> takes it back; why <id> tells how a thing got where it is.
+  history <person> (a name, pike,first, or an id like p1895): what that person did. help person""",
+        "person": persons.HELP,
         "go": "go <room>: walk to a room, by id or a word of its title (go lounge), and see it; go <room> :1 walks without "
               "looking; go alone says where you are and who is in each room. help rooms",
         "rest": "rest: go home to your corner (Home if you have none); history marks it via=rest. In the house a resident "
@@ -1707,7 +1773,8 @@ class DeskKnife(DeskMoo):
                   "tasks": "task", "chats": "chat", "docs": "doc", "surfaces": "surface", "corner": "resident",
                   "corners": "resident", "residents": "resident", "worker": "commissions", "workers": "commissions",
                   "commission": "commissions"}
-    COMMAND_ALIAS = {"x": "examine", "ex": "examine", "?": "help", "run": "script", "scripts": "script", "apply": "plan"}
+    COMMAND_ALIAS = {"x": "examine", "ex": "examine", "?": "help", "run": "script", "scripts": "script", "apply": "plan",
+                     "persons": "person"}
 
     def _command_help(self, name):
         """-> the help for a command word, or None. HELP_TOPICS answers first where it has the word."""
@@ -1719,7 +1786,7 @@ class DeskKnife(DeskMoo):
     def _commands(self):
         """The command words help lists when it doesn't know a word: each answers help <it>."""
         import verbs
-        return [w for w in sorted(verbs.DESK_WORDS) if w not in ("?", "x", "ex", "plan", "apply", "script", "scripts", "run")]
+        return [w for w in sorted(verbs.DESK_WORDS) if w not in ("?", "x", "ex", "plan", "apply", "script", "scripts", "run", "persons")]
 
     def cmd_help(self, name):
         name = name.lower()
@@ -1828,6 +1895,10 @@ class DeskKnife(DeskMoo):
         if rec:
             return rec
         nid = self._resolve(ident or "desk")
+        if persons.is_person(self.world, nid):
+            note, self._person_note = getattr(self, "_person_note", ""), ""
+            self._mark_seen(nid)
+            return persons.card(self.world, nid, note)          # a1568: a person is a thing the house can show
         if nid in self.world.subjects:
             return self.cmd_pivot(nid)
         w = self.world
@@ -1937,8 +2008,8 @@ class DeskKnife(DeskMoo):
             if seen is not None and seen != w.nodes[i]["rev"]:
                 sid = w.nodes[i].get("subject")
                 last = [e for e in w.events if e["target"] == i or (sid and e["target"] == sid) or i in (e.get("changed") or [])]
-                if last and (last[-1]["by"] != self.world.me or rule_did_unseen(last[-1], self.world.me)):
-                    stale.append(f"{i} (changed by {last[-1]['by']})")
+                if last and (not persons.mine(self.world, last[-1]) or rule_did_unseen(last[-1], self.world.me)):
+                    stale.append(f"{i} (changed by {persons.by(self.world, last[-1])})")
         if stale:
             raise Refusal("stale: " + ", ".join(stale) + "; look at them again before acting")
 

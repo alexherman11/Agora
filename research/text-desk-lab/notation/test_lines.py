@@ -195,5 +195,10 @@ check("an undone migration is not done again", "lines" not in W.subjects[bsid] a
 t = say("pike", f'do append {BT} line="@sable still appends, as before"')
 check("a chat without lines still takes a line as it always did", "line m" not in t and W.subjects[bsid]["text"].endswith("as before"), t)
 
+# ---- persons (a1568): a line's author is its event's person, so persons reach lines with nothing migrated ----------
+t = say("alex", "person begin")
+t2 = say("alex", f"examine {mid}")
+check("after person begin, examine of a line names its author from the event", "by sable · at 20" in t2, (t[:300], t2[:400]))
+
 print(f"\n{'all ok' if not fails else str(len(fails)) + ' failed: ' + ', '.join(fails)}")
 sys.exit(1 if fails else 0)

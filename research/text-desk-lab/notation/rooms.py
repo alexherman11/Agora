@@ -86,7 +86,35 @@ def corner_of(w, actor):
         p = n.get("props") or {}
         if n["type"] == "surface" and p.get("role") == "resident" and str(p.get("actor", "")).lower() == a and a:
             return fid
+    import persons
+    pid = persons.today(w, a) if a and persons.on(w) else None
+    if pid:
+        # a1568: a corner's actor= is a stored name, read as the person who bears it today (phase 1 reads it, phase 2
+        # stores the person). So a renamed resident is still at home: corner:kestrel is Pike's corner after a rename
+        for fid, n in w.nodes.items():
+            p = n.get("props") or {}
+            if n["type"] == "surface" and p.get("role") == "resident" and p.get("actor") \
+                    and persons.today(w, p["actor"]) == pid:
+                return fid
     return None
+
+
+def same_person(w, a, b):
+    """Are two names one person today (a1568)? By name before a world has persons."""
+    import persons
+    if str(a or "").lower() == str(b or "").lower():
+        return True
+    if not persons.on(w):
+        return False
+    pa = persons.today(w, a)
+    return pa is not None and pa == persons.today(w, b)
+
+
+def shown_name(w, actor):
+    """An actor as narration names them: the person's name today (a1568), else the name as typed, capitalised."""
+    import persons
+    pid = persons.today(w, actor) if persons.on(w) else None
+    return persons.display(w, pid) if pid else w.display_name(actor)
 
 
 def home_room(w):
@@ -481,19 +509,19 @@ def narrate(desk, fid):
         out.append(shown if shown == body else shown + f" (read {dnid} for all of it)")
         if shown == body:
             marks += [(dnid, ["title"] + (["text"] if ds["text"].strip() else [])), (ds["id"], ["title"] + (["text"] if ds["text"].strip() else []))]
-    others = [a for a in here(w, fid) if a != me]
+    others = [a for a in here(w, fid) if not same_person(w, a, me)]
     how = presences(desk)
     awake = [a for a in others if how(a) != "asleep"]
     sleeping = [a for a in others if how(a) == "asleep"]
     # a806 (6): a sleeping actor is never 'here with you'; one asleep is said so, wherever they sleep. a948 (4): one
     # between turns is here, and resting; only someone in a turn right now is named plain
-    names = ", ".join(w.display_name(a) + (f" ({how(a)})" if how(a) else "") for a in awake)
+    names = ", ".join(shown_name(w, a) + (f" ({how(a)})" if how(a) else "") for a in awake)
     if at == fid:
         out.append(f"Here with you: {names}." if awake else "No one else is here." if not sleeping else "No one else here is awake.")
     else:
         out.append(f"Here: {names}." if awake else "No one is here." if not sleeping else "No one here is awake.")
     for a in sleeping:
-        out.append(f"{w.display_name(a)} is asleep here" + (" (their own corner)." if corner_of(w, a) == fid else "."))
+        out.append(f"{shown_name(w, a)} is asleep here" + (" (their own corner)." if corner_of(w, a) == fid else "."))
     tnid, ts = _target(desk, p["talk"]) if p.get("talk") else (None, None)
     skip = {x for x in (dnid, tnid) if x} | {x["id"] for x in (ds, ts) if x}
     if p.get("shows"):

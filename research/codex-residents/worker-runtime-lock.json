@@ -1,0 +1,8 @@
+{
+  "sdk": "0.147.0",
+  "binary": "C:\\Users\\Alex\\AppData\\Local\\OpenAI\\Codex\\bin\\c6fe824d725f02d7\\codex.exe",
+  "version": "codex-cli 0.159.2",
+  "binary_sha256": "cbafb6422bca005b94c12d105b1a16a0474219e24ea4893f85846409c464f5a1",
+  "catalog_sha256": "4b7cba75e32a43b740f18255f1019474ffe18f5c24f846b3750877cbf800d903",
+  "model": "gpt-6.1-sol"
+}
