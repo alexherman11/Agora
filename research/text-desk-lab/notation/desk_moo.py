@@ -267,6 +267,9 @@ class DeskMoo(Desk):
         waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
         if waits:
             out += f"\n  {waits}"    # a1566: whom this line took ('to: pike'), and for each what happened ('Pike: woken')
+        calls = self._written_calls(evs) if evs and not adds and not getattr(self, "_in_rules", False) else ""
+        if calls:
+            out += f"\n  {calls}"    # a2733: whom a comment or note edit called by its header, and what it only mentioned
         made = str(r.get("created") or "").split()[:1]
         for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:

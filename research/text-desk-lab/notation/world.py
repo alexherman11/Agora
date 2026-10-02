@@ -70,6 +70,72 @@ def to_names(value):
     return [] if names in (["nobody"], ["none"]) else list(dict.fromkeys(names))
 
 
+# a2733 (Pike e4912, Claude e4918, Sable c2804): one rule wherever a person writes. Outside a chat line (whose address
+# is stored, a1581) words call only by their header (a2715): a comment by the @names that open it; a note by the headers
+# of the lines an edit added, read old against new, so a rewrite that only moves lines adds none, and a line whose other
+# words changed calls no one again (the header the edit took away already called them). An @ after a header is a
+# mention. Whether @everyone or @all reach anyone outside a chat line is the reader's to say (a916: they don't).
+
+def own_header(text, writer=None):
+    """-> (names, end) for words a person wrote outside a chat line: header()'s, except that a 'Word:' opening them is
+    a signature only when it is the writer's own name ('Why: @pike ...' in a note is a heading, and calls no one)."""
+    m = SPEAKER.match(str(text))
+    if m and (not writer or m.group(1).lower() != str(writer).split("/")[0].lower()):
+        return [], 0
+    return header(text, writer)
+
+
+def changed_lines(old, new):
+    """-> (added, gone): the non-blank lines of `new` that `old` did not have, and the lines of `old` that `new` no
+    longer has, each counted as a multiset (a line said twice must be there twice), so moving lines changes none."""
+    from collections import Counter
+    have = Counter(l.rstrip() for l in str(old).splitlines() if l.strip())
+    added = []
+    for l in str(new).splitlines():
+        if not l.strip():
+            continue
+        if have[l.rstrip()] > 0:
+            have[l.rstrip()] -= 1
+        else:
+            added.append(l)
+    return added, [l for l, k in have.items() for _ in range(k)]
+
+
+def written(e):
+    """a2733: -> (calls, mentions) for event `e`, outside a chat line: the names its words call by header, and the
+    @names they mention after a header (outside quotes), each lower-case, once, in order; the writer is in neither. A
+    comment (or a resolve's reply) is read whole, so only its opening calls; a note edit reads the lines it added
+    (changed_lines) and drops a name the header of a line it took away already called; an append reads each line it
+    added; anything else (a create's text, a prop) reads each line of each word it gave. A chat line's address is its
+    stored to= (rooms.line_to), so an event that made one writes nothing here."""
+    args = e.get("args") or {}
+    if "line_id" in args:
+        return [], []
+    texts, gone = [], []
+    if e.get("verb") in ("comment", "resolve"):
+        texts = [str(args.get("line", ""))]
+    elif e.get("verb") == "edit" and {"text", "title", "append"} & set(args):
+        old = (e.get("undo") or {}).get("restore_subject") or {}
+        if "text" in args:
+            texts, gone = changed_lines(old.get("text", ""), args["text"])
+        if "append" in args:
+            texts += [l for l in str(args["append"]).splitlines() if l.strip()]
+        if "title" in args and str(args["title"]) != str(old.get("title", "")):
+            texts.append(str(args["title"]))
+            gone.append(str(old.get("title", "")))
+    else:
+        texts = [l for v in args.values() if isinstance(v, str) for l in v.splitlines() if l.strip()]
+    by = str(e.get("by") or "").split("/")[0].lower()
+    before = {n for l in gone for n in own_header(l, by)[0]}
+    calls, heard, headed = [], [], set()
+    for t in texts:
+        names, end = own_header(t, by)
+        headed.update(names)
+        calls += [n for n in names if n not in before and n != by and n not in calls]
+        heard += [m.group(1).lower() for m in ADDRESS.finditer(unquoted(t[end:]))]
+    return calls, [n for n in dict.fromkeys(heard) if n not in headed and n != by]
+
+
 class World:
     def __init__(self):
         self.subjects = {}
