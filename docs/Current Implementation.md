@@ -493,7 +493,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 
 | Endpoint (`deskd.py`) | What it does |
 |---|---|
-| `GET /api/snapshot?session&as` | The world as JSON, plus `events_total`, `worktree`, `readers` and the actor's outline. Rendering does not count as looking |
+| `GET /api/snapshot?session&as` | The world as JSON, plus `events_total`, `worktree`, `readers` and the actor's outline. Rendering does not count as looking: `seen`, `last_event_seen` and the fence's aspect record `_seen_idx` are put back after the outline is built (`snapshot_for`; a2872: `_seen_idx` was not, so each Desktop refresh marked every outline line's title and props as seen, and a later act passed the stale fence) |
 | `GET /api/scene?session&as&lens[&view=painter]` | `{scene, text, events_total}` or `{refused}`. `view=painter` sends `painter_view` with the root's `def`. A compiler crash is reported as a bug in scene.py, not in the lens |
 | `GET /api/style?session&as&name` | A style's source from the world, else the seed file (`name` defaults to `calm`) |
 | `GET /api/version` | `{code, painter, shape}` (a1505): `code` is `$DESKD_CODE` (the commit the door started it on), else git HEAD when deskd started; `painter` hashes every file under the static dir; `shape` is `scene.PAINTER_SHAPE`. Loads no session |
@@ -923,4 +923,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e4991. Edit it there; a direct edit here makes the next export stop and warn. sha1:d4ab024afc53 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e5173. Edit it there; a direct edit here makes the next export stop and warn. sha1:75fd988bbfe0 -->
