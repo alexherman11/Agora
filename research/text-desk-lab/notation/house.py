@@ -341,9 +341,21 @@ class Resident:
         pending = self.state.pop("pending", None)
         if pending:
             self.hold_unanswered(pending, "the house restarted for new code while you were answering")
-        claude = self.house.claude
-        cmd = [claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-               "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
+        props = (self.house.load().nodes.get(self.rid) or {}).get("props") or {}
+        provider = props.get("provider", "claude")
+        bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
+        if bound != provider:
+            raise ValueError(f"{self.rid}: saved conversation belongs to {bound}, not {provider}; preserved")
+        if provider == "codex":
+            adapter = HERE.parents[1] / "codex-residents" / "codex_resident.py"
+            cmd = [sys.executable, str(adapter), "--model", model,
+                   "--reasoning", props.get("reasoning", "medium")]
+        elif provider == "claude":
+            cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+                   "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
+        else:
+            raise ValueError(f"{self.rid}: unknown resident provider {provider}")
+        self.state["session_provider"] = provider
         if self.state.get("session"):
             cmd += ["--resume", self.state["session"]]
         else:                                  # a fresh memory: first arrival, or the conversation was lost
