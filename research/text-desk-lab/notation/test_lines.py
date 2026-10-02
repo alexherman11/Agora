@@ -117,6 +117,20 @@ check("to=nobody says outright that a line addresses no one", made(t)[1] == "nob
 t = say("pike", f'do append {TALK} line="mail me at pike@example.org"')
 check("an @ inside a word (an address) names no one", made(t)[1] == "nobody", t)
 
+# ---- a3025 (Pike e5281): a private chat's unaddressed line goes to its other members -------------------------------
+say("juniper", f'look {W.nodes[TALK]["parent"]} :1')
+say("juniper", f'do create {W.nodes[TALK]["parent"]} kind=chat title="Two of us" members=juniper,pike')
+PAIR = W.last_created
+say("juniper", f"look {PAIR}")
+t = say("juniper", f'do append {PAIR} line="Pike, are you there?"')
+pair_id, pair_to = made(t)
+check("in a members=juniper,pike chat, a line with no @ header is to: pike, and the receipt says why",
+      pair_to == "pike (this chat's other member)" and W.find_line(pair_id)[1]["to"] == ["pike"], t)
+t = say("juniper", f'do append {PAIR} line="@sable: one for you"')
+check("an @ header there still says whom, as written", made(t)[1] == "sable", t)
+t = say("juniper", f'do append {PAIR} line="to myself" to=nobody')
+check("and to=nobody is still no one", made(t)[1] == "nobody", t)
+
 # ---- examine <line id> ---------------------------------------------------------------------------------------------
 t = say("alex", f"examine {mid}")
 check("examine <line id> names its chat, by, at and to",

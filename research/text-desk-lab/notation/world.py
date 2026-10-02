@@ -1100,6 +1100,13 @@ class World:
                         to = [n for n in to if n not in no_one]
                         mentioned = [] if "to" in line_args else \
                             [n for n in mentions(line) if not rooms.same_person(self, n, str(actor).split("/")[0])]
+                        # a3025 (Pike e5281): in a private chat (members= names people), a line with no header and no
+                        # to= goes to its other members, as For you already shows it; an @ header narrows or widens it
+                        why_to = ""
+                        if "to" not in line_args and not header(line)[0]:
+                            to = rooms.private_others(self, s, actor)
+                            if to:
+                                why_to = f" (this chat's other member{'s' if len(to) > 1 else ''})"
                         new_line = {"id": self._id("m"), "text": line.strip("\n"), "to": to, "ev": None}
                         if str(line_args.get("reply_to", "")).strip():
                             new_line["reply_to"] = str(line_args["reply_to"]).strip()
@@ -1108,7 +1115,7 @@ class World:
                         args = dict(args, line_id=new_line["id"], to=",".join(to) or "nobody")
                         if no_one:
                             args["no_one"] = ",".join(no_one)
-                        new_line_why = ("; " + MENTION_NOTE.format(", ".join("@" + n for n in mentioned))) if mentioned else ""
+                        new_line_why = why_to + (("; " + MENTION_NOTE.format(", ".join("@" + n for n in mentioned))) if mentioned else "")
                 s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
         elif verb == "place":
             dest = args.get("into")

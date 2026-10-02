@@ -234,6 +234,20 @@ def members_of(s):
     return {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
 
 
+def private_others(w, s, writer):
+    """a3025 (Pike e5281): whom a private chat's unaddressed line goes to: the people its members= names, and the
+    resident whose corner holds it (book_owners: Pike's Talk with Alex says members=alex), less the writer, in the
+    order written, each someone. A chat with no members=, or members=all, is shared: [] (its plain line calls no one)."""
+    named = [m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",") if m.strip()]
+    if not named or set(named) & set(EVERYONE):
+        return []
+    out = []
+    for n in named + book_owners(w, s.get("id")):
+        if n not in out and not same_person(w, n, str(writer).split("/")[0]) and someone(w, n):
+            out.append(n)
+    return out
+
+
 def member(w, s, actor):
     """Is `actor` in chat `s`'s members (members=all counts everyone)?"""
     members = members_of(s)
