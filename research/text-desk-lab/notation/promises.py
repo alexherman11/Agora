@@ -166,7 +166,12 @@ def phrase(w, st, reader=None):
         a, who, eid, _ = st["ended"]
         return f"a request of {L(st['asked'])} by {L(st['asker'])}, {k} by {L(who)}" + (f" ({eid})" if eid else "")
     owed = L(st["owed"])
-    base = f"{L(st['holder'])} promised {owed}" if not st["carried_from"] else f"{L(st['holder'])} {'hold' if same(st['holder'], r) else 'holds'} it, owed to {owed}"
+    if same(st["holder"], st["owed"]):
+        base = "your own promise" if same(st["holder"], r) else f"{label(w, st['holder'])}'s own promise"
+    elif st["carried_from"]:
+        base = f"{L(st['holder'])} {'hold' if same(st['holder'], r) else 'holds'} it, owed to {owed}"
+    else:
+        base = f"{L(st['holder'])} promised {owed}"
     if k == OPEN:
         out = base
         for old, new, eid in st["carried_to"]:
@@ -597,6 +602,347 @@ def guard_props(w, verb, kv):
         if k in kv and verb in ("prop", "create"):
             raise Refusal(f"{k}= is a promise now, held by the house as a thing with its maker and its end: {door}. "
                           f"(remove={k} still clears an old one)")
+
+
+# ---- the migration, once per world (a1587 (5), (7); the table in c1992, Sable's answers in e4790) ------------------
+
+IN_FLIGHT = ("asked", "working", "waiting", "ready", "landing", "landed")
+
+# Sable's word on frontier's cards (e4790), each applied only while the card still says what it said when she gave it:
+# a719's owe is a request of alex (deleting a card is his act); a1193's is her own promise owed to alex (the world half
+# is hers, his seeing it confirms it), and it absorbs a1140's owe and a1971's due note; a1193's earlier owe (e2720) and
+# awaiting=pike (e2798) were her request of Pike, ended when she rewrote them (e3291): migrated as a closed record.
+# The Astra-era requests are closed records too: the team is paused and Jeff isn't here.
+DECIDED = {
+    "a719": {"owe": "Alex deletes a card", "as": "ask", "to": "alex"},
+    "a1193": {"owe": "after landing: the world half", "to": "alex"},
+    "a1140": {"owe": "after pulse lands: the world half", "into": "a1193"},
+    "a397": {"awaiting": "astra-awareness", "closed": "withdrawn at migration: asker paused"},
+    "a432": {"awaiting": "jeff", "closed": "withdrawn at migration: asker paused"},
+    "a505": {"awaiting": "jeff", "closed": "withdrawn at migration: asker paused"},
+}
+SPOKE = {"sable"}      # writers who checked the table themselves (e4790): their owes are not flagged back to them
+HISTORY = [   # (card, the owe event, its words, asked of, the awaiting event, the event that ended it, how)
+    ("a1193", "e2720", "Pike's review before landing", "pike", "e2798", "e3291",
+     "kept: Pike reviewed it (c1377, resolved Kept at e3328); Sable rewrote the owe and removed awaiting=pike at e3291"),
+]
+
+
+def writer(w, sid, key):
+    """The latest live event that set this subject's prop `key` (a prop or a create), or None."""
+    nodes = set(w.appearances_of(sid)) | {sid}
+    for e in reversed(w.events):
+        if e.get("undone") or e["verb"] == "undo" or e["target"] not in nodes and not (
+                e["verb"] == "create" and (e.get("undo") or {}).get("delete") in nodes):
+            continue
+        if key in (e.get("args") or {}):
+            return e
+    return None
+
+
+def _decided(w, sid, key, val):
+    for aid in w.appearances_of(sid):
+        d = DECIDED.get(aid)
+        if d and key in d and str(val).startswith(d[key]):
+            return aid, d
+    return None, None
+
+
+def plan(w):
+    """What the migration would make, without making it. -> (items, steps): items are promises to make, each
+    {form, what, to, about, acts, card, why}; steps are the other changes, each (kind, id, words)."""
+    items, steps, cards = [], [], {}
+    for sid, s in w.subjects.items():
+        p = s.get("props") or {}
+        if s.get("kind") == "promise":
+            continue
+        if any(k in p for k in ("owe", "awaiting")) or (s.get("kind") == "task" and p.get("commission") in IN_FLIGHT
+                                                         and not p.get("lived") and p.get("status") not in ENDS_CARD):
+            cards[sid] = p
+    dues = {}
+    for sid, s in w.subjects.items():
+        d = (s.get("props") or {}).get("due_for")
+        if d and (s.get("props") or {}).get("status") != "done":
+            dues.setdefault(w.subject_of(d) if d in w.nodes else d, []).append(sid)
+    folded = {}
+    commission_done = set()
+
+    def asker_of(card):
+        e = next((x for x in reversed(w.events) if x["target"] in w.appearances_of(card) and x["verb"] == "prop"
+                  and (x.get("args") or {}).get("commission") == "asked" and not x.get("undone")), None)
+        return e
+
+    for sid, p in cards.items():
+        s, card = w.subjects[sid], aid_of(w, sid)
+        owe, aw = p.get("owe"), p.get("awaiting")
+        oe, ae = (writer(w, sid, "owe") if owe is not None else None), (writer(w, sid, "awaiting") if aw is not None else None)
+        flight = s.get("kind") == "task" and p.get("commission") in IN_FLIGHT and not p.get("lived") and p.get("status") not in ENDS_CARD
+        ce = asker_of(sid) if flight else None
+        if aw is not None:
+            _, d = _decided(w, sid, "awaiting", aw)
+            if d and d.get("closed"):
+                items.append({"form": "ask", "what": s["title"], "to": aw, "about": card, "card": sid,
+                              "acts": [[ae["id"] if ae else None, "ask"], ["MIG", "withdraw", d["closed"]]],
+                              "why": f"awaiting={aw} on {card}: a closed record ({d['closed']})"})
+                steps.append(("remove", sid, "awaiting"))
+                aw = None
+        if owe is not None and str(owe).strip().lower() in ("none", ""):
+            steps.append(("remove", sid, "owe"))
+            owe = None
+        if owe is not None:
+            daid, d = _decided(w, sid, "owe", owe)
+            steps.append(("remove", sid, "owe"))
+            wname = oe["by"] if oe else None
+            if d and d.get("into"):
+                folded.setdefault(w.subject_of(d["into"]), []).append((card, owe))
+                steps.append(("note", sid, f"owe on {card} folds into {d['into']}'s promise (Sable e4790)"))
+            elif aw is not None and ae and oe and persons.norm(ae["by"]) == persons.norm(oe["by"]):
+                items.append({"form": "ask", "what": owe, "to": aw, "about": card, "card": sid, "acts": [[oe["id"], "ask"]],
+                              "why": f"owe= and awaiting={aw} on {card}, both by {oe['by']}: a request of {aw}",
+                              "flag": None if persons.norm(oe["by"]) in SPOKE else persons.norm(oe["by"])})
+                steps.append(("remove", sid, "awaiting"))
+                aw = None
+                if flight:
+                    commission_done.add(sid)
+            elif d and d.get("as") == "ask":
+                items.append({"form": "ask", "what": owe, "to": d["to"], "about": card, "card": sid,
+                              "acts": [[oe["id"] if oe else None, "ask"]], "why": f"owe on {card}: a request of {d['to']} (Sable e4790)"})
+            elif flight and ce and oe and persons.norm(ce["by"]) == persons.norm(oe["by"]):
+                cards[sid] = dict(p, _words=owe, _to=(d or {}).get("to"))      # the commission's promise takes its words
+            else:
+                to = (d or {}).get("to") or _owed_for(w, sid, wname or "")
+                items.append({"form": "promise", "what": owe, "to": to, "about": card, "card": sid,
+                              "acts": [[oe["id"] if oe else None, "promise"]],
+                              "why": f"owe on {card} by {wname or 'unknown'}, owed to {to}"})
+        if aw is not None:
+            items.append({"form": "ask", "what": s["title"], "to": aw, "about": card, "card": sid,
+                          "acts": [[ae["id"] if ae else None, "ask"]],
+                          "why": f"awaiting={aw} on {card} by {ae['by'] if ae else 'unknown'}: a request of {aw}"})
+            steps.append(("remove", sid, "awaiting"))
+    for sid, p in cards.items():
+        s = w.subjects[sid]
+        flight = s.get("kind") == "task" and p.get("commission") in IN_FLIGHT and not p.get("lived") and p.get("status") not in ENDS_CARD
+        if not flight or sid in commission_done:
+            continue
+        ce = asker_of(sid)
+        who = ce["by"] if ce else None
+        to = p.get("_to") or _owed_for(w, sid, who or "")
+        words = p.get("_words") or f"live what this lands: {s['title']}"
+        items.append({"form": "promise", "what": words, "to": to, "about": aid_of(w, sid), "card": sid,
+                      "acts": [[ce["id"] if ce else None, "promise"]],
+                      "why": f"commission {aid_of(w, sid)}: its asker's promise, owed to {to}"
+                             + (", with its owe's words" if p.get("_words") else "")
+                             + "".join(f"; folds in {c}'s owe" for c, _ in folded.get(sid, []))
+                             + "".join(f"; retires due note {aid_of(w, n)}" for n in dues.get(sid, []))})
+        for n in dues.pop(sid, []):
+            steps.append(("retire-note", n, aid_of(w, sid)))
+    for csid, notes in dues.items():         # due notes whose commission is no longer in flight (lived, or done)
+        c = w.subjects.get(csid)
+        if not c:
+            continue
+        ce = asker_of(csid)
+        le = writer(w, csid, "lived")
+        acts = [[ce["id"] if ce else None, "promise"]]
+        if le and (c.get("props") or {}).get("lived"):
+            acts.append([le["id"], "report", c["props"]["lived"]])
+        items.append({"form": "promise", "what": f"live what this lands: {c['title']}", "about": aid_of(w, csid),
+                      "to": _owed_for(w, csid, ce["by"] if ce else ""), "card": csid, "acts": acts,
+                      "why": f"due note{'s' if len(notes) > 1 else ''} {', '.join(aid_of(w, n) for n in notes)} for "
+                             f"{aid_of(w, csid)}: its asker's promise" + (", reported by its lived=" if len(acts) > 1 else "")})
+        for n in notes:
+            steps.append(("retire-note", n, aid_of(w, csid)))
+    for card, eo, words, to, ea, eend, how in HISTORY:
+        evs = events(w)
+        if card in w.nodes and (evs.get(eo, {}).get("args") or {}).get("owe") == words and \
+                (evs.get(ea, {}).get("args") or {}).get("awaiting") == to and eend in evs:
+            items.append({"form": "ask", "what": words, "to": to, "about": card, "card": w.subject_of(card),
+                          "acts": [[eo, "ask"], [eend, "confirm", how]],
+                          "why": f"{card}'s earlier owe ({eo}) and awaiting={to} ({ea}): a request, closed as {how}"})
+    for fid, n in w.nodes.items():           # the readers: views, lenses, rules, verbs that answer these words
+        if n["type"] == "surface" and n.get("layout") == "view":
+            q, cols = str(n.get("query") or ""), str(n.get("cols") or "")
+            colset = [c.strip() for c in cols.split(",") if c.strip()]
+            m = re.search(r"prop:awaiting=([\w-]+)", q)
+            o = re.search(r"prop:owner=([\w-]+)", q)
+            if m:
+                steps.append(("view", fid, (f"kind:promise,asked-of:{m.group(1)}", "title,promise,about")))
+            elif "owe" in colset and o:
+                steps.append(("view", fid, (f"kind:promise,held-by:{o.group(1)}", "title,promise,about")))
+            elif "awaiting" in colset or "owe" in colset:
+                steps.append(("view", fid, (q, ",".join("asked_of" if c in ("awaiting", "owe") else c for c in colset))))
+            if not m and ("prop:awaiting" in q or "prop:owe" in q):
+                steps.append(("note", fid, f"view {fid} \"{n['title']}\": its selection {q} is left as it is, and "
+                                           f"matches nothing once the props go; asked-of:<name> selects requests"))
+    for sid, s in w.subjects.items():
+        tags = s.get("tags") or []
+        text = s.get("text") or ""
+        if "lens" in tags and re.search(r"\$awaiting\b|prop:awaiting", text):
+            new = re.sub(r"only when prop:awaiting(?![=\w])", "only when awaits:any", text)
+            new = re.sub(r"prop:awaiting=([\w-]+)", r"awaits:\1", new).replace("$awaiting", "$asked_of")
+            steps.append(("lens", sid, new))
+        elif "rule" in tags and re.search(r"\bdue_for\b", text):
+            steps.append(("retire-rule", sid, "a commission's promise does its job now (a1587)"))
+        elif "verb" in tags and {x.strip().lower() for x in s["title"].split("|")} & set(VERBS):
+            steps.append(("tell-verb", sid, s["title"]))
+    return items, steps
+
+
+def migrate(desk):
+    """Once per world, at its first top-level line after landing: owe=, awaiting= and open due notes become
+    promises and requests, the props go, and their readers read promises. One event by the house, said in history;
+    undo takes all of it back (and it never runs again)."""
+    w = desk.world
+    if getattr(w, "_promises_version", 0) >= 1:
+        return
+    w._promises_version = 1
+    items, steps = plan(w)
+    if not items and not [s for s in steps if s[0] != "note"]:
+        return
+    import rooms
+    rs = rooms.all_rooms(w)
+    home = rs[0] if rs else w.root
+    fid = surface(w)
+    made_nodes, made_subjects, restore_s, restore_n = [], [], {}, {}
+    if not fid:
+        fid = w.add_surface("Promises", home, "column", 8, 8, 400, 300)
+        w.nodes[fid]["props"] = {"role": "promises"}
+        w.reflow(home)
+        made_nodes.append(fid)
+    ev = w._event("promises", fid, {}, {}, "house")
+    mig = ev["id"]
+
+    def keep_s(sid):
+        if sid not in restore_s:
+            restore_s[sid] = deepcopy(w.subjects[sid])
+
+    said, per = [], {}
+    for it in items:
+        acts = [[mig if a[0] == "MIG" else a[0]] + a[1:] for a in it["acts"]]
+        aid, _ = make(w, it["form"], it["what"], it["to"], it.get("about"), quiet=True, acts=acts)   # None: no event says who
+        sid = w.nodes[aid]["subject"]
+        made_nodes.append(aid)
+        made_subjects.append(sid)
+        st = state(w, sid)
+        said.append(f"{aid} ({it['why']}): {phrase(w, st, {'pid': None, 'name': ''})}")
+        for who in {label(w, st["maker"] or st["asker"]), label(w, st["asked"]) if st["asked"] else None, it.get("flag")}:
+            if who and who != "unknown":
+                per.setdefault(who, []).append((aid, st, it))
+    for kind, ident, val in steps:
+        if kind == "remove":
+            if val in (w.subjects[ident].get("props") or {}):
+                keep_s(ident)
+                w.subjects[ident]["props"].pop(val)
+                w.subjects[ident]["rev"] += 1
+                said.append(f"{aid_of(w, ident)}: {val}= removed")
+        elif kind == "retire-note":
+            keep_s(ident)
+            w.subjects[ident]["props"].update(status="done", next=f"now the asker's promise about {val} (a1587)")
+            w.subjects[ident]["rev"] += 1
+            said.append(f"{aid_of(w, ident)}: due note retired into the promise about {val}")
+        elif kind == "view":
+            restore_n.setdefault(ident, deepcopy(w.nodes[ident]))
+            q, cols = val
+            was = f"{w.nodes[ident].get('query')} as {w.nodes[ident].get('cols')}"
+            w.nodes[ident]["query"], w.nodes[ident]["cols"] = q, cols
+            w._bump(ident)
+            said.append(f"view {ident} \"{w.nodes[ident]['title']}\": was {was}, now {q} as {cols}")
+        elif kind == "lens":
+            keep_s(ident)
+            w.subjects[ident]["text"] = val
+            w.subjects[ident]["rev"] += 1
+            said.append(f"lens {aid_of(w, ident)} \"{w.subjects[ident]['title']}\": $awaiting reads $asked_of, prop:awaiting reads awaits:")
+            per.setdefault(_maker(w, ident) or "", []).append((aid_of(w, ident), None, {"why": "your lens read awaiting=; it reads open requests now ($asked_of, awaits:any)"}))
+        elif kind == "retire-rule":
+            keep_s(ident)
+            s = w.subjects[ident]
+            s["tags"] = [t for t in s["tags"] if t != "rule"] + ["retired"]
+            s["rev"] += 1
+            said.append(f"rule {aid_of(w, ident)} \"{s['title']}\" retired (untagged rule, tagged retired): {val}")
+        elif kind == "tell-verb":
+            who = _maker(w, ident)
+            said.append(f"world verb {aid_of(w, ident)} '{val}': the word is the house's now; use {aid_of(w, ident)} still runs it")
+            per.setdefault(who or "", []).append((aid_of(w, ident), None, {"why": f"your verb '{val}' answers a word the house "
+                                                  f"answers now ({', '.join(sorted(set(VERBS) & {x.strip().lower() for x in val.split('|')}))}); "
+                                                  f"use {aid_of(w, ident)} still runs it, and it removed owe=, which nothing has now"}))
+        elif kind == "note":
+            said.append(val)
+    asked = []
+    for sid in made_subjects:            # (4): what the migration made about a card already gone asks its holder once
+        st = state(w, sid)
+        c = about_sid(w, st)
+        if st["state"] == OPEN and c and not living(w, c):
+            asked.append(st)
+    for who, rows in per.items():
+        f = sill(w, who)
+        if not f or who in ("alex",):
+            continue
+        lines = [f"- {aid}: " + (f"\"{st['what'][:90]}\" · {phrase(w, st, _person(w, who))} · ({it['why']})" if st else it["why"])
+                 + (f". You wrote this owe with awaiting= on the same card, so it is your request of them now; if it was "
+                    f"your own promise instead, withdraw {aid} and promise to=<them> <words>" if it.get("flag") == who else "")
+                 for aid, st, it in rows]
+        sid = w.add_subject("note", "What the promises migration made of yours (a1587)",
+                            "owe=, awaiting= and due notes are promises and requests now, things with their makers read "
+                            f"from events ({mig}; help promises). Yours:\n" + "\n".join(lines))
+        aid = w.place(sid, f, 8, 8, 300, 120)
+        w._bump(f)
+        made_nodes.append(aid)
+        made_subjects.append(sid)
+        said.append(f"told {who} on their sill ({aid})")
+    for st in asked:
+        holder = label(w, st["holder"])
+        f = sill(w, holder)
+        if not f:
+            said.append(f"{st['aid']} is about {st['about']}, which has left the living; {holder} has no sill to be asked on")
+            continue
+        sid = w.add_subject("note", f"Kept, released or carried? {st['aid']} about {st['about']}",
+                            f"{st['about']} has left the living, and your promise about it is still open (the migration "
+                            f"{mig} found it):\n  {st['aid']} \"{st['what']}\"\nOne of these ends it, and this note with it:\n"
+                            f"  kept: report {st['aid']} how=\"...\"\n  released: release {st['aid']} [why=\"...\"]\n"
+                            f"  carried: carry {st['aid']} to=<name>")
+        w.subjects[sid]["props"]["promise"] = st["aid"]
+        aid = w.place(sid, f, 8, 8, 300, 120)
+        w._bump(f)
+        made_nodes.append(aid)
+        made_subjects.append(sid)
+        w.subjects[st["sid"]]["promise"]["acts"].append([mig, "asked-end"])
+        said.append(f"{st['aid']}: its card {st['about']} has left the living; {holder} is asked once on their sill ({aid})")
+    w.reflow(fid)
+    n_p = sum(1 for i in items if i["form"] == "promise")
+    ev["args"] = {"promises": n_p, "requests": len(items) - n_p, "steps": len(steps)}
+    ev["undo"] = {"promises_migrate": {"nodes": made_nodes, "subjects": made_subjects,
+                                       "restore_subjects": list(restore_s.values()), "restore_nodes": list(restore_n.values())}}
+    ev["changed"] = [fid] + list(restore_s) + list(restore_n)
+    ev["note"] = (f"a1587: owe=, awaiting= and open due notes became {n_p} promise(s) and {len(items) - n_p} request(s), "
+                  f"each made by whoever wrote it (its event), and their readers read promises: " + "; ".join(said))
+
+
+def _maker(w, sid):
+    apps = set(w.appearances_of(sid))
+    for e in w.events:
+        if e["verb"] == "create" and not e.get("undone") and (e.get("undo") or {}).get("delete") in apps:
+            return persons.norm(e["by"])
+    return None
+
+
+def unmigrate(w, u):
+    """The undo of the migration: what it made goes, what it changed comes back. It does not run again."""
+    for r in deepcopy(u.get("restore_subjects") or []):
+        r["rev"] = w.subjects[r["id"]]["rev"] + 1 if r["id"] in w.subjects else r["rev"]
+        w.subjects[r["id"]] = r
+    for r in deepcopy(u.get("restore_nodes") or []):
+        r["rev"] = w.nodes[r["id"]]["rev"] + 1 if r["id"] in w.nodes else r["rev"]
+        w.nodes[r["id"]] = r
+    parents = set()
+    for nid in reversed(u.get("nodes") or []):
+        n = w.nodes.pop(nid, None)
+        if n and n.get("parent"):
+            parents.add(n["parent"])
+    for sid in u.get("subjects") or []:
+        w.subjects.pop(sid, None)
+    for p in parents:
+        if p in w.nodes:
+            w.reflow(p)
+            w._bump(p)
 
 
 # ---- printing helpers for the desk --------------------------------------------------------------------------------

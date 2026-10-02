@@ -75,6 +75,7 @@ def prints_at(rev):
         # a1156: likewise the one-time binding of stored lines saved before bindings (verbs.bind_unbound) is a change
         # to a living world, recorded as a house event; a frozen world is printed as it was frozen
         world._binds_version = 1
+        world._promises_version = 1     # a1587: and so is the once-per-world migration of owe= and awaiting=
         for title in lens_titles(desk):
             try:
                 r = desk.dispatch("desk", {"line": f"scene {title}"})

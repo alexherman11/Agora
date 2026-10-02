@@ -444,6 +444,10 @@ class World:
             return dict(self.TEXT_VERBS, place="into=<surface>")
         n = self.nodes[nid]
         v = {}
+        if n["type"] == "appearance" and (self.subjects.get(n["subject"]) or {}).get("kind") == "promise":
+            # a1587: a promise's words are its maker's and it never leaves quietly; it ends by its own verbs
+            return {"comment": "line=<str>  (a comment on this promise, signed by you)",
+                    "link": "to=<id> as=blocks|refers|answers|part-of  (a connection to another thing)"}
         if n["parent"]:
             parent = self.nodes[n["parent"]]
             if parent["layout"] == "free" and self.coords:
@@ -924,7 +928,7 @@ class World:
             raise Refusal(ev["undo"]["refuse"].format(eid=event_id))
         # a1069: `place above=` changes several subjects in one event (the card, and the ranks it renumbered); a later
         # change to any of them stops the undo, as a later change to the target always did
-        mine = {ev["target"]} | (set(ev.get("changed") or []) if "restore_subjects" in (ev.get("undo") or {}) else set())
+        mine = {ev["target"]} | (set(ev.get("changed") or []) if {"restore_subjects", "promises_migrate"} & set(ev.get("undo") or {}) else set())
         later = [e for e in self.events if int(e["id"][1:]) > int(event_id[1:]) and not e.get("undone")
                  and e["verb"] != "undo" and (e["target"] in mine or mine & set(e.get("changed") or []))]
         if later:
@@ -980,6 +984,9 @@ class World:
         elif "persons_begin" in u:
             import persons     # a1568: the persons go, and every who= with them
             persons.unbegin(self, u["persons_begin"])
+        elif "promises_migrate" in u:
+            import promises    # a1587: what the migration made goes, what it changed comes back; it never runs again
+            promises.unmigrate(self, u["promises_migrate"])
         elif "drop_link" in u:
             self.links = [l for l in self.links if l["id"] != u["drop_link"]]
         elif "restore_link" in u:

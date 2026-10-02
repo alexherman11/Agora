@@ -26,7 +26,31 @@ def writer(w, sid, key):
     return None, None
 
 
+def dry_run(path):
+    """--migrate: run a1587's migration on the world in memory (never saved) and print what it made and changed."""
+    import promises
+    desk = pickle.loads(Path(path).read_bytes())
+    w = desk.world
+    w.me = "house"
+    n0 = len(w.events)
+    promises.migrate(desk)
+    for e in w.events[n0:]:
+        print(f"{e['id']} {e['verb']} by {e['by']}: {e.get('args')}")
+        for part in (e.get("note") or "").split("; "):
+            print("  " + part)
+    print("== every promise, as a third person reads it")
+    for sid in promises.all_sids(w):
+        st = promises.state(w, sid)
+        print(f"{st['aid']}\t{st['state']}\t{promises.phrase(w, st, {'pid': None, 'name': ''})}\t{st['what'][:60]!r}\tabout={st['about']}")
+    for who in ("sable", "pike", "juniper", "alex"):
+        w.me = who
+        print(f"== as {who}: held-by {len(promises.matching(w, 'held-by:' + who))}, asked-of "
+              f"{len(promises.matching(w, 'asked-of:' + who))}, owed-to {len(promises.matching(w, 'owed-to:' + who))}")
+
+
 def main():
+    if "--migrate" in sys.argv:
+        return dry_run(sys.argv[sys.argv.index("--migrate") + 1])
     w = pickle.loads((HERE / "sessions" / f"{sys.argv[1]}.pickle").read_bytes()).world
     trash = {nid for nid, n in w.nodes.items() if (n.get("props") or {}).get("trash") == "yes"}
 

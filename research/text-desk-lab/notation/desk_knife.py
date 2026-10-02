@@ -8,6 +8,7 @@ import harness   # registers launch; provides sync
 import knife
 import moo
 import persons
+import promises
 from desk import aspects_meet, event_aspects, rule_did_unseen, unescape_value
 from desk_moo import DeskMoo, HELP_MOO
 from world import Refusal
@@ -557,7 +558,8 @@ class DeskKnife(DeskMoo):
         n = len(ids)
         things = f"{n} thing" + ("" if n == 1 else "s")
         out = []
-        missing = [c for c in dict.fromkeys(cols) if c not in self.TABLE_COLS and c not in self.HOUSE_COLS and c not in held]
+        missing = [c for c in dict.fromkeys(cols) if c not in self.TABLE_COLS and c not in self.HOUSE_COLS and c not in held
+                   and c not in promises.COLS]
         if missing:
             out.append(f"{', '.join(missing)}: nothing by {'that name' if len(missing) == 1 else 'those names'} on any of "
                        f"{things}; house columns are {', '.join(self.HOUSE_COLS)}")
@@ -612,6 +614,8 @@ class DeskKnife(DeskMoo):
             if c == "age":
                 d = w.last_day(i)
                 return str(w.days_between(d, self.today)) if d and self.today else ""
+            if c in promises.COLS and s and c not in (s.get("props") or {}):
+                return promises.cell(w, s["id"], c)     # a1587: read from the promise's events, never stored
             return str(((s or {}).get("props") or {}).get(c, ""))
         shown = [{"title": "title", "tags": "tags", "due": "due", "in": "place"}.get(c, None if c in ("id", "kind", "words", "age") + self.HOUSE_COLS else f"prop:{c}") for c in cols]
         shown = [a for a in shown if a]
@@ -637,7 +641,7 @@ class DeskKnife(DeskMoo):
             return "  " + "  ".join(str(v)[:widths[k]].ljust(widths[k]) for k, v in enumerate(row)).rstrip()
         out = [fmt(header)] + [fmt(r) for r in rows]
         out.append("  columns: id title kind tags due in age words, made_by made_at edited_by edited_at (the house's record), "
-                   "and any prop; cols= picks, by= sorts (desc=1)")
+                   "promise asked_of holder owed (help promises), and any prop; cols= picks, by= sorts (desc=1)")
         return out
 
     def _rule_selection(self, sel, home=None):
@@ -784,6 +788,15 @@ class DeskKnife(DeskMoo):
         if len(out) == 1:
             out.append("  no differences in props, kind, due, text or tags")
         return "\n".join(out)
+
+    # ---- a1587: promises and requests, things with honest ends (promises.py) -----------------------------------------
+    def _promise_verb(self, verb, arg):
+        """promise, ask, accept, decline, withdraw, report, confirm, release, carry: typed, or through do."""
+        n0 = len(self.world.events)
+        out = promises.command(self, verb, arg)
+        if len(self.world.events) > n0:
+            self._after_mutation()
+        return out
 
     # ---- a1568: persons, a thing with one id for a life; names are labels on it ------------------------------------
     def cmd_person(self, arg):
@@ -1291,6 +1304,7 @@ class DeskKnife(DeskMoo):
         if top:
             import verbs
             verbs.bind_unbound(self)      # a1156: once per world, lines saved before bindings bind to what they mean now
+            promises.migrate(self)        # a1587: once per world, owe= and awaiting= become promises and requests
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
@@ -1450,6 +1464,10 @@ class DeskKnife(DeskMoo):
                     return rooms.narrate(self, fid)
         if cmd in ("person", "persons"):
             return self.cmd_person(arg)
+        if cmd in promises.VERBS:
+            return self._promise_verb(cmd, arg)
+        if cmd == "promises":
+            return promises.listing(self)
         if cmd == "rules":
             return self.cmd_rules()
         if cmd == "rule":
@@ -1530,6 +1548,8 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
+            if verb in promises.VERBS:      # a1587: do accept a2001 is accept a2001
+                return self._promise_verb(verb, arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else "")
             is_target = is_target_word      # a selection term is the target, = or not (Juniper; see SEL)
             # tier 1: `do sweep porch` may name a verb made in the world; a990: so may a retired built-in's word (tidy,
             # reply, stack ...), which this desk only refuses, so a world verb answers it first
@@ -1696,6 +1716,21 @@ class DeskKnife(DeskMoo):
   examine <e12> explains one event; undo <e12> takes it back; why <id> tells how a thing got where it is.
   history <person> (a name, pike,first, or an id like p1895): what that person did. help person""",
         "person": persons.HELP,
+        "promises": promises.HELP,
+        "promise": "promise to=<name> <words> [about=<id>]: a promise by you, owed to <name>, kept in the Promises "
+                   "surface; report it when done, release it if you can't, carry it to=<name> to hand it on. help promises",
+        "ask": "ask to=<name> <words> [about=<id>]: a request of <name>, held by you. It is not their promise until they "
+               "accept it; they may decline it with no reason, and you may withdraw it. help promises",
+        "accept": "accept <id>: you were asked; now it is your promise, owed to whoever asked. help promises",
+        "decline": "decline <id>: you were asked, and you say no; no reason is needed. help promises",
+        "withdraw": "withdraw <id>: you asked, and you take the request back. help promises",
+        "report": "report <id> [how=<words>]: you hold the promise, and it is done. It shows 'reported, not confirmed' "
+                  "to the one it's owed to until they confirm; owed to yourself, it is kept on your own word. help promises",
+        "confirm": "confirm <id>: it was owed to you, and it was kept. help promises",
+        "release": "release <id> [why=<words>]: you hold the promise and let it go; a reason is welcome, never required. "
+                   "help promises",
+        "carry": "carry <id> to=<name>: hand a promise you hold to someone else; they see 'carried to you from <you>'. "
+                 "help promises",
         "go": "go <room>: walk to a room, by id or a word of its title (go lounge), and see it; go <room> :1 walks without "
               "looking; go alone says where you are and who is in each room. help rooms",
         "rest": "rest: go home to your corner (Home if you have none); history marks it via=rest. In the house a resident "
@@ -1934,6 +1969,8 @@ class DeskKnife(DeskMoo):
                 out.append(f"  a {s['kind']} (subject {s['id']}) on {n['parent']}; text begins: {first}")
             if len(apps) > 1:
                 out.append("  also appears at " + ", ".join(f"{a} in {w.nodes[a]['parent']}" for a in apps if a != nid))
+            if s["kind"] == "promise":
+                out += promises.card_lines(self, nid)       # a1587: its story act by act, and what is open to you
             if "rule" in (s.get("tags") or []):
                 # a1027: a rule note says what rules says of it: its home, who it acts as, how it has gone
                 self._rules_sync(say=False)
@@ -2034,6 +2071,16 @@ class DeskKnife(DeskMoo):
         w = self.world
         if verb == "prop" and "query" in kv and positional:
             self._check_view_query(positional[0], kv["query"])
+        promises.guard_props(w, verb, kv)         # a1587: owe= and awaiting= are promises now, in a world that has them
+        if positional and verb not in ("comment", "resolve", "link", "unlink") and promises.on(w):
+            try:
+                sel = self._parse_selection(positional[0])
+                hit = [i for i in (sel[0] if sel else [self._resolve(positional[0])]) if promises.is_promise(w, i)]
+            except Refusal:
+                hit = []          # the act itself says what is wrong with its target
+            if hit:
+                raise Refusal(f"{hit[0]} is a promise: its words are its maker's, and it ends only by its own verbs "
+                              f"(report, release, carry, confirm, accept, decline, withdraw; help promises)")
         before, texts, n0 = verbs.state(w), verbs.stored_texts(w), len(w.events)
         out = self._do_knife(verb, positional, kv)
         if len(w.events) == n0:
@@ -2045,6 +2092,7 @@ class DeskKnife(DeskMoo):
         if bad:
             verbs.rollback(self, n0)
             raise Refusal(bad + ". Nothing was changed")
+        notes += promises.after_act(self, n0)     # a1587: a commission asked, lived=, a card leaving with a promise open
         made = w.nodes.get(w.last_created) or {}
         if verb == "create" and made.get("layout") == "view" and made.get("cols"):
             # a1431: a column that names nothing would print empty at every look; its receipt says so once

@@ -1272,6 +1272,9 @@ def _ctx_for(w, nid, state=None):
            "_tags": list(s.get("tags") or []),
            # F11: a surface's props live on the surface itself (a resident's corner carries status, want)
            "_props": dict(s.get("props") or (n.get("props") if n.get("type") == "surface" else None) or {})}
+    if s.get("id"):
+        import promises      # a1587: who open requests about it ask, read from their events ($asked_of; '' for none)
+        ctx["asked_of"] = promises.cell(w, s["id"], "asked_of") if promises.on(w) else ""
     if state:
         ctx["_state"] = state
     return ctx
