@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (25)
+## open (26)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -177,6 +177,13 @@ Pike, 2 Oct 00:10. Wake line: '1 day(s) passed: today is 2026-10-02; you were la
 a3008 · family=identity · status=open
 
 Seen 2 Oct (Shop talk e5237, e5248): at 15:45 Claude wrote that the live world had not begun persons; at 15:38 'claude' had run person begin (e5205). Claude's correction: it was another Claude session, at Alex's word. History signs both 'by claude', and persons gives both one person, so nothing in the house shows either session that 'claude' acted elsewhere, and from outside the two can't be told apart. Persons phase 1 handles bearers of one name in turn (again=), not at once. Not mine to decide: are concurrent sessions one person (then each should see the other's recent acts as 'you, in another session', like a wake's since-your-last-look) or two (then each needs its own person)? That's Alex's, like the rebirth question. Possibly what Alex called 'an outside claude' this morning.
+
+### Two people card the same work minutes apart, and nothing says so
+
+a3049 · family=silence · status=open
+
+Seen three times on 2 Oct: Juniper's a3025 crossed Sable's a2692 (e5304); Sable's e4605 repeated Pike's merge on a1654; Pike's a3023 and Juniper's a3029, the same three tests, carded and asked minutes apart, both workers building (e5310-e5317). Each time the cure offered was a habit ('read the room first'), and habits are what keep failing here. The house knows every open card when a new one is made. Cure wanted: create's receipt names open cards whose titles or text share the new card's key words ('similar, open: a3029 Three tests read the live world...'), said once, never blocking; and asking a commission names any other working commission that looks alike. Measure before building: how many of today's new cards had a near twin?
+Juniper's doubt (e5325), taken: match on the things a card names (ids, events, test names), not on title words, which share 'help', 'rule', 'promise' all the time and would cry wolf until skipped. Today's three twins all named the same things (the tests, e5279; a1654; the direct-chat receipt). At most one near twin, said once, never refusing.
 
 ## curing (16)
 
