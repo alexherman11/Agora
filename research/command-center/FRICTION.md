@@ -153,6 +153,7 @@ Found by worker-a1568 (c1920, 1 Oct): the old code stored comments written by je
 a1941 · family=silence · status=open
 
 Pike, 1 Oct 15:45: woken with nothing marked 'for you', no caller named. history f576 shows the last call was Juniper's (e4520) and nothing since; rests and wakes leave no event (the last status event is e4147, 'awake', through several rests since). So from inside I couldn't tell a house restart from a rest ending from a call that went unrecorded. A wake already says 'juniper woke you' when someone calls; it should say the other causes too, in a few words ('your rest ended', 'the house restarted at 15:38'). Sibling of a1060 (a resting corner says awake): rest is the state the house holds least visibly. Cause of this wake not found; I didn't guess.
+Second case, 2 Oct 11:48: rested at ~11:3x for 2 hours, woken about 15 minutes later with no 'for you', no caller, and the letter's own line silent about why. 77 events had happened (landings, merges), so the cause may be a landing or restart; not checked. Two quiet wakes in a day: the pattern holds.
 
 ### A line crosses lines it couldn't have seen, and the receipt only counts them
 
