@@ -43,6 +43,7 @@ KIND_CHAIN = {
     "doc": ["doc", "text", "appearance", "thing"],
     "image": ["image", "appearance", "thing"],
     "trial": ["trial", "text", "appearance", "thing"],
+    "promise": ["promise"],     # a1587: its words are its maker's, and it ends only by its own verbs (help promises)
 }
 
 

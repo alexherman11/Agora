@@ -85,6 +85,10 @@ def aspects_of(verb, args):
         # fenced as the other placement verbs are. Alex, 29 Sep: deleting a task from the Desktop was refused over an
         # owner removed hours before the page was painted, a change no view could show.
         return {"place"}
+    if verb == "promises" and a.get("aspects"):
+        # a1587: the migration says which aspects it touched (owe=, awaiting=, a view's query, a lens's text), so a card
+        # whose awaiting= went is not 'doing since' the migration
+        return set(a["aspects"])
     return None
 
 
@@ -705,6 +709,10 @@ class Desk:
                                                  p.get("score", ""),
                                                  f"{p['calls']} calls" if p.get("calls") else "",
                                                  f"{p['seconds']}s" if p.get("seconds") else ""] if x))
+            elif s["kind"] == "promise":
+                import promises     # a1587: how it stands, as it reads to you ('asked of you by sable'), not its to=
+                st = promises.state(w, s["id"])
+                bits.append(promises.phrase(w, st) + (f" · about {st['about']}" if st["about"] else ""))
             elif s.get("props"):
                 bits.append(" ".join(f"{k}={v}" for k, v in s["props"].items() if k not in ("label", "started")))
             if s["kind"] in ("note", "task", "chat", "doc", "trial"):

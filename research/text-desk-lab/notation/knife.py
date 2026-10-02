@@ -26,6 +26,7 @@ Verbs (all take an id or a selection unless noted):
 import re
 
 import moo
+import promises
 from world import Refusal
 
 SPECIALIZED = {"split", "gather", "dedupe", "reveal", "reply", "tidy", "stack", "done"}   # due and tag are property setters: general
@@ -44,7 +45,7 @@ def _leaves(w, fid):
 
 # the selection terms parse_selection reads; the Help binder's selections note must name each (helpnotes.check, a1595)
 TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:",
-         "answered-by:", "unanswered:")
+         "answered-by:", "unanswered:") + promises.TERMS      # a1587: held-by: asked-of: owed-to: asked-by: awaits:
 
 
 def parse_selection(w, token, trash=False):
@@ -63,7 +64,7 @@ def parse_selection(w, token, trash=False):
             raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
-    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:")) or t == "hidden" for t in terms + neg):
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t == "hidden" for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -188,6 +189,11 @@ def parse_selection(w, token, trash=False):
             else:
                 linked = {l["to"] for l in w.links_of(src) if l["kind"] == "answers" and l["from"] == src}
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in linked]
+        elif t.startswith(promises.TERMS):
+            # a1587: open promises and requests, read from their events (held-by: asked-of: owed-to: asked-by:), and
+            # the things open requests are about (awaits:<name|any>)
+            hit = promises.matching(w, t)
+            cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in hit]
         else:
             raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>; -term leaves out")
     for n in neg:
