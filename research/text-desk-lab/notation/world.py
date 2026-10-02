@@ -381,10 +381,14 @@ class World:
 
     def _event(self, verb, target, args, undo, actor=None, note=""):
         actor = actor or self.me
+        import persons
+        who = persons.who_for(self, actor)     # a1568: the person, once this world has persons; by= stays the name signed
         self._eseq = self.next_event_number()
         ev = {"id": f"e{self._eseq}", "verb": verb, "target": target,
               "args": deepcopy(args), "undo": undo, "note": note, "by": actor,
               "at": __import__("datetime").datetime.now().isoformat(timespec="seconds")}   # wall time; `day` stays the desk's clock
+        if who:
+            ev["who"] = who
         if self.today:
             ev["day"] = self.today
         self.events.append(ev)
@@ -973,6 +977,9 @@ class World:
                     obj.pop("binds", None)
                 else:
                     obj["binds"] = prev
+        elif "persons_begin" in u:
+            import persons     # a1568: the persons go, and every who= with them
+            persons.unbegin(self, u["persons_begin"])
         elif "drop_link" in u:
             self.links = [l for l in self.links if l["id"] != u["drop_link"]]
         elif "restore_link" in u:

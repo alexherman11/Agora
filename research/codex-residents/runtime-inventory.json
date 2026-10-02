@@ -1,0 +1,44 @@
+{
+  "model": "gpt-6-astra",
+  "tools": null,
+  "instructions": null,
+  "messages": [
+    {
+      "type": "additional_tools",
+      "id": "at_d1bcf2a7-b08c-5f1f-b7fb-23f6bb9f490a",
+      "role": "developer",
+      "tools": []
+    },
+    {
+      "type": "message",
+      "id": "msg_01a0f88b-afca-7ca1-801e-0f577a9deb1f",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "The door probe."
+        }
+      ]
+    }
+  ],
+  "reply": [
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "> look\n> rest"
+          }
+        ]
+      }
+    },
+    {
+      "type": "result",
+      "is_error": false,
+      "result": "> look\n> rest"
+    }
+  ],
+  "kind": "actual compiled runtime, local mock inference; no live model"
+}

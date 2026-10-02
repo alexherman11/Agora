@@ -207,7 +207,8 @@ def find(desk, word, words, me, at=None):
 
 DESK_WORDS = {"help", "?", "look", "open", "close", "read", "where", "verbs", "pivot", "find", "history", "undo", "do",
               "plan", "apply", "examine", "x", "ex", "rest", "wake", "go", "rules", "rule", "export", "why", "compare", "table",
-              "sync", "vars", "set", "rows", "scene", "clock", "scripts", "script", "run", "use", "worktree"}
+              "sync", "vars", "set", "rows", "scene", "clock", "scripts", "script", "run", "use", "worktree", "person",
+              "persons"}
 
 
 def _world_word(desk, step):

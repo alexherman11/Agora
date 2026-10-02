@@ -97,6 +97,16 @@ def save_desk(path, desk, data=None):
     halfway left a pickle that would not load, and the whole session was lost. `data`: the pickled desk, if in hand."""
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_bytes(data if data is not None else pickle.dumps(desk))
+    # 1 Oct (worker-a1568 c1920, Pike e4506): on Windows the rename is refused while any other process has the world
+    # open, even only to read it (a copy taken without the lock, a virus scan of a 58 MB file), and the write was lost.
+    # Try again for up to ten seconds before giving up; the lock keeps every other writer out meanwhile
+    import time
+    for wait in [0.05] * 20 + [0.25] * 36:
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            time.sleep(wait)
     os.replace(tmp, path)
 
 
