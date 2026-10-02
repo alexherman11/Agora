@@ -15,8 +15,9 @@ the resident knows comes from the world, and everything it does goes through it:
   - it rests when it says so: `> rest` rests until someone calls; `> rest 2 hours` (or 30 minutes, 1 day, 1h30m,
     half an hour: human time, a month at most) rests that long. An empty reply rests too. A resting resident is
     reached at once by a call: `wake <name>` or the Desktop's wake (call= on its corner), a comment on something in
-    its corner, a comment on its commission, @its-name or @everyone outside quotes from anyone (a1566: a resident's @
-    knocks, as a person's does), and, from a person at a keyboard (a surface says person=<them>), any line in a chat
+    its corner, a comment on its commission, a chat line addressed to it (the line's stored to=, a2662: never its
+    words read again) or @everyone in a chat it is in, @its-name outside quotes in a comment or note, from anyone
+    (a1566: a resident's @ knocks, as a person's does), and, from a person at a keyboard (a surface says person=<them>), any line in a chat
     in its own corner. A line from a resident or an agent is kept for it and said first at that wake, under 'for you
     while you rested', with chat and time (a1062); their plain line in its own corner's chat waits for its next wake.
     The speaker's receipt says whom the line took and, per name, what happened. Otherwise it is woken when its
@@ -71,8 +72,9 @@ STATE = HERE / "house-state"
 # moved still holds the old world module, and the workshop imports this file fresh inside it; the fallback keeps that
 # import working (it failed every pass for 40 minutes, and no worker could start) until the house restarts.
 try:
-    from world import QUOTED, unquoted  # noqa: E402,F401
+    from world import ADDRESS, QUOTED, unquoted  # noqa: E402,F401
 except ImportError:
+    ADDRESS = re.compile(r"(?<![\w@])@([A-Za-z][\w]*(?:-[\w]+)*)")     # a1581's rule, as world.py has it
     QUOTED = re.compile(r"`[^`]*`|\"[^\"\n]*\"|(?<![\w])'[^'\n]*'(?![\w])")
 
     def unquoted(text):
@@ -591,8 +593,11 @@ class House:
         start = r.state.get("cursor", len(w.events))
         inbox, urgent = r.state.setdefault("inbox", []), False
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
-        called = re.compile(rf"@({re.escape(actor)}|everyone|all)\b", re.I)
-        named = re.compile(rf"@({re.escape(actor)})\b", re.I)     # outside a chat line only a name reaches (a916)
+
+        def named(text):
+            # outside a chat line only a name reaches (a916). a2662: read by the rule a chat line's address is
+            # (world.ADDRESS, outside quotes, never inside a word), at hearing time: a comment or note has no stored to= yet
+            return [m.group(0) for m in ADDRESS.finditer(unquoted(text)) if rooms.same_person(w, m.group(1), actor)]
         for e in w.events[start:]:
             if e.get("by") == actor or e.get("undone"):
                 continue
@@ -621,16 +626,19 @@ class House:
                 continue
             at = str(e.get("at") or "")[11:16]
             if s and s["kind"] == "chat" and "append" in args:
-                members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
+                members = rooms.members_of(s)
+                # a2662: whom the line calls is its stored address (to=, a1581), never its words read again; a line
+                # with none (from before lines) is read once by the same rule. The receipt asks the same question.
+                to, _ = rooms.line_to(e)
+                now_ = rooms.calls(w, s, to, actor)
                 if sid in mine:                                    # a chat in its own corner is its own
                     if waits:                                      # a1062 (5): a book line is a note at the door,
                         self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
-                        urgent = urgent or bool(called.search(unquoted(said)))     # a1566: and an @ in it knocks
+                        urgent = urgent or now_                    # a1566: and a line addressed to it knocks
                         continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                     urgent = True
-                elif "all" in members or actor in members:
-                    now_ = bool(called.search(unquoted(said)))
+                elif "all" in members or actor in members or now_:
                     if now_ and waits:                             # a1566: kept, first and marked, and it knocks
                         self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                         urgent = True
@@ -641,20 +649,20 @@ class House:
             # a916, as Sable, Pike and Juniper agreed: outside a chat line, @everyone and @all never reach anyone (a
             # broadcast from a document edit is almost never meant; a chat line is the place for it), @name in a note,
             # task or comment still reaches that person, and nothing inside quotes or backticks counts
-            heard_in = unquoted(said)
+            heard_in = said
             if "text" in args and e["verb"] == "edit":
                 # Pike a611: rewriting a note that already named you is not news; only a mention the new text adds is
-                old = unquoted(((e.get("undo") or {}).get("restore_subject") or {}).get("text", ""))
-                if len(named.findall(unquoted(args["text"]))) <= len(named.findall(old)):
-                    heard_in = unquoted(" ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str)))
-            m = named.search(heard_in)
+                old = ((e.get("undo") or {}).get("restore_subject") or {}).get("text", "")
+                if len(named(args["text"])) <= len(named(old)):
+                    heard_in = " ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str))
+            m = named(heard_in)
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
                 if waits:                                          # a1566: a mention is kept first, and knocks
-                    self._hold(r, e, f"~ {at} {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
+                    self._hold(r, e, f"~ {at} {e['by']} mentioned you{where}, as {m[0]} ({e['id']}): {said[:300]}")
                     urgent = True
                     continue
-                inbox.append(f"~ {e['by']} mentioned you{where}, as {m.group(0)} ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} mentioned you{where}, as {m[0]} ({e['id']}): {said[:300]}")
                 urgent = True
             elif e["verb"] == "comment" and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")

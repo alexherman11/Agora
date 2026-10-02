@@ -189,28 +189,65 @@ def kind_of(w, actor):
     return "agent"
 
 
-CALLED = r"@({names}|everyone|all)\b"
+EVERYONE = ("everyone", "all")
 
 
-def called_by_line(w, sid, text, speaker):
-    """a1062: the residents a chat line in subject `sid` would call, as the house hears it (house.news): the owner of a
-    corner the chat sits in (a visitors' book, a talk with Alex), and, in a chat they are a member of, anyone it names
-    @name, @everyone or @all outside quotes (a916). Never the speaker. -> [actor, ...]"""
-    from world import unquoted
-    s = w.subjects.get(sid)
-    if not s or s["kind"] != "chat":
-        return []
-    members = {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
-    heard = unquoted(text)
-    me = str(speaker or "").split("/")[0].lower()
+def someone(w, name):
+    """a2662: who an addressed name is, or None when it names no one. 'everyone' (@everyone, @all); 'resident' (a corner
+    says actor=); 'person' (a surface says person=); 'agent': anyone else the world knows, a bearer of the name among
+    persons (a1568) or anyone who has signed an event. A name no one has borne or acted under is no one, so a typo
+    ('@pikee') is said to its writer and never stored as an address. An agent who has never acted here is no one until
+    they do."""
+    import persons
+    a = str(name or "").split("/")[0].strip().lower()
+    if not a:
+        return None
+    if a in EVERYONE:
+        return "everyone"
+    kind = kind_of(w, a)
+    if kind != "agent":
+        return kind
+    if persons.on(w) and persons.today(w, a):
+        return "agent"
+    if any(str(e.get("by") or "").split("/")[0].lower() == a for e in w.events):
+        return "agent"
+    return None
+
+
+def line_to(e):
+    """a2662: whom a chat line's append event addressed, as one reading for the house's knock and the speaker's
+    receipt: the line's stored to= (a1581: the writer's word, kept on the event with its line_id), or, for a line with
+    no stored address (said before lines, or in a chat whose lines are not things), its words read by the same rule
+    the migration used (world.addressed). -> (names, stored)"""
+    from world import addressed, to_names
+    args = e.get("args") or {}
+    if "line_id" in args:
+        return to_names(args.get("to")), True
+    return addressed(args.get("append", "")), False
+
+
+def members_of(s):
+    return {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
+
+
+def calls(w, s, to, actor):
+    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them (in any chat: the
+    address is the writer's word, and membership governs only plain lines), or says @everyone or @all in a chat they
+    are a member of. The house's knock (house.news) and the receipt (waiting_note) both ask this, so they agree."""
+    if any(same_person(w, n, actor) for n in to if n not in EVERYONE):
+        return True
+    members = members_of(s)
+    return bool(set(EVERYONE) & set(to)) and ("all" in members or str(actor).lower() in members)
+
+
+def book_owners(w, sid):
+    """The residents whose corner holds chat `sid` (a visitors' book, a talk with Alex)."""
     out = []
     for fid, n in w.nodes.items():
         p = n.get("props") or {}
         who = str(p.get("actor", "")).lower()
-        if n["type"] != "surface" or p.get("role") != "resident" or not who or who == me:
-            continue
-        inside = any(a["type"] == "appearance" and a.get("subject") == sid and _within(w, a, fid) for a in w.nodes.values())
-        if inside or (("all" in members or who in members) and re.search(CALLED.format(names=re.escape(who)), heard, re.I)):
+        if n["type"] == "surface" and p.get("role") == "resident" and who and \
+                any(a["type"] == "appearance" and a.get("subject") == sid and _within(w, a, fid) for a in w.nodes.values()):
             out.append(who)
     return out
 
@@ -225,32 +262,64 @@ def _within(w, node, fid):
 
 
 def waiting_note(desk, nid, text):
-    """a1062, a1566: what a chat line's receipt says about whom it reaches, or "". First whom the line took,
-    'to: pike, sable' (an @ counts only outside quotes and backticks, as the house reads it; a line with an @ that
-    took no one says 'to: nobody', and why when its @ was quoted). Then one line per resident about what happened:
-    'Pike: woken' (an @name or @everyone from anyone, or any line from a person, ends a rest; a1566), 'Pike: in a
-    turn; ...', or why it waits (asleep; the house not running; a resident's plain line in their own corner's chat,
-    which waits for their next wake). A line from a resident or agent is shown first at that wake, marked for them."""
+    """a1062, a1566, a2662: what a chat line's receipt says about whom it reaches, or "". Whom the line addresses is
+    said once, by the world ('line m5 · to: pike, alex', its stored to=); this says it only for a line with no stored
+    address, read from its words by the same rule. Then one line per name about what happened, read the way the house
+    reads it (calls, line_to): a resident: 'Pike: woken' (addressed by name, or @everyone in a chat they're in, or any
+    line from a person in their own chat, ends a rest), 'Pike: in a turn; ...', or why it waits (asleep; the house not
+    running; a resident's plain line in their own corner's chat, which waits for their next wake). A line from a
+    resident or agent is shown first at that wake, marked for them. A person: 'Alex: a person; it waits in their For
+    you'. An agent: not knocked, and where it waits. A name that is no one: 'pikee: no one by that name'."""
     import scene
-    from world import unquoted
+    from world import ADDRESS, addressed
     w = desk.world
     n = w.nodes.get(nid)
     sid = n.get("subject") if n else nid
-    who = called_by_line(w, sid, text, w.me)
-    heard = unquoted(text)
-    if not who:
-        if not re.search(r"@\w", str(text)):
-            return ""                                  # a plain line to no one: nothing to say
-        quoted = not re.search(r"@\w", heard)
-        return "to: nobody" + (" (an @ inside quotes or backticks calls no one)" if quoted else "")
-    rows = {r["corner"]: r for r in scene.house_rows(desk)}
+    s = w.subjects.get(sid)
+    if not s or s["kind"] != "chat":
+        return ""
+    e = next((x for x in reversed(w.events) if x["target"] in (nid, sid) and "append" in (x.get("args") or {})), None)
+    to, stored = line_to(e) if e else (addressed(text), False)
+    no_one = [a for a in to if not someone(w, a)]
+    out = []
+    if stored:
+        from world import to_names
+        no_one = to_names((e.get("args") or {}).get("no_one"))     # the world left them out of to=, and kept them here
+    elif to or ADDRESS.search(str(text)):
+        to = [a for a in to if a not in no_one]
+        out.append("to: " + (", ".join(to) or "nobody") + (" (read from its words: this line has no stored address)" if to
+                   else " (an @ inside quotes or backticks calls no one)" if not no_one else ""))
+    me = str(w.me).split("/")[0].lower()
     person = kind_of(w, w.me) == "person"
     marked = "" if person else ", first and marked for them"
-    out = ["to: " + ", ".join(who)]
-    for a in who:
-        name, row = w.display_name(a), rows.get(corner_of(w, a)) or {}
+    rows = {r["corner"]: r for r in scene.house_rows(desk)}
+    names = []
+    for a in to:
+        if a in EVERYONE:
+            names += [str(p["actor"]).lower() for p in ((x.get("props") or {}) for x in w.nodes.values() if x["type"] == "surface")
+                      if p.get("role") == "resident" and p.get("actor") and calls(w, s, to, p["actor"])]
+        else:
+            names.append(a)
+    owners = book_owners(w, sid)
+    for a in owners:
+        names.append(a)
+    seen = set()
+    for a in names:
+        if a in seen or same_person(w, a, me):
+            continue
+        seen.add(a)
+        name = w.display_name(a)
+        kind = someone(w, a)
+        if kind == "person":
+            out.append(f"{name}: a person; it waits in their For you")
+            continue
+        if kind != "resident":
+            out.append(f"{name}: not knocked (no corner: the house runs no session for them); it waits in their For you "
+                       f"(inbox:{a}) when they look")
+            continue
+        row = rows.get(corner_of(w, a)) or {}
         doing = str(row.get("doing", ""))
-        knocks = person or re.search(CALLED.format(names=re.escape(a)), heard, re.I)
+        knocks = calls(w, s, to, a) or (person and a in owners)
         if asleep(w, a):
             out.append(f"{name}: asleep (want=rest), so the house doesn't run them; your line waits for them{marked} "
                        f"until someone sets want=awake")
@@ -266,6 +335,8 @@ def waiting_note(desk, nid, text):
             until = doing if doing != "resting" else ("resting, until " + wakes + " at the latest" if wakes else "resting")
             out.append(f"{name}: {until}; a plain line in their own chat waits for their next wake{marked} "
                        f"(@{a} or wake {a} to call them now)")
+    for a in no_one:
+        out.append(f"{a}: no one by that name" + ("; not stored as an address" if stored else ""))
     return "\n  ".join(out)
 
 

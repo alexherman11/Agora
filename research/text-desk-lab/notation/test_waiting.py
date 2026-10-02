@@ -149,7 +149,8 @@ check("an @ that names no resident: 'to: nobody', no quote excuse", "to: nobody"
 if BOOK:
     rest(PIKE, 0)
     got = say("juniper", "left you the notes from this morning", BOOK)
-    check("a plain book line: 'to: pike', resting, the line waits, with how to call him", "to: pike" in got
+    # a2662: 'to:' is the line's stored address (nobody: it names no one); Pike's own line says why it is his
+    check("a plain book line: 'to: nobody', Pike resting, the line waits, with how to call him", "to: nobody" in got
           and re.search(r"Pike: resting, until \S+ at the latest; a plain line", got) and "wake pike" in got and OLD not in got, got)
     H.step()
     check("the book line waits for his wake", not res(PIKE).sent
@@ -231,7 +232,7 @@ check("Alex's line in Pike's own chat wakes him at once, the held book line firs
 rest(PIKE, 3600)
 rest(SABLE, 3600)
 got = say("juniper", "@everyone the suite is green again")
-check("@everyone: the receipt names each, woken", re.search(r"to: .*pike", got) and re.search(r"to: .*sable", got)
+check("@everyone: 'to: everyone', and the receipt names each, woken", got.count("to: everyone") == 1
       and "Pike: woken" in got and "Sable: woken" in got and OLD not in got, got)
 H.step()
 p, s = sent(PIKE), sent(SABLE)
@@ -241,7 +242,8 @@ check("@everyone reaches both now, first and marked", "suite is green" in p and 
 # 7. an agent's (no corner, no person record) @pike knocks too; a plain line wakes no one and is not marked for him
 rest(PIKE, 3600)
 got = say("juniper", "a plain line in the lounge")
-check("a line with no @ that calls no one says nothing about anyone", "to:" not in got and "woken" not in got, got)
+check("a line with no @ that calls no one: 'to: nobody' once, and nothing about anyone",
+      got.count("to: nobody") == 1 and "inside quotes" not in got and "woken" not in got and "Pike:" not in got, got)
 H.step()
 check("the plain line wakes no one", not res(PIKE).sent and res(PIKE).state.get("rest_until"), sent(PIKE))
 got = say("claude", "@pike a note from outside")
@@ -259,6 +261,56 @@ H.step()
 got2 = sent(PIKE)
 check("a comment's @pike wakes him, the mention first", got2.startswith("for you while you rested (1):")
       and "mentioned you" in got2 and "see the lounge" in got2, (got, got2[:600]))
+
+rest(PIKE, 3600)
+H.act("juniper", f"do comment {LOUNGE} line=\"write to x@pike.org about it\"")
+H.step()
+check("a comment's x@pike (inside a word, a1581's rule) does not wake him", not res(PIKE).sent and res(PIKE).state.get("rest_until"),
+      sent(PIKE)[:300])
+
+# 10. a2662: one reading of @. The knock reads the line's stored to=, never its words; the receipt says the address
+# once, then per name what happened, for residents, persons, agents and names that are no one
+import rooms   # noqa: E402
+rest(PIKE, 3600)
+rest(SABLE, 3600)
+got = H.act("juniper", f"do append {LOUNGE} line={house.json.dumps('Sable asked about this, @sable said it first')} to=pike")
+check("a line stored to=pike whose words say @sable: 'to: pike' once, 'Pike: woken', nothing about Sable",
+      got.count("to: ") == 1 and "to: pike" in got and "Pike: woken" in got and "\n  Sable:" not in got, got)
+H.step()
+check("and it knocks Pike, not Sable", "Sable asked" in sent(PIKE) and not res(SABLE).sent and res(SABLE).state.get("rest_until"),
+      (sent(SABLE)[:300], res(SABLE).state.get("rest_until")))
+got = say("juniper", "ping x@sable when you can")
+H.step()
+check("x@sable (inside a word) is no address: 'to: nobody', and Sable sleeps on", "to: nobody" in got and "\n  Sable:" not in got
+      and not res(SABLE).sent and res(SABLE).state.get("rest_until"), got)
+got = say("juniper", "@alex @claude the receipt is honest now")
+check("'@alex @claude': 'to: alex, claude' once; Alex a person, in their For you; Claude not knocked",
+      got.count("to: ") == 1 and "to: alex, claude" in got and "Alex: a person; it waits in their For you" in got
+      and "Claude: not knocked" in got and "inbox:claude" in got, got)
+got = say("juniper", "@pikee did you see it?")
+mline = re.search(r"line (m\d+) · to: ([^\n]*)", got)
+stored = H.load().find_line(mline.group(1))[1] if mline else None
+check("'@pikee': 'to: nobody', 'pikee: no one by that name', and no address stored",
+      mline and mline.group(2) == "nobody" and "pikee: no one by that name" in got and stored is not None and stored["to"] == [],
+      (got, stored))
+got = say("juniper", "@pike @pikee both of you")
+check("'@pike @pikee': 'to: pike', Pike woken, pikee no one", "to: pike\n" in got and "Pike: woken" in got
+      and "pikee: no one by that name" in got, got)
+H.step()
+sent(PIKE)
+check("a line from before lines (no stored to=) is read by the same rule as the migration",
+      rooms.line_to({"args": {"append": "Juniper: @pike see 'the @sable note' and x@mica"}}) == (["pike"], False))
+check("a stored to= is read as stored, whatever the words say",
+      rooms.line_to({"args": {"append": "Juniper: @sable", "line_id": "m1", "to": "pike"}}) == (["pike"], True)
+      and rooms.line_to({"args": {"append": "Juniper: @sable", "line_id": "m1", "to": "nobody"}}) == ([], True))
+wl = H.load()
+private = {"props": {"members": "juniper,sable"}}
+check("a line addressed to Pike calls him in a chat he is not a member of; @everyone there does not",
+      rooms.calls(wl, private, ["pike"], "pike") and not rooms.calls(wl, private, ["everyone"], "pike")
+      and rooms.calls(wl, private, ["everyone"], "sable"))
+check("someone: resident, person, agent, everyone, and no one",
+      [rooms.someone(wl, n) for n in ("pike", "alex", "juniper", "claude", "everyone", "pikee")]
+      == ["resident", "person", "resident", "agent", "everyone", None], [rooms.someone(wl, n) for n in ("pike", "alex", "claude", "pikee")])
 
 # 9. asleep (want=rest): a line waits, and a wake waits for someone to set want=awake; the call is then delivered,
 # first, and cleared, so the next wake is a change again
