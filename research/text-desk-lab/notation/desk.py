@@ -1202,7 +1202,7 @@ class Desk:
         return "; ".join(bits) + f"; read {nid}"
 
     def _chat_waits(self, nid, kv):
-        """a1062: what a chat line's receipt says about the residents it calls who are resting or asleep (rooms)."""
+        """a1062, a1566: what a chat line's receipt says about whom it took and what happened to each (rooms)."""
         import rooms
         text = str((kv or {}).get("line", (kv or {}).get("append", "")))
         try:
@@ -1598,7 +1598,7 @@ class Desk:
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since
         waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
         if waits:
-            out += f"\n  {waits}"    # a1062: who this line calls is resting, and when they'll see it
+            out += f"\n  {waits}"    # a1566: whom this line took ('to: pike'), and for each what happened ('Pike: woken')
         if r.get("created") in w.nodes:
             self._mark_seen(r["created"])
             if verb == "create":

@@ -153,6 +153,31 @@ const Viewer = (session, who, lens, said, status) => {
       const body = JSON.stringify({ session, as: who, lens, at, facts, boxes, painted: painted || null, ...view });
       if (body !== told) { told = body; fetch("/api/observe", { method: "POST", body }); }
     },
+    // where each scrolling frame is: plain data, so a page reloaded for new painter code (a1505) can carry it.
+    // Scroll end (chat): a frame this viewer had at its end stays at its end; one never seen before starts there.
+    // a1134 (Alex, 30 Sep: "I keep getting jumped to the top of the conversation in shop talk"): a frame whose lines
+    // changed is made again, and a new element starts at the top. Every scrolling frame the viewer wasn't at the end
+    // of keeps its place by the line at its top: which child, and how far down the frame it sat.
+    places() {
+      const all = [...document.querySelectorAll('[data-scroll="end"]')];
+      const out = { ends: all.filter(e => e.scrollTop + e.clientHeight >= e.scrollHeight - 2).map(e => e.dataset.key), seen: all.map(e => e.dataset.key), at: {} };
+      for (const e of document.querySelectorAll("[data-scroll]")) {
+        if (out.ends.includes(e.dataset.key) || e.scrollHeight <= e.clientHeight) continue;
+        const top = e.getBoundingClientRect().top, kid = [...e.children].find(c => c.dataset.key && c.getBoundingClientRect().bottom > top + 1);
+        out.at[e.dataset.key] = { y: e.scrollTop, kid: kid && kid.dataset.key, off: kid ? kid.getBoundingClientRect().top - top : 0 };
+      }
+      return out;
+    },
+    place(pl) {
+      const ends = new Set(pl.ends), seen = new Set(pl.seen);
+      for (const e of document.querySelectorAll('[data-scroll="end"]')) if (ends.has(e.dataset.key) || !seen.has(e.dataset.key)) e.scrollTop = e.scrollHeight;
+      for (const e of document.querySelectorAll("[data-scroll]")) {
+        const p = pl.at[e.dataset.key]; if (!p) continue;
+        const kid = p.kid && [...e.children].find(c => c.dataset.key === p.kid);
+        if (kid) e.scrollTop += kid.getBoundingClientRect().top - e.getBoundingClientRect().top - p.off;
+        else e.scrollTop = p.y;
+      }
+    },
     // Pike (run 1, Alex's workspace): everything repaints but the part in hand; focus, caret and selection are put back
     keep(draw) {
       const ed = document.activeElement, s = getSelection(), sel = s.rangeCount ? [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset] : null;
@@ -160,18 +185,7 @@ const Viewer = (session, who, lens, said, status) => {
       // has its key, else to the one now at its place among its siblings, else to its parent; never to the page's top
       const fk = ed && ed.dataset && ed.dataset.key, up = fk && ed.parentElement, at = up ? [...up.children].indexOf(ed) : -1;
       const pk = up && up.dataset && up.dataset.key;
-      // scroll end (chat): a frame this viewer had at its end stays at its end; one never seen before starts there
-      const ends = new Set([...document.querySelectorAll('[data-scroll="end"]')].filter(e => e.scrollTop + e.clientHeight >= e.scrollHeight - 2).map(e => e.dataset.key));
-      const seenBefore = new Set([...document.querySelectorAll('[data-scroll="end"]')].map(e => e.dataset.key));
-      // a1134 (Alex, 30 Sep: "I keep getting jumped to the top of the conversation in shop talk"): a frame whose lines
-      // changed is made again, and a new element starts at the top. Every scrolling frame the viewer wasn't at the end
-      // of keeps its place by the line at its top: which child, and how far down the frame it sat.
-      const places = new Map();
-      for (const e of document.querySelectorAll("[data-scroll]")) {
-        if (ends.has(e.dataset.key) || e.scrollHeight <= e.clientHeight) continue;
-        const top = e.getBoundingClientRect().top, kid = [...e.children].find(c => c.dataset.key && c.getBoundingClientRect().bottom > top + 1);
-        places.set(e.dataset.key, { y: e.scrollTop, kid: kid && kid.dataset.key, off: kid ? kid.getBoundingClientRect().top - top : 0 });
-      }
+      const places = v.places();
       v.repainting = true;
       try {
         draw();
@@ -181,13 +195,7 @@ const Viewer = (session, who, lens, said, status) => {
           const next = same || (parent && (parent.children[at] || parent.children[at - 1])) || parent;
           if (next) { if (!next.hasAttribute("tabindex") && !next.isContentEditable && !/^(BUTTON|A|INPUT|TEXTAREA)$/.test(next.tagName)) next.tabIndex = -1; next.focus(); }
         }
-        for (const e of document.querySelectorAll('[data-scroll="end"]')) if (ends.has(e.dataset.key) || !seenBefore.has(e.dataset.key)) e.scrollTop = e.scrollHeight;
-        for (const e of document.querySelectorAll("[data-scroll]")) {
-          const p = places.get(e.dataset.key); if (!p) continue;
-          const kid = p.kid && [...e.children].find(c => c.dataset.key === p.kid);
-          if (kid) e.scrollTop += kid.getBoundingClientRect().top - e.getBoundingClientRect().top - p.off;
-          else e.scrollTop = p.y;
-        }
+        v.place(places);
         const moved = sel && (s.anchorNode !== sel[0] || s.anchorOffset !== sel[1] || s.focusNode !== sel[2] || s.focusOffset !== sel[3]);
         if (moved && sel[0].isConnected && sel[2].isConnected) s.setBaseAndExtent(...sel);   // only if the repaint moved it
       } finally { v.repainting = false; }

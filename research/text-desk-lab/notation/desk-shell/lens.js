@@ -336,13 +336,17 @@
     else if (e.key === "Tab") setTimeout(() => over(document.activeElement.dataset.drop === carrying?.n.part ? document.activeElement : null));
   });
 
+  let held = null;                               // the last scene answer painted, carried over a reload for new painter code
   async function refresh(force) {
-    const have = !force && /^\d+-\d+$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
+    const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
     const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter${have}`)).json();
     if (r.same) return;                          // deskd: nothing changed since the build this page has
-    const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene it built; comparing 700 KB was the fallback
+    return paintAnswer(r, force);
+  }
+  async function paintAnswer(r, force) {
+    const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene by its content (a1505); comparing 700 KB was the fallback
     if (key === last && !force) return;
-    last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null;
+    last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null; if (r.scene) held = r;
     await restyle((def && def.style_name) || "calm", (def && def.style_rev) || "seed");
     // 30 Sep (Alex: the Desktop kept going blank over the node budget): a refused scene keeps the last good paint on
     // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
@@ -360,20 +364,62 @@
 
   // 30 Sep: a page that loads while deskd restarts (it reloads itself for new code, just as the keeper restarts the
   // server) got a failed first fetch; unguarded, it threw before the repaint loop below was set, and stayed blank
+  // a1505: a page reloaded for new painter code (Alex pressed the quiet line, or the scene shape changed) carries its
+  // view: the scene it showed (painted at once, before anything is fetched), each frame's scroll, focus and caret, and
+  // the floats that were open. Only this tab reads it.
+  const carryKey = `lens-carry:${session}:${who}:${lens}`;
+  let carried = null; try { carried = JSON.parse(sessionStorage.getItem(carryKey) || "null"); sessionStorage.removeItem(carryKey); } catch (e) { carried = null; }
+  if (carried && carried.answer) {
+    await paintAnswer(carried.answer, true).catch(() => {});
+    const q = k => paint.querySelector(`[data-key="${CSS.escape(k)}"]`);
+    (carried.floats || []).forEach(k => { const el = q(k), h = el && el.querySelector(":scope > button"); if (h && el.dataset.folded === "1") h.click(); });
+    if (carried.places) V.place(carried.places);
+    const f = carried.focus && q(carried.focus.key);
+    if (f) { f.focus(); const t = f.firstChild; if (t && t.nodeType === 3 && carried.focus.caret != null) getSelection().collapse(t, Math.min(carried.focus.caret, t.length)); }
+  }
   await refresh().catch(() => {});
   setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
-  // live building (tier 2): when the code under the page changes, the page reloads itself, but never under someone's
-  // hands. Drafts already survive a reload (viewer.js keeps them); a part in hand or a line being typed waits.
-  // 30 Sep: "under someone's hands" means typing now, not a caret left in a kept draft an hour ago (Alex's tab sat on old
-  // code for that); a key in the last 15 s, or a part in hand, still holds the reload
-  let code = null, keyed = 0, down = false;
-  document.addEventListener("keydown", () => { keyed = Date.now(); }, true);
-  document.addEventListener("pointerdown", () => { down = true; }, true);
-  ["pointerup", "pointercancel"].forEach(t => document.addEventListener(t, () => { down = false; keyed = Date.now(); }, true));
+  // a1505: the door (door.py) holds one long connection per page. A world event repaints at once (the 1.5 s poll stays
+  // for what changes without an event: the clock, the house); the door's news feeds the quiet line (door.js).
+  if (window.EventSource) {
+    let soon = null;
+    const es = new EventSource(`/door/stream?session=${encodeURIComponent(session)}`);
+    es.addEventListener("world", () => { clearTimeout(soon); soon = setTimeout(() => refresh().catch(() => {}), 60); });
+    es.addEventListener("door", m => { try { if (window.DoorLine) DoorLine.show(JSON.parse(m.data)); } catch (e) {} });
+    es.onerror = () => { if (es.readyState === EventSource.CLOSED) es.close(); };   // no door (a bare deskd): the polls carry on
+  }
+  // live building (tier 2). a1505: a landing that changes only Python reloads nothing; deskd is swapped behind the door
+  // and the next scene shows what it changed. When the PAINTER's own files change, the page keeps the painter it has
+  // and the quiet line offers the new one ("new screen code: click to use it"); Alex chooses when (Juniper, e3746:
+  // reading is not a keystroke, so no pause is safe to reload in). Only when deskd sends a scene shape this lens.js
+  // can't read (scene.PAINTER_SHAPE) does the page reload on its own, and the line says why. Either way the reload
+  // carries the view (above), and the terminal keeps its lines (term.js).
+  const SHAPE = 1;                                  // the scene shape this file reads: scene.PAINTER_SHAPE
+  let painter = null, leaving = false;
+  function reloadKeeping() {
+    const a = document.activeElement, s = getSelection();
+    const focus = a && a.dataset && a.dataset.key ? { key: a.dataset.key, caret: s.rangeCount && a.contains(s.focusNode) ? s.focusOffset : null } : null;
+    const floats = [...paint.querySelectorAll('.l-float:not([data-folded="1"])')].map(e => e.dataset.key);
+    try { sessionStorage.setItem(carryKey, JSON.stringify({ answer: held, places: V.places(), focus, floats })); }
+    catch (e) { try { sessionStorage.setItem(carryKey, JSON.stringify({ places: V.places(), focus, floats })); } catch (e2) {} }
+    location.reload();
+  }
+  function versionIs(v) {
+    if (v.shape != null && v.shape !== SHAPE) {
+      if (leaving) return; leaving = true;
+      if (window.DoorLine) DoorLine.note(`the new code sends screens this page can't read (shape ${v.shape}; it reads ${SHAPE}): reloading, keeping your view`);
+      return setTimeout(reloadKeeping, 1500);
+    }
+    const p = v.painter || v.code; if (!p) return;
+    if (painter === null) { painter = p; return; }
+    if (!window.DoorLine) return;
+    if (p === painter) { DoorLine.note(""); return; }
+    const n = ((DoorLine.status && DoorLine.status.news) || []).filter(x => x.ok && x.painter).pop();
+    const which = n && n.commits && n.commits.length ? n.commits.map(c => (c[1].match(/^land (a\d+)/) || [])[1] || c[0]).join(", ") : "";
+    DoorLine.note(`new screen code${which ? ` (${which})` : ""}: click to use it`, reloadKeeping);
+  }
   setInterval(async () => {
-    let v; try { v = (await (await fetch("/api/version")).json()).code; } catch (e) { return; }
-    if (!v) return; if (code === null) { code = v; return; } if (v === code) return;
-    const typing = down || carrying || Date.now() - keyed < 15000;      // V.hold is set by a mere focus, so not it
-    if (!typing) location.reload(); else V.show("new code is here; the page reloads when you put this down");
+    let v; try { v = await (await fetch("/api/version")).json(); } catch (e) { return; }
+    versionIs(v);
   }, 5000);
 })();
