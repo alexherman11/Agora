@@ -86,7 +86,8 @@ check("a quoted @ addresses nobody, and the receipt says 'to: nobody' with no me
 t = say("juniper", f'do append {TALK} line="Juniper, @sable @pike: hi"')
 check("(i) 'Juniper, @sable @pike: hi' is to: sable, pike (the writer's own name may sign the header)", made(t)[1] == "sable, pike", t)
 t = say("juniper", f'do append {TALK} line="Juniper, for @sable @pike: a look?"')
-check("a signature may end in 'for' (Sable e4871): 'Juniper, for @sable @pike:' is to: sable, pike", made(t)[1] == "sable, pike", t)
+check("'Juniper, for @sable @pike:' is no header (a 'for' signature was dropped, Juniper c2807): mentions",
+      made(t)[1] == "nobody; a mid-line @ is a mention (@sable, @pike); put names first to call them", t)
 t = say("juniper", f'do append {TALK} line="thanks, @sable, that is right"')
 check("(ii) 'thanks, @sable, that is right' is to: nobody, and the receipt says the mention",
       made(t)[1] == "nobody; a mid-line @ is a mention (@sable); put names first to call them", t)

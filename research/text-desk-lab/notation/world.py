@@ -55,9 +55,9 @@ ADDRESS = re.compile(r"(?<![\w@])@([A-Za-z][\w]*(?:-[\w]+)*)")
 
 # a2715 (Pike e4870: 26 of 30 lines put every address first, 4 mid-line @s called someone by mistake): a line's
 # address is its header, the run of @names that opens it, after the world's signature ('Juniper: ') and the writer's
-# own name if they typed one ('Juniper, @sable @pike: hi'), and a 'for' ('Claude, for @sable: ...'). Names in the run
-# may be parted by spaces, commas, 'and', 'or' or '&'; anything else ends it. An @ after the header is a mention: it
-# calls no one, quoted or not. Comments and note edits are not read by it yet (a2733).
+# own name if they typed one ('Juniper, @sable @pike: hi'; a signature ending in 'for' was considered and dropped,
+# Juniper c2807). Names in the run may be parted by spaces, commas, 'and', 'or' or '&'; anything else ends it. An @
+# after the header is a mention: it calls no one, quoted or not. Comments and note edits are not read by it yet (a2733).
 SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
 _HEAD_SEP = re.compile(r"(?:[\s,;&+]|\band\b|\bor\b)*", re.I)
 _HEAD_AT = re.compile(r"@([A-Za-z]\w*(?:-\w+)*)(?![\w@'’])")
@@ -75,9 +75,6 @@ def header(text, writer=None):
         sig = re.compile(r"\s*" + re.escape(str(writer).split("/")[0]) + r"\s*[,:]", re.I).match(t, i)
         if sig:
             i = sig.end()
-    lead = re.compile(r"\s*for\s+(?=@)", re.I).match(t, i)      # Sable e4871: 'Claude, for @sable @pike: ...'
-    if lead:
-        i = lead.end()
     names = []
     while True:
         m = _HEAD_AT.match(t, _HEAD_SEP.match(t, i).end())
