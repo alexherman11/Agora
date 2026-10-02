@@ -42,12 +42,19 @@
   let hist = []; try { hist = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) { hist = []; }
   let at = hist.length, draft = "";
   function write(text, role) {
-    const s = document.createElement("span"); if (role) s.className = R(role);
+    const s = document.createElement("span"); if (role) { s.className = R(role); s.dataset.role = role; }
     s.textContent = text.endsWith("\n") ? text : text + "\n"; out.appendChild(s);
     while (out.childNodes.length > 600) out.removeChild(out.firstChild);
     out.scrollTop = out.scrollHeight;
   }
-  write(`desk terminal · ${who} in ${session} · help for the manual, clear to clear`, "term.echo");
+  // a1505: the scrollback outlives a reload of this tab (for new painter code); view state, this tab only
+  const backKey = `desk-term-back:${session}:${who}`;
+  let back = []; try { back = JSON.parse(sessionStorage.getItem(backKey) || "[]"); } catch (e) { back = []; }
+  addEventListener("pagehide", () => {
+    try { sessionStorage.setItem(backKey, JSON.stringify([...out.childNodes].slice(-300).map(s => [s.textContent, s.dataset.role || ""]))); } catch (e) { /* view state only */ }
+  });
+  if (back.length) back.forEach(([t, r]) => write(t, r || null));
+  else write(`desk terminal · ${who} in ${session} · help for the manual, clear to clear`, "term.echo");
 
   // a1047: one intent, one event (a1008 gave the painter this). Enter on new words mints a gesture id. If the answer is
   // lost, the words go back into the line holding that id, kept over a reload: Enter on them, untouched, sends the
@@ -81,6 +88,9 @@
       let r; try { r = await res.json(); } catch (e4) { r = { error: `deskd answered ${res.status} without words` }; }
       const t = r.text || r.error || "(no answer)";
       write(t.replace(/^> .*\n/, ""), r.error || /^ERR/m.test(t) ? "term.err" : null);
+      // a1505 (vii, Sable a1201): while two deskds overlap behind the door, a receipt from the code being replaced says so
+      const now = window.DoorLine && DoorLine.status && DoorLine.status.code;
+      if (r.code && now && r.code !== now) write(`(answered by ${r.code}, the code before the update to ${now})`, "meta");
     }
     input.disabled = false; input.focus();
   });

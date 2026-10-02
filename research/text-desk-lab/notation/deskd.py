@@ -9,7 +9,10 @@ POST /api/do   {"session": "...", "as": "...", "line": "..."}    run desk comman
                                                  command, a ; in it being words (a resident's > line, a736);
                                                  "gesture": "<id>" (a1008) is recorded on the events it made, and a
                                                  second post with that id does nothing and answers "already done, as eN"
-GET  /api/events?session=<name>&since=<n>       events after index n (poll this; it is cheap)
+GET  /api/events?session=<name>&since=<n>       events after index n (poll this; it is cheap: an unchanged world file
+                                                 is not loaded)
+GET  /api/version, /api/health                  the code this runs, the painter's files' hash and scene shape; ok
+Under the keeper it runs behind door.py (a1505), which swaps it for one on new code; see door.py.
 GET  /anything-else                              static files from static_dir (the shell)
 
 The server and `python explore.py <session> --as <name>` share sessions: both take the same per-session lock from
@@ -106,7 +109,24 @@ def _code_version():
         return "dev"
 
 
-CODE_VERSION = _code_version()
+# a1505: the door (door.py) starts each deskd with DESKD_CODE set to the commit it swapped to, so a receipt and the
+# quiet line name the same code even if HEAD moved again while this one was starting
+CODE_VERSION = os.environ.get("DESKD_CODE") or _code_version()
+_PAINTER = [None, ""]
+
+
+def painter_version():
+    """The painter's own code: a hash of every file under the static dir. A page offers its person the new painter only
+    when this changes (a1505); a landing that changes only Python leaves the page as it is."""
+    import hashlib
+    files = sorted(p for p in STATIC.rglob("*") if p.is_file())
+    key = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) for p in files)
+    if key != _PAINTER[0]:
+        h = hashlib.sha1()
+        for p in files:
+            h.update(str(p.relative_to(STATIC)).encode() + b"\0" + p.read_bytes() + b"\0")
+        _PAINTER[:] = [key, h.hexdigest()[:12]]
+    return _PAINTER[1]
 
 
 SESSION_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_@-]{0,63}$")    # frontier-x, a@b, try-t, _test_x: no . / \ or ..
@@ -121,7 +141,7 @@ class BadRequest(ValueError):
 # KB), though nothing had changed. A scene is now built again only when something it can show changed: the world file
 # (a request that changes nothing doesn't write it), the house's state apart from its heartbeat, whether the house is
 # alive, or the minute (times print as 08:15). The answer for anything else is the one already built.
-_SCENES, _GEN = {}, 0
+_SCENES, _EVENTS = {}, {}
 
 
 def _scene_key(q):
@@ -268,17 +288,28 @@ class Handler(SimpleHTTPRequestHandler):
                 except Exception as e:      # Astra: a compiler fault must arrive as a refusal, not as a dead endpoint
                     out = {"refused": f"the lens compiler failed ({type(e).__name__}: {e}); this is a bug in scene.py, not in your lens",
                            "events_total": len(desk.world.events)}
-            global _GEN
-            _GEN += 1
-            out["gen"] = f"{os.getpid()}-{_GEN}"        # names this build, so a painter compares a word, not 700 KB
+            # names this build, so a painter compares a word, not 700 KB. a1505: by its content, so the same scene from
+            # a deskd started after a landing has the same name, and the painter is told `same` in a few bytes
+            import hashlib
+            out["gen"] = "g" + hashlib.sha1(json.dumps(out, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+            body = json.dumps(out, ensure_ascii=False).encode("utf-8")
             if key is not None and key == _scene_key(q):     # unchanged while it was built: keep it (a few, the newest)
-                _SCENES[key] = (out["gen"], json.dumps(out, ensure_ascii=False).encode("utf-8"))
+                _SCENES[key] = (out["gen"], body)
                 while len(_SCENES) > 16:
                     _SCENES.pop(next(iter(_SCENES)))
-            return self._json(out)
+            if q.get("have") == out["gen"]:
+                return self._json({"same": True, "gen": out["gen"]})
+            return self._json(None, body=body)
         if u.path == "/api/version":
-            # live building: the code this deskd runs. keeper.py restarts deskd when HEAD moves; the painter reloads on a change
-            return self._json({"code": CODE_VERSION})
+            # live building: the code this deskd runs (a1505: the commit the door started it on), `painter`, the hash
+            # of the painter's own files (a page offers its person the new one when it changes), and `shape`, the
+            # scene shape this code sends (a page reloads on its own only when it can't read that)
+            import scene
+            return self._json({"code": CODE_VERSION, "painter": painter_version(), "shape": scene.PAINTER_SHAPE})
+        if u.path == "/api/health":
+            # a1505: the door asks this of a deskd it has just started, before any page is sent to it (and then the
+            # scenes it has recently served, built by this process). Loads no session.
+            return self._json({"ok": True, "code": CODE_VERSION, "pid": os.getpid()})
         if u.path == "/api/style":
             # F7: a style is world data (a note tagged style); the seed file answers only when the world has none
             import scene
@@ -287,9 +318,21 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(st or {"refused": f"no style {q.get('name')!r}"})
         if u.path == "/api/events":
             since = int(q.get("since", 0))
-            with Session(q.get("session", "desktop"), q.get("as")) as desk:
+            # a1505: the door asks this twice a second for each page it holds; a world file unchanged since the last
+            # answer has no new events, and is not loaded (8 MB) to say so
+            name = q.get("session", "desktop")
+            try:
+                st = (SESSIONS / f"{name}.pickle").stat() if SESSION_NAME.match(str(name)) else None
+            except OSError:
+                st = None
+            seen = _EVENTS.get(name)
+            if st is not None and seen and seen[:2] == (st.st_mtime_ns, st.st_size) and since >= seen[2]:
+                return self._json({"events": [], "total": seen[2]})
+            with Session(name, q.get("as")) as desk:
                 evs = [{k: v for k, v in e.items() if k != "undo"} for e in desk.world.events[since:]]
                 total = len(desk.world.events)
+            if st is not None:
+                _EVENTS[name] = (st.st_mtime_ns, st.st_size, total)
             return self._json({"events": evs, "total": total})
         return super().do_GET()
 
@@ -331,7 +374,8 @@ class Handler(SimpleHTTPRequestHandler):
             if done:
                 return self._json({"text": f"already done, as {done[0]['id']}: this gesture was acted on at {done[0].get('at', '?')}; "
                                    "nothing new was done", "error": None, "events_total": n0, "line": line,
-                                   "as": (body.get("as") or "alex"), "created": [], "events": [], "already": [e["id"] for e in done]})
+                                   "as": (body.get("as") or "alex"), "created": [], "events": [], "already": [e["id"] for e in done],
+                                   "code": CODE_VERSION})
             ob = body.get("observed") or {}
             d = ob.get("def") or {}
             lens_id = d.get("id")                   # a990: the lens a gesture was painted by (d may be reassigned below)
@@ -484,7 +528,8 @@ class Handler(SimpleHTTPRequestHandler):
         bad = [l for l in text.splitlines() if l.startswith("ERR")]
         refused = r.get("error") or (bad[0] if bad else None)
         self._json({"text": r.get("text"), "error": refused, "events_total": total, "line": line,
-                    "as": (body.get("as") or "alex"), "created": created, "events": events})
+                    "as": (body.get("as") or "alex"), "created": created, "events": events,
+                    "code": CODE_VERSION})       # a1505 (vii, Sable a1201): which code answered, told apart across a swap
 
 
 if __name__ == "__main__":
@@ -492,4 +537,11 @@ if __name__ == "__main__":
     SESSIONS.mkdir(exist_ok=True)
     STATIC.mkdir(exist_ok=True)
     print(f"deskd on http://localhost:{port}  static={STATIC}", flush=True)
+    if os.environ.get("DESKD_PARENT"):
+        # a1505: a deskd the door started goes when the door goes (a stopped door on Windows leaves its children running)
+        def orphaned(pid=int(os.environ["DESKD_PARENT"])):
+            while explore._alive(pid):
+                time.sleep(3)
+            os._exit(0)
+        __import__("threading").Thread(target=orphaned, daemon=True).start()
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

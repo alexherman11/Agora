@@ -8,6 +8,7 @@ Checks, from this checkout:
   - the rooms tests pass (test_room_verbs, test_room_look, test_room_reads, test_blanks, test_prop_fields,
     test_house_words, test_house_cols, test_persons, test_help_notes), each on a small world it
     builds itself (roomworld.py), so a failure is the code's and not today's world's
+  - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - the Python mirror of style.js that style receipts use (scene.style_check) agrees with style.js under node, on
     test_scene's samples, calm.style and every style note in <world>; without node the line says it was not checked
   - the frozen session prints are unchanged in the golden form (suite/sessions.py --check)
@@ -161,6 +162,14 @@ def main():
             if code:
                 failed.append(f"{Path(name).stem}: {last}"[:300])
         print(f"room tests: {'; '.join(outs)}{took('room tests', t0)}")
+        # a1505: the door swaps deskd under the live page; a deskd that no longer answers what the door asks (health,
+        # events by index, gesture ids) would make every landing visible again
+        t0 = time.perf_counter()
+        code, out = run(["test_door.py"], timeout=300)
+        last = (out.strip().splitlines() or ["?"])[-1]
+        print(f"door test: {last}{took('door test', t0)}")
+        if code:
+            failed.append(f"test_door: {last}"[:300])
         # Pike a611, 30 Sep: some painter rules live only in CSS (peek's nesting, a1032), and only a browser can test
         # them. When one is here, every test_*_paint.py runs (about 3 s each); without one, the line says so
         t0 = time.perf_counter()

@@ -10,9 +10,11 @@ and read back what it measured. The screenshot is a PNG a model can open with it
 desktop (index.html: dock, windows, apps) instead of the painter. --reduced-motion looks as someone whose system asks
 for reduced motion (prefers-reduced-motion: reduce).
 
-By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served by a deskd on a free port
-from THIS directory's desk-shell/, so a worktree sees its own painter code and nothing you do reaches the shared world.
-`--live` points at the keeper's deskd (port 8794) instead: every press is then a real act, as --as, in the real world.
+By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served on a free port as the
+keeper serves the real one, by a door (door.py) with a deskd behind it, from a copy of THIS directory's desk-shell/
+made at the start, so a worktree sees its own painter code and nothing you do reaches the shared world (--bare: a
+deskd alone, as before the door). `--live` points at the keeper's door (port 8794) instead: every press is then a
+real act, as --as, in the real world.
 
 STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/add, or x,y in CSS pixels, or a CSS
        selector beginning # or . for a part with no key: #term input, .window .titlebar)
@@ -42,8 +44,20 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     desk <line>                  run one desk line as --as in the world this page shows, and print its answer: e.g.
                                  desk "scene command-center open" reads the sizes this page just reported (a1473);
                                  with --live it is a real act in the real world
-    restart | stop | start      stop the throwaway deskd and/or start it again on the same port (not with --live);
-                                 a press while it is stopped is a lost answer, as when deskd restarts mid-send
+    restart | stop | start       stop the throwaway server (the door and its deskd) and/or start it again on the same
+                                 port (not with --live); a press while it is stopped is a lost answer
+    land [fail|painter|bg|done]  as a landing does (a1505): the door starts a deskd that says a new code version (with one
+                                 pretend `land` commit) and switches to it once healthy; `fail`: one that exits before
+                                 answering health; `painter`: one that also changes the painter's own files (the copy
+                                 served here), so the quiet line offers the new screen code; `bg`: the steps after it run
+                                 while it swaps, `land done` waits for it
+    page                         what the page went through since the last `page`: how many times it loaded, painted
+                                 parts made and removed, requests lost, whole scenes received, each scrolling part's
+                                 scroll, focus, whether a menu or float is open, the status line
+    stream                       the world events the page's stream from the door delivered: their ids, any gap or
+                                 duplicate among them, and how far behind the world the last one is
+    js <expression>              the value of a JavaScript expression in the page (awaited), as JSON
+--bare serves the copy from a deskd alone, without the door (as before a1505); `land` then restarts it as the keeper did.
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
 """
@@ -177,10 +191,40 @@ class Page:
 
 
 STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
-         "css", "blur", "events", "resend", "desk", "restart", "stop", "start")
+         "css", "blur", "events", "resend", "desk", "restart", "stop", "start",
+         "land", "page", "js", "stream")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
 SENDS_JS = """(() => { const f = window.fetch; window.__sends = [];
   window.fetch = (u, o) => { if (String(u).startsWith('/api/do') && o && o.body) window.__sends.push(o.body); return f(u, o); }; })();"""
+# a1505: `page` counts what a landing did to the page: loads (kept in sessionStorage, so a reload is counted, not reset),
+# painted parts made and removed, requests that failed, and whole scenes (a body over a few hundred bytes) received;
+# `stream` reads the ids of the world events the door's stream delivered
+PAGE_JS = """(() => { const n = +(sessionStorage.getItem('__loads') || 0) + 1; sessionStorage.setItem('__loads', n);
+  const c = window.__page = { made: 0, gone: 0, lost: 0, scenes: 0 }, f = window.fetch;
+  const keyed = x => x.nodeType === 1 ? (x.dataset && x.dataset.key ? 1 : 0) + x.querySelectorAll('[data-key]').length : 0;
+  new MutationObserver(ms => { for (const m of ms) { m.addedNodes.forEach(x => c.made += keyed(x)); m.removedNodes.forEach(x => c.gone += keyed(x)); } })
+    .observe(document, { childList: true, subtree: true });
+  const ES = window.EventSource, ids = window.__stream = { ids: [], door: 0, opened: 0 };
+  if (ES) window.EventSource = function (u, o) { const es = new ES(u, o); ids.opened++;
+    es.addEventListener('world', m => ids.ids.push(+m.lastEventId)); es.addEventListener('door', () => ids.door++); return es; };
+  if (ES) Object.assign(window.EventSource, { CONNECTING: 0, OPEN: 1, CLOSED: 2 });
+  window.fetch = (u, o) => f(u, o).then(r => { if (String(u).startsWith('/api/scene')) r.clone().text().then(t => { if (t.length > 400) c.scenes++; });
+    return r; }, e => { c.lost++; throw e; }); })();"""
+PAGE_READ = r"""(() => { const c = window.__page || {}, out = [`loads ${sessionStorage.getItem('__loads')}, parts made ${c.made} removed ${c.gone}, requests lost ${c.lost}, whole scenes ${c.scenes}`];
+  for (const e of document.querySelectorAll('#paint [data-scroll]')) if (e.scrollHeight > e.clientHeight + 1) out.push(`  ${e.dataset.key} scrolled ${Math.round(e.scrollTop)} of ${e.scrollHeight - e.clientHeight}`);
+  for (const e of document.querySelectorAll('#paint [contenteditable]')) if (e.innerText.trim() && e.innerText.trim() !== ((e._n && e._n.paint && e._n.paint.text) || '').trim()) out.push(`  ${e.dataset.key} holds ${JSON.stringify(e.innerText.trim().slice(0, 60))}`);
+  const a = document.activeElement; out.push(`  focus ${a && a.dataset && a.dataset.key || (a ? a.tagName : 'nothing')}; menu ${document.getElementById('menu-pop') ? 'open' : 'closed'}; open floats ${document.querySelectorAll('.l-float:not([data-folded="1"])').length}`);
+  const d = document.getElementById('door'); if (d && !d.hidden) out.push(`  quiet line: ${d.innerText.split('\n')[0].slice(0, 200)}`);
+  if (window.__page) Object.assign(window.__page, { made: 0, gone: 0, lost: 0, scenes: 0 });
+  return out.join('\n'); })()"""
+STREAM_READ = r"""(async () => { const st = window.__stream; if (!st || !st.opened) return 'stream: this page opened none (no door?)';
+  const ids = st.ids, gaps = [], dups = [];
+  for (let k = 1; k < ids.length; k++) { if (ids[k] === ids[k - 1]) dups.push(ids[k]); else if (ids[k] !== ids[k - 1] + 1) gaps.push(`${ids[k - 1]}->${ids[k]}`); }
+  const s = new URLSearchParams(location.search).get('session');
+  const total = (await (await fetch(`/api/events?session=${s}&since=999999999`)).json()).total;
+  const behind = ids.length ? total - ids[ids.length - 1] : null;
+  return `stream: ${st.opened} opened, ${ids.length} world events (ids ${ids[0] || '-'}..${ids[ids.length - 1] || '-'}), gaps ${gaps.length ? gaps.join(' ') : 'none'}, `
+    + `duplicates ${dups.length ? dups.join(' ') : 'none'}; the world has ${total}${behind === null ? '' : `, the stream is ${behind} behind`}; door news ${st.door}`; })()"""
 EVENTS_JS = r"""
 (async (n) => {
   const s = new URLSearchParams(location.search).get('session');
@@ -215,6 +259,7 @@ async def run(url, steps, size, shots, restart=None, still=False):
             if still:
                 await p.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
             await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
+            await p.call("Page.addScriptToEvaluateOnNewDocument", source=PAGE_JS)
             await p.call("Page.navigate", url=url)
             for _ in range(100):                          # the painter has drawn when a keyed part exists, or it refused
                 await asyncio.sleep(0.2)
@@ -352,6 +397,28 @@ async def run(url, steps, size, shots, restart=None, still=False):
                         raise RuntimeError(f"{s}: only the throwaway deskd can be stopped or started (not with --live)")
                     restart(s)
                     print({"restart": "deskd restarted", "stop": "deskd stopped", "start": "deskd started"}[s])
+                elif s == "land":
+                    if not restart:
+                        raise RuntimeError("land: only the throwaway deskd can be replaced (not with --live)")
+                    mode = steps[i] if i < len(steps) and steps[i] in ("fail", "painter", "bg", "done") else ""
+                    i += bool(mode)
+                    if mode == "done":           # the landing begun with `land bg`: wait for it and say how it went
+                        print(await p.landing if getattr(p, "landing", None) else "land done: no landing was begun with land bg")
+                        p.landing = None
+                        continue
+                    job = asyncio.get_running_loop().run_in_executor(None, restart, mode if mode in ("fail", "painter") else "land")
+                    if mode == "bg":             # the steps after it run while the door is swapping (a shot 'during')
+                        p.landing = job
+                        print("landing begun; the next steps run while it goes (land done waits for it)")
+                    else:
+                        print(await job)
+                elif s == "page":
+                    print(await p.js(PAGE_READ))
+                elif s == "stream":
+                    print(await p.js(STREAM_READ))
+                elif s == "js":
+                    print(json.dumps(await p.js(arg()), ensure_ascii=False, default=str)[:2000])
+                    i += 1
                 else:
                     raise RuntimeError(f"unknown step {s!r}; see python screen.py --help")
     finally:
@@ -369,7 +436,7 @@ def main():
         print(__doc__)
         return
     world, who, lens, size, live, steps = a[0], None, "command-center", (1500, 900), False, []
-    page, term, still = "lens", False, False
+    page, term, still, bare = "lens", False, False, False
     k = 1
     while k < len(a):
         if a[k] == "--reduced-motion":
@@ -388,6 +455,8 @@ def main():
             size, k = tuple(int(x) for x in a[k + 1].lower().split("x")), k + 2
         elif a[k] == "--live":
             live, k = True, k + 1
+        elif a[k] == "--bare":
+            bare, k = True, k + 1
         else:
             steps.append(a[k])
             k += 1
@@ -406,17 +475,54 @@ def main():
             copy = HERE / "sessions" / f"{session}.pickle"
             shutil.copy(src, copy)
             port = free_port()
-            srv = subprocess.Popen([PY, "deskd.py", str(port)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            wait_http(f"http://127.0.0.1:{port}/lens.html")
+            # a1505: served as the keeper serves it, through a door (door.py) with its own deskd behind it, its news
+            # kept in a temporary directory, and the painter from a copy of this checkout's desk-shell/ made now, so
+            # `land painter` can change it without touching files any other page is served from. --bare: a deskd alone
+            state = tempfile.mkdtemp(prefix="screen-door-")
+            shell = Path(state) / "desk-shell"
+            shutil.copytree(HERE / "desk-shell", shell)
+            serve = (lambda: [PY, "deskd.py", str(port)]) if bare else \
+                (lambda: [PY, "door.py", str(port), "--no-git", "--state", state, "--static", str(shell)])
+            srv = subprocess.Popen(serve(), cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            wait_http(f"http://127.0.0.1:{port}/lens.html", 60)
+            landed = [0]
 
             def restart(how):
                 nonlocal srv
-                if how in ("restart", "stop") and srv.poll() is None:
+                t0 = time.time()
+                if how in ("land", "fail", "painter"):
+                    landed[0] += 1
+                    ver = f"landed-{landed[0]}"
+                if not bare and how in ("land", "fail", "painter"):
+                    # a landing as the door makes one: a new deskd beside the old, switched to once healthy
+                    body = {"code": ver, "commits": [[f"{landed[0]:07x}", f"land a{9000 + landed[0]}: a pretend landing, number {landed[0]}"]]}
+                    if how == "fail":
+                        body["argv"] = ["-c", "raise SystemExit('a landing that does not start')"]
+                    if how == "painter":         # a landing that changes the painter's own code (its copy, here)
+                        with (shell / "lens.js").open("a", encoding="utf-8") as f:
+                            f.write(f"\n// screen.py: a pretend change to the painter, landing {landed[0]}\n")
+                    req = urllib.request.Request(f"http://127.0.0.1:{port}/door/swap", json.dumps(body).encode(), {"Content-Type": "application/json"})
+                    with urllib.request.urlopen(req, timeout=300) as f:
+                        r = json.loads(f.read())
+                    return (f"landed {ver}: the door switched to it after {time.time() - t0:.1f} s" if r["ok"] else
+                            f"landed {ver}, refused after {time.time() - t0:.1f} s: {r['why']}; the door kept {r['code']}")
+                if how in ("restart", "stop", "land", "fail", "painter") and srv.poll() is None:
                     srv.terminate()
                     srv.wait()
                 if how in ("restart", "start") and srv.poll() is not None:
-                    srv = subprocess.Popen([PY, "deskd.py", str(port)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    wait_http(f"http://127.0.0.1:{port}/lens.html")
+                    srv = subprocess.Popen(serve(), cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    wait_http(f"http://127.0.0.1:{port}/lens.html", 60)
+                if how in ("land", "fail", "painter"):
+                    # --bare: as keeper.py did on a landing before the door: stop deskd, start one that says a new version
+                    run_it = ("raise SystemExit('a landing that does not start')" if how == "fail" else
+                              "import os, sys, deskd; from http.server import ThreadingHTTPServer as T; "
+                              "T(('127.0.0.1', int(sys.argv[1])), deskd.Handler).serve_forever()")
+                    srv = subprocess.Popen([PY, "-c", run_it, str(port)], cwd=HERE, env={**os.environ, "DESKD_CODE": ver},
+                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if how == "fail":
+                        return f"landed a deskd that does not start: nothing answers now ({time.time() - t0:.1f} s)"
+                    wait_http(f"http://127.0.0.1:{port}/api/version")
+                    return f"landed {ver}: nothing answered for {time.time() - t0:.1f} s"
         if page == "shell":
             q, what, file = urllib.parse.urlencode({"session": session, "as": who}), "the windowed shell", "index.html"
         else:
@@ -428,6 +534,9 @@ def main():
         if srv:
             srv.terminate()
             srv.wait()
+            if not bare:
+                time.sleep(3.5)                 # the door's deskd goes within 3 s of the door (deskd.py, DESKD_PARENT)
+            shutil.rmtree(state, ignore_errors=True)
         if copy:
             for p in copy.parent.glob(copy.stem + "*"):
                 p.unlink(missing_ok=True)

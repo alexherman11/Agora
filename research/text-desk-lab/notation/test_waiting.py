@@ -1,6 +1,14 @@
-"""test_waiting (a1062, talk step 3e): a mention waits for waking; waking is its own act.
+"""test_waiting (a1062, talk step 3e; a1566): a resident's @ knocks; a line kept for a resident comes first, marked.
 
     python test_waiting.py [world]      default frontier-try; it CHANGES the world it is given, so give it a copy
+
+a1062 held a resident's @name for the named one's next wake, and made waking a second act; a1566 (Alex, e3710, e3802:
+'a resident's @ should knock') reverses the hold: an @name or @everyone from anyone wakes a resting resident now, the
+line still first in that wake under 'for you while you rested', and the speaker's receipt says whom the line took
+('to: pike', 'to: nobody') and per name what happened ('Pike: woken'). An @ counts only outside quotes and backticks
+(a916; Sable's scope change to a1566, matching a1570's addressing). What still waits: a resident's plain line in
+another's own corner chat (a visitors' book), and anything for someone asleep (want=rest). `wake <name>` still calls
+without a line.
 
 It drives House.step, the house's own pass, with stand-in residents that keep what the house would send instead of
 writing to a claude process (no model is called, no worker is started). The house's heartbeat is written as it runs,
@@ -54,7 +62,7 @@ H = house.House(WORLD)
 H.workshop.step = lambda *a, **k: None               # no workers in a test
 w = H.load()
 by_actor = {(n.get("props") or {}).get("actor"): fid for fid, n in H.corners(w).items()}
-PIKE, JUNIPER = by_actor["pike"], by_actor["juniper"]
+PIKE, JUNIPER, SABLE = by_actor["pike"], by_actor["juniper"], by_actor["sable"]
 
 
 def app_titled(title):
@@ -94,8 +102,10 @@ def rest(rid, seconds):
     H.rest(res(rid), seconds, "a test")
     res(rid).state["last_turn"] = house.now()
     H.step()
+    res(rid).sent.clear()
 
 
+OLD = "they'll see this when they wake"     # a1062's receipt; untrue since a1566, so never said
 t0 = time.time()
 out = H.act("alex", f"look {DESKTOP} :1; do prop {DESKTOP} person=alex")
 check("the Desktop records its person (person=alex)", "person=alex" in out or "already has that" in out, out)
@@ -104,117 +114,159 @@ H.step()
 for rid in H.residents:
     res(rid).sent.clear()
 
-# 1. Pike rests an hour; Juniper says a line with @pike; Pike stays resting
+# 1. Pike rests an hour; Juniper's @pike wakes him now; the line comes first, marked for him
 rest(PIKE, 3600)
-until = time.strftime("%H:%M", time.localtime(res(PIKE).state["rest_until"]))
 got = say("juniper", "@pike the lens you asked about is on the board")
-check("Juniper's receipt says Pike is resting and when he'll see it",
-      f"Pike is resting until {until}; they'll see this when they wake" in got and "wake pike" in got
-      and "no need to say so" in got, got)
-H.step()
-check("Pike stays resting: nothing sent, the line is kept for him", not res(PIKE).sent
-      and len(res(PIKE).state.get("for_you") or []) == 1 and res(PIKE).state.get("rest_until"), res(PIKE).state)
-
-# 2. at Pike's next wake the line is first, marked for you, with its chat and time
-res(PIKE).state["rest_until"] = house.now() - 1
+check("Juniper's receipt: 'to: pike', 'Pike: woken', and not a1062's wording",
+      "to: pike" in got and "Pike: woken" in got and OLD not in got, got)
 H.step()
 got = sent(PIKE)
 lines = got.splitlines()
-check("at the wake: 'for you while you rested' comes first, before the wake's own look",
-      len(lines) > 3 and lines[0].startswith("You are pike.") and lines[1].startswith("(you rested")
-      and lines[2] == "for you while you rested (1):" and "Lounge talk" in lines[3] and "@pike the lens" in lines[3]
-      and re.search(r"~ \d\d:\d\d in chat", lines[3]), got[:900])
+check("Juniper's @pike reaches Pike at once, and his rest ends", "@pike the lens" in got
+      and not res(PIKE).state.get("rest_until") and not res(PIKE).state.get("for_you"), (got[:600], res(PIKE).state.get("rest_until")))
+check("the line comes first, under 'for you while you rested', with its chat and time",
+      len(lines) > 1 and lines[0] == "for you while you rested (1):" and "Lounge talk" in lines[1]
+      and "@pike the lens" in lines[1] and re.search(r"~ \d\d:\d\d in chat", lines[1]), got[:600])
 
-# 3. wake pike ends his rest; his wake names Juniper and the line
-rest(PIKE, 0)
-got = say("juniper", "@pike one more thing, when you're up")
-check("an untimed rest: the receipt says the latest the line waits", re.search(r"Pike is resting, until \S+ at the latest; they'll see", got), got)
+# 1b. an @ inside quotes or backticks knocks no one, and the receipt says whom it took (Sable, a1566 scope change)
+rest(PIKE, 3600)
+for line in ['Sable wrote "@pike (e3305) see the board" yesterday', "the `@pike` handle is the old one",
+             "she said '@everyone, stand up' and left"]:
+    got = say("juniper", line)
+    check(f"a quoted @ takes no one: {line[:30]}...", got.count("to: nobody (an @ inside quotes") == 1
+          and "woken" not in got, got)
 H.step()
-check("still resting before the wake", not res(PIKE).sent, sent(PIKE))
-got = H.act("juniper", "wake pike")
-check("wake pike: signed by Juniper, the house calls them now", re.search(r"ok e\d+: you wake Pike", got) and "calls them now" in got, got)
-ev = H.load().events[-1]
-check("the wake is a call= on Pike's corner, by juniper, via=wake", ev["verb"] == "prop" and ev["target"] == PIKE
-      and ev["by"] == "juniper" and ev.get("via") == "wake" and ev["args"].get("call") == "juniper", ev)
+check("and Pike is not woken, nor anything kept for him", not res(PIKE).sent and not res(PIKE).state.get("for_you")
+      and res(PIKE).state.get("rest_until"), (sent(PIKE)[:300], res(PIKE).state.get("for_you")))
+got = say("juniper", 'about "the board": @pike, look')
+check("an @ outside quotes in a line that also quotes: 'to: pike', woken", "to: pike" in got and "Pike: woken" in got, got)
 H.step()
-got = sent(PIKE)
-check("Pike's wake names Juniper and the line she left", got.startswith("~ juniper woke you (wake, e")
-      and "for the line they left you:" in got.splitlines()[0] and "one more thing" in got.splitlines()[1], got[:600])
-check("the call is cleared once delivered", "call" not in (H.load().nodes[PIKE].get("props") or {}), H.load().nodes[PIKE].get("props"))
+check("and it wakes him", "about" in sent(PIKE) and not res(PIKE).state.get("rest_until"), res(PIKE).state)
+got = say("juniper", "mail me at someone@example.org")
+check("an @ that names no resident: 'to: nobody', no quote excuse", "to: nobody" in got and "inside quotes" not in got, got)
+
+# 2. a resident's plain line in Pike's own book is a note at the door: it waits; wake pike calls him for it
+if BOOK:
+    rest(PIKE, 0)
+    got = say("juniper", "left you the notes from this morning", BOOK)
+    check("a plain book line: 'to: pike', resting, the line waits, with how to call him", "to: pike" in got
+          and re.search(r"Pike: resting, until \S+ at the latest; a plain line", got) and "wake pike" in got and OLD not in got, got)
+    H.step()
+    check("the book line waits for his wake", not res(PIKE).sent
+          and any("left you the notes" in h["text"] for h in res(PIKE).state.get("for_you") or []), res(PIKE).state.get("for_you"))
+    got = H.act("juniper", "wake pike")
+    check("wake pike: signed by Juniper, the house calls them now", re.search(r"ok e\d+: you wake Pike", got) and "calls them now" in got, got)
+    ev = H.load().events[-1]
+    check("the wake is a call= on Pike's corner, by juniper, via=wake", ev["verb"] == "prop" and ev["target"] == PIKE
+          and ev["by"] == "juniper" and ev.get("via") == "wake" and ev["args"].get("call") == "juniper", ev)
+    H.step()
+    got = sent(PIKE)
+    check("Pike's wake names Juniper and the line she left", got.startswith("~ juniper woke you (wake, e")
+          and "for the line they left you:" in got.splitlines()[0] and "notes from this morning" in got.splitlines()[1], got[:600])
+    check("the call is cleared once delivered", "call" not in (H.load().nodes[PIKE].get("props") or {}), H.load().nodes[PIKE].get("props"))
+
+    # a timed rest's end: a held line is first, after who he is and how long he rested, before the wake's own look
+    rest(PIKE, 3600)
+    say("juniper", "the second page too", BOOK)
+    H.step()
+    res(PIKE).state["rest_until"] = house.now() - 1
+    H.step()
+    got = sent(PIKE)
+    lines = got.splitlines()
+    check("at a timed wake: 'for you while you rested' comes first, before the wake's own look",
+          len(lines) > 3 and lines[0].startswith("You are pike.") and lines[1].startswith("(you rested")
+          and lines[2] == "for you while you rested (1):" and "the second page too" in lines[3], got[:900])
+
+    # an @pike in his book knocks, like anywhere else; a quoted one in his book doesn't
+    rest(PIKE, 3600)
+    say("juniper", "the tag reads `@pike`", BOOK)
+    H.step()
+    check("a quoted @ in his own book doesn't knock", not res(PIKE).sent, sent(PIKE))
+    got = say("juniper", "@pike one more thing", BOOK)
+    check("an @ in his own book: 'Pike: woken'", "Pike: woken" in got, got)
+    H.step()
+    check("and he is woken", "one more thing" in sent(PIKE) and not res(PIKE).state.get("rest_until"), res(PIKE).state)
+else:
+    print("skip Pike's corner has no talk= chat")
 got = H.act("juniper", "wake juniper")
 check("waking yourself is refused", "ERR" in got and "you are awake" in got, got)
 got = H.act("juniper", "wake nobody")
 check("waking no one is refused, and says why", "ERR" in got and "no resident called 'nobody'" in got, got)
 
-# 4. a person's @pike still wakes Pike at once
+# 3. a person's @pike wakes Pike at once, as before
 rest(PIKE, 3600)
 got = say("alex", "@pike can you look at this now?")
-check("Alex's receipt: his line calls Pike now", "Pike was resting; your line calls them now" in got, got)
+check("Alex's receipt: 'Pike: woken'", "to: pike" in got and "Pike: woken" in got, got)
 H.step()
 got = sent(PIKE)
 check("Alex's @pike reaches Pike at once, and his rest ends", "(to you)" in got and "can you look at this now" in got
       and not res(PIKE).state.get("rest_until"), got[:600])
 
-# 5. a resident writing to an awake resident (in a turn) is unchanged
+# 4. to someone in a turn: the receipt says so, and the line goes with what reaches him when it ends
 res(PIKE).busy = True
 H.step()                                                   # the heartbeat now says Pike is working
 got = say("juniper", "@pike while you're at it")
-check("to someone in a turn, the receipt says nothing about resting", "resting" not in got and "asleep" not in got, got)
+check("to someone in a turn: 'Pike: in a turn; your line goes with what reaches them when it ends'",
+      "Pike: in a turn; your line goes with what reaches them when it ends" in got and "woken" not in got, got)
 res(PIKE).busy = False
 H.after_turn(H.load(), res(PIKE), H.load().nodes[PIKE], "pike", "Thinking, nothing done yet.")
 got = sent(PIKE)
 check("it goes with what reaches him when his turn ends, marked to you, not kept", "(to you)" in got
       and "while you're at it" in got and not res(PIKE).state.get("for_you"), got[:600])
 
-# 6. a visitors' book line from a resident is a note at the door; from a person, a knock
+# 5. a person's line in Pike's own chat wakes him at once; a held book line comes first
 rest(PIKE, 3600)
 if BOOK:
-    got = say("juniper", "left you the notes from this morning", BOOK)
-    check("a resident's line in Pike's own book: the receipt says he's resting", "Pike is resting until" in got, got)
+    say("juniper", "a plain note for later", BOOK)
     H.step()
-    check("the book line waits for his wake", not res(PIKE).sent and any("left you the notes" in h["text"] for h in res(PIKE).state.get("for_you") or []), res(PIKE).state.get("for_you"))
-else:
-    print("skip Pike's corner has no talk= chat")
 TALK = app_titled("Talk with Alex, Pike")
 got = say("alex", "are you there?", TALK)
+check("Alex's line in Pike's own chat: 'Pike: woken'", "Pike: woken" in got, got)
 H.step()
 got = sent(PIKE)
 check("Alex's line in Pike's own chat wakes him at once, the held book line first", "are you there?" in got
       and (not BOOK or got.index("for you while you rested") < got.index("are you there?")), got[:800])
 
-# 7. @everyone: resting residents get it at their next wake
+# 6. @everyone wakes each resting resident it reaches, each named in the receipt
 rest(PIKE, 3600)
-SABLE = by_actor["sable"]
 rest(SABLE, 3600)
 got = say("juniper", "@everyone the suite is green again")
-check("@everyone: the receipt names each resting resident", "Pike is resting until" in got and "Sable is resting until" in got, got)
+check("@everyone: the receipt names each, woken", re.search(r"to: .*pike", got) and re.search(r"to: .*sable", got)
+      and "Pike: woken" in got and "Sable: woken" in got and OLD not in got, got)
 H.step()
-check("@everyone waits for both", not res(PIKE).sent and not res(SABLE).sent
-      and any("suite is green" in h["text"] for h in res(SABLE).state.get("for_you") or []), (res(PIKE).sent, res(SABLE).sent))
+p, s = sent(PIKE), sent(SABLE)
+check("@everyone reaches both now, first and marked", "suite is green" in p and "suite is green" in s
+      and p.startswith("for you while you rested") and s.startswith("for you while you rested"), (p[:300], s[:300]))
 
-# 8. an agent (no corner, no person record) waits too; a plain line wakes no one and is not marked for you
-got = say("claude", "@pike a note from outside")
-check("an agent's @pike: the receipt says Pike is resting", "Pike is resting until" in got, got)
+# 7. an agent's (no corner, no person record) @pike knocks too; a plain line wakes no one and is not marked for him
+rest(PIKE, 3600)
 got = say("juniper", "a plain line in the lounge")
-check("a line that calls no one says nothing about resting", "resting" not in got, got)
+check("a line with no @ that calls no one says nothing about anyone", "to:" not in got and "woken" not in got, got)
 H.step()
-held = [h["text"] for h in res(PIKE).state.get("for_you") or []]
-check("the agent's line is held; the plain line is not marked for him", not res(PIKE).sent
-      and any("a note from outside" in h for h in held) and not any("a plain line" in h for h in held), held)
-res(PIKE).state["rest_until"] = house.now() - 1
+check("the plain line wakes no one", not res(PIKE).sent and res(PIKE).state.get("rest_until"), sent(PIKE))
+got = say("claude", "@pike a note from outside")
+check("an agent's @pike: 'Pike: woken'", "Pike: woken" in got, got)
 H.step()
 got = sent(PIKE)
-first = got.split("for you while you rested", 1)
-check("at his wake: both held lines first, the plain lounge line after the wake's look",
-      len(first) == 2 and "suite is green" in got and "a note from outside" in got
-      and got.index("a note from outside") < got.index("a plain line in the lounge"), got[:1200])
+check("the agent's line first and marked; the plain lounge line after it, not marked",
+      got.startswith("for you while you rested (1):") and "a note from outside" in got.splitlines()[1]
+      and got.index("a note from outside") < got.index("a plain line in the lounge"), got[:800])
+
+# 8. a resident's @pike in a comment (not a chat) knocks too
+rest(PIKE, 3600)
+got = H.act("juniper", f"do comment {LOUNGE} line=\"@pike see the lounge\"")
+H.step()
+got2 = sent(PIKE)
+check("a comment's @pike wakes him, the mention first", got2.startswith("for you while you rested (1):")
+      and "mentioned you" in got2 and "see the lounge" in got2, (got, got2[:600]))
 
 # 9. asleep (want=rest): a line waits, and a wake waits for someone to set want=awake; the call is then delivered,
 # first, and cleared, so the next wake is a change again
 H.act("alex", f"look {PIKE} :1; do prop {PIKE} want=rest")
 H.step()
 got = say("juniper", "@pike for when you're back")
-check("to someone asleep, the receipt says so", "Pike is asleep" in got and "they'll see this when they wake" in got, got)
+check("to someone asleep, the receipt says so, and not 'woken'", "Pike: asleep (want=rest)" in got
+      and "want=awake" in got and "woken" not in got and OLD not in got, got)
 got = H.act("juniper", "wake pike")
 check("wake pike while asleep: the call waits for want=awake, and says so", "asleep (want=rest)" in got and "waits" in got, got)
 H.step()

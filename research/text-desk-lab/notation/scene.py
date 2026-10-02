@@ -1913,6 +1913,12 @@ def emit(node):
     return node
 
 
+# a1505: the shape of what painter_view sends. A page keeps the painter it loaded until its person asks for the new one
+# (the door's quiet line), so a change here that an older lens.js can't read must raise this number; a page whose
+# lens.js (const SHAPE) reads another shape then reloads on its own, carrying its view, and says why.
+PAINTER_SHAPE = 1
+
+
 def painter_view(node):
     """The node as the painter should see it: key, paint, acts, fence, kids, and nothing else."""
     out = {"key": node["key"], "paint": node.get("paint"), "acts": node.get("acts") or [], "kids": [painter_view(k) for k in node.get("kids") or []]}
