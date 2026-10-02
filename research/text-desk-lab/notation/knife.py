@@ -42,6 +42,11 @@ def _leaves(w, fid):
     return out
 
 
+# the selection terms parse_selection reads; the Help binder's selections note must name each (helpnotes.check, a1595)
+TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:",
+         "answered-by:", "unanswered:")
+
+
 def parse_selection(w, token, trash=False):
     """Return (ids, description) or None if token is a plain id. What is inside a Trash (moo.trash_surfaces) is left out
     unless an in: term names the Trash or a surface inside it, or trash=True (a1327)."""
@@ -51,8 +56,7 @@ def parse_selection(w, token, trash=False):
     terms = [t for t in re.split(r"[,\s]+", token) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
-    KNOWN = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:",
-             "answered-by:", "unanswered:")
+    KNOWN = TERMS
     for t in terms:
         # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
         if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):

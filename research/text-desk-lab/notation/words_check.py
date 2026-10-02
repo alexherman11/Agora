@@ -136,7 +136,12 @@ def main():
     builtin = d._builtin_verbs()
     import scene
     lens_words = {x.strip().split()[0] for x in scene.vocabulary().replace("|", ",").split(",") if x.strip()}
+    import helpnotes
+    examples = {s["id"] for _, s, _ in helpnotes.entries(w)}
     for where, text in world_texts(w):
+        # a1595: help's own notes (the Help binder, in the Handbook) show example ids (do move a04 into=f02), which
+        # name nothing on purpose; helpnotes.check holds those notes to the code instead
+        example = any(f" {a} " in where + " " for s in examples for a in w.appearances_of(s))
         for word in [x for t in TICKED.findall(text) for x in HELP_WORD.findall(t)]:     # prose says 'help take care'
             if word in PROSE:
                 continue
@@ -144,12 +149,12 @@ def main():
             ok, t = ask(f"help {word}")
             if not ok:
                 note("help <word> named in the world's own text", word, where, first_line(t))
-        for rid in ID.findall(text):
+        for rid in ID.findall(text) if not example else ():
             checked += 1
             ok, t = ask(f"examine {rid}")
             if not ok:
                 note("an id the world's own text prints", rid, where, first_line(t))
-        for h in HASHISH.findall(text):
+        for h in HASHISH.findall(text) if not example else ():
             if not any(c.isdigit() for c in h) or h.isdigit() or not any(c.isalpha() for c in h):
                 continue
             checked += 1

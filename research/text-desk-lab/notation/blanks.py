@@ -295,21 +295,4 @@ def made_by(events):
     return out
 
 
-HELP = """blanks: words beginning with $ that the desk fills with a value when the line runs.
-  $here          the room you are in; $here.<prop> a prop of it: $here.talk its chat, $here.describe its note
-                 (in a rule: the room the rule lives in, where its author saved it)
-  $new           the thing made most recently earlier in this reply (a note, task, surface, view ...; if one line
-                 made several, the last). Only this reply: in a reply where nothing was made yet it refuses and
-                 says why. The receipt ends ($new = <id>), so you see which thing it was
-  $today         the clock's date          $me   who you are          $<name>   a handle (help handles)
-  in a verb: $1 $2 .. its words, $* the rest of the line exactly as said, $this the thing a verb lives on
-  in a rule: $item the thing it fired on
-  parts of a thing a blank names ($1 $item $new $this or a handle): .title its title, .maker who made it, .<prop>
-                 one of its props ($item.asked_by); a part it doesn't have refuses
-  Text is words by default: an argument a verb declares as text (help append: line=<str>; old= new= title= text=)
-  is never filled in a typed line, so a chat line about $here keeps its words. Targets, selections and ids are
-  filled: do move a12 into=$here. A prop value fills only when the whole value is one blank (do prop f581
-  describe=$new); a blank inside other words (next="check $today") stays as typed, and the receipt says so. Inside a verb, a script or a rule (templates their author wrote), text values are filled
-  too, once: what a blank becomes is never filled again. A literal dollar sign is \\$, in both.
-  A blank that can't be filled refuses; nothing stores a blank's own name. A receipt shows the value, not the blank.
-  e.g. do create $here kind=note title=Plan   then   do link $new $here.describe"""
+# a1595: help blanks / help verbs live in the world now, as notes in the Help binder (helpnotes.py)
