@@ -5,7 +5,8 @@ the writer's stored word.
 
 Builds its own small world in memory (roomworld.py) and never saves it; every desk line runs through the desk's own
 dispatch, as explore.py and deskd call it. Checks: a line's id, chat, to and its by and at read from its event; @name
-outside quotes is stored as to=, a quoted @ addresses nobody, to= overrides, and the receipt says which; For you
+opening a line (its header, a2715) is stored as to= and a later @ is a mention the receipt names, a quoted @
+addresses nobody, the writer is never in their own to=, to= overrides, and the receipt says which; For you
 (inbox:) reads to=, not the words; one press never makes two lines; a changed line says 'edited' and keeps its
 words; a chat from before lines becomes lines in one event, an unknown line says 'by unknown, at unknown', and
 undoing that event puts the chat back as it was.
@@ -72,13 +73,39 @@ by, at = W.line_by_at(first)
 check("by and at are read from the event that made the line", by == "sable" and at[:4].isdigit(), (by, at))
 
 # ---- addresses: the writer's word, stored when written ---------------------------------------------------------
-t = say("sable", f'do append {TALK} line="@pike could you look at this? and @Juniper too"')
+t = say("sable", f'do append {TALK} line="@pike and @Juniper, could you look at this? as @alex said"')
 mid, to = made(t)
-check("append reads @name outside quotes as to=, and the receipt says so", mid and to == "pike, juniper", t)
+check("append reads the header's @names as to=, and the receipt names the mention after it (a2715)",
+      mid and to == "pike, juniper; a mid-line @ is a mention (@alex); put names first to call them", t)
 t = say("juniper", f"do append {TALK} line=\"as Pike wrote, '@sable (e3305)' and `@pike` are quoted\"")
 qid, qto = made(t)
-check("a quoted @ addresses nobody, and the receipt says 'to: nobody' and why (a2662)",
-      qid and qto == "nobody (an @ inside quotes or backticks calls no one)", t)
+check("a quoted @ addresses nobody, and the receipt says 'to: nobody' with no mention to teach (it was quoted on purpose)",
+      qid and qto == "nobody", t)
+
+# ---- a2715: the address is the header; an @ later is a mention -------------------------------------------------
+t = say("juniper", f'do append {TALK} line="Juniper, @sable @pike: hi"')
+check("(i) 'Juniper, @sable @pike: hi' is to: sable, pike (the writer's own name may sign the header)", made(t)[1] == "sable, pike", t)
+t = say("juniper", f'do append {TALK} line="thanks, @sable, that is right"')
+check("(ii) 'thanks, @sable, that is right' is to: nobody, and the receipt says the mention",
+      made(t)[1] == "nobody; a mid-line @ is a mention (@sable); put names first to call them", t)
+t = say("juniper", f'do append {TALK} line="see my line to @alex @pike about it"')
+check("(iii) 'my line to @alex @pike' mid-sentence calls no one",
+      made(t)[1] == "nobody; a mid-line @ is a mention (@alex, @pike); put names first to call them", t)
+t = say("juniper", f'do append {TALK} line="@juniper @pike: note to self and Pike"')
+check("(iv) the writer's own @name is never in their to=", made(t)[1] == "pike", t)
+t = say("juniper", f'do append {TALK} line="Juniper: Juniper, @sable hi"')
+check("a typed 'Juniper:' is dropped and a following 'Juniper,' still signs", made(t)[1] == "sable", t)
+t = say("juniper", f'do append {TALK} line="Pike, @sable: what do you think"')
+check("someone else's name before the @ is a first word: the @ after it is a mention",
+      made(t)[1].startswith("nobody; a mid-line @ is a mention (@sable)"), t)
+t = say("juniper", f'do append {TALK} line="@sable\'s idea is good"')
+check("a possessive '@sable\\'s' opening a line talks about her: a mention, not a call", made(t)[1].startswith("nobody; a mid-line"), t)
+t = say("juniper", f'do append {TALK} line="@sable or @pike, whoever is free: a look?"')
+check("'or' and 'and' join names in a header", made(t)[1] == "sable, pike", t)
+t = say("juniper", f'do append {TALK} line="@pike: as @sable said, @pike is right"')
+check("a header name mentioned again later is not taught as a mention", made(t)[1] == "pike; a mid-line @ is a mention (@sable); put names first to call them", t)
+t = say("juniper", f'do append {TALK} line="thanks, @sable" to=sable')
+check("to= said outright overrides the header, and no mention is taught", made(t)[1] == "sable", t)
 t = say("pike", f'do append {TALK} line="@sable this is really for Juniper" to=juniper')
 oid, oto = made(t)
 check("to= overrides what the words say", oto == "juniper", t)
@@ -90,7 +117,7 @@ check("an @ inside a word (an address) names no one", made(t)[1] == "nobody", t)
 # ---- examine <line id> ---------------------------------------------------------------------------------------------
 t = say("alex", f"examine {mid}")
 check("examine <line id> names its chat, by, at and to",
-      f"a chat line in \"{S['title']}\"" in t and "by sable · at 20" in t and "to: pike, juniper" in t and "@pike could you" in t, t)
+      f"a chat line in \"{S['title']}\"" in t and "by sable · at 20" in t and "to: pike, juniper" in t and "@pike and @Juniper, could you" in t, t)
 check("read and look of a line id print the same", say("alex", f"read {mid}") == t == say("alex", f"look {mid}"), say("alex", f"read {mid}"))
 t = say("alex", f"history {mid}")
 check("history <line id> lists the event that made it", W.find_line(mid)[1]["ev"] in t, t)
@@ -172,7 +199,7 @@ BT = R.TALK[R.BOARD]
 bsid = W.nodes[BT]["subject"]
 B = W.subjects[bsid]
 B.pop("lines")                     # as every chat was before a1581
-B["text"] += "\nSomeone: a line no event made"
+B["text"] += "\nSomeone: a line no event made, for @pike"
 was = copy.deepcopy(B)
 n_ev = len(W.events)
 t = say("alex", "look")
@@ -184,7 +211,9 @@ bl = B.get("lines") or []
 check("the appended line got its event; the other says by unknown", len(bl) == 2 and bl[0]["ev"] and bl[1]["ev"] is None, bl)
 t = say("alex", f"examine {bl[1]['id']}")
 check("examine of a line no event made says 'by unknown, at unknown'", "by unknown, at unknown" in t, t)
-check("the migration event counts the lines it addressed", mig[0]["args"] == {"lines": 2, "addressed": 0, "unknown": 1}, mig[0]["args"])
+check("the migration event counts the lines it addressed", mig[0]["args"] == {"lines": 2, "addressed": 1, "unknown": 1}, mig[0]["args"])
+check("(v) an old line keeps the address of the rule it was written under: its mid-line @pike (a2715 re-reads no history)",
+      bl[1]["to"] == ["pike"], bl)
 say("alex", f"undo {mig[0]['id']}")
 B = W.subjects[bsid]                # undo puts back the subject as it was: a new record
 now = copy.deepcopy(B)

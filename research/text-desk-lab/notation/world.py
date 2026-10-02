@@ -53,15 +53,62 @@ def unquoted(text):
 # Stored on the line as `to`, a list of lower-case names; @everyone and @all are kept as written.
 ADDRESS = re.compile(r"(?<![\w@])@([A-Za-z][\w]*(?:-[\w]+)*)")
 
+# a2715 (Pike e4870: 26 of 30 lines put every address first, 4 mid-line @s called someone by mistake): a line's
+# address is its header, the run of @names that opens it, after the world's signature ('Juniper: ') and the writer's
+# own name if they typed one ('Juniper, @sable @pike: hi'). Names in the run may be parted by spaces, commas, 'and',
+# 'or' or '&'; anything else ends it. An @ after the header is a mention: it calls no one, quoted or not.
+SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
+_HEAD_SEP = re.compile(r"(?:[\s,;&+]|\band\b|\bor\b)*", re.I)
+_HEAD_AT = re.compile(r"@([A-Za-z]\w*(?:-\w+)*)(?![\w@'’])")
 
-def addressed(text):
-    """-> the names a line addresses, in the order written, each once."""
+
+def header(text, writer=None):
+    """-> (names, end): the names a line's header addresses, lower-case, in order, each once, and where the header
+    ends in `text`. `writer` is whose own name may open it as a signature; a signed line ('Juniper: ...') says it."""
+    t = str(text)
+    i = 0
+    m = SPEAKER.match(t)
+    if m:
+        writer, i = writer or m.group(1), m.end()
+    if writer:
+        sig = re.compile(r"\s*" + re.escape(str(writer).split("/")[0]) + r"\s*[,:]", re.I).match(t, i)
+        if sig:
+            i = sig.end()
+    names = []
+    while True:
+        m = _HEAD_AT.match(t, _HEAD_SEP.match(t, i).end())
+        if not m:
+            break
+        if m.group(1).lower() not in names:
+            names.append(m.group(1).lower())
+        i = m.end()
+    return names, i
+
+
+def addressed(text, writer=None):
+    """-> the names a line addresses: its header's (a2715), in the order written, each once."""
+    return header(text, writer)[0]
+
+
+def addressed_before(text):
+    """-> the names a line addressed under a1581's rule, which it was written under: every @name outside quotes. Only
+    the migration of a chat's old lines reads this, so history is never re-read by a later rule (a2715)."""
+    return list(dict.fromkeys(m.group(1).lower() for m in ADDRESS.finditer(unquoted(text))))
+
+
+def mentions(text, writer=None):
+    """-> the @names after a line's header, outside quotes and backticks, that its header does not already call: a
+    receipt names them, so a mention meant as a call is never silent."""
+    names, end = header(text, writer)
     out = []
-    for m in ADDRESS.finditer(unquoted(text)):
-        name = m.group(1).lower()
-        if name not in out:
-            out.append(name)
+    for m in ADDRESS.finditer(unquoted(str(text)[end:])):
+        n = m.group(1).lower()
+        if n not in names and n not in out:
+            out.append(n)
     return out
+
+
+MENTION_NOTE = "a mid-line @ is a mention ({}); put names first to call them"
 
 
 def to_names(value):
@@ -187,7 +234,7 @@ class World:
         """a1581: make chat `sid`'s lines things, once, from the text it holds: each line is matched to the append
         event that made it, in order (the earliest unused append whose words are exactly these lines); a line no
         event made is kept with ev None, so it says 'by unknown, at unknown', never a guess. Its address is read
-        by the same rule as a new line's. One event, by the house, said in history; undo puts the chat back.
+        by the rule it was written under (addressed_before, a2715). One event, by the house, said in history; undo puts the chat back.
         -> the event, or None when the chat already has lines."""
         s = self.subjects[sid]
         if s["kind"] != "chat" or "lines" in s:
@@ -210,7 +257,7 @@ class World:
                 i += 1
                 continue
             words = "\n".join(tl[i:i + n])
-            lines.append({"id": self._id("m"), "text": words, "to": addressed(words), "ev": hit["id"] if hit else None})
+            lines.append({"id": self._id("m"), "text": words, "to": addressed_before(words), "ev": hit["id"] if hit else None})
             i += n
         before = deepcopy(s)
         s["lines"] = lines           # the text is not touched: it is these lines joined (blank lines at its ends aside)
@@ -626,7 +673,7 @@ class World:
         return a[:1].upper() + a[1:]
 
     # a chat line's signature: 'Sable: ...', or 'Alex, via rule r3: ...' when an authorless rule added it (group 1 the speaker)
-    SPEAKER = re.compile(r"^([\w-]+)(?:, via rule (\w+))?[ \t]*:[ \t]*")
+    SPEAKER = SPEAKER
 
     def sign_chat_line(self, line, actor):
         """A chat line as the world keeps it: 'Name: words', Name the actor's display name. Returns (line, dropped):
@@ -861,7 +908,9 @@ class World:
             ev = self._event(verb, target, args, {"delete": aid, "delete_subject": sid}, actor)
             if kind == "chat":       # a1581: a chat's text= is its first line, made (and so signed) by this create
                 words = self.subjects[sid]["text"].strip("\n")
-                self.subjects[sid]["lines"] = [{"id": self._id("m"), "text": words, "to": addressed(words), "ev": ev["id"]}] if words else []
+                import rooms
+                first_to = [n for n in addressed(words, actor) if not rooms.same_person(self, n, str(actor).split("/")[0])]
+                self.subjects[sid]["lines"] = [{"id": self._id("m"), "text": words, "to": first_to, "ev": ev["id"]}] if words else []
             r = {"ok": True, "event": ev["id"], "changed": [target, aid], "created": aid,
                  "note": f"new {kind} {sid} placed as {aid}" + (" · " + " ".join(f"{k}={v}" for k, v in props.items()) if props else "")
                          + ("; x= y= w= h= place a thing, they are not props (do prop " + aid + " y=... for a prop)" if {"x", "y", "w", "h"} & set(args) else "")}
@@ -1033,13 +1082,16 @@ class World:
                         signed_note = "the world signs for you; your typed name was dropped"
                     if "lines" in s:
                         # a1581: the line is a thing. Who it addresses is the writer's word, stored now: to= said
-                        # outright, else each @name outside quotes; never read again from the text later
+                        # outright, else the @names of its header (a2715); never read again from the text later
                         to = to_names(line_args["to"]) if "to" in line_args else addressed(line)
-                        # a2662: a name that is no one ('@pikee') is not stored; it is kept on the event and said
+                        # a2715 (Pike e4859): the writer is never in their own to=
                         import rooms
+                        to = [n for n in to if not rooms.same_person(self, n, str(actor).split("/")[0])]
+                        # a2662: a name that is no one ('@pikee') is not stored; it is kept on the event and said
                         no_one = [n for n in to if not rooms.someone(self, n)]
                         to = [n for n in to if n not in no_one]
-                        quoted = not to and not no_one and "to" not in line_args and bool(ADDRESS.search(line))
+                        mentioned = [] if "to" in line_args else \
+                            [n for n in mentions(line) if not rooms.same_person(self, n, str(actor).split("/")[0])]
                         new_line = {"id": self._id("m"), "text": line.strip("\n"), "to": to, "ev": None}
                         if str(line_args.get("reply_to", "")).strip():
                             new_line["reply_to"] = str(line_args["reply_to"]).strip()
@@ -1048,7 +1100,7 @@ class World:
                         args = dict(args, line_id=new_line["id"], to=",".join(to) or "nobody")
                         if no_one:
                             args["no_one"] = ",".join(no_one)
-                        new_line_why = " (an @ inside quotes or backticks calls no one)" if quoted else ""
+                        new_line_why = ("; " + MENTION_NOTE.format(", ".join("@" + n for n in mentioned))) if mentioned else ""
                 s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
         elif verb == "place":
             dest = args.get("into")
