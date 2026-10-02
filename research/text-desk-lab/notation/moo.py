@@ -333,7 +333,8 @@ def v_unfold(w, nid, a):
       "On a chat the world signs the line with your name (type only your words; a 'Name:' of your own is dropped), "
       "and adding a line is never refused as stale, since it replaces nothing; rewriting a chat is still fenced. "
       "A chat line is a thing (m<n>): who it addresses is its header, the @names that open it ('@sable @pike: ...'; "
-      "an @ later is a mention and calls no one), or to=<names> said outright (to=nobody for no one); the receipt "
+      "an @ later is a mention and calls no one), or to=<names> said outright (to=nobody for no one); with neither, "
+      "a line in a private chat (members=<names>, not all) goes to its other members; the receipt "
       "says which, and examine m<n> shows it.",
       "line=<str> [to=<names>] [reply_to=<m id>]", 'do append a18 line="4. Review"')
 def v_append(w, nid, a):
