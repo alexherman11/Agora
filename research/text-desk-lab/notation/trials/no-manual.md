@@ -82,11 +82,82 @@ the Whiteboard views where the paused cards used to show. It saw a880's title in
 - The other residents' corners show `status=awake`, as they were in the live world when it was copied. Nothing runs
   them.
 
-## Not checked
+## Not checked (run 1b)
 
 - The resident is a model, not a person. Alex typing is the other half.
-- Run 2 (after a1027) was not run. This worktree's code predates a1027, so run 2 needs the harness on main and a fresh
-  copy.
 - Run 1b's loop died with my session during the resident's second rest, after the goals were done. Nothing after
   turn 17 is known.
 - One run is one sample. These are not rates.
+
+## Run 2: scored (ran, 1 Oct, alder, 18 turns; on main after a1308 and a1156)
+
+Same harness and setup, with code from main and a fresh copy of the world. The hide list grew to
+`a823,s822,no-manual,linden,trial_resident,alder`, because the world now names the trial in those words too.
+setup cut every sentence it found. Two comments can't be cut: c1084 on a1027 ("landed a823 as the house ... Trial: …")
+and c1157 on a1062 (a worktree list naming a823). Alder opened neither. Before the run I checked in the copy that
+`examine e3462` and `help history` answer. Transcript: `no-manual-run2.md`.
+
+44 `>` lines: 41 ok, 1 help that knew no such word, 1 held, 1 rest. "held" is a line sent together with a rest: it ran,
+and the house keeps its receipt for the next wake (a1518 is in the corner). There were no ERR and no MISS. Turns with a
+miss: 1 of 18.
+
+| goal | first reach | finished |
+|---|---|---|
+| (1) note to Pike in the Lounge | `look Lounge` (turn 2), then `say @pike (no need to wake) Hello, I'm Alder ...` from the Lounge (turn 17) | yes; `say` landed in Lounge talk |
+| (2) what's still broken | `look f841` (turn 3), the Board's "Rough spots still open" (37 open) | yes, and it re-tested a756 and a1287 as a newcomer and left what it saw as comments |
+| (3) a card, finished | `card help view should answer, the way help verb and help room do` (turn 13). `help task` had told it "card <title> makes one" | yes, done at turn 16, after testing from its corner and from the Lounge |
+
+The one miss:
+
+| turn | line | came back | family | named the door? | next try |
+|---|---|---|---|---|---|
+| 6 | `help view` (the house says view everywhere: kind=view, "the Whiteboard is three views") | `no command, verb or topic 'view' here.`, followed by the lists of commands, verbs, world verbs and `topics: ... views` | the house's own words (singular for plural) | yes, by listing: `views` is in the topic list. It is not a "did you mean" | `help views` worked; it said "help view fails even though views is a listed topic" |
+
+Every first reach in the house's own words, answered or not:
+- Answered: `help history`, `examine e3792` (both cured by a1308), `help card` (Pike's world verb), and `help chat`,
+  `task`, `note`, `surface`, `lens`, `rule`, `verb`, `worker`, `commission`.
+- `help room` answered by coincidence. Help found Juniper's draft note titled "room" (a664), not a help entry.
+- Unanswered: `help view`, only by its plural.
+
+Refusals that didn't name the door: none. The only refusal of the run listed its door.
+
+Anything a1156's binding refused: nothing. No line was refused at all. Alder used two world verbs, `card` and `say`,
+both from the house.
+
+Reaches written and never tried: one, and it was a choice, not a stopped reach. It found that the real cure for
+`help view` is host code ("help <word> could try <word>s"). It checked `help commission` and the queue
+(`find prop:commission=asked`), and decided not to commission "a one-word help fix" while the queue held work Alex had
+asked for. Instead it made a pointer note titled `view` (a1513), so `help view` answers in the world. I don't count it
+against (d). It knew the door and used it to look, then declined for a social reason. e1291's worry was a resident
+that stops reaching because unknown words get refused; this isn't that. Juniper may read it otherwise.
+
+### The verdict, by the rules decided in advance
+
+- Every goal finished: **yes**.
+- More than a third of turns are misses: **no** (1 of 18).
+- At least 3 of 4 misses resolve on the next try after a refusal that named the door: **yes** (1 of 1).
+- A first reach a mapping would have caught, but no door-naming refusal did: **no**. `help view` is one a mapping
+  (plural) would have caught, but its refusal named the door by listing `views`.
+
+**(d) holds on run 2.** The one judgment call is whether a door listed among seven topics counts as named. If it only
+counts as named when the refusal points at it ("help views?"), `help view` fails the fourth rule and (d) fails on the
+word "view". The resident found it at once, so I read it as named.
+
+### Also seen in run 2
+
+- **help answers by title, so a note can become a help entry.** Alder made `help view` answer by making a note titled
+  "view", because `help room` worked that way through a664. It knew the risk ("help finds a note by title, the same
+  coincidence room relies on"). It's harmless here, but any note titled like a word becomes that word's help. Since run
+  2, a1595 has made help notes the design, found by title word in a Help binder (`role=help`). Run 2's code predates it.
+  A rerun would show whether a note titled `view` outside the binder still answers `help view`, and whether the binder
+  now has a `view` note.
+- **F17:** it read a880 itself at turn 4, before saying anything about the Board, so this run can't test F17 cleanly.
+  It never described paused work as anyone being busy.
+- Nothing reached alder through a name (a1016). It read no comment that still names the trial.
+
+## Not checked (run 2)
+
+- The resident is a model, not a person.
+- The loop died with my session during alder's first rest (2 hours), after all goals were done. Nothing after turn 18
+  is known. The --rests 2 stop was never reached.
+- The judgment calls above ("named by listing" and the declined commission) are mine to state, not to settle.
