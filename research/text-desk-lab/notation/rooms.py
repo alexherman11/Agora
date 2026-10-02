@@ -225,49 +225,55 @@ def _within(w, node, fid):
 
 
 def waiting_note(desk, nid, text):
-    """a1062: what a chat line's receipt says about the residents it calls who are resting or asleep, or "". A
-    resident's line waits for their next wake, and is shown first there, marked for them; a person's line calls them
-    at once (a resting one; one asleep is not run by the house until someone wakes them). Said every time, so the
-    old '(no need to wake)' habit has nothing left to do."""
+    """a1062, a1566: what a chat line's receipt says about whom it reaches, or "". First whom the line took,
+    'to: pike, sable' (an @ counts only outside quotes and backticks, as the house reads it; a line with an @ that
+    took no one says 'to: nobody', and why when its @ was quoted). Then one line per resident about what happened:
+    'Pike: woken' (an @name or @everyone from anyone, or any line from a person, ends a rest; a1566), 'Pike: in a
+    turn; ...', or why it waits (asleep; the house not running; a resident's plain line in their own corner's chat,
+    which waits for their next wake). A line from a resident or agent is shown first at that wake, marked for them."""
     import scene
+    from world import unquoted
     w = desk.world
     n = w.nodes.get(nid)
     sid = n.get("subject") if n else nid
     who = called_by_line(w, sid, text, w.me)
+    heard = unquoted(text)
     if not who:
-        return ""
-    how = presences(desk)
+        if not re.search(r"@\w", str(text)):
+            return ""                                  # a plain line to no one: nothing to say
+        quoted = not re.search(r"@\w", heard)
+        return "to: nobody" + (" (an @ inside quotes or backticks calls no one)" if quoted else "")
     rows = {r["corner"]: r for r in scene.house_rows(desk)}
-    resting = []
-    for a in who:
-        word = how(a)
-        if word == "asleep":
-            resting.append((a, "asleep", "is asleep (the house doesn't run them)"))
-        elif word.startswith("resting"):
-            wakes = (rows.get(corner_of(w, a)) or {}).get("wakes", "")
-            said = word if word != "resting" else ("resting, until " + wakes + " at the latest" if wakes else "resting")
-            resting.append((a, "resting", "is " + said))
-    if not resting:
-        return ""
     person = kind_of(w, w.me) == "person"
-    out = []
-    for a, how_, said in resting:
-        name = w.display_name(a)
-        if person and how_ == "resting":
-            out.append(f"{name} was resting; your line calls them now")
-        elif person:
-            out.append(f"{name} {said}; they'll see this first when they're woken (wake {a}, or want=awake)")
+    marked = "" if person else ", first and marked for them"
+    out = ["to: " + ", ".join(who)]
+    for a in who:
+        name, row = w.display_name(a), rows.get(corner_of(w, a)) or {}
+        doing = str(row.get("doing", ""))
+        knocks = person or re.search(CALLED.format(names=re.escape(a)), heard, re.I)
+        if asleep(w, a):
+            out.append(f"{name}: asleep (want=rest), so the house doesn't run them; your line waits for them{marked} "
+                       f"until someone sets want=awake")
+        elif not row or doing.startswith("house "):
+            out.append(f"{name}: not woken, the house is not running ({doing or 'no heartbeat'}); your line waits for "
+                       f"them{marked} until it runs")
+        elif doing == "working":
+            out.append(f"{name}: in a turn; your line goes with what reaches them when it ends")
+        elif knocks:
+            out.append(f"{name}: woken")
         else:
-            out.append(f"{name} {said}; they'll see this when they wake, first and marked for them, so there's no need "
-                       f"to say so (wake {a} to call them now)")
+            wakes = row.get("wakes", "")
+            until = doing if doing != "resting" else ("resting, until " + wakes + " at the latest" if wakes else "resting")
+            out.append(f"{name}: {until}; a plain line in their own chat waits for their next wake{marked} "
+                       f"(@{a} or wake {a} to call them now)")
     return "\n  ".join(out)
 
 
 def cmd_wake(desk, arg):
     """a1062: wake <name>: end that resident's rest now. It sets call=<you> on their corner, signed by you (the
     Desktop's wake button sets the same prop); the house delivers it at once, clears it, and their wake says who
-    called and, if you left a line that was held for them, which one. A mention never wakes a resting resident when
-    a resident or agent says it; waking is this act."""
+    called and, if you left a line that was held for them, which one. Since a1566 an @name wakes them too; this is
+    for calling someone without a line."""
     import moo
     w = desk.world
     name = arg.strip().strip("\"'").lstrip("@").split()[0].lower() if arg.strip() else ""

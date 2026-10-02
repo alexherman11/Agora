@@ -266,7 +266,7 @@ class DeskMoo(Desk):
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since
         waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
         if waits:
-            out += f"\n  {waits}"    # a1062: who this line calls is resting, and when they'll see it
+            out += f"\n  {waits}"    # a1566: whom this line took ('to: pike'), and for each what happened ('Pike: woken')
         made = str(r.get("created") or "").split()[:1]
         for c in r.get("changed", []) if not behind else ():
             if c in w.nodes and c != nid:
