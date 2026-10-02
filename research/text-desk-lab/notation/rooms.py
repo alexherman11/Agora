@@ -230,14 +230,26 @@ def members_of(s):
     return {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
 
 
-def calls(w, s, to, actor):
-    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them (in any chat: the
-    address is the writer's word, and membership governs only plain lines), or says @everyone or @all in a chat they
-    are a member of. The house's knock (house.news) and the receipt (waiting_note) both ask this, so they agree."""
-    if any(same_person(w, n, actor) for n in to if n not in EVERYONE):
-        return True
+def member(w, s, actor):
+    """Is `actor` in chat `s`'s members (members=all counts everyone)?"""
     members = members_of(s)
-    return bool(set(EVERYONE) & set(to)) and ("all" in members or str(actor).lower() in members)
+    return "all" in members or any(same_person(w, m, actor) for m in members if m)
+
+
+def can_read(w, s, actor):
+    """a2662 (Sable c2682): a chat whose members= leaves `actor` out is private to its members; one with no members=
+    keeps no one out."""
+    return not (members_of(s) - {""}) or member(w, s, actor)
+
+
+def calls(w, s, to, actor):
+    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them in a chat they can
+    read (the address is the writer's word, so they need not be a member: membership governs plain lines; but a
+    private chat never carries its line out, Sable c2682), or says @everyone or @all in a chat they are a member of.
+    The house's knock (house.news) and the receipt (waiting_note) both ask this, so they agree."""
+    if any(same_person(w, n, actor) for n in to if n not in EVERYONE):
+        return can_read(w, s, actor)
+    return bool(set(EVERYONE) & set(to)) and member(w, s, actor)
 
 
 def book_owners(w, sid):
@@ -320,7 +332,9 @@ def waiting_note(desk, nid, text):
         row = rows.get(corner_of(w, a)) or {}
         doing = str(row.get("doing", ""))
         knocks = calls(w, s, to, a) or (person and a in owners)
-        if asleep(w, a):
+        if a not in owners and not can_read(w, s, a):
+            out.append(f"{name}: can't read this chat (members={(s.get('props') or {}).get('members')}); not knocked")
+        elif asleep(w, a):
             out.append(f"{name}: asleep (want=rest), so the house doesn't run them; your line waits for them{marked} "
                        f"until someone sets want=awake")
         elif not row or doing.startswith("house "):

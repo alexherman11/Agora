@@ -9,6 +9,8 @@ line still first in that wake under 'for you while you rested', and the speaker'
 (a916; Sable's scope change to a1566, matching a1570's addressing). What still waits: a resident's plain line in
 another's own corner chat (a visitors' book), and anything for someone asleep (want=rest). `wake <name>` still calls
 without a line.
+a2662: one reading of @. The knock reads a line's stored to= (a1581), never its words; the receipt says 'to:' once
+(the world's) and then a line per name: resident, person, agent, a private chat they can't read, or no one by that name.
 
 It drives House.step, the house's own pass, with stand-in residents that keep what the house would send instead of
 writing to a claude process (no model is called, no worker is started). The house's heartbeat is written as it runs,
@@ -305,9 +307,20 @@ check("a stored to= is read as stored, whatever the words say",
       and rooms.line_to({"args": {"append": "Juniper: @sable", "line_id": "m1", "to": "nobody"}}) == ([], True))
 wl = H.load()
 private = {"props": {"members": "juniper,sable"}}
-check("a line addressed to Pike calls him in a chat he is not a member of; @everyone there does not",
-      rooms.calls(wl, private, ["pike"], "pike") and not rooms.calls(wl, private, ["everyone"], "pike")
-      and rooms.calls(wl, private, ["everyone"], "sable"))
+check("a line addressed to Pike does not call him in a private chat he is not in (Sable c2682); one with no members= does",
+      not rooms.calls(wl, private, ["pike"], "pike") and rooms.calls(wl, {"props": {}}, ["pike"], "pike")
+      and not rooms.calls(wl, private, ["everyone"], "pike") and rooms.calls(wl, private, ["sable"], "sable"))
+talk = wl.subjects[wl.nodes[TALK]["subject"]]
+if "sable" not in rooms.members_of(talk) and "all" not in rooms.members_of(talk):
+    rest(SABLE, 3600)
+    got = say("alex", "@sable a word for you, in Pike's talk", TALK)
+    H.step()
+    check("to=sable in a chat she can't read: 'Sable: can't read this chat; not knocked', and nothing sent",
+          "to: sable" in got and "Sable: can't read this chat" in got and "Sable: woken" not in got
+          and not res(SABLE).sent and res(SABLE).state.get("rest_until"), (got, sent(SABLE)[:300]))
+    sent(PIKE)
+else:
+    print(f"skip Pike's talk lets Sable in (members={(talk.get('props') or {}).get('members')})")
 check("someone: resident, person, agent, everyone, and no one",
       [rooms.someone(wl, n) for n in ("pike", "alex", "juniper", "claude", "everyone", "pikee")]
       == ["resident", "person", "resident", "agent", "everyone", None], [rooms.someone(wl, n) for n in ("pike", "alex", "claude", "pikee")])
