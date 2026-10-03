@@ -489,6 +489,20 @@ def line_rows(desk, chat=None):
     return out
 
 
+def away(desk):
+    """a2844: who is away in a version of the code, as the door observes it (its visits.json, beside the house's state):
+    actor -> '<commission>@<commit>'. Like the house's rows, an outside observation, never an event of this world."""
+    import json
+    try:
+        world = (getattr(desk, "_session", "") or "").split("@")[0]
+        st = json.loads((HOUSE_STATE / "visits.json").read_text(encoding="utf-8"))
+        if st.get("world") != world:
+            return {}
+        return {str(a).lower(): str(v.get("label") or v.get("in")) for a, v in (st.get("away") or {}).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def house_rows(desk, corner=None):
     """What the house observes, read from its own state (not the world's history: an outside resource with observed
     status). `fresh` says whether the house itself is alive: its heartbeat is written every two seconds, and a beat
@@ -506,7 +520,7 @@ def house_rows(desk, corner=None):
         return []
     age = time.time() - float(st.get("beat") or 0)
     fresh = "live" if age < 30 else f"stale {int(age // 60)}m" if age < 3600 else f"stale {int(age // 3600)}h"
-    out = []
+    out, gone = [], away(desk)
     for cid, r in sorted((st.get("residents") or {}).items()):
         if corner and cid != corner:
             continue
@@ -524,7 +538,9 @@ def house_rows(desk, corner=None):
         out.append({"item": cid, "resident": r.get("actor") or "(no name yet)", "corner": cid, "doing": doing,
                     "turns": r.get("turns", 0), "since": time.strftime("%H:%M", time.localtime(last)) if last else "",
                     "beat": time.strftime("%H:%M:%S", time.localtime(st.get("beat") or 0)), "fresh": fresh,
-                    "room": desk.world.nodes[room]["title"] if room else "", "wakes": wakes})
+                    # a2844: someone visiting a version is not in a room of this world: the door says where they are
+                    "room": "away in " + gone[str(r.get("actor")).lower()] if str(r.get("actor")).lower() in gone else
+                            desk.world.nodes[room]["title"] if room else "", "wakes": wakes})
     return out
 
 
