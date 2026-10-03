@@ -13,7 +13,8 @@ the resident knows comes from the world, and everything it does goes through it:
   - thinking isn't resting (Alex, 29 Sep). A reply with no command lines is answered `(quiet)`, or with whatever
     news is waiting, and the resident goes on; after 10 quiet exchanges in a row the house lets it rest.
   - it rests when it says so: `> rest` rests until someone calls; `> rest 2 hours` (or 30 minutes, 1 day, 1h30m,
-    half an hour: human time, a month at most) rests that long. An empty reply rests too. A resting resident is
+    half an hour: human time, a month at most) rests that long; `> rest until 13:00` (9:30pm, noon) until the clock
+    next reads that. An empty reply rests too. A resting resident is
     reached at once by a call: `wake <name>` or the Desktop's wake (call= on its corner), a comment on something in
     its corner, a comment on its commission, a chat line addressed to it (the line's stored to=, a2662: never its
     words read again) or @everyone in a chat it is in, @its-name outside quotes in a comment or note, from anyone
@@ -274,6 +275,39 @@ def duration(text):
     return int(total)
 
 
+def until(text, at=None):
+    """`until 13:00` -> seconds from now to the next time the clock reads that, or a sentence saying why not, or None
+    when `text` is not an until (3 Oct, Pike: receipts print 'resting until 16:25', so a resident may say it back).
+    `13:00`, `09:30`, `0:15` are the 24-hour clock. `9:30pm`, `9pm`, `noon`, `midnight` say themselves. `1:30` with no am/pm
+    is whichever of 1:30 and 13:30 comes first. A time already past today is tomorrow. A bare `9` is refused (an
+    hour or a duration?)."""
+    import datetime
+    m = re.match(r"^until\s+(.+?)\.?$", text.strip(), re.I)
+    if not m:
+        return None
+    w = m.group(1).lower().replace(" ", "")
+    words = {"noon": "12:00pm", "midday": "12:00pm", "midnight": "12:00am"}
+    w = words.get(w, w)
+    c = re.match(r"^(\d{1,2})(?::(\d{2}))?(am|pm)?$", w)
+    if not c or not (c.group(2) or c.group(3)):
+        return (f"'until {m.group(1)}' isn't a time of day I can read. Say it as the clock does: > rest until 13:00, "
+                f"> rest until 9:30pm, > rest until noon; or how long: > rest 2 hours")
+    h, mi, half = int(c.group(1)), int(c.group(2) or 0), c.group(3)
+    if mi > 59 or h > 23 or (half and not 1 <= h <= 12):
+        return f"'until {m.group(1)}' isn't a time on a clock"
+    if half:
+        h = h % 12 + (12 if half == "pm" else 0)
+    now = at or datetime.datetime.now()
+    hours = [h] if half or h == 0 or h > 12 or c.group(1).startswith("0") else [h, (h + 12) % 24]
+    best = None
+    for hh in hours:
+        t = now.replace(hour=hh, minute=mi, second=0, microsecond=0)
+        if t <= now:
+            t += datetime.timedelta(days=1)
+        best = t if best is None or t < best else best
+    return max(60, int(best.timestamp() - now.timestamp()))       # local clock, so a daylight-saving night is right
+
+
 def human(seconds):
     """Seconds -> `2 hours`, `1 day 3 hours`, `45 minutes`."""
     out, s = [], int(round(seconds / 60.0)) * 60
@@ -295,13 +329,17 @@ def rest_in(cmds):
             keep.append(line)
             continue
         when = m.group(1).strip()
-        if not when:
+        if not when or re.match(r"^until\s+(someone\s+calls|called|i'?m\s+called)\.?$", when, re.I):
             rest = 0
             continue
-        secs = duration(when)
-        if secs is None:
+        clock = until(when)
+        secs = clock if isinstance(clock, int) else duration(when)
+        if isinstance(clock, str):
+            rest = clock
+        elif secs is None:
             rest = (f"'{when}' isn't a time I can keep. Say how long, the way people do: > rest 2 hours, "
-                    f"> rest 30 minutes, > rest 1 day, > rest 1h30m; or just > rest, until someone calls")
+                    f"> rest 30 minutes, > rest 1 day, > rest 1h30m, or until when: > rest until 13:00; "
+                    f"or just > rest, until someone calls")
         elif secs > REST_MAX:
             rest = f"{human(secs)} is longer than a rest ({human(REST_MAX)} at most); > rest with a shorter time"
         else:
