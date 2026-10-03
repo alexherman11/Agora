@@ -1013,6 +1013,13 @@ class World:
             if not line:
                 raise Refusal("comment needs line=")
             cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor)
+            # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
+            # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
+            # them: the house tells a resident every string an event's args hold. A comment from before this has no
+            # `to`, and For you (rooms.shown) never counts it: a line written before the rule wasn't a call.
+            import rooms
+            ev = self.events[-1]
+            ev["to"] = [n for n in written(ev)[0] if n not in rooms.EVERYONE and rooms.someone(self, n)]
             return {"ok": True, "event": self.events[-1]["id"], "changed": [sid] + apps, "created": cid,
                     "note": f"comment {cid} added on {sid}"}
         if verb == "resolve":

@@ -324,7 +324,13 @@ SOURCES = {
     "messages": ("messages:<id>", ("item", "who", "said", "index", "at", "line", "to", "edited")),
     # Alex, 30 Sep: what's for me, one list, oldest first like a chat (newest at the bottom), each line saying which
     # chat it came from and when
+    # (a3319: these rows are `sayings for:<name>` under their first name, kept so nothing printed goes false)
     "inbox": ("inbox:<name>", ("item", "chat", "who", "said", "at", "open", "index", "eid", "line", "before")),
+    # a3319 (lines phase 2): chat lines and comments as they are stored, two kinds read through one showing. `what` is
+    # line or comment, `saying` its own id (m<n> or c<n>), `name` its writer as a word an @ can call; answered and
+    # before are filled when for:<name> says whose For you it is
+    "sayings": ("sayings [for:<name>] [in:<id>]", ("item", "what", "saying", "by", "name", "at", "in", "to", "said",
+                                                    "answered", "edited", "before", "state", "eid")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
     "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),
@@ -414,54 +420,128 @@ def text_lines(w, sid):
     return out
 
 
-def inbox_rows(desk, me):
-    """Every chat line for `me`, oldest first like a chat: a line in a chat whose members name me (a direct chat), or one that
-    calls @me by name outside quotes. @everyone and @all don't count (Alex, 30 Sep: 'just direct chats and @alex';
-    a broadcast in a shared chat stayed 'for you' forever, since he rarely writes there). Narrower than what reaches
-    a resident (house.news), on purpose. `open` says no line of mine has followed it in that chat yet.
-    a2692: one rule with the knock and the receipt (rooms.calls): nothing shows from a chat I am not a member of now
-    (rooms.is_member), however it was addressed. A line addressed to me before I was a member (I joined since) shows, and `before` says so,
-    since it never knocked me (Pike c2697: the knock is a happening, read as membership was; For you is a showing, read
-    as it is)."""
-    import re
+def source_head(source):
+    """The row source a repeat's `of` names, or its first word when it names none: the word before the first colon
+    ('messages:a12'), or `sayings`, whose terms follow it after a space ('sayings for:alex in:a12')."""
+    src = str(source).strip()
+    return "sayings" if src.split(" ")[0] == "sayings" else src.partition(":")[0]
+
+
+def saying_rows(desk, terms=""):
+    """a3319 (lines phase 2; Pike c3323: unify the reading first): the SAYINGS of the desk, chat lines and comments
+    as they are stored, two kinds read through one showing, oldest first like a chat. Nothing is migrated and no id
+    is new: `saying` is a line's m<n> or a comment's c<n>, `what` says which. `by`, `at`, `in` (the chat, or the thing
+    commented on) and `to` are read as each kind keeps them: a line's signature, its event's time and its stored
+    to=; a comment's author (persons.comment_by), its event's time, and the address stored on that event (world's
+    comment; a comment from before a3319 has none, and addresses no one here).
+
+    Terms, in any order: `in:<id>` keeps one chat's lines or one thing's comments; `for:<name>` keeps what is shown
+    in that person's For you, by the house's one showing rule (rooms.shown, which asks rooms.calls: nothing here
+    restates it), leaves out what they wrote themselves, and fills `answered` and `before`, which are facts about a
+    saying and a person:
+      answered  a line: 'yes' when a line of theirs follows it in that chat, else 'no' (today's rule: who wrote last).
+                a comment: 'yes' when they replied to it or commented later on that thing; 'withdrawn' when its
+                writer resolved it; else 'no'. Someone else's resolve doesn't end it for them (Pike c3323): `state`
+                then says 'resolved by <name>', and their answer is a new comment on the thing.
+      before    a2692: 'addressed to you before you were a member of this chat', for a line that never knocked them
+                (Pike c2697: the knock is a happening, read as membership was; For you is a showing, read as it is).
+    A row also answers to the names For you's rows had (chat, who, open, index, line), so `inbox:<name>` is this
+    source under its first name."""
+    import persons
     import rooms
-    from world import unquoted
-    w, me = desk.world, str(me or "").lower()
-    if not me:
-        return []
-    called = re.compile(rf"@{re.escape(me)}\b", re.I)
+    from world import addressed_before
+    w = desk.world
+    me, only = "", None
+    for t in str(terms).replace(",", " ").split():
+        k, _, v = t.partition(":")
+        if k == "for" and v:
+            me = v.lower()
+        elif k == "in" and v:
+            nid = desk._resolve(v)
+            only = (w.nodes.get(nid) or {}).get("subject") or (nid if nid in w.subjects else None)
+            if only is None:
+                raise LensRefusal(f"sayings in:{v}: {v} has no lines or comments to list")
+        else:
+            raise LensRefusal(f"sayings: unknown term {t!r}; sayings [for:<name>] [in:<id>], e.g. sayings for:$me")
     where = {}
     for nid, n in w.nodes.items():
         if n["type"] == "appearance" and n["subject"] not in where:
             where[n["subject"]] = nid
+    made, closed = persons.comment_events(w), None
+    flip = {"yes": "no", "no": "yes", "withdrawn": "no"}
     out = []
     for sid, s in w.subjects.items():
-        if s["kind"] != "chat" or sid not in where or not rooms.is_member(w, s, me):
+        if sid not in where or (only and sid != only):
             continue
-        direct = "all" not in rooms.members_of(s) and rooms.member(w, s, me)
-        tl = text_lines(w, sid)
-        mine_after = False                  # walking back from the end: has a line of mine come after this one?
-        for k in range(len(tl) - 1, -1, -1):
-            text, line, (at, eid) = tl[k]
-            m = w.SPEAKER.match(text)
-            who = m.group(1).lower() if m else ""
-            if who == me:
-                mine_after = True
-                continue
-            said = text[m.end():] if m else text
-            # a1581: a line is for me when its writer addressed me (its stored to=), never by searching its words; a
-            # chat from before lines (no line) is still read by its words. A direct chat is for me by its membership.
-            named = (rooms.calls(w, s, [n for n in line["to"] if n not in rooms.EVERYONE], me) if line is not None
-                     else bool(called.search(unquoted(said))))
-            if who and (direct or named):
-                before = named and eid and not rooms.is_member(w, s, me, at=eid)
+        if s["kind"] == "chat" and not (me and not rooms.is_member(w, s, me)):
+            tl = text_lines(w, sid)
+            mine_after = False              # walking back from the end: has a line of mine come after this one?
+            for k in range(len(tl) - 1, -1, -1):
+                text, line, (at, eid) = tl[k]
+                m = w.SPEAKER.match(text)
+                who = m.group(1).lower() if m else ""
+                if me and who == me:
+                    mine_after = True
+                    continue
+                if me and not who:
+                    continue
+                said = text[m.end():] if m else text
+                # a1581: a line's address is its writer's stored word, never its words searched again; a chat from
+                # before lines is read by the rule it was written under (every @name outside quotes)
+                to = line["to"] if line is not None else addressed_before(said)
+                before = ""
+                if me:
+                    if not rooms.shown(w, s, to, me):
+                        continue
+                    if eid and rooms.calls(w, s, [n for n in to if n not in rooms.EVERYONE], me) \
+                            and not rooms.is_member(w, s, me, at=eid):
+                        before = "addressed to you before you were a member of this chat"
+                by = m.group(0).rstrip(" \t:") if m else ""
+                answered = ("yes" if mine_after else "no") if me else ""
                 # eid keys the row (the line's own event), so a line keeps its place in the painter as newer ones arrive
-                out.append({"item": where[sid], "chat": s["title"], "who": m.group(0).rstrip(" \t:"), "said": said,
-                            "at": _clock(at), "open": "no" if mine_after else "yes", "index": k + 1,
-                            "eid": eid or f"{where[sid]}-{k + 1}", "line": line["id"] if line else "",
-                            "before": "addressed to you before you were a member of this chat" if before else "", "_t": at})
-    out.sort(key=lambda r: r.pop("_t") or "")
+                out.append({"item": where[sid], "what": "line", "saying": line["id"] if line else "", "by": by,
+                            "name": who, "at": _clock(at), "in": s["title"], "to": ", ".join(to), "said": said,
+                            "answered": answered, "edited": "edited" if line and line.get("edited") else "",
+                            "before": before, "state": "", "eid": eid or f"{where[sid]}-{k + 1}",
+                            "chat": s["title"], "who": by, "open": flip.get(answered, ""), "index": k + 1,
+                            "line": line["id"] if line else "", "_t": (at or "", _enum(eid))})
+        cs = s.get("comments") or []
+        for i, c in enumerate(cs):
+            e = made.get(c["id"])
+            writer = str(c.get("by") or "").split("/")[0].lower()
+            to = (e or {}).get("to")
+            if me and (rooms.same_person(w, writer, me) or to is None or not rooms.shown(w, s, to, me, comment=True)):
+                continue
+            state = "open"
+            if c.get("resolved"):
+                if closed is None:
+                    closed = {(x.get("args") or {}).get("id"): x for x in w.events
+                              if x.get("verb") == "resolve" and not x.get("undone")}
+                r = closed.get(c["id"])
+                rby = str((r or {}).get("by") or "").split("/")[0].lower()
+                state = "withdrawn" if r and rooms.same_person(w, rby, writer) else \
+                    "resolved by " + (rooms.shown_name(w, rby) if r else "someone")
+            answered = ""
+            if me:
+                mine = any(rooms.same_person(w, str(x.get("by") or "").split("/")[0], me)
+                           for x in list(c.get("replies") or []) + cs[i + 1:])
+                answered = "yes" if mine else "withdrawn" if state == "withdrawn" else "no"
+            by = str(persons.comment_by(w, c, e) or "")
+            by = by[:1].upper() + by[1:]
+            at = (e or {}).get("at", "")
+            out.append({"item": where[sid], "what": "comment", "saying": c["id"], "by": by, "name": writer,
+                        "at": _clock(at), "in": s["title"], "to": ", ".join(to or []), "said": c["text"],
+                        "answered": answered, "edited": "", "before": "", "state": state,
+                        "eid": e["id"] if e else c["id"], "chat": s["title"], "who": by, "open": flip.get(answered, ""),
+                        "index": i + 1, "line": "", "_t": (at or "", _enum(e["id"] if e else ""))})
+    out.sort(key=lambda r: r.pop("_t"))
     return out
+
+
+def _enum(eid):
+    """An event id's number ('e5967' -> 5967), 0 when it has none: sayings of one second stay in the order said."""
+    d = "".join(ch for ch in str(eid or "") if ch.isdigit())
+    return int(d) if d else 0
 
 
 def line_rows(desk, chat=None):
@@ -547,11 +627,13 @@ def house_rows(desk, corner=None):
 def rows(desk, source, session=None):
     """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection)."""
     w = desk.world
+    if source_head(source) == "sayings":
+        return saying_rows(desk, source.strip()[len("sayings"):])
     head, _, arg = source.strip().partition(":")
     if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name; house, turns and lines one or none; the rest none
     if head == "inbox":
-        return inbox_rows(desk, arg)
+        return saying_rows(desk, "for:" + arg)
     if head == "lines":
         return line_rows(desk, desk._resolve(arg) if arg else None)
     if head == "house":
@@ -608,7 +690,7 @@ def rows_text(desk, source):
     rs = rows(desk, source)
     if rs is None:
         raise LensRefusal("rows <source>. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
-    fields = SOURCES[source.partition(":")[0]][1]
+    fields = SOURCES[source_head(source)][1]
     lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
     for r in rs:
         lines.append("  " + " · ".join(f"{f}={str(r.get(f, ''))[:60]!r}" if " " in str(r.get(f, "")) else f"{f}={str(r.get(f, ''))[:60]}" for f in fields if f != "text" or len(fields) < 6))
