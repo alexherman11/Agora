@@ -145,9 +145,13 @@ class Workshop:
         return out
 
     def asked_by(self, w, s):
+        """Who asked for this commission, as printed and as written back (a1590: asked_by= holds the person once a world
+        has persons; this is their name, with its door mark where two bore it, so writing it back means the same person
+        and a worker's prompt, the land message and house.out never print p2919)."""
+        import persons
         by = (s.get("props") or {}).get("asked_by")
         if by:
-            return by
+            return persons.shown(w, by)
         for e in w.events:
             if e["verb"] == "create" and isinstance(e.get("undo"), dict):
                 made = e["undo"].get("delete")
@@ -317,7 +321,7 @@ class Workshop:
             self.say(cid, "its worktree was gone when the house restarted, so it is asked again: the next worker starts in "
                           "a fresh worktree on the same branch.")
             return None
-        wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", props.get("asked_by") or self.asked_by(w, s))
+        wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))     # a1590: the name, never p2919
         if not wk.state.get("session"):
             return None
         if wk.state.get("retry_at", 0) > time.time():

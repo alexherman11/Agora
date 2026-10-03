@@ -524,6 +524,36 @@ def test_what_you_made_you_have_seen():
     assert do(f"do prop {root} mood=calm", "juniper").startswith("ok"), "a create still leaves its parent's props unstaled"
 
 
+def test_a_desktop_snapshot_is_not_a_look():
+    """a2872: the Desktop asks /api/snapshot at every change anyone makes, and its outline marked every line's title
+    and props seen for the asker. Alex, who had looked once, then retitled over pike's newer title without being refused
+    (ran on a copy, e5105). Painting someone's screen must never count as their reading it."""
+    import explore, deskd, re
+    d = explore.fresh()
+    slots = {}
+
+    def do(line, who):
+        slots[d.world.me] = (d.seen, d.open, d.last_event_seen)
+        d.seen, d.open, d.last_event_seen = slots.get(who) or ({}, {d.world.root}, len(d.world.events))
+        d.world.me = who
+        r = d.dispatch("desk", {"line": line})
+        return r.get("text") or ("ERR " + str(r.get("error")))
+
+    do("look", "juniper")
+    nid = re.search(r"created (a\d+)", do(f"do create {d.world.root} kind=note title=first text=x", "juniper")).group(1)
+    do(f"look {nid}", "alex")                              # alex has looked once, at the old title
+    do(f"look {nid}", "pike")
+    assert do(f"do retitle {nid} title=second", "pike").startswith("ok")
+    slots[d.world.me] = (d.seen, d.open, d.last_event_seen)
+    d.seen, d.open, d.last_event_seen = slots["alex"]
+    d.world.me = "alex"
+    idx = dict(getattr(d, "_seen_idx", None) or {})
+    deskd.snapshot_for(d)                                  # the Desktop repaints for alex
+    assert dict(getattr(d, "_seen_idx", None) or {}) == idx, "a snapshot wrote what alex has seen"
+    out = do(f"do retitle {nid} title=blind", "alex")
+    assert "stale" in out, out
+
+
 def test_edits_to_what_you_made_are_told():
     """a1471 (sketch2, c1439 c1450): when someone else changes a note or task you made, your next reply says so in a
     ~ line of its own (who, which line, the event, its undo), not in the !! counts. Your own edits, a chat line and

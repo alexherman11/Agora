@@ -26,6 +26,7 @@ Verbs (all take an id or a selection unless noted):
 import re
 
 import moo
+import persons
 import promises
 from world import Refusal
 
@@ -48,13 +49,16 @@ TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links
          "answered-by:", "unanswered:") + promises.TERMS      # a1587: held-by: asked-of: owed-to: asked-by: awaits:
 
 
-def parse_selection(w, token, trash=False):
+def parse_selection(w, token, trash=False, binds=None):
     """Return (ids, description) or None if token is a plain id. What is inside a Trash (moo.trash_surfaces) is left out
-    unless an in: term names the Trash or a surface inside it, or trash=True (a1327)."""
+    unless an in: term names the Trash or a surface inside it, or trash=True (a1327). binds (a1590): the persons the
+    stored line being read was bound to when saved; prop:owner= (and each person key) and the promise terms mean them,
+    and a typed name means today's bearer. A door mark stays with its name: prop:owner=juniper,first is one term."""
     token = token.strip().strip('"')
     if token in w.nodes or token in w.subjects or token in ("desk", "root") or token.lower().startswith("corner:"):
         return None     # corner:<name> is one thing, a resident's corner (a1027), not a selection
-    terms = [t for t in re.split(r"[,\s]+", token) if t]
+    door = rf",[ \t]*({'|'.join(persons.ORDINALS + ('last',))})\b"
+    terms = [t.replace("\x01", ",") for t in re.split(r"[,\s]+", re.sub(door, "\x01\\1", token)) if t]
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
     KNOWN = TERMS
@@ -111,6 +115,8 @@ def parse_selection(w, token, trash=False):
             def okp(nid, k=k, v=v, eq=eq):
                 n = w.nodes[nid]
                 props = (n.get("props") if n["type"] == "surface" else w.subjects[n["subject"]].get("props")) or {}
+                if v and k in persons.PERSON_KEYS and k in props:
+                    return persons.matches(w, props[k], v, binds)      # a1590: the same person, not the same name
                 return (props.get(k) == v) if v else (k in props)
             cands = [c for c in cands if okp(c)]
         elif t.startswith("age<") or t.startswith("age>"):
@@ -192,12 +198,12 @@ def parse_selection(w, token, trash=False):
         elif t.startswith(promises.TERMS):
             # a1587: open promises and requests, read from their events (held-by: asked-of: owed-to: asked-by:), and
             # the things open requests are about (awaits:<name|any>)
-            hit = promises.matching(w, t)
+            hit = promises.matching(w, t, binds)
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in hit]
         else:
             raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>; -term leaves out")
     for n in neg:
-        r = parse_selection(w, n, trash=True)
+        r = parse_selection(w, n, trash=True, binds=binds)
         if r is None:
             raise Refusal(f"-{n}: {n!r} is not a selection term")
         out = set(r[0])

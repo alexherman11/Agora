@@ -332,16 +332,18 @@ def v_unfold(w, nid, a):
 @verb("append", ["text"], "Add a line at the end of the text. Edits the subject: every appearance changes. "
       "On a chat the world signs the line with your name (type only your words; a 'Name:' of your own is dropped), "
       "and adding a line is never refused as stale, since it replaces nothing; rewriting a chat is still fenced. "
-      "A chat line is a thing (m<n>): who it addresses is each @name outside quotes, or to=<names> said outright "
-      "(to=nobody for no one); the receipt says which, and examine m<n> shows it.",
+      "A chat line is a thing (m<n>): who it addresses is its header, the @names that open it ('@sable @pike: ...'; "
+      "an @ later is a mention and calls no one), or to=<names> said outright (to=nobody for no one); with neither, "
+      "a line in a private chat (members=<names>, not all) goes to its other members; the receipt "
+      "says which, and examine m<n> shows it.",
       "line=<str> [to=<names>] [reply_to=<m id>]", 'do append a18 line="4. Review"')
 def v_append(w, nid, a):
     return _prim(w, "append", nid, a)
 
 
 CHAT_RULES = ("the world signs each line with who added it (type only your words); adding a line is never refused "
-              "as stale, rewriting the chat is; each line is a thing (m<n>) that keeps who it addresses (@name outside "
-              "quotes, or to=), and a changed line shows 'edited' and keeps its words")
+              "as stale, rewriting the chat is; each line is a thing (m<n>) that keeps who it addresses (the @names that "
+              "open it, or to=), and a changed line shows 'edited' and keeps its words")
 
 
 def unanswered(w, sid, me="alex"):
@@ -370,7 +372,9 @@ def v_reply(w, nid, a):
     return r
 
 
-@verb("comment", ["appearance"], "Leave a comment on this thing, signed by you. Comments show under read.", "line=<str>", 'do comment a20 line="Which timezone?"')
+@verb("comment", ["appearance"], "Leave a comment on this thing, signed by you. Comments show under read. The @names "
+      "that open it call them, as a chat line's header does (`@ana @ben: ...`); an @ later is a mention and calls no one, "
+      "and the receipt says to: and names it.", "line=<str>", 'do comment a20 line="Which timezone?"')
 def v_comment(w, nid, a):
     return _prim(w, "comment", nid, a)
 
@@ -587,10 +591,16 @@ def v_done(w, nid, a):
     return _prim(w, "retitle", nid, {"title": "✓ " + t})
 
 
+def _now(w, props):
+    import persons
+    return "props now: " + (" ".join(f"{k}={v}" for k, v in persons.shown_props(w, props).items()) or "(none)")
+
+
 @verb("prop", ["appearance", "surface"], "Set or clear named properties on this thing (k=v ...; remove=k). prop:k=v selects by them. "
       "On a view, query=<selection> changes what it shows. A field kept elsewhere (title text kind due tags) is refused, naming its verb.",
       "k=v ... | remove=k","do prop a12 model=gpt-5.6-sol status=queued")
 def v_prop(w, nid, a):
+    import persons
     actor = a.pop("_by", None) or w.me
     here = str(a.pop("at", "")) == "appearance"
     view = w.nodes[nid].get("layout") == "view"
@@ -598,6 +608,7 @@ def v_prop(w, nid, a):
         why = _field(w, nid, k, view)
         if why:
             raise Refusal(why)
+    persons.store_args(w, a)        # a1590: a person prop holds the person (the desk has done it already, with its notes)
     if view and "query" in a:
         return _requery(w, nid, a, actor)
     if w.nodes[nid]["type"] == "surface" or here:
@@ -609,7 +620,7 @@ def v_prop(w, nid, a):
         if not a and not rem:
             raise Refusal("prop needs k=v and/or remove=k")
         if all(props.get(k) == str(v) for k, v in a.items()) and not [k for k in rem if k in props]:
-            raise Refusal(f"{nid} already has that; props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)"))
+            raise Refusal(f"{nid} already has that; " + _now(w, props))
         before = dict(props)
         for k in rem:
             props.pop(k, None)
@@ -617,8 +628,7 @@ def v_prop(w, nid, a):
             props[k] = str(v)
         w._bump(nid)
         ev = w._event("prop", nid, dict(a, **({"remove": ",".join(rem)} if rem else {})), {"restore_props": (nid, before)}, actor)
-        return {"ok": True, "event": ev["id"], "changed": [nid],
-                "note": "props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)")}
+        return {"ok": True, "event": ev["id"], "changed": [nid], "note": _now(w, props)}
     s = w.subjects[w.nodes[nid]["subject"]]
     props = s.setdefault("props", {})
     rem = [k for k in str(a.pop("remove", "")).split(",") if k.strip()]
@@ -626,9 +636,10 @@ def v_prop(w, nid, a):
         raise Refusal("prop needs k=v and/or remove=k")
     absent = [k for k in rem if k not in props]
     if absent and not a and len(absent) == len(rem):
-        raise Refusal(f"no prop {', '.join(absent)} on {nid}; props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)"))
+        raise Refusal(f"no prop {', '.join(absent)} on {nid}; " + _now(w, props))
     if all(props.get(k) == str(v) for k, v in a.items()) and not [k for k in rem if k in props]:
-        raise Refusal(f"{nid} already has " + " ".join(f"{k}={v}" for k, v in a.items()) + "; nothing to change")
+        raise Refusal(f"{nid} already has " + " ".join(f"{k}={v}" for k, v in persons.shown_props(w, a).items())
+                      + "; nothing to change")
     before = deepcopy(s)      # a whole copy: a shallow one shared tags and comments with later changes, and undo restored those
     for k in rem:
         props.pop(k, None)
@@ -638,8 +649,7 @@ def v_prop(w, nid, a):
     for x in w.appearances_of(s["id"]):
         w._bump(x)
     ev = w._event("prop", nid, dict(a, **({"remove": ",".join(rem)} if rem else {})), {"restore_subject": before}, actor)
-    return {"ok": True, "event": ev["id"], "changed": [s["id"]] + w.appearances_of(s["id"]),
-            "note": "props now: " + (" ".join(f"{k}={v}" for k, v in props.items()) or "(none)")}
+    return {"ok": True, "event": ev["id"], "changed": [s["id"]] + w.appearances_of(s["id"]), "note": _now(w, props)}
 
 
 def _field(w, nid, k, view):

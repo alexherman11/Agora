@@ -16,12 +16,17 @@ nothing: its event is undone, and the state is read without it.
                                              confirms; owed to yourself, it is kept on your own word
     confirm <id>                             the one owed says it was kept
     release <id> [why=<words>]               its holder lets it go; a reason is welcome, never required
-    carry <id> to=<name>                     its holder hands it on: 'carried to you from X' / 'you carried it to Y'
+    carry <id> to=<name>                     its holder offers it on (a2798): it stays theirs, 'offered to Y', until Y
+                                             accepts ('carried to you from X' / 'you carried it to Y') or declines ('Y
+                                             declined'); withdraw <id> takes the offer back. Notification isn't consent.
 
-A commission is its asker's own once-promise (Juniper c1585): setting commission=asked makes one, owed to asked_by (or
-the card's maker), and lived= on the card is the asker's report. A card that leaves the living (done, trashed,
-cancelled, in a Trash) with an open promise about it that the same act did not end asks its holder, once, on their
-sill: kept, released or carried?
+A commission is its asker's own once-promise (Juniper c1585): owed to asked_by (or the card's maker), and lived= on the
+card is the asker's report. It is made by the asker's own act of asking (a2798): the earliest event where asked_by
+set commission=asked. When someone else set it for them, it is no one's promise: 'asked for X; held by no one', until
+someone holds it by an act (accept <id>, or X setting commission=asked). A card that leaves the living (done, trashed,
+cancelled, in a Trash) with an open promise about it that the same act did not end asks, once, on their sill: its
+holder (kept, released or carried?), or for a request its asker (withdraw or keep?), or for a promise held by no one
+the one it was asked for (release or confirm?).
 """
 
 import re
@@ -35,7 +40,7 @@ from world import Refusal
 VERBS = ("promise", "ask", "accept", "decline", "withdraw", "report", "confirm", "release", "carry")
 ENDS_CARD = ("done", "trashed", "cancelled")
 OPEN, ASKED, REPORTED = "open", "requested", "reported"
-TERMS = ("held-by:", "asked-of:", "owed-to:", "asked-by:", "awaits:")
+TERMS = ("held-by:", "asked-of:", "owed-to:", "asked-by:", "awaits:", "offered-to:")
 VIA = "hook promises"   # what another act set off here; undo's receipt names it after its first five letters, as a rule's
 
 _ev = weakref.WeakKeyDictionary()
@@ -83,6 +88,8 @@ def _person(w, name=None, e=None):
     if e is not None:
         n = persons.norm(e.get("by"))
         return {"pid": persons.of_event(w, e), "name": n}
+    if persons.is_pid(w, name):           # a1590: a person prop holds the person (asked_by=p2919)
+        return {"pid": str(name).strip(), "name": persons.name_now(w, str(name).strip())}
     n = persons.norm(name)
     return {"pid": persons.today(w, n) if n and persons.on(w) else None, "name": n}
 
@@ -114,7 +121,8 @@ def state(w, sid):
     evs = events(w)
     st = {"sid": sid, "aid": aid_of(w, sid), "what": s["title"], "form": None, "state": None, "asker": None,
           "asked": None, "maker": None, "holder": None, "owed": None, "about": p.get("about", ""), "trail": [],
-          "asked_end": False, "carried_from": None, "carried_to": [], "made": None, "ended": None, "self": False}
+          "asked_end": False, "carried_from": None, "carried_to": [], "made": None, "ended": None, "self": False,
+          "setter": None, "offer": None, "last_offer": None}
     to = _person(w, p.get("to")) if p.get("to") else None
     for a in (s.get("promise") or {}).get("acts") or []:
         eid, act, words = a[0], a[1], (a[2] if len(a) > 2 else "")
@@ -128,10 +136,22 @@ def state(w, sid):
         st["trail"].append((act, who, eid if e is not None else None, words))
         if act == "promise":
             st.update(form="promise", state=OPEN, maker=who, holder=who, owed=to, made=eid)
+        elif act == "asked-for":          # a2798: a commission set for someone by another hand: no one's promise yet
+            st.update(form="promise", state=OPEN, maker=None, holder=None, owed=to, made=eid, setter=who)
         elif act == "ask":
             st.update(form="request", state=ASKED, asker=who, asked=to, made=eid)
+        elif act == "offer":              # a2798: carry offers it; it stays its holder's until the one offered accepts
+            st["offer"] = {"by": st["holder"], "to": _person(w, words), "eid": eid}
+        elif act == "accept" and st["state"] == OPEN and st["offer"]:
+            o = st["offer"]
+            st["carried_to"].append((o["by"], who, eid))
+            st.update(carried_from=o["by"], holder=who, offer=None, last_offer=None)
+        elif act == "accept" and st["state"] == OPEN and st["holder"] is None:
+            st.update(maker=who, holder=who)  # taken by an act: the promise is theirs now
         elif act == "accept":
             st.update(form="promise", state=OPEN, maker=who, holder=who, owed=st["asker"])
+        elif act in ("decline", "withdraw") and st["state"] == OPEN and st["offer"]:
+            st.update(last_offer=dict(st["offer"], end=act, who=who, end_eid=eid), offer=None)
         elif act in ("decline", "withdraw", "release"):
             st.update(state={"decline": "declined", "withdraw": "withdrawn", "release": "released"}[act], ended=(act, who, eid, words))
         elif act == "report":
@@ -141,7 +161,7 @@ def state(w, sid):
                 st.update(state=REPORTED, ended=(act, who, eid, words))
         elif act == "confirm":
             st.update(state="kept", ended=(act, who, eid, words))
-        elif act == "carry":
+        elif act == "carry":              # before a2798 a carry moved it at once; those stand as they were
             new = _person(w, words)
             st["carried_to"].append((st["holder"], new, eid))
             st["carried_from"] = st["holder"]
@@ -167,6 +187,9 @@ def phrase(w, st, reader=None, hints=True):
         a, who, eid, _ = st["ended"]
         return f"a request of {L(st['asked'])} by {L(st['asker'])}, {k} by {L(who)}" + (f" ({eid})" if eid else "")
     owed = L(st["owed"])
+    if st["holder"] is None and k == OPEN:
+        return (f"asked for {owed}; held by no one" + (f" (set by {L(st['setter'])})" if st["setter"] else "")
+                + (f" (accept {st['aid']} to hold it)" if hints else ""))
     if same(st["holder"], st["owed"]):
         base = "your own promise" if same(st["holder"], r) else f"{label(w, st['holder'])}'s own promise"
     elif st["carried_from"]:
@@ -182,6 +205,13 @@ def phrase(w, st, reader=None, hints=True):
                 out += f" · you carried it to {label(w, new)}"
             else:
                 out += f" · carried to {label(w, new)} from {label(w, old)}"
+        o = st["offer"]
+        if o and same(o["to"], r):
+            out = f"offered to you by {label(w, o['by'])} · {out}" + (f" (accept or decline {st['aid']})" if hints else "")
+        elif o:
+            out += f" · offered to {L(o['to'])}" + (f" (withdraw {st['aid']} takes the offer back)" if hints and same(o["by"], r) else "")
+        elif st["last_offer"] and st["last_offer"]["end"] == "decline":
+            out += f" · {L(st['last_offer']['to'])} declined"
         return out
     a, who, eid, words = st["ended"]
     if k == REPORTED:
@@ -220,13 +250,16 @@ def asked_of(w, card_sid):
     return ", ".join(names)
 
 
-def matching(w, term):
-    """A selection term over promises -> the set of subject ids it selects (cards, for awaits:)."""
+def matching(w, term, binds=None):
+    """A selection term over promises -> the set of subject ids it selects (cards, for awaits:). binds (a1590): the
+    persons a stored line's names were bound to when it was saved; a typed name is today's bearer (pike,first the
+    earlier one)."""
     key, _, val = term.partition(":")
     val = val.strip().lower()
     if not val:
         raise Refusal(f"{key}:<name>, e.g. {key}:sable" + (" (awaits:any for anyone)" if key == "awaits" else ""))
-    who = {"pid": None, "name": persons.norm(val)} if val == "any" else _person(w, val)
+    pid = persons.resolve(w, val, binds)[0] if val != "any" and persons.on(w) else None
+    who = {"pid": None, "name": persons.norm(val)} if val == "any" else (_person(w, pid) if pid else _person(w, val))
     hit = set()
     for sid in all_sids(w):
         st = state(w, sid)
@@ -235,6 +268,8 @@ def matching(w, term):
         elif key == "asked-of" and st["state"] == ASKED and same(st["asked"], who):
             hit.add(sid)
         elif key == "asked-by" and st["state"] == ASKED and same(st["asker"], who):
+            hit.add(sid)
+        elif key == "offered-to" and st["state"] == OPEN and st["offer"] and same(st["offer"]["to"], who):
             hit.add(sid)
         elif key == "owed-to" and st["state"] in (OPEN, REPORTED) and same(st["owed"], who):
             hit.add(sid)
@@ -266,9 +301,10 @@ def ensure_surface(w):
     return fid, ev["id"]
 
 
-def make(w, form, what, to, about=None, actor=None, cause=None, acts=None, quiet=False):
+def make(w, form, what, to, about=None, actor=None, cause=None, acts=None, quiet=False, act=None):
     """A new promise or request in the Promises surface. -> (aid, event). `acts`: the acts it is made with when they
-    come from older events (the migration); otherwise the event made here is its making act."""
+    come from older events (the migration, or an asker's own earlier act); otherwise the event made here is its making
+    act, read as `act` (default: the form; 'asked-for' when it is set for someone and made by no one)."""
     fid, _ = ensure_surface(w)
     sid = w.add_subject("promise", str(what).strip())
     w.subjects[sid]["props"] = {"to": persons.norm(to)} if to else {}
@@ -284,7 +320,7 @@ def make(w, form, what, to, about=None, actor=None, cause=None, acts=None, quiet
         ev = w._event(form, aid, args, {"delete": aid, "delete_subject": sid}, actor)
         if cause:
             ev["cause"], ev["via"] = cause, VIA
-    w.subjects[sid]["promise"] = {"acts": acts if acts is not None else [[ev["id"], form]]}
+    w.subjects[sid]["promise"] = {"acts": acts if acts is not None else [[ev["id"], act or form]]}
     return aid, ev
 
 
@@ -294,13 +330,15 @@ def _sill_notes(w, sid):
             and (s.get("props") or {}).get("status") != "done"]
 
 
-def add_act(w, sid, act, words="", actor=None, cause=None, args=None):
-    """One act on a promise: an event by the actor, the act kept with the event's id, and any sill question about it
-    answered in the same event. Undo restores the promise and the questions."""
-    notes = _sill_notes(w, sid) if act in ("report", "confirm", "release", "carry", "decline", "withdraw") else []
+def add_act(w, sid, act, words="", actor=None, cause=None, args=None, verb=None, answers=True):
+    """One act on a promise: an event by the actor (its verb is `verb`, else the act), the act kept with the event's
+    id, and any sill question about it answered in the same event (answers=False leaves them: an offer, or an offer's
+    end, answers nothing). Undo restores the promise and the questions."""
+    ends = ("report", "confirm", "release", "carry", "decline", "withdraw", "accept")
+    notes = _sill_notes(w, sid) if answers and act in ends else []
     before = [deepcopy(w.subjects[x]) for x in [sid] + notes]
     aid = aid_of(w, sid)
-    ev = w._event(act, aid, dict(args or {}, **({"words": words} if words and not args else {})),
+    ev = w._event(verb or act, aid, dict(args or {}, **({"words": words} if words and not args else {})),
                   {"restore_subjects": before}, actor)
     ev["changed"] = [sid] + notes
     if cause:
@@ -324,15 +362,24 @@ def _who_may(w, st, act, actor):
     k = st["state"]
     if k not in (OPEN, ASKED, REPORTED):
         return f"{st['aid']} has ended: {phrase(w, st)}. Nothing more ends it"
+    o = st["offer"] if k == OPEN else None
     if act in ("accept", "decline"):
-        if k != ASKED:
-            return f"{st['aid']} is not a request waiting for an answer: {phrase(w, st)}"
-        if not same(st["asked"], a):
+        if o:
+            if not same(o["to"], a):
+                return f"{st['aid']} is offered to {label(w, o['to'])}; only they can {act} it"
+        elif k == OPEN and st["holder"] is None and act == "accept":
+            return None          # set for someone by another hand, held by no one: whoever takes it holds it
+        elif k != ASKED:
+            return f"{st['aid']} is not a request or an offer waiting for an answer: {phrase(w, st)}"
+        elif not same(st["asked"], a):
             return f"only {label(w, st['asked'])}, who was asked, can {act} {st['aid']}"
     elif act == "withdraw":
-        if k != ASKED:
-            return f"{st['aid']} is not a request (it is {phrase(w, st)}); its holder can release it"
-        if not same(st["asker"], a):
+        if o:
+            if not same(o["by"], a):
+                return f"only {label(w, o['by'])}, who offered it to {label(w, o['to'])}, can withdraw the offer"
+        elif k != ASKED:
+            return f"{st['aid']} is not a request or an offer (it is {phrase(w, st)}); its holder can release it"
+        elif not same(st["asker"], a):
             return f"only {label(w, st['asker'])}, who asked, can withdraw {st['aid']}"
     elif act in ("report", "release", "carry"):
         if k == ASKED:
@@ -340,8 +387,15 @@ def _who_may(w, st, act, actor):
                     + ("accept it first, or decline it" if same(st["asked"], a) else "the one asked accepts or declines it"))
         if k == REPORTED:
             return f"{st['aid']} is reported already, waiting for {label(w, st['owed'])} to confirm it"
+        if st["holder"] is None:
+            if act == "release" and same(st["owed"], a):
+                return None      # it was asked for them by another hand; they may let it go
+            return f"{st['aid']} is held by no one: accept {st['aid']} to hold it" + (
+                f" ({label(w, st['owed'])}, for whom it was asked, can release it)" if act == "release" else "")
         if not same(st["holder"], a):
             return f"only {label(w, st['holder'])}, who holds it, can {act} {st['aid']}"
+        if act == "carry" and o:
+            return f"{st['aid']} is offered to {label(w, o['to'])} already; withdraw {st['aid']} takes that offer back first"
     elif act == "confirm":
         if k == ASKED and same(st["asker"], a):
             return None          # what was asked was done: the asker says so, and it ends kept
@@ -414,17 +468,23 @@ def command(desk, verb, arg):
     if why:
         raise Refusal(why)
     text = ""
+    offer = st["offer"] if st["state"] == OPEN else None
+    unheld = st["state"] == OPEN and st["holder"] is None
     if verb == "carry":
         to = kv.get("to") or (words[1] if len(words) > 1 else "")
         if not to:
             raise Refusal(USAGE["carry"])
         if same(_person(w, to), st["holder"]):
             raise Refusal(f"{label(w, st['holder'])} holds it already")
+        if persons.on(w) and persons.typed(w, to) is None and not _known_name(w, to):
+            raise Refusal(f"no one called {to} acts here (person lists everyone)")
         text = persons.norm(to)
-        ev = add_act(w, sid, "carry", text, args={"to": text})
+        ev = add_act(w, sid, "offer", text, args={"to": text}, verb="carry", answers=False)
     elif verb in ("report", "release"):
         text = kv.get("how" if verb == "report" else "why") or " ".join(words[1:])
         ev = add_act(w, sid, verb, text, args=({"how" if verb == "report" else "why": text} if text else {}))
+    elif offer:
+        ev = add_act(w, sid, verb, args={"offer": offer["eid"]}, answers=(verb == "accept"))
     else:
         ev = add_act(w, sid, verb)
     desk._mark_seen(target)
@@ -432,7 +492,15 @@ def command(desk, verb, arg):
     st = state(w, sid)
     out = f"ok {ev['id']}: {target} {verb}: {phrase(w, st)} · \"{st['what']}\""
     if verb == "carry":
-        out += f"\n  {label(w, st['holder'])} sees it as 'carried to you from {label(w, st['carried_from'])}'"
+        out += (f"\n  an offer: it stays yours until {label(w, st['offer']['to'])} accepts (their list says 'offered to "
+                f"you by {label(w, st['holder'])}') or declines; withdraw {target} takes the offer back")
+    elif offer and verb == "accept":
+        out += f"\n  it is yours now; {label(w, st['carried_from'])} sees 'you carried it to {label(w, st['holder'])}'"
+    elif offer:
+        out += f"\n  the offer ends; it stays {label(w, st['holder'])}'s" + (
+            "" if verb == "withdraw" else f", and they see '{label(w, me(w))} declined'")
+    elif unheld and verb == "accept":
+        out += f"\n  it was asked for {label(w, st['owed'])} and held by no one; you hold it now"
     if verb == "report" and st["state"] == REPORTED:
         out += f"\n  it leaves your list; {label(w, st['owed'])} sees 'reported, not confirmed' until they confirm it"
     return out
@@ -447,13 +515,21 @@ def listing(desk):
     """`promises`: yours, by what is waiting on whom."""
     w = desk.world
     r = me(w)
-    groups = {"asked of you (accept or decline)": [], "you hold (report, release or carry)": [],
-              "reported to you, not confirmed (confirm)": [], "owed to you": [], "you asked, waiting": [],
+    groups = {"asked of you (accept or decline)": [], "offered to you (accept or decline)": [],
+              "you hold (report, release or carry)": [],
+              "reported to you, not confirmed (confirm)": [], "asked for you, held by no one (accept to hold it)": [],
+              "owed to you": [], "you asked, waiting": [], "you set for someone, held by no one": [],
               "you reported, not confirmed yet": []}
     for sid in all_sids(w):
         st = state(w, sid)
         k = st["state"]
-        if k == ASKED and same(st["asked"], r):
+        if k == OPEN and st["offer"] and same(st["offer"]["to"], r):
+            groups["offered to you (accept or decline)"].append(st)
+        elif k == OPEN and st["holder"] is None and same(st["owed"], r):
+            groups["asked for you, held by no one (accept to hold it)"].append(st)
+        elif k == OPEN and st["holder"] is None and same(st["setter"], r):
+            groups["you set for someone, held by no one"].append(st)
+        elif k == ASKED and same(st["asked"], r):
             groups["asked of you (accept or decline)"].append(st)
         elif k == ASKED and same(st["asker"], r):
             groups["you asked, waiting"].append(st)
@@ -483,7 +559,9 @@ def card_lines(desk, nid):
     st = state(w, w.subject_of(nid))
     out = [f"  a {st['form'] or 'promise'}: {phrase(w, st)}" + (f" · about {st['about']}" if st["about"] else "")]
     for act, who, eid, words in st["trail"]:
-        out.append(f"    {act} by {label(w, who)}" + (f" ({eid})" if eid else " (no event says who)")
+        name, words = {"offer": ("carry", f"an offer to {words}"),
+                       "asked-for": ("set", f"for {label(w, st['owed'])}, made by no one")}.get(act, (act, words))
+        out.append(f"    {name} by {label(w, who)}" + (f" ({eid})" if eid else " (no event says who)")
                    + (f": {words}" if words else ""))
     may = [v for v in ("accept", "decline", "withdraw", "report", "confirm", "release", "carry") if not _who_may(w, st, v, w.me)]
     out.append("  verbs: " + (" · ".join(USAGE[v].replace("<id>", st["aid"]) for v in may) if may else "none open to you now")
@@ -497,6 +575,8 @@ def _owed_for(w, card_sid, writer):
     """Juniper c1585, Sable e4790 (a): owed to asked_by if set, else the card's maker, else its writer."""
     p = w.subjects[card_sid].get("props") or {}
     if p.get("asked_by"):
+        if persons.is_pid(w, p["asked_by"]):     # a1590: asked_by= holds the person; a promise's to= stays a name (a1576)
+            return persons.door(w, p["asked_by"].strip())
         return persons.norm(p["asked_by"])
     import blanks
     apps = set(w.appearances_of(card_sid))
@@ -522,13 +602,90 @@ def living(w, card_sid):
 
 def sill(w, name):
     import rooms
+    if persons.is_pid(w, name):           # a1590: asked_by= and to= may hold the person
+        fid = persons.corner(w, str(name).strip())
+        if fid:
+            return fid
     fid = rooms.corner_of(w, name)
     if fid:
         return fid
     for f, n in w.nodes.items():
-        if n["type"] == "surface" and persons.norm(name) in {x.strip().lower() for x in str((n.get("props") or {}).get("person", "")).split(",")}:
+        if n["type"] == "surface" and persons.holds(w, (n.get("props") or {}).get("person", ""), name):
             return f
     return None
+
+
+def _sets_asked(w, e, apps):
+    a = e.get("args") or {}
+    return (not e.get("undone") and a.get("commission") == "asked"
+            and ((e["verb"] == "prop" and e["target"] in apps)
+                 or (e["verb"] == "create" and (e.get("undo") or {}).get("delete") in apps)))
+
+
+def asker_act(w, card_sid, name, used=()):
+    """a2798: a commission's promise is made by its asker's own act of asking: the earliest live event by `name` that
+    set commission=asked on this card and made no promise yet. None when they never did (someone set it for them)."""
+    apps, who = set(w.appearances_of(card_sid)), _person(w, name)
+    for e in w.events:
+        if e["id"] not in used and _sets_asked(w, e, apps) and same(_person(w, e=e), who):
+            return e
+    return None
+
+
+def _is_commission(w, st, apps):
+    """a2986: is this promise a commission's for this card? Its making act set commission=asked on the card (an
+    asker's own earlier ask, the migration's), or was caused by an event that did. A promise merely about the card is
+    not (Pike's a2825 'set a1590 commission=asked once ...' is about the asking, not the commission's)."""
+    evs = events(w)
+    m = evs.get(st["made"]) or {}
+    return bool(m) and (_sets_asked(w, m, apps) or _sets_asked(w, evs.get(m.get("cause")) or {"verb": None}, apps))
+
+
+def _commission_asked(w, sid, e):
+    """commission=asked on a card, by event e -> receipt lines. Owed to asked_by (else the card's maker); made by
+    asked_by's own act of asking, or, when someone else set it for them, by no one: 'asked for X; held by no one'
+    until someone holds it by an act (accept, or X setting commission=asked themselves). One commission, one promise:
+    nothing is made while a commission promise for this card is open; any other promise about it stops nothing."""
+    s, card = w.subjects[sid], aid_of(w, sid)
+    asked_by = persons.norm((s.get("props") or {}).get("asked_by") or "")
+    setter = _person(w, e=e)
+    asker = _person(w, asked_by) if asked_by else setter
+    owed = _owed_for(w, sid, e["by"])
+    apps = set(w.appearances_of(sid))
+    mine = [st for st in open_about(w, sid) if st["state"] == OPEN and same(st["owed"], _person(w, owed))
+            and (st["holder"] is None or same(st["holder"], asker) or same(st["holder"], setter))
+            and _is_commission(w, st, apps)]
+    if mine:
+        st = mine[0]
+        if st["holder"] is None and same(setter, asker):
+            add_act(w, st["sid"], "promise", actor=e["by"], cause=e["id"])
+            st = state(w, st["sid"])
+            return [f"~ you asked for {card} yourself: {st['aid']} is your promise now · {phrase(w, st)}"
+                    f" (lived= on {card} is your report)"]
+        return [f"~ no new promise: {st['aid']} already holds this commission · {phrase(w, st)}"]   # a2986, Sable c2993
+    what, older = f"live what this lands: {s['title']}", None
+    if not asked_by or same(setter, asker):      # a2986: asked_by's own act is this one, never an older ask
+        aid, _ = make(w, "promise", what, owed, card, e["by"], cause=e["id"])
+    else:
+        evs = events(w)
+        used = set()
+        for st in (state(w, x) for x in all_sids(w)):
+            if about_sid(w, st) == sid and st["made"]:
+                used |= {st["made"], (evs.get(st["made"]) or {}).get("cause")}
+        mine_e = asker_act(w, sid, asked_by, used)
+        if mine_e is not None:
+            older = mine_e["id"]
+            aid, _ = make(w, "promise", what, owed, card, "house", cause=e["id"], acts=[[mine_e["id"], "promise"]])
+        else:
+            aid, _ = make(w, "promise", what, owed, card, e["by"], cause=e["id"], act="asked-for")
+            st = state(w, w.nodes[aid]["subject"])
+            return [f"~ a commission is its asker's own act: {label(w, asker)} did not set commission=asked on {card} "
+                    f"({label(w, setter)} did, for them), so {aid} is no one's promise yet: {phrase(w, st, hints=False)}. "
+                    f"Whoever accepts {aid} holds it ({label(w, asker)} too: then it is their own promise)"]
+    st = state(w, w.nodes[aid]["subject"])
+    return [f"~ a commission is its asker's promise: {aid} \"{st['what'][:60]}\" · {phrase(w, st)}"
+            f" (lived= on {card} is {'your' if same(st['holder'], setter) else label(w, st['holder']) + chr(39) + 's'} report)"
+            + (f"; made by {label(w, asker)}'s own asking ({older})" if older else "")]
 
 
 def after_act(desk, n0):
@@ -548,17 +705,16 @@ def after_act(desk, n0):
             if c and w.subjects.get(c, {}).get("kind") not in (None, "promise"):
                 cards.add(c)
         a = e.get("args") or {}
+        if e["verb"] == "create" and a.get("commission") == "asked" and persons.norm(e["by"]) not in persons.NOT_PERSONS:
+            made = (e.get("undo") or {}).get("delete")
+            csid = w.subject_of(made) if made in w.nodes else None
+            if csid and w.subjects[csid].get("kind") == "task":
+                notes += _commission_asked(w, csid, e)     # a2798: made already asked counts as the act of asking
         if e["verb"] != "prop" or not sid or persons.norm(e["by"]) in persons.NOT_PERSONS:
             continue
         s = w.subjects[sid]
         if a.get("commission") == "asked" and s.get("kind") == "task":
-            mine_ = [st for st in open_about(w, sid) if st["state"] == OPEN and same(st["holder"], _person(w, e=e))]
-            if not mine_:
-                owed = _owed_for(w, sid, e["by"])
-                aid, ev = make(w, "promise", f"live what this lands: {s['title']}", owed, aid_of(w, sid), e["by"], cause=e["id"])
-                st = state(w, w.nodes[aid]["subject"])
-                notes.append(f"~ a commission is its asker's promise: {aid} \"{st['what'][:60]}\" · {phrase(w, st)}"
-                             f" (lived= on {aid_of(w, sid)} is your report)")
+            notes += _commission_asked(w, sid, e)
         if a.get("lived"):
             actor = _person(w, e=e)
             for st in open_about(w, sid):
@@ -573,29 +729,45 @@ def after_act(desk, n0):
         if living(w, c):
             continue
         for st in open_about(w, c):
-            if st["state"] != OPEN or st["asked_end"]:
+            if st["asked_end"]:
                 continue
-            holder = label(w, st["holder"])
-            fid = sill(w, holder)
             card = aid_of(w, c)
+            gone = (f"{card} \"{w.subjects[c]['title']}\" left the living "
+                    f"({w.subjects[c].get('props', {}).get('status') or 'no longer placed'})")
+            x = st["aid"]
+            if st["state"] == ASKED:        # a2798: a request asks its asker: withdraw it, or keep it open
+                who, title, q = st["asker"], f"Withdraw or keep? {x} about {card}", "withdraw or keep?"
+                text = (f"{gone}, and your request about it is still open:\n  {x} \"{st['what']}\" · {phrase(w, st, who)}\n"
+                        f"Withdraw it, or keep it open? Either answers this note:\n  withdraw: withdraw {x}\n"
+                        f"  keep: do prop <this note> status=done (the request stays open; "
+                        f"{label(w, st['asked'])} can still accept or decline it)")
+            elif st["holder"] is None:      # set for someone, held by no one: the one it was asked for is asked
+                who, title, q = st["owed"], f"Release or confirm? {x} about {card}", "release or confirm?"
+                text = (f"{gone}. {x} \"{st['what']}\" was asked for you and no one held it:\n  {phrase(w, st, who)}\n"
+                        f"  released: release {x} [why=\"...\"]\n  done anyway: confirm {x}\n"
+                        f"  anyone may still hold it: accept {x}")
+            else:
+                who, title, q = st["holder"], f"Kept, released or carried? {x} about {card}", "kept, released or carried?"
+                text = (f"{gone}, and your promise about it is still open:\n  {x} \"{st['what']}\" · {phrase(w, st, who)}\n"
+                        f"Was it kept, released or carried? One of these ends it, and this note with it:\n"
+                        f"  kept: report {x} how=\"...\"\n  released: release {x} [why=\"...\"]\n"
+                        f"  carried: carry {x} to=<name> (an offer: this note closes when they accept)")
+            name = label(w, who)
+            fid = sill(w, name)
             if not fid:
-                notes.append(f"~ {card} left the living with {st['aid']} still open (\"{st['what'][:60]}\", held by "
-                             f"{holder}), and {holder} has no sill to be asked on: report, release or carry {st['aid']}")
+                notes.append(f"~ {card} left the living with {x} still open (\"{st['what'][:60]}\", {phrase(w, st, hints=False)}), "
+                             f"and {name} has no sill to be asked on: {q}")
                 continue
-            text = (f"{card} \"{w.subjects[c]['title']}\" left the living ({w.subjects[c].get('props', {}).get('status') or 'no longer placed'}), "
-                    f"and your promise about it is still open:\n  {st['aid']} \"{st['what']}\" · {phrase(w, st, st['holder'])}\n"
-                    f"Was it kept, released or carried? One of these ends it, and this note with it:\n"
-                    f"  kept: report {st['aid']} how=\"...\"\n  released: release {st['aid']} [why=\"...\"]\n"
-                    f"  carried: carry {st['aid']} to=<name>")
             made = w.last_created
-            r = w.apply("create", fid, None, {"kind": "note", "title": f"Kept, released or carried? {st['aid']} about {card}",
-                                              "text": text, "promise": st["aid"]}, "house")
+            r = w.apply("create", fid, None, {"kind": "note", "title": title, "text": text, "promise": x}, "house")
             w.last_created = made
-            evx = next(x for x in w.events if x["id"] == r["event"])
+            qs = w.subjects[w.subject_of(r["created"])]
+            qs["text"] = qs["text"].replace("<this note>", r["created"])
+            evx = next(e for e in w.events if e["id"] == r["event"])
             evx["cause"], evx["via"] = new[0]["id"], VIA
             w.subjects[st["sid"]]["promise"]["acts"].append([r["event"], "asked-end"])
-            notes.append(f"~ {card} left the living with {st['aid']} still open: {holder} is asked once, on their sill "
-                         f"({r['created']}): kept, released or carried?")
+            notes.append(f"~ {card} left the living with {x} still open: {name} is asked once, on their sill "
+                         f"({r['created']}): {q}")
     return notes
 
 
@@ -734,8 +906,9 @@ def plan(w):
         who = ce["by"] if ce else None
         to = p.get("_to") or _owed_for(w, sid, who or "")
         words = p.get("_words") or f"live what this lands: {s['title']}"
+        own = asker_act(w, sid, p["asked_by"]) if p.get("asked_by") else ce     # a2798: asked_by's own act, or no one's
         items.append({"form": "promise", "what": words, "to": to, "about": aid_of(w, sid), "card": sid,
-                      "acts": [[ce["id"] if ce else None, "promise"]],
+                      "acts": [[own["id"], "promise"]] if own else [[ce["id"] if ce else None, "asked-for"]],
                       "why": f"commission {aid_of(w, sid)}: its asker's promise, owed to {to}"
                              + (", with its owe's words" if p.get("_words") else "")
                              + "".join(f"; folds in {c}'s owe" for c, _ in folded.get(sid, []))
@@ -992,12 +1165,16 @@ promise only when the one asked accepts it.
                                            owed to yourself, it is kept (your own word)
   confirm <id>                             the one owed: it was kept
   release <id> [why=<words>]               its holder lets it go; a reason is welcome, never required
-  carry <id> to=<name>                     its holder hands it on; the new holder sees 'carried to you from X'
-  promises                                 yours: asked of you, held, owed to you, reported to you, asked by you
+  carry <id> to=<name>                     its holder offers it on: it stays theirs ('offered to Y') until Y accepts
+                                           or declines it; withdraw <id> takes the offer back
+  promises                                 yours: asked of you, offered to you, held, owed to you, asked by you
 Selections: held-by:<name> (open promises held), asked-of:<name> (open requests of), owed-to:<name> (open or reported,
-owed to), asked-by:<name> (open requests made by), awaits:<name|any> (the things open requests are about). Columns
-(table, a view's cols=): promise (how it reads to you), asked_of, holder, owed. A lens may print $asked_of of a card.
-A commission is its asker's promise: commission=asked makes it (owed to asked_by, or the card's maker), and lived= on
-the card is the asker's report. A card that leaves the living (done, trashed, cancelled, the Trash) with an open
-promise about it asks the holder once, on their sill: kept, released or carried?
+owed to), asked-by:<name> (open requests made by), offered-to:<name> (open offers to), awaits:<name|any> (the things
+open requests are about). Columns (table, a view's cols=): promise (how it reads to you), asked_of, holder, owed. A
+lens may print $asked_of of a card.
+A commission is its asker's promise, owed to asked_by (or the card's maker), made by asked_by's own act of setting
+commission=asked; set by someone else for them, it is held by no one ('asked for X; held by no one') until someone
+accepts it. lived= on the card is the holder's report. A card that leaves the living (done, trashed, cancelled, the
+Trash) with an open promise or request about it asks once, on a sill: the holder (kept, released or carried?), the
+asker of a request (withdraw or keep?), or, held by no one, the one it was asked for (release or confirm?).
 owe= and awaiting= are not props any more in a world with promises: their door is promise and ask."""

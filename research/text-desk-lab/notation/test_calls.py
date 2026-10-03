@@ -91,7 +91,7 @@ check("(vii) a replace of other words in a line that opens '@sable @pike: ...' k
 
 # (ii) a comment that opens with @pike: knocks Pike, and its receipt says so
 n = len(W.events)
-t = act("juniper", f"look {R.LOUNGE} :1", f'do comment {R.NOTE} line="@pike: could you look"')
+t = act("juniper", f"read {R.NOTE}", f'do comment {R.NOTE} line="@pike: could you look"')
 k = knocked(n)
 check("(ii) a comment opening '@pike: could you look' knocks Pike, no one else", set(k) == {"pike"}, k)
 check("(ii) its receipt says 'to: pike'", "to: pike" in t and "mention" not in t, t)
@@ -99,7 +99,7 @@ check("(ii) what Pike hears says he was called, and how", any("called you" in l 
 
 # (iii) a comment mentioning @pike mid-sentence knocks no one, and its receipt says it is a mention
 n = len(W.events)
-t = act("juniper", f"look {R.LOUNGE} :1", f'do comment {R.NOTE} line="I think @pike said this already"')
+t = act("juniper", f"read {R.NOTE}", f'do comment {R.NOTE} line="I think @pike said this already"')
 check("(iii) a comment mentioning @pike mid-sentence knocks no one", knocked(n) == {}, knocked(n))
 check("(iii) its receipt says 'to: nobody' and names the mention", "to: nobody; a mid-line @ is a mention (@pike)" in t, t)
 
@@ -136,16 +136,16 @@ n = len(W.events)
 t = act("juniper", f"read {WATCH}", f'do append {WATCH} line="`@sable @pike: ...` is how an example is quoted"')
 check("a quoted header in a note calls no one, and the receipt says nothing of it", knocked(n) == {} and "to: " not in t, (t, knocked(n)))
 n = len(W.events)
-t = act("juniper", f"look {R.LOUNGE} :1", f'do comment {R.NOTE} line="Juniper, @sable: one for you"')
+t = act("juniper", f"read {R.NOTE}", f'do comment {R.NOTE} line="Juniper, @sable: one for you"')
 check("a comment signed with its writer's name, 'Juniper, @sable: ...', knocks Sable", set(knocked(n)) == {"sable"}, (t, knocked(n)))
 n = len(W.events)
-t = act("juniper", f"look {R.LOUNGE} :1", f'do comment {R.NOTE} line="@juniper: a note to myself"')
-check("the writer never calls themself", knocked(n) == {} and "to: " not in t, (t, knocked(n)))
+t = act("juniper", f"read {R.NOTE}", f'do comment {R.NOTE} line="@juniper: a note to myself"')
+check("the writer never calls themself", "ok" in t and knocked(n) == {} and "to: " not in t, (t, knocked(n)))
 n = len(W.events)
-t = act("sable", f"look {R.LOUNGE} :1", f'do comment {R.NOTE} line="@everyone: look"')
+t = act("sable", f"read {R.NOTE}", f'do comment {R.NOTE} line="@everyone: look"')
 check("@everyone opening a comment reaches no one (a916), and the receipt says a chat line is the place for it",
       knocked(n) == {} and "chat line is the place" in t, (t, knocked(n)))
-t = act("pike", f"look {R.LOUNGE} :1", f'do comment {R.NOTE} line="@pikee: typo"')
+t = act("pike", f"read {R.NOTE}", f'do comment {R.NOTE} line="@pikee: typo"')
 check("a header name that is no one: the receipt says so", "pikee: no one by that name" in t, t)
 
 # a chat line is not read here: its address is stored (a1581, a2715), so a comment's reading never doubles it

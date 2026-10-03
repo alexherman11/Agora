@@ -2,6 +2,7 @@
 them. Read-only: loads a copy of the pickle and never saves.
 
     python promise_census.py <world>
+    python promise_census.py --commissions <world>    each commission's promise, and who a2798's rule says made it
 """
 import pickle
 import re
@@ -48,9 +49,31 @@ def dry_run(path):
               f"{len(promises.matching(w, 'asked-of:' + who))}, owed-to {len(promises.matching(w, 'owed-to:' + who))}")
 
 
+def commissions(world):
+    """--commissions: every promise about a commission card, and what a2798's rule makes of it (made by asked_by's own
+    act of setting commission=asked, the earliest; or by no one when someone else set it for them). Never saves."""
+    import promises
+    w = pickle.loads((HERE / "sessions" / f"{world}.pickle").read_bytes()).world
+    for sid in promises.all_sids(w):
+        st = promises.state(w, sid)
+        c = promises.about_sid(w, st)
+        p = (w.subjects.get(c) or {}).get("props") or {}
+        if not c or st["form"] != "promise" or w.subjects[c].get("kind") != "task" or "commission" not in p:
+            continue
+        ab = p.get("asked_by")
+        made = promises.events(w).get(st["made"]) if st["made"] else None
+        own = promises.asker_act(w, c, ab) if ab else None
+        rule = ("no asked_by: the setter's, as before" if not ab else
+                f"{ab}'s own ({own['id']})" if own else f"no one's: {ab} never set commission=asked here")
+        print(f"{st['aid']}\tabout {st['about']}\tasked_by={ab or '-'}\tnow: {promises.phrase(w, st, {'pid': None, 'name': ''})}"
+              f"\tmade by {made['by'] if made else '?'} ({st['made']})\trule: {rule}")
+
+
 def main():
     if "--migrate" in sys.argv:
         return dry_run(sys.argv[sys.argv.index("--migrate") + 1])
+    if "--commissions" in sys.argv:
+        return commissions(sys.argv[sys.argv.index("--commissions") + 1])
     w = pickle.loads((HERE / "sessions" / f"{sys.argv[1]}.pickle").read_bytes()).world
     trash = {nid for nid, n in w.nodes.items() if (n.get("props") or {}).get("trash") == "yes"}
 

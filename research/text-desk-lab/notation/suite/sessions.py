@@ -76,6 +76,7 @@ def prints_at(rev):
         # to a living world, recorded as a house event; a frozen world is printed as it was frozen
         world._binds_version = 1
         world._promises_version = 1     # a1587: and so is the once-per-world migration of owe= and awaiting=
+        world._persons_version = 2      # a1590: and the binding of stored names to persons
         for title in lens_titles(desk):
             try:
                 r = desk.dispatch("desk", {"line": f"scene {title}"})

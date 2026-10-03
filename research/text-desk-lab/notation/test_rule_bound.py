@@ -1,14 +1,15 @@
 """test_rule_bound (a1388, from Claude e3229 and Pike a1356): hitting the 3-round bound is said to the rules' authors.
 
-    python test_rule_bound.py [world]        default frontier-try
+    python test_rule_bound.py
 
-Loads the world into memory and never saves it (the harness of test_rules.py). Rules trip rules in rounds: a round runs
-each rule once, in the order they were made, so a chain written last-step-first takes one round per step. A 4-step
-chain, by three authors, is tripped by juniper: the fourth step is not run, and the receipt, the sills and the counts
-say so. A 3-step chain fits the bound and says nothing.
+Builds its own small world (roomworld.py), in memory, never saved. Rules trip rules in rounds: a round runs each rule
+once, in the order they were made, so a chain written last-step-first takes one round per step. A 4-step chain, by
+three authors, is tripped by juniper: the fourth step is not run, and the receipt, the sills and the counts say so. A
+3-step chain fits the bound and says nothing.
+
+a3076: until then it read a copy of the live world and set the world's own rules aside; the built world has none.
 """
 import os
-import pickle
 import sys
 import uuid
 from pathlib import Path
@@ -17,7 +18,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
 fails = []
 
 
@@ -27,9 +27,10 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+import roomworld   # noqa: E402
+
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -59,19 +60,15 @@ def last(me, *lines):
 
 import rooms   # noqa: E402
 
-# rules already in the world would fire beside the ones written here: set them aside, in memory only (never saved)
-for _s in W.subjects.values():
-    if "rule" in (_s.get("tags") or []):
-        _s["tags"] = [t for t in _s["tags"] if t != "rule"]
-D._rulestate = None
-
-BOARD = next(f for f in rooms.all_rooms(W) if W.nodes[f]["title"] == "Board")
-TITLE = "your rules were stopped after 3 rounds"
+BOARD = R.BOARD
+assert not any("rule" in (s.get("tags") or []) for s in W.subjects.values()), "the built world holds no rules"
+TITLE = "your rules were stopped after "     # then the bound's number: a3076, a sill note under any bound counts
 
 
 def sill(who):
     fid = rooms.corner_of(W, who)
-    return [k["id"] for k in W.children(fid) if k.get("subject") and W.subjects[k["subject"]]["title"] == TITLE]
+    return [k["id"] for k in W.children(fid) if k.get("subject")
+            and str(W.subjects[k["subject"]]["title"]).startswith(TITLE)]
 
 
 def tags(nid):
@@ -103,7 +100,11 @@ A4 = rule("sable", "step 1", "when tag:b1 do tag add=b2")
 Z3 = rule("pike", "three 3", "when tag:c3 do tag add=c4")
 Y3 = rule("pike", "three 2", "when tag:c2 do tag add=c3")
 X3 = rule("pike", "three 1", "when tag:c1 do tag add=c2")
-pike0, sable0, juniper0 = len(sill("pike")), len(sill("sable")), len(sill("juniper"))
+# a3076: 'juniper gets none' and '3 steps: no sill notes' count notes on sills; a sill that resolved to nothing would
+# count 0 forever and pass them empty
+check("each author's sill is their corner", all(rooms.corner_of(W, a) == R.corner[a] for a in ("pike", "sable", "juniper")),
+      {a: rooms.corner_of(W, a) for a in ("pike", "sable", "juniper")})
+pike0, sable0, juniper0 =len(sill("pike")), len(sill("sable")), len(sill("juniper"))
 
 # ---- the 3-step chain fits: nothing said ----------------------------------------------------------------------------
 T3 = thing("three-step thing")
@@ -160,8 +161,13 @@ t, e = last("juniper", f"look {T6} :1", f"do tag {T6} add=b1")
 check("after a re-save, its author is told again (and only they)", len(sill("pike")) == pike0 + 2
       and len(sill("sable")) == sable0 + 1 and "told on their sills: pike (" in t, t)
 
-t, e = last("pike", "help rules")
-check("help rules says it", "each act runs at" in t and "stopped by the bound" in t, t)
+# a3076: this read 'help rules says it', but help is a note in the world's Help binder (a1595), so it checked the live
+# world's note, not the code; the built world has none. What the code says is the ~ line's own account of the bound
+T7 = thing("a fourth four-step thing")
+t, e = last("juniper", f"look {T7} :1", f"do tag {T7} add=b1")
+check("the ~ line says the bound itself, so the tripper needs no help note",
+      "Each act runs at most 3 rounds of rules (a round runs each rule once, in the order they were made); what was "
+      "stopped fires on the next change if it still matches. rules counts each stop" in t, t)
 
 print(f"\n{'all passed' if not fails else str(len(fails)) + ' FAILED'}")
 sys.exit(1 if fails else 0)

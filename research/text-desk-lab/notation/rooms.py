@@ -82,6 +82,9 @@ def all_rooms(w):
 
 def corner_of(w, actor):
     a = str(actor or "").lower()
+    import persons
+    if persons.is_pid(w, a):          # a1590: a person prop may hold the person (corner:p2919)
+        return persons.corner(w, a)
     for fid, n in w.nodes.items():
         p = n.get("props") or {}
         if n["type"] == "surface" and p.get("role") == "resident" and str(p.get("actor", "")).lower() == a and a:
@@ -183,9 +186,10 @@ def kind_of(w, actor):
         return "agent"
     if corner_of(w, a):
         return "resident"
+    import persons
     for n in w.nodes.values():
-        if n["type"] == "surface" and a in {x.strip().lower() for x in str((n.get("props") or {}).get("person", "")).split(",")}:
-            return "person"
+        if n["type"] == "surface" and persons.holds(w, (n.get("props") or {}).get("person", ""), a):
+            return "person"        # a1590: person= holds the person (Alex's p id), read by person
     return "agent"
 
 
@@ -214,11 +218,20 @@ def someone(w, name):
     return None
 
 
+# a2692: how a line reaches an agent with no corner, in that agent's own words; the receipt prints them as given, and for
+# an agent who hasn't said, only what the house knows. Claude, c2687 on a2692; Codex, c3056 on a2692.
+REACH = {
+    "claude": "not knocked (no corner); Claude sees it only while a Claude session is watching, and answers in the world",
+    "codex": "a separate event watcher can notify its Codex chat when @codex appears in event text; delivery is not "
+             "confirmed here",
+}
+
+
 def line_to(e):
     """a2662: whom a chat line's append event addressed, as one reading for the house's knock and the speaker's
     receipt: the line's stored to= (a1581: the writer's word, kept on the event with its line_id), or, for a line with
-    no stored address (said before lines, or in a chat whose lines are not things), its words read by the same rule
-    the migration used (world.addressed). -> (names, stored)"""
+    no stored address (said before lines, or in a chat whose lines are not things), its words read when heard by the
+    header rule a new line's address is (world.addressed, a2715). -> (names, stored)"""
     from world import addressed, to_names
     args = e.get("args") or {}
     if "line_id" in args:
@@ -226,30 +239,68 @@ def line_to(e):
     return addressed(args.get("append", "")), False
 
 
-def members_of(s):
-    return {m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",")}
+def members_of(s, at=None, w=None):
+    """Chat `s`'s members=, as a set of lower-case names; with `at` (an event id) and the world, as they were just after
+    that event (members_at)."""
+    raw = (s.get("props") or {}).get("members", "") if at is None else members_at(w, s, at)
+    return {m.strip().lower() for m in str(raw).split(",")}
 
 
-def member(w, s, actor):
-    """Is `actor` in chat `s`'s members (members=all counts everyone)?"""
-    members = members_of(s)
+def members_at(w, s, eid):
+    """a2692 (Pike c2697): chat `s`'s members= as it stood just after event `eid`: the first later change to members=
+    that still stands kept the whole subject as it was before (its undo), so that is what it said; with no later change,
+    what it says now."""
+    k = next((i for i, e in enumerate(w.events) if e["id"] == eid), None)
+    if k is not None:
+        apps = set(w.appearances_of(s["id"])) | {s["id"]}
+        for e in w.events[k + 1:]:
+            args = e.get("args") or {}
+            if e.get("verb") == "prop" and not e.get("undone") and e["target"] in apps and \
+                    ("members" in args or "members" in str(args.get("remove", "")).split(",")):
+                was = (e.get("undo") or {}).get("restore_subject")
+                if was is not None:
+                    return (was.get("props") or {}).get("members", "")
+    return (s.get("props") or {}).get("members", "")
+
+
+def private_others(w, s, writer):
+    """a3025 (Pike e5281): whom a private chat's unaddressed line goes to: the people its members= names, and the
+    resident whose corner holds it (book_owners: Pike's Talk with Alex says members=alex), less the writer, in the
+    order written, each someone. A chat with no members=, or members=all, is shared: [] (its plain line calls no one)."""
+    named = [m.strip().lower() for m in str((s.get("props") or {}).get("members", "")).split(",") if m.strip()]
+    if not named or set(named) & set(EVERYONE):
+        return []
+    out = []
+    for n in named + book_owners(w, s.get("id")):
+        if n not in out and not same_person(w, n, str(writer).split("/")[0]) and someone(w, n):
+            out.append(n)
+    return out
+
+
+def member(w, s, actor, at=None):
+    """Is `actor` in chat `s`'s members (members=all counts everyone)? With `at`, as they were after that event."""
+    members = members_of(s, at, w)
     return "all" in members or any(same_person(w, m, actor) for m in members if m)
 
 
-def can_read(w, s, actor):
+def is_member(w, s, actor, at=None):
     """a2662 (Sable c2682): a chat whose members= leaves `actor` out is private to its members; one with no members=
-    keeps no one out, and the chats in a resident's own corner are theirs (Talk with Alex, Pike says members=alex)."""
-    return not (members_of(s) - {""}) or member(w, s, actor) or \
+    keeps no one out, and the chats in a resident's own corner are theirs (Talk with Alex, Pike says members=alex).
+    Wider than member(): it counts an open chat and a corner's owner too. It decides who is called and what For you
+    shows, not who may read: reading a chat is not restricted (a3090; whether it should be is Alex's open question).
+    a2692: with `at` (an event id), whether they were when it happened, by members= as it was then (a corner is read
+    as it is now: no history of where a chat sat is kept)."""
+    return not (members_of(s, at, w) - {""}) or member(w, s, actor, at) or \
         any(same_person(w, o, actor) for o in book_owners(w, s.get("id")))
 
 
 def calls(w, s, to, actor):
-    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them in a chat they can
-    read (the address is the writer's word, so they need not be a member: membership governs plain lines; but a
+    """a2662: does a chat line addressed `to`, in chat subject `s`, call `actor`? When it names them in a chat they are
+    a member of by is_member (the address is the writer's word, so they need not be a member: membership governs plain lines; but a
     private chat never carries its line out, Sable c2682), or says @everyone or @all in a chat they are a member of.
     The house's knock (house.news) and the receipt (waiting_note) both ask this, so they agree."""
     if any(same_person(w, n, actor) for n in to if n not in EVERYONE):
-        return can_read(w, s, actor)
+        return is_member(w, s, actor)
     return bool(set(EVERYONE) & set(to)) and member(w, s, actor)
 
 
@@ -282,9 +333,11 @@ def waiting_note(desk, nid, text):
     line from a person in their own chat, ends a rest), 'Pike: in a turn; ...', or why it waits (asleep; the house not
     running; a resident's plain line in their own corner's chat, which waits for their next wake). A line from a
     resident or agent is shown first at that wake, marked for them. A person: 'Alex: a person; it waits in their For
-    you'. An agent: not knocked, and where it waits. A name that is no one: 'pikee: no one by that name'."""
+    you' ('a member of this chat' in a private chat they're in). An agent: how a line reaches them in their own words
+    (REACH), or only what the house knows. Anyone not a member of the chat: so, and it won't show in their For you
+    (a2692: For you, the knock and this ask one rule). A name that is no one: 'pikee: no one by that name'."""
     import scene
-    from world import ADDRESS, addressed
+    from world import ADDRESS, MENTION_NOTE, addressed, mentions
     w = desk.world
     n = w.nodes.get(nid)
     sid = n.get("subject") if n else nid
@@ -292,7 +345,7 @@ def waiting_note(desk, nid, text):
     if not s or s["kind"] != "chat":
         return ""
     e = next((x for x in reversed(w.events) if x["target"] in (nid, sid) and "append" in (x.get("args") or {})), None)
-    to, stored = line_to(e) if e else (addressed(text), False)
+    to, stored = line_to(e) if e else (addressed(text, w.me), False)
     no_one = [a for a in to if not someone(w, a)]
     out = []
     if stored:
@@ -300,8 +353,10 @@ def waiting_note(desk, nid, text):
         no_one = to_names((e.get("args") or {}).get("no_one"))     # the world left them out of to=, and kept them here
     elif to or ADDRESS.search(str(text)):
         to = [a for a in to if a not in no_one]
-        out.append("to: " + (", ".join(to) or "nobody") + (" (read from its words: this line has no stored address)" if to
-                   else " (an @ inside quotes or backticks calls no one)" if not no_one else ""))
+        said = (e.get("args") or {}).get("append", "") if e else text
+        heard = mentions(said, None if e else w.me)
+        out.append("to: " + (", ".join(to) or "nobody") + (" (read from its words: this line has no stored address)" if to else "")
+                   + ("; " + MENTION_NOTE.format(", ".join("@" + a for a in heard)) if heard else ""))
     me = str(w.me).split("/")[0].lower()
     person = kind_of(w, w.me) == "person"
     marked = "" if person else ", first and marked for them"
@@ -324,17 +379,32 @@ def waiting_note(desk, nid, text):
         name = w.display_name(a)
         kind = someone(w, a)
         if kind == "person":
-            out.append(f"{name}: a person; it waits in their For you")
+            # a2692: a person not a member of the chat never sees it in For you (it asks is_member too); a member of a
+            # private chat sees every line of it in For you, addressed or not (inbox_rows' direct chats)
+            if a not in owners and not is_member(w, s, a):
+                out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); it won't "
+                           f"show in their For you")
+            elif "all" not in members_of(s) and member(w, s, a):
+                out.append(f"{name}: a member of this chat; it waits in their For you")
+            else:
+                out.append(f"{name}: a person; it waits in their For you")
             continue
         if kind != "resident":
-            out.append(f"{name}: not knocked (no corner: the house runs no session for them); it waits in their For you "
-                       f"(inbox:{a}) when they look")
+            # an agent's own word on how a line reaches them is said as given, even where they are not a member (a
+            # watcher of their own may not ask the house's rule: Codex c3056); the house says only what it knows
+            if a not in owners and not is_member(w, s, a):
+                out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); it won't "
+                           f"show in their For you" + (f"; their own word: {REACH[a]}" if a in REACH else ""))
+            else:
+                out.append(f"{name}: " + (REACH.get(a) or f"not knocked (no corner: the house runs no session for them); "
+                                          f"the house doesn't know how a line reaches them; it shows in their For you "
+                                          f"(inbox:{a})"))
             continue
         row = rows.get(corner_of(w, a)) or {}
         doing = str(row.get("doing", ""))
         knocks = calls(w, s, to, a) or (person and a in owners)
-        if a not in owners and not can_read(w, s, a):
-            out.append(f"{name}: can't read this chat (members={(s.get('props') or {}).get('members')}); not knocked")
+        if a not in owners and not is_member(w, s, a):
+            out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); not knocked")
         elif asleep(w, a):
             out.append(f"{name}: asleep (want=rest), so the house doesn't run them; your line waits for them{marked} "
                        f"until someone sets want=awake")
@@ -524,7 +594,8 @@ def item_line(desk, nid):
         return f"{nid} {kind} \"{title}\"" + (f" · {k} inside" if k else " · empty")
     s = w.subjects[n["subject"]]
     p = s.get("props") or {}
-    bits = [x for x in (p.get("status"), f"owner {p['owner']}" if p.get("owner") else "", f"due {s['due']}" if s.get("due") else "") if x]
+    import persons
+    bits = [x for x in (p.get("status"), f"owner {persons.shown(w, p['owner'])}" if p.get("owner") else "", f"due {s['due']}" if s.get("due") else "") if x]
     return f"{nid} {s['kind']} \"{title}\"" + (" · " + " · ".join(bits) if bits else "")
 
 

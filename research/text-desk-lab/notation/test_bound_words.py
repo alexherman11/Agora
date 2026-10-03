@@ -1,13 +1,17 @@
 """test_bound_words (a1156, from a1147): stored lines bind their words when saved; nothing takes over a word later.
 
-    python test_bound_words.py [world]        default frontier-try
+    python test_bound_words.py
 
-Loads the world into memory and never saves it (the harness of test_room_verbs.py). Each check is a line of the
-commission's 'done when', or of Juniper's c1337 (a room may stand over a word only out loud: overrides=<id>), tried on
-what this world holds: the house's trash verb and the two lens acts that use it, the residents' corners and sills.
+Builds its own small world (roomworld.py), in memory, never saved. Each check is a line of the commission's 'done
+when', or of Juniper's c1337 (a room may stand over a word only out loud: overrides=<id>), tried on a house trash verb,
+the lens acts that use it, and the residents' corners and sills.
+
+a3029: until then it read a copy of the live world, whose two trash lenses happened to be written by sable (the one
+who changes trash here, told on the receipt) and by someone with no sill (told on the receipt too). When pike became
+the Desktop lens's last writer, pike was told on their sill, which the check did not look at, and it failed. Here the
+three kinds of author are made on purpose: the changer, one with a sill, one without.
 """
 import os
-import pickle
 import sys
 import uuid
 from pathlib import Path
@@ -16,7 +20,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
-WORLD = sys.argv[1] if len(sys.argv) > 1 else "frontier-try"
 fails = []
 
 
@@ -26,9 +29,10 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-D = pickle.loads((HERE / "sessions" / f"{WORLD}.pickle").read_bytes())
+import roomworld   # noqa: E402
+
+D, R = roomworld.build()
 W = D.world
-D._session = WORLD + "-inmemory"
 
 
 def be(me):
@@ -60,10 +64,9 @@ def last(me, *lines):
 import rooms   # noqa: E402
 import verbs   # noqa: E402
 
-room = lambda title: next(f for f in rooms.all_rooms(W) if W.nodes[f]["title"] == title)
-LOUNGE, BOARD = room("Lounge"), room("Board")
-JC, PC = rooms.corner_of(W, "juniper"), rooms.corner_of(W, "pike")
-print(f"world {WORLD} (in memory): Lounge {LOUNGE}, Board {BOARD}, Juniper's corner {JC}, Pike's corner {PC}")
+LOUNGE, BOARD = R.LOUNGE, R.BOARD
+JC, PC = R.corner["juniper"], R.corner["pike"]
+print(f"world (built, in memory): Lounge {LOUNGE}, Board {BOARD}, Juniper's corner {JC}, Pike's corner {PC}")
 
 
 def make(me, fid, title, text="x", extra=""):
@@ -86,9 +89,29 @@ def sill_notes(who, title):
     return [k["id"] for k in W.children(fid) if k.get("subject") and W.subjects[k["subject"]]["title"] == title]
 
 
+# ---- the world before a1156: a house trash verb, and lenses whose acts use it -------------------------------------
+# as the live world had them (a1174 trash, a589 command-center, a1180 trash-probe, a134 p-gesture), each lens written by
+# someone chosen: sable will change trash (told on the receipt), pike has a sill (told there), claude has none (the
+# receipt says so). Their texts are put in memory, as lines saved before bindings were
+last("jeff", f"look {R.HOME} :1", f'do create {R.HOME} kind=surface title=Trash')
+TRASHF = W.last_created
+make("juniper", R.HOME, "trash", f"# put a thing in the Trash: trash <id>\\ndo prop $1 status=trashed\\ndo move $1 into={TRASHF}",
+     "tags=verb on=house")
+LENS_TEXT = {
+    "desk-board": ("pike", 'board : column, of tag:probe, each card\ncard : text "$title", on menu "delete" do trash $item'),
+    "trash-probe": ("sable", f'probe : column, the {R.NOTE}\n  x : text "delete", role tool, on click do trash $item\n'
+                             f'  y : text "$title"'),
+    "guest-bin": ("claude", 'bin : column, of tag:probe, each b\nb : text "$title", role tool, on click do trash $item'),
+    "p-gesture": ("sable", 'root : column\n  list : of tag:probe, each card\ncard : text "$title $beds", '
+                           'on click do prop $item beds=9; prop $item color=red'),
+}
+for title, (who, text) in LENS_TEXT.items():
+    lid, t, e = make(who, R.DESKTOP, title, "x", "tags=lens")
+    assert lid, (title, e)
+    subj(lid)["text"] = text
+
 # ---- the lines saved before bindings bind once, to what they mean now ---------------------------------------------
-# the copy may have been opened by this code already (another test saves it): start from the world as it is before
-# landing, with no binding anywhere
+# start from the world as it is before landing, with no binding anywhere
 W._binds_version = 0
 for s in W.subjects.values():
     s.pop("binds", None)
@@ -228,13 +251,22 @@ n_notes = len(sill_notes("pike", title))
 t, e = last("juniper", f"read {W1} :3", f'do rewrite {W1} text="# stamps it\\ndo prop $1 stamped=2"')
 check("a change only to its # description lines tells no one", len(sill_notes("pike", title)) == n_notes, t)
 
-# the real case: the house's trash, used by two lenses' acts
+# the real case: the house's trash, used by three lenses' acts, one by each kind of author. a3029: each lens is named
+# where its author will read it: the changer's on the receipt, pike's in the note on their sill, claude's (no sill) on
+# the receipt, saying so. Until a3029 this looked only at the receipt, so an author with a sill failed it
+trash_title = "trash changed; these of yours use it"
 t, e = last("sable", f"read {TA} :3", f'do append {TA} line="do prop $1 binned=1"')
 told = [l for l in t.splitlines() if l.startswith("~ trash")]
-check("changing the house's trash tells the authors of the lens acts bound to it (or says who has no sill)",
-      told and all(any(W.appearances_of(s["id"])[0] in l for l in told) for s in cc), e or t)
 for l in told:
     print("     " + l[:240])
+app = lambda title: W.appearances_of(next(s for s in cc if s["title"] == title)["id"])[0]
+mine = next((l for l in told if "these of yours use it" in l), "")
+nosill = next((l for l in told if "claude has lines that use it and no sill to tell" in l), "")
+psill = sill_notes("pike", trash_title)
+check("changing the house's trash tells the authors of the lens acts bound to it (or says who has no sill)",
+      len(cc) == 3 and app("trash-probe") in mine and app("guest-bin") in nosill and len(psill) == 1
+      and app("desk-board") in subj(psill[0])["text"] and app("desk-board") not in mine + nosill
+      and not sill_notes("sable", trash_title), (e or t, [subj(x)["text"] for x in psill]))
 
 # ---- undo, and the lens and wake paths ----------------------------------------------------------------------------
 R3, t, e = make("pike", BOARD, "frob board", "when tag:fb do frobnicate", "tags=rule")

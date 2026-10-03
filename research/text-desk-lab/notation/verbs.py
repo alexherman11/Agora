@@ -355,7 +355,8 @@ def holder_kind(s):
 
 def stored_texts(w):
     """-> {key: (kind, text)} for every placed holder of stored lines: ('s', subject id) for a verb, rule or lens note,
-    ('n', node id) for a node with a wake line."""
+    ('n', node id) for a node with a wake line, ('q', view id) for a view's query (a1590: it names persons, bound when
+    saved; it has no verb words)."""
     out = {}
     for s in w.subjects.values():
         kind = holder_kind(s)
@@ -365,12 +366,16 @@ def stored_texts(w):
         wake = (n.get("props") or {}).get("wake")
         if wake:
             out[("n", n["id"])] = ("wake", str(wake))
+        if n.get("layout") == "view" and n.get("query"):
+            out[("q", n["id"])] = ("view", str(n["query"]))
     return out
 
 
 def holder_home(w, key, kind):
     """Where a holder's lines stand (a990 (3)): a verb's where it lives, a rule's or a lens's in the room holding its
     note, a wake in its corner."""
+    if key[0] == "q":
+        return None             # a view's query has no verb words to judge where it stands
     if key[0] == "n":
         import rooms
         return key[1] if rooms.is_room(w, key[1]) else room_holding(w, key[1])
@@ -381,6 +386,8 @@ def holder_home(w, key, kind):
 def holder_label(w, key, kind):
     if key[0] == "n":
         return f"the wake on {key[1]}"
+    if key[0] == "q":
+        return f"view {key[1]} \"{(w.nodes.get(key[1]) or {}).get('title', '')}\""
     s = w.subjects.get(key[1])
     return f"{kind} {_aid(w, s) if s else key[1]}" + (f' "{s["title"]}"' if s and kind != "verb" else "")
 
@@ -426,6 +433,8 @@ def _lens_steps(text):
 def line_words(desk, kind, text):
     """-> [(word, its words, the step)] for each step of stored text whose word reaches for a verb made in the world."""
     import desk as desk_mod
+    if kind == "view":
+        return []
     if kind == "rule":
         steps = _rule_steps(text)
     elif kind == "lens":
@@ -476,6 +485,9 @@ def bind_text(desk, kind, text, here, me):
                                       f"neither a general verb ({' '.join(knife.GENERAL)}) nor one made in the world. "
                                       f"A stored line's words are bound when it is saved, so a verb made later never takes "
                                       f"one over: make the verb first (help verbs), then save the line; or name one: use <id>")
+    import persons
+    if persons.on(w):
+        entry["persons"] = persons.bind_words(w, text)     # a1590: its names mean the persons its writer meant, now
     return entry
 
 
@@ -483,6 +495,9 @@ def binding_of(w, key, text):
     """The binding kept for this holder's current `text`, or None (saved before bindings, a1156)."""
     if key[0] == "s":
         b = (w.subjects.get(key[1]) or {}).get("binds")
+        return b if b and b.get("text") == text else None
+    if key[0] == "q":
+        b = (w.nodes.get(key[1]) or {}).get("qbinds")
         return b if b and b.get("text") == text else None
     for b in reversed((w.nodes.get(key[1]) or {}).get("binds") or []):
         if b.get("text") == text:
@@ -492,17 +507,19 @@ def binding_of(w, key, text):
 
 def keep_binding(w, key, entry):
     """Kept with the holder, outside its props: a subject's binding is restored with it by undo (restore_subject);
-    a corner keeps its last few wake bindings by text, since undo restores only its props."""
-    if key[0] == "s":
-        s = w.subjects[key[1]]
-        if entry["words"] or entry["missing"]:
-            s["binds"] = entry
+    a corner keeps its last few wake bindings by text, since undo restores only its props. a1590: a view keeps its
+    query's in qbinds, by text, so a query put back by undo finds its own."""
+    keep = bool(entry["words"] or entry["missing"] or entry.get("persons"))
+    if key[0] in ("s", "q"):
+        holder, slot = (w.subjects[key[1]], "binds") if key[0] == "s" else (w.nodes[key[1]], "qbinds")
+        if keep:
+            holder[slot] = entry
         else:
-            s.pop("binds", None)
+            holder.pop(slot, None)
         return
     n = w.nodes[key[1]]
     kept = [b for b in (n.get("binds") or []) if b.get("text") != entry["text"]]
-    n["binds"] = (kept + ([entry] if entry["words"] or entry["missing"] else []))[-KEEP_WAKES:]
+    n["binds"] = (kept + ([entry] if keep else []))[-KEEP_WAKES:]
 
 
 def writer(w, key):
@@ -521,6 +538,9 @@ def writer(w, key):
             elif e["target"] in ids and e["verb"] == "edit" and ("text" in a or "append" in a):
                 who = e["by"]
         return who
+    if key[0] == "q":
+        return next((e["by"] for e in reversed(w.events) if "query" in (e.get("args") or {}) and not e.get("undone")
+                     and (e["target"] == key[1] or (e.get("undo") or {}).get("delete") == key[1])), None)
     return next((e["by"] for e in reversed(w.events) if e["target"] == key[1] and e["verb"] == "prop"
                  and "wake" in (e.get("args") or {}) and not e.get("undone")), None)
 
@@ -684,6 +704,10 @@ def after_act(desk, before):
             notes.append(f"~ {holder_label(w, key, kind)}: its words are bound (a1156): " + ", ".join(
                 f"{wd} → {rec['at']}" if not rec.get("thing") else f"{wd} → the verb on the thing it is used on"
                 for wd, rec in entry["words"].items()))
+        if entry.get("persons"):
+            import persons
+            notes.append(f"~ {holder_label(w, key, kind)}: its names are bound to persons (a1590), so they mean these "
+                         f"persons whoever bears the names later: {persons.bound_note(w, entry['persons'])}")
         old = before.get(key)
         if kind == "verb" and old is not None and old[0] == "verb" and _steps(old[1]) != _steps(text):
             changed_verbs.append(key[1])
@@ -709,6 +733,9 @@ def binding_lines(w, key, text, indent="  "):
         out.append(f"{indent}its words are bound (saved by {b.get('by') or '?'}): " + ", ".join(parts))
     for wd in b["missing"]:
         out.append(f"{indent}{wd} is bound to nothing: nothing answered it when these lines were saved")
+    if b.get("persons"):
+        import persons
+        out.append(f"{indent}its names are bound to persons (a1590): {persons.bound_note(w, b['persons'])}")
     return out
 
 

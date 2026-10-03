@@ -164,6 +164,28 @@ def _scene_key(q):
             int(time.time() // 60))
 
 
+def snapshot_for(desk):
+    """The world as JSON for the Desktop (core.js asks at start, after each of its own acts, and at every change)."""
+    snap = desk.snapshot()
+    snap["events_total"] = len(desk.world.events)
+    # Lark: each person's reading position is a fact others may see (how far into the log they have looked)
+    wt = getattr(desk, "_wt", None)
+    snap["worktree"] = {k: (len(v) if k == "journal" else v) for k, v in wt.items()} if wt else None
+    snap["readers"] = {a: v[2] for a, v in (getattr(desk, "_per", None) or {}).items()}
+    # reading for the renderer must not count as the actor looking. a2872: nor what the fence reads (_seen_idx); left
+    # out, every refresh marked each outline line's title and props seen, and alex's next retitle passed unrefused.
+    # A shallow copy is enough: _note_seen replaces a key's dict, never changes one in place.
+    seen, header, idx = dict(desk.seen), desk.last_event_seen, getattr(desk, "_seen_idx", None)
+    idx = dict(idx) if idx is not None else None
+    snap["outline"] = desk.outline(desk.world.root, 2, deep=True)
+    desk.seen, desk.last_event_seen = seen, header
+    if idx is None:
+        desk.__dict__.pop("_seen_idx", None)     # absent before: absent after, so an unchanged world is not rewritten
+    else:
+        desk._seen_idx = idx
+    return snap
+
+
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
@@ -259,15 +281,7 @@ class Handler(SimpleHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path == "/api/snapshot":
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
-                snap = desk.snapshot()
-                snap["events_total"] = len(desk.world.events)
-                # Lark: each person's reading position is a fact others may see (how far into the log they have looked)
-                wt = getattr(desk, "_wt", None)
-                snap["worktree"] = {k: (len(v) if k == "journal" else v) for k, v in wt.items()} if wt else None
-                snap["readers"] = {a: v[2] for a, v in (getattr(desk, "_per", None) or {}).items()}
-                seen, header = dict(desk.seen), desk.last_event_seen      # reading for the renderer must not count as the actor looking
-                snap["outline"] = desk.outline(desk.world.root, 2, deep=True)
-                desk.seen, desk.last_event_seen = seen, header
+                snap = snapshot_for(desk)
             return self._json(snap)
         if u.path == "/api/scene":
             import scene

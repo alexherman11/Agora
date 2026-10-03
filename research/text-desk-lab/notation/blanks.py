@@ -112,7 +112,8 @@ def _one(desk, ctx, name, attr):
         p = attr[1:]
         props = w.nodes[fid].get("props") or {}
         if p in props and str(props[p]).strip():
-            return str(props[p])
+            import persons
+            return str(persons.shown(w, props[p]))      # a1590: a person prop fills as the name
         if p == "title":
             return w.nodes[fid]["title"]
         raise Refusal(f"{what}: {w.nodes[fid]['title']} ({fid}), the room you are in, has no {p}= "
@@ -175,7 +176,8 @@ def _part(desk, val, attr, what):
         return who
     props = ((w.subjects[sid].get("props") if sid in w.subjects else w.nodes[nid].get("props")) or {})
     if p in props and str(props[p]).strip():
-        return str(props[p])
+        import persons     # a1590: a person prop fills as the person's name (juniper,first for an earlier one): the
+        return str(persons.shown(w, props[p]))     # words that, typed back, mean the same person
     raise Refusal(f"{what}: {nid} has no {p}= (a thing's parts are .title, .maker and its props)")
 
 

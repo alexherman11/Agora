@@ -159,9 +159,12 @@ class DeskKnife(DeskMoo):
 
     # ---- views: live collections (round 11d) ---------------------------------------------------------
     def view_matches(self, nid):
+        import verbs
         q = self.world.nodes[nid].get("query", "")
+        b = verbs.binding_of(self.world, ("q", nid), q)       # a1590: its names mean whom they meant when it was saved
         try:
-            sel = self._parse_selection(q)
+            with persons.reading(self, (b or {}).get("persons")):
+                sel = self._parse_selection(q)
         except Refusal:
             return None
         return [] if sel is None else [i for i in sel[0] if i != nid]
@@ -351,7 +354,7 @@ class DeskKnife(DeskMoo):
             already = []
             if not broken and not st.get("on") and not st.get("now"):
                 try:
-                    already = self._rule_selection(st["sel"], home)[0]
+                    already = self._rule_selection(st["sel"], home, sid)[0]
                     st["done"].update(already)
                 except Refusal as e:
                     st["broken"] = broken = str(e)
@@ -576,7 +579,7 @@ class DeskKnife(DeskMoo):
                 return str(w.days_between(d, self.today)) if d and self.today else ""
             if c in promises.COLS and s and c not in (s.get("props") or {}):
                 return promises.cell(w, s["id"], c)     # a1587: read from the promise's events, never stored
-            return str(((s or {}).get("props") or {}).get(c, ""))
+            return str(persons.shown(w, ((s or {}).get("props") or {}).get(c, "")))
         shown = [{"title": "title", "tags": "tags", "due": "due", "in": "place"}.get(c, None if c in ("id", "kind", "words", "age") + self.HOUSE_COLS else f"prop:{c}") for c in cols]
         shown = [a for a in shown if a]
         for i in ids:                       # Juniper (reads case): a table that printed status has shown status
@@ -604,10 +607,17 @@ class DeskKnife(DeskMoo):
                    "promise asked_of holder owed (help promises), and any prop; cols= picks, by= sorts (desc=1)")
         return out
 
-    def _rule_selection(self, sel, home=None):
+    def _rule_selection(self, sel, home=None, sid=None):
         """A rule's selection, its blanks filled each time it is asked ($today follows the clock; $here is the rule's
-        home, a990)."""
-        return self._parse_selection(blanks.fill(self, sel, ctx=blanks.Ctx("rule", home=home)))
+        home, a990). a1590: its names mean the persons they were bound to when the rule was saved."""
+        filled = blanks.fill(self, sel, ctx=blanks.Ctx("rule", home=home))
+        s = self.world.subjects.get(sid) if sid else None
+        if s is None:
+            return self._parse_selection(filled)       # being parsed: _parse_binds is the rule's binding
+        import verbs
+        b = verbs.binding_of(self.world, ("s", sid), s["text"])
+        with persons.reading(self, (b or {}).get("persons")):
+            return self._parse_selection(filled)
 
     def _parse_action(self, argv, home=None):
         """The part of a rule after do: <verb> [target] [k=v ...], or a verb made in the world (a990): its word, or use
@@ -840,7 +850,7 @@ class DeskKnife(DeskMoo):
             if r.get("on"):
                 continue
             try:
-                ids, _ = self._rule_selection(r["sel"], r.get("home"))
+                ids, _ = self._rule_selection(r["sel"], r.get("home"), r.get("sid"))
             except Refusal:
                 continue
             if nid in ids and nid not in r["done"]:
@@ -983,7 +993,7 @@ class DeskKnife(DeskMoo):
             done = set()
         else:
             try:
-                ids = self._rule_selection(r["sel"], r.get("home"))[0]
+                ids = self._rule_selection(r["sel"], r.get("home"), r.get("sid"))[0]
             except Refusal:
                 return []
             done = r["done"]
@@ -1011,7 +1021,7 @@ class DeskKnife(DeskMoo):
                         r["done"] = set()   # an event rule fires every time
                     else:
                         try:
-                            ids, desc = self._rule_selection(r["sel"], r.get("home"))
+                            ids, desc = self._rule_selection(r["sel"], r.get("home"), r.get("sid"))
                         except Refusal as e:
                             self._note(f"~ {r['id']} could not select ({e})")
                             continue
@@ -1272,6 +1282,7 @@ class DeskKnife(DeskMoo):
             for sid in self.world.chats_without_lines():
                 self.world.chat_lines(sid)        # a1581: once per chat, its lines become things (one event each)
             promises.migrate(self)        # a1587: once per world, owe= and awaiting= become promises and requests
+            persons.migrate(self)         # a1590: once per world, stored names become the persons who bore them then
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
@@ -1360,7 +1371,9 @@ class DeskKnife(DeskMoo):
         return ",".join(out)
 
     def _parse_selection(self, token):
-        return knife.parse_selection(self.world, self._selection_terms(token.strip()))
+        # a1590: read for a stored line (a view's query, a rule, a lens, a wake), its names mean the persons it was bound
+        # to when saved; typed, today's bearers
+        return knife.parse_selection(self.world, self._selection_terms(token.strip()), binds=persons.active(self))
 
     def _trash_note(self, token):
         """a1327: what a selection left out because it is in the Trash, said so the leaving out is never silent."""
@@ -1768,6 +1781,9 @@ class DeskKnife(DeskMoo):
         if (n.get("props") or {}).get("wake"):
             import verbs
             out += verbs.binding_lines(w, ("n", nid), str(n["props"]["wake"]), indent="  wake: ")
+        if n.get("layout") == "view" and n.get("query"):
+            import verbs
+            out += verbs.binding_lines(w, ("q", nid), str(n["query"]), indent="  query: ")     # a1590
         out.append("  where: " + self._where_line(nid))
         if self.today:
             d = w.last_day(nid)
@@ -1852,6 +1868,8 @@ class DeskKnife(DeskMoo):
             if hit:
                 raise Refusal(f"{hit[0]} is a promise: its words are its maker's, and it ends only by its own verbs "
                               f"(report, release, carry, confirm, accept, decline, withdraw; help promises)")
+        # a1590: a person prop holds the person: a typed name is today's bearer, a stored line's the one it was bound to
+        said = persons.store_args(w, kv, persons.active(self)) if verb in ("create", "prop") else []
         before, texts, n0 = verbs.state(w), verbs.stored_texts(w), len(w.events)
         out = self._do_knife(verb, positional, kv)
         if len(w.events) == n0:
@@ -1860,6 +1878,7 @@ class DeskKnife(DeskMoo):
         notes = []
         if not bad:
             bad, notes = verbs.after_act(self, texts)
+        notes = said + notes
         if bad:
             verbs.rollback(self, n0)
             raise Refusal(bad + ". Nothing was changed")

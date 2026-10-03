@@ -130,11 +130,30 @@ check("only the one asked may accept", t.startswith("ERR") and "only pike" in t,
 t = say("pike", f"accept {aid_c}")
 check("accept makes it Pike's promise, owed to Sable", "you promised sable" in t, t)
 check("and it leaves Waiting on me", "0 matches" in say("pike", f"look {V2}"))
-# ---- (ii): carried, seen from both sides ----------------------------------------------------------------------------
+# ---- (ii): carried, seen from both sides; a carry is an offer until accepted (a2798) --------------------------------
 t = say("pike", f"carry {aid_c} to=juniper")
-check("carry: the old holder reads 'you carried it to juniper'", "you carried it to juniper" in t, t)
+check("carry is an offer: it stays Pike's, 'offered to juniper'", "you promised sable · offered to juniper" in t, t)
+check("held-by: still selects Pike while it is offered", promises.state(W, W.nodes[aid_c]["subject"])["holder"]["name"] == "pike")
 t = say("juniper", "promises")
-check("the new holder reads 'carried to you from pike'", "carried to you from pike" in t, t)
+check("the one offered reads 'offered to you by pike'", "offered to you (accept or decline)" in t and "offered to you by pike" in t, t)
+check("only the one offered may answer it", "only they can accept" in say("sable", f"look {aid_c} :1", f"accept {aid_c}"))
+t = say("juniper", f"look {aid_c} :1", f"decline {aid_c}")
+check("a declined offer leaves it Pike's", "pike promised sable · you declined" in t, t)
+t = say("pike", "promises")
+check("and Pike reads 'juniper declined'", "you promised sable · juniper declined" in t, t)
+t = say("pike", f"carry {aid_c} to=juniper")
+check("a second offer, after a decline", "offered to juniper" in t, t)
+check("one offer at a time", "already" in say("pike", f"carry {aid_c} to=sable"))
+t = say("pike", f"withdraw {aid_c}")
+check("the carrier withdraws the offer; it stays theirs", "ok" in t and "offered" not in t.split("\n")[0], t)
+check("a withdrawn offer cannot be accepted", say("juniper", f"accept {aid_c}").startswith("ERR"))
+say("pike", f"carry {aid_c} to=juniper")
+t = say("juniper", f"accept {aid_c}")
+check("accepted, it is theirs: 'carried to you from pike'", "carried to you from pike" in t, t)
+t = say("pike", f"look {aid_c} :1")
+check("the old holder reads 'you carried it to juniper'", "you carried it to juniper" in t, t)
+t = say("juniper", "promises")
+check("the new holder's list reads 'carried to you from pike'", "carried to you from pike" in t, t)
 t = say("sable", f"look {aid_c} :1")
 check("the one owed sees who holds it now", "juniper holds it, owed to you" in t, t)
 # ---- report and confirm; release; decline; withdraw --------------------------------------------------------------
@@ -148,6 +167,7 @@ t = say("sable", f'ask to=juniper "read the census" about={A}')
 q = made(t) or re.search(r"(a\d+) ask", t).group(1)
 t = say("juniper", f"look {q} :1", f"decline {q}")
 check("decline needs no reason", "declined by you" in t, t)
+q_decline = re.search(r"ok (e\d+)", t).group(1)
 t = say("sable", f'ask to=pike "and the table" about={A}')
 q2 = re.search(r"(a\d+) ask", t).group(1)
 t = say("sable", f"withdraw {q2}")
@@ -175,6 +195,42 @@ check("commission=asked makes its asker's promise", "a commission is its asker's
 t = say("pike", f"look {Y} :1", f'do prop {Y} lived="lived it"')
 check("lived= reports it; owed to yourself, kept on your own word", "kept (your own word)" in t, t)
 
+# ---- a2798: a commission's promise is its asker's own act; set for them by another hand, it is no one's ---------------
+Z = made(say("sable", f"look {B} :1", f'do create {B} kind=task title="Worlds" owner=sable asked_by=juniper status=open'))
+t = say("sable", f"look {Z} :1", f"do prop {Z} commission=asked")
+check("set by someone other than asked_by: no one's promise, and the receipt says so",
+      "no one's promise yet" in t and "asked for juniper; held by no one" in t, t)
+pz = re.search(r"so (a\d+) is no one's", t).group(1)
+check("held-by:sable does not select it", pz not in say("sable", "table kind:promise,held-by:sable cols=title"))
+t = say("juniper", "promises")
+check("juniper's list: 'asked for you, held by no one'", "asked for you, held by no one" in t and pz in t, t)
+check("no one can report what no one holds", "held by no one" in say("sable", f"look {pz} :1", f"report {pz}"))
+t = say("juniper", f"look {pz} :1", f"accept {pz}")
+check("asked_by accepting it makes it hers", "your own promise" in t, t)
+Z2 = made(say("sable", f"look {B} :1", f'do create {B} kind=task title="Doors 2" owner=sable asked_by=juniper status=open'))
+t = say("sable", f"look {Z2} :1", f"do prop {Z2} commission=asked")
+pz2 = re.search(r"so (a\d+) is no one's", t).group(1)
+t = say("pike", f"look {pz2} :1", f"accept {pz2}")
+check("anyone may hold it by accepting it: Pike's promise, owed to juniper", "you promised juniper" in t, t)
+Z3 = made(say("juniper", f"look {B} :1", f'do create {B} kind=task title="Doors 3" owner=juniper asked_by=juniper status=open'))
+say("juniper", f"look {Z3} :1", f"do prop {Z3} commission=working")
+t = say("sable", f"look {Z3} :1", f"do prop {Z3} commission=asked")
+check("no one's, even when asked_by made the card", "no one's promise yet" in t, t)
+
+# ---- a2798: a request on a card that leaves the living asks its asker, once: withdraw or keep ----------------------
+X2 = made(say("sable", f"look {B} :1", f'do create {B} kind=task title="Ask it" status=doing'))
+t = say("sable", f'ask to=pike "Pike looks at it" about={X2}')
+rq = re.search(r"(a\d+) ask", t).group(1)
+t = say("sable", f"look {X2} :1", f"do prop {X2} status=done")
+check("closing a card with an open request asks its asker once", "sable is asked once, on their sill" in t
+      and "withdraw or keep?" in t, t)
+qn = [s for s in W.subjects.values() if (s.get("props") or {}).get("promise") == rq]
+check("the question sits on Sable's sill", len(qn) == 1 and W.nodes[W.appearances_of(qn[0]["id"])[0]]["parent"] == R.corner["sable"], qn)
+say("sable", f"look {X2} :1", f"do prop {X2} status=doing")
+check("and only once", "asked once" not in say("sable", f"look {X2} :1", f"do prop {X2} status=done"))
+say("pike", f"look {rq} :1", f"decline {rq}")
+check("an answer to the request closes the question", qn[0]["props"].get("status") == "done", qn)
+
 # ---- the props stay gone; persons; undo ------------------------------------------------------------------------------
 check("owe= is refused, naming promise", "promise to=" in say("sable", f"look {X} :1", f'do prop {X} owe="x"'))
 t = say("sable", f"table kind:promise,held-by:sable cols=title,promise,holder")
@@ -185,7 +241,7 @@ say("jeff", "person pike name=kestrel")
 t = say("sable", f"examine {aid_c}")
 check("a rename moves nothing: who accepted and carried is read from events, and prints by the person's name now",
       "accept by kestrel" in t and "carry by kestrel" in t and "pike" not in t.split("verbs:")[0].replace("Pike's", ""), t)
-t = say("juniper", f"undo")
+t = say("juniper", f"undo {q_decline}")
 check("undo of an act puts it back (a decline undone is a request again)", "reverted" in t, t)
 D2, R2 = roomworld.build(say=False)        # a world where nothing came after the migration, so undo may reach it
 W2 = D2.world
@@ -204,6 +260,39 @@ check("undo of the migration takes back what it made and what it caused, and put
       and W2.subjects[W2.nodes[DUE2]["subject"]]["props"].get("status") != "done", t)
 say("sable", "look :1")
 check("and it never runs again", len([e for e in W2.events if e["verb"] == "promises"]) == 2)
+
+# ---- a2986: a re-ask makes its asker's promise; an old ask, or a different promise about the card, never stops it -----
+D3, R3 = roomworld.build(say=False)        # a1590's life, shrunk: asked before promises, the ask taken back for an owe
+W3 = D3.world
+D, W = D3, W3
+K3 = create("pike", R3.BOARD, 'kind=task title="Persons 2" owner=pike asked_by=pike status=open')
+say("pike", f"look {K3} :1", f"do prop {K3} commission=asked")
+old_ask = W3.events[-1]["id"]
+say("pike", f"look {K3} :1", f'do prop {K3} owe="ask it when phase 1 lands" remove=commission')
+W3._promises_version = 0
+say("sable", "look :1")
+check("(the migration ran, and made the owe a promise, not a commission's)", promises.on(W3)
+      and len(promises.open_about(W3, W3.nodes[K3]["subject"])) == 1)
+p_owe = promises.open_about(W3, W3.nodes[K3]["subject"])[0]["aid"]
+say("pike", f"look {p_owe} :1", f"release {p_owe}")
+t = say("pike", f"look {K3} :1", f"do prop {K3} commission=asked")
+ask = [e for e in W3.events if e["verb"] == "prop" and (e.get("args") or {}).get("commission") == "asked"][-1]["id"]
+st3 = [st for st in (promises.state(W3, x) for x in promises.all_sids(W3))
+       if (promises.events(W3).get(st["made"]) or {}).get("cause") == ask and st["state"] == "open"]
+check("re-asking a card whose old ask came before promises makes the asker's promise, made by this ask (not the old one)",
+      "a commission is its asker's promise" in t and old_ask not in t and len(st3) == 1
+      and st3[0]["holder"]["name"] == "pike", (t, st3))
+K4 = create("pike", R3.BOARD, 'kind=task title="Persons 3" owner=pike asked_by=pike status=open')
+t = say("pike", f'promise to=pike "set {K4} commission=asked once phase 1 lands" about={K4}')
+check("(pike holds a different promise about the card)", "promise" in t and len(promises.open_about(W3, W3.nodes[K4]["subject"])) == 1, t)
+t = say("pike", f"look {K4} :1", f"do prop {K4} commission=asked")
+op = promises.open_about(W3, W3.nodes[K4]["subject"])
+check("asking a card about which the asker holds a different open promise still makes the commission's promise",
+      "a commission is its asker's promise" in t and len(op) == 2, (t, op))
+t = say("pike", f"look {K4} :1", f"do prop {K4} commission=working", f"do prop {K4} commission=asked")
+check("but a commission promise for this card already open is not made twice, and the receipt names it",
+      "a commission is its asker's promise" not in t and len(promises.open_about(W3, W3.nodes[K4]["subject"])) == 2
+      and re.search(r"no new promise: a\d+ already holds this commission", t), t)
 
 print(f"\n{len(fails)} failed" if fails else "\nall ok")
 sys.exit(1 if fails else 0)
