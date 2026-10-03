@@ -122,6 +122,25 @@ check("examine e999999: no event by that id, and the latest one named", e and "n
       and W.events[-1]["id"] in e, (t, e))
 t, e = one(ME, "examine 9661f78")
 check("examine <a commit hash>: says it looks like a commit", e and "looks like a commit" in e, (t, e))
+check("examine <a hash no card landed>: says no card landed it, and how one is found (a3295)",
+      e and "no card here landed it" in e and "find prop:landed=" in e, (t, e))
+reply("house", f"look {CARD} :1", f"do prop {CARD} commission=landed landed=9661f78")
+for h in ("9661f78", "9661f78a0b1c2d3e4f"):
+    t, e = one(ME, f"examine {h}")
+    check(f"examine {h} (a hash a card landed): names the card and the door to it (a3295)",
+          e and "looks like a commit" in e and f"landed by {CARD}" in e and f"read {CARD}" in e and "no card" not in e, (t, e))
+t, e = one(ME, "examine 9661f79")
+check("a hash one digit off a landed one is no card's", e and "no card here landed it" in e, (t, e))
+
+# a3295: a link's receipt names the link it made and its kind, and $new holds it
+got = reply(ME, f"look {NOTE} :1", f"look {CARD} :1", f"do link {CARD} {NOTE} as=blocks", "examine $new",
+            f"do unlink {CARD} id=$new")
+L2 = W.events[-2]["undo"].get("drop_link") if len(got) == 5 else None
+check("do link A B: the receipt says 'created l…' and 'l…: A blocks → B'",
+      L2 and f"→ created {L2}" in got[2][1] and f"{L2}: {CARD} blocks → {NOTE}" in got[2][1], got[2:])
+check("$new after a link is the link: examine $new shows it, unlink id=$new removes it",
+      L2 and got[3][1].lstrip().startswith(f"{L2} link") and f"{L2} removed" in got[4][1]
+      and not any(l["id"] == L2 for l in W.links), got[3:])
 t, e = one(ME, f"examine {GONE}")
 check(f"examine {GONE} (removed): not 'no such id', but its last event", e and "not in the world now" in e
       and "remove" in e, (t, e))

@@ -459,8 +459,18 @@ class Desk:
                 raise Refusal(f"{ident} is not in the world now; its last event was {last['id']} ({last['verb']} by "
                               f"{persons.by(self.world, last)}): examine {last['id']} shows it; history {ident} lists what happened to it")
         if HASH.match(ident) and any(ch.isdigit() for ch in ident) and not ident.isdigit():
+            # a3295: the house keeps the door already: a landed card's landed= holds its commit. Name the card, or say
+            # plainly that none has it (a commit a landing did not make: a worker's own, a docs export, another repo's)
+            w = self.world
+            cards = [a for s in w.subjects.values() for v in [str((s.get("props") or {}).get("landed") or "")]
+                     if v and (v.startswith(ident) or ident.startswith(v)) for a in w.appearances_of(s["id"])[:1]]
+            if cards:
+                raise Refusal(f"no such id {ident!r}: it looks like a commit (the code's history, kept in git, outside the "
+                              f"world), landed by " + ", ".join(f"{a} \"{w.title(w.nodes[a])[:80]}\"" for a in cards)
+                              + f": read {cards[0]} (its comments say what it changed)")
             raise Refusal(f"no such id {ident!r}: it looks like a commit (the code's history, kept in git, outside the "
-                          f"world); a landed card's comments say what it changed. {ID_HINT}")
+                          f"world), and no card here landed it: no landed= holds that hash (find prop:landed=<hash> finds "
+                          f"the card that landed one). {ID_HINT}")
         raise Refusal(f"no such id {ident!r} ({ID_HINT})")
 
     def _touched_by_others(self, nid, fields=None, others_only=True):
