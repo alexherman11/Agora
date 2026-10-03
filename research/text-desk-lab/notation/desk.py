@@ -809,6 +809,9 @@ class Desk:
         latest = {persons.by(w, e): e for e in evs if e["verb"] == "go"}
         evs = [e for e in evs if e["verb"] != "go" or latest.get(persons.by(w, e)) is e]
         yours, told = self.edits_to_yours(evs)      # a1471: an edit to what you made has its own line, not a count
+        import promises     # a3275: the house's `landed` on a promise you hold is said to you in its own sentence
+        ended, told2 = promises.landings_told(w, evs)
+        yours, told = yours + ended, told | told2
         evs = [e for e in evs if e["id"] not in told]
         yours = "".join(l + "\n" for l in yours)
         if not evs:

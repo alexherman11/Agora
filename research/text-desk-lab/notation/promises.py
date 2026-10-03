@@ -29,7 +29,9 @@ someone holds it by an act (accept <id>, or X setting commission=asked). A lived
 not landed yet (the door's `a3165@4bf2a2a`, or the commit the door last pinned for them) is a report as of that commit
 (a3165): the promise stays open, 'lived at 4bf2a2a, not landed yet', and ends at the landing, when the house says what
 it compared (`landed <id> ...`, its word alone): kept if the same code landed, still open, 'landed differently from
-what you lived: <files>', if not. Nothing reopens. A card that leaves the living (done, trashed,
+what you lived: <files>', if not; its holder hears that sentence once, in their catch-up (a3275). The commit is read
+only from a label naming the card's own commission or the plain 'at <commit>'; another commission's label, or anything
+in quotes, is words (a3275, lived_read). Nothing reopens. A card that leaves the living (done, trashed,
 cancelled, in a Trash) with an open promise about it that the same act did not end asks, once, on their sill: its
 holder (kept, released or carried?), or for a request its asker (withdraw or keep?), or for a promise held by no one
 the one it was asked for (release or confirm?).
@@ -300,7 +302,7 @@ def testimony(w, card_sid, holder=None):
         who = _person(w, e=e)
         if same(who, holder):
             continue
-        out[who.get("pid") or who.get("name")] = (who, e["id"], str(words), lived_commit(words)[:7])    # as a3165 reads one
+        out[who.get("pid") or who.get("name")] = (who, e["id"], str(words), lived_commit(words, apps)[:7])    # as a3165 reads one
     return list(out.values())
 
 
@@ -578,10 +580,36 @@ def command(desk, verb, arg):
     return out
 
 
-def lived_commit(text):
-    """The commit a lived= names: the door's label (`a3165@4bf2a2a: ...`), or 'at 4bf2a2a'. '' when it names none."""
-    m = re.search(r"(?:@|\bat\s+)([0-9a-f]{7,40})\b", str(text))
-    return m.group(1) if m and re.search(r"\d", m.group(1)) else ""
+_QUOTED = (re.compile(r'"[^"\n]*"'), re.compile(r"(?<!\w)'[^'\n]*'(?!\w)"))
+_COMMIT_REF = re.compile(r"(\w*)@([0-9a-f]{7,40})\b|\bat\s+([0-9a-f]{7,40})\b")
+
+
+def lived_read(text, own=()):
+    """What a lived= says of commits, on a card whose ids are `own` (a3275: a use is not a mention). A commit is taken
+    from the door's label when it names this card (`a3165@4bf2a2a: ...`; a bare `@4bf2a2a` names no other), or from the
+    plain 'at 4bf2a2a'; the first such is the one. A label naming another commission, or anything inside quotes, is
+    words. -> (commit or '', [why each reference seen was not taken])."""
+    text = str(text)
+    own = {str(x).lower() for x in own}
+    spans = [m.span() for q in _QUOTED for m in q.finditer(text)]
+    commit, left = "", []
+    for m in _COMMIT_REF.finditer(text):
+        c = m.group(2) or m.group(3)
+        if not re.search(r"\d", c):
+            continue
+        ref = m.group(0)
+        if m.group(1) and m.group(1).lower() not in own:
+            left.append(f"{ref} names another commission; not taken as this one's")
+        elif any(a <= m.start() < b for a, b in spans):
+            left.append(f"{ref} is inside quotes, so it is words; not taken as the commit you lived")
+        elif not commit:
+            commit = c
+    return commit, left
+
+
+def lived_commit(text, own=()):
+    """The commit a lived= names (lived_read). '' when it names none."""
+    return lived_read(text, own)[0]
 
 
 def door_commit(desk, who, cards):
@@ -640,6 +668,33 @@ def _landed(desk, words, kv):
     ev = add_act(w, sid, "landed", text, args=args, answers=bool(more.get("same")), more=more)
     st = state(w, sid)
     return f"ok {ev['id']}: {target} landed: {phrase(w, st, o['who'])} · \"{st['what']}\""
+
+
+def landings_told(w, evs):
+    """a3275: a promise ended (or held open) by the house's `landed` is someone else's act on what you hold, so its
+    holder hears the sentence itself, once, in their catch-up: 'a3218 kept: lived at d5bb83d; landed on a main that
+    moved in 1 other file since; health passed'. Told to the holder, the one who lived it, and the one it is owed to;
+    a comparison since replaced or ended by another act says nothing. -> (lines, ids of the events they tell)."""
+    lines, told = [], set()
+    if not on(w):
+        return lines, told
+    r = me(w)
+    for e in evs:
+        if e["verb"] != "landed" or e.get("undone") or not is_promise(w, e["target"]):
+            continue
+        st = state(w, w.subject_of(e["target"]))
+        o = st["asof"]
+        if not o or not any(same(p, r) for p in (st["holder"], o["who"], st["owed"]) if p):
+            continue
+        last = next((t[2] for t in reversed(st["trail"]) if t[0] == "landed"), None)
+        if st["state"] == OPEN and o["compared"] and last == e["id"]:
+            lines.append(f"~ {st['aid']} stays open: {phrase(w, st, r)} ({e['id']})")
+        elif st["ended"] and st["ended"][2] == e["id"]:
+            lines.append(f"~ {st['aid']} {phrase(w, st, r)} ({e['id']})")
+        else:
+            continue
+        told.add(e["id"])
+    return lines, told
 
 
 def _known_name(w, name):
@@ -860,10 +915,14 @@ def after_act(desk, n0):
             # landed yet, the commit may be the door's (the one it last pinned for this actor); with none, or on a
             # card that is no commission in flight, it is their own word, as before
             comm, card = str((s.get("props") or {}).get("commission") or ""), aid_of(w, sid)
-            commit, door = lived_commit(a["lived"]) if comm in NOT_LANDED + ("landed",) else "", False
+            # a3275: the commit is taken only from a reference to this card, or the plain 'at <commit>'; one that
+            # names another commission, or stands inside quotes, is words, and the receipt says so once
+            (commit, left), door = lived_read(a["lived"], w.appearances_of(sid)) if comm in NOT_LANDED + ("landed",) else ("", []), False
             if not commit and comm in NOT_LANDED:
                 commit = door_commit(desk, e["by"], w.appearances_of(sid))
                 door = bool(commit)
+            if left and any(same(st["holder"], actor) or same(st["owed"], actor) for st in open_about(w, sid)):
+                notes.append("~ " + " · ".join(left))
             for st in open_about(w, sid):
                 if commit and st["state"] == OPEN and (same(st["holder"], actor) or same(st["owed"], actor)):
                     add_act(w, st["sid"], "lived", str(a["lived"]), e["by"], cause=e["id"], verb="report",
@@ -964,10 +1023,10 @@ def not_your_report(desk, n0):
             if st["state"] == OPEN and _is_commission(w, st, apps):
                 card = aid_of(w, sid)
                 whose = label(w, st["holder"]) if st["holder"] else label(w, st["owed"])
-                m = re.search(r"\b\w+@[0-9a-f]{7,40}\b", str(e["args"]["lived"]))
+                c = lived_commit(e["args"]["lived"], apps)     # a3275: this card's commit, never another's
                 return (f"lived= on {card} is {whose}'s word, not yours: {st['aid']} ({phrase(w, st, hints=False)}) ends by "
                         f"their act alone. What you lived is testimony, and it is welcome: do prop {card} "
-                        f"lived_by=\"{m.group(0) if m else '<commission>@<commit>'}: <what you saw>\" keeps it on the card "
+                        f"lived_by=\"{f'{card}@{c}' if c else '<commission>@<commit>'}: <what you saw>\" keeps it on the card "
                         f"and shows it on the promise, ending nothing; or tell {whose} in a comment on {card}")
     return None
 
@@ -1395,7 +1454,9 @@ saw>" is their testimony, kept on the card and shown on the promise ('also lived
 A lived= that names a commit before the commission has landed
 (the door's words after a visit: lived="a3165@4bf2a2a: what you saw"; with no commit named, the one the door last
 pinned for you) is a report as of that commit: the promise stays open, 'lived at 4bf2a2a, not landed yet', and ends at
-the landing. The house compares the branch as it landed with that commit, in the files the commission touched: the
+the landing. The commit is taken only from a label naming the card itself (a3165@4bf2a2a on a3165) or the plain 'at
+4bf2a2a'; a label naming another commission, or anything inside quotes, is words, and the receipt says it was not
+taken. The house's comparison is said to you in your next reply, in a ~ line of its own. The house compares the branch as it landed with that commit, in the files the commission touched: the
 same, it ends 'kept: lived at 4bf2a2a; landed on a main that moved in 14 other files since; health passed'; not the
 same, it stays open, 'landed differently from what you lived at 4bf2a2a: <files>', until you live it as it landed
 (lived= again) or report <id> how=<why it didn't matter>, your own word. A card that leaves the living (done, trashed, cancelled, the

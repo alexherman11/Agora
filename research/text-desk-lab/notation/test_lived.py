@@ -153,7 +153,7 @@ check("the same code landed: kept, and the receipt states its reach",
       reads(P1) == f"kept: lived at {c1[:7]}; landed on a main that moved in 2 other files since; health passed", reads(P1))
 check("to someone else it says who lived it", reads(P1, "sable").startswith(f"kept: pike lived at {c1[:7]};"), reads(P1, "sable"))
 check("by the house's one act, and pike is asked nothing", [e["by"] for e in W.events[n:]] == ["house", "house"]
-      and P1 not in say("pike", "promises"), W.events[n:])
+      and not [l for l in say("pike", "promises").splitlines() if P1 in l and not l.startswith(f"~ {P1} kept: ")], W.events[n:])
 t = say("pike", f"examine {P1}")
 check("examine tells it act by act", f"lived by pike" in t and f"as of {c1[:7]}: {K1}@{c1[:7]}: the door opens" in t
       and "compared with the landing by house" in t, t)
@@ -241,6 +241,71 @@ check("landed is the house's word alone", t.startswith("ERR") and "the house's w
 ev = [e for e in W.events if e["verb"] == "report"][-1]["id"]
 say("pike", f"undo {ev}")
 check("a report as of a commit undone leaves the promise as it was", reads(P8) == "your own promise", reads(P8))
+
+# ---- a3275: a commit is used only when the words name this card's; a mention is words -----------------------------------
+K9, P9 = commission("Fence")
+git("checkout", "-q", "-b", "worker/k9")
+c9 = write("lab/a.py", "a = 9\n", "k9: a")
+say("house", f"look {K9} :1", f"do prop {K9} commission=landed landed={land('worker/k9')}")
+t = say("pike", f"look {K9} :1", f"do prop {K9} lived=\"walked it as it landed. Earlier I typed '{K7}@{c7[:7]}: sat on it' on the other card\"")
+check("another commission's label, in quotes, on a landed card: no commit, pike's own word",
+      "kept (your own word)" in t and "as of" not in t and reads(P9).startswith("kept (your own word)"), t)
+check("and the receipt says once that it was seen and not taken",
+      t.count(f"~ {K7}@{c7[:7]} names another commission; not taken as this one's") == 1, t)
+K10, P10 = commission("Hedge")
+t = say("pike", f"look {K10} :1", f'do prop {K10} lived="like {K7}@{c7[:7]} did, it holds"')
+check("another commission's label outside quotes is words too", "kept (your own word)" in t and "names another commission" in t, t)
+K11, P11 = commission("Well")
+t = say("pike", f"look {K11} :1", f"do prop {K11} lived=\"the receipt read '{K11}@{c9[:7]}: fine' and 'at {c9[:7]}'; it's pike's word\"")
+check("this card's own label inside quotes is words, and said so; an apostrophe opens no quote",
+      "kept (your own word)" in t and t.count("is inside quotes") == 2 and "as of" not in t, t)
+K12, P12 = commission("Path")
+t = say("pike", f"look {K12} :1", f"do prop {K12} lived=\"{K12}@{c9[:7]}: walked it, unlike '{K7}@{c7[:7]}'\"")
+check("the card's own label still reports as of it, with the mention left as words",
+      f"reports {P12} as of {c9[:7]}, not landed yet" in t and f"{K7}@{c7[:7]} names another commission" in t, t)
+K13, P13 = commission("Step")
+t = say("pike", f"look {K13} :1", f'do prop {K13} lived="walked it at {c9[:7]}"')
+check("the plain 'at <commit>' still reports as of it", f"reports {P13} as of {c9[:7]}" in t and "not taken" not in t, t)
+check("the reader alone", promises.lived_read("a1@abcdef1 'at abcdef2' @abcdef3 at abcdef4 at defaced", ["a2"])
+      == ("abcdef3", ["a1@abcdef1 names another commission; not taken as this one's",
+                      "at abcdef2 is inside quotes, so it is words; not taken as the commit you lived"]),
+      promises.lived_read("a1@abcdef1 'at abcdef2' @abcdef3 at abcdef4 at defaced", ["a2"]))
+
+
+# ---- a3275: the house's landed is said to the holder, once, in the promise's own sentence ------------------------------
+def header(me):
+    """What `me` is told at the top of their next reply (the catch-up), whole."""
+    W.me = me
+    D.seen, D.open, D.last_event_seen = D._per[me]
+    h = D.delta_header()
+    D._per[me] = (D.seen, D.open, D.last_event_seen)
+    return h
+
+
+K14, P14 = commission("Lamp")
+git("checkout", "-q", "-b", "worker/k14")
+c14 = write("lab/a.py", "a = 14\n", "k14: a")
+say("pike", f"look {K14} :1", f'do prop {K14} lived="{K14}@{c14[:7]}: it lights"')
+header("pike")
+landed(K14, land("worker/k14"))
+h = header("pike")
+check("kept by the landing: the holder is told the sentence, in a ~ line",
+      f"~ {P14} kept: lived at {c14[:7]}; landed on a main that had not moved elsewhere since; health passed" in h, h)
+check("and it is not also counted as a bare 'landed ... by house'", f"landed {P14} by house" not in h, h)
+check("once", P14 not in header("pike"), header("pike"))
+say("sable", "look")
+K15, P15 = commission("Bell")
+git("checkout", "-q", "-b", "worker/k15")
+c15 = write("lab/a.py", "a = 15\n", "k15: a")
+say("pike", f"look {K15} :1", f'do prop {K15} lived="{K15}@{c15[:7]}: it rings"')
+write("lab/b.py", "b = 15\n", "k15: b, after the visit")
+header("pike"), header("sable")
+landed(K15, land("worker/k15"))
+h = header("pike")
+check("landed differently: the holder is told it stays open, and why",
+      f"~ {P15} stays open: your own promise · landed differently from what you lived at {c15[:7]}: lab/b.py" in h, h)
+h = header("sable")
+check("someone it is not held by or owed to hears no sentence", "~" not in h and "stays open" not in h, h)
 
 tmp.cleanup()
 print(f"\n{len(fails)} failed" if fails else "\nall ok")
