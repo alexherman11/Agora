@@ -1444,7 +1444,7 @@ class DeskKnife(DeskMoo):
                     return rooms.narrate(self, fid)
         if cmd in ("person", "persons"):
             return self.cmd_person(arg)
-        if cmd in promises.VERBS:
+        if cmd in promises.VERBS + promises.HOUSE_VERBS:
             return self._promise_verb(cmd, arg)
         if cmd == "promises":
             return promises.listing(self)
@@ -1528,7 +1528,7 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
-            if verb in promises.VERBS:      # a1587: do accept a2001 is accept a2001
+            if verb in promises.VERBS + promises.HOUSE_VERBS:      # a1587: do accept a2001 is accept a2001
                 return self._promise_verb(verb, arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else "")
             is_target = is_target_word      # a selection term is the target, = or not (Juniper; see SEL)
             # tier 1: `do sweep porch` may name a verb made in the world; a990: so may a retired built-in's word (tidy,
