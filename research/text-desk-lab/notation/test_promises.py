@@ -224,7 +224,11 @@ check("the promise is still held-by:sable, and no testimony made pike or juniper
 check("the door's question (whose commission is this?) answers by who asks",
       (setattr(W, "me", "sable") or promises.commission_of(W, V)) == {"promise": pv, "holder": "sable", "owed": "sable", "yours": True}
       and (setattr(W, "me", "pike") or promises.commission_of(W, V)["yours"]) is False, promises.commission_of(W, V))
-t = say("sable", f"look {V} :1", f'do prop {V} lived="{V}@4bf2a2a: lived it myself, as pike did"')
+t = say("sable", f"look {V} :1", f'do prop {V} lived="{V}@4bf2a2a: lived it myself"')
+check("the holder's own lived= naming a commit is her report as of it (a3165), and the testimony shows beside it",
+      f"lived= reports {pv} as of 4bf2a2a, not landed yet" in t
+      and "your own promise · lived at 4bf2a2a, not landed yet · also lived by pike at 4bf2a2a; by juniper" in say("sable", "promises"), t)
+t = say("sable", f"look {V} :1", f'do prop {V} lived="lived it myself, as pike did"')
 check("the holder's own lived= then ends it, on her own word", f"lived= reports {pv}: kept (your own word)" in t, t)
 check("and the card keeps the testimony beside her report", (W.subjects[W.nodes[V]["subject"]]["props"]).get("lived_by")
       and W.subjects[W.nodes[V]["subject"]]["props"]["lived"].endswith("as pike did"))

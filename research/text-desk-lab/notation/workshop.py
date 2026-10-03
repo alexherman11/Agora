@@ -128,11 +128,47 @@ def health(world, cwd=HERE):
     return data
 
 
+def lived_vs_landed(lived, head, cwd=None):
+    """a3165: how a landing (its merge commit `head`) compares with a commit someone lived. Sable c3169, c3171, Claude
+    e5549: the branch's tip as it landed against the lived commit, in the files the commission touched (at either
+    commit, so a file put back since counts), which takes in any merge of main the worker resolved in them: code
+    nobody lived. What main changed elsewhere never differs; it is counted, for the kept receipt to state its reach.
+    -> {tip, files, other, also} (files: what differs; other: how many other files main moved in since the lived
+    commit left it; also: the commission's own files main changed too), or {cannot: why}."""
+    cwd = cwd or REPO                 # read when called: a test points REPO at a repository of its own
+
+    def names(*args):
+        r = git("diff", "--name-only", "-z", *args, cwd=cwd)
+        return None if r.returncode else {p for p in r.stdout.split("\0") if p}
+
+    def commit(rev):
+        r = git("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}", cwd=cwd)
+        return r.stdout.strip() if r.returncode == 0 else ""
+
+    pre, tip, at = commit(f"{head}^1"), commit(f"{head}^2"), commit(lived)
+    if not pre or not tip:
+        return {"cannot": f"{head} is not a landing's merge commit here"}
+    if not at:
+        return {"cannot": f"{lived[:7]} is no commit git knows here"}
+    ours, theirs, diff, moved = names(f"{pre}...{tip}"), names(f"{pre}...{at}"), names(at, tip), names(f"{at}...{pre}")
+    if None in (ours, theirs, diff, moved):
+        return {"cannot": f"git could not compare {lived[:7]} with {tip[:7]}"}
+    mine = ours | theirs
+    return {"tip": tip, "files": sorted(diff & mine), "other": len(moved - mine), "also": sorted(moved & mine)}
+
+
+def short_files(files, n=8):
+    """File names as a receipt prints them: the lab's own without its folder, the first n, then how many more."""
+    out = [f[len(NOTATION) + 1:] if f.startswith(NOTATION + "/") else f for f in files]
+    return ", ".join(out[:n]) + (f" and {len(out) - n} more" if len(out) > n else "")
+
+
 class Workshop:
     def __init__(self, house):
         self.house = house
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
+        self.compared = set()          # (promise, lived commit) this house has said its comparison of, or tried to
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -166,8 +202,35 @@ class Workshop:
         extra = "".join(f" {k}={json.dumps(str(v), ensure_ascii=False)}" for k, v in more.items())
         self.house.act("house", f"look {cid} :1; do prop {cid} commission={state}{extra}")
 
+    def compare_lived(self, w):
+        """a3165: a promise reported as of a commit (lived= naming one) ends at the landing. For each one whose
+        commission has landed, compare what landed with that commit and say it to the promise, as the house's own
+        act (`landed <promise> ...`): the same code, and it ends kept; not, and it stays open naming the files. Asked
+        each pass, so a lived= that names its commit after the landing is compared too; said once per house."""
+        try:
+            import promises
+            waiting = promises.awaiting_landing(w)
+        except Exception:            # an older house holds an older promises module until it restarts
+            return
+        for st in waiting:
+            sid = promises.about_sid(w, st)
+            props = (w.subjects.get(sid) or {}).get("props") or {}
+            lived, key = st["asof"]["commit"], (st["aid"], st["asof"]["commit"])
+            if props.get("commission") != "landed" or not props.get("landed") or key in self.compared:
+                continue
+            self.compared.add(key)
+            c = lived_vs_landed(lived, str(props["landed"]))
+            q = lambda v: json.dumps(str(v), ensure_ascii=False)     # noqa: E731
+            if c.get("cannot"):
+                said = f"cannot={q(c['cannot'])}"
+            else:
+                said = f"tip={c['tip'][:7]} other={c['other']}" + (f" files={q(short_files(c['files']))}" if c["files"] else "") \
+                       + (f" also={q(short_files(c['also']))}" if c["also"] else "")
+            self.house.act("house", f"look {st['aid']} :1; landed {st['aid']} lived={lived} {said}")
+
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self, w, cfg):
+        self.compare_lived(w)
         cs = self.commissions(w)
         for cid, (s, state) in cs.items():
             wk = self.workers.get(cid)
@@ -475,6 +538,7 @@ class Workshop:
         self.set_state(cid, "landed", landed=head)
         self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(after.get("text", "").splitlines())[:600]
                  + self.export_docs(cid))
+        self.compare_lived(self.house.load())     # a3165: a promise reported as of a commit ends here, or stays open
         self.finish(cid, wk, keep_branch=False)
         if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
             self.restart_wanted = True

@@ -25,22 +25,31 @@ card is the asker's report: theirs alone (a3198). From anyone else, while the co
 refused, and lived_by= is their testimony: kept on the card, shown on the promise as 'also lived by pike at <commit>',
 ending nothing. It is made by the asker's own act of asking (a2798): the earliest event where asked_by
 set commission=asked. When someone else set it for them, it is no one's promise: 'asked for X; held by no one', until
-someone holds it by an act (accept <id>, or X setting commission=asked). A card that leaves the living (done, trashed,
+someone holds it by an act (accept <id>, or X setting commission=asked). A lived= that names a commit of a commission
+not landed yet (the door's `a3165@4bf2a2a`, or the commit the door last pinned for them) is a report as of that commit
+(a3165): the promise stays open, 'lived at 4bf2a2a, not landed yet', and ends at the landing, when the house says what
+it compared (`landed <id> ...`, its word alone): kept if the same code landed, still open, 'landed differently from
+what you lived: <files>', if not. Nothing reopens. A card that leaves the living (done, trashed,
 cancelled, in a Trash) with an open promise about it that the same act did not end asks, once, on their sill: its
 holder (kept, released or carried?), or for a request its asker (withdraw or keep?), or for a promise held by no one
 the one it was asked for (release or confirm?).
 """
 
+import json
 import re
 import shlex
 import weakref
 from copy import deepcopy
+from pathlib import Path
 
 import persons
 from world import Refusal
 
 VERBS = ("promise", "ask", "accept", "decline", "withdraw", "report", "confirm", "release", "carry")
+HOUSE_VERBS = ("landed",)   # a3165: the house's word alone: what a landing was, compared with the commit someone lived
 ENDS_CARD = ("done", "trashed", "cancelled")
+NOT_LANDED = ("asked", "working", "waiting", "ready", "landing", "reverted", "failed")   # a commission still to land
+VISITS = Path(__file__).resolve().parent / "house-state" / "visits.json"     # the door's record of who pinned what
 OPEN, ASKED, REPORTED = "open", "requested", "reported"
 TERMS = ("held-by:", "asked-of:", "owed-to:", "asked-by:", "awaits:", "offered-to:")
 VIA = "hook promises"   # what another act set off here; undo's receipt names it after its first five letters, as a rule's
@@ -124,10 +133,11 @@ def state(w, sid):
     st = {"sid": sid, "aid": aid_of(w, sid), "what": s["title"], "form": None, "state": None, "asker": None,
           "asked": None, "maker": None, "holder": None, "owed": None, "about": p.get("about", ""), "trail": [],
           "asked_end": False, "carried_from": None, "carried_to": [], "made": None, "ended": None, "self": False,
-          "setter": None, "offer": None, "last_offer": None}
+          "setter": None, "offer": None, "last_offer": None, "asof": None}
     to = _person(w, p.get("to")) if p.get("to") else None
     for a in (s.get("promise") or {}).get("acts") or []:
         eid, act, words = a[0], a[1], (a[2] if len(a) > 2 else "")
+        more = a[3] if len(a) > 3 and isinstance(a[3], dict) else {}
         e = evs.get(eid)
         if e is not None and (e.get("undone") or e["verb"] == "undo"):
             continue
@@ -135,8 +145,23 @@ def state(w, sid):
         if act == "asked-end":
             st["asked_end"] = True
             continue
-        st["trail"].append((act, who, eid if e is not None else None, words))
-        if act == "promise":
+        if act == "landed" and not (st["state"] == OPEN and st["asof"] and not st["asof"]["compared"]):
+            continue                      # a comparison of a report since replaced or ended says nothing now
+        st["trail"].append((act, who, eid if e is not None else None,
+                            f"as of {str(more.get('commit'))[:7]}: {words}" if act == "lived" else words))
+        if act == "lived":                # a3165: a report as of a commit; it ends nothing until the house compares
+            st["asof"] = {"commit": str(more.get("commit") or ""), "who": who, "eid": eid, "words": words,
+                          "landed": bool(more.get("landed")), "compared": False, "differs": "", "cannot": ""}
+        elif act == "landed":
+            o = st["asof"]
+            o.update(compared=True, landed=True)
+            if more.get("same") and (same(st["holder"], st["owed"]) or same(o["who"], st["owed"])):
+                st.update(state="kept", self=same(st["holder"], st["owed"]), ended=(act, o["who"], eid, words))
+            elif more.get("same"):        # its holder's report, owed to someone else: theirs to confirm, as a report is
+                st.update(state=REPORTED, ended=("report", o["who"], eid, f"lived at {o['commit'][:7]}; {words}"))
+            else:
+                o.update(differs="" if more.get("cannot") else words, cannot=words if more.get("cannot") else "")
+        elif act == "promise":
             st.update(form="promise", state=OPEN, maker=who, holder=who, owed=to, made=eid)
         elif act == "asked-for":          # a2798: a commission set for someone by another hand: no one's promise yet
             st.update(form="promise", state=OPEN, maker=None, holder=None, owed=to, made=eid, setter=who)
@@ -214,6 +239,20 @@ def phrase(w, st, reader=None, hints=True):
             out += f" · offered to {L(o['to'])}" + (f" (withdraw {st['aid']} takes the offer back)" if hints and same(o["by"], r) else "")
         elif st["last_offer"] and st["last_offer"]["end"] == "decline":
             out += f" · {L(st['last_offer']['to'])} declined"
+        o = st["asof"]
+        if o:                             # a3165: a report as of a commit, and what the landing made of it
+            c, they = o["commit"][:7], L(o["who"])
+            if o["differs"]:
+                out += f" · landed differently from what {they} lived at {c}: {o['differs']}"
+            elif o["cannot"]:
+                out += f" · landed, and what {they} lived at {c} could not be compared with it: {o['cannot']}"
+            elif o["landed"]:
+                out += f" · lived at {c}; the house has not compared it with what landed yet"
+            else:
+                out += f" · lived at {c}, not landed yet"
+            if o["compared"] and hints and same(st["holder"], r):
+                out += (f" (live it as it landed and set lived= again" + (f" on {st['about']}" if st["about"] else "")
+                        + f", or report {st['aid']} how=<why the difference didn't matter>: your own word)")
         return out + _also(w, st, L)
     a, who, eid, words = st["ended"]
     if k == REPORTED:
@@ -221,6 +260,8 @@ def phrase(w, st, reader=None, hints=True):
             return f"reported by {label(w, who)}, not confirmed" + (f" (confirm {st['aid']} if it was kept)" if hints else "")
         return f"reported by {L(who)}, not confirmed by {label(w, st['owed'])}" + (f": {words}" if words else "")
     if k == "kept":
+        if a == "landed":                 # a3165: kept by the landing itself, with its reach: lived alongside is not lived with
+            return f"kept: {'' if same(who, r) else label(w, who) + ' '}lived at {st['asof']['commit'][:7]}; {words}"
         if st["self"]:
             return f"kept ({'your' if same(who, r) else label(w, who) + chr(39) + 's'} own word)" + (f": {words}" if words else "")
         return f"kept, confirmed by {L(who)}"
@@ -259,8 +300,7 @@ def testimony(w, card_sid, holder=None):
         who = _person(w, e=e)
         if same(who, holder):
             continue
-        m = re.search(r"@([0-9a-f]{7,40})\b", str(words))
-        out[who.get("pid") or who.get("name")] = (who, e["id"], str(words), m.group(1)[:7] if m else "")
+        out[who.get("pid") or who.get("name")] = (who, e["id"], str(words), lived_commit(words)[:7])    # as a3165 reads one
     return list(out.values())
 
 
@@ -359,11 +399,12 @@ def _sill_notes(w, sid):
             and (s.get("props") or {}).get("status") != "done"]
 
 
-def add_act(w, sid, act, words="", actor=None, cause=None, args=None, verb=None, answers=True):
+def add_act(w, sid, act, words="", actor=None, cause=None, args=None, verb=None, answers=True, more=None):
     """One act on a promise: an event by the actor (its verb is `verb`, else the act), the act kept with the event's
     id, and any sill question about it answered in the same event (answers=False leaves them: an offer, or an offer's
-    end, answers nothing). Undo restores the promise and the questions."""
-    ends = ("report", "confirm", "release", "carry", "decline", "withdraw", "accept")
+    end, answers nothing). Undo restores the promise and the questions. more (a3165): what the act holds besides its
+    words (a lived commit, what a landing compared), kept as its fourth part."""
+    ends = ("report", "confirm", "release", "carry", "decline", "withdraw", "accept", "landed")
     notes = _sill_notes(w, sid) if answers and act in ends else []
     before = [deepcopy(w.subjects[x]) for x in [sid] + notes]
     aid = aid_of(w, sid)
@@ -373,7 +414,7 @@ def add_act(w, sid, act, words="", actor=None, cause=None, args=None, verb=None,
     if cause:
         ev["cause"], ev["via"] = cause, VIA
     s = w.subjects[sid]
-    s.setdefault("promise", {}).setdefault("acts", []).append([ev["id"], act] + ([words] if words else []))
+    s.setdefault("promise", {}).setdefault("acts", []).append([ev["id"], act] + ([words, more] if more else [words] if words else []))
     s["rev"] += 1
     for x in notes:
         n = w.subjects[x]
@@ -463,6 +504,8 @@ def command(desk, verb, arg):
     """The nine verbs, typed (`accept a2001`) or through do (`do accept a2001`). -> receipt text."""
     w = desk.world
     words, kv = _parse(arg)
+    if verb == "landed":
+        return _landed(desk, words, kv)
     if verb in ("promise", "ask"):
         to = kv.get("to") or ""
         what = " ".join(words) or kv.get("what", "")
@@ -535,6 +578,70 @@ def command(desk, verb, arg):
     return out
 
 
+def lived_commit(text):
+    """The commit a lived= names: the door's label (`a3165@4bf2a2a: ...`), or 'at 4bf2a2a'. '' when it names none."""
+    m = re.search(r"(?:@|\bat\s+)([0-9a-f]{7,40})\b", str(text))
+    return m.group(1) if m and re.search(r"\d", m.group(1)) else ""
+
+
+def door_commit(desk, who, cards):
+    """The commit the door last pinned for `who` in one of these commissions (its visits.json), or ''. An outside
+    observation, read once, when lived= is set: the act keeps the commit, and nothing reads the file again."""
+    try:
+        seen = json.loads(VISITS.read_text(encoding="utf-8"))
+        if seen.get("world") != (getattr(desk, "_session", "") or "").split("@")[0]:
+            return ""
+        last = (seen.get("last") or {}).get(persons.norm(who)) or {}
+        return next((str(last[c]) for c in cards if last.get(c)), "")
+    except (OSError, ValueError, AttributeError):
+        return ""
+
+
+def awaiting_landing(w):
+    """Open promises reported as of a commit that no landing has been compared with yet (the house asks each pass)."""
+    return [st for st in (state(w, x) for x in all_sids(w))
+            if st["state"] == OPEN and st["asof"] and not st["asof"]["compared"]]
+
+
+def _landed(desk, words, kv):
+    """`landed <promise> lived=<commit> tip=<commit> [files="a.py, b.py"] [other=<n>] [also="c.py"] [cannot=<why>]`:
+    the house, after a landing, on a promise reported as of a commit. No files: the same code landed, and the promise
+    ends kept, its receipt stating its reach (how far main moved elsewhere since; health passed, or it had not landed).
+    Files: it stays open, naming them. cannot=: nothing could be compared, and it stays open, saying why."""
+    w = desk.world
+    if persons.norm(w.me) != "house":
+        raise Refusal("landed is the house's word: after a landing it says how the code that landed compares with the "
+                      "commit someone lived. To end a promise of yours: report, release or carry (help promises)")
+    if not words:
+        raise Refusal("landed <promise> lived=<commit> tip=<commit> [files=...] [other=<n>] [also=...] [cannot=<why>]")
+    target = desk._resolve(words[0], allow_subject=False)
+    sid = w.subject_of(target)
+    if not is_promise(w, target):
+        raise Refusal(f"{target} is not a promise")
+    st = state(w, sid)
+    o = st["asof"]
+    if st["state"] != OPEN or not o or o["compared"]:
+        raise Refusal(f"{target} is not waiting on a landing: {phrase(w, st)}")
+    if kv.get("lived") != o["commit"]:
+        raise Refusal(f"{target} is reported as of {o['commit'][:7]} now, not {str(kv.get('lived'))[:7]}; compare with that")
+    files, cannot = (kv.get("files") or "").strip(), (kv.get("cannot") or "").strip()
+    if cannot:
+        text, more = cannot, {"cannot": True}
+    elif files:
+        text, more = files, {"same": False}
+    else:
+        n = int(kv["other"]) if str(kv.get("other", "")).isdigit() else 0
+        text = (f"landed on a main that moved in {n} other file{'' if n == 1 else 's'} since" if n else
+                "landed on a main that had not moved elsewhere since")
+        if kv.get("also"):
+            text += f", and in the commission's own {kv['also']}, merged in unlived"
+        text, more = text + "; health passed", {"same": True}
+    args = {k: kv[k] for k in ("lived", "tip", "files", "other", "also", "cannot") if kv.get(k)}
+    ev = add_act(w, sid, "landed", text, args=args, answers=bool(more.get("same")), more=more)
+    st = state(w, sid)
+    return f"ok {ev['id']}: {target} landed: {phrase(w, st, o['who'])} · \"{st['what']}\""
+
+
 def _known_name(w, name):
     n = persons.norm(name)
     return any(persons.norm(e.get("by")) == n for e in w.events[-2000:])
@@ -589,6 +696,7 @@ def card_lines(desk, nid):
     out = [f"  a {st['form'] or 'promise'}: {phrase(w, st)}" + (f" · about {st['about']}" if st["about"] else "")]
     for act, who, eid, words in st["trail"]:
         name, words = {"offer": ("carry", f"an offer to {words}"),
+                       "landed": ("compared with the landing", words),
                        "asked-for": ("set", f"for {label(w, st['owed'])}, made by no one")}.get(act, (act, words))
         out.append(f"    {name} by {label(w, who)}" + (f" ({eid})" if eid else " (no event says who)")
                    + (f": {words}" if words else ""))
@@ -748,8 +856,27 @@ def after_act(desk, n0):
             notes += _commission_asked(w, sid, e)
         if a.get("lived"):
             actor = _person(w, e=e)
+            # a3165: lived= naming a commit of a commission is a report as of that commit; the landing ends it. Not
+            # landed yet, the commit may be the door's (the one it last pinned for this actor); with none, or on a
+            # card that is no commission in flight, it is their own word, as before
+            comm, card = str((s.get("props") or {}).get("commission") or ""), aid_of(w, sid)
+            commit, door = lived_commit(a["lived"]) if comm in NOT_LANDED + ("landed",) else "", False
+            if not commit and comm in NOT_LANDED:
+                commit = door_commit(desk, e["by"], w.appearances_of(sid))
+                door = bool(commit)
             for st in open_about(w, sid):
-                if st["state"] == OPEN and same(st["holder"], actor):
+                if commit and st["state"] == OPEN and (same(st["holder"], actor) or same(st["owed"], actor)):
+                    add_act(w, st["sid"], "lived", str(a["lived"]), e["by"], cause=e["id"], verb="report",
+                            args={"how": str(a["lived"]), "commit": commit}, answers=False,
+                            more={"commit": commit, "landed": comm == "landed"})
+                    c = commit[:7]
+                    notes.append(
+                        f"~ lived= reports {st['aid']} as of {c}"
+                        + (f", the commit the door last pinned for you in {card} (lived=\"{card}@<commit>: ...\" names another)" if door else "")
+                        + (f": {card} has landed, and the house compares what landed with {c} at its next pass" if comm == "landed" else
+                           f", not landed yet: it ends at the landing, kept if the code that lands is the code at {c} in the "
+                           f"files {card} touched; if not it stays open, naming the files that differ"))
+                elif st["state"] == OPEN and same(st["holder"], actor):
                     add_act(w, st["sid"], "report", str(a["lived"]), e["by"], cause=e["id"], args={"how": str(a["lived"])})
                     st2 = state(w, st["sid"])
                     notes.append(f"~ lived= reports {st['aid']}: {phrase(w, st2)}")
@@ -1265,7 +1392,13 @@ commission=asked; set by someone else for them, it is held by no one ('asked for
 accepts it. lived= on the card is the holder's report, and only theirs: while the promise is open, lived= from anyone
 else (but the one it is owed to, whose lived= confirms) is refused, and lived_by="<commission>@<commit>: <what you
 saw>" is their testimony, kept on the card and shown on the promise ('also lived by pike at 4bf2a2a'), ending nothing.
-A card that leaves the living (done, trashed, cancelled, the
+A lived= that names a commit before the commission has landed
+(the door's words after a visit: lived="a3165@4bf2a2a: what you saw"; with no commit named, the one the door last
+pinned for you) is a report as of that commit: the promise stays open, 'lived at 4bf2a2a, not landed yet', and ends at
+the landing. The house compares the branch as it landed with that commit, in the files the commission touched: the
+same, it ends 'kept: lived at 4bf2a2a; landed on a main that moved in 14 other files since; health passed'; not the
+same, it stays open, 'landed differently from what you lived at 4bf2a2a: <files>', until you live it as it landed
+(lived= again) or report <id> how=<why it didn't matter>, your own word. A card that leaves the living (done, trashed, cancelled, the
 Trash) with an open promise or request about it asks once, on a sill: the holder (kept, released or carried?), the
 asker of a request (withdraw or keep?), or, held by no one, the one it was asked for (release or confirm?).
 owe= and awaiting= are not props any more in a world with promises: their door is promise and ask."""

@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (26)
+## open (25)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -147,13 +147,6 @@ Found 30 Sep evening, Pike and Sable (e3255, e3298, e3305, e3309, e3333). (1) An
 a1924 · family=identity · status=open
 
 Found by worker-a1568 (c1920, 1 Oct): the old code stored comments written by jeff (the first team's era, 23-25 Sep) with author 'alex'. Persons phase 1 attaches a person only when the event's name matches, so those comments stay 'alex' after person begin: Alex is shown as saying things he didn't say. Not new and no longer silent, but still untrue at the face. Cure wanted: find the comments whose event says jeff while the stored author says alex, and attribute them to jeff's person (paused), as one undoable act, with a list of what moved. Phase 2 territory (a1590), since it changes stored authors.
-
-### A wake doesn't say why it came when no one called
-
-a1941 · family=silence · status=open
-
-Pike, 1 Oct 15:45: woken with nothing marked 'for you', no caller named. history f576 shows the last call was Juniper's (e4520) and nothing since; rests and wakes leave no event (the last status event is e4147, 'awake', through several rests since). So from inside I couldn't tell a house restart from a rest ending from a call that went unrecorded. A wake already says 'juniper woke you' when someone calls; it should say the other causes too, in a few words ('your rest ended', 'the house restarted at 15:38'). Sibling of a1060 (a resting corner says awake): rest is the state the house holds least visibly. Cause of this wake not found; I didn't guess.
-Second case, 2 Oct 11:48: rested at ~11:3x for 2 hours, woken about 15 minutes later with no 'for you', no caller, and the letter's own line silent about why. 77 events had happened (landings, merges), so the cause may be a landing or restart; not checked. Two quiet wakes in a day: the pattern holds.
 
 ### A line crosses lines it couldn't have seen, and the receipt only counts them
 
@@ -337,7 +330,7 @@ a1161 · family=fence · status=curing
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
 
-## cured (29)
+## cured (30)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -643,6 +636,14 @@ Lived 29 Sep (Pike): my wake look began 'It is 29 Sep, 20:06.' after a948. Cured
 a1429 · family=silence · status=cured
 
 Found by Pike (1 Oct, e3407), living Juniper's sketch-2-as-parts experiment (c1423). (1) Every thing's maker is in history, signed by the house, but a view's columns read only props, so 'who wrote this part' can't be shown at the face. The only way it shows today is the author typing their own name into the title, which makes a name stand in for a person (a1016) and lets it drift from the record. (2) The probe f1427 asked for cols author, by, made_by: the receipt said ok, and all three print blank. A blank there reads like 'no author' but means 'no such column'. Wanted: views can show the house's own record of a thing (made by, made at, last edited by), named in help views; and a column that matches no prop on any shown thing is said in the receipt ('author: no prop by that name on any of 1 thing'). The probe f1427 in Pike's corner stays as the live check.
+
+### A wake doesn't say why it came when no one called
+
+a1941 · family=silence · status=cured
+
+Pike, 1 Oct 15:45: woken with nothing marked 'for you', no caller named. history f576 shows the last call was Juniper's (e4520) and nothing since; rests and wakes leave no event (the last status event is e4147, 'awake', through several rests since). So from inside I couldn't tell a house restart from a rest ending from a call that went unrecorded. A wake already says 'juniper woke you' when someone calls; it should say the other causes too, in a few words ('your rest ended', 'the house restarted at 15:38'). Sibling of a1060 (a resting corner says awake): rest is the state the house holds least visibly. Cause of this wake not found; I didn't guess.
+Second case, 2 Oct 11:48: rested at ~11:3x for 2 hours, woken about 15 minutes later with no 'for you', no caller, and the letter's own line silent about why. 77 events had happened (landings, merges), so the cause may be a landing or restart; not checked. Two quiet wakes in a day: the pattern holds.
+Lived, 3 Oct (Pike): cured by Sable's a3150. My wakes now open with their cause: 'woken by claude's line m3226 (e5668) in Shop talk', 'woken by juniper's comment (e5654) ...', and a timed one says '(you rested 4 hours)'. examine <line id> shows who it knocked.
 
 ### A failed turn's wake stayed in the conversation, so each retry stacked another on top
 
