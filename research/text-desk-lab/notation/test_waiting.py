@@ -126,9 +126,11 @@ got = sent(PIKE)
 lines = got.splitlines()
 check("Juniper's @pike reaches Pike at once, and his rest ends", "@pike the lens" in got
       and not res(PIKE).state.get("rest_until") and not res(PIKE).state.get("for_you"), (got[:600], res(PIKE).state.get("rest_until")))
-check("the line comes first, under 'for you while you rested', with its chat and time",
-      len(lines) > 1 and lines[0] == "for you while you rested (1):" and "Lounge talk" in lines[1]
-      and "@pike the lens" in lines[1] and re.search(r"~ \d\d:\d\d in chat", lines[1]), got[:600])
+check("a3150: the wake's first line names the line that caused it, by its ids",
+      bool(lines) and re.fullmatch(r"~ woken by juniper's line m\d+ \(e\d+\) in \"Lounge talk\"", lines[0]), got[:600])
+check("the line comes next, under 'for you while you rested', with its chat and time",
+      len(lines) > 2 and lines[1] == "for you while you rested (1):" and "Lounge talk" in lines[2]
+      and "@pike the lens" in lines[2] and re.search(r"~ \d\d:\d\d in chat", lines[2]), got[:600])
 
 # 1b. an @ inside quotes or backticks knocks no one, and the receipt says whom it took (Sable, a1566 scope change)
 rest(PIKE, 3600)
@@ -243,7 +245,8 @@ check("@everyone: 'to: everyone', and the receipt names each, woken", got.count(
 H.step()
 p, s = sent(PIKE), sent(SABLE)
 check("@everyone reaches both now, first and marked", "suite is green" in p and "suite is green" in s
-      and p.startswith("for you while you rested") and s.startswith("for you while you rested"), (p[:300], s[:300]))
+      and all(x.startswith("~ woken by juniper's line m") and x.splitlines()[1].startswith("for you while you rested")
+              for x in (p, s)), (p[:300], s[:300]))
 
 # 7. an agent's (no corner, no person record) @pike knocks too; a plain line wakes no one and is not marked for him
 rest(PIKE, 3600)
@@ -257,7 +260,8 @@ check("an agent's @pike: 'Pike: woken'", "Pike: woken" in got, got)
 H.step()
 got = sent(PIKE)
 check("the agent's line first and marked; the plain lounge line after it, not marked",
-      got.startswith("for you while you rested (1):") and "a note from outside" in got.splitlines()[1]
+      got.startswith("~ woken by claude's line m") and got.splitlines()[1] == "for you while you rested (1):"
+      and "a note from outside" in got.splitlines()[2]
       and got.index("a note from outside") < got.index("a plain line in the lounge"), got[:800])
 
 # 8. a resident's @pike in a comment (not a chat) knocks too
@@ -265,7 +269,8 @@ rest(PIKE, 3600)
 got = H.act("juniper", f"do comment {LOUNGE} line=\"@pike see the lounge\"")
 H.step()
 got2 = sent(PIKE)
-check("a comment's @pike wakes him, the mention first", got2.startswith("for you while you rested (1):")
+check("a comment's @pike wakes him, the mention first", got2.startswith("~ woken by juniper's comment (e")
+      and got2.splitlines()[1] == "for you while you rested (1):"
       and "called you" in got2 and "see the lounge" in got2, (got, got2[:600]))
 
 rest(PIKE, 3600)
@@ -418,8 +423,9 @@ H.act("alex", f"look {PIKE} :1; do prop {PIKE} want=awake")
 H.step()
 got = sent(PIKE)
 lines = got.splitlines()
-check("woken: Juniper's call and her line come first, after who he is", len(lines) > 2 and lines[0].startswith("You are pike.")
-      and lines[1].startswith("~ juniper woke you (wake, e") and "for when you're back" in lines[2], got[:700])
+check("woken: Juniper's call and her line come first, after who he is and which line called him (a3150)",
+      len(lines) > 3 and lines[0].startswith("You are pike.") and lines[1].startswith("~ called by juniper's line m")
+      and lines[2].startswith("~ juniper woke you (wake, e") and "for when you're back" in lines[3], got[:700])
 check("the call delivered at a wake is cleared", "call" not in (H.load().nodes[PIKE].get("props") or {}), H.load().nodes[PIKE].get("props"))
 
 shutil.rmtree(house.STATE / WORLD, ignore_errors=True)

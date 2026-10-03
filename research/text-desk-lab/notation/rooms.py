@@ -304,6 +304,111 @@ def calls(w, s, to, actor):
     return bool(set(EVERYONE) & set(to)) and member(w, s, actor)
 
 
+# a3150 (Sable c2705 on a1941): a knock leaves a record. The house writes one knock event per line that named or reached
+# someone (target and cause: the line's own event), saying per name what happened, so who was called by which line can
+# be checked afterwards instead of taken on someone's word. It is the house's observation, so undo leaves it.
+KNOCK_UNDO = ("{eid} is the house's record of whom a line knocked: it changed nothing in the world, so undo leaves it. "
+              "examine {eid} says which line and what happened")
+NOT_MEMBER = "not a member, not knocked"
+
+
+def reached(w, e):
+    """a3150: whom event `e` named or reached, as the house's knock reads it (house.news asks the same calls, line_to
+    and world.written, in the same order) -> {name: how}, in order; {} for a line that calls no one (a plain line in
+    a shared chat), an undone one, and the house's own bookkeeping. For a resident, how is 'call' (it ends a rest: a
+    chat line addressed to them or to everyone in a chat they are in, a person's line in their own corner's chat, an
+    @header in a comment or a note's added lines, a comment on a thing in their corner or on their commission) or
+    'book' (a resident's or agent's plain line in their own corner's chat: it waits for their next wake). For anyone
+    else it is the words the record keeps: not a member of the chat, a person, an agent, or no one by that name."""
+    import persons
+    from world import written
+    args = e.get("args") or {}
+    by = str(e.get("by") or "")
+    if e.get("undone") or e.get("verb") == "knock":
+        return {}
+    sid = e["target"]
+    if sid in w.nodes and w.nodes[sid]["type"] == "appearance":
+        sid = w.nodes[sid]["subject"]
+    s = w.subjects.get(sid)
+    chat = bool(s) and s["kind"] == "chat" and "append" in args
+    comment = e.get("verb") == "comment" and bool(s)
+    to = line_to(e)[0] if chat else written(e)[0]
+    named = [n for n in to if n not in EVERYONE]
+    if not (chat or comment or named):
+        return {}
+    out = {}
+    for fid, n in w.nodes.items():
+        p = n.get("props") or {}
+        actor = p.get("actor")
+        if n["type"] != "surface" or p.get("role") != "resident" or not actor or by == actor:
+            continue
+        asked = comment and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
+        if by == "house" and not asked:
+            continue                                   # the house's own word reaches only who asked (a commission)
+        mine = bool(s) and any(a["type"] == "appearance" and a.get("subject") == sid and _within(w, a, fid)
+                               for a in w.nodes.values())
+        called = any(same_person(w, x, actor) for x in named)
+        if chat:
+            if calls(w, s, to, actor):
+                out[str(actor).lower()] = "call"
+            elif mine:
+                out[str(actor).lower()] = "call" if kind_of(w, by) == "person" else "book"
+            elif called:
+                out[str(actor).lower()] = NOT_MEMBER
+        elif called or (comment and (mine or asked)):
+            out[str(actor).lower()] = "call"
+    if by == "house":
+        return out
+    for x in named:
+        if same_person(w, x, by.split("/")[0]) or any(same_person(w, x, a) for a in out):
+            continue
+        kind = someone(w, x)
+        if chat and kind and not is_member(w, s, x):
+            out[x] = NOT_MEMBER
+        elif kind == "resident":
+            continue                                   # a corner with want=rest still says actor=, so it is above
+        else:
+            out[x] = {"person": "a person, not knocked (it waits in their For you)",
+                      "agent": "an agent, not knocked"}.get(kind, "no one by that name")
+    return out
+
+
+def knock_of(w, eid):
+    """a3150: the knock event the house recorded for the line made by event `eid`, or None."""
+    return next((e for e in reversed(w.events) if e.get("verb") == "knock" and e.get("cause") == eid
+                 and not e.get("undone")), None)
+
+
+def cmd_knocked(desk, arg):
+    """a3150: knocked <event> <json {name: what happened}>: the house's own line, refused to anyone else. It records
+    one knock event for the line `event` made: target and cause that event, line=<its m id> when it is a chat line,
+    then what happened per name. Said once per line: a second record of the same line is refused, whoever asks, so a
+    house that restarts (or loses its own state) finds the record in the world and stays quiet."""
+    import json
+    w = desk.world
+    if str(w.me).split("/")[0].lower() != "house":
+        raise Refusal("knocked is the house's own record of whom a line knocked; examine <line> or history <corner> "
+                      "shows what it recorded")
+    eid, _, rest = arg.strip().partition(" ")
+    line = w.event_by_id(eid)
+    if line is None:
+        raise Refusal(f"no event {eid!r}")
+    was = knock_of(w, eid)
+    if was is not None:
+        return f"({eid} already has its knock record, {was['id']})"
+    try:
+        what = {str(k).lower(): str(v) for k, v in json.loads(rest).items()}
+    except (ValueError, AttributeError):
+        raise Refusal("knocked <event> {\"name\": \"what happened\", ...}")
+    if not what:
+        raise Refusal(f"{eid} named and reached no one: nothing to record")
+    mid = (line.get("args") or {}).get("line_id")
+    ev = w._event("knock", eid, dict({"line": mid} if mid else {}, **what), {"refuse": KNOCK_UNDO}, w.me)
+    ev["cause"], ev["changed"] = eid, []
+    ev["knocked"] = [c for c in (corner_of(w, a) for a in what) if c]      # history <corner> lists it
+    return f"ok {ev['id']}: knock recorded for {eid}"
+
+
 def book_owners(w, sid):
     """The residents whose corner holds chat `sid` (a visitors' book, a talk with Alex)."""
     out = []
