@@ -9,8 +9,13 @@ state folder and --trees pointing at them. Then, through the door, as the house 
   (i)   pike visits a9001, uses what it changes, makes a note there, and comes home: home's world has no new event,
         its file is not written, and while away the door's record (which scene.py and rooms.py read) says where pike
         is; `home` says what pike leaves behind;
-  (iii) a9002 refuses entry and quotes its error; a9001's deskd, killed, brings its visitors home: each one's next
-        line is refused, told, and run nowhere;
+  (iii) a9002 refuses entry and quotes its error; a9001's deskd, killed with two inside, brings both home, each told
+        once (a3204): juniper's own next line is refused, told, and run nowhere; sable was resting, so the house's rest
+        line as her (by=house, kind=rest) does not take the word and runs at home, carrying her to her corner, and her
+        wake (kind=wake) runs at home and opens with it;
+  a3204: every reply from a version opens with `[in <commission>@<commit>, not home]`; the entry line says what home's
+        world holds that the code is older than (--holds, by git ancestry); `write home <words>` leaves one comment on
+        the commission at home, and nothing else; `home` offers lived= to the commission's asker and a comment to others;
   (iv)  sable joins pike in a9001 and finds pike's note there; home never has it. Once the worker has committed, the
         door does not pick for a newcomer (Juniper c3167): it names who is in which commit, `with=<name>` joins them
         and `new` takes the newest;
@@ -108,12 +113,17 @@ base = f"http://127.0.0.1:{port}"
 door = None
 
 
-def say(who, line, session=WORLD, headers=None, whole=True):
-    """One line through the door, as house.deskd_do sends a resident's > line. -> what a receipt would print."""
-    body = json.dumps({"session": session, "as": who, "line": line, "whole": whole}).encode()
+def raw(who, line, session=WORLD, headers=None, whole=True, **more):
+    """One line through the door. -> the answer as sent. more: what the house adds to its own lines (by=, kind=)."""
+    body = json.dumps({"session": session, "as": who, "line": line, "whole": whole, **more}).encode()
     req = urllib.request.Request(base + "/api/do", body, {"Content-Type": "application/json", **(headers or {})})
     with urllib.request.urlopen(req, timeout=300) as f:
-        r = json.loads(f.read())
+        return json.loads(f.read())
+
+
+def say(who, line, **how):
+    """One line through the door, as house.deskd_do sends a resident's > line. -> what a receipt would print."""
+    r = raw(who, line, **how)
     return r.get("text") or ("ERR " + str(r.get("error")))
 
 
@@ -121,9 +131,15 @@ def total():
     return get(f"{base}/api/events?session={WORLD}&since=999999999")["total"]
 
 
+def at_home():
+    """Home's world as its file has it now."""
+    return pickle.loads(saved.read_bytes()).world
+
+
 def start_door():
     p = subprocess.Popen([sys.executable, "door.py", str(port), "--no-git", "--world", WORLD, "--state", str(state),
-                          "--trees", str(trees)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                          "--trees", str(trees), "--holds", str(tmp / "holds.json")], cwd=HERE,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     t = time.time() + 60
     while time.time() < t:
         try:
@@ -139,12 +155,26 @@ try:
     worktree(trees, "a9002", lambda lab: (lab / "deskd.py").write_text("raise SystemExit('broken on purpose')\n", encoding="utf-8"))
     sha1 = git(a1, "rev-parse", "HEAD")
     one = f"a9001@{sha1[:7]}"
+    # a3204 (2): what home's world holds, as landings; a9001 has the first and not the second (a commit beside its own)
+    git(a1, "checkout", "-q", "-b", "side")
+    git(a1, "commit", "-q", "--allow-empty", "-m", "a landing a9001 does not have")
+    side = git(a1, "rev-parse", "HEAD")
+    git(a1, "checkout", "-q", "-")
+    (tmp / "holds.json").write_text(json.dumps([{"name": "lines", "commit": sha1}, {"name": "promises", "commit": side},
+                                                {"name": "elsewhere", "commit": "0" * 40}]), encoding="utf-8")
     door = start_door()
+    # a3204 (3), (5): a commission that is a card at home, asked by sable, with a worktree of its own id
+    say("pike", f"look {R.SHELF} :1")
+    made = raw("pike", f'do create {R.SHELF} kind=task title="A commission to visit" asked_by=sable')
+    CARD = next((c if isinstance(c, str) else c.get("id") for c in made.get("created") or []), None)
+    check("the test's commission is a card at home with an id a worktree can bear", bool(CARD) and CARD[0].isalpha() and CARD[1:].isdigit(), made)
+    worktree(trees, CARD, lambda lab: None)
+    say("sable", f"go {R.LOUNGE}")                # so that a rest that carries her to her corner can be seen
     n0 = total()
 
     # ---- (i) go, use the one thing it changes, home ------------------------------------------------------------
     t = say("pike", "go")
-    check("at home `go` alone is the desk's own word, and says what home's code says", SAYS in t and "VERSION" not in t and "~ in" not in t, t)
+    check("at home `go` alone is the desk's own word, and says what home's code says", SAYS in t and "VERSION" not in t and "[in " not in t, t)
     t = say("pike", "visit")
     check("`visit` alone says which commissions can be visited, and who is away", "a9001, a9002" in t and "Away now: nobody" in t, t)
     t = say("pike", "visit a7777")
@@ -156,6 +186,10 @@ try:
     check(f"visit a9001: the door's one line names the commission, the commit, the world and its events, and full rights ({took:.1f} s)",
           t.startswith(f"[door] you are in a9001 at {sha1[:7]}") and f"a copy of {WORLD} made now, from e" in t and f"({n0} events)" in t
           and "full rights" in t and "`home` brings you back" in t and "\n" not in t, t)
+    check("it says what home's world holds that this code is older than, from git ancestry (and nothing git can't tell)",
+          "This code is older than: promises. " in t and "may show less than home's" in t and "lines" not in t.split("older than:")[1].split(".")[0]
+          and "elsewhere" not in t, t)
+    check("it says how one line is written home", f"`write home <words>` leaves one line at home, a comment on a9001" in t, t)
     st = get(base + "/door/status")
     check("the door says who is away, and in which version", st.get("away") == {"pike": one}, st.get("away"))
     scene.HOUSE_STATE = state                     # the door's record, where home's desk reads it
@@ -170,13 +204,19 @@ try:
     check("the house's row for pike (what the Desktop paints) says away, where the room was", row and row[0]["room"] == f"away in {one}", row)
     written = saved.stat().st_mtime_ns
     t = say("pike", "go")
-    check("in the version, the thing it changes is there, and the receipt is labelled", "(VERSION ONE)" in t and t.endswith(f"~ in {one}, not home"), t)
+    check("in the version, the thing it changes is there, and the receipt opens with where it is from",
+          "(VERSION ONE)" in t and t.startswith(f"[in {one}, not home]\n"), t)
     t = say("pike", f"look {R.SHELF} :1")
     t = say("pike", f'do create {R.SHELF} kind=note title="made while away"')
-    check("an act in the version is done there, labelled", "created" in t and f"~ in {one}, not home" in t, t)
+    check("an act in the version is done there, labelled first", "created" in t and t.startswith(f"[in {one}, not home]\n"), t)
     check("home's world file was not written by any of it (reading writes, but not here)", saved.stat().st_mtime_ns == written)
     t = say("pike", "do nonsense-verb x")
-    check("a refusal in the version still begins as a refusal, and is labelled", t.startswith(("ERR", "MISS")) and one in t, t)
+    check("a refusal in the version still begins as a refusal, and the label follows the word",
+          t.startswith((f"ERR [in {one}, not home] ", f"MISS [in {one}, not home] ")), t)
+    t = say("pike", "write home the shelf count is missing in this version")
+    check("`write home` on a commission home has no card for: home refuses, the door says so, nothing is written",
+          t.startswith("ERR [door] home refused the line, so nothing was written home") and f"You are still in {one}" in t
+          and total() == n0, t)
     t = say("pike", "look", session="roomworld-other")
     check("away, a line for another world is refused: `home` first", t.startswith("ERR [door]") and "`home` first" in t, t)
     t = say("pike", "visit a9001; look", whole=False)
@@ -189,7 +229,7 @@ try:
     t = say("sable", 'find "made while away"')
     check("sable sees pike's note in the version", "1 hit" in t and one in t, t)
     t = say("juniper", 'find "made while away"')
-    check("juniper, at home, does not: nothing of the visit is at home", "1 hit" not in t and "~ in" not in t, t)
+    check("juniper, at home, does not: nothing of the visit is at home", "1 hit" not in t and "[in " not in t, t)
 
     # ---- (v) the worker commits mid-visit ------------------------------------------------------------------------
     rewrite(a1 / NOTATION / "rooms.py", "(VERSION ONE)", "(VERSION TWO)")
@@ -229,20 +269,65 @@ try:
     check("a version whose deskd won't start refuses entry and quotes its error",
           t.startswith("ERR [door] a9002") and "can't be entered" in t and "broken on purpose" in t and "You are still home" in t, t)
     t = say("juniper", "go")
-    check("and juniper never left", "VERSION" not in t and "~ in" not in t and SAYS in t, t)
+    check("and juniper never left", "VERSION" not in t and "[in " not in t and SAYS in t, t)
     t = say("juniper", "home")
     check("`home` at home is answered by the door", t == "[door] you are home already, in no version.", t)
+    say("juniper", "visit a9001 with=sable")      # two inside when it dies: each is told, once (Pike e5672)
     vs = get(base + "/door/status")["versions"]
     pid = vs[one]["pid"]
     subprocess.run(["taskkill", "/F", "/PID", str(pid)] if sys.platform == "win32" else ["kill", "-9", str(pid)], capture_output=True)
     time.sleep(1)
     before = total()
-    t = say("sable", f'do create {R.SHELF} kind=note title="typed after it died"')
-    check("a version killed mid-visit: the next line is refused, told, and run nowhere",
-          t.startswith("ERR [door]") and f"{one}'s desk stopped" in t and "You are home" in t and "not run anywhere" in t, t)
+    t = say("juniper", f'do create {R.SHELF} kind=note title="typed after it died"')
+    check("a version killed mid-visit: the visitor's own next line is refused, told when it died, and run nowhere",
+          t.startswith(f"ERR [door] {one} died at ") and "you are home; nothing of yours ran since" in t and "not run anywhere" in t, t)
     check("nothing was sent home", total() == before, (before, total()))
+    t = say("juniper", "go")
+    check("juniper is home again, on home's code, and is not told twice", "VERSION" not in t and "[in " not in t and "[door]" not in t and SAYS in t, t)
+    # a3204 (6), as Pike lived it on 3 Oct: sable was resting inside. The house's own rest line, signed sable, comes
+    # first; its answer goes only to the house's log, so it must not take the word, and it runs at home
+    check("before the house's rest line, sable is not in her corner at home", rooms.room_of(at_home(), "sable") != R.corner["sable"])
+    t = say("sable", "rest :1", whole=False, by="house", kind="rest")
+    check("the house's rest line as sable does not take the door's word, and is run at home",
+          "[door]" not in t and not t.startswith("ERR") and "[in " not in t, t)
+    check("that rest carried sable to her corner at home (Claude e5694)", rooms.room_of(at_home(), "sable") == R.corner["sable"],
+          rooms.room_of(at_home(), "sable"))
+    rested = total() - before
+    t = say("sable", "go", whole=False, by="house", kind="wake")
+    check("sable's wake runs at home and opens with the word: which version died, when, and that she is home",
+          t.startswith(f"[door] {one} died at ") and "you are home; nothing of yours ran since.\n" in t and SAYS in t and "VERSION" not in t, t)
     t = say("sable", "go")
-    check("sable is home again, on home's code", "VERSION" not in t and "~ in" not in t and SAYS in t, t)
+    check("it is said once: sable's next line is home's, with no word from the door", "[door]" not in t and "[in " not in t and SAYS in t, t)
+
+    # ---- a3204 (3), (5): a commission that is a card at home: who is offered lived=, and one line written home ----
+    t = say("sable", f"visit {CARD}")
+    lab = t.split("you are in ")[1].split(" at ")[0] + "@" + t.split(" at ")[1][:7]
+    t = say("sable", "write home ; the lounge view shows no count here", whole=False)
+    check("`write home <words>`: the door writes one comment on the commission at home, and says that it did",
+          t.startswith("[door] written home") and f"a comment on {CARD}" in t and f"from {lab}, sable: ; the lounge view shows no count here" in t
+          and "the door wrote it" in t and f"You are still in {lab}" in t, t)
+    t = say("sable", "go")
+    check("sable is still in the version after writing home", t.startswith(f"[in {lab}, not home]"), t)
+    t = say("sable", "write home @pike it will not open the shelf")
+    check("a line home that begins with @name keeps the name first, so it calls them, and is labelled after",
+          t.startswith("[door] written home") and f"@pike it will not open the shelf [from {lab}, sable]" in t, t)
+    t = say("juniper", f"examine {CARD}")
+    check("at home the commission bears both lines, signed sable and labelled with the version",
+          f"from {lab}, sable: ; the lounge view shows no count here" in t and f"[from {lab}, sable]" in t and "[in " not in t, t)
+    wrote = total() - before - rested
+    check("home gained those two comments and nothing else", wrote == 2, wrote)
+    t = say("juniper", "write home hello")
+    check("at home `write home` is not the door's word: home's desk answers it", "[door]" not in t, t)
+    extra = total() - n0                          # what home gained by now: the rest, and the two lines written home
+    check("and nothing else reached home", extra == rested + 2, (extra, rested))
+    say("juniper", f"visit {CARD} with=sable")
+    t = say("sable", "home")
+    check("home, for the commission's asker: lived= is offered, no comment, and the lines written home are counted",
+          f'do prop {CARD} lived="{lab}:' in t and "do comment" not in t and f"but the 2 line(s) you wrote home, comments on {CARD}" in t, t)
+    t = say("juniper", "home")
+    check("home, for someone who did not ask it: lived= is its asker's report, and a comment is offered instead",
+          f"{CARD} was asked by sable, so lived= on it is their report, not yours" in t and f'do comment {CARD} line="{lab}:' in t
+          and "do prop" not in t and "Nothing from the visit is in home's world. " in t, t)
 
     # ---- home, and what home gained -------------------------------------------------------------------------------
     say("pike", f"look {R.SHELF} :1")
@@ -253,8 +338,8 @@ try:
           t.startswith(f"[door] you are home, back from a9001@{sha2[:7]}") and f'do prop a9001 lived="a9001@{sha2[:7]}:' in t
           and "You leave behind: 2 notes made; it is gone with the version" in t, t)
     t = say("pike", "go")
-    check("pike's lines are home's again", "VERSION" not in t and "~ in" not in t, t)
-    check("home's world gained no event from any of it", total() == n0, (n0, total()))
+    check("pike's lines are home's again", "VERSION" not in t and "[in " not in t, t)
+    check("home's world gained no other event from any of it", total() == n0 + extra, (n0, extra, total()))
     check("home's desk no longer shows pike away", not rooms.presences(D)("pike").startswith("away"), rooms.presences(D)("pike"))
     lived = json.loads((state / "visits.json").read_text(encoding="utf-8"))["lived"]
     check("the door kept who lived which commit (for a landing to compare)",
@@ -277,9 +362,10 @@ try:
     door = start_door()
     t = say("pike", f'do create {R.SHELF} kind=note title="typed after the door restarted"')
     check("a door started again brings pike home, told, and the line is run nowhere",
-          t.startswith("ERR [door] the door was started again while you were in a9001") and "not run anywhere" in t and total() == n0, t)
+          t.startswith("ERR [door] the door was started again at ") and "while you were in a9001" in t and "you are home" in t
+          and "not run anywhere" in t and total() == n0 + extra, t)
     t = say("pike", "go")
-    check("and the line after is home's", "VERSION" not in t and "~ in" not in t and SAYS in t, t)
+    check("and the line after is home's", "VERSION" not in t and "[in " not in t and SAYS in t, t)
 finally:
     if door is not None:
         door.terminate()

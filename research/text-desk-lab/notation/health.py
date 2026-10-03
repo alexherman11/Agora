@@ -10,6 +10,7 @@ Checks, from this checkout:
     test_rules, test_lanes, test_bound_words, test_calls), each on a small world it builds itself (roomworld.py), so a failure is
     the code's and not today's world's
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
+  - test_visit.py passes (a3204): `visit` and `home` through a real door, a version killed, one line written home
   - the Python mirror of style.js that style receipts use (scene.style_check) agrees with style.js under node, on
     test_scene's samples, calm.style and every style note in <world>; without node the line says it was not checked
   - the frozen session prints are unchanged in the golden form (suite/sessions.py --check)
@@ -171,6 +172,15 @@ def main():
         print(f"door test: {last}{took('door test', t0)}")
         if code:
             failed.append(f"test_door: {last}"[:300])
+        # a3204 (a3029: a test outside health fails unseen): visits go through the same door, into versions of this
+        # code; it runs at every health, with no condition on which files changed, since a condition can miss
+        t0 = time.perf_counter()
+        code, out = run(["test_visit.py"], timeout=400)
+        last = (out.strip().splitlines() or ["?"])[-1]
+        print(f"visit test: {last}{took('visit test', t0)}")
+        if code:
+            bad = [l[5:] for l in out.splitlines() if l.startswith("FAIL ")]
+            failed.append(f"test_visit: {last}{': ' + '; '.join(bad) if bad else ''}"[:300])
         # Pike a611, 30 Sep: some painter rules live only in CSS (peek's nesting, a1032), and only a browser can test
         # them. When one is here, every test_*_paint.py runs (about 3 s each); without one, the line says so
         t0 = time.perf_counter()
