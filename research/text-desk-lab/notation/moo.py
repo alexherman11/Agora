@@ -372,7 +372,9 @@ def v_reply(w, nid, a):
     return r
 
 
-@verb("comment", ["appearance"], "Leave a comment on this thing, signed by you. Comments show under read.", "line=<str>", 'do comment a20 line="Which timezone?"')
+@verb("comment", ["appearance"], "Leave a comment on this thing, signed by you. Comments show under read. The @names "
+      "that open it call them, as a chat line's header does (`@ana @ben: ...`); an @ later is a mention and calls no one, "
+      "and the receipt says to: and names it.", "line=<str>", 'do comment a20 line="Which timezone?"')
 def v_comment(w, nid, a):
     return _prim(w, "comment", nid, a)
 

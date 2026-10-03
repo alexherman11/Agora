@@ -1218,6 +1218,31 @@ class Desk:
         except Exception as e:      # a receipt's aside must never cost the line that already landed
             return f"(who this line reaches could not be told: {type(e).__name__})"
 
+    def _written_calls(self, eids):
+        """a2733: what a comment's or note edit's receipt says about whom its words call, as a line's does: 'to: pike',
+        or 'to: nobody', and the mid-line @s it only mentions (world.written, the house's own reading). "" when what it
+        wrote has no @ to speak of, or when it made a chat line (that line's receipt says its address)."""
+        import rooms
+        from world import MENTION_NOTE, written
+        w = self.world
+        calls, heard = [], []
+        for e in (x for x in w.events if x["id"] in set(eids)):
+            c, m = written(e)
+            calls += [n for n in c if n not in calls]
+            heard += [n for n in m if n not in heard]
+        heard = [n for n in heard if n not in calls]
+        if not calls and not heard:
+            return ""
+        everyone = [n for n in calls if n in rooms.EVERYONE]
+        no_one = [n for n in calls if n not in everyone and not rooms.someone(w, n)]
+        to = [n for n in calls if n not in everyone and n not in no_one]
+        out = "to: " + (", ".join(to) or "nobody") + ("; " + MENTION_NOTE.format(", ".join("@" + n for n in heard)) if heard else "")
+        if everyone:
+            out += f"\n  @{everyone[0]}: reaches no one outside a chat line (a916); a chat line is the place for it"
+        for n in no_one:
+            out += f"\n  {n}: no one by that name"
+        return out
+
     def _where_line(self, nid):
         w = self.world
         n = w.nodes[nid]
@@ -1607,6 +1632,9 @@ class Desk:
         waits = self._chat_waits(nid, kv) if adds and not getattr(self, "_in_rules", False) else ""
         if waits:
             out += f"\n  {waits}"    # a1566: whom this line took ('to: pike'), and for each what happened ('Pike: woken')
+        calls = self._written_calls([r["event"]]) if r.get("event") and not adds and not getattr(self, "_in_rules", False) else ""
+        if calls:
+            out += f"\n  {calls}"    # a2733: whom a comment or note edit called by its header, and what it only mentioned
         if r.get("created") in w.nodes:
             self._mark_seen(r["created"])
             if verb == "create":

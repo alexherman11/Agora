@@ -225,7 +225,13 @@ class Workshop:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
 
     def heard(self, w, cid, s, wk):
-        """Comments on its commission by anyone but itself and the house, and mentions of it anywhere."""
+        """Comments on its commission by anyone but itself and the house, and calls of it anywhere: a chat line's stored
+        address, or the header of what a comment or note edit wrote (a2733, world.written); a mid-line @ is a mention."""
+        try:
+            import rooms
+            from world import written
+        except ImportError:          # an older house holds an older world module until it restarts: hear @ anywhere
+            rooms = written = None
         start = wk.state.get("cursor", len(w.events))
         out = []
         for e in w.events[start:]:
@@ -237,8 +243,11 @@ class Workshop:
             said = " ".join(str(v) for v in (e.get("args") or {}).values() if isinstance(v, str))
             if e["verb"] == "comment" and sid == s["id"]:
                 out.append(f"~ {e['by']} on your commission ({e['id']}): {said[:2000]}")
-            elif f"@{wk.actor}" in said.lower():
+            elif written is None and f"@{wk.actor}" in said.lower():
                 out.append(f"~ {e['by']} mentioned you ({e['id']}): {said[:2000]}")
+            elif written is not None and wk.actor.lower() in (rooms.line_to(e)[0] if "line_id" in (e.get("args") or {})
+                                                              else written(e)[0]):
+                out.append(f"~ {e['by']} called you ({e['id']}): {said[:2000]}")
         wk.state["cursor"] = len(w.events)
         wk.save()
         return out

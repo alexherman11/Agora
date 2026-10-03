@@ -266,7 +266,7 @@ got = H.act("juniper", f"do comment {LOUNGE} line=\"@pike see the lounge\"")
 H.step()
 got2 = sent(PIKE)
 check("a comment's @pike wakes him, the mention first", got2.startswith("for you while you rested (1):")
-      and "mentioned you" in got2 and "see the lounge" in got2, (got, got2[:600]))
+      and "called you" in got2 and "see the lounge" in got2, (got, got2[:600]))
 
 rest(PIKE, 3600)
 H.act("juniper", f"do comment {LOUNGE} line=\"write to x@pike.org about it\"")

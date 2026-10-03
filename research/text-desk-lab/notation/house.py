@@ -588,9 +588,11 @@ class House:
         said first at its next wake, marked for it. a1566 (Alex, e3710, e3802: 'a resident's @ should knock'): an @name
         or @everyone from anyone ends the rest now, as a person's does; only a resident's or agent's plain line in its
         own corner's chat (a visitors' book) still waits for the next wake. An @ counts only outside quotes and
-        backticks (unquoted, a916). wake <name> (a call= on the corner) calls."""
+        backticks (unquoted, a916), and only as a header (a2715 for a line, a2733 for a comment or a note's added
+        lines: world.written). wake <name> (a call= on the corner) calls."""
         import persons
         import rooms
+        from world import written      # here, not at the top: the workshop imports this file into an older house
         start = r.state.get("cursor", len(w.events))
         inbox, urgent = r.state.setdefault("inbox", []), False
 
@@ -599,11 +601,6 @@ class House:
             # can, by name when it can't (Claude c2998 (1))
             return bool(s) and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
-
-        def named(text):
-            # outside a chat line only a name reaches (a916). a2662: read by the rule a chat line's address is
-            # (world.ADDRESS, outside quotes, never inside a word), at hearing time: a comment or note has no stored to= yet
-            return [m.group(0) for m in ADDRESS.finditer(unquoted(text)) if rooms.same_person(w, m.group(1), actor)]
         for e in w.events[start:]:
             if e.get("by") == actor or e.get("undone"):
                 continue
@@ -653,22 +650,18 @@ class House:
                     urgent = urgent or now_
                 continue
             # a916, as Sable, Pike and Juniper agreed: outside a chat line, @everyone and @all never reach anyone (a
-            # broadcast from a document edit is almost never meant; a chat line is the place for it), @name in a note,
-            # task or comment still reaches that person, and nothing inside quotes or backticks counts
-            heard_in = said
-            if "text" in args and e["verb"] == "edit":
-                # Pike a611: rewriting a note that already named you is not news; only a mention the new text adds is
-                old = ((e.get("undo") or {}).get("restore_subject") or {}).get("text", "")
-                if len(named(args["text"])) <= len(named(old)):
-                    heard_in = " ".join(str(v) for k, v in args.items() if k != "text" and isinstance(v, str))
-            m = named(heard_in)
+            # broadcast from a document edit is almost never meant; a chat line is the place for it). a2733: @name in a
+            # note, task or comment reaches that person only as a header, the rule a chat line has (a2715): a comment by
+            # the @names that open it, a note edit by the headers of the lines it added, never the rest of the note
+            # again (Pike a611, Claude e4918, Sable c2804). A mid-line @ is a mention, and calls no one.
+            m = [n for n in written(e)[0] if n not in rooms.EVERYONE and rooms.same_person(w, n, actor)]
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
-                if waits:                                          # a1566: a mention is kept first, and knocks
-                    self._hold(r, e, f"~ {at} {e['by']} mentioned you{where}, as {m[0]} ({e['id']}): {said[:300]}")
+                if waits:                                          # a1566: a call is kept first, and knocks
+                    self._hold(r, e, f"~ {at} {e['by']} called you{where}, as @{m[0]} ({e['id']}): {said[:300]}")
                     urgent = True
                     continue
-                inbox.append(f"~ {e['by']} mentioned you{where}, as {m[0]} ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} called you{where}, as @{m[0]} ({e['id']}): {said[:300]}")
                 urgent = True
             elif e["verb"] == "comment" and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
