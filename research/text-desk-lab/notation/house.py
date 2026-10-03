@@ -212,9 +212,11 @@ def unmarked_in(reply):
     return n
 
 
-def deskd_do(world, who, text, whole=False, stored=None):
+def deskd_do(world, who, text, whole=False, stored=None, kind=None):
     """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
-    or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736)."""
+    or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736).
+    kind (a3204): the line is signed `who` but is the house's own, 'rest' or 'wake'; it is sent as by=house with that
+    kind. A line without it is `who`'s own."""
     import urllib.error
     import urllib.request
     url = os.environ.get("DESKD", "")
@@ -224,7 +226,8 @@ def deskd_do(world, who, text, whole=False, stored=None):
     reply = __import__("uuid").uuid4().hex      # a806: one reply's lines share it, so $new names what the line before made
     for k, line in enumerate(lines):
         body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply,
-                           **({"stored": stored} if stored else {})}).encode("utf-8")
+                           **({"stored": stored} if stored else {}),
+                           **({"by": "house", "kind": kind} if kind else {})}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
                                         timeout=120) as f:
@@ -506,13 +509,14 @@ class House:
             self.desk, self.mtime = export_docs.load(self.world), m
         return self.desk.world
 
-    def act(self, who, line, whole=False, stored=None):
+    def act(self, who, line, whole=False, stored=None, kind=None):
         """Desk lines as `who`. Through deskd when it is up, so residents and the painter run the same code (one host);
         otherwise the same path a desk tool call takes, one fresh process per call. whole (a736): each line is one
         command, a ; in it is words; for a resident's > lines. The house's own lines (wake strings) keep ; as a
         separator. stored (a1156): the node whose stored line this is (a corner, for its wake): it stands there and
-        its words mean what they were bound to when it was set."""
-        text = deskd_do(self.world, who, line, whole, stored)
+        its words mean what they were bound to when it was set. kind (a3204): a line the house sends as a resident
+        that is not the resident's own: 'rest' (its answer is only logged) or 'wake' (its answer opens their wake)."""
+        text = deskd_do(self.world, who, line, whole, stored, kind)
         if text is None:
             text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored})
         return text
@@ -888,9 +892,6 @@ class House:
         r.state.pop("cut_by_restart", None)              # older state: now said through unanswered
         if undelivered:                                  # it never reached this conversation: said in full, once
             lead += "(a message I had for you never reached you; here it is:)\n" + undelivered + "\n(and your wake:)\n"
-        door = r.state.pop("door", "")
-        if door:                                         # the door's word, spent on the house's rest line as you
-            lead += "(the door said this to the rest line I sent as you, so you haven't seen it:)\n" + door + "\n"
         unanswered, why_not = r.state.pop("unanswered", 0), r.state.pop("unanswered_why", "")
         r.state["woke"] = now()
         if unanswered and not undelivered:
@@ -921,7 +922,7 @@ class House:
             lead += "(the house started you; no one called)\n"
         lead += "".join(x + "\n" for x in first)
         stored = r.rid if (corner.get("props") or {}).get("wake") else None      # a1156: a wake is stored text
-        r.send(lead + self.act(actor, line, stored=stored) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
+        r.send(lead + self.act(actor, line, stored=stored, kind="wake") + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
         # a1062: a call delivered by a wake (a resident started from want=rest) is cleared too, so the next is a change
         if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:
             self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")
@@ -995,14 +996,9 @@ class House:
         actor = ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("actor")
         if actor:
             # a806 (9): the desk's rest, a go home marked via=rest, so history tells being carried home from walking
-            said = self.act(actor, "rest :1")
-            r.log("home", said[:300])
-            # 3 Oct (Pike, a2844 (iii), lived): the door says its word (your version died, you are home) once, to the
-            # first line sent as you. When that line is this rest, the resident never saw it; their next wake says it
-            door = [x for x in said.splitlines() if "[door]" in x]
-            if door:
-                r.state["door"] = "\n".join(door)
-                r.save()
+            # a3204 (Pike lived it, 3 Oct): this line is the house's, sent as the resident, and its answer goes only to
+            # the log; it says so, so that whoever answers keeps a word meant for the resident for a line they will see
+            r.log("home", self.act(actor, "rest :1", kind="rest")[:300])
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not
