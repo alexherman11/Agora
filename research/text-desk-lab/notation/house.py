@@ -305,7 +305,8 @@ def until(text, at=None):
         if t <= now:
             t += datetime.timedelta(days=1)
         best = t if best is None or t < best else best
-    return max(60, int(best.timestamp() - now.timestamp()))       # local clock, so a daylight-saving night is right
+    # local clock, so a daylight-saving night is right; rounded up, or the house's 'now' a moment later says 12:59 (Pike)
+    return max(60, int(best.timestamp() - now.timestamp()) + 1)
 
 
 def human(seconds):
