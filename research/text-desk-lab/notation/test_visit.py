@@ -13,9 +13,9 @@ state folder and --trees pointing at them. Then, through the door, as the house 
         once (a3204): juniper's own next line is refused, told, and run nowhere; sable was resting, so the house's rest
         line as her (by=house, kind=rest) does not take the word and runs at home, carrying her to her corner, and her
         wake (kind=wake) runs at home and opens with it;
-  a3204: every reply from a version opens with `[in <commission>@<commit>, not home]`; the entry line says what home's
-        world holds that the code is older than (--holds, by git ancestry); `write home <words>` leaves one comment on
-        the commission at home, and nothing else; `home` offers lived= to the commission's asker and a comment to others;
+  a3204: every reply from a version opens with `[in <commission>@<commit>, not home]`; `write home <words>` leaves one
+        comment on the commission at home, and nothing else, and `home` counts them; the wording for a version behind
+        home's code (door.older) and for last words (door.reason) is checked directly, without git;
   (iv)  sable joins pike in a9001 and finds pike's note there; home never has it. Once the worker has committed, the
         door does not pick for a newcomer (Juniper c3167): it names who is in which commit, `with=<name>` joins them
         and `new` takes the newest;
@@ -138,8 +138,7 @@ def at_home():
 
 def start_door():
     p = subprocess.Popen([sys.executable, "door.py", str(port), "--no-git", "--world", WORLD, "--state", str(state),
-                          "--trees", str(trees), "--holds", str(tmp / "holds.json")], cwd=HERE,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                          "--trees", str(trees)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     t = time.time() + 60
     while time.time() < t:
         try:
@@ -155,21 +154,16 @@ try:
     worktree(trees, "a9002", lambda lab: (lab / "deskd.py").write_text("raise SystemExit('broken on purpose')\n", encoding="utf-8"))
     sha1 = git(a1, "rev-parse", "HEAD")
     one = f"a9001@{sha1[:7]}"
-    # a3204 (2): what home's world holds, as landings; a9001 has the first and not the second (a commit beside its own)
-    git(a1, "checkout", "-q", "-b", "side")
-    git(a1, "commit", "-q", "--allow-empty", "-m", "a landing a9001 does not have")
-    side = git(a1, "rev-parse", "HEAD")
-    git(a1, "checkout", "-q", "-")
-    (tmp / "holds.json").write_text(json.dumps([{"name": "lines", "commit": sha1}, {"name": "promises", "commit": side},
-                                                {"name": "elsewhere", "commit": "0" * 40}]), encoding="utf-8")
     door = start_door()
-    # a3204 (3), (5): a commission that is a card at home, asked by sable, with a worktree of its own id
-    say("pike", f"look {R.SHELF} :1")
-    made = raw("pike", f'do create {R.SHELF} kind=task title="A commission to visit" asked_by=sable')
-    CARD = next((c if isinstance(c, str) else c.get("id") for c in made.get("created") or []), None)
-    check("the test's commission is a card at home with an id a worktree can bear", bool(CARD) and CARD[0].isalpha() and CARD[1:].isdigit(), made)
-    worktree(trees, CARD, lambda lab: None)
-    say("sable", f"go {R.LOUNGE}")                # so that a rest that carries her to her corner can be seen
+    say("sable", f"go {R.LOUNGE}")                # a3204: so that a rest that carries her to her corner can be seen
+    say("sable", 'promise to=pike "a world with promises"')      # a3198: a commission sable asked for, with a worktree
+    say("sable", f"look {R.BOARD} :1")                           # of its own (commissions are promises once a world has them)
+    t = say("sable", f'do create {R.BOARD} kind=task title="Asked by sable" owner=sable asked_by=sable status=open commission=asked')
+    asked = t.split("created ")[1].split()[0]
+    worktree(trees, asked, lambda lab: None)
+    c = get(f"{base}/api/commission?session={WORLD}&as=pike&card={asked}")
+    check("home's desk says whose commission a card is, and whether it is the asker's", c.get("holder") == "sable" and c.get("yours") is False, (t, c))
+    CARD = asked
     n0 = total()
 
     # ---- (i) go, use the one thing it changes, home ------------------------------------------------------------
@@ -186,9 +180,15 @@ try:
     check(f"visit a9001: the door's one line names the commission, the commit, the world and its events, and full rights ({took:.1f} s)",
           t.startswith(f"[door] you are in a9001 at {sha1[:7]}") and f"a copy of {WORLD} made now, from e" in t and f"({n0} events)" in t
           and "full rights" in t and "`home` brings you back" in t and "\n" not in t, t)
-    check("it says what home's world holds that this code is older than, from git ancestry (and nothing git can't tell)",
-          "This code is older than: promises. " in t and "may show less than home's" in t and "lines" not in t.split("older than:")[1].split(".")[0]
-          and "elsewhere" not in t, t)
+    import door as door_code                      # it imports nothing of the desk's; its wording is asked directly
+    o = door_code.older(["land a5: Five. ", "a4: a worker's commit", "docs: export", "land a3: Three", "land a2: Two", "land a1: One"])
+    check("a version behind home is told which landings it lacks, newest first, and that views may show less (wording; git not run here)",
+          o == "This code is older than 4 landing(s) at home, newest first: a5: Five; a3: Three; a2: Two; and 1 more. It does not know "
+               "what they brought, so a view here may show less than home's, and nothing here says so"
+          and door_code.older(["a4: x"]).startswith("This code is older than home's: a view here may show less"), o)
+    check("a version's last words are quoted only when they are an error",
+          door_code.reason("deskd on http://localhost:1 static=C:/x") == "it gave no reason"
+          and door_code.reason("ValueError: no") == "its last words: ValueError: no")
     check("it says how one line is written home", f"`write home <words>` leaves one line at home, a comment on a9001" in t, t)
     st = get(base + "/door/status")
     check("the door says who is away, and in which version", st.get("away") == {"pike": one}, st.get("away"))
@@ -280,7 +280,8 @@ try:
     before = total()
     t = say("juniper", f'do create {R.SHELF} kind=note title="typed after it died"')
     check("a version killed mid-visit: the visitor's own next line is refused, told when it died, and run nowhere",
-          t.startswith(f"ERR [door] {one} died at ") and "you are home; nothing of yours ran since" in t and "not run anywhere" in t, t)
+          t.startswith(f"ERR [door] {one} died at ") and "(it gave no reason); you are home; nothing of yours ran since" in t
+          and "not run anywhere" in t and "static=" not in t, t)
     check("nothing was sent home", total() == before, (before, total()))
     t = say("juniper", "go")
     check("juniper is home again, on home's code, and is not told twice", "VERSION" not in t and "[in " not in t and "[door]" not in t and SAYS in t, t)
@@ -320,14 +321,10 @@ try:
     check("at home `write home` is not the door's word: home's desk answers it", "[door]" not in t, t)
     extra = total() - n0                          # what home gained by now: the rest, and the two lines written home
     check("and nothing else reached home", extra == rested + 2, (extra, rested))
-    say("juniper", f"visit {CARD} with=sable")
     t = say("sable", "home")
-    check("home, for the commission's asker: lived= is offered, no comment, and the lines written home are counted",
-          f'do prop {CARD} lived="{lab}:' in t and "do comment" not in t and f"but the 2 line(s) you wrote home, comments on {CARD}" in t, t)
-    t = say("juniper", "home")
-    check("home, for someone who did not ask it: lived= is its asker's report, and a comment is offered instead",
-          f"{CARD} was asked by sable, so lived= on it is their report, not yours" in t and f'do comment {CARD} line="{lab}:' in t
-          and "do prop" not in t and "Nothing from the visit is in home's world. " in t, t)
+    check("home counts the lines written home, the one thing of the visit that is there",
+          f"Nothing from the visit is in home's world but the 2 line(s) you wrote home, comments on {CARD}. " in t
+          and f'do prop {CARD} lived="{lab}:' in t, t)
 
     # ---- home, and what home gained -------------------------------------------------------------------------------
     say("pike", f"look {R.SHELF} :1")
@@ -336,7 +333,7 @@ try:
     t = say("pike", "home")
     check("home: the door says where pike was, what pike leaves behind, and how to report it",
           t.startswith(f"[door] you are home, back from a9001@{sha2[:7]}") and f'do prop a9001 lived="a9001@{sha2[:7]}:' in t
-          and "You leave behind: 2 notes made; it is gone with the version" in t, t)
+          and f'do prop a9001 lived_by="a9001@{sha2[:7]}:' in t and "You leave behind: 2 notes made; it is gone with the version" in t, t)
     t = say("pike", "go")
     check("pike's lines are home's again", "VERSION" not in t and "[in " not in t, t)
     check("home's world gained no other event from any of it", total() == n0 + extra, (n0, extra, total()))
@@ -348,6 +345,18 @@ try:
     time.sleep(3)
     left = [p.name for p in (state / "visits").iterdir()] if (state / "visits").exists() else []
     check("the versions' folders are removed when nobody is in them", left == [], left)
+
+    # ---- a3198: home says whose word lived= is ---------------------------------------------------------------------
+    say("pike", f"visit {asked}")
+    t = say("pike", "home")
+    check("home, from a commission someone else asked for: tell them; a comment or lived_by= will do, never lived=",
+          f"{asked} is sable's commission" in t and "tell sable what you saw" in t and f'do prop {asked} lived_by="{asked}@' in t
+          and " lived=" not in t, t)
+    say("sable", f"visit {asked}")
+    t = say("sable", "home")
+    check("home, from your own commission: lived= is your report", f'To report what you lived, from here: do prop {asked} lived="{asked}@' in t
+          and "lived_by" not in t, t)
+    check("and asking whose it is wrote nothing home", total() == n0 + extra, (n0, extra, total()))
 
     # ---- a page; a door started again; no door at all -------------------------------------------------------------
     t = say("pike", "visit a9001", headers={"Origin": base})

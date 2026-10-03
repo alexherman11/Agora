@@ -1,6 +1,6 @@
 """door: the front door that stays while deskd changes behind it (a1505, phase 1 of a1483).
 
-    python door.py [port] [--world frontier] [--state DIR] [--no-git] [--static DIR] [--trees DIR] [--holds FILE]
+    python door.py [port] [--world frontier] [--state DIR] [--no-git] [--static DIR] [--trees DIR]
                                                 default port 8794, state house-state/; --static: deskd's static dir
 
 It is meant to change almost never, and imports nothing of the desk's (no deskd, scene or desk), so a landing that
@@ -34,9 +34,9 @@ breaks those cannot break it. It:
     ERR or MISS when it is a refusal). The word that a version died is said once to each person who was in it, on a
     line whose answer they see: their own next line (refused, run nowhere) or their wake. The house marks the lines it
     sends signed as a resident (by=house, kind=rest|wake): its rest line does not take the word and runs at home; a
-    wake runs at home and opens with it. The entry line says what home's world holds that the visited code is older
-    than (world_holds.json, or --holds FILE: landings checked by git ancestry). `home` offers lived= only to the
-    commission's asker (read from the version's copy of the world) and a comment to anyone else. `write home <words>`,
+    wake runs at home and opens with it. The version's last words are quoted only when they are an error. When the
+    visited code is behind home's, the entry line names the newest landings it lacks (from git) and says that a view
+    there may show less than home's. `home` counts the lines written home. `write home <words>`,
     from inside a visit, is answered by the door: it writes one comment on the visited commission at home, signed by
     the visitor and labelled with the version; the single thing a visit writes in home's store.
 A request that could not reach a deskd at all (refused: it never arrived) is sent again to the current one; so is a
@@ -183,7 +183,7 @@ class Version:
         self.made, self.first = time.strftime("%H:%M"), ""         # when the world was copied, and for whom
         self.visitors, self.lines, self.since = set(), {}, {}      # who is in; each one's count of lines, and since when
         self.told, self.asked, self.head = {}, 0.0, sha            # which later head each visitor was told of
-        self.asker, self.wrote = "", {}            # a3204: who asked the commission ('' not asked yet, None unknown); lines written home
+        self.wrote = {}                                            # a3204: each visitor's count of lines written home
 
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
@@ -287,12 +287,29 @@ def labelled(text, label):
     return f"{first} {tag} {rest}" if first in ("ERR", "MISS") else f"{tag}\n{text}"
 
 
+def older(subjects, keep=3):
+    """a3204 (2): what a version behind home's code is told at entry. subjects: home's commits it lacks, newest first.
+    The landings among them are named from git (Pike c3244: a fact nobody maintains; a hand-kept list of what the
+    world holds would rot)."""
+    lands = [s[5:].strip() for s in subjects if s.startswith("land ")]
+    warn = "a view here may show less than home's, and nothing here says so"
+    if not lands:
+        return "This code is older than home's: " + warn
+    return (f"This code is older than {len(lands)} landing(s) at home, newest first: " + "; ".join(l[:70].rstrip(". ") for l in lands[:keep])
+            + (f"; and {len(lands) - keep} more" if len(lands) > keep else "") + ". It does not know what they brought, so " + warn)
+
+
+def reason(words):
+    """a3204 (6), Juniper c3247: a deskd killed from outside leaves no error, and its last output is its banner. Its
+    last words are quoted only when they are an error."""
+    return f"its last words: {words}" if any(w in words for w in ("Traceback", "Error", "Exception")) else "it gave no reason"
+
+
 class Door:
-    def __init__(self, port, world, state, watch_git, static=None, trees=None, holds=None):
+    def __init__(self, port, world, state, watch_git, static=None, trees=None):
         self.port, self.world, self.state, self.watch_git, self.static = port, world, Path(state), watch_git, static
         self.state.mkdir(parents=True, exist_ok=True)
         self.trees = Path(trees) if trees else REPO / ".worktrees"
-        self.holds = Path(holds) if holds else HERE / "world_holds.json"
         self.away, self.versions, self.fell = {}, {}, {}     # actor -> Version; (commission, commit) -> Version; actor -> what to tell
         self.last, self.lived = {}, []                       # actor -> {commission: commit last pinned}; the visits made
         self.visiting, self.entering = threading.RLock(), threading.Lock()
@@ -608,36 +625,6 @@ class Door:
                             f"visit writes at home, and the door wrote it, not {v.label}'s code. You are still in {v.label}; nothing "
                             "else you do here reaches home.", version=v.label)
 
-    def lacks(self, tree, sha):
-        """What home's world holds that the code at `sha` is older than (a3204; Juniper's promises view showed no count
-        under old code, silently): the landings named in world_holds.json that are not ancestors of `sha`."""
-        try:
-            holds = json.loads(self.holds.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return []
-        out = []
-        for h in holds if isinstance(holds, list) else []:
-            try:
-                r = subprocess.run(["git", "merge-base", "--is-ancestor", str(h["commit"]), sha], cwd=tree, capture_output=True, timeout=30)
-            except Exception:
-                continue
-            if r.returncode == 1:                  # 0: it has it; anything else: git could not say, and the door doesn't guess
-                out.append(str(h["name"]))
-        return out
-
-    def asker_of(self, ver, who):
-        """Who asked the commission, read from the version's own copy of the world (the door reads no world itself, and
-        asks home nothing): the card's own line, as the version's desk prints it. None when it can't be told."""
-        import re
-        try:
-            r = json.loads(ask(ver.port, "/api/do", timeout=60, method="POST", headers=JSON,
-                               body=json.dumps({"session": self.world, "as": who, "line": f"look {ver.cid} :1", "whole": True}).encode("utf-8"))[2])
-            first = next((l for l in str(r.get("text") or "").splitlines() if l.startswith(ver.cid + " ")), "")
-            m = re.search(r"\basked_by=([\w-]+)", first.rsplit('"', 1)[-1])
-            return m.group(1).lower() if m else None
-        except (OSError, ValueError, AttributeError):
-            return None
-
     def enter(self, body, who, args):
         """`visit <commission> [new | with=<name>]`: pin the commission's worktree at its commit as it is now (or join
         the version someone is in), and send this actor's lines there from now on. `visit` alone says who is where."""
@@ -709,9 +696,6 @@ class Door:
                 others = sorted(ver.visitors - {who})
             self.visits_save()
         self.log(f"door: {who} is in {ver.label} (port {ver.port})")
-        if ver.asker == "":
-            ver.asker = self.asker_of(ver, who)
-        lacks = self.lacks(tree, sha)
         subject = git_in(tree, "log", "-1", "--format=%s", sha)[1][:100]
         head = f"[door] you are in {cid} at {sha[:7]}" + (f" ({subject})" if subject else "")
         base = git("rev-parse", "HEAD")
@@ -732,11 +716,8 @@ class Door:
                 "Nothing you do here reaches home, and what you make here goes when the version does; `home` brings you back, "
                 f"and `write home <words>` leaves one line at home, a comment on {cid} (begin it with @name to call someone): "
                 "the door answers both, not this version"]
-        if lacks:      # Juniper, a2844 lived: under old code her promises view showed no count, and nothing said why
-            bits.insert(1, f"This code is older than: {', '.join(lacks)}. Home's world holds them and this code does not know "
-                           "them, so a view here may show less than home's, or nothing, without saying so")
-        elif ok2 and behind != "0":
-            bits.insert(1, "Being behind, a view here may show less than home's without saying so")
+        if ok2 and behind != "0":      # Juniper, a2844 lived: under old code her promises view showed no count, silently
+            bits.insert(1, older(git_in(tree, "log", "--first-parent", "--format=%s", f"{sha}..{base}")[1].splitlines()))
         if others:
             bits.append("Here too: " + ", ".join(others))
         if left:
@@ -789,30 +770,39 @@ class Door:
             stays = sorted(v.visitors)
         self.visits_save()
         self.log(f"door: {who} is home from {v.label} ({n} lines)")
-        # a3204 (Juniper; Pike avoided it by hand on a1666): lived= on a commission is its asker's report of their own
-        # promise, so only the asker is offered it; anyone else is pointed at a comment
-        lived, comment = f"do prop {v.cid} lived=\"{v.label}: <what you saw>\"", f"do comment {v.cid} line=\"{v.label}: <what you saw>\""
-        if v.asker == who:
-            report = f"To report what you lived, from here: {lived}"
-        elif v.asker:
-            report = (f"{v.cid} was asked by {v.asker}, so lived= on it is their report, not yours. To say what you lived, "
-                      f"from here: {comment}")
-        else:
-            report = (f"To report what you lived, from here: if you asked {v.cid}, {lived}; if you did not, lived= would report "
-                      f"its asker's promise, so {comment}")
         return answer(body, f"[door] you are home, back from {v.label} ({n} line(s) run there). {left}"
                             + ("" if not left.startswith("You leave") else "; it is gone with the version" if not stays else
                                f"; it stays there while {', '.join(stays)} {'is' if len(stays) == 1 else 'are'} in it")
                             + (f". Nothing from the visit is in home's world but the {wrote} line(s) you wrote home, comments on {v.cid}. "
-                               if wrote else ". Nothing from the visit is in home's world. ") + report)
+                               if wrote else ". Nothing from the visit is in home's world. ") + self.report_hint(v, who))
+
+    def report_hint(self, v, who):
+        """a3198: how to say what was lived, from home. lived= on the card is its holder's report; from anyone else it
+        is testimony (lived_by=, or a comment), so home's desk is asked whose commission this is. No answer, or no open
+        commission promise: both lines, and which is whose."""
+        mine, theirs = f"do prop {v.cid} lived=\"{v.label}: <what you saw>\"", f"do prop {v.cid} lived_by=\"{v.label}: <what you saw>\""
+        try:
+            b = self.current
+            c = json.loads(ask(b.port, "/api/commission?" + urlencode({"session": self.world, "as": who, "card": v.cid}), timeout=30)[2])
+        except (OSError, ValueError, AttributeError):
+            c = None
+        if not isinstance(c, dict) or not c.get("promise"):
+            return (f"To report what you lived, from here: {mine} if you asked for {v.cid}; if someone else did, lived= is "
+                    f"their word, so tell them what you saw: a comment on {v.cid} or {theirs} will do")
+        if c.get("yours"):
+            return f"To report what you lived, from here: {mine}"
+        whose = c.get("holder") or c.get("owed")
+        return (f"{v.cid} is {whose}'s commission" + ("" if c.get("holder") else " (asked for them, held by no one yet)")
+                + f", and its promise ({c['promise']}) ends by their word, not yours: tell {whose} what you saw; a comment on "
+                  f"{v.cid} or {theirs} will do (testimony: it shows on the promise and ends nothing)")
 
     def fall(self, v):
         """A version's deskd died: everyone in it is home, and each is told once, on their own next line (which is run
         nowhere) or at their wake."""
         with self.visiting:
             words = v.last_words()
-            said = (f"{v.label} died at {time.strftime('%H:%M')} while you were in it" + (f" (its last words: {words})" if words else "")
-                    + "; you are home; nothing of yours ran since")
+            said = (f"{v.label} died at {time.strftime('%H:%M')} while you were in it ({reason(words)}); you are home; "
+                    "nothing of yours ran since")
             gone = sorted(v.visitors)
             for who in gone:
                 self.depart(who, v, fell=True)
@@ -1048,8 +1038,7 @@ def main():
     state = a[a.index("--state") + 1] if "--state" in a[:-1] else str(HERE / "house-state")
     static = a[a.index("--static") + 1] if "--static" in a[:-1] else None
     trees = a[a.index("--trees") + 1] if "--trees" in a[:-1] else None
-    holds = a[a.index("--holds") + 1] if "--holds" in a[:-1] else None
-    DOOR = Door(port, world, state, "--no-git" not in a, static, trees, holds)
+    DOOR = Door(port, world, state, "--no-git" not in a, static, trees)
     DOOR.start_first()
     threading.Thread(target=DOOR.watch, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
