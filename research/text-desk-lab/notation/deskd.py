@@ -160,8 +160,12 @@ def _scene_key(q):
         house = (json.dumps(h, sort_keys=True, default=str), time.time() - beat < 30)
     except (OSError, ValueError, TypeError):
         pass
+    try:                                         # a2844: who is away in a version (the door's visits.json) is shown too
+        visits = (HERE / "house-state" / "visits.json").stat().st_mtime_ns
+    except OSError:
+        visits = None
     return (name, (q.get("as") or "alex").lower(), q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, house,
-            int(time.time() // 60))
+            int(time.time() // 60), visits)
 
 
 def snapshot_for(desk):

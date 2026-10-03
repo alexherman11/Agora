@@ -469,11 +469,13 @@ def presences(desk):
     for r in scene.house_rows(desk):
         d = r["doing"]
         doing[r["corner"]] = "" if d == "working" else d if d.startswith("resting") else "resting"   # stopped: not in a turn
-    w = desk.world
+    w, gone = desk.world, scene.away(desk)
 
     def word(actor):
         if asleep(w, actor):
             return "asleep"
+        if str(actor).lower() in gone:           # a2844: visiting a version of the code, as the door observes it
+            return "away in " + gone[str(actor).lower()]
         return doing.get(corner_of(w, actor), "")
     return word
 
