@@ -328,6 +328,11 @@ class Handler(SimpleHTTPRequestHandler):
             # a1505: the door asks this of a deskd it has just started, before any page is sent to it (and then the
             # scenes it has recently served, built by this process). Loads no session.
             return self._json({"ok": True, "code": CODE_VERSION, "pid": os.getpid()})
+        if u.path == "/api/commission":
+            # a3198: the door's `home` asks whose commission a visitor is back from, to say whose word lived= is
+            import promises
+            with Session(q.get("session", "desktop"), q.get("as")) as desk:
+                return self._json(promises.commission_of(desk.world, q.get("card", "")))
         if u.path == "/api/style":
             # F7: a style is world data (a note tagged style); the seed file answers only when the world has none
             import scene

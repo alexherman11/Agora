@@ -140,6 +140,13 @@ try:
     sha1 = git(a1, "rev-parse", "HEAD")
     one = f"a9001@{sha1[:7]}"
     door = start_door()
+    say("sable", 'promise to=pike "a world with promises"')      # a3198: a commission sable asked for, with a worktree
+    say("sable", f"look {R.BOARD} :1")                           # of its own (commissions are promises once a world has them)
+    t = say("sable", f'do create {R.BOARD} kind=task title="Asked by sable" owner=sable asked_by=sable status=open commission=asked')
+    asked = t.split("created ")[1].split()[0]
+    worktree(trees, asked, lambda lab: None)
+    c = get(f"{base}/api/commission?session={WORLD}&as=pike&card={asked}")
+    check("home's desk says whose commission a card is, and whether it is the asker's", c.get("holder") == "sable" and c.get("yours") is False, (t, c))
     n0 = total()
 
     # ---- (i) go, use the one thing it changes, home ------------------------------------------------------------
@@ -251,7 +258,7 @@ try:
     t = say("pike", "home")
     check("home: the door says where pike was, what pike leaves behind, and how to report it",
           t.startswith(f"[door] you are home, back from a9001@{sha2[:7]}") and f'do prop a9001 lived="a9001@{sha2[:7]}:' in t
-          and "You leave behind: 2 notes made; it is gone with the version" in t, t)
+          and f'do prop a9001 lived_by="a9001@{sha2[:7]}:' in t and "You leave behind: 2 notes made; it is gone with the version" in t, t)
     t = say("pike", "go")
     check("pike's lines are home's again", "VERSION" not in t and "~ in" not in t, t)
     check("home's world gained no event from any of it", total() == n0, (n0, total()))
@@ -263,6 +270,18 @@ try:
     time.sleep(3)
     left = [p.name for p in (state / "visits").iterdir()] if (state / "visits").exists() else []
     check("the versions' folders are removed when nobody is in them", left == [], left)
+
+    # ---- a3198: home says whose word lived= is ---------------------------------------------------------------------
+    say("pike", f"visit {asked}")
+    t = say("pike", "home")
+    check("home, from a commission someone else asked for: tell them; a comment or lived_by= will do, never lived=",
+          f"{asked} is sable's commission" in t and "tell sable what you saw" in t and f'do prop {asked} lived_by="{asked}@' in t
+          and " lived=" not in t, t)
+    say("sable", f"visit {asked}")
+    t = say("sable", "home")
+    check("home, from your own commission: lived= is your report", f'To report what you lived, from here: do prop {asked} lived="{asked}@' in t
+          and "lived_by" not in t, t)
+    check("and asking whose it is wrote nothing home", total() == n0, (n0, total()))
 
     # ---- a page; a door started again; no door at all -------------------------------------------------------------
     t = say("pike", "visit a9001", headers={"Origin": base})
