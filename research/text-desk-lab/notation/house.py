@@ -888,6 +888,9 @@ class House:
         r.state.pop("cut_by_restart", None)              # older state: now said through unanswered
         if undelivered:                                  # it never reached this conversation: said in full, once
             lead += "(a message I had for you never reached you; here it is:)\n" + undelivered + "\n(and your wake:)\n"
+        door = r.state.pop("door", "")
+        if door:                                         # the door's word, spent on the house's rest line as you
+            lead += "(the door said this to the rest line I sent as you, so you haven't seen it:)\n" + door + "\n"
         unanswered, why_not = r.state.pop("unanswered", 0), r.state.pop("unanswered_why", "")
         r.state["woke"] = now()
         if unanswered and not undelivered:
@@ -992,7 +995,14 @@ class House:
         actor = ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("actor")
         if actor:
             # a806 (9): the desk's rest, a go home marked via=rest, so history tells being carried home from walking
-            r.log("home", self.act(actor, "rest :1")[:300])
+            said = self.act(actor, "rest :1")
+            r.log("home", said[:300])
+            # 3 Oct (Pike, a2844 (iii), lived): the door says its word (your version died, you are home) once, to the
+            # first line sent as you. When that line is this rest, the resident never saw it; their next wake says it
+            door = [x for x in said.splitlines() if "[door]" in x]
+            if door:
+                r.state["door"] = "\n".join(door)
+                r.save()
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not
