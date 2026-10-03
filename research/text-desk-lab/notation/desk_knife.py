@@ -1882,7 +1882,11 @@ class DeskKnife(DeskMoo):
         if bad:
             verbs.rollback(self, n0)
             raise Refusal(bad + ". Nothing was changed")
-        notes += promises.after_act(self, n0)     # a1587: a commission asked, lived=, a card leaving with a promise open
+        bad = promises.not_your_report(self, n0)  # a3198: lived= is its holder's word; anyone else's is lived_by=
+        if bad:
+            verbs.rollback(self, n0)
+            raise Refusal(bad + ". Nothing was changed")
+        notes += promises.after_act(self, n0)    # a1587: a commission asked, lived=, a card leaving with a promise open
         made = w.nodes.get(w.last_created) or {}
         if verb == "create" and made.get("layout") == "view" and made.get("cols"):
             # a1431: a column that names nothing would print empty at every look; its receipt says so once

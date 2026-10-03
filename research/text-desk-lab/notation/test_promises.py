@@ -195,6 +195,50 @@ check("commission=asked makes its asker's promise", "a commission is its asker's
 t = say("pike", f"look {Y} :1", f'do prop {Y} lived="lived it"')
 check("lived= reports it; owed to yourself, kept on your own word", "kept (your own word)" in t, t)
 
+# ---- a3198: lived= is its holder's word alone; anyone else's is testimony (lived_by=), which ends nothing -------------
+V = made(say("sable", f"look {B} :1", f'do create {B} kind=task title="Visits" owner=sable asked_by=sable status=open'))
+t = say("sable", f"look {V} :1", f"do prop {V} commission=asked")
+pv = re.search(r"asker's promise: (a\d+)", t).group(1)
+n_ev = len(W.events)
+t = say("pike", f"look {V} :1", f'do prop {V} lived="{V}@4bf2a2a: the door let me in and out"')
+check("a visitor's lived= on someone else's commission is refused, naming whose word it is and the line for testimony",
+      t.startswith("ERR") and "is sable's word, not yours" in t and f'do prop {V} lived_by="{V}@4bf2a2a: <what you saw>"' in t
+      and "Nothing was changed" in t, t)
+check("and nothing was changed: no event, no lived= on the card, the promise open with one act",
+      len(W.events) == n_ev and "lived" not in (W.subjects[W.nodes[V]["subject"]].get("props") or {})
+      and promises.state(W, W.nodes[pv]["subject"])["state"] == "open", W.events[n_ev:])
+t = say("pike", f"look {V} :1", f'do prop {V} lived_by="{V}@4bf2a2a: the door let me in and out"')
+check("lived_by= is testimony: kept on the card, said to end nothing, and the promise stays sable's and open",
+      f"lived_by= is your testimony on {V}: it ends nothing" in t and f"{pv} stays open: sable's own promise" in t
+      and "Only sable's own lived= reports it" in t and promises.state(W, W.nodes[pv]["subject"])["state"] == "open", t)
+t = say("sable", "promises")
+check("sable's list shows it on her open promise: 'also lived by pike at <commit>'",
+      f"{pv} " in t and "your own promise · also lived by pike at 4bf2a2a" in t, t)
+say("juniper", f"look {V} :1", f'do prop {V} lived_by="read the receipts only, no visit"')
+t = say("sable", f"examine {pv}")
+check("a second testimony does not hide the first, and one naming no commit says no commit",
+      "also lived by pike at 4bf2a2a; by juniper ·" in t and "testimony by pike" in t and "testimony by juniper" in t
+      and "which ends nothing: read the receipts only" in t, t)
+check("the promise is still held-by:sable, and no testimony made pike or juniper its holder",
+      pv in say("sable", "table kind:promise,held-by:sable cols=title") and pv not in say("pike", "table kind:promise,held-by:pike cols=title"))
+check("the door's question (whose commission is this?) answers by who asks",
+      (setattr(W, "me", "sable") or promises.commission_of(W, V)) == {"promise": pv, "holder": "sable", "owed": "sable", "yours": True}
+      and (setattr(W, "me", "pike") or promises.commission_of(W, V)["yours"]) is False, promises.commission_of(W, V))
+t = say("sable", f"look {V} :1", f'do prop {V} lived="{V}@4bf2a2a: lived it myself, as pike did"')
+check("the holder's own lived= then ends it, on her own word", f"lived= reports {pv}: kept (your own word)" in t, t)
+check("and the card keeps the testimony beside her report", (W.subjects[W.nodes[V]["subject"]]["props"]).get("lived_by")
+      and W.subjects[W.nodes[V]["subject"]]["props"]["lived"].endswith("as pike did"))
+check("a card whose commission promise has ended takes no promise's word: anyone's lived= is a prop again",
+      not say("pike", f"look {V} :1", f'do prop {V} lived="pike, after"').startswith("ERR"))
+# owed to someone else: their lived= is the confirmation it always was; a third person's is still refused
+V2 = made(say("juniper", f"look {B} :1", f'do create {B} kind=task title="Visits 2" owner=sable status=open'))
+t = say("sable", f"look {V2} :1", f"do prop {V2} commission=asked")
+check("(sable asks on juniper's card: sable promised juniper)", "sable promised juniper" in t or "you promised juniper" in t, t)
+t = say("pike", f"look {V2} :1", f'do prop {V2} lived="x"')
+check("a third person's lived= is refused there too", t.startswith("ERR") and "is sable's word, not yours" in t, t)
+t = say("juniper", f"look {V2} :1", f'do prop {V2} lived="saw it land"')
+check("the owed one's lived= confirms, as before", "lived= by the one it's owed to confirms" in t, t)
+
 # ---- a2798: a commission's promise is its asker's own act; set for them by another hand, it is no one's ---------------
 Z = made(say("sable", f"look {B} :1", f'do create {B} kind=task title="Worlds" owner=sable asked_by=juniper status=open'))
 t = say("sable", f"look {Z} :1", f"do prop {Z} commission=asked")
@@ -216,6 +260,9 @@ Z3 = made(say("juniper", f"look {B} :1", f'do create {B} kind=task title="Doors 
 say("juniper", f"look {Z3} :1", f"do prop {Z3} commission=working")
 t = say("sable", f"look {Z3} :1", f"do prop {Z3} commission=asked")
 check("no one's, even when asked_by made the card", "no one's promise yet" in t, t)
+t = say("pike", f"look {Z3} :1", f'do prop {Z3} lived="x"')
+check("a3198: held by no one, a passer-by's lived= is refused, naming the one it was asked for",
+      t.startswith("ERR") and "is juniper's word, not yours" in t and "held by no one" in t, t)
 
 # ---- a2798: a request on a card that leaves the living asks its asker, once: withdraw or keep ----------------------
 X2 = made(say("sable", f"look {B} :1", f'do create {B} kind=task title="Ask it" status=doing'))

@@ -21,7 +21,9 @@ nothing: its event is undone, and the state is read without it.
                                              declined'); withdraw <id> takes the offer back. Notification isn't consent.
 
 A commission is its asker's own once-promise (Juniper c1585): owed to asked_by (or the card's maker), and lived= on the
-card is the asker's report. It is made by the asker's own act of asking (a2798): the earliest event where asked_by
+card is the asker's report: theirs alone (a3198). From anyone else, while the commission's promise is open, lived= is
+refused, and lived_by= is their testimony: kept on the card, shown on the promise as 'also lived by pike at <commit>',
+ending nothing. It is made by the asker's own act of asking (a2798): the earliest event where asked_by
 set commission=asked. When someone else set it for them, it is no one's promise: 'asked for X; held by no one', until
 someone holds it by an act (accept <id>, or X setting commission=asked). A card that leaves the living (done, trashed,
 cancelled, in a Trash) with an open promise about it that the same act did not end asks, once, on their sill: its
@@ -189,7 +191,7 @@ def phrase(w, st, reader=None, hints=True):
     owed = L(st["owed"])
     if st["holder"] is None and k == OPEN:
         return (f"asked for {owed}; held by no one" + (f" (set by {L(st['setter'])})" if st["setter"] else "")
-                + (f" (accept {st['aid']} to hold it)" if hints else ""))
+                + (f" (accept {st['aid']} to hold it)" if hints else "") + _also(w, st, L))
     if same(st["holder"], st["owed"]):
         base = "your own promise" if same(st["holder"], r) else f"{label(w, st['holder'])}'s own promise"
     elif st["carried_from"]:
@@ -212,7 +214,7 @@ def phrase(w, st, reader=None, hints=True):
             out += f" · offered to {L(o['to'])}" + (f" (withdraw {st['aid']} takes the offer back)" if hints and same(o["by"], r) else "")
         elif st["last_offer"] and st["last_offer"]["end"] == "decline":
             out += f" · {L(st['last_offer']['to'])} declined"
-        return out
+        return out + _also(w, st, L)
     a, who, eid, words = st["ended"]
     if k == REPORTED:
         if same(st["owed"], r):
@@ -239,6 +241,33 @@ def about_sid(w, st):
 
 def open_about(w, card_sid):
     return [st for st in (state(w, x) for x in all_sids(w)) if is_open(st) and about_sid(w, st) == card_sid]
+
+
+def testimony(w, card_sid, holder=None):
+    """a3198: who else says they lived this card's work: each person's latest live lived_by= on it, the holder's own
+    left out (theirs is lived=, the report). -> [(person, event id, words, commit named in the words or '')]. Read
+    from the events, as every person here is, so two who testify both show though the prop holds the later words."""
+    if not card_sid or not (w.subjects.get(card_sid, {}).get("props") or {}).get("lived_by"):
+        return []
+    apps, out = set(w.appearances_of(card_sid)) | {card_sid}, {}
+    for e in w.events:
+        words = (e.get("args") or {}).get("lived_by")
+        if not words or e.get("undone") or e["verb"] not in ("prop", "create") or persons.norm(e["by"]) in persons.NOT_PERSONS:
+            continue
+        if e["target"] not in apps and not (e["verb"] == "create" and (e.get("undo") or {}).get("delete") in apps):
+            continue
+        who = _person(w, e=e)
+        if same(who, holder):
+            continue
+        m = re.search(r"@([0-9a-f]{7,40})\b", str(words))
+        out[who.get("pid") or who.get("name")] = (who, e["id"], str(words), m.group(1)[:7] if m else "")
+    return list(out.values())
+
+
+def _also(w, st, L):
+    """' · also lived by pike at 4bf2a2a' for an open promise about a card that carries testimony, else ''."""
+    said = testimony(w, about_sid(w, st), st["holder"]) if st.get("about") else []
+    return (" · also lived by " + "; by ".join(L(who) + (f" at {commit}" if commit else "") for who, _e, _t, commit in said)) if said else ""
 
 
 def asked_of(w, card_sid):
@@ -563,6 +592,8 @@ def card_lines(desk, nid):
                        "asked-for": ("set", f"for {label(w, st['owed'])}, made by no one")}.get(act, (act, words))
         out.append(f"    {name} by {label(w, who)}" + (f" ({eid})" if eid else " (no event says who)")
                    + (f": {words}" if words else ""))
+    for who, eid, words, _c in testimony(w, about_sid(w, st), st["holder"]) if st["about"] else []:
+        out.append(f"    testimony by {label(w, who)} ({eid}), which ends nothing: {words}")      # a3198
     may = [v for v in ("accept", "decline", "withdraw", "report", "confirm", "release", "carry") if not _who_may(w, st, v, w.me)]
     out.append("  verbs: " + (" · ".join(USAGE[v].replace("<id>", st["aid"]) for v in may) if may else "none open to you now")
                + "   (help promises)")
@@ -725,6 +756,18 @@ def after_act(desk, n0):
                 elif st["state"] in (OPEN, REPORTED) and same(st["owed"], actor):
                     add_act(w, st["sid"], "confirm", "", e["by"], cause=e["id"])
                     notes.append(f"~ lived= by the one it's owed to confirms {st['aid']}: kept")
+        if a.get("lived_by"):                 # a3198: testimony, kept on the card; it ends nothing
+            actor, card = _person(w, e=e), aid_of(w, sid)
+            for st in open_about(w, sid):
+                if st["state"] != OPEN:
+                    continue
+                if same(st["holder"], actor):
+                    notes.append(f"~ lived_by= is testimony and ends nothing; {st['aid']} is your own to report: lived= on {card}")
+                else:
+                    whose = label(w, st["holder"]) if st["holder"] else label(w, st["owed"])
+                    notes.append(f"~ lived_by= is your testimony on {card}: it ends nothing. {st['aid']} stays open: "
+                                 f"{phrase(w, st, hints=False)}. Only {whose}'s own lived= "
+                                 + ("reports it" if st["holder"] else "confirms it (or whoever accepts it reports it)"))
     for c in cards:
         if living(w, c):
             continue
@@ -769,6 +812,51 @@ def after_act(desk, n0):
             notes.append(f"~ {card} left the living with {x} still open: {name} is asked once, on their sill "
                          f"({r['created']}): {q}")
     return notes
+
+
+def not_your_report(desk, n0):
+    """a3198: lived= on a card is its holder's report (or the owed one's confirmation). Set by anyone else on a card
+    whose commission promise is open, it would leave the card saying 'lived' while the promise says not, in words
+    that are not its holder's: refused, naming whose it is and the line that keeps what they saw (lived_by=). -> the
+    refusal's words, or None. A card with no open commission promise takes lived= from anyone, as before."""
+    w = desk.world
+    if not on(w):
+        return None
+    for e in w.events[n0:]:
+        if e.get("undone") or e["verb"] not in ("prop", "create") or not (e.get("args") or {}).get("lived") \
+                or persons.norm(e["by"]) in persons.NOT_PERSONS:
+            continue
+        made = (e.get("undo") or {}).get("delete") if e["verb"] == "create" else e["target"]
+        sid = w.subject_of(made) if made in w.nodes else (made if made in w.subjects else None)
+        if not sid:
+            continue
+        actor, apps, about = _person(w, e=e), set(w.appearances_of(sid)), open_about(w, sid)
+        if any(same(st["holder"], actor) or same(st["owed"], actor) for st in about):
+            continue
+        for st in about:
+            if st["state"] == OPEN and _is_commission(w, st, apps):
+                card = aid_of(w, sid)
+                whose = label(w, st["holder"]) if st["holder"] else label(w, st["owed"])
+                m = re.search(r"\b\w+@[0-9a-f]{7,40}\b", str(e["args"]["lived"]))
+                return (f"lived= on {card} is {whose}'s word, not yours: {st['aid']} ({phrase(w, st, hints=False)}) ends by "
+                        f"their act alone. What you lived is testimony, and it is welcome: do prop {card} "
+                        f"lived_by=\"{m.group(0) if m else '<commission>@<commit>'}: <what you saw>\" keeps it on the card "
+                        f"and shows it on the promise, ending nothing; or tell {whose} in a comment on {card}")
+    return None
+
+
+def commission_of(w, card):
+    """a3198, for the door's `home`: the open commission promise about this card, as the reader (w.me) stands to it.
+    -> {promise, holder, owed, yours} (names as printed; holder '' when no one holds it), or {} when there is none."""
+    sid = w.subject_of(card) if card in w.nodes else (card if card in w.subjects else None)
+    if not sid or not on(w):
+        return {}
+    apps = set(w.appearances_of(sid))
+    for st in open_about(w, sid):
+        if st["state"] == OPEN and _is_commission(w, st, apps):
+            return {"promise": st["aid"], "holder": label(w, st["holder"]) if st["holder"] else "",
+                    "owed": label(w, st["owed"]), "yours": same(st["holder"], me(w)) or same(st["owed"], me(w))}
+    return {}
 
 
 def guard_props(w, verb, kv):
@@ -1174,7 +1262,10 @@ open requests are about). Columns (table, a view's cols=): promise (how it reads
 lens may print $asked_of of a card.
 A commission is its asker's promise, owed to asked_by (or the card's maker), made by asked_by's own act of setting
 commission=asked; set by someone else for them, it is held by no one ('asked for X; held by no one') until someone
-accepts it. lived= on the card is the holder's report. A card that leaves the living (done, trashed, cancelled, the
+accepts it. lived= on the card is the holder's report, and only theirs: while the promise is open, lived= from anyone
+else (but the one it is owed to, whose lived= confirms) is refused, and lived_by="<commission>@<commit>: <what you
+saw>" is their testimony, kept on the card and shown on the promise ('also lived by pike at 4bf2a2a'), ending nothing.
+A card that leaves the living (done, trashed, cancelled, the
 Trash) with an open promise or request about it asks once, on a sill: the holder (kept, released or carried?), the
 asker of a request (withdraw or keep?), or, held by no one, the one it was asked for (release or confirm?).
 owe= and awaiting= are not props any more in a world with promises: their door is promise and ask."""

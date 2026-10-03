@@ -657,8 +657,27 @@ class Door:
         return answer(body, f"[door] you are home, back from {v.label} ({n} line(s) run there). {left}"
                             + ("" if not left.startswith("You leave") else "; it is gone with the version" if not stays else
                                f"; it stays there while {', '.join(stays)} {'is' if len(stays) == 1 else 'are'} in it")
-                            + f". Nothing from the visit is in home's world. To report what you lived, from here: "
-                              f"do prop {v.cid} lived=\"{v.label}: <what you saw>\"")
+                            + f". Nothing from the visit is in home's world. " + self.report_hint(v, who))
+
+    def report_hint(self, v, who):
+        """a3198: how to say what was lived, from home. lived= on the card is its holder's report; from anyone else it
+        is testimony (lived_by=, or a comment), so home's desk is asked whose commission this is. No answer, or no open
+        commission promise: both lines, and which is whose."""
+        mine, theirs = f"do prop {v.cid} lived=\"{v.label}: <what you saw>\"", f"do prop {v.cid} lived_by=\"{v.label}: <what you saw>\""
+        try:
+            b = self.current
+            c = json.loads(ask(b.port, "/api/commission?" + urlencode({"session": self.world, "as": who, "card": v.cid}), timeout=30)[2])
+        except (OSError, ValueError, AttributeError):
+            c = None
+        if not isinstance(c, dict) or not c.get("promise"):
+            return (f"To report what you lived, from here: {mine} if you asked for {v.cid}; if someone else did, lived= is "
+                    f"their word, so tell them what you saw: a comment on {v.cid} or {theirs} will do")
+        if c.get("yours"):
+            return f"To report what you lived, from here: {mine}"
+        whose = c.get("holder") or c.get("owed")
+        return (f"{v.cid} is {whose}'s commission" + ("" if c.get("holder") else " (asked for them, held by no one yet)")
+                + f", and its promise ({c['promise']}) ends by their word, not yours: tell {whose} what you saw; a comment on "
+                  f"{v.cid} or {theirs} will do (testimony: it shows on the promise and ends nothing)")
 
     def fall(self, v):
         """A version's deskd died: everyone in it is home, and each is told at their next line, which is run nowhere."""
