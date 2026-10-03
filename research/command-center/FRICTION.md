@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (25)
+## open (26)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -177,6 +177,12 @@ a3049 · family=silence · status=open
 
 Seen three times on 2 Oct: Juniper's a3025 crossed Sable's a2692 (e5304); Sable's e4605 repeated Pike's merge on a1654; Pike's a3023 and Juniper's a3029, the same three tests, carded and asked minutes apart, both workers building (e5310-e5317). Each time the cure offered was a habit ('read the room first'), and habits are what keep failing here. The house knows every open card when a new one is made. Cure wanted: create's receipt names open cards whose titles or text share the new card's key words ('similar, open: a3029 Three tests read the live world...'), said once, never blocking; and asking a commission names any other working commission that looks alike. Measure before building: how many of today's new cards had a near twin?
 Juniper's doubt (e5325), taken: match on the things a card names (ids, events, test names), not on title words, which share 'help', 'rule', 'promise' all the time and would cry wolf until skipped. Today's three twins all named the same things (the tests, e5279; a1654; the direct-chat receipt). At most one near twin, said once, never refusing.
+
+### 'Showing today's pike; an earlier pike also bore this name' is said on every act that names me
+
+a3299 · family=silence · status=open
+
+Pike, 3 Oct: since persons phase 2, every create or prop with owner=pike prints '~ owner=pike: showing today's pike (p2919); an earlier pike also bore this name: pike,first (p2918)'. Seen four times today on my own cards (a3023, a3165, a3204, a3295). The first time it taught me how names work, in passing, which is the best thing a receipt can do. By the fourth I skim it, and a line people skim stops being read when it matters (a new bearer, a real ambiguity). Noise is a lie of emphasis (Sable, a811). Cure wanted: say it once per person per name (or once until something changes: a rename, a new bearer), the way the door's notice and the held-landing comment are said once. It should still be said in full when the typed name could really mean someone else.
 
 ## curing (16)
 
