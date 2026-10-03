@@ -75,6 +75,8 @@ def aspects_of(verb, args):
         return {"links"}
     if verb == "go":
         return {"presence"}           # a678: where an actor is; no thing's aspect
+    if verb == "knock":
+        return {"knock"}              # a3150: the house's record of whom a line knocked; no thing's aspect
     if verb == "create":
         # 30 Sep: a create adds to a surface's contents and changes none of its props or title. It counted as touching
         # everything, so a resident making a note in its corner staled Alex's wake/rest press (prop want=) on the corner.
@@ -800,6 +802,8 @@ class Desk:
         # a1568: 'mine' is by person once the world has persons, so a renamed person's own acts stay theirs
         evs = [e for e in self.world.events[self.last_event_seen:]
                if (not persons.mine(w, e) and e.get("tripped_by") != me) or rule_did_unseen(e, me)]
+        # a3150: the house's record of a knock is no news to anyone: it is there for whoever asks (history, examine)
+        evs = [e for e in evs if e["verb"] != "knock"]
         self.last_event_seen = len(self.world.events)
         # a678 (6): walking folds, at most one line per actor, their latest room
         latest = {persons.by(w, e): e for e in evs if e["verb"] == "go"}
@@ -1344,7 +1348,9 @@ class Desk:
                 head = (f"history of {persons.label(self.world, nid)} ({nid}): " + (f"the latest 12 of {len(evs)} events"
                         if len(evs) > 12 else f"{len(evs)} event(s)") + (f"; {note}" if note else ""))
                 return "\n".join([head] + [self._history_line(e) for e in evs[-12:]])
-            evs =[e for e in evs if e["target"] == nid or nid in (e.get("args") or {}).values()]
+            # a3150: a corner's history lists the knocks the house recorded for its resident
+            evs =[e for e in evs if e["target"] == nid or nid in (e.get("args") or {}).values()
+                  or nid in (e.get("knocked") or ())]
         evs = evs[-12:]
         if not evs:
             return "no events yet"
@@ -1400,6 +1406,7 @@ class Desk:
             own |= {e["id"] for e in w.events if (e.get("args") or {}).get("line_id") == rid}
             ids = own - {None}
             return [e for e in w.events if e["id"] in ids or (e["verb"] == "undo" and e["target"] in ids)
+                    or (e["verb"] == "knock" and e.get("cause") in ids)      # a3150: whom the line knocked
                     or (chat is not None and e["verb"] == "lines" and chat["id"] in (e.get("changed") or ()))]
         mine, ids = [], set()
         for e in w.events:
@@ -1448,6 +1455,7 @@ class Desk:
                 out.append(f"  tripped by {persons.tripped(w, e)} (a rule acting as {persons.by(w, e)})")
             if e.get("cause"):
                 out.append(f"  because of {e['cause']} (examine {e['cause']})")
+            out += self._knock_lines(rid)
             caused = [x["id"] for x in w.events if x.get("cause") == rid]
             if caused:
                 out.append("  it caused: " + " ".join(caused[:12]) + (f" (+{len(caused) - 12})" if len(caused) > 12 else ""))
@@ -1505,6 +1513,8 @@ class Desk:
                        + (f", from press {line['intent']}" if line.get("intent") else ""))
         else:
             out.append("  no event that made it could be found, so who said it and when are not known (a1581 kept it as it was)")
+        if ev:
+            out += self._knock_lines(ev["id"])
         if line.get("reply_to"):
             out.append(f"  in reply to {line['reply_to']} (examine {line['reply_to']})")
         if line.get("was"):
@@ -1514,6 +1524,15 @@ class Desk:
                 out.append(f"    ({x.get('ev') or 'unknown'}) " + x["text"].replace("\n", "\n    "))
         out.append(f"  read {apps[0] if apps else chat['id']} shows the chat; history {rid} lists what happened to this line")
         return "\n".join(out)
+
+    def _knock_lines(self, eid):
+        """a3150: what the house recorded about whom the line made by event `eid` knocked: one line, or none."""
+        import rooms
+        k = rooms.knock_of(self.world, eid)
+        if k is None:
+            return []
+        return [f"  knock ({k['id']}, the house's record): " + "; ".join(
+            f"{self.world.display_name(a)}: {v}" for a, v in (k.get("args") or {}).items() if a != "line")]
 
     def _fmt_args(self, args):
         def one(k, v):

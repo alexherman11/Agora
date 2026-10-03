@@ -205,7 +205,8 @@ import house      # noqa: E402
 import workshop   # noqa: E402
 
 HOUSE = SimpleNamespace(_inside=lambda w, n, f: house.House._inside(None, w, n, f),
-                        _hold=lambda r, e, t: house.House._hold(None, r, e, t))
+                        _hold=lambda r, e, t: house.House._hold(None, r, e, t),
+                        _knocked=lambda r, e, s, resting: house.House._knocked(None, r, e, s, resting))
 
 
 def heard(d, me, card, by="worker-x"):

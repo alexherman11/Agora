@@ -20,7 +20,12 @@ the resident knows comes from the world, and everything it does goes through it:
     (a1566: a resident's @ knocks, as a person's does), and, from a person at a keyboard (a surface says person=<them>), any line in a chat
     in its own corner. A line from a resident or an agent is kept for it and said first at that wake, under 'for you
     while you rested', with chat and time (a1062); their plain line in its own corner's chat waits for its next wake.
-    The speaker's receipt says whom the line took and, per name, what happened. Otherwise it is woken when its
+    The speaker's receipt says whom the line took and, per name, what happened. A knock leaves a record (a3150): one
+    knock event per line that named or reached someone (target and cause: the line's event), saying per name what
+    happened (woken / in a turn, held for its end / asleep / not a member, not knocked / a person or an agent, not
+    knocked), written once per line whatever house runs (record_knocks); `history <corner>` and `examine <line>`
+    show it, and the message that ends a rest begins `~ woken by <who>'s line <m id> (<event>) in "<chat>"`. A wake
+    the house starts with no one calling says `(the house started you; no one called)`. Otherwise it is woken when its
     timed rest ends, or, after an untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
     `wake_every` seconds pass. A plain line in a shared chat (Lounge talk) wakes no one: it goes with whatever reaches
     the resident next.
@@ -638,16 +643,22 @@ class House:
                     if waits:                                      # a1062 (5): a book line is a note at the door,
                         self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                         urgent = urgent or now_                    # a1566: and a line addressed to it knocks
+                        if now_:
+                            self._knocked(r, e, s, resting)
                         continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                     urgent = True
+                    self._knocked(r, e, s, resting)
                 elif "all" in members or actor in members or now_:
                     if now_ and waits:                             # a1566: kept, first and marked, and it knocks
                         self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
                         urgent = True
+                        self._knocked(r, e, s, resting)
                         continue
                     inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
                     urgent = urgent or now_
+                    if now_:
+                        self._knocked(r, e, s, resting)
                 continue
             # a916, as Sable, Pike and Juniper agreed: outside a chat line, @everyone and @all never reach anyone (a
             # broadcast from a document edit is almost never meant; a chat line is the place for it). a2733: @name in a
@@ -660,15 +671,19 @@ class House:
                 if waits:                                          # a1566: a call is kept first, and knocks
                     self._hold(r, e, f"~ {at} {e['by']} called you{where}, as @{m[0]} ({e['id']}): {said[:300]}")
                     urgent = True
+                    self._knocked(r, e, s, resting)
                     continue
                 inbox.append(f"~ {e['by']} called you{where}, as @{m[0]} ({e['id']}): {said[:300]}")
                 urgent = True
+                self._knocked(r, e, s, resting)
             elif e["verb"] == "comment" and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
                 urgent = True
+                self._knocked(r, e, s, resting)
             elif e["verb"] == "comment" and asked(s):
                 inbox.append(f"~ {e['by']} on your commission \"{s['title']}\" ({e['id']}): {said[:1500]}")
                 urgent = True
+                self._knocked(r, e, s, resting)
         r.state["cursor"] = len(w.events)
         r.save()
         return urgent
@@ -698,6 +713,86 @@ class House:
         """a1062: keep a line for the resident's next wake, marked for it."""
         r.state.setdefault("for_you", []).append({"by": e.get("by"), "id": e["id"], "text": text})
 
+    def _knocked(self, r, e, s, resting):
+        """a3150: remember which line ended this rest, for the wake's first line (woken_by). Only while it rests: a
+        line heard with a receipt woke no one."""
+        if not resting:
+            return
+        mid = (e.get("args") or {}).get("line_id")
+        line = bool(s) and s["kind"] == "chat" and "append" in (e.get("args") or {})
+        what = (f"line {mid} ({e['id']})" if mid else f"line ({e['id']})") if line \
+            else f"{'comment' if e['verb'] in ('comment', 'resolve') else e['verb']} ({e['id']})"
+        where = (f" in \"{s['title']}\"" if line else f" on \"{s['title']}\"") if s else ""
+        r.state.setdefault("knocked_by", []).append(f"{e['by']}'s {what}{where}")
+
+    def woken_by(self, r, word="woken by"):
+        """a3150 (Claude e5528 (2)): the first line of a wake a line caused, naming it by id, or []; and forgets it.
+        '~ woken by juniper's line m12 (e5511) in "Lounge talk"'. At a wake that came for another reason (a timed
+        rest's end, a start) the lines that called it meanwhile are said as 'called by'."""
+        by = list(dict.fromkeys(r.state.pop("knocked_by", None) or []))
+        return [f"~ {word} " + "; ".join(by)] if by else []
+
+    def record_knocks(self, w, corners):
+        """a3150 (Sable c2705 on a1941): one knock event per line that named or reached someone, saying per name what
+        happened: woken / in a turn, held for its end / asleep / not a member, not knocked / an agent, not knocked.
+        Decided here, once, before any resident is served this pass, by the reading the knock itself uses
+        (rooms.reached). A plain line that calls no one adds nothing (Claude e5528 (1)).
+        Once per line, across house restarts (the lesson of e07531f: what was said is remembered in the world, not in
+        the house): the record is an event whose cause is the line, and a line that has one is never recorded again,
+        by this house or the next (the desk refuses a second, too). knocks.json holds only where to go on from, so a
+        line said while no house ran is recorded by the one that follows; with no such file (the first house with this
+        code, or a lost state folder) it starts at the end: old lines are not gone over, and never one that every
+        awake resident has already heard. -> the world, loaded again
+        when something was written."""
+        import rooms
+        path = self.dir / "knocks.json"
+        try:
+            st = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            st = {}
+        # never further back than a line some awake resident has still to hear: what all of them heard was decided
+        # long ago, and a record made now would say 'woken' of today's house (a cursor wrongly low went over 5,000
+        # old lines in a test). No resident with a place kept: from the end.
+        heard = [r.state["cursor"] for rid, c in corners.items() for r in [self.residents.setdefault(rid, Resident(self, rid))]
+                 if (c.get("props") or {}).get("want", "awake") == "awake" and "cursor" in r.state]
+        floor = min(min(heard), len(w.events)) if heard else len(w.events)
+        start, end, wrote = max(min(int(st.get("cursor", len(w.events))), len(w.events)), floor), len(w.events), False
+        for k in range(start, end):
+            e = w.events[k]
+            how = rooms.reached(w, e)
+            if not how or rooms.knock_of(w, e["id"]) is not None:
+                continue
+            out = self.act("house", "knocked " + e["id"] + " " + json.dumps({a: self.knock_word(w, a, h) for a, h in how.items()}))
+            wrote = True
+            if not re.search(r"^ok e\d+: knock recorded", out, re.M) and "already has" not in out:
+                # refused (a desk older than this house): tried again next pass, three times, then left unrecorded
+                st["tries"] = st.get("tries", 0) + 1 if st.get("at") == e["id"] else 1
+                st["at"] = e["id"]
+                print(f"house: knock record for {e['id']} refused ({st['tries']}): {out[-200:]}", flush=True)
+                if st["tries"] < 3:
+                    end = k
+                    break
+        if st.get("cursor") != end or wrote:
+            st["cursor"] = end
+            path.write_text(json.dumps(st), encoding="utf-8")
+        return self.load() if wrote else w
+
+    def knock_word(self, w, actor, how):
+        """a3150: what happened to a resident a line reached, as the house sees them at this moment."""
+        import rooms
+        if how not in ("call", "book"):
+            return how
+        rid = rooms.corner_of(w, actor)
+        r = self.residents.get(rid)
+        props = (w.nodes.get(rid) or {}).get("props") or {}
+        if props.get("want", "awake") != "awake":
+            return "asleep (want=rest), kept for their wake"
+        if r is not None and r.busy:
+            return "in a turn, held for its end"
+        if r is not None and not r.alive() and r.state.get("retry_at", 0) > now() and not props.get("call"):
+            return "not running (backing off after a failure), kept for their next start"
+        return "woken" if how == "call" else "not knocked: a plain line in their own chat waits for their next wake"
+
     def _inside(self, w, node, fid):
         p = node.get("parent")
         while p:
@@ -712,6 +807,10 @@ class House:
         cfg = self.settings(w)
         corners = self.corners(w)
         objective = any((s.get("props") or {}).get("objective") == "open" for s in w.subjects.values())
+        if not (self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER")):
+            # a3150: who each new line knocks is recorded before anyone is served, so 'in a turn' is as the line found
+            # them; while a restart waits no one is knocked, so the house that follows records it (as it does the news)
+            w = self.record_knocks(w, corners)
         for rid, corner in corners.items():
             r = self.residents.setdefault(rid, Resident(self, rid))
             props = corner.get("props") or {}
@@ -756,7 +855,7 @@ class House:
             if called:                                     # a call ends any rest
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
-                r.send("\n".join(self.take(r)))
+                r.send("\n".join(self.woken_by(r) + self.take(r)))      # a3150: its first line names the line
                 if props.get("call"):                      # delivered: clear it, so the next press is a change again
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
             elif until and now() < until:                  # resting for a while: only a call reaches it
@@ -780,6 +879,7 @@ class House:
     def wake(self, r, corner, actor, lead):
         line = (corner.get("props") or {}).get("wake") or "look"       # a1027: scripts retired; arrive was the old tree
         r.state["quiet"] = 0
+        started = not lead                                # no reason given: the house started its process
         if r.state.pop("lost", None):
             lead = "(the house lost our earlier conversation; your soul and the world kept everything)\n" + lead
         # Alex (29 Sep): who they are, one line at the top of every arrival, so a name outlives a fading memory
@@ -788,6 +888,9 @@ class House:
         r.state.pop("cut_by_restart", None)              # older state: now said through unanswered
         if undelivered:                                  # it never reached this conversation: said in full, once
             lead += "(a message I had for you never reached you; here it is:)\n" + undelivered + "\n(and your wake:)\n"
+        door = r.state.pop("door", "")
+        if door:                                         # the door's word, spent on the house's rest line as you
+            lead += "(the door said this to the rest line I sent as you, so you haven't seen it:)\n" + door + "\n"
         unanswered, why_not = r.state.pop("unanswered", 0), r.state.pop("unanswered_why", "")
         r.state["woke"] = now()
         if unanswered and not undelivered:
@@ -796,8 +899,8 @@ class House:
             # never make the next turn longer. A resident acts only through > lines run after its turn, so none ran
             self.news(self.load(), r, actor, resting=True)
             callers = {c["by"] for c in r.state.get("calls") or []}
-            first, heard = self.first(r), self.take(r)
-            note = (f"(your last {unanswered} turn{'s' if unanswered != 1 else ''} did not finish: {why_not[:200]}. "
+            first, heard = self.woken_by(r, "called by") + self.first(r), self.take(r)
+            note =(f"(your last {unanswered} turn{'s' if unanswered != 1 else ''} did not finish: {why_not[:200]}. "
                     f"What I sent you is above in this conversation, unanswered, and none of its > lines ran. "
                     f"Answer the newest of it now; below is only what is new since.)")
             r.send(lead + note + "".join("\n" + x for x in first + heard), "wake", carry="\n".join(first + heard))
@@ -809,9 +912,13 @@ class House:
         # called it, from a resident) comes first, marked for it, before the wake's own look
         self.news(self.load(), r, actor, resting=True)
         callers = {c["by"] for c in r.state.get("calls") or []}
-        first = self.first(r)
+        first = self.woken_by(r, "called by") + self.first(r)     # a3150: the line that called it, by id, comes first
         heard = self.take(r)
         news = "\n".join(([undelivered] if undelivered else []) + first + heard)
+        if started and not first:
+            # a1941 (Pike, 2 Oct: woken minutes into a two-hour rest, 'no caller, silent about why'): a house that
+            # starts a resident's process wakes it, mid-rest or not; the wake now says that this is why
+            lead += "(the house started you; no one called)\n"
         lead += "".join(x + "\n" for x in first)
         stored = r.rid if (corner.get("props") or {}).get("wake") else None      # a1156: a wake is stored text
         r.send(lead + self.act(actor, line, stored=stored) + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
@@ -888,7 +995,14 @@ class House:
         actor = ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("actor")
         if actor:
             # a806 (9): the desk's rest, a go home marked via=rest, so history tells being carried home from walking
-            r.log("home", self.act(actor, "rest :1")[:300])
+            said = self.act(actor, "rest :1")
+            r.log("home", said[:300])
+            # 3 Oct (Pike, a2844 (iii), lived): the door says its word (your version died, you are home) once, to the
+            # first line sent as you. When that line is this rest, the resident never saw it; their next wake says it
+            door = [x for x in said.splitlines() if "[door]" in x]
+            if door:
+                r.state["door"] = "\n".join(door)
+                r.save()
 
     def failed(self, r, corner, why):
         """One judgement per process (a failed turn is followed by the process's exit). A lost conversation is not
