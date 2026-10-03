@@ -1436,6 +1436,9 @@ class DeskKnife(DeskMoo):
         if cmd == "wake":
             import rooms
             return rooms.cmd_wake(self, arg)
+        if cmd == "knocked" and str(self.world.me).split("/")[0].lower() == "house":
+            import rooms           # a3150: the house's record of whom a line knocked; to anyone else it is no command
+            return rooms.cmd_knocked(self, arg)
         if cmd == "look":
             import rooms           # a678: a bare look narrates the room you are in; a948: look <room> narrates that
             if rooms.narrates(self):   # room, from wherever you are; look <room> :2 and look <anything else> keep the tree
