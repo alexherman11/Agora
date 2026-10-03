@@ -305,7 +305,7 @@ try:
     lab = t.split("you are in ")[1].split(" at ")[0] + "@" + t.split(" at ")[1][:7]
     t = say("sable", "write home ; the lounge view shows no count here", whole=False)
     check("`write home <words>`: the door writes one comment on the commission at home, and says that it did",
-          t.startswith("[door] written home") and f"a comment on {CARD}" in t and f"from {lab}, sable: ; the lounge view shows no count here" in t
+          t.startswith("[door] written home as c") and f"a comment on {CARD}" in t and f"from {lab}, sable: ; the lounge view shows no count here" in t
           and "the door wrote it" in t and f"You are still in {lab}" in t, t)
     t = say("sable", "go")
     check("sable is still in the version after writing home", t.startswith(f"[in {lab}, not home]"), t)

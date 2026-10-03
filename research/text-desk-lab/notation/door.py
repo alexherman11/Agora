@@ -617,7 +617,7 @@ class Door:
         if r.get("error") or not text or text.startswith(("ERR", "MISS")):
             return answer(body, error=f"[door] home refused the line, so nothing was written home: {str(r.get('error') or text)[:300]}. "
                                       f"You are still in {v.label}.", version=v.label)
-        made = next((c for c in r.get("created") or [] if isinstance(c, str)), "")
+        made = text.partition("created ")[2].split(" ")[0].strip() if "created c" in text else ""
         with self.visiting:
             v.wrote[who] = v.wrote.get(who, 0) + 1
         self.log(f"door: {who} wrote home from {v.label}: {said[:200]}")
