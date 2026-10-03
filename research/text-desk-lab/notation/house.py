@@ -364,6 +364,7 @@ class Resident:
         self.status = None         # last status written to the world
         self.failed = False        # this process has already been judged failed (a result error, then its exit)
         self.wakes_at = None       # a1062: when the house would next wake it on its own, while it rests
+        self.started = False       # this house process has started it once (the first start after a restart is special)
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
@@ -448,6 +449,7 @@ class Resident:
         receipts: all of it; a wake: only the news it brought, since the wake itself is simply done again). What is
         out is recorded before it is written, so a process that died under us (its failure may already be in the
         queue) loses nothing: the pipe error is logged and the failure is judged from the process's own events."""
+        self.state.pop("at_rest", None)        # anything said to a resident ends its rest (house.rest begins one)
         if carry is None and kind in ("news", "receipt"):
             carry = text
         if self.state.get("welcome_due"):      # entering the desk with a fresh memory: the welcome comes first
@@ -866,6 +868,8 @@ class House:
             if want != "awake" or not actor:               # a resident is given its name (Alex, 29 Sep); none, no start
                 if r.alive() and not r.busy:
                     r.stop()
+                if r.state.pop("at_rest", None) is not None:    # asleep is not a rest: want=awake wakes it in full
+                    r.save()
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if not r.alive():
@@ -877,8 +881,20 @@ class House:
                 if r.state.get("retry_at", 0) > now():
                     self.set_status(r, corner, "error")
                     continue
+                first = not r.started
                 r.start(props.get("model") or cfg["model"])
-                r.state.pop("woke", None)
+                r.started = True
+                # 3 Oct (Pike e5914, Sable e5917): a restart for new code started every resident's process and woke each
+                # one for a whole turn with no caller, at every landing of a house file, through any rest. A resident
+                # resting when the house stopped, whose conversation resumes with nothing unanswered, keeps resting:
+                # its rest ends as it would have (a call, its time, the house's own wake), on the resumed conversation
+                resting = r.state.get("at_rest") or r.state.get("rest_until", 0) > now()     # (a rest from older code)
+                keep = first and resting and r.state.get("session") and \
+                    not any(r.state.get(k) for k in ("unanswered", "undelivered", "lost", "door", "welcome_due"))
+                if keep:
+                    r.log("restart", {"why": "resting when the house restarted; not woken"})
+                else:
+                    r.state.pop("woke", None)
             if r.busy:
                 continue
             if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
@@ -1023,7 +1039,7 @@ class House:
     def rest(self, r, seconds, why):
         """The resident rests: until someone calls (seconds=0), or for that long. A call still reaches it (Alex: he
         can talk with them at any point); an open objective and wake_every wait until the rest is over."""
-        r.state["quiet"] = 0
+        r.state["quiet"], r.state["at_rest"] = 0, True
         if seconds:
             r.state["rest_until"], r.state["rest_for"] = now() + seconds, seconds
         else:
