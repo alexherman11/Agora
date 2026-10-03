@@ -1947,7 +1947,13 @@ class DeskKnife(DeskMoo):
             self._mark_seen(a)
             self._mark_seen(b)
             evs = r.get("events") or []
-            return (f"ok {verb} {a} {b}  [{evs[0]}" + (f"..{evs[-1]}" if len(evs) > 1 else "") + "]\n  now: "
+            made = ""
+            if verb == "link" and r.get("created"):
+                # a3295: a link is a made thing, and its receipt names it as a comment's and a create's do: its id, its
+                # kind and its direction, as examine prints them
+                l = next(x for x in w.links if x["id"] == r["created"])
+                made = f" → created {l['id']}\n  {l['id']}: {a} {l['kind']} → {b}"
+            return (f"ok {verb} {a} {b}  [{evs[0]}" + (f"..{evs[-1]}" if len(evs) > 1 else "") + f"]{made}\n  now: "
                     + self.line(a, 1) + self.position_note(a) + "\n  now: " + self.line(b, 1) + self.position_note(b))
         if (verb if verb in moo.REGISTRY else moo.SYNONYMS.get(verb, verb)) in knife.SPECIALIZED:
             alt = self.SPECIALIZED_ALT.get(verb, "a general verb")

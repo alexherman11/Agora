@@ -288,9 +288,13 @@ def word(desk, raw, ctx=None):
 
 
 def made_by(events):
-    """The things a line made: each create or group it did itself, not what a rule did after it."""
+    """The things a line made: each create, group or link it did itself, not what a rule did after it."""
     out = []
     for e in events:
+        if e["verb"] == "link" and isinstance(e.get("undo"), dict) and e["undo"].get("drop_link") \
+                and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
+            out.append(e["undo"]["drop_link"])      # a3295: a link is made too; $new is its id (examine, unlink id=)
+            continue
         if e["verb"] in ("create", "group") and isinstance(e.get("undo"), dict) and e["undo"].get("delete") \
                 and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
             out.append(e["undo"]["delete"])
