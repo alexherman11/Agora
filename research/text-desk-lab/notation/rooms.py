@@ -304,7 +304,20 @@ def calls(w, s, to, actor):
     return bool(set(EVERYONE) & set(to)) and member(w, s, actor)
 
 
-# a3150 (Sable c2705 on a1941): a knock leaves a record. The house writes one knock event per line that named or reached
+def shown(w, s, to, actor, comment=False):
+    """a3319 (Sable c3321: called is not shown, and one rule stays one): is a saying addressed `to`, in chat or thing
+    `s`, shown in `actor`'s For you? The showing rule, beside the calling rule and asking it: a saying whose address
+    names them, by calls() (so a private chat never carries its line out, and a change to calls changes this); or any
+    line of a direct chat, one whose members= names them (not all), addressed or not. Narrower than what calls: an
+    address to @everyone or @all is left out (Alex, 30 Sep: a broadcast stayed 'for you' forever), and so is what
+    reaches someone with no address at all (a comment on a thing in their corner or on their commission knocks, and
+    is not shown). `sayings for:<name>` (scene.saying_rows) asks only this; no lens restates it."""
+    if not comment and s.get("kind") == "chat" and "all" not in members_of(s) and member(w, s, actor):
+        return True
+    return calls(w, s, [n for n in to if n not in EVERYONE], actor)
+
+
+# a3150(Sable c2705 on a1941): a knock leaves a record. The house writes one knock event per line that named or reached
 # someone (target and cause: the line's own event), saying per name what happened, so who was called by which line can
 # be checked afterwards instead of taken on someone's word. It is the house's observation, so undo leaves it.
 KNOCK_UNDO = ("{eid} is the house's record of whom a line knocked: it changed nothing in the world, so undo leaves it. "

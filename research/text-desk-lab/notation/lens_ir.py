@@ -284,7 +284,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         # --- count (a1101): the size of a selection or row source, as $count, without drawing its members
         if node["count"]:
             q = S._fill(node["count"], ctx, track)
-            rs = acc.rows(q) if q.partition(":")[0] in S.SOURCES else None
+            rs = acc.rows(q) if S.source_head(q) in S.SOURCES else None
             if rs is None:
                 named, ids = acc.select(q)
                 ids = [i for i, _ in named] if named is not None else ids
@@ -428,7 +428,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             if b["of"]:
                 sel_text = S._fill(b["of"], ctx)
                 out["of"] = sel_text
-                rs = acc.rows(sel_text) if sel_text.partition(":")[0] in S.SOURCES else None
+                rs = acc.rows(sel_text) if S.source_head(sel_text) in S.SOURCES else None
                 total = len(rs) if rs is not None else None
                 if b.get("by"):
                     out["by"] = b["by"]             # a1069: ordered here, in the scene, so both printers show one order
