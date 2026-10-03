@@ -158,6 +158,16 @@ def via_deskd(name, me, lines, whole=False, stored=""):
     return True
 
 
+def away_in(name, who, state=None):
+    """a2844: the version `who` is away in ('<commission>@<commit>'), by the door's record for world `name`, or None."""
+    try:
+        visits = json.loads((Path(state or HERE / "house-state") / "visits.json").read_text(encoding="utf-8"))
+        there = (visits.get("away") or {}).get(who) if visits.get("world") == name else None
+        return str(there.get("label")) if there else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def main():
     name = sys.argv[1]
     SESSIONS.mkdir(exist_ok=True)
@@ -174,6 +184,13 @@ def main():
         lines = [l for l in lines if l.strip() and not l.startswith("#")]
         who = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
         if not window and not any(l.startswith("!") for l in lines) and via_deskd(name, who, lines, whole, stored):
+            return
+        # a2844: someone away in a version of the code (the door's record) whose line arrives here was not answered by
+        # the door. Run from these files it would change home's world from a visit, silently: it is refused instead
+        there = away_in(name, who)
+        if there:
+            print(f"ERR you are away in {there} and the door did not answer, so nothing was run: {len(lines)} line(s) "
+                  "would have changed home's world from a visit. When the door answers again it brings you home and says so.")
             return
         import io
         sys.stdin = io.StringIO("\n".join(lines) + "\n")
