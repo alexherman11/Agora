@@ -1225,19 +1225,27 @@ class DeskKnife(DeskMoo):
             return None
         from datetime import datetime
         now = datetime.now()
-        wall, last, note = now.date().isoformat(), self.last_here, None
+        wall, note = now.date().isoformat(), None
+        # 4 Oct (Pike, a1969): 'last here' and 'a day passed' are each person's, not the desk's. They were one pair for
+        # everyone, so Sable's 01:20 command made Pike's 08:00 wake say 'same day; last here 7 h ago' after 13 h 39 m
+        me = str(getattr(self.world, "me", None) or "alex").lower()
+        here = self.__dict__.setdefault("_here", {})          # actor -> (when, day), kept with the desk
+        last, last_day = here.get(me, (None, self.today))
         away = ""
-        if last:
-            hours = (now - last).total_seconds() / 3600
-            away = (f"; you were last here {int(hours // 24)} day(s) {int(hours % 24)} h ago" if hours >= 24
-                    else f"; you were last here {hours:.0f} h ago" if hours >= 1 else "")
-        if wall != self.today:
-            n = self.world.days_between(self.today, wall) if self.today else 0
+        if last:                                               # counted down, never rounded up: 13 h 39 min, not '14 h'
+            d, rem = divmod(int((now - last).total_seconds() // 60), 1440)
+            h, m = divmod(rem, 60)
+            span = f"{d} day(s) {h} h" if d else f"{h} h {m} min" if h else ""
+            away = f"; you were last here {span} ago" if span else ""
+        if wall != self.today:                                 # the world's day: its rules run once, whoever is first
             self.today = self.world.today = wall
             self._run_rules(cause=None)
+        if last_day and wall != last_day:
+            n = self.world.days_between(last_day, wall)
             note = f"~ {n} day(s) passed: today is {wall}{away}"
         elif away:
             note = "~ same day" + away
+        here[me] = (now, wall)
         self.last_here = now
         return note
 
