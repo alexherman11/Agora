@@ -9,8 +9,8 @@ Selections (one token; quote it if it has spaces, or join terms with commas):
   in:f04            inside surface f04 (recursively)
   hidden            more than 5% covered
   also:a18          the other appearances of a18's subject
-  due<2026-09-20    due before (or due>)
-  a20,a22           an explicit list
+  due<2026-09-20    due before (or due>); due:any, has a due date
+  a20,a22          an explicit list
   terms combine with AND:  kind:image,in:f04   or  "kind:image in:f04"
 
 Verbs (all take an id or a selection unless noted):
@@ -46,7 +46,22 @@ def _leaves(w, fid):
 
 # the selection terms parse_selection reads; the Help binder's selections note must name each (helpnotes.check, a1595)
 TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:",
-         "answered-by:", "unanswered:") + promises.TERMS      # a1587: held-by: asked-of: owed-to: asked-by: awaits:
+         "answered-by:", "unanswered:", "due:") + promises.TERMS      # a1587: held-by: asked-of: owed-to: asked-by: awaits:
+
+DUE_DOORS = "use due:any, due<DATE or due>DATE"
+
+
+def misnamed(text):
+    """a3359: a selection that asks for the due date as a prop, or by a due: word the desk doesn't read, is told the
+    door. due is a field of its own (moo._field refuses `prop due=` the same way), so prop:due matched nothing and
+    said so as if it had looked. -> the refusal's words, or None. Reads the text alone, so a lens is told when saved."""
+    for t in re.split(r"[,\s]+", (text or "").strip().strip('"')):
+        t = t.lstrip("-")
+        if re.fullmatch(r"prop:due(=.*)?", t):
+            return f"due is not a prop: {DUE_DOORS}"
+        if re.match(r"due:\S", t) and t != "due:any":
+            return f"{t}: due: takes only any (things with a due date); {DUE_DOORS}"
+    return None
 
 
 def parse_selection(w, token, trash=False, binds=None):
@@ -62,13 +77,16 @@ def parse_selection(w, token, trash=False, binds=None):
     if all(t in w.nodes for t in terms) and len(terms) > 1:
         return terms, "list " + ",".join(terms)
     KNOWN = TERMS
+    said = misnamed(",".join(terms))
+    if said:
+        raise Refusal(said)
     for t in terms:
         # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
         if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):
             raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
-    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t == "hidden" for t in terms + neg):
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "due:", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t == "hidden" for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -143,6 +161,9 @@ def parse_selection(w, token, trash=False, binds=None):
                 d = w.subjects[n["subject"]]["due"]
                 return bool(d) and ((d < date) if op == "<" else (d > date))
             cands = [c for c in cands if okd(c)]
+        elif t == "due:any":
+            # a3359: has a due date, as comments:any and awaits:any ask; it could only be asked as due<2999-12-31
+            cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.subjects[w.nodes[c]["subject"]]["due"]]
         elif t.startswith("title:"):
             word = t[6:].lower()
             cands = [c for c in cands if word in w.title(w.nodes[c]).lower()]
@@ -201,7 +222,7 @@ def parse_selection(w, token, trash=False, binds=None):
             hit = promises.matching(w, t, binds)
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in hit]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>; -term leaves out")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> due:any age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>; -term leaves out")
     for n in neg:
         r = parse_selection(w, n, trash=True, binds=binds)
         if r is None:
