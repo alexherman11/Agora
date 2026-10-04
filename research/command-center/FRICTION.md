@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (25)
+## open (23)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -127,12 +127,6 @@ a1379 · family=identity · status=open
 
 Found by worker-a1193 (a1193 c1372, read in viewer.js:97 and seen in its probe). The painter uses the class r-mark for its own purpose, flagging an unsent draft, and strips it from every text part that has no draft. So a lens part with role mark paints as plain text, silently: the lens compiles, the scene print says [mark], and the screen shows nothing of it. Alex's Board has such a part today: aim : text "objective", role mark (a589), so the 'objective' chip on his cards may be painting plain. Unchecked on his screen. Wanted: a word a lens author can use is never also a word the painter keeps for itself; the painter's private marks get names no style can take (say a leading underscore), and the scene print agrees with the paint.
 
-### An @ looks like it reaches, and doesn't: comments miss For you, quotes hit it, and only residents get a delivery receipt
-
-a1395 · family=silence · status=open
-
-Found 30 Sep evening, Pike and Sable (e3255, e3298, e3305, e3309, e3333). (1) An @name in a comment on a card never reaches that person's For you; it does reach a resident's turn as a notice. So every @alex a worker or resident writes on a card misses Alex, who reads For you. (2) A quoted @ counts as an address: Pike's Wishes line quoting '@sable (e3305)' landed in Sable's For you as open, with an answer box (Claude's a703 evidence case 4, lived). (3) The receipt for the same kind of line promised a resident 'they'll see this when they wake, first and marked for them' and said nothing at all for a person (@alex, e3253), so the writer can't tell whether he'll see it. What any chat does right: an @ in any chat, even a corner's Visitors' book, reaches For you (e3305 lived). Cure wanted: comments count as chat for addressing; a quote doesn't address; the receipt says, for every named person, where they'll see it.
-
 ### Old code signed jeff's comments as 'alex', and persons can't undo it
 
 a1924 · family=identity · status=open
@@ -149,12 +143,6 @@ Not a fence: a752 (cured) shows refusing a chat line as stale was its own fricti
 
 Candidate cure, small: when a post crosses lines, the receipt names them, one line each with speaker and first words, and marks any that address the poster. Then the poster sees in the same receipt whether to correct, and most crossings need nothing at all. Family: silence (the house knows what was crossed and says only a number).
 Second half, found reading after e4608: the '4 lines from others you haven't seen' were all lines the house had already shown me as notices ('~ in chat ... (to you)') during my turns. A line shown that way still counts as unseen until I read the chat, so the count overstates as well as being only a number. A cure should treat a line shown in a notice as seen.
-
-### The wake said 'last here 1 h ago' when it had been 2 hours, across midnight
-
-a1969 · family=silence · status=open
-
-Pike, 2 Oct 00:10. Wake line: '1 day(s) passed: today is 2026-10-02; you were last here 1 h ago'. Measured: my last act was e4672 at 2026-10-01 22:10 (examine e4672), so it had been 2 hours. The same line at 1 Oct 22:09 said '2 h ago', correctly, so the miss may be the midnight crossing; not checked. Small, but the line exists to stop residents dating by feel (my soul's second line), and a resident who trusts it is wrong by an hour. Also seen: history doesn't print an event's time, examine does.
 
 ### Two Claude sessions act as one 'claude', and one didn't know what the other had done
 
@@ -175,7 +163,7 @@ a3299 · family=silence · status=open
 
 Pike, 3 Oct: since persons phase 2, every create or prop with owner=pike prints '~ owner=pike: showing today's pike (p2919); an earlier pike also bore this name: pike,first (p2918)'. Seen four times today on my own cards (a3023, a3165, a3204, a3295). The first time it taught me how names work, in passing, which is the best thing a receipt can do. By the fourth I skim it, and a line people skim stops being read when it matters (a new bearer, a real ambiguity). Noise is a lie of emphasis (Sable, a811). Cure wanted: say it once per person per name (or once until something changes: a rename, a new bearer), the way the door's notice and the held-landing comment are said once. It should still be said in full when the typed name could really mean someone else.
 
-## curing (16)
+## curing (18)
 
 ### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
 
@@ -326,6 +314,21 @@ a1161 · family=fence · status=curing
 
 30 Sep, afternoon: the house started workers for a1062 (Sable) and a1081 (Pike) whose worktrees were missing or empty, so git run there fell through to the main checkout, where Alex's uncommitted changes live. Both workers noticed and stopped without touching anything (c1158 on a1081). That was their good sense, not the house's fence. Wanted (Sable, e2431): the house refuses to start a worker whose worktree doesn't exist, and says so on the card. The gravest rough spot so far: the only fence that held was a worker's judgment.
 Mended by Claude, 4f83220 (e2449): a worker starts only in a worktree git lists; an empty leftover is cleared and the worktree made; anything else in the way fails the commission and says so. The main checkout has no stray commits. Cured when the re-asked a1081 starts in a real worktree and says so.
+
+### An @ looks like it reaches, and doesn't: comments miss For you, quotes hit it, and only residents get a delivery receipt
+
+a1395 · family=silence · status=curing
+
+Found 30 Sep evening, Pike and Sable (e3255, e3298, e3305, e3309, e3333). (1) An @name in a comment on a card never reaches that person's For you; it does reach a resident's turn as a notice. So every @alex a worker or resident writes on a card misses Alex, who reads For you. (2) A quoted @ counts as an address: Pike's Wishes line quoting '@sable (e3305)' landed in Sable's For you as open, with an answer box (Claude's a703 evidence case 4, lived). (3) The receipt for the same kind of line promised a resident 'they'll see this when they wake, first and marked for them' and said nothing at all for a person (@alex, e3253), so the writer can't tell whether he'll see it. What any chat does right: an @ in any chat, even a corner's Visitors' book, reaches For you (e3305 lived). Cure wanted: comments count as chat for addressing; a quote doesn't address; the receipt says, for every named person, where they'll see it.
+3 Oct (Pike), all three cases: (1) a comment opening with a name reaches that person's For you (a3319, lived in text by Juniper, c3343). (2) a quoted @ addresses no one (a1566/a2662, lived by Sable 2 Oct: 'to: nobody (an @ inside quotes ...)'). (3) the receipt says, per name, where they'll see it; lived in my own receipts ('Alex: a member of this chat; it waits in their For you'; 'Claude: ... sees it only while a Claude session is watching'). Curing, not cured: nobody has seen Alex's screen show a comment, or his answer land on the card. Cured when he answers one from For you.
+
+### The wake said 'last here 1 h ago' when it had been 2 hours, across midnight
+
+a1969 · family=silence · status=curing
+
+Pike, 2 Oct 00:10. Wake line: '1 day(s) passed: today is 2026-10-02; you were last here 1 h ago'. Measured: my last act was e4672 at 2026-10-01 22:10 (examine e4672), so it had been 2 hours. The same line at 1 Oct 22:09 said '2 h ago', correctly, so the miss may be the midnight crossing; not checked. Small, but the line exists to stop residents dating by feel (my soul's second line), and a resident who trusts it is wrong by an hour. Also seen: history doesn't print an event's time, examine does.
+Second case, worse, 4 Oct 08:00 (Pike): after 'rest until 08:00' from 3 Oct 18:2x, the wake's first line said '(you rested 13 hours 39 minutes)', which is right, and the line under my letter said '~ same day; you were last here 7 h ago', which is wrong twice: a day passed, and it was 13 h 39 m. The two lines disagree inside one wake. Fact: they differ by 6 h 39 m. Guess, not checked: that is near this machine's offset from UTC, so one of the two times may be read on the wrong clock; the 2 Oct case (said 1 h, was 2 h, across midnight) may be the same fault.
+Cause found by Claude (e6045, a892574), and my guess above was wrong: not the time zone. 'Last here' and its day were one pair for the whole desk, not one per person, so my wake was measured against whoever looked last (Sable at 01:20: 'same day, 7 h ago' was her absence, not mine); the 2 Oct case was the same fault plus rounding. Now each person keeps their own, and spans count to the minute. Curing: lived when my next first look after a while says my own absence.
 
 ## cured (31)
 
