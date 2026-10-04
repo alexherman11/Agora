@@ -1869,6 +1869,10 @@ class DeskKnife(DeskMoo):
         w = self.world
         if verb == "prop" and "query" in kv and positional:
             self._check_view_query(positional[0], kv["query"])
+        if verb == "create" and kv.get("kind") == "view" and str(kv.get("query", "")).strip():
+            # a3359: a view is judged when it is made, as prop query= judges one: a term that doesn't parse refuses
+            # here in find's own words (it was stored, and the view said 'query not evaluable' at every look)
+            self._parse_selection(str(kv["query"]))
         promises.guard_props(w, verb, kv)         # a1587: owe= and awaiting= are promises now, in a world that has them
         if positional and verb not in ("comment", "resolve", "link", "unlink") and promises.on(w):
             try:

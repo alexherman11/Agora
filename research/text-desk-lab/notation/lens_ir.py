@@ -104,7 +104,7 @@ def term_aspects(q):
             subj.add("title")
         elif t.startswith("?"):
             subj |= {"title", "text", "tags"}
-        elif t.startswith(("due<", "due>")):
+        elif t.startswith(("due<", "due>", "due:")):
             subj.add("due")
         elif t.startswith(("in:", "also:")) or t == "hidden":
             app.add("place")

@@ -1054,6 +1054,11 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `by` orders a repeat; this part has no `of`")
     if node["capture"] and not node["the"]:
         raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
+    import knife      # a3359: a selection that names due as a prop is refused here, when the lens is saved, not at a look
+    for sel in [node["of"], node["the"], node["only"], node["count"]] + [c for _, c in node["role_when"]]:
+        said = knife.misnamed(sel)
+        if said:
+            raise LensRefusal(f"line {n}: {said}")
 
 
 def parse(src, roles=None, style=None):
