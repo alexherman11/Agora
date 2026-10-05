@@ -131,38 +131,86 @@ def _scratch(name):
 
 
 def test_a_frame_may_not_shadow_one_above_and_count_is_defined_inside_instances():
-    import deskd
+    import deskd, lens_ir
     tmp = _scratch("_test_scope")
     try:
         with deskd.Session("_test_scope", "jeff") as desk:
             shadow = chr(10).join(["x : column, of kind:note as a, each y", "y : column, of kind:note as a, each z", 'z : text "$a.title"'])
             try:
-                scene.build(desk, shadow)
+                lens_ir.evaluate(desk, shadow)
                 raise AssertionError("shadowing admitted")
             except scene.LensRefusal as e:
                 assert "would shadow the frame `as a`" in str(e)
             counted = chr(10).join(["root : column, of kind:note, each d", 'd : text "$count things here"'])
-            sc = scene.build(desk, counted)
+            sc = lens_ir.evaluate(desk, counted)
             assert [k["text"] for k in sc["kids"]] == ["2 things here", "2 things here"]
     finally:
         tmp.unlink(missing_ok=True)
 
+def test_one_word_per_line():
+    """Alex, 5 Oct (out of the comma lists): a part line says what the part is and how it looks; every other word is its
+    own line under it, among its child parts. The comma list is still read; to_lines prints the one form; both parse
+    to the same tree, and a refusal names the word's own line."""
+    lines = chr(10).join([
+        "card : column, role card",
+        '  let size = "big" when $beds > 5',
+        '  let size = "small" when $beds <= 5',
+        '  let size = "unsized" otherwise',
+        "  of kind:note",
+        "  each t",
+        "  on click do check $item",
+        '  h : text "Things"',
+        "    only when $beds > 2",
+        't : text "$title"',
+        "l : column",
+        "  of kind:task",
+        "  by priority rank",
+        "  each t"])
+    commas = chr(10).join([
+        'card : column, let size = "big" when $beds > 5, let size = "small" when $beds <= 5, let size = "unsized" otherwise, of kind:note, each t, on click do check $item, role card',
+        '  h : text "Things", only when $beds > 2',
+        't : text "$title"',
+        "l : column, of kind:task, by priority, rank, each t"])
+
+    def norm(node):
+        return {**{k: v for k, v in node.items() if k not in ("line", "kids", "src", "words")}, "kids": [norm(k) for k in node["kids"]]}
+    a, b = scene.parse(lines), scene.parse(commas)
+    assert a[0] == b[0] == "card" and {k: norm(v) for k, v in a[1].items()} == {k: norm(v) for k, v in b[1].items()}
+    assert a[1]["card"]["kids"][0]["line"] == 8 and a[1]["card"]["kids"][0]["only"] == "$beds > 2" and a[1]["l"]["by"] == ["priority", "rank"]
+    assert a[1]["l"]["src"] == b[1]["l"]["src"] == "l : column, of kind:task, by priority rank, each t"
+    assert scene.to_lines(commas) == lines and scene.to_lines(lines) == lines
+    refused("of kind:note" + chr(10) + "root : column", "line 1: 'of kind:note' is a word with no part above it")
+    refused("root : column" + chr(10) + "  of kind:note" + chr(10) + "  eachh t", "line 3: a lens cannot say 'eachh t'")
+    refused("root : column" + chr(10) + "  t : text a" + chr(10) + "  of kind:note" + chr(10) + "  each t" + chr(10) + "    role nosuch", "line 5: no role 'nosuch'")
+    refused("root : column" + chr(10) + "  of kind:note", "line 1: `of`/`over` repeats something")      # a part's checks wait for all its lines
+    _, parts = scene.parse('root : column' + chr(10) + '  the a01' + chr(10) + '  t : text "a"' + chr(10) + '    hint "say : it"')
+    assert "say : it" in str(parts["root"]["kids"][0]["hint"]) and parts["root"]["the"] == "a01"
+
+
 def test_only_when_takes_a_value_test_and_prints_it():
-    import deskd
+    import deskd, lens_ir
     tmp = _scratch("_test_guard")
     try:
         with deskd.Session("_test_guard", "jeff") as desk:
             src = chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds > 5'])
-            sc = scene.build(desk, src)
+            sc = lens_ir.evaluate(desk, src)
             shown = [k for k in sc["kids"] if not k.get("absent")]
             absent = [k for k in sc["kids"] if k.get("absent")]
-            assert len(shown) == 1 and shown[0]["test"] == "$beds is 6 > 5"
-            assert len(absent) == 1 and absent[0]["why"] == "no beds"
+            assert len(shown) == 1 and shown[0]["test"] == "$beds > 5 ($beds=6)"
+            assert len(absent) == 1 and absent[0]["why"] == "can't tell: no beds ($beds=none)"
             src = chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds = 7'])
-            sc = scene.build(desk, src)
-            assert [k.get("why") for k in sc["kids"]] == ["$beds is 6, not = 7", "no beds"]
+            sc = lens_ir.evaluate(desk, src)
+            assert [k.get("why") for k in sc["kids"]] == ["$beds = 7 is false ($beds=6)", "can't tell: no beds ($beds=none)"]
             text = scene.to_text(sc, "t", "jeff", 0)
-            assert "(absent: $beds is 6, not = 7)" in text and "(absent: no beds)" in text
+            assert "(absent: $beds = 7 is false ($beds=6))" in text and "(absent: can't tell: no beds ($beds=none))" in text
+            # 5 Oct: the older spelling with a bare word is read as the expression with the word quoted, the one way
+            _, parts = scene.parse("root : column, of kind:note, each c\nc : text a, only when $status=done, role mark when $kind = note")
+            assert parts["c"]["only"] == '$status = "done"' and parts["c"]["role_when"] == [("mark", '$kind = "note"')]
+            try:
+                scene.resolve(*scene.parse('root : column, of kind:note, each c\nc : text a, only when $kind = "note" and $beds > big'))
+                raise AssertionError("a bare word that names no let was admitted")
+            except scene.LensRefusal as e:
+                assert "`big` in `only when" in str(e), e
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -199,17 +247,17 @@ def test_carry_and_drop_shape():
     refused("root : column, of kind:note, each c\nc : text a, carry, on drop c do prop $carried x=1; do prop $carried y=2", "one proposal")
     _, parts = scene.parse("root : column, of kind:note, each c, on drop c do move $carried into=$item\nc : text a, carry")
     assert parts["root"]["on"] == [{"on": "drop", "line": "do move $carried into=$item", "part": "c"}] and parts["c"]["carry"]
-    import deskd
+    import deskd, lens_ir
     tmp = _scratch("_test_carry")
     try:
         with deskd.Session("_test_carry", "jeff") as desk:
-            sc = scene.build(desk, chr(10).join(["root : column, of kind:note, each c, on drop c do move $carried into=f01", 'c : text "$title", carry']))
+            sc = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:note, each c, on drop c do move $carried into=f01", 'c : text "$title", carry']))
             assert sc["acts"] == [{"on": "drop", "line": "do move $carried into=f01", "part": "c"}] and sc.get("defpart") and sc["reads"] == []
             assert sc["kids"][0]["acts"] == [{"on": "carry"}] and sc["kids"][0]["rev"] is not None
             text = scene.to_text(sc, "t", "jeff", 0)
             assert "· drop c: do move $carried into=f01" in text and "· carry" in text
             try:
-                scene.build(desk, "root : column, carry")
+                lens_ir.evaluate(desk, "root : column, carry")
                 raise AssertionError("carry on the root admitted")
             except scene.LensRefusal as e:
                 assert "needs a world thing" in str(e)
@@ -239,7 +287,7 @@ def test_role_when_follows_state():
             desk.repl("do create f01 kind=task title=Both aim=open weight=9")
             src = chr(10).join(["root : column, of kind:task, each c",
                                 'c : text "$title", role card, role mark when prop:aim=open,prop:weight=9, role sheet when prop:aim=open, role said when $weight > 3'])
-            for sc in (lens_ir.evaluate(desk, src), scene.build(desk, src)):
+            for sc in (lens_ir.evaluate(desk, src),):
                 got = {k["text"]: (k["role"], k.get("since")) for k in sc["kids"]}
                 assert got == {"Plain": ("card", None), "Aim": ("sheet", "prop:aim=open"), "Both": ("mark", "prop:aim=open,prop:weight=9")}, got
                 scene.emit(sc)
@@ -248,7 +296,7 @@ def test_role_when_follows_state():
                 assert '"Aim" [sheet, since prop:aim=open]' in text and '"Plain" [card]' in text, text
             sc = lens_ir.evaluate(desk, src.replace("role mark when prop:aim=open,prop:weight=9, role sheet when prop:aim=open, ", ""))
             got = {k["text"]: (k["role"], k.get("since")) for k in sc["kids"]}
-            assert got == {"Plain": ("card", None), "Aim": ("card", None), "Both": ("said", "$weight is 9 > 3")}, got
+            assert got == {"Plain": ("card", None), "Aim": ("card", None), "Both": ("said", "$weight > 3 ($weight=9)")}, got
             sc = lens_ir.evaluate(desk, "root : column, role mark when kind:task,title:Nothing-here")
             assert sc["role"] is None and "since" not in sc          # no plain role, nothing holds: no role
     finally:
@@ -462,12 +510,20 @@ def test_fold_group():
 
 
 def test_value_test_has():
-    """`has` and `!has`: the words contain the value, ignoring case; a value with a $name in it is filled."""
-    m = scene._VALUE_TEST.fullmatch("$said has @$me")
-    assert m and m.groups() == ("$said", "has", "@$me")
-    assert scene._VALUE_TEST.fullmatch("$said !has @alex").group(2) == "!has"
-    assert scene._compare("ok @Alex, look", "has", "@alex") and scene._compare("ok", "!has", "@alex")
-    assert not scene._compare("ok", "has", "@alex") and scene._compare("5", ">", "3")
+    """`has` and `!has`: the words contain the value, ignoring case; a value with a $name in it is filled. Since 5 Oct
+    there is one path, the expression evaluator; scene._one_test reads the older spelling as the expression."""
+    import expr as X
+    assert scene._one_test("$said has @$me", 1) == "$said has @$me"
+    assert scene._one_test("$said !has @alex", 1) == "$said !has @alex"
+    assert scene._one_test("$status=done", 1) == '$status = "done"' and scene._one_test("$beds>5", 1) == "$beds > 5"
+    assert scene._one_test("kind:task,prop:x=1", 1) == "kind:task,prop:x=1"
+
+    def env(**vals):
+        return {"get": lambda n: vals.get(n.lstrip("$")), "select": lambda q: [], "field": lambda i, f: None, "reads": []}
+    assert X.run("$said has @$me", env(said="ok @Alex, look", me="alex"))[0].v is True
+    assert X.run("$said !has @alex", env(said="ok"))[0].v is True
+    assert X.run("$said has @alex", env(said="ok"))[0].v is False
+    assert X.run("$n > 3", env(n="5"))[0].v is True
 
 
 def test_replace_changes_one_exact_passage():
@@ -793,7 +849,7 @@ def test_count_word_and_true_size():
             sc = lens_ir.evaluate(desk, src)
             line, none, lst = sc["kids"]
             assert line["text"] == "2 notes" and line["counted"] == ("kind:note", 2), line
-            assert none.get("absent") and none["why"] == "$count is 0, not > 0", none
+            assert none.get("absent") and none["why"] == "$count > 0 is false ($count=0)", none
             assert lst["text"] == "1 of 2", lst["text"]
             assert lst["kids"][0]["text"].endswith("(2)") and lst["kids"][-1]["text"] == "all 2", [k["text"] for k in lst["kids"]]
             assert "· count 2 of kind:note" in scene.to_text(sc, "t", "jeff", 0)
@@ -942,9 +998,9 @@ def test_let_if_and_arithmetic():
             assert d["num"]["result"] == "2" and d["avg"]["result"] == "3 · from 1 of 2", (d["num"], d["avg"])
             head, none, old, lst = sc["kids"]
             assert head["text"] == "2 notes, 6 (1 of 2) beds, 3 (from 1 of 2) each", head["text"]
-            assert head["test"].startswith("total > 3 holds") and head["computed"][0][0] == "total", head
-            assert none["absent"] and none["why"] == "no nothing", none
-            assert old["text"] == "old path" and old["test"] == "$count is 2 > 0", old            # the older value test is untouched
+            assert head["test"].startswith("total > 3 (") and head["computed"][0][0] == "total", head
+            assert none["absent"] and none["why"] == "can't tell: no nothing ($nothing=none)", none
+            assert old["text"] == "old path" and old["test"] == "$count > 0 ($count=2)", old            # the older spelling, the one print
             big, small = lst["kids"]
             assert big["kids"][0]["text"] == "Probe: big (12)" and not big["kids"][1].get("absent"), big["kids"]
             assert small["kids"][0]["text"] == "beds-lens: unsized (none)", small["kids"][0]
@@ -955,7 +1011,7 @@ def test_let_if_and_arithmetic():
             assert both["k"]["result"] == "1" and both["k"]["overlap"] == 2, both             # an overlap is taken first and said
             text = scene.to_text(sc, "t", "jeff", 0)
             assert "· total = 6 · 1 of 2; 1 have none (sum($beds of kind:note))" in text and "(overlap: 2 answers held; the first was taken)" in text, text
-            assert "(absent: can't tell:" not in text and '(absent: size = "big" is false (size=unsized))' in text, text
+            assert "(absent: can't tell: no nothing ($nothing=none))" in text and '(absent: size = "big" is false (size=unsized))' in text, text
             # a guard that cannot tell is absence with the reason, never false
             sc2 = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds * 2 > 5']))
             assert [k.get("why") for k in sc2["kids"]] == [None, "can't tell: no beds ($beds=none)"], [k.get("why") for k in sc2["kids"]]

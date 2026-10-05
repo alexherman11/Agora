@@ -1,1 +1,1 @@
-ERR line 2: `as a` would shadow the frame `as a` named above this part; choose another frame name
+ERR line 4: `as a` would shadow the frame `as a` named above this part; choose another frame name

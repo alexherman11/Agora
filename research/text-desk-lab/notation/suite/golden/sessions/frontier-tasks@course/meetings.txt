@@ -1,89 +1,89 @@
 scene meetings · for golden · world @20 · no style=; using the default (calm)
   m a03 column · the prop:role=term -> s02 (a03) as term
     days a03 column · days = days-from(2027-03-29, 2027-06-11) = 75 rows · read term s02 start=2027-03-29 end=2027-06-11 · 75
-      day a03 row · wd = weekday(2027-03-29) = Mon · read it date=2027-03-29 · only when $wd is Mon = Mon · key 1
+      day a03 row · wd = weekday(2027-03-29) = Mon · read it date=2027-03-29 · only when $wd = "Mon" ($wd=Mon) · key 1
         t a03 "2027-03-29 Mon" · read it date=2027-03-29
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-04-05) = Mon · read it date=2027-04-05 · only when $wd is Mon = Mon · key 8
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-04-05) = Mon · read it date=2027-04-05 · only when $wd = "Mon" ($wd=Mon) · key 8
         t a03 "2027-04-05 Mon" · read it date=2027-04-05
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-04-12) = Mon · read it date=2027-04-12 · only when $wd is Mon = Mon · key 15
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-04-12) = Mon · read it date=2027-04-12 · only when $wd = "Mon" ($wd=Mon) · key 15
         t a03 "2027-04-12 Mon" · read it date=2027-04-12
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-04-19) = Mon · read it date=2027-04-19 · only when $wd is Mon = Mon · key 22
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-04-19) = Mon · read it date=2027-04-19 · only when $wd = "Mon" ($wd=Mon) · key 22
         t a03 "2027-04-19 Mon" · read it date=2027-04-19
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-04-26) = Mon · read it date=2027-04-26 · only when $wd is Mon = Mon · key 29
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-04-26) = Mon · read it date=2027-04-26 · only when $wd = "Mon" ($wd=Mon) · key 29
         t a03 "2027-04-26 Mon" · read it date=2027-04-26
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-05-03) = Mon · read it date=2027-05-03 · only when $wd is Mon = Mon · key 36
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-05-03) = Mon · read it date=2027-05-03 · only when $wd = "Mon" ($wd=Mon) · key 36
         t a03 "2027-05-03 Mon" · read it date=2027-05-03
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-05-10) = Mon · read it date=2027-05-10 · only when $wd is Mon = Mon · key 43
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-05-10) = Mon · read it date=2027-05-10 · only when $wd = "Mon" ($wd=Mon) · key 43
         t a03 "2027-05-10 Mon" · read it date=2027-05-10
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-05-17) = Mon · read it date=2027-05-17 · only when $wd is Mon = Mon · key 50
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-05-17) = Mon · read it date=2027-05-17 · only when $wd = "Mon" ($wd=Mon) · key 50
         t a03 "2027-05-17 Mon" · read it date=2027-05-17
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-05-24) = Mon · read it date=2027-05-24 · only when $wd is Mon = Mon · key 57
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-05-24) = Mon · read it date=2027-05-24 · only when $wd = "Mon" ($wd=Mon) · key 57
         t a03 "2027-05-24 Mon" · read it date=2027-05-24
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-05-31) = Mon · read it date=2027-05-31 · only when $wd is Mon = Mon · key 64
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-05-31) = Mon · read it date=2027-05-31 · only when $wd = "Mon" ($wd=Mon) · key 64
         t a03 "2027-05-31 Mon" · read it date=2027-05-31
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
-      day a03 (absent: $wd is Sat, not = Mon)
-      day a03 (absent: $wd is Sun, not = Mon)
-      day a03 row · wd = weekday(2027-06-07) = Mon · read it date=2027-06-07 · only when $wd is Mon = Mon · key 71
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sat))
+      day a03 (absent: $wd = "Mon" is false ($wd=Sun))
+      day a03 row · wd = weekday(2027-06-07) = Mon · read it date=2027-06-07 · only when $wd = "Mon" ($wd=Mon) · key 71
         t a03 "2027-06-07 Mon" · read it date=2027-06-07
-      day a03 (absent: $wd is Tue, not = Mon)
-      day a03 (absent: $wd is Wed, not = Mon)
-      day a03 (absent: $wd is Thu, not = Mon)
-      day a03 (absent: $wd is Fri, not = Mon)
+      day a03 (absent: $wd = "Mon" is false ($wd=Tue))
+      day a03 (absent: $wd = "Mon" is false ($wd=Wed))
+      day a03 (absent: $wd = "Mon" is false ($wd=Thu))
+      day a03 (absent: $wd = "Mon" is false ($wd=Fri))

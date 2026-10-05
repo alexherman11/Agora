@@ -1,4 +1,4 @@
 scene who · for golden · world @24 · no style=; using the default (calm)
   x column · 2 of actors
-    r "juniper read to 24, behind 0" · key juniper
-    r "ben read to 21, behind 3" · key ben
+    r "juniper read to , behind " · key juniper
+    r "ben read to , behind " · key ben

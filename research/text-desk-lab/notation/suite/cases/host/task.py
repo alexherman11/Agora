@@ -40,7 +40,7 @@ def probe(name, run):
             bad.append("text")
         if "1 of kind:task,prop:owner=juniper" not in out:
             bad.append("of")
-        if "(absent: no today)" in out or "only when" in out and "< 2026" not in out:
+        if "no today" in out or "only when" in out and "$today=20" not in out:
             bad.append("only when")
         if "uninterpretable" in out:
             bad.append("derive")

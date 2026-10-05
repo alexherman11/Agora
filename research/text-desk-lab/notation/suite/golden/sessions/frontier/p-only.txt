@@ -1,4 +1,4 @@
 scene p-only · for golden · world @336 · no style=; using the default (calm)
   root column
     list · 1 of tag:probe
-      card a122 (absent: no wd)
+      card a122 (absent: can't tell: no wd ($wd=none))

@@ -2,51 +2,39 @@ scene together · for golden · world @126 · no style=; using the default (calm
   window [window] column
     bar [titlebar] row
       name "Together" [windowname]
-    people column · 11 of actors
+    people column · 8 of actors
       person [card.plain] row · key bob
         who "bob" [title]
         hands "last move a21 at 2026-09-18T15:28:20" [body]
-        eyes "read to 125 · 1 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key jeff
         who "jeff" [title]
         hands "last undo e123 at 2026-09-18T15:26:35" [body]
-        eyes "read to 126 · 0 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key alex
         who "alex" [title]
         hands "last edit a29 at 2026-09-18T15:23:38" [body]
-        eyes "read to 116 · 10 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key flint
         who "flint" [title]
         hands "last tag a11 at 2026-09-18T14:42:58" [body]
-        eyes "read to 105 · 21 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key moss
         who "moss" [title]
         hands "last edit a13 at 2026-09-18T14:41:56" [body]
-        eyes "read to 126 · 0 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key lark
         who "lark" [title]
         hands "last edit a17 at 2026-09-18T14:41:34" [body]
-        eyes "read to 105 · 21 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key larktwo
         who "larktwo" [title]
         hands "last create f03 at 2026-09-18T14:41:05" [body]
-        eyes "read to 73 · 53 behind" [meta]
+        eyes "read to  ·  behind" [meta]
       person [card.plain] row · key wren
         who "wren" [title]
         hands "last edit a13 at 2026-09-18" [body]
-        eyes "read to 126 · 0 behind" [meta]
-      person [card.plain] row · key iris
-        who "iris" [title]
-        hands "last   at " [body]
-        eyes "read to 103 · 23 behind" [meta]
-      person [card.plain] row · key rookwatch
-        who "rookwatch" [title]
-        hands "last   at " [body]
-        eyes "read to 57 · 69 behind" [meta]
-      person [card.plain] row · key astra-liaison
-        who "astra-liaison" [title]
-        hands "last   at " [body]
-        eyes "read to 117 · 9 behind" [meta]
+        eyes "read to  ·  behind" [meta]
     away column · 0 of worktrees (empty)
     recent column · 20 of events
       ev "e126 move a21 by bob at 2026-09-18T15:28:20" [source] · key e126

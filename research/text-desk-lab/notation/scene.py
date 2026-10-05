@@ -10,8 +10,20 @@ and read by anyone. A lens is not code. The host that interprets it is small, fi
 Both projections are printed from the same scene tree, so the screen and the text cannot disagree about what
 is there, what it says, where it is, or what a gesture will do. That is the whole point.
 
-Lens grammar v0. One line per part:  name : prop, prop, ...   Children are indented under their parent.
-An unindented name defines a part; the first one is the root.
+Lens grammar. A part line is a name, ` : `, and what the part is and how it looks: `card : column, role card`,
+`t : text "$title"`. Every other word is its own line, indented under its part, among the part's child parts
+(Alex, 5 Oct: out of the comma lists). An unindented part is defined; the first one is the root.
+
+    card : column, role card
+      let size = "big" when $beds > 5
+      let size = "small" otherwise
+      of kind:note
+      each t
+    t : text "$title: $size"
+      only when $beds > 2
+
+The older `name : word, word, ...` is still read (the worlds hold lenses written so); `scene <lens> lines` prints
+the one form. The words:
 
     column | row | free          how children are laid out (the same three words surfaces use)
     role <name>                  the look, by a role from the style file. A lens never names a colour or a size.
@@ -36,8 +48,10 @@ An unindented name defines a part; the first one is the root.
                                  lens note itself: do prop <lens> spacing=210. Computed presentation, never written back
     lens <name>                  place another lens here. A lens may not contain itself
     only when <selection>        the part exists only if the current thing (or anything) matches; the text prints the absence
-    only when $x <op> value      a value test (= != < > <= >= has !has) on a field, prop, frame field or derive of this part, judged
-                                 after its derives; prints its inputs; a missing value is absence (no x), not false
+    only when <expr>             the part exists only when the expression holds (= != < > <= >= has !has, and, or, not,
+                                 arithmetic; see let). It prints its inputs; none (a missing value) is absence with
+                                 the reason, not false. One way to test since 5 Oct: `$x = done` is read as
+                                 `$x = "done"`, the one spelling
     the <selection>              exactly one thing becomes the current thing here; the text prints which (-> s31 (a32)),
                                  or (empty), or (ambiguous: a32, a50) with nothing built under it and gestures off
     as <name>                    name this part's thing as a frame; parts below read it as $name.title $name.start
@@ -54,7 +68,6 @@ An unindented name defines a part; the first one is the root.
                                  Several lets of one name with `when` are an if: the first that holds is taken, an
                                  overlap is said, and `otherwise` holds when none of the others do. The scene
                                  prints every let with its expression, inputs and result
-    only when <expr>             the part exists only when the expression holds; none (can't tell) is absence
     text "... $(<expr>) ..."     an expression computed inside words; the scene prints each one with its inputs
     capture <field>=<value>      use this value instead of following the frame's; prints (now X: differs) when the
                                  world has moved on. Following is the default and is never written down
@@ -854,7 +867,8 @@ def _w_role(node, p, val, n, env):
     # prints which and why, and a part none holds for keeps its plain role. The test is `only when`'s, either kind.
     val, _, cond = val.partition(" when ")
     if not re.fullmatch(r"[\w.-]+", val) or (_ and not cond.strip()):
-        raise LensRefusal(f"line {n}: `role <name>` or `role <name> when <selection | $x <op> value>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `role <name>` or `role <name> when <selection | expr>`; got {p!r}")
+    cond = _one_test(cond.strip(), n)
     if env["roles"] is not None and val not in env["roles"]:
         raise LensRefusal(f"line {n}: no role {val!r} in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
     if _:
@@ -1010,8 +1024,28 @@ def _w_let(node, p, val, n, env):
 
 def _w_only(node, p, val, n, env):
     if not (val.startswith("when ") and val[5:].strip()):
-        raise LensRefusal(f"line {n}: `only when <selection>` or `only when $x <op> <value>`; got {p!r}")
-    node["only"] = val[5:].strip()      # Wren, Flint: the desk's own selection decides; a value test is judged after derives
+        raise LensRefusal(f"line {n}: `only when <selection>` or `only when <expr>`; got {p!r}")
+    node["only"] = _one_test(val[5:].strip(), n)      # Wren, Flint: the desk's own selection decides; an expression is judged after lets
+
+
+# Alex, 5 Oct ("make our three ways to say the one new one"): a test is a selection (membership) or an expression; the
+# older `$x <op> value` form, with a bare word on the right, is the expression `$x <op> "value"` and is read as that.
+_LEGACY_TEST = re.compile(r"(\$[\w.-]+)\s*(=|!=|<=|>=|<|>|!?has(?=\s))\s*(\S+)")
+
+
+def _one_test(text, n):
+    m = _LEGACY_TEST.fullmatch(text)
+    if not m:
+        return text
+    ref, op, rhs = m.groups()
+    if not (rhs[0] in "$\"@(-" or rhs[0].isdigit() or rhs in ("none", "true", "false")):
+        rhs = f'"{rhs}"'
+    text = f"{ref} {op} {rhs}"
+    try:
+        X.parse(text)
+    except X.ExprError as e:
+        raise LensRefusal(f"line {n}: {e}")
+    return text
 
 
 # the desk's own commands a gesture may begin with; any other first word is a verb, and gets `do ` (verbs.py binds the
@@ -1056,7 +1090,7 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "peek": ("peek", _w_peek),
     "carry": ("carry", _w_carry),
-    "role": ("role <name> [when <selection | $x <op> value>]", _w_role),
+    "role": ("role <name> [when <selection | expr>]", _w_role),
     "text": ('text "..."', _w_text),
     "clamp": ("clamp [last] <n>", _w_clamp),
     "the": ("the <selection> [as <frame>]", _w_the),
@@ -1067,7 +1101,7 @@ WORDS = {
     "as": ("as <frame>", _w_as),
     "each": ("each <part>", _w_each),
     "at": ("at item", _w_at),
-    "only": ("only when <selection | $x <op> value | expr>", _w_only),
+    "only": ("only when <selection | expr>", _w_only),
     "derive": ("derive <name> = <interpretation> <inputs>", _w_derive),
     "let": ("let <name> = <expr> [when <expr> | otherwise]", _w_let),
     "capture": ("capture <field>=<value>", _w_capture),
@@ -1100,40 +1134,64 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
     import knife      # a3359: a selection that names due as a prop is refused here, when the lens is saved, not at a look
     only = None if X.looks_like(node["only"]) else node["only"]
-    for sel in [node["of"], node["the"], only, node["count"]] + [c for _, c in node["role_when"]]:
+    for sel in [node["of"], node["the"], only, node["count"]] + [c for _, c in node["role_when"] if not X.looks_like(c)]:
         said = knife.misnamed(sel)
         if said:
             raise LensRefusal(f"line {n}: {said}")
 
 
+def indent_of(line):
+    return len(line) - len(line.lstrip())
+
+
 def parse(src, roles=None, style=None):
-    """-> (root_name, parts) where parts[name] = node {name, props, kids}. `roles`: the lens's style's roles (F7)."""
+    """-> (root_name, parts) where parts[name] = node {name, props, kids}. `roles`: the lens's style's roles (F7).
+    Alex, 5 Oct (out of the comma lists): a line whose head is a name before ` : ` opens a part and says what it is and
+    how it looks (`card : column, role card`, `t : text "$title"`); every other word is its own line, indented under
+    the part it belongs to, among that part's child parts. The older comma list on the part line is still read, since
+    the worlds hold lenses written that way; to_lines prints the one form, and both parse to the same tree."""
     parts, stack, root = {}, [], None
     env = {"roles": roles if roles is not None else _roles(), "style": style}
+
+    def say(node, p, n):
+        word, _, val = p.partition(" ")
+        row = WORDS.get(word)
+        if row is None:
+            raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {vocabulary()}")
+        row[1](node, p, val, n, env)
+        node["words"].append(p)
+
     for n, raw in enumerate(src.splitlines(), 1):
         line = _outside_quotes(raw, " # ")[0].rstrip()
-        if not line.strip() or line.strip().startswith("#") or line.strip().startswith("lens "):
+        if not line.strip() or line.strip().startswith("#") or (indent_of(line) == 0 and re.fullmatch(r"lens \S+", line.strip())):   # a header line, `lens <name>`, as the first lenses began; an indented `lens x` is the word
             continue
         indent = len(line) - len(line.lstrip())
-        name, colon, rest = line.strip().partition(" : ")
-        if not colon or not re.fullmatch(r"[\w-]+", name):
-            raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
+        text = line.strip()
+        pieces = _outside_quotes(text, " : ")
+        head = pieces[0] if len(pieces) > 1 else (text[:-2] if text.endswith(" :") else None)
+        if head is None or not re.fullmatch(r"[\w-]+", head):
+            # a word line: it belongs to the nearest part above it with a smaller indent
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            if not stack:
+                raise LensRefusal(f"line {n}: {text!r} is a word with no part above it. A part is `name : <what it is>`; "
+                                  f"its words are indented under it, one per line")
+            say(stack[-1][1], text, n)
+            continue
+        name, rest = head, (" : ".join(pieces[1:]) if len(pieces) > 1 else "")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": line.strip(), "carry": False, "by": None,
+                "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None,
                 "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
             if last == "by" and not val and word not in WORDS and re.fullmatch(r"[\w.-]+", word):
-                node["by"].append(word)          # `by priority, rank`: a bare name after `by` is its next prop
+                node["by"].append(word)          # the older `by priority, rank`: a bare name after `by` is its next prop
+                node["words"][-1] += " " + word  # said once, as `by priority rank`
                 continue
             last = word
-            row = WORDS.get(word)
-            if row is None:
-                raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {vocabulary()}")
-            row[1](node, p, val, n, env)
-        _check_part(node, n)
+            say(node, p, n)
         if indent == 0:
             if name in parts:
                 raise LensRefusal(f"line {n}: part {name!r} is already defined on line {parts[name]['line']}; one name, one part")
@@ -1153,6 +1211,8 @@ def parse(src, roles=None, style=None):
         raise LensRefusal("an empty lens shows nothing; start with  window : column")
     every = [k for p in parts.values() for k in _walk(p)]
     for k in every:
+        k["src"] = f"{k['name']} : " + ", ".join(k["words"])     # one spelling of the part's own words, whichever form it was written in
+        _check_part(k, k["line"])          # after every line, since a part's words may follow its children
         for wd in ("gap", "scroll", "fold", "measure"):
             if k[wd] not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
@@ -1180,6 +1240,42 @@ def parse(src, roles=None, style=None):
     for name in parts:
         reach(name, [])
     return root, parts
+
+
+HEAD_WORDS = LAYOUTS + ("grid", "text")
+
+
+def to_lines(src, roles=None, style=None):
+    """The one form of a lens (Alex, 5 Oct): a part line says what the part is and how it looks, `card : column, role
+    card` or `t : text "$title"`; every other word is its own line under it, in the order written, then its child
+    parts. A lens that does not parse is refused as parse refuses it. Comments do not survive (parse drops them)."""
+    root, parts = parse(src, roles, style)
+    out = []
+
+    def split(node):
+        head, rest = [], []
+        for p in node["words"]:
+            w = p.partition(" ")[0]
+            if w in HEAD_WORDS and not any(x.partition(" ")[0] in HEAD_WORDS for x in head):
+                head.append(p)
+            elif w == "role" and " when " not in p and not any(x.startswith("role ") for x in head):
+                head.append(p)
+            else:
+                rest.append(p)
+        head.sort(key=lambda x: x.startswith("role "))      # what it is, then how it looks
+        return head, rest
+
+    def emit(node, depth):
+        head, rest = split(node)
+        out.append("  " * depth + node["name"] + (" : " + ", ".join(head) if head else " :"))
+        for p in rest:
+            out.append("  " * (depth + 1) + p)
+        for k in node["kids"]:
+            emit(k, depth + 1)
+
+    for name in parts:
+        emit(parts[name], 0)
+    return "\n".join(out)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -1210,6 +1306,15 @@ def _refs_of(node):
     return out
 
 
+def _exprs_of(node):
+    """The expressions this part's own words hold, with the word they sit in."""
+    out = [("let", e) for _, e, _c in node["let"]] + [("let", c) for _, _e, c in node["let"] if c and c != "otherwise"]
+    if node["only"] and X.looks_like(node["only"]):
+        out.append(("only when", node["only"]))
+    out += [("role", c) for _, c in node["role_when"] if X.looks_like(c)]
+    return out
+
+
 def resolve(root, parts):
     """-> {id(node): {"frames": set, "lets": set}} for every part reachable from the root, walking kids and `each`.
     Refuses a `$frame.field` whose frame no part above names, and a bare `$frame` used as a value."""
@@ -1226,6 +1331,10 @@ def resolve(root, parts):
         for lname, _e, _c in node["let"]:
             lets.add(lname)
         scopes[id(node)] = {"frames": frames, "lets": lets}
+        for word, text in _exprs_of(node):      # a bare word in an expression is a let named above, or it is refused
+            for bare in X.bare_words(text):
+                if bare not in lets:
+                    raise LensRefusal(f"line {node['line']}: `{bare}` in `{word} {text}` is no let named above; quote words: \"{bare}\"")
         for word, a, b in _refs_of(node):
             if b:
                 if a not in frames and a != "it" and a not in HOST_FRAMES:
@@ -1255,22 +1364,16 @@ def classify(name, scope):
     return "prop"
 
 
-def role_of(role, role_when, ctx, track, select):
+def role_of(role, role_when, ctx, track, select, run=None):
     """a1105: the role a part takes here and why. `role_when` is [(name, condition)] in the lens's order; the first that
     holds for this part's thing wins, else the plain role. A condition is a selection (judged as `only when` judges one:
-    the thing is among what it finds, or, with no thing, it finds anything) or a value test, where a missing value does
-    not hold. `select(q)` -> ids. -> (role, why or None)."""
+    the thing is among what it finds, or, with no thing, it finds anything) or an expression run by `run(text) ->
+    (Value, inputs)`, where none does not hold. `select(q)` -> ids. -> (role, why or None)."""
     for name, cond in role_when:
-        vt = _VALUE_TEST.fullmatch(cond)
-        if vt:
-            ref, op, rhs = vt.group(1), vt.group(2), vt.group(3).strip('"')
-            vctx = dict(ctx.get("_props") or {})
-            vctx.update(ctx)
-            left = _fill(ref, vctx, track)
-            right = _fill(rhs, vctx, track) if "$" in rhs else rhs
-            gone = [x for x, v in ((ref, left), (rhs, right)) if x.startswith("$") and (v == x or v == "")]
-            if not gone and _compare(left, op, right):
-                return name, f"{ref} is {left} {op} {right}"
+        if run and X.looks_like(cond, ctx.get("_lets") or ()):
+            val, ins = run(cond)
+            if X.holds(val):
+                return name, cond + (f" ({ins})" if ins else "")
             continue
         q = _fill(cond, ctx)
         ids = select(q)
@@ -1355,20 +1458,6 @@ INTERPS = {"day-n": (("date", "n"), _day_n), "days-from": (("start", "end"), _da
            "weekday": (("date",), _weekday), "week-of": (("date",), _week_of),
            "time": (("when",), lambda v: _when(v, "time")), "date": (("when",), lambda v: _when(v, "date"))}
 _VAR = re.compile(r"\$(\w+)(?:\.(\w+))?")
-# Pike (round six, `if`): a structural test on a value. `only when $wd = Mon`, `only when $beds > 5`, `only when $a.due < $today`.
-# Alex, 29 Sep ("messages to me should be pleasantly highlighted"): `has` and `!has` ask whether the words contain the
-# value, ignoring case: `only when $said has @$me`. A value with a $name in it is filled, as a bare $name is.
-_VALUE_TEST = re.compile(r"(\$[\w.-]+)\s*(=|!=|<=|>=|<|>|!?has(?=\s))\s*(\$[\w.-]+|\"[^\"]*\"|\S+)")
-
-
-def _compare(left, op, right):
-    try:
-        a, b = float(left), float(right)
-    except (TypeError, ValueError):
-        a, b = str(left), str(right)
-    if op in ("has", "!has"):
-        return (str(right).lower() in str(left).lower()) == (op == "has")
-    return {"=": a == b, "!=": a != b, "<": a < b, ">": a > b, "<=": a <= b, ">=": a >= b}[op]
 
 
 def _fill(tpl, ctx, track=None):
@@ -1543,265 +1632,6 @@ def _named(w, sel):
         else:
             out.append((t, "gone"))
     return out
-
-
-def build(desk, src, stack=(), count=None, props=None, closure=None):
-    props = props or {}
-    root, parts = parse(src, roles=style_roles(desk, props.get("style")), style=props.get("style"))   # F7, F18
-    resolve(root, parts)          # stage 2: names are judged before any part is evaluated
-    w = desk.world
-
-    def spread_of(node, index, kid):
-        sp, item = node.get("spread"), w.nodes.get(kid.get("item") or "")
-        if not sp:
-            return
-        if node["layout"] != "free":
-            raise LensRefusal(f"line {node['line']}: spread places parts by position, which only a `free` part can honour")
-        xy = {}
-        for axis, (start, step, top) in sp.items():
-            if step.startswith("$"):
-                if step[1:] not in props or not str(props[step[1:]]).lstrip("-").isdigit():
-                    raise LensRefusal(f"line {node['line']}: spread step {step}: this lens has no numeric prop {step[1:]!r}. Set it: do prop <this lens> {step[1:]}=150")
-                step = props[step[1:]]
-            xy[axis] = max(0, min(top, start + index * int(step)))
-        kid["box"] = [xy.get("x", 0), xy.get("y", 0), item["w"] if item else 200, item["h"] if item else 80]
-        kid["placed"] = "spread"          # computed presentation, not the thing's durable position: no drag, nothing written back
-    count = count if count is not None else [0]
-
-    def make(node, ctx, key, parent_layout="free", chain=()):
-        chain = chain + (node,)
-        if node["at"] == "item" and parent_layout != "free":
-            raise LensRefusal(f"line {node['line']}: `at item` places a part by its world position, which only a `free` parent can honour; "
-                              f"its parent is {parent_layout or 'unlaid'}. Make the parent free, or drop `at item`")
-        vtest = _VALUE_TEST.fullmatch(node["only"].strip()) if node["only"] else None
-        if node["only"] and not vtest:
-            sel = desk._parse_selection(_fill(node["only"], ctx))
-            ids = sel[0] if sel else []
-            if not ((ctx.get("item") in ids) if ctx.get("item") else bool(ids)):
-                # the text prints the absence; it does not pretend the part was never written
-                return {"part": node["name"], "key": key, "role": None, "layout": None, "item": ctx.get("item"), "box": None,
-                        "text": None, "clamp": None, "acts": [], "kids": [], "absent": node["only"]}
-        ctx = dict(ctx)
-        frames = dict(ctx.get("_frames") or {})
-        ctx["_frames"] = frames
-        track = {"frames": set(), "reads": {}, "missing": set(), "bad": set()}
-        the_state = "live"
-        if node["the"]:
-            # Pike W2: exactly one. Empty and ambiguous are states the scene prints; nothing is built under them.
-            sel_text = _fill(node["the"], ctx, track)
-            named = _named(w, sel_text)
-            if named is not None:
-                ids = [i for i, st in named if st == "live"] or [i for i, st in named if st == "unplaced"]
-            else:
-                sel = desk._parse_selection(sel_text)
-                ids = list(sel[0]) if sel else []
-            if len(ids) == 1:
-                tc = _ctx_for(w, ids[0])
-                for k, v in node["capture"].items():
-                    # Pike W7: a captured value is used instead of the live one, and the scene says whether they still agree
-                    live = tc.get(k) if (k in tc and not k.startswith("_")) else (tc.get("_props") or {}).get(k)
-                    tc.setdefault("_captured", []).append((k, v, live))
-                    tc.setdefault("_captured_fields", set()).add(k)      # Juniper: rows printed `read trip start=<captured>`, a false provenance
-                    if k in tc and not k.startswith("_"):
-                        tc[k] = v
-                    else:
-                        tc["_props"] = dict(tc.get("_props") or {}, **{k: v})
-                ctx.update({k: v for k, v in tc.items() if k != "_frames"})
-                if node["as"]:
-                    frames[node["as"]] = tc
-                the_state = f"-> {tc['id']}" + (f" ({ids[0]})" if ids[0] != tc["id"] else "")
-            else:
-                the_state = "empty" if not ids else "ambiguous: " + ", ".join(ids)
-        out = {"part": node["name"], "key": key, "role": node["role"], "layout": node["layout"], "item": ctx.get("item"),
-               "box": None, "text": None, "clamp": node["clamp"], "acts": [], "kids": []}
-        out.update({k: node[k] for k in PAINT_WORDS if node.get(k) not in (None, False)})
-        if isinstance(out.get("fold"), str) and "$" in out["fold"]:
-            out["fold"] = _fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
-        if node["the"]:
-            out["the"] = (_fill(node["the"], ctx), the_state)
-        if node["as"]:
-            out["as"] = node["as"]
-        if ctx.get("_captured") and node["the"]:
-            out["captured"] = [{"field": k, "value": v, "now": live, "same": (str(live) == str(v))} for k, v, live in ctx["_captured"]]
-        if the_state not in ("live",) and not the_state.startswith("->"):
-            return out          # empty or ambiguous: printed, gestures off, nothing under it
-        for dname, interp, ins in node["derive"]:
-            dctx = dict(ctx.get("_props") or {})
-            dctx.update(ctx)                                     # Juniper: `day-n $trip.start $tripday` could not read the thing's own prop
-            vals = [_fill(x, dctx, track) if x.startswith("$") else x for x in ins]
-            res, err = INTERPS[interp][1](vals)
-            out.setdefault("derived", []).append({"name": dname, "interp": interp, "inputs": vals,
-                                                  "result": (f"{len(res)} rows" if isinstance(res, list) else res), "error": err})
-            if isinstance(res, list):
-                ctx["_" + dname] = res
-            else:
-                ctx[dname] = res or ""
-        if vtest:
-            # Sable probe 5, Juniper A5: `only when $wd=Mon` was accepted as a selection and printed a wrong reason on every
-            # day. It is a value test, judged after this part's derives so its own `derive wd` is visible; it prints its
-            # inputs, and a missing value is absence, not false (Sable's R6 condition).
-            ref, op, rhs = vtest.group(1), vtest.group(2), vtest.group(3).strip('"')
-            vctx = dict(ctx.get("_props") or {})
-            vctx.update(ctx)
-            left = _fill(ref, vctx, track)
-            right = _fill(rhs, vctx, track) if "$" in rhs else rhs
-            gone = [x for x, v in ((ref, left), (rhs, right)) if x.startswith("$") and (v == x or v == "")]
-            if gone or not _compare(left, op, right):
-                out.update(text=None, acts=[], kids=[], absent=node["only"],
-                           why=(f"no {gone[0].lstrip('$')}" if gone else f"{ref} is {left}, not {op} {right}"))
-                return out
-            out["test"] = f"{ref} is {left} {op} {right}"
-        if node["role_when"]:
-            out["role"], why = role_of(node["role"], node["role_when"], ctx, track,
-                                       lambda q: (desk._parse_selection(q) or [[]])[0])
-            if why:
-                out["since"] = why
-        if node["at"] == "item" and ctx.get("item") in w.nodes:
-            n = w.nodes[ctx["item"]]
-            out["box"] = [n["x"], n["y"], n["w"], n["h"]]
-            # Lark: "can he see this?" The world already knows (offscreen-part, spills-parent, 43% hidden by f52); the scene threw it away.
-            out["facts"] = [f for f in w.relations(ctx["item"]) if f != "clear"]
-        if node["text"] is not None:
-            pv = dict(ctx.get("_props") or {})
-            missing = [p for p in node["props"] if p not in pv and p not in ctx]
-            # Juniper: a prop named n (or any built-in name) crashed the compiler here. Built-ins win; the prop is still readable as $it or a frame.
-            fill_ctx = {p: "" for p in missing}
-            fill_ctx.update(pv)
-            fill_ctx.update({k: v for k, v in ctx.items() if k != "n"} if node["each"] else ctx)
-            out["text"] = _fill(node["text"], fill_ctx, track)   # a repeat words its own count
-            if node["props"]:
-                out["read"] = {p: pv.get(p) for p in node["props"] if p in pv}      # what the lens read from the thing
-            if missing:
-                out["missing"] = missing                                             # printed (no place); the painter shows nothing there
-        if ctx.get("_state") and ctx["_state"] != "live":
-            out["state"] = ctx["_state"]
-        safe = {k: (_cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
-        out["id"] = ctx.get("id")
-        # a thing that is gone or unplaced has no appearance to act on: no gesture is offered, and the text says why
-        safe["_frames"] = {k: {kk: (_cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
-        acts = [] if (node["on"] and ctx.get("_state") in ("gone", "unplaced")) else [
-            {"on": a["on"], "line": _fill(a["line"], safe, track), **{k: a[k] for k in ("part", "label") if a.get(k)}} for a in node["on"]]
-        if node["carry"]:
-            if not ctx.get("item"):
-                raise LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")
-            acts.append({"on": "carry"})          # no line: the drop's receiver says what happens
-        out["acts"] = acts
-        if track["bad"]:
-            raise LensRefusal(f"line {node['line']}: ${sorted(track['bad'])[0]}.field: no part above this one is named `as {sorted(track['bad'])[0]}`")
-        if track["reads"]:
-            out["freads"] = {k: v for k, v in track["reads"].items()}
-            out["frames"] = {f: frames[f].get("id") for f in track["frames"] if f in frames}
-        if track["missing"]:
-            out["missing"] = sorted(set(out.get("missing") or []) | {f"{m} on {frames[m.split('.')[0]].get('id')}" for m in track["missing"]})
-        if out["acts"]:
-            # Pike F1: what a gesture was built from. The item's subject and every frame its words or derives read.
-            # Pike a308: at the grain of the aspect, so a retitle does not refuse a gesture that only read a prop.
-            reads = {}
-            sj = (w.nodes.get(ctx.get("item") or "") or {}).get("subject")
-            fields = {}
-            for f in track.get("own", ()):
-                a = _aspect_of_field(f)
-                if a and sj:
-                    fields.setdefault(sj, set()).add(a)
-            for k in track["reads"]:
-                fr, _, fld = k.partition(".")
-                fid = frames.get(fr, {}).get("id")
-                a = _aspect_of_field(fld)
-                if fid and a:
-                    fields.setdefault(fid, set()).add(a)
-            for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames]:
-                if i and _rev_of(w, i) is not None:
-                    reads[i] = _rev_of(w, i)
-            out["reads"] = [[i, r, sorted(fields.get(i) or [])] for i, r in sorted(reads.items())]
-            out["defpart"] = {"path": "/".join(n["name"] for n in chain), "hash": _chain_hash(chain)}
-        if ctx.get("item") in w.nodes and out["acts"]:
-            out["rev"] = w.nodes[ctx["item"]]["rev"]
-            # Astra (bridge c31, c42): fields they had to join server-side, now stated. Coordinates are px in the parent.
-            nd = w.nodes[ctx["item"]]
-            sj = w.subjects.get(nd.get("subject") or "")
-            out["bind"] = {"subject": nd.get("subject"), "subject_rev": sj["rev"] if sj else None, "parent": nd["parent"],
-                           "parent_rev": w.nodes[nd["parent"]]["rev"] if nd["parent"] in w.nodes else None, "units": "px in parent"}      # Astra: a gesture acts on the generation that was observed, not on a fresh look
-        count[0] += 1
-        if count[0] > BUDGET:
-            raise LensRefusal(f"this lens makes more than {BUDGET} scene nodes. Put `clamp N` on the repeat (line {node['line']}); the text will say how many are left")
-        if node["each"]:
-            each = parts[node["each"]]
-            if node["of"]:
-                sel_text = _fill(node["of"], ctx)
-                out["of"] = sel_text                  # Pike: the text printed the selection unfilled; print what was asked
-                rs = rows(desk, sel_text)
-                keep = node["clamp"] or 10 ** 9       # Flint: clamp N on a repeat; 305 things put 305 nodes in both printers
-                last = bool(node.get("clamp_last"))
-                total = len(rs) if rs is not None else None
-                cnt = min(total, keep) if total is not None else None
-                first = max(0, len(rs or []) - keep) if last else 0
-                for k, r in enumerate((rs or [])[first:first + keep], first):
-                    # Pike: sections and tags were keyed by position, so an insert retargeted every draft below it. Key by what it is.
-                    okey = r.get("cid") or r.get("eid") or r.get("name") or (_slug(r["heading"]) if "heading" in r else k)
-                    out["kids"].append(make(each, _inst(ctx, node, {**ctx, "count": cnt, **r}), f"{key}/{okey}", node["layout"], chain))
-                named = _named(w, sel_text) if rs is None else None
-                pick = (lambda xs: xs[-keep:]) if last else (lambda xs: xs[:keep])      # noqa: E731
-                if named is not None:
-                    total = len(named)
-                    for i, st in pick(named):
-                        out["kids"].append(make(each, _inst(ctx, node, dict(_ctx_for(w, i, st), count=min(total, keep))), f"{key}/{i}", node["layout"], chain))
-                    out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
-                else:
-                    sel = desk._parse_selection(sel_text) if rs is None else None
-                    ids = sel[0] if sel else []
-                    total = len(ids) if total is None else total
-                    for i in pick(list(ids)):
-                        out["kids"].append(make(each, _inst(ctx, node, dict(_ctx_for(w, i), count=min(total, keep))), f"{key}/{i}", node["layout"], chain))
-                # Juniper (round six, past Sable's probes): tagging a thing outside the printed reads moved the scene, because
-                # the repeat had read "the set matching tag:day" and recorded nothing. A membership read is a read.
-                got = [k["item"] or k["key"] for k in out["kids"]]
-                out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
-                if total > keep:
-                    out["cut"] = total - keep
-                    cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
-                           "text": (f"{total - keep} earlier not shown (clamp last {keep}); " if last else f"{total - keep} more not shown (clamp {keep}); ")
-                           + f"find {_fill(node['of'], ctx)} lists all {total}", "clamp": None, "acts": [], "kids": []}
-                    if last:
-                        out["kids"].insert(0, cut)
-                    else:
-                        out["kids"].append(cut)
-            else:
-                rows_over = ctx.get("_" + node["over"], [])
-                for k, v in enumerate(rows_over):
-                    if isinstance(v, dict):         # rows from a derive (days-from): $it.n $it.date, keyed by n
-                        ictx = _inst(ctx, node, dict(ctx, it=str(v.get("date", v.get("n", ""))), count=len(rows_over)))
-                        ictx["_frames"] = dict(ictx["_frames"], it=v)
-                        out["kids"].append(make(each, ictx, f"{key}/{_slug(str(v.get('n', k)))}", node["layout"], chain))
-                    else:
-                        out["kids"].append(make(each, _inst(ctx, node, dict(ctx, it=v, count=len(rows_over))), f"{key}/{_slug(str(v))}", node["layout"], chain))
-            # the same thing twice in one repeat gave two identical keys (Pike); an occurrence is (thing, ordinal here)
-            seen_keys = {}
-            for kid in out["kids"]:
-                c = seen_keys.get(kid["key"], 0) + 1
-                seen_keys[kid["key"]] = c
-                if c > 1:
-                    old = kid["key"]
-                    kid["key"] = f"{old}#{c}"
-                    _reprefix(kid, old, kid["key"])
-            out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
-            for k, kid in enumerate(out["kids"][:out["n"]]):
-                spread_of(node, k, kid)
-            if out["text"] is not None:                         # Flint bug 4: the count existed and could not be put into words
-                out["text"] = out["text"].replace("$n", str(out["n"]))
-        if node["lens"]:
-            inner = _fill(node["lens"], ctx)
-            if inner.lower() in stack:
-                raise LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
-            sub = _compile(desk, find_lens(desk, inner), stack + (inner.lower(),), count, closure if closure is not None else [])
-            sub["key"] = f"{key}/lens:{inner}"
-            _rekey(sub, sub["key"])
-            out["kids"].append(sub)
-            out["lens"] = inner
-        for kid in node["kids"]:
-            out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("n", ctx.get("count", ""))), f"{key}/{kid['name']}", node["layout"], chain))
-        return out
-
-    return make(parts[root], {}, root)
 
 
 def _rekey(n, prefix):
@@ -2047,51 +1877,6 @@ def find_lens(desk, name):
     raise LensRefusal(f"no lens {name!r}. A lens is a note tagged lens whose text is the description. Lenses here: {', '.join(have) or 'none'}")
 
 
-def _compile(desk, s, stack, count, closure):
-    """One lens to a scene, recording in `closure` exactly which definition was used. A lens that does not compile is
-    shown in its last version that did (Astra: also when it is an INNER lens), and the closure says so."""
-    good = getattr(desk, "_lens_good", None)
-    if good is None:
-        good = desk._lens_good = {}
-    entry = {"lens": s["title"], "id": s["id"], "rev": s["rev"], "status": "current"}
-    closure.append(entry)
-    mark = len(closure)
-
-    def stamp(node):
-        dp = node.get("defpart")
-        if dp is not None and "lens" not in dp:
-            dp["lens"], dp["id"] = s["title"], s["id"]
-        for k in node.get("kids") or []:
-            stamp(k)
-    try:
-        import persons
-        import verbs
-        b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
-        with persons.reading(desk, (b or {}).get("persons")):
-            sc = build(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure)
-        stamp(sc)
-        good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
-        return sc
-    except LensRefusal as e:
-        g = good.get(s["id"])
-        g = {"text": g, "rev": None} if isinstance(g, str) else g
-        if not g:
-            raise
-        del closure[mark:]
-        entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e))
-        sc = build(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure)
-        stamp(sc)
-        sc["broken"] = f"lens {s['title']}: {e}"
-        return sc
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Stage 6, emission. Pike's node contract (pike-7 section 6): every node the painter receives is {key, paint, acts, fence,
-# kids}. `paint` is exactly what is drawn, and the painter's signature is paint plus the acts' shapes plus the kids' keys,
-# so an unrelated event no longer remakes an element. `fence` is opaque to the painter: sent back with a gesture, never
-# drawn, never compared. Provenance (the, derived, test, read, freads, frames, captured, members, states, missing, of,
-# cut) stays on the node for the printer and need not travel to the painter.
-# ---------------------------------------------------------------------------------------------------------------------
 PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views", "counted", "size", "computed")
 
 
@@ -2220,25 +2005,7 @@ def scene_for(desk, name, part=None):
     """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
     accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
-    whose whole closure is current; a fallback frame is for reading. The old evaluator below (build) stays for one
-    stage as the reference the goldens were made with; Juniper's check judged the switch at 82 same."""
+    whose whole closure is current; a fallback frame is for reading. The old single-pass evaluator (build, _compile,
+    scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds."""
     import lens_ir
     return lens_ir.scene_for(desk, name, part)
-
-
-def scene_for_old(desk, name):
-    s = find_lens(desk, name)
-    closure = []
-    sc = _compile(desk, s, (s["title"].lower(),), [0], closure)
-    emit(sc)                      # stage 6: the painter's contract on every node
-    at = len(desk.world.events)
-    fallen = [c for c in closure if c["status"] == "fallback"]
-    sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
-                     frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **_identity())      # Pike report 1, item 4: the event count made every event remake the root; observed.at carries it
-    # Iris, Lark: painters report back what only they know; per viewer, printed as ~, never world facts.
-    sc["views"] = {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}
-    text = to_text(sc, s["title"], desk.world.me, at)
-    if fallen:
-        head = "".join(f"! lens {c['lens']} no longer compiles: {c['refusal']}\n" for c in fallen)
-        text = head + "! showing the last version that did; gestures are off until it compiles. Fix it with rewrite, or undo.\n" + text
-    return sc, text

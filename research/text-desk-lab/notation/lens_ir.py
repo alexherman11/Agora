@@ -150,10 +150,8 @@ def lower(root, parts):
         else:
             bind = None
         guard = None
-        if node["only"]:
-            m = S._VALUE_TEST.fullmatch(node["only"].strip())
-            guard = {"kind": "value", "ref": m.group(1), "op": m.group(2), "rhs": m.group(3).strip('"'), "src": node["only"]} if m \
-                else {"kind": "auto", "q": node["only"], "src": node["only"]}      # a selection, or an expression (expr.looks_like) judged at evaluation, when the lets in scope are known
+        if node["only"]:        # a selection, or an expression (expr.looks_like), told apart at evaluation, when the lets in scope are known
+            guard = {"q": node["only"], "src": node["only"]}
         ir = {"part": node["name"], "line": node["line"], "src": node["src"], "ast": node,
               "bind": bind,
               "lets": [{"name": d, "interp": i, "inputs": ins} for d, i, ins in node["derive"]]
@@ -357,18 +355,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             ctx[lname] = X.fmt(val, reach=False)          # $name in words and selections prints it; none prints none
         # --- guard: one rule, judged against the part's own frame after its bind and lets (sable-8 section 2)
         g = node["guard"]
-        if g and g["kind"] == "value":
-            vctx = dict(ctx.get("_props") or {})
-            vctx.update(ctx)
-            left = S._fill(g["ref"], vctx, track)
-            right = S._fill(g["rhs"], vctx, track) if "$" in g["rhs"] else g["rhs"]
-            gone = [x for x, v in ((g["ref"], left), (g["rhs"], right)) if x.startswith("$") and (v == x or v == "")]
-            if gone or not S._compare(left, g["op"], right):
-                out.update(text=None, acts=[], kids=[], absent=g["src"],
-                           why=(f"no {gone[0].lstrip('$')}" if gone else f"{g['ref']} is {left}, not {g['op']} {right}"))
-                return out
-            out["test"] = f"{g['ref']} is {left} {g['op']} {right}"
-        elif g and g["kind"] == "auto" and X.looks_like(g["src"], ctx.get("_lets") or ()):
+        if g and X.looks_like(g["src"], ctx.get("_lets") or ()):
             val, ins = X.run(g["src"], xenv())
             h = X.holds(val)
             if h is None:
@@ -377,7 +364,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             if not h:
                 out.update(text=None, acts=[], kids=[], absent=g["src"], why=f"{g['src']} is false" + (f" ({ins})" if ins else ""))
                 return out
-            out["test"] = f"{g['src']} holds" + (f" ({ins})" if ins else "")
+            out["test"] = g["src"] + (f" ({ins})" if ins else "")
         elif g:
             q = S._fill(g["q"], ctx)
             named, ids = acc.select(q)
@@ -393,7 +380,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             def sel(q):
                 named, ids = acc.select(q)
                 return [i for i, _ in named] if named is not None else ids
-            out["role"], why = S.role_of(em["role"], em["role_when"], ctx, track, sel)
+            out["role"], why = S.role_of(em["role"], em["role_when"], ctx, track, sel, run=lambda t: X.run(t, xenv()))
             if why:
                 out["since"] = why
         if em["at"] == "item" and ctx.get("item") in w.nodes:

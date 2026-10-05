@@ -1,12 +1,10 @@
 scene notes · for golden · world @128 · no style=; using the default (calm)
-  ~ alex is looking: 257x597 at scroll 0,0 · painted world @126 (behind) · reported 15:31:12
-  ~ rook is looking: 660x760 at scroll 0,0 · painted world @127 (behind) · reported 15:38:25
   window [window] column
     bar [titlebar] row
       name "Notes" [windowname]
       hint "drag a card · click a title to rename" [meta]
     canvas free · 8 of kind:note,in:Canvas
-      card a07 [card] column at 510,353 449x511 = offscreen-part · drag: do move a07 to=$x,$y ~ alex: out of view · key a07
+      card a07 [card] column at 510,353 449x511 = offscreen-part · drag: do move a07 to=$x,$y · key a07
         title a07 "A shared visual desk" [title] · edit: do retitle a07 title="$value"
         body a07 "Two people, one world, all of it sayable in text." (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a07 row · 0 (empty)
@@ -18,12 +16,12 @@ scene notes · for golden · world @128 · no style=; using the default (calm)
         title a11 "ROOK2 CHANGED THIS FIRST" [title] · edit: do retitle a11 title="$value"
         body a11 "The studio chooses." (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a11 row · 0 (empty)
-      card a21 [card] column at 95,563 300x160 · drag: do move a21 to=$x,$y ~ alex: out of view · key a21
+      card a21 [card] column at 95,563 300x160 · drag: do move a21 to=$x,$y · key a21
         title a21 "Proximity is evidence, not intent" [title] · edit: do retitle a21 title="$value"
         body a21 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a21 row · 1
           tag a21 "idea" [tag] · key idea
-      card a27 [card] column at 8,8 184x50 = offscreen-part · drag: do move a27 to=$x,$y ~ alex: contents overflow the box ~ rook: contents overflow the box · key a27
+      card a27 [card] column at 8,8 184x50 = offscreen-part · drag: do move a27 to=$x,$y · key a27
         title a27 "Rendering, from one scene" [title] · edit: do retitle a27 title="$value"
         body a27 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a27 row · 0 (empty)
@@ -31,11 +29,11 @@ scene notes · for golden · world @128 · no style=; using the default (calm)
         title a29 "Style tokens" [title] · edit: do retitle a29 title="$value"
         body a29 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a29 row · 0 (empty)
-      card a50 [card] column at 1000,700 300x90 = offscreen-part · drag: do move a50 to=$x,$y ~ alex: out of view ~ rook: out of view · key a50
+      card a50 [card] column at 1000,700 300x90 = offscreen-part · drag: do move a50 to=$x,$y · key a50
         title a50 "Bug triage" [title] · edit: do retitle a50 title="$value"
-        body a50 "An application authored entirely with desk commands. / No JavaScript was written for this. Drop a #bug tag on anything and it appears below. / Tag it #accept to triage it." (~clamp 3: the painter clamps wrapped lines and may show less) [body] ~ alex: cut by the clamp ~ rook: cut by the clamp
+        body a50 "An application authored entirely with desk commands. / No JavaScript was written for this. Drop a #bug tag on anything and it appears below. / Tag it #accept to triage it." (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a50 row · 0 (empty)
-      card a54 [card] column at 1330,700 300x90 = offscreen-part, spills-parent · drag: do move a54 to=$x,$y ~ alex: out of view ~ rook: out of view · key a54
+      card a54 [card] column at 1330,700 300x90 = offscreen-part, spills-parent · drag: do move a54 to=$x,$y · key a54
         title a54 "rule r4: accept triages" [title] · edit: do retitle a54 title="$value"
         body a54 "A card that is a running rule." (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a54 row · 0 (empty)

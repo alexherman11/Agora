@@ -1494,12 +1494,16 @@ class DeskKnife(DeskMoo):
             # the same tree the painter draws, printed: what is shown, where, and what each gesture would do
             import scene
             if not arg.strip():
-                raise Refusal("scene <lens name> [<part path> | ok]. A lens is a note tagged lens; help scene")
+                raise Refusal("scene <lens name> [<part path> | ok | lines]. A lens is a note tagged lens; help scene")
             try:
                 name, rest = scene.split_scene_arg(self, arg)
                 if rest == "ok":
                     import lens_ir
                     return lens_ir.check(self, scene.find_lens(self, name), ages=True)[1]
+                if rest == "lines":         # Alex, 5 Oct: the one form, a word per line; rewrite the lens with it
+                    s = scene.find_lens(self, name)
+                    style = (s.get("props") or {}).get("style")
+                    return scene.to_lines(s.get("text") or "", scene.style_roles(self, style), style)
                 sc, text = scene.scene_for(self, name, rest)
             except scene.LensRefusal as e:
                 raise Refusal(str(e))
@@ -1594,7 +1598,7 @@ class DeskKnife(DeskMoo):
         "vars": "vars",
         "set": "set <name> = <id or title>",
         "rows": "rows [<source>]",
-        "scene": "scene <lens> [<part path>|ok]",
+        "scene": "scene <lens> [<part path>|ok|lines]",
         "clock": "clock [follow|now|<YYYY-MM-DD>]",
         "worktree": "worktree [fork|diff|merge] [<name>]",
         "use": "use <verb id> [<words>]",

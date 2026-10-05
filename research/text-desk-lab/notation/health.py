@@ -211,7 +211,7 @@ def main():
         failed += [f"style mirror {b}" for b in bad]
         t0 = time.perf_counter()
         code, out = run(["suite/sessions.py", "--check"])
-        line = next((l for l in out.splitlines() if "worlds at" in l), out.strip()[-200:])
+        line = next((l for l in out.splitlines() if "compiler on the working tree" in l), out.strip()[-200:])
         print(f"session prints: {line}{took('session prints', t0)}")
         if code or " 0 differ in the golden form" not in line:
             failed.append(f"session prints: {line}")

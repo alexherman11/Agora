@@ -290,7 +290,7 @@ def parse(text):
 def looks_like(text, lets=()):
     """Does this `only when` text mean an expression rather than a selection? Expressions begin with a $name, a
     bracket, `not`, a number, a quote, none/true/false, an aggregate, or a let named above; selections begin with a
-    term like kind:note. The old `$x <op> v` form is an expression too, but its caller keeps the older path."""
+    term like kind:note. The older `$x <op> v` form is this expression (scene._one_test reads it as one)."""
     s = (text or "").strip()
     if not s:
         return False
@@ -300,6 +300,14 @@ def looks_like(text, lets=()):
     if head in ("not", "none", "true", "false") or (head in AGGREGATES and s.startswith(head + "(")):
         return True
     return head in lets and re.fullmatch(r"\w+", head) is not None
+
+
+def bare_words(text):
+    """The bare words of an expression that are not keywords: each must be a let named above, or is refused."""
+    try:
+        return [t[1] for t in tokens(text) if t[0] == "word" and t[1] not in KEYWORDS]
+    except ExprError:
+        return []
 
 
 def names_in(text):
