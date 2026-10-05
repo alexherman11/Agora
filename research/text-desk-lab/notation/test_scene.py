@@ -914,6 +914,55 @@ def test_style_check_agrees_with_the_painter():
     assert ("b", "on papr", 7,"names no token of the right kind") in bad
 
 
+def test_let_if_and_arithmetic():
+    """Alex, 5 Oct: if and arithmetic. `let` names a value from an expression; several lets of one name with `when` are
+    an if; aggregates carry their reach; a missing value is none and a guard on it cannot tell; $( ) computes in words."""
+    import deskd, lens_ir
+    refused("root : column, let x = $a +", "expected a value")
+    refused("root : column, let x = 1, let x = 2", "two answers")
+    refused("root : column, let x = 1 when $a > 1, let x = 3 otherwise, let x = 4 otherwise", "two `otherwise`")
+    refused("root : column, let title = 3", "that name is taken")
+    refused("root : column, let n = 3", "that name is taken")
+    tmp = _scratch("_test_let")
+    try:
+        with deskd.Session("_test_let", "jeff") as desk:            # the probe world: 'Probe' has beds=6, 'beds-lens' has none
+            src = chr(10).join([
+                "root : column, let total = sum($beds of kind:note), let num = count(kind:note), let avg = total / num",
+                '  head : text "$num notes, $(total) beds, $(avg) each", only when total > 3',
+                '  none : text "never", only when $nothing > 1',
+                '  old : text "old path", only when $count > 0, count kind:note',
+                "  list : column, of kind:note, each c",
+                'c : row, let size = "big" when $beds > 5, let size = "small" when $beds <= 5, let size = "unsized" otherwise, let twice = $beds * 2',
+                '  t : text "$title: $size ($(twice))"',
+                '  big : text "a big one", only when size = "big"',
+                '  both : text "x", let k = 1 when $beds > 1, let k = 2 when $beds > 2'])
+            sc = lens_ir.evaluate(desk, src)
+            d = {x["name"]: x for x in sc["derived"]}
+            assert d["total"]["result"] == "6 · 1 of 2; 1 have none" and d["total"]["expr"] == "sum($beds of kind:note)", d["total"]
+            assert d["num"]["result"] == "2" and d["avg"]["result"] == "3 · from 1 of 2", (d["num"], d["avg"])
+            head, none, old, lst = sc["kids"]
+            assert head["text"] == "2 notes, 6 (1 of 2) beds, 3 (from 1 of 2) each", head["text"]
+            assert head["test"].startswith("total > 3 holds") and head["computed"][0][0] == "total", head
+            assert none["absent"] and none["why"] == "no nothing", none
+            assert old["text"] == "old path" and old["test"] == "$count is 2 > 0", old            # the older value test is untouched
+            big, small = lst["kids"]
+            assert big["kids"][0]["text"] == "Probe: big (12)" and not big["kids"][1].get("absent"), big["kids"]
+            assert small["kids"][0]["text"] == "beds-lens: unsized (none)", small["kids"][0]
+            assert small["kids"][1]["why"] == 'size = "big" is false (size=unsized)', small["kids"][1]
+            sz = {x["name"]: x for x in small["derived"]}
+            assert sz["size"]["expr"] == '"unsized" otherwise' and sz["twice"]["result"] == "none", sz
+            both = {x["name"]: x for x in big["kids"][2]["derived"]}
+            assert both["k"]["result"] == "1" and both["k"]["overlap"] == 2, both             # an overlap is taken first and said
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "· total = 6 · 1 of 2; 1 have none (sum($beds of kind:note))" in text and "(overlap: 2 answers held; the first was taken)" in text, text
+            assert "(absent: can't tell:" not in text and '(absent: size = "big" is false (size=unsized))' in text, text
+            # a guard that cannot tell is absence with the reason, never false
+            sc2 = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds * 2 > 5']))
+            assert [k.get("why") for k in sc2["kids"]] == [None, "can't tell: no beds ($beds=none)"], [k.get("why") for k in sc2["kids"]]
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     import os
     os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from

@@ -1,0 +1,502 @@
+"""expr: arithmetic, comparisons and `if` for lenses, in the shape of a spreadsheet formula inside the declarative tree.
+
+Alex, 5 Oct 2026: "I want if and arithmetic." Built from what the residents' sketches agreed on (Pike a1397, Juniper
+a1399, the arithmetic-with-reach note a1448), keeping only what earned its place:
+
+  * values have kinds (number, text, date, time, duration, bool, none) and are never coerced: a stored string is a
+    number only when the whole of it is one ('7' is; '2,550 USD' is not, and says so);
+  * a missing value is none, printed as none, never 0 or ""; arithmetic on none is none with the reason;
+  * aggregates over a selection (count, sum, min, max) carry their reach: '41 of 43; 2 have none', and anything
+    built from a partial aggregate stays marked partial;
+  * `if` is a guarded definition: several `let name = value when <test>` lines and one `otherwise`; the first that
+    holds is taken, and an overlap is said, never silently resolved by position;
+  * every expression prints its inputs and its result, so the text printer can say what a value came from;
+  * text joins only text: "Total: " + 3 is none with the reason; write it in text as "Total: $(...)".
+
+Grammar (precedence low to high):
+    or  ::= and ('or' and)*            x or y: y when x is none (the author's fallback), else x when x is not false
+    and ::= not ('and' not)*
+    not ::= 'not' not | cmp
+    cmp ::= sum (('=' | '!=' | '<' | '>' | '<=' | '>=' | 'has' | '!has') sum)?
+    sum ::= term (('+' | '-') term)*
+    term ::= unary (('*' | '/') unary)*
+    unary ::= '-' unary | atom
+    atom ::= number | duration (3d 2h 30m 1w) | date (2026-10-05[ 14:30]) | "text" | $name | $frame.field
+           | name (a let named above) | none | true | false | '(' expr ')'
+           | count(<selection>) | sum($field of <selection>) | min(...) | max(...)
+
+The evaluator reads names through an environment the caller supplies (see `evaluate`), so the lens's own frames,
+props, lets and host facts answer, and every read is reported back for the fence and the print."""
+import datetime
+import re
+
+KINDS = ("number", "text", "date", "time", "duration", "bool", "none")
+AGGREGATES = ("count", "sum", "min", "max")
+KEYWORDS = ("and", "or", "not", "has", "none", "true", "false", "of") + AGGREGATES
+
+
+class Value:
+    __slots__ = ("kind", "v", "reach", "partial", "why")
+
+    def __init__(self, kind, v=None, reach=None, partial=False, why=None):
+        self.kind, self.v, self.reach, self.partial, self.why = kind, v, reach, partial, why
+
+    def is_none(self):
+        return self.kind == "none"
+
+    def __repr__(self):
+        return f"Value({self.kind}, {self.v!r})"
+
+
+def none(why):
+    return Value("none", None, why=why)
+
+
+class ExprError(Exception):
+    """The expression cannot be read (a parse error): said with the text, when a lens is saved."""
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# typing a stored string: the whole of it, or it stays text
+# ---------------------------------------------------------------------------------------------------------------------
+_NUM = re.compile(r"-?\d+(?:\.\d+)?")
+_DUR = re.compile(r"(\d+(?:\.\d+)?)\s*([wdhm])")
+_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?")
+_UNIT = {"w": 7 * 24 * 60, "d": 24 * 60, "h": 60, "m": 1}
+
+
+def typed(raw, name="value"):
+    """A stored string (or Python value) as a Value. '' and None are none; a whole number, date, time or duration is
+    that kind; anything else is text."""
+    if isinstance(raw, Value):
+        return raw
+    if raw is None:
+        return none(f"no {name}")
+    if isinstance(raw, bool):
+        return Value("bool", raw)
+    if isinstance(raw, (int, float)):
+        return Value("number", raw)
+    if isinstance(raw, (datetime.date, datetime.datetime)):
+        return Value("time", raw) if isinstance(raw, datetime.datetime) else Value("date", raw)
+    if isinstance(raw, datetime.timedelta):
+        return Value("duration", raw)
+    s = str(raw).strip()
+    if s == "":
+        return none(f"no {name}")
+    if _NUM.fullmatch(s):
+        return Value("number", float(s) if "." in s else int(s))
+    m = _DATE.fullmatch(s)
+    if m:
+        try:
+            d = datetime.date.fromisoformat(m.group(1))
+        except ValueError:
+            return Value("text", s)
+        if m.group(2):
+            return Value("time", datetime.datetime(d.year, d.month, d.day, int(m.group(2)), int(m.group(3)), int(m.group(4) or 0)))
+        return Value("date", d)
+    if re.fullmatch(r"(?:\d+(?:\.\d+)?\s*[wdhm]\s*)+", s):
+        minutes = sum(float(n) * _UNIT[u] for n, u in _DUR.findall(s))
+        return Value("duration", datetime.timedelta(minutes=minutes))
+    if s in ("true", "false"):
+        return Value("bool", s == "true")
+    return Value("text", s)
+
+
+def fmt(val, reach=True):
+    """How a value prints: none as none, numbers without a trailing .0, dates as ISO, durations in the largest unit
+    that divides them; with its reach after a dot when it has one."""
+    if val.kind == "none":
+        s = "none"
+    elif val.kind == "bool":
+        s = "true" if val.v else "false"
+    elif val.kind == "number":
+        s = str(int(val.v)) if float(val.v).is_integer() else f"{val.v:.4g}" if abs(val.v) < 1e6 else str(val.v)
+    elif val.kind == "date":
+        s = val.v.isoformat()
+    elif val.kind == "time":
+        s = val.v.strftime("%Y-%m-%d %H:%M")
+    elif val.kind == "duration":
+        mins = val.v.total_seconds() / 60
+        neg = mins < 0
+        mins = abs(mins)
+        for u in ("w", "d", "h"):
+            if mins and mins % _UNIT[u] == 0:
+                s = f"{int(mins // _UNIT[u])}{u}"
+                break
+        else:
+            s = f"{int(mins)}m" if float(mins).is_integer() else f"{mins:.4g}m"
+        if neg:
+            s = "-" + s
+    else:
+        s = str(val.v)
+    return f"{s} · {val.reach}" if (reach and val.reach) else s
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# tokens
+# ---------------------------------------------------------------------------------------------------------------------
+_TOKEN = re.compile(r"""
+    (?P<ws>\s+)
+  | (?P<date>\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)
+  | (?P<dur>\d+(?:\.\d+)?[wdhm]\b)
+  | (?P<num>\d+(?:\.\d+)?)
+  | (?P<str>"[^"]*")
+  | (?P<name>\$\w+(?:\.\w+)?)
+  | (?P<at>@[\w$.-]+)
+  | (?P<word>[A-Za-z_]\w*)
+  | (?P<op><=|>=|!=|!has\b|=|<|>|\+|-|\*|/|\(|\))
+""", re.X)
+
+
+def tokens(text):
+    out, i = [], 0
+    while i < len(text):
+        m = _TOKEN.match(text, i)
+        if not m:
+            raise ExprError(f"cannot read {text[i:i + 12]!r} in {text!r}")
+        kind = m.lastgroup
+        tok = m.group(kind)
+        i = m.end()
+        if kind == "ws":
+            continue
+        if kind == "word" and tok in AGGREGATES and text.startswith("(", i):
+            close = text.find(")", i)
+            if close < 0:
+                raise ExprError(f"{tok}( has no closing ) in {text!r}")
+            out.append(("agg", tok, text[i + 1:close].strip()))
+            i = close + 1
+            continue
+        out.append((kind, tok))
+    return out
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# parse -> a small tree of tuples
+# ---------------------------------------------------------------------------------------------------------------------
+def parse(text):
+    toks = tokens(text)
+    pos = [0]
+
+    def peek():
+        return toks[pos[0]] if pos[0] < len(toks) else None
+
+    def take(*want):
+        t = peek()
+        if t and (t[0] in want or (t[0] in ("op", "word") and t[1] in want)):
+            pos[0] += 1
+            return t
+        return None
+
+    def expect(what):
+        t = take(what)
+        if not t:
+            raise ExprError(f"expected {what!r} at {' '.join(x[1] for x in toks[pos[0]:pos[0] + 3]) or 'the end'} in {text!r}")
+        return t
+
+    def p_or():
+        n = p_and()
+        while take("or"):
+            n = ("or", n, p_and())
+        return n
+
+    def p_and():
+        n = p_not()
+        while take("and"):
+            n = ("and", n, p_not())
+        return n
+
+    def p_not():
+        if take("not"):
+            return ("not", p_not())
+        return p_cmp()
+
+    def p_cmp():
+        n = p_sum()
+        t = peek()
+        if t and ((t[0] == "op" and t[1] in ("=", "!=", "<", ">", "<=", ">=", "!has")) or (t[0] == "word" and t[1] == "has")):
+            pos[0] += 1
+            return ("cmp", t[1], n, p_sum())
+        return n
+
+    def p_sum():
+        n = p_term()
+        while True:
+            t = peek()
+            if t and t[0] == "op" and t[1] in ("+", "-"):
+                pos[0] += 1
+                n = ("bin", t[1], n, p_term())
+            else:
+                return n
+
+    def p_term():
+        n = p_unary()
+        while True:
+            t = peek()
+            if t and t[0] == "op" and t[1] in ("*", "/"):
+                pos[0] += 1
+                n = ("bin", t[1], n, p_unary())
+            else:
+                return n
+
+    def p_unary():
+        if take("-"):
+            return ("neg", p_unary())
+        return p_atom()
+
+    def p_atom():
+        t = peek()
+        if t is None:
+            raise ExprError(f"expected a value at the end of {text!r}")
+        pos[0] += 1
+        kind = t[0]
+        if kind == "num":
+            return ("lit", typed(t[1]))
+        if kind == "dur" or kind == "date":
+            return ("lit", typed(t[1]))
+        if kind == "str":
+            return ("lit", Value("text", t[1][1:-1]))
+        if kind == "name":
+            return ("name", t[1])
+        if kind == "at":
+            return ("at", t[1])         # @pike, @$me: a bare word on the right of has, as the old value test allowed
+        if kind == "agg":
+            name, inner = t[1], t[2]
+            if name == "count":
+                return ("count", inner)
+            m = re.fullmatch(r"\$(\w+)\s+of\s+(.+)", inner)
+            if not m:
+                raise ExprError(f"{name}(...) takes `$field of <selection>`; got {inner!r}")
+            return ("agg", name, m.group(1), m.group(2).strip())
+        if kind == "word":
+            if t[1] == "none":
+                return ("lit", none("none, as written"))
+            if t[1] in ("true", "false"):
+                return ("lit", Value("bool", t[1] == "true"))
+            if t[1] in KEYWORDS:
+                raise ExprError(f"{t[1]!r} is not a value in {text!r}")
+            return ("name", t[1])           # a let named above
+        if kind == "op" and t[1] == "(":
+            n = p_or()
+            expect(")")
+            return n
+        raise ExprError(f"unexpected {t[1]!r} in {text!r}")
+
+    tree = p_or()
+    if peek() is not None:
+        raise ExprError(f"unexpected {peek()[1]!r} after the expression in {text!r}")
+    return tree
+
+
+def looks_like(text, lets=()):
+    """Does this `only when` text mean an expression rather than a selection? Expressions begin with a $name, a
+    bracket, `not`, a number, a quote, none/true/false, an aggregate, or a let named above; selections begin with a
+    term like kind:note. The old `$x <op> v` form is an expression too, but its caller keeps the older path."""
+    s = (text or "").strip()
+    if not s:
+        return False
+    head = re.split(r"[\s(]", s, 1)[0]
+    if s[0] in "$(-\"" or s[0].isdigit():
+        return True
+    if head in ("not", "none", "true", "false") or (head in AGGREGATES and s.startswith(head + "(")):
+        return True
+    return head in lets and re.fullmatch(r"\w+", head) is not None
+
+
+def names_in(text):
+    """Every $name and $frame.field an expression reads, plus bare let names: for resolve and deps."""
+    out = []
+    try:
+        for t in tokens(text):
+            if t[0] == "name":
+                out.append(t[1])
+            elif t[0] == "word" and t[1] not in KEYWORDS:
+                out.append("$" + t[1])
+            elif t[0] == "agg":
+                out += re.findall(r"\$\w+(?:\.\w+)?", t[2]) if t[1] == "count" else re.findall(r"\$\w+(?:\.\w+)?", t[2].split(" of ", 1)[-1])
+    except ExprError:
+        pass
+    return out
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# evaluate
+# ---------------------------------------------------------------------------------------------------------------------
+_COMPARABLE = {"number", "date", "time", "duration", "text"}
+
+
+def _cmp(op, a, b):
+    if op in ("has", "!has"):
+        hit = fmt(b, reach=False).lower() in fmt(a, reach=False).lower()
+        return Value("bool", hit if op == "has" else not hit)
+    if a.kind != b.kind:
+        if "number" in (a.kind, b.kind) and "text" in (a.kind, b.kind):
+            t = a if a.kind == "text" else b
+            return none(f"{fmt(t)!r} is not a number")
+        return none(f"cannot compare {a.kind} with {b.kind}")
+    if a.kind not in _COMPARABLE and op not in ("=", "!="):
+        return none(f"cannot order {a.kind}s")
+    x, y = a.v, b.v
+    return Value("bool", {"=": x == y, "!=": x != y, "<": x < y, ">": x > y, "<=": x <= y, ">=": x >= y}[op])
+
+
+def _arith(op, a, b):
+    ka, kb = a.kind, b.kind
+    try:
+        if op == "+":
+            if ka == kb == "number" or ka == kb == "duration":
+                return Value(ka, a.v + b.v)
+            if ka in ("date", "time") and kb == "duration":
+                return Value(ka, a.v + b.v)
+            if ka == "duration" and kb in ("date", "time"):
+                return Value(kb, b.v + a.v)
+            if "text" in (ka, kb):
+                return none("text joins only text; write it in text as \"... $(...)\"")
+        elif op == "-":
+            if ka == kb == "number" or ka == kb == "duration":
+                return Value(ka, a.v - b.v)
+            if ka == kb and ka in ("date", "time"):
+                d = a.v - b.v
+                return Value("duration", d if isinstance(d, datetime.timedelta) else datetime.timedelta(days=d))
+            if ka in ("date", "time") and kb == "duration":
+                return Value(ka, a.v - b.v)
+        elif op == "*":
+            if ka == kb == "number":
+                return Value("number", a.v * b.v)
+            if ka == "duration" and kb == "number":
+                return Value("duration", a.v * b.v)
+            if ka == "number" and kb == "duration":
+                return Value("duration", b.v * a.v)
+        elif op == "/":
+            if kb == "number" and b.v == 0:
+                return none("divided by zero")
+            if ka == kb == "number":
+                return Value("number", a.v / b.v)
+            if ka == "duration" and kb == "number":
+                return Value("duration", a.v / b.v)
+            if ka == kb == "duration":
+                return none("a duration divided by a duration has no unit here") if b.v.total_seconds() == 0 else Value("number", a.v.total_seconds() / b.v.total_seconds())
+    except (TypeError, OverflowError) as e:
+        return none(str(e))
+    return none(f"{ka} {op} {kb} has no meaning")
+
+
+def _carry(res, *ins):
+    """Reach travels: a value built from a partial aggregate says so (a1448, Pike c1475)."""
+    part = [v for v in ins if v.partial]
+    if part and not res.is_none():
+        res.partial = True
+        res.reach = res.reach or ("from " + part[0].reach.split(";")[0].strip())
+    return res
+
+
+def evaluate(tree, env):
+    """env: get(name) -> raw or Value or None (a $name, $frame.field or let); select(q) -> ids; field(id, f) -> raw;
+    reads: a list the evaluator appends (name, printed value) to. -> Value."""
+    def ev(n):
+        k = n[0]
+        if k == "lit":
+            return n[1]
+        if k == "at":
+            def sub(m):
+                raw = env["get"](m.group(0))
+                return "" if raw is None else str(raw)
+            return Value("text", re.sub(r"\$\w+(?:\.\w+)?", sub, n[1]))
+        if k == "name":
+            raw = env["get"](n[1])
+            v = typed(raw, n[1].lstrip("$"))
+            env["reads"].append((n[1] if n[1].startswith("$") else n[1], fmt(v)))
+            return v
+        if k == "neg":
+            v = ev(n[1])
+            if v.kind == "number":
+                return Value("number", -v.v, v.reach, v.partial)
+            if v.kind == "duration":
+                return Value("duration", -v.v, v.reach, v.partial)
+            return v if v.is_none() else none(f"cannot negate {v.kind}")
+        if k == "not":
+            v = ev(n[1])
+            return Value("bool", not v.v) if v.kind == "bool" else (v if v.is_none() else none(f"not needs a test, not {v.kind}"))
+        if k == "and":
+            a = ev(n[1])
+            if a.is_none():
+                return a
+            if a.kind != "bool":
+                return none(f"and needs tests, not {a.kind}")
+            if not a.v:
+                return Value("bool", False)
+            b = ev(n[2])
+            return b if b.is_none() else (Value("bool", bool(b.v)) if b.kind == "bool" else none(f"and needs tests, not {b.kind}"))
+        if k == "or":
+            a = ev(n[1])
+            if a.is_none() or (a.kind == "bool" and not a.v):
+                return ev(n[2])
+            return a
+        if k == "cmp":
+            a, b = ev(n[2]), ev(n[3])
+            if a.is_none():
+                return a
+            if b.is_none():
+                return b
+            return _carry(_cmp(n[1], a, b), a, b)
+        if k == "bin":
+            a, b = ev(n[2]), ev(n[3])
+            if a.is_none():
+                return a
+            if b.is_none():
+                return b
+            return _carry(_arith(n[1], a, b), a, b)
+        if k == "count":
+            ids = env["select"](n[1])
+            return Value("number", len(ids))
+        if k == "agg":
+            _, name, field, q = n
+            ids = env["select"](q)
+            vals = [typed(env["field"](i, field), field) for i in ids]
+            have = [v for v in vals if not v.is_none()]
+            if not ids:
+                return none(f"nothing matches {q}")
+            if not have:
+                return none(f"0 of {len(ids)} have {field}")
+            kinds = {v.kind for v in have}
+            if len(kinds) > 1 or (name == "sum" and not kinds <= {"number", "duration"}):
+                return none(f"{field} is not all one kind: " + ", ".join(sorted(kinds)))
+            kind = have[0].kind
+            if name == "sum":
+                total = sum((v.v for v in have), datetime.timedelta() if kind == "duration" else 0)
+                res = Value(kind, total)
+            elif kind not in _COMPARABLE:
+                return none(f"cannot order {kind}s")
+            else:
+                res = Value(kind, (min if name == "min" else max)(v.v for v in have))
+            if len(have) < len(ids):
+                res.reach = f"{len(have)} of {len(ids)}; {len(ids) - len(have)} have none"
+                res.partial = True
+            else:
+                res.reach = f"{len(ids)} of {len(ids)}"
+            return res
+        raise ExprError(f"bad tree {k}")
+    return ev(tree)
+
+
+def run(text, env):
+    """Parse and evaluate `text`. -> (Value, inputs string). A parse error becomes none with the reason."""
+    env.setdefault("reads", [])
+    try:
+        v = evaluate(parse(text), env)
+    except ExprError as e:
+        v = none(str(e))
+    seen, inputs = set(), []
+    for name, shown in env["reads"]:
+        if name not in seen:
+            seen.add(name)
+            inputs.append(f"{name}={shown}")
+    return v, ", ".join(inputs)
+
+
+def holds(val):
+    """A guard's verdict: True, False, or None when it cannot tell (a1397: a guard on a missing value makes no claim)."""
+    if val.is_none():
+        return None
+    if val.kind == "bool":
+        return bool(val.v)
+    return True

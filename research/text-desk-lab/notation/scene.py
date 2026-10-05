@@ -44,7 +44,18 @@ An unindented name defines a part; the first one is the root.
                                  (a prop) and the scene prints `read name s31 start=...`. On a repeat, each instance
     derive <name> = <interpretation> <inputs>   a named calculation from a closed list (day-n <date> <n>,
                                  days-from <start> <end> (rows with $it.n $it.date, for over $name), weekday <date>,
-                                 week-of <date>); it prints its inputs and result; no + and no if
+                                 week-of <date>); it prints its inputs and result
+    let <name> = <expr>          a named value (Alex, 5 Oct: if and arithmetic). An expression has + - * / and ( ),
+      [when <expr> | otherwise]  comparisons (= != < > <= >= has !has), and, or, not; numbers, "text", dates
+                                 (2026-10-05), durations (3d 2h), $names, $frame.field, a let named above; and
+                                 count(<selection>), sum($field of <selection>), min(...), max(...), which carry
+                                 their reach ('41 of 43; 2 have none'). Kinds are never coerced: '7' is a number,
+                                 '2,550 USD' is text and says so. A missing value is none, printed none, never 0.
+                                 Several lets of one name with `when` are an if: the first that holds is taken, an
+                                 overlap is said, and `otherwise` holds when none of the others do. The scene
+                                 prints every let with its expression, inputs and result
+    only when <expr>             the part exists only when the expression holds; none (can't tell) is absence
+    text "... $(<expr>) ..."     an expression computed inside words; the scene prints each one with its inputs
     capture <field>=<value>      use this value instead of following the frame's; prints (now X: differs) when the
                                  world has moved on. Following is the default and is never written down
     carry                        this part's thing can be picked up (pointer or keys) and put down on a part that says `on drop`
@@ -64,6 +75,7 @@ the pressure that builds against that wall is the research result.
 import pathlib
 import re
 from desk import split_batch
+import expr as X
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
@@ -965,6 +977,37 @@ def _w_capture(node, p, val, n, env):
     node["capture"][m.group(1)] = m.group(2)
 
 
+def _w_let(node, p, val, n, env):
+    """`let <name> = <expr> [when <expr> | otherwise]` (Alex, 5 Oct: if and arithmetic; Pike a1397, Juniper a1399).
+    Several lets of one name, each with `when`, are an if; one may say `otherwise`; two unguarded answers are refused."""
+    m = re.fullmatch(r"(\w+)\s*=\s*(.+)", val.strip())
+    if not m:
+        raise LensRefusal(f"line {n}: `let <name> = <expr> [when <expr> | otherwise]`; got {p!r}")
+    lname, rest = m.group(1), m.group(2).strip()
+    if lname in NAMES or lname in X.KEYWORDS or any(lname == d[0] for d in node["derive"]):
+        raise LensRefusal(f"line {n}: let {lname}: that name is taken")
+    cond = None
+    if rest.endswith(" otherwise"):
+        rest, cond = rest[:-len(" otherwise")].strip(), "otherwise"
+    elif " when " in rest:
+        rest, _, cond = rest.rpartition(" when ")
+        rest, cond = rest.strip(), cond.strip()
+    for text in (rest, cond if cond and cond != "otherwise" else None):
+        if text:
+            try:
+                X.parse(text)
+            except X.ExprError as e:
+                raise LensRefusal(f"line {n}: let {lname}: {e}")
+    others = [c for l, _, c in node["let"] if l == lname]
+    if cond is None and others:
+        raise LensRefusal(f"line {n}: let {lname} has two answers on this part; give each a `when`, or one `otherwise`")
+    if others and None in others:
+        raise LensRefusal(f"line {n}: let {lname} already has an unguarded answer on this part; give it a `when`")
+    if cond == "otherwise" and "otherwise" in others:
+        raise LensRefusal(f"line {n}: let {lname} has two `otherwise` answers")
+    node["let"].append((lname, rest, cond))
+
+
 def _w_only(node, p, val, n, env):
     if not (val.startswith("when ") and val[5:].strip()):
         raise LensRefusal(f"line {n}: `only when <selection>` or `only when $x <op> <value>`; got {p!r}")
@@ -1024,8 +1067,9 @@ WORDS = {
     "as": ("as <frame>", _w_as),
     "each": ("each <part>", _w_each),
     "at": ("at item", _w_at),
-    "only": ("only when <selection | $x <op> value>", _w_only),
+    "only": ("only when <selection | $x <op> value | expr>", _w_only),
     "derive": ("derive <name> = <interpretation> <inputs>", _w_derive),
+    "let": ("let <name> = <expr> [when <expr> | otherwise]", _w_let),
     "capture": ("capture <field>=<value>", _w_capture),
     "spread": ("spread x|y <start> step <n | $prop> to <max>", _w_spread),
     "lens": ("lens <name>", _w_lens),
@@ -1055,7 +1099,8 @@ def _check_part(node, n):
     if node["capture"] and not node["the"]:
         raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
     import knife      # a3359: a selection that names due as a prop is refused here, when the lens is saved, not at a look
-    for sel in [node["of"], node["the"], node["only"], node["count"]] + [c for _, c in node["role_when"]]:
+    only = None if X.looks_like(node["only"]) else node["only"]
+    for sel in [node["of"], node["the"], only, node["count"]] + [c for _, c in node["role_when"]]:
         said = knife.misnamed(sel)
         if said:
             raise LensRefusal(f"line {n}: {said}")
@@ -1075,7 +1120,7 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {n}: a part is `name : prop, prop`; got {line.strip()!r}")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "capture": {}, "src": line.strip(), "carry": False, "by": None,
+                "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": line.strip(), "carry": False, "by": None,
                 "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
@@ -1154,6 +1199,9 @@ def _refs_of(node):
     srcs = [("text", node["text"] or ""), ("only", node["only"] or ""), ("of", node["of"] or ""), ("the", node["the"] or ""),
             ("lens", node["lens"] or ""), ("count", node["count"] or "")]
     srcs += [("derive", x) for _, _, ins in node["derive"] for x in ins]
+    srcs += [("let", e) for _, e, _c in node["let"]] + [("let", c) for _, _e, c in node["let"] if c and c != "otherwise"]
+    if node["only"] and X.looks_like(node["only"]):
+        srcs.append(("only", node["only"]))
     srcs += [("on", a["line"]) for a in node["on"]]
     srcs += [("role", c) for _, c in node["role_when"]]          # a1105: a role's test reads names like `only when`
     for word, text in srcs:
@@ -1175,6 +1223,8 @@ def resolve(root, parts):
             frames.add("it")
         for dname, _i, _ins in node["derive"]:
             lets.add(dname)
+        for lname, _e, _c in node["let"]:
+            lets.add(lname)
         scopes[id(node)] = {"frames": frames, "lets": lets}
         for word, a, b in _refs_of(node):
             if b:
@@ -1351,8 +1401,37 @@ def _fill(tpl, ctx, track=None):
     return _VAR.sub(rep, tpl)
 
 
+def _fill_text(tpl, ctx, track, run):
+    """Words with `$( <expr> )` inside: each expression is computed by `run(text) -> (Value, inputs)` and printed in its
+    place, with its reach; then the plain $names are filled. -> (text, [(expr, printed, inputs)])."""
+    out, computed, i = "", [], 0
+    while True:
+        j = tpl.find("$(", i)
+        if j < 0:
+            out += tpl[i:]
+            break
+        depth, k = 0, j + 1
+        while k < len(tpl):
+            depth += (tpl[k] == "(") - (tpl[k] == ")")
+            if depth == 0:
+                break
+            k += 1
+        if k >= len(tpl):
+            out += tpl[i:]
+            break
+        inner = tpl[j + 2:k].strip()
+        val, inputs = run(inner)
+        shown = X.fmt(val)
+        computed.append((inner, shown, inputs))
+        # in the words themselves: the bare value, with a short reach only when it is partial ('6 (1 of 2)'); the scene
+        # print beside the part says the whole reach (a1448: reach is part of the value, and the eye must see partiality)
+        out += tpl[i:j] + X.fmt(val, reach=False) + (f" ({val.reach.split(';')[0]})" if val.partial and val.reach else "")
+        i = k + 1
+    return _fill(out, ctx, track), computed
+
+
 def _binds(node):
-    return bool(node["the"] or node["of"] or node["over"] or node["as"] or node["derive"] or node["capture"] or node["only"] or node["each"])
+    return bool(node["the"] or node["of"] or node["over"] or node["as"] or node["derive"] or node.get("let") or node["capture"] or node["only"] or node["each"])
 
 
 def _chain_hash(chain):
@@ -1895,7 +1974,13 @@ def to_text(scene, name, who, at, roots=None, part=None):
         for c in n.get("captured") or []:
             bits.append(f"· captured {c['field']}={c['value']} (now {c['now']}: {'same' if c['same'] else 'differs'})")
         for dv in n.get("derived") or []:
-            bits.append(f"· {dv['name']} = {dv['interp']}({', '.join(dv['inputs'])}) = {dv['result']}" if not dv["error"] else f"· {dv['name']}: (uninterpretable: {dv['error']})")
+            if dv.get("interp") == "let":
+                bits.append(f"· {dv['name']} = {dv['result']} ({dv['expr']}" + (f"; {dv['inputs_s']}" if dv.get("inputs_s") else "") + ")"
+                            + (f" (overlap: {dv['overlap']} answers held; the first was taken)" if dv.get("overlap") else ""))
+            else:
+                bits.append(f"· {dv['name']} = {dv['interp']}({', '.join(dv['inputs'])}) = {dv['result']}" if not dv["error"] else f"· {dv['name']}: (uninterpretable: {dv['error']})")
+        for ex, shown, inputs in n.get("computed") or []:
+            bits.append(f"· $({ex}) = {shown}" + (f" ({inputs})" if inputs else ""))
         if n.get("read"):
             bits.append("· read " + " ".join(f"{k}={rv(v)}" for k, v in n["read"].items()))
         if n.get("freads"):
@@ -2007,7 +2092,7 @@ def _compile(desk, s, stack, count, closure):
 # drawn, never compared. Provenance (the, derived, test, read, freads, frames, captured, members, states, missing, of,
 # cut) stays on the node for the printer and need not travel to the painter.
 # ---------------------------------------------------------------------------------------------------------------------
-PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views", "counted", "size")
+PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views", "counted", "size", "computed")
 
 
 def emit(node):

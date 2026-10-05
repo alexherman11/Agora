@@ -11,6 +11,7 @@ import re
 
 import moo
 import scene as S
+import expr as X
 from desk import aspects_of, aspects_meet, event_aspects
 
 ABSENT = None          # printed (no x); a third value, distinct from "" and from false
@@ -152,10 +153,11 @@ def lower(root, parts):
         if node["only"]:
             m = S._VALUE_TEST.fullmatch(node["only"].strip())
             guard = {"kind": "value", "ref": m.group(1), "op": m.group(2), "rhs": m.group(3).strip('"'), "src": node["only"]} if m \
-                else {"kind": "selection", "q": node["only"], "src": node["only"]}
+                else {"kind": "auto", "q": node["only"], "src": node["only"]}      # a selection, or an expression (expr.looks_like) judged at evaluation, when the lets in scope are known
         ir = {"part": node["name"], "line": node["line"], "src": node["src"], "ast": node,
               "bind": bind,
-              "lets": [{"name": d, "interp": i, "inputs": ins} for d, i, ins in node["derive"]],
+              "lets": [{"name": d, "interp": i, "inputs": ins} for d, i, ins in node["derive"]]
+                      + [{"name": l, "expr": e, "when": c} for l, e, c in node.get("let", [])],
               "guard": guard,
               "emit": {"layout": node["layout"], "role": node["role"], "role_when": list(node["role_when"]), "text": node["text"], "clamp": node["clamp"],
                        "at": node["at"], "spread": node.get("spread"), "props": node["props"],
@@ -165,7 +167,8 @@ def lower(root, parts):
               "kids": [one(k) for k in node["kids"]],
               "deps": {"emit": _deps(node["text"]), "guard": _deps(node["only"]), "role": _deps(*[c for _, c in node["role_when"]]),
                        "acts": [_deps(a["line"]) for a in node["on"]],
-                       "lets": [_deps(*[x for x in ins if x.startswith("$")]) for _, _, ins in node["derive"]]}}
+                       "lets": [_deps(*[x for x in ins if x.startswith("$")]) for _, _, ins in node["derive"]]
+                               + [_deps(e, c if c and c != "otherwise" else "") for _, e, c in node.get("let", [])]}}
         return ir
     return {name: one(node) for name, node in parts.items()}, root
 
@@ -292,7 +295,33 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             ctx["count"] = len(rs) if rs is not None else len(ids)
             out["counted"] = (q, ctx["count"])
         # --- lets
+        def xenv():
+            """The expression evaluator's door to this part: $names and lets from the frame, selections through the
+            accessor (a membership read on the gesture's chain), a member's field through the accessor's thing read."""
+            vals = ctx.get("_values") or {}
+            def get(name):
+                bare = name[1:] if name.startswith("$") else name
+                if "." not in bare and bare in vals:
+                    return vals[bare]
+                if not name.startswith("$"):
+                    return ctx.get(name)
+                v = S._fill(name, dict(ctx.get("_props") or {}, **ctx), track)
+                return None if v in (name, "") else v
+            def select(q):
+                q = S._fill(q, ctx, track)
+                named, ids = acc.select(q)
+                ids = [i for i, _ in named] if named is not None else ids
+                cb.append(["select", q, list(ids)])
+                return ids
+            def field(i, f):
+                tc = acc.thing(i)
+                return tc.get(f) if (f in tc and not f.startswith("_")) else (tc.get("_props") or {}).get(f)
+            return {"get": get, "select": select, "field": field, "reads": []}
+        groups = {}
         for let in node["lets"]:
+            if "expr" in let:
+                groups.setdefault(let["name"], []).append(let)
+                continue
             dctx = dict(ctx.get("_props") or {})
             dctx.update(ctx)
             vals = [S._fill(x, dctx, track) if x.startswith("$") else x for x in let["inputs"]]
@@ -303,6 +332,29 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 ctx["_" + let["name"]] = res
             else:
                 ctx[let["name"]] = res or ""
+        for lname, defs in groups.items():      # an if: the first `when` that holds, else `otherwise`; an overlap is said
+            held, otherwise = [], None
+            for d in defs:
+                if d["when"] == "otherwise":
+                    otherwise = d
+                elif d["when"] is None:
+                    held.append((d, ""))
+                else:
+                    cv, cins = X.run(d["when"], xenv())
+                    if X.holds(cv):
+                        held.append((d, cins))
+            chosen, cins = held[0] if held else ((otherwise, "") if otherwise else (None, ""))
+            if chosen is None:
+                val, ins, said = X.none(f"no answer for {lname} holds here"), "", "; ".join(d["expr"] + " when " + str(d["when"]) for d in defs)
+            else:
+                val, ins = X.run(chosen["expr"], xenv())
+                said = chosen["expr"] + (f" when {chosen['when']}" if chosen["when"] and chosen["when"] != "otherwise" else " otherwise" if chosen["when"] else "")
+            ins = "; ".join(x for x in (cins, ins) if x)
+            out.setdefault("derived", []).append({"name": lname, "interp": "let", "inputs": [], "result": X.fmt(val), "error": None,
+                                                  "expr": said, "inputs_s": ins, "overlap": len(held) if len(held) > 1 else 0})
+            ctx["_values"] = dict(ctx.get("_values") or {}, **{lname: val})
+            ctx["_lets"] = set(ctx.get("_lets") or ()) | {lname}
+            ctx[lname] = X.fmt(val, reach=False)          # $name in words and selections prints it; none prints none
         # --- guard: one rule, judged against the part's own frame after its bind and lets (sable-8 section 2)
         g = node["guard"]
         if g and g["kind"] == "value":
@@ -316,6 +368,16 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                            why=(f"no {gone[0].lstrip('$')}" if gone else f"{g['ref']} is {left}, not {g['op']} {right}"))
                 return out
             out["test"] = f"{g['ref']} is {left} {g['op']} {right}"
+        elif g and g["kind"] == "auto" and X.looks_like(g["src"], ctx.get("_lets") or ()):
+            val, ins = X.run(g["src"], xenv())
+            h = X.holds(val)
+            if h is None:
+                out.update(text=None, acts=[], kids=[], absent=g["src"], why=f"can't tell: {val.why}" + (f" ({ins})" if ins else ""))
+                return out
+            if not h:
+                out.update(text=None, acts=[], kids=[], absent=g["src"], why=f"{g['src']} is false" + (f" ({ins})" if ins else ""))
+                return out
+            out["test"] = f"{g['src']} holds" + (f" ({ins})" if ins else "")
         elif g:
             q = S._fill(g["q"], ctx)
             named, ids = acc.select(q)
@@ -344,7 +406,12 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             fill_ctx = {p: "" for p in missing}
             fill_ctx.update(pv)
             fill_ctx.update({k: v for k, v in ctx.items() if k not in ("n", "count")} if (b and b["kind"] == "many") else ctx)
-            out["text"] = S._fill(em["text"], fill_ctx, track)
+            if "$(" in em["text"]:
+                out["text"], computed = S._fill_text(em["text"], fill_ctx, track, lambda e: X.run(e, xenv()))
+                if computed:
+                    out["computed"] = computed
+            else:
+                out["text"] = S._fill(em["text"], fill_ctx, track)
             if em["props"]:
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:
