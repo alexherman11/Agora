@@ -1154,7 +1154,8 @@ class DeskKnife(DeskMoo):
                 sid = (w.nodes.get(i) or {}).get("subject") or (i if i in w.subjects else None)
                 if sid and sid not in touched:
                     touched.append(sid)
-        lenses = [s for s in w.subjects.values() if "lens" in (s.get("tags") or []) and w.appearances_of(s["id"])]
+        import kinds
+        lenses = [s for s in w.subjects.values() if kinds.is_lens(s) and w.appearances_of(s["id"])]
         checked = set()
         for sid in touched:
             s = w.subjects[sid]
@@ -1192,7 +1193,7 @@ class DeskKnife(DeskMoo):
                          + ("all compile" if not bad else f"now refusing: {len(bad)}")) if using \
                     else "\n  no placed lens says style=" + s["title"]
                 self._note(said + "".join(f"\n  ! {b}" for b in bad))
-            if "lens" in tags and sid not in checked and w.appearances_of(sid):
+            if (("lens" in tags) or w.subjects[sid].get("kind") == "lens") and sid not in checked and w.appearances_of(sid):
                 checked.add(sid)
                 ok, line = lens_ir.check(self, s)
                 self._note(("~ " if ok else "~ ! ") + line)

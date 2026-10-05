@@ -85,7 +85,7 @@ python screen.py frontier --as me facts porch/main 2 shot   # the painter in hea
 
 | Concept | In code (`world.py`) |
 |---|---|
-| **Subject** `s..` | Content: `id kind title text tags due comments props rev`. `create kind=` takes a closed list: note, task, chat, image, doc, trial, surface, view. The last two make surfaces, not subjects. Any other `k=v` at create becomes a prop (not on surfaces). Props are strings. |
+| **Subject** `s..` | Content: `id kind title text tags due comments props rev`. `create kind=` takes note, task, chat, image, doc, trial, surface, view (the last two make surfaces, not subjects), or a kind made in this world (5 Oct): a note tagged `kind` in the Handbook's Kinds binder, titled with the kind's name, whose `is=` says what it builds on. `rekind` moves a thing between kinds of one shape; `kinds.py` and help kinds say the rest. Any other `k=v` at create becomes a prop (not on surfaces). Props are strings. |
 | **Appearance** `a..` | One placement of a subject: `parent x y w h z folded rev`, and optional `props` (`prop … at=appearance`). With `DESK_GEOMETRY=choices`, also `order` and `share`. A subject may appear in several places. |
 | **Surface** `f..` | A container with layout `free`, `column` or `row`, and props. A **view** is a surface with `layout: view`, a `query` and optional `cols by desc`, re-evaluated at every look. Surface prop `extent=WxH` bounds `spills-parent` on a free surface. |
 | **Link** `l..` | A typed edge between subjects: `blocks`, `refers` (the default), `answers`, `part-of`. Self-links, duplicates and links to surfaces are refused. |
@@ -942,4 +942,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e6113. Edit it there; a direct edit here makes the next export stop and warn. sha1:9ec91135c142 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e6126. Edit it there; a direct edit here makes the next export stop and warn. sha1:60b545d77346 -->

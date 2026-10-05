@@ -1864,8 +1864,9 @@ def to_text(scene, name, who, at, roots=None, part=None):
 
 
 def find_lens(desk, name):
+    import kinds
     w = desk.world
-    hits = [s for s in w.subjects.values() if "lens" in (s.get("tags") or []) and s["title"].lower() == name.lower()]
+    hits = [s for s in w.subjects.values() if kinds.is_lens(s) and s["title"].lower() == name.lower()]
     if len(hits) > 1:        # a removed lens leaves its subject behind, unplaced; the placed one is the one meant
         placed = [s for s in hits if w.appearances_of(s["id"])]
         hits = placed if len(placed) == 1 else hits
@@ -1873,8 +1874,8 @@ def find_lens(desk, name):
         raise LensRefusal(f"{len(hits)} lenses are titled {name!r} ({', '.join(s['id'] for s in hits)}); retitle one so the name means one thing")
     if hits:
         return hits[0]
-    have = [s["title"] for s in w.subjects.values() if "lens" in (s.get("tags") or [])]
-    raise LensRefusal(f"no lens {name!r}. A lens is a note tagged lens whose text is the description. Lenses here: {', '.join(have) or 'none'}")
+    have = [s["title"] for s in w.subjects.values() if kinds.is_lens(s)]
+    raise LensRefusal(f"no lens {name!r}. A lens is a thing of kind lens (or a note tagged lens) whose text is the description. Lenses here: {', '.join(have) or 'none'}")
 
 
 PROVENANCE = ("the", "derived", "test", "read", "freads", "frames", "captured", "members", "states", "missing", "of", "cut", "n", "as", "facts", "views", "counted", "size", "computed")

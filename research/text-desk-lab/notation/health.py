@@ -34,7 +34,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 ROOM_TESTS = ("test_room_verbs.py", "test_room_look.py", "test_room_reads.py", "test_blanks.py", "test_prop_fields.py",
-              "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_persons_stored.py", "test_lines.py",
+              "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_persons_stored.py", "test_lines.py", "test_kinds.py",
               "test_help_notes.py", "test_promises.py", "test_lived.py", "test_rules.py", "test_lanes.py", "test_bound_words.py", "test_rule_bound.py", "test_calls.py", "test_sayings.py", "test_due_any.py")
 HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
 
@@ -114,7 +114,8 @@ def check_lenses(world):
     import scene
     desk = export_docs.load(world)
     w = desk.world
-    lenses = {s["title"]: s for s in w.subjects.values() if "lens" in (s.get("tags") or []) and w.appearances_of(s["id"])}
+    import kinds
+    lenses = {s["title"]: s for s in w.subjects.values() if kinds.is_lens(s) and w.appearances_of(s["id"])}
     ok, bad, expected = [], [], []
     for name in sorted(lenses):
         # Pike a611: a lens kept to refuse (a probe, prop expect=refuse on its note) is counted apart, so a refusal in

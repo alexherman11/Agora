@@ -177,7 +177,8 @@ class DeskMoo(Desk):
     def subject_verbs_line(self, sid):
         """Subject verbs from the registry: the text-level verbs of its kind, plus place. One verb source."""
         s = self.world.subjects[sid]
-        chain = set(moo.KIND_CHAIN.get(s["kind"], [])) - {"appearance", "thing"}
+        import kinds
+        chain = set(kinds.chain(self.world, s["kind"])) - {"appearance", "thing"}
         names = [v.name for v in moo.REGISTRY.values() if set(v.kinds) & chain]
         if not self.world.checklist(s["text"]):
             names = [n for n in names if n != "check"]

@@ -1229,7 +1229,7 @@ def plan(w):
     for sid, s in w.subjects.items():
         tags = s.get("tags") or []
         text = s.get("text") or ""
-        if "lens" in tags and re.search(r"\$awaiting\b|prop:awaiting", text):
+        if ("lens" in tags or s.get("kind") == "lens") and re.search(r"\$awaiting\b|prop:awaiting", text):
             new = re.sub(r"only when prop:awaiting(?![=\w])", "only when awaits:any", text)
             new = re.sub(r"prop:awaiting=([\w-]+)", r"awaits:\1", new).replace("$awaiting", "$asked_of")
             steps.append(("lens", sid, new))

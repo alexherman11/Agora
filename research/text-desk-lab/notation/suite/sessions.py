@@ -54,9 +54,10 @@ def slug(title):
 
 
 def lens_titles(world):
+    import kinds
     seen = {}
     for s in world.subjects.values():
-        if "lens" in (s.get("tags") or []):
+        if kinds.is_lens(s):
             seen.setdefault(s["title"].lower(), s["title"])
     return sorted(seen.values(), key=str.lower)
 

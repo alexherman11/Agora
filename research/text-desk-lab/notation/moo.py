@@ -35,16 +35,7 @@ def verb(name, kinds, doc, args="", example="", level=1):
     return deco
 
 
-KIND_CHAIN = {
-    "surface": ["surface", "thing"],
-    "note": ["note", "text", "appearance", "thing"],
-    "task": ["task", "text", "appearance", "thing"],
-    "chat": ["chat", "text", "appearance", "thing"],
-    "doc": ["doc", "text", "appearance", "thing"],
-    "image": ["image", "appearance", "thing"],
-    "trial": ["trial", "text", "appearance", "thing"],
-    "promise": ["promise"],     # a1587: its words are its maker's, and it ends only by its own verbs (help promises)
-}
+from kinds import KIND_CHAIN  # noqa: E402  (5 Oct: the built-in chains; kinds.chain walks a world-made kind to them)
 
 
 def kind_of(w, nid):
@@ -55,7 +46,8 @@ def kind_of(w, nid):
 def verbs_by_origin(w, nid):
     """{origin kind: [verb names]} walking the chain from most specific to most general."""
     out = {}
-    chain = KIND_CHAIN[kind_of(w, nid)]
+    import kinds
+    chain = kinds.chain(w, kind_of(w, nid))
     for k in chain:
         names = [v.name for v in REGISTRY.values() if k in v.kinds and _applies(w, nid, v)]
         if names:
@@ -314,7 +306,7 @@ def v_group(w, nid, a):
     return _prim(w, "group", nid, a)
 
 
-@verb("create", ["surface"], "Make a new note, task, chat, doc, image or surface inside this surface.", "kind=note|task|chat|doc|image|surface title=<str> [text=<str>] [due=YYYY-MM-DD] [tags=a,b] [layout=column|row|free] [query=<selection> for kind=view] [any other key: a prop]", 'do create f03 kind=task title="Send parser" due=2026-09-19')
+@verb("create", ["surface"], "Make a new note, task, chat, doc, image or surface, or a thing of a kind made here (help kinds), inside this surface.", "kind=note|task|chat|doc|image|surface|<a kind made here> title=<str> [text=<str>] [due=YYYY-MM-DD] [tags=a,b] [layout=column|row|free] [query=<selection> for kind=view] [any other key: a prop]", 'do create f03 kind=task title="Send parser" due=2026-09-19')
 def v_create(w, nid, a):
     return _prim(w, "create", nid, a)
 
@@ -397,6 +389,12 @@ def v_link(w, nid, a):
 @verb("unlink", ["appearance"], "Remove a link by id.", "id=<lNN>", "do unlink a20 id=l02")
 def v_unlink(w, nid, a):
     return _prim(w, "unlink", nid, a)
+
+
+@verb("rekind", ["appearance"], "Make this thing another kind of one shape: a note into a lens, a task into a note (5 Oct; help kinds). "
+      "Refused across shapes (a chat is lines, an image bytes): make a new thing instead.", "kind=<kind>", "do rekind a124 kind=lens")
+def v_rekind(w, nid, a):
+    return _prim(w, "rekind", nid, a)
 
 
 @verb("retitle", ["text", "image"], "Change the subject's title everywhere it appears.", "title=<str>", 'do retitle a18 title="Agenda"')

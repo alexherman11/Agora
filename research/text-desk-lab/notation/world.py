@@ -683,6 +683,7 @@ class World:
     TEXT_VERBS = {
         "append": "line=<str>  (adds a line at the end; edits the subject, so every appearance changes)",
         "retitle": "title=<str>",
+        "rekind": "kind=<kind>  (another kind of the same shape; help kinds)",
         "rewrite": "text=<str> [section=<heading>]  (replaces all the text, or only the body of one ## section; write \\n between lines)",
         "replace": "old=<str> new=<str>  (changes one exact passage; old must appear exactly once; write \\n between lines)",
     }
@@ -776,7 +777,7 @@ class World:
         n = self.nodes[target]
         before = deepcopy(n)
         changed = [target]
-        if verb in ("append", "retitle", "rewrite", "replace", "edit", "comment", "resolve", "check", "link", "unlink"):
+        if verb in ("append", "retitle", "rekind", "rewrite", "replace", "edit", "comment", "resolve", "check", "link", "unlink"):
             if n["type"] != "appearance":
                 raise Refusal(f"{verb} needs an appearance or subject, not a surface")
             return self._apply_subject(verb, n["subject"], None, args, actor, via=target)
@@ -926,8 +927,9 @@ class World:
             import persons
             persons.store_args(self, props)             # a1590: a person prop holds the person (owner=juniper: today's)
             args = dict(args, **{k: props[k] for k in persons.PERSON_KEYS if k in props})
-            if kind not in ("note", "task", "chat", "image", "doc", "trial", "surface", "view"):
-                raise Refusal("kind= must be note, task, chat, image, doc, trial, surface or view")
+            import kinds
+            if kind not in kinds.known(self):       # 5 Oct: or a kind made in this world, a note tagged kind (help kinds)
+                raise Refusal(kinds.refusal(self, kind))
             title = args.get("title")
             if not title:
                 raise Refusal("create needs title=")
@@ -1101,6 +1103,21 @@ class World:
         elif verb == "retitle":
             args = {"title": args.get("title", args.get("text", ""))}
             verb = "edit"
+        elif verb == "rekind":
+            # 5 Oct (help kinds): a thing becomes another kind of its shape; the event keeps the old word, undo restores it
+            import kinds
+            new = str(args.get("kind", "")).strip().lower()
+            if not new:
+                raise Refusal("rekind needs kind=<kind>: " + kinds.refusal(self, "").split("; ")[0])
+            if new not in kinds.known(self):
+                raise Refusal(kinds.refusal(self, new))
+            if new == s["kind"]:
+                raise Refusal(f"{sid} is a {new} already")
+            if kinds.shape(self, new) != kinds.shape(self, s["kind"]):
+                raise Refusal(f"{sid} is a {s['kind']} ({kinds.shape(self, s['kind'])}) and {new} is {kinds.shape(self, new)}: "
+                              f"a thing keeps its shape; make a new {new} instead")
+            args = {"kind": new, "was": s["kind"]}
+            s["kind"] = new
         elif verb == "replace":
             # Alex, 29 Sep: changing one line of a 67-line lens meant resending all of it as one escaped string. replace
             # changes one exact passage, as an editor's find-and-replace does: old must appear exactly once, so what is
@@ -1191,6 +1208,8 @@ class World:
                             args["no_one"] = ",".join(no_one)
                         new_line_why = why_to + (("; " + MENTION_NOTE.format(", ".join("@" + n for n in mentioned))) if mentioned else "")
                 s["text"] = (s["text"].rstrip("\n") + "\n" + line).strip("\n")
+        elif verb == "rekind":
+            pass                        # judged and done above; the event and the undo are the subject's, below
         elif verb == "place":
             dest = args.get("into")
             if dest not in self.nodes or self.nodes[dest]["type"] != "surface":
