@@ -30,7 +30,6 @@ You are here to help build the larger vision, and that means more than finishing
   - If you see something outdated or incorrect, don't just leave it uncorrected. You have to work together to take care of the space, like you share the same kitchen.
   - Never read `sessions/*.pickle` files directly, and never grep exported logs (they dump whole transcripts).
   - Private experiments go in your own world (`<world>-<your name>`) or a fork of the shared one (`worktree fork <name>` in the desk). Don't touch other people's.
-  - Never edit the lab's Python or JavaScript while trials or other agents are running: each process imports at start, so a mid-run edit breaks later runs.
 
 ## Where things live
 
