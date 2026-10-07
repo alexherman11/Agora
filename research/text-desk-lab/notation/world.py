@@ -1036,6 +1036,12 @@ class World:
             line = str(args.get("line", args.get("text", ""))).strip()
             if not line:
                 raise Refusal("comment needs line=")
+            # Sable, 7 Oct: a comment is signed by the world as a chat line is, so a typed 'Sable:' that is the writer's
+            # own name is dropped the same way (c3496 read 'sable: Sable: ...')
+            own = re.match(r"^([\w-]+)[ \t]*:[ \t]*(?=\S)", line)
+            own = own if own and own.group(1).casefold() == str(actor).casefold() else None
+            if own:
+                line = line[own.end():]
             cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor)
             # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
             # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
@@ -1045,7 +1051,7 @@ class World:
             ev = self.events[-1]
             ev["to"] = [n for n in written(ev)[0] if n not in rooms.EVERYONE and rooms.someone(self, n)]
             return {"ok": True, "event": self.events[-1]["id"], "changed": [sid] + apps, "created": cid,
-                    "note": f"comment {cid} added on {sid}"}
+                    "note": f"comment {cid} added on {sid}" + ("; the world signs for you, your typed name was dropped" if own else "")}
         if verb == "resolve":
             cid = str(args.get("id", args.get("comment", "")))
             owner, c = self.find_comment(cid)

@@ -214,6 +214,22 @@ reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled")
 ruled = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "Ruled"][-1]
 check("a rule's $item.title is the title of the thing it fired on", props(ruled).get("tagged") == "Ruled", props(ruled))
 reply(ME, f"look {r} :1", f"do remove {r}")
+
+# Pike, 7 Oct (Editor board): where a thing is. .in what holds it, .before and .after its neighbours, .text its words
+reply(ME, f"look {CORNER} :1", f'do create {CORNER} kind=surface title="Page" layout=column')
+page = W.last_created
+paras = []
+for t in ("one", "two", "three"):
+    reply(ME, f"look {page} :1", f'do create {page} kind=note title={t} text="the {t} words"')
+    paras.append(W.last_created)
+got = reply(ME, f"look {page} :2", f"set mid = {paras[1]}", "do prop $mid.before mark=up", "do prop $mid.after mark=down",
+            "do prop $mid.before said=$mid.text", 'do create $mid.in kind=note title=four')
+check("$x.before and $x.after are the neighbours in reading order", not got[-1][2] and props(paras[0]).get("mark") == "up"
+      and props(paras[2]).get("mark") == "down", got)
+check("$x.text is the thing's words", props(paras[0]).get("said") == "the two words", props(paras[0]))
+check("$x.in is what holds it", W.nodes[W.last_created]["parent"] == page, W.nodes[W.last_created])
+got = reply(ME, f"look {page} :2", f"set top = {paras[0]}", "do prop $top.before mark=none")
+check("the first thing has nothing before it, and says so", f"{paras[0]} is first in {page}" in got[-1][1] + got[-1][2], got[-1])
 r = rule_note(f"on create by={ME} do prop where=\\$here")
 got = reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled2")
 reply(ME, f"look {r} :1", f"do remove {r}")

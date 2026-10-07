@@ -40,7 +40,7 @@ the one form. The words:
     over $tags                   repeat over a list field of the current thing; $it is each value
     each <part>                  what to instantiate for each repeated thing. $count is the repeat's true size (before
                                  any clamp), on the repeat, in each instance and in its fixed kids; $n on the repeat
-                                 itself is how many it shows
+                                 itself is how many it shows; $index in an instance is its place, from 1 (7 Oct)
     count <selection>            $count is how many things a selection (or a row source) finds, without drawing them:
                                  rested : text "$count paused", count kind:task,prop:status=paused. Printed `· count 7 of ...`
     at item                      take x,y,w,h from the thing's own appearance in the world (parent must be free)
@@ -95,7 +95,7 @@ PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fo
 GESTURES = ("click", "edit", "drag", "menu")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
-NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count")
+NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index")
 
 
 class LensRefusal(Exception):
@@ -293,15 +293,13 @@ def _style_prop_ok(p, T):
     for pat, fn in ((r"^(show|hide)\s+\w+$", lambda m: True), (r"^on\s+(.+)$", lambda m: col(m.group(1))),
                     (r"^([\w.]+)\s*->\s*(.+)$", lambda m: col(m.group(2))), (r"^edge\s+(.+)$", lambda m: col(m.group(1))),
                     (r"^border\s+(top|right|bottom|left)\s+(.+)$", lambda m: col(m.group(2))),
-                    (r"^corner\s+(.+)$", lambda m: ln(m.group(1)) == "n"), (r"^pad\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
+                    (r"^corner\s+(.+)$", lambda m: ln(m.group(1)) == "n"), (r"^pad\s+(top|right|bottom|left)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^pad\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
                     (r"^space\s+(above|below)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^between\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
                     (r"^width\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^lift\s+(.+)$", lambda m: ln(m.group(1)) == "n" and T.get("ink") == "colour")):
         m = re.match(pat, p)
         if m:
             if fn(m):
                 return True, ""
-            if re.match(r"^pad\s+(top|right|bottom|left)\s", p):
-                return False, "style.js reads `pad` before `pad <side>`, so a side is never reached (a painter bug)"
             if re.search(r"\s\d+(\.\d+)?$", p) and not re.search(r"[x/]\s*\d+(\.\d+)?$", p):
                 return False, "a bare number is not on the scale: say gap, gap xN or gap /N"
             return False, "names no token of the right kind"
@@ -906,7 +904,7 @@ def _w_clamp(node, p, val, n, env):
 
 def _w_of(node, p, val, n, env):
     if not val:
-        raise LensRefusal(f"line {n}: `of <selection> [as <frame>]`; got {p!r}")
+        raise LensRefusal(f"line {n}: `of <selection | row source> [as <frame>]`; got {p!r}")
     node["of"], _, asname = val.partition(" as ")          # `of parts:$trip.item as stop`
     if asname:
         node["as"] = asname.strip()
@@ -927,9 +925,15 @@ def _w_count(node, p, val, n, env):
 
 
 def _w_over(node, p, val, n, env):
+    val, _, asname = val.partition(" as ")       # Sable, 7 Oct: `over $comments as c` was refused by printing its own form
+    val = val.strip()
     if not re.fullmatch(r"\$\w+", val):
-        raise LensRefusal(f"line {n}: `over $<rows> [as <frame>]`; got {p!r}")
+        raise LensRefusal(f"line {n}: `over $<list> [as <frame>]` repeats over a list the current thing holds ($tags) or "
+                          f"rows a derive named; got {p!r}. Rows from a source (comments:<id>, sections:<id>; the command "
+                          f"`rows` lists them) go under `of`: `of comments:$item`")
     node["over"] = val[1:]
+    if asname:
+        node["as"] = asname.strip()
 
 
 def _w_at(node, p, val, n, env):
@@ -1094,8 +1098,8 @@ WORDS = {
     "text": ('text "..."', _w_text),
     "clamp": ("clamp [last] <n>", _w_clamp),
     "the": ("the <selection> [as <frame>]", _w_the),
-    "of": ("of <selection> [as <frame>]", _w_of),
-    "over": ("over $<rows> [as <frame>]", _w_over),
+    "of": ("of <selection | row source> [as <frame>]", _w_of),
+    "over": ("over $<list> [as <frame>]", _w_over),
     "by": ("by <prop>[, <prop>]", _w_by),
     "count": ("count <selection>", _w_count),
     "as": ("as <frame>", _w_as),
@@ -1351,7 +1355,7 @@ def resolve(root, parts):
 
 def classify(name, scope):
     """What a bare $name means in a scope: field | host | gesture | let | frame | prop."""
-    if name in ("title", "text", "kind", "due", "tags", "id", "item", "n", "count"):
+    if name in ("title", "text", "kind", "due", "tags", "id", "item", "n", "count", "index"):
         return "field"
     if name in HOST:
         return "host"

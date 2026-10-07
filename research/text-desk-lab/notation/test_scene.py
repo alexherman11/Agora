@@ -853,6 +853,16 @@ def test_count_word_and_true_size():
             assert lst["text"] == "1 of 2", lst["text"]
             assert lst["kids"][0]["text"].endswith("(2)") and lst["kids"][-1]["text"] == "all 2", [k["text"] for k in lst["kids"]]
             assert "· count 2 of kind:note" in scene.to_text(sc, "t", "jeff", 0)
+            # Juniper, 7 Oct: a numbered item could not ask where it stands. $index is the place in the repeat, from 1,
+            # in the instance and its kids; a clamp last keeps the true place; an expression can use it
+            src = chr(10).join(["root : column", "  all : column, of kind:note, each c", "  end : column, of kind:note, clamp last 1, each c",
+                                'c : column, text "$index of $count"', '  k : text "$index."', '  odd : text "odd", only when $index = 1'])
+            sc = lens_ir.evaluate(desk, src)
+            every, end = sc["kids"]
+            assert [k["text"] for k in every["kids"]] == ["1 of 2", "2 of 2"], [k["text"] for k in every["kids"]]
+            assert every["kids"][1]["kids"][0]["text"] == "2." and every["kids"][1]["kids"][1].get("absent"), every["kids"][1]["kids"]
+            assert not every["kids"][0]["kids"][1].get("absent"), every["kids"][0]["kids"][1]
+            assert [k["text"] for k in end["kids"] if k["part"] == "c"] == ["2 of 2"], [k["text"] for k in end["kids"]]
     finally:
         tmp.unlink(missing_ok=True)
 

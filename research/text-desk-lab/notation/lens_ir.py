@@ -492,7 +492,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     first = max(0, len(rs) - keep) if b.get("last") else 0
                     for k, r in enumerate(rs[first:first + keep], first):
                         okey = r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
-                        out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, **r}), f"{key}/{okey}", em["layout"], chain, cb))
+                        out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
                     if b.get("by"):
@@ -506,14 +506,16 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                              + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []
                     if named is not None:
                         total = len(named)
-                        for i, st in pick(named):
+                        base = max(0, total - keep) if b.get("last") else 0      # $index: the place in the whole repeat
+                        for k, (i, st) in enumerate(pick(named), base + 1):
                             mcb = cb + shown + ([[i, S._rev_of(w, i), []]] if st != "live" else _member_reads(w, i, sel_text))
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total)), f"{key}/{i}", em["layout"], chain, mcb))
+                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k)), f"{key}/{i}", em["layout"], chain, mcb))
                         out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                     else:
                         total = len(ids)
-                        for i in pick(list(ids)):
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total)), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
+                        base = max(0, total - keep) if b.get("last") else 0
+                        for k, i in enumerate(pick(list(ids)), base + 1):
+                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k)), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
                 got = [k["item"] or k["key"] for k in out["kids"]]
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 if total > keep:
@@ -531,11 +533,11 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 dcb = cb + frame_reads()
                 for k, v in enumerate(rows_over):
                     if isinstance(v, dict):
-                        ictx = S._inst(ctx, node["ast"], dict(ctx, it=str(v.get("date", v.get("n", ""))), count=len(rows_over)))
+                        ictx = S._inst(ctx, node["ast"], dict(ctx, it=str(v.get("date", v.get("n", ""))), count=len(rows_over), index=k + 1))
                         ictx["_frames"] = dict(ictx["_frames"], it=v)
                         out["kids"].append(make(each, ictx, f"{key}/{S._slug(str(v.get('n', k)))}", em["layout"], chain, dcb))
                     else:
-                        out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(ctx, it=v, count=len(rows_over))), f"{key}/{S._slug(str(v))}", em["layout"], chain, dcb))
+                        out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(ctx, it=v, count=len(rows_over), index=k + 1)), f"{key}/{S._slug(str(v))}", em["layout"], chain, dcb))
             seen_keys = {}
             for kid in out["kids"]:
                 c = seen_keys.get(kid["key"], 0) + 1

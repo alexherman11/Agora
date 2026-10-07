@@ -12,7 +12,8 @@ world verbs, scripts and rules all fill their blanks here, the same way:
     in a verb:     $1 $2 ... its words, $* the rest of the line exactly as said, $this the thing a verb lives on
     in a rule:     $item   the thing it fired on (the target, as in a lens act)
     a part of the thing a blank names (a1027): .title its title, .maker who made it, .<prop> one of its props
-                   ($item.asked_by, $1.status); a part it doesn't have refuses, naming the thing
+                   ($item.asked_by, $1.status); .text its words, .in what holds it, .before and .after its neighbours
+                   there (7 Oct); a part it doesn't have refuses, naming the thing
 
 Where they are filled: after the line is parsed, in the values themselves (a target, a selection, a k=v value), so a
 filled value is never read again as desk words or filled a second time ($* may carry '$here' or 'a; b "hi"' through
@@ -38,7 +39,7 @@ READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare"
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
 KNOWN = ("$here $here.<prop> $new $today $me, a handle you set ($name); in a verb $1 $2 $* $this; in a rule $item; "
-         "a thing's parts .title .maker .<prop>")
+         "a thing's parts .title .maker .text .in .before .after .<prop>")
 
 
 class Ctx:
@@ -175,10 +176,36 @@ def _part(desk, val, attr, what):
             raise Refusal(f"{what}: no one is recorded as making {nid} (it was made before this world's log began)")
         return who
     props = ((w.subjects[sid].get("props") if sid in w.subjects else w.nodes[nid].get("props")) or {})
+    if p in PLACE and not str(props.get(p) or "").strip():      # a prop of the same name is the author's, and wins
+        return _place(w, nid, p, what)
     if p in props and str(props[p]).strip():
         import persons     # a1590: a person prop fills as the person's name (juniper,first for an earlier one): the
         return str(persons.shown(w, props[p]))     # words that, typed back, mean the same person
-    raise Refusal(f"{what}: {nid} has no {p}= (a thing's parts are .title, .maker and its props)")
+    raise Refusal(f"{what}: {nid} has no {p}= (a thing's parts are .title .maker .text, where it is .in .before .after, and its props)")
+
+
+PLACE = ("in", "before", "after", "text")
+
+
+def _place(w, nid, p, what):
+    """Pike, 7 Oct (Editor board a3472): a verb that makes a paragraph after this one, joins it to the one above or
+    moves it could not say where its thing is. .in is what holds it, .before and .after its neighbours there in the
+    order they are read, .text its words. An edge refuses plainly, so a verb stops instead of acting on nothing."""
+    n = w.nodes.get(nid)
+    if p == "text":
+        s = w.subjects.get(n.get("subject")) if n else w.subjects.get(nid)
+        if s is None or not isinstance(s.get("text"), str):
+            raise Refusal(f"{what}: {nid} has no text (a note has; a chat's words are its lines)")
+        return s["text"]
+    if n is None or not n.get("parent"):
+        raise Refusal(f"{what}: {nid} is in nothing, so it has no {p}")
+    if p == "in":
+        return n["parent"]
+    ids = [k["id"] for k in w.children(n["parent"])]
+    i = ids.index(nid) + (1 if p == "after" else -1)
+    if not 0 <= i < len(ids):
+        raise Refusal(f"{what}: {nid} is {'last' if p == 'after' else 'first'} in {n['parent']}, so nothing is {p} it")
+    return ids[i]
 
 
 def fill(desk, value, text=False, ctx=None, quote=False, soft=False):

@@ -153,8 +153,8 @@ const Style = (() => {
     if ((m = p.match(/^edge\s+(.+)$/))) { const c = colour(m[1], T); return c ? { css: { border: `1px solid ${c}` } } : null; }
     if ((m = p.match(/^border\s+(top|right|bottom|left)\s+(.+)$/))) { const c = colour(m[2], T); return c ? { css: { ["border-" + m[1]]: `1px solid ${c}` } } : null; }
     if ((m = p.match(/^corner\s+(.+)$/))) { const l = len(m[1], T); return typeof l === "number" ? { css: { "border-radius": l + "px" } } : null; }
-    if ((m = p.match(/^pad\s+(.+)$/))) { const l = len(m[1], T); return typeof l === "number" ? { css: { padding: l + "px" } } : null; }
     if ((m = p.match(/^pad\s+(top|right|bottom|left)\s+(.+)$/))) { const l = len(m[2], T); return typeof l === "number" ? { css: { ["padding-" + m[1]]: l + "px" } } : null; }
+    if ((m = p.match(/^pad\s+(.+)$/))) { const l = len(m[1], T); return typeof l === "number" ? { css: { padding: l + "px" } } : null; }
     if ((m = p.match(/^space\s+(above|below)\s+(.+)$/))) { const l = len(m[2], T); return typeof l === "number" ? { css: { [m[1] === "above" ? "margin-top" : "margin-bottom"]: l + "px" } } : null; }
     if ((m = p.match(/^between\s+(.+)$/))) { const l = len(m[1], T); return typeof l === "number" ? { css: { gap: l + "px" } } : null; }
     if ((m = p.match(/^width\s+(.+)$/))) { const l = len(m[1], T); if (l && l.em) return { css: { "max-width": l.em + "em" } }; return typeof l === "number" ? { css: { width: l + "px" } } : null; }
