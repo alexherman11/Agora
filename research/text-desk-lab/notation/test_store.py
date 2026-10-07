@@ -18,6 +18,7 @@ before it and store.commit after, as deskd and explore.py do. What is asked:
 import copy
 import json
 import os
+import re
 import sys
 import tempfile
 import uuid
@@ -441,6 +442,8 @@ text = W.subjects[subj(NOTE)]["text"]
 check("Sable changes line 2; Juniper, who read it before that, changes line 5: hers is joined, not refused, and both are in the text",
       not a.error and not b.error and "the bridge, slowly" in text and "if the log holds" in text and "~ joined" in b.text, b.error or b.text)
 check("   she is told so, and that she has not read Sable's line", "You have not read theirs" in b.text and "line 2" in b.text, b.text)
+check("   and whose change it was and which event (Juniper and Sable, a3474: 'theirs' named no one)",
+      re.search(r"by [Ss]able e" + chr(92) + "d+", b.text) is not None, b.text)
 mine = PLAN.replace("Friday: the flip", "Friday: the flip, if the log holds").replace("Saturday: rest", "Saturday: rest, properly")
 c = run("juniper", f"do rewrite {NOTE} text={q(mine)}")
 text = W.subjects[subj(NOTE)]["text"]
@@ -464,7 +467,7 @@ a = run("sable", f"do replace {LENS_ID} old={q('head : text \"A shared document\
 b = run("juniper", f"do replace {LENS_ID} old={q('foot : text \"end\"')} new={q('foot : text \"the end\"')}")
 text = W.subjects[subj(LENS_ID)]["text"]
 check("a lens, two editors, two parts: both land, and the lens still compiles",
-      not a.error and not b.error and "A document, shared" in text and '"the end"' in text and "~ joined" in b.text and "compiles" in b.text, b.error or b.text)
+      not a.error and not b.error and "A document, shared" in text and '"the end"' in text and "~ joined" in b.text and "compiles" in b.text and "only the scene shows" in b.text, b.error or b.text)
 ok("sable", f"read {LENS_ID}")
 ok("juniper", f"read {LENS_ID}")
 a = run("sable", f"do replace {LENS_ID} old={q('  t : text \"$text\"')} new={q('  words : text \"$text\"')}")

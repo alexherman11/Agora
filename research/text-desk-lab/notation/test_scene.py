@@ -879,6 +879,20 @@ def test_count_word_and_true_size():
             assert every["kids"][1]["kids"][0]["text"] == "2." and every["kids"][1]["kids"][1].get("absent"), every["kids"][1]["kids"]
             assert not every["kids"][0]["kids"][1].get("absent"), every["kids"][0]["kids"][1]
             assert [k["text"] for k in end["kids"] if k["part"] == "c"] == ["2 of 2"], [k["text"] for k in end["kids"]]
+            # Juniper, the same hour: a let named above a nested repeat read none inside it; and a numbered item wants
+            # its place in its own list. A let crosses into a repeat; `run <prop>` counts along like neighbours
+            assert scene.run_places(["n", "n", None, "n", "b", "b", "b"]) == [1, 2, 1, 1, 1, 2, 3]
+            w = desk.world
+            for nid in [n["id"] for n in w.nodes.values() if n.get("subject")]:
+                w.subjects[w.nodes[nid]["subject"]].setdefault("props", {})["block"] = "number"
+            src = chr(10).join(["root : column", "  all : column, of kind:note, run block, each entry",
+                                "entry : row", "  let place = $run", "  main : column, of $item, each para",
+                                'para : text "$(place). of $index"'])
+            sc = lens_ir.evaluate(desk, src)
+            got = [e["kids"][0]["kids"][0]["text"] for e in sc["kids"][0]["kids"]]
+            assert got == ["1. of 1", "2. of 1"], got
+            assert "run block" in scene.to_text(sc, "t", "jeff", 0)
+            refused("root : column, run block\n  c : text a", "counts along a repeat")
     finally:
         tmp.unlink(missing_ok=True)
 

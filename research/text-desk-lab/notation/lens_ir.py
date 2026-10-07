@@ -146,7 +146,7 @@ def lower(root, parts):
             bind = {"kind": "one", "q": node["the"], "as": node["as"], "capture": dict(node["capture"])}
         elif node["of"] or node["over"]:
             bind = {"kind": "many", "of": node["of"], "over": node["over"], "each": node["each"], "as": node["as"], "clamp": node["clamp"],
-                    "last": bool(node.get("clamp_last")), "by": node.get("by")}
+                    "last": bool(node.get("clamp_last")), "by": node.get("by"), "run": node.get("run")}
         else:
             bind = None
         guard = None
@@ -488,9 +488,14 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     out["by"] = b["by"]             # a1069: ordered here, in the scene, so both printers show one order
                 if rs is not None and b.get("by"):
                     rs = sorted(rs, key=lambda r: tuple(moo.order_value(r.get(k)) for k in b["by"]))
+                if b.get("run"):
+                    out["run"] = b["run"]
                 if rs is not None:
                     first = max(0, len(rs) - keep) if b.get("last") else 0
+                    place = S.run_places([r.get(b["run"]) for r in rs]) if b.get("run") else None
                     for k, r in enumerate(rs[first:first + keep], first):
+                        if place:
+                            r = dict(r, run=place[k])
                         okey = r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
                         out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
@@ -504,18 +509,20 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in
                     shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]
                              + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []
+                    order = [x[0] for x in named] if named is not None else list(ids)
+                    place = dict(zip(order, S.run_places([moo.props_of(w, i).get(b["run"]) for i in order]))) if b.get("run") else {}
                     if named is not None:
                         total = len(named)
                         base = max(0, total - keep) if b.get("last") else 0      # $index: the place in the whole repeat
                         for k, (i, st) in enumerate(pick(named), base + 1):
                             mcb = cb + shown + ([[i, S._rev_of(w, i), []]] if st != "live" else _member_reads(w, i, sel_text))
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k)), f"{key}/{i}", em["layout"], chain, mcb))
+                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, mcb))
                         out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                     else:
                         total = len(ids)
                         base = max(0, total - keep) if b.get("last") else 0
                         for k, i in enumerate(pick(list(ids)), base + 1):
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k)), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
+                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
                 got = [k["item"] or k["key"] for k in out["kids"]]
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 if total > keep:

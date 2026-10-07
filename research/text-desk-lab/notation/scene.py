@@ -45,6 +45,9 @@ the one form. The words:
     each <part>                  what to instantiate for each repeated thing. $count is the repeat's true size (before
                                  any clamp), on the repeat, in each instance and in its fixed kids; $n on the repeat
                                  itself is how many it shows; $index in an instance is its place, from 1 (7 Oct)
+    run <prop>                   on a repeat: $run in each instance is its place in the unbroken stretch of neighbours
+                                 that hold the same value of that prop (a numbered list: 1. 2., and 1. again after a
+                                 break). A let named above a repeat is read inside it
     count <selection>            $count is how many things a selection (or a row source) finds, without drawing them:
                                  rested : text "$count paused", count kind:task,prop:status=paused. Printed `· count 7 of ...`
     at item                      take x,y,w,h from the thing's own appearance in the world (parent must be free)
@@ -99,7 +102,7 @@ PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fo
 GESTURES = ("click", "edit", "drag", "menu")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
-NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index")
+NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index", "run")
 
 
 class LensRefusal(Exception):
@@ -954,6 +957,25 @@ def _w_by(node, p, val, n, env):
     node["by"] = (node["by"] or []) + val.split()
 
 
+def _w_run(node, p, val, n, env):
+    # Juniper, 7 Oct (a3470): a numbered item reads 1. 2. within its own list. `run <prop>` on a repeat gives each
+    # instance $run: its place in the unbroken stretch of neighbours, in the order shown, that hold the same value of
+    # that prop. A neighbour with another value (or none) ends the stretch, and the next begins again at 1.
+    if not re.fullmatch(r"[BSw.-]+".replace("BS", chr(92)), val or ""):
+        raise LensRefusal(f"line {n}: `run <prop>` on a repeat; got {p!r}")
+    node["run"] = val
+
+
+def run_places(values):
+    """[value] in the order shown -> each one's place in its unbroken stretch of equal values, from 1."""
+    out, prev, c = [], object(), 0
+    for v in values:
+        c = c + 1 if v == prev else 1
+        prev = v
+        out.append(c)
+    return out
+
+
 def _w_count(node, p, val, n, env):
     if not val.strip():
         raise LensRefusal(f"line {n}: `count <selection or row source>`; got {p!r}")
@@ -1138,6 +1160,7 @@ WORDS = {
     "of": ("of <selection | row source> [as <frame>]", _w_of),
     "over": ("over $<list> [as <frame>]", _w_over),
     "by": ("by <prop>[, <prop>]", _w_by),
+    "run": ("run <prop>", _w_run),
     "count": ("count <selection>", _w_count),
     "as": ("as <frame>", _w_as),
     "each": ("each <part>", _w_each),
@@ -1169,6 +1192,8 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `as {node['as']}` would shadow a built-in name; choose another frame name")
     if node["as"] and not (node["the"] or node["of"] or node["over"]):
         raise LensRefusal(f"line {n}: `as {node['as']}` names the thing chosen here, so this part needs `the`, `of` or `over`")
+    if node.get("run") and not (node["of"] or node["over"]):
+        raise LensRefusal(f"line {n}: `run {node['run']}` counts along a repeat; this part repeats nothing (say `of` and `each`)")
     if node["by"] and not node["of"]:
         raise LensRefusal(f"line {n}: `by` orders a repeat; this part has no `of`")
     if node["capture"] and not node["the"]:
@@ -1222,7 +1247,7 @@ def parse(src, roles=None, style=None):
         name, rest = head, (" : ".join(pieces[1:]) if len(pieces) > 1 else "")
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None,
+                "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
                 "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
@@ -1392,7 +1417,7 @@ def resolve(root, parts):
 
 def classify(name, scope):
     """What a bare $name means in a scope: field | host | gesture | let | frame | prop."""
-    if name in ("title", "text", "kind", "due", "tags", "id", "item", "n", "count", "index"):
+    if name in ("title", "text", "kind", "due", "tags", "id", "item", "n", "count", "index", "run"):
         return "field"
     if name in HOST:
         return "host"
@@ -1614,6 +1639,13 @@ def _inst(ctx, node, ictx):
     """The context for one instance of a repeat: the thing's own values, plus every frame named above, plus this
     part's own frame when it says `as`. Pike: a nested `of` used to lose the outer thing's fields."""
     ictx = dict(ictx)
+    # Juniper, 7 Oct (a3470): a let named above a repeat was in scope inside it (the lens compiled) and read none
+    # there, since an instance began from its thing alone. A let crosses into the repeat as a frame does.
+    if ctx.get("_lets"):
+        ictx["_lets"] = set(ctx["_lets"]) | set(ictx.get("_lets") or ())
+        ictx["_values"] = dict(ctx.get("_values") or {}, **(ictx.get("_values") or {}))
+        for name in ctx["_lets"]:
+            ictx[name] = ctx.get(name)
     frames = dict(ctx.get("_frames") or {})
     if node["as"]:
         if node["as"] in frames:
@@ -1871,7 +1903,7 @@ def to_text(scene, name, who, at, roots=None, part=None):
         if n.get("state"):
             bits.append(f"({n['state']})")
         if "n" in n:
-            bits.append((f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}") + (f" by {', '.join(n['by'])}" if n.get("by") else ""))
+            bits.append((f"· {n['n']} of {n['of']}" if n.get("of") else f"· {n['n']}") + (f" by {', '.join(n['by'])}" if n.get("by") else "") + (f" run {n['run']}" if n.get("run") else ""))
             if n["n"] == 0:
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):

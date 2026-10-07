@@ -1664,8 +1664,19 @@ class Desk:
                 return None, None, "; your change and theirs are on different lines, but together the lens does not compile"
         d_theirs, d_mine = _line_change(base, theirs), _line_change(theirs, merged)
         said = lambda d: (f"{d[0]} {_numbered('line', d[1])}" if d[1] else d[0])     # noqa: E731
-        note = (f"~ joined: this text was changed since you read it ({said(d_theirs)}); your change ({said(d_mine)}, as "
-                f"numbered now) went into the text as it is now, and theirs is kept. You have not read theirs: read {nid} shows the whole")
+        # Juniper and Sable, 7 Oct (a3474): 'theirs' named neither who nor which event; and a text that joined is not
+        # a lens that still means what each intended, which the receipt can say though it cannot check
+        since = max(seen.get("text", 0), seen.get("*", 0))
+        them = [e for e in w.events[since:] if e.get("target") in (nid, sid) and e.get("by") != w.me and not e.get("undone")
+                and aspects_meet({"text"}, event_aspects(e))]
+        by = {}
+        for e in them:
+            by.setdefault(persons.by(w, e), []).append(e["id"])
+        who = "; ".join(f"{name} {', '.join(ids[-3:])}" for name, ids in by.items())
+        note = (f"~ joined: this text was changed since you read it ({said(d_theirs)}" + (f", by {who}" if who else "") + f"); your "
+                f"change ({said(d_mine)}, as numbered now) went into the text as it is now, and theirs is kept. You have not "
+                f"read theirs: read {nid} shows the whole" + (". The lines joined and the lens compiles; whether it still "
+                f"means what you each intended, only the scene shows" if kinds.is_lens(s) else ""))
         if verb == "replace" and theirs.count(kv["old"]) == 1:
             return verb, kv, note
         return "rewrite", {"text": merged}, note
