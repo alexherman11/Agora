@@ -104,6 +104,8 @@ LENS_TEXT = {
     "guest-bin": ("claude", 'bin : column, of tag:probe, each b\nb : text "$title", role tool, on click do trash $item'),
     "p-gesture": ("sable", 'root : column\n  list : of tag:probe, each card\ncard : text "$title $beds", '
                            'on click do prop $item beds=9; prop $item color=red'),
+    # 7 Oct: a lens in the one form, a word per line (the Desktop was rewritten so on 5 Oct, and its `trash` went unbound)
+    "lines-board": ("pike", 'board : column\n  of tag:probe\n  each card\ncard : text "$title"\n  role card\n  on menu "delete" do trash $item'),
 }
 for title, (who, text) in LENS_TEXT.items():
     lid, t, e = make(who, R.DESKTOP, title, "x", "tags=lens")
@@ -264,8 +266,9 @@ mine = next((l for l in told if "these of yours use it" in l), "")
 nosill = next((l for l in told if "claude has lines that use it and no sill to tell" in l), "")
 psill = sill_notes("pike", trash_title)
 check("changing the house's trash tells the authors of the lens acts bound to it (or says who has no sill)",
-      len(cc) == 3 and app("trash-probe") in mine and app("guest-bin") in nosill and len(psill) == 1
-      and app("desk-board") in subj(psill[0])["text"] and app("desk-board") not in mine + nosill
+      len(cc) == 4 and app("trash-probe") in mine and app("guest-bin") in nosill and len(psill) == 1
+      and app("desk-board") in subj(psill[0])["text"] and app("lines-board") in subj(psill[0])["text"]
+      and app("desk-board") not in mine + nosill
       and not sill_notes("sable", trash_title), (e or t, [subj(x)["text"] for x in psill]))
 
 # ---- undo, and the lens and wake paths ----------------------------------------------------------------------------

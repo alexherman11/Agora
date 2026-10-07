@@ -410,10 +410,34 @@ def _rule_steps(text):
     return out
 
 
+class _AnyRole:
+    """Every role name is admitted: the verb words of a lens are judged whatever style it names (a lens that names a role
+    its style lacks is refused at the look, not here)."""
+    def __contains__(self, name):
+        return True
+
+    def __iter__(self):
+        return iter(())
+
+
 def _lens_steps(text):
-    """Each desk command a lens's gestures send (`on click do ...`), read as the lens compiler reads them."""
+    """Each desk command a lens's gestures send (`on click do ...`), read as the lens compiler reads them: the parse tree's
+    acts, so the one-word-per-line form and the older comma list bind alike (7 Oct: the Desktop's `trash` went unbound
+    after its lens was rewritten in lines, and the menu's delete said so). A lens that does not parse falls back to
+    the older scan of its lines, so a lens saved broken still has its words judged."""
     import desk as desk_mod
     import scene
+    try:
+        _root, parts = scene.parse(text, roles=_AnyRole())
+    except scene.LensRefusal:
+        parts = None
+    if parts is not None:
+        out = []
+        for part in parts.values():
+            for node in scene._walk(part):
+                for a in node["on"]:
+                    out += desk_mod.split_batch(a["line"])
+        return out
     out = []
     for raw in text.splitlines():
         line = scene._outside_quotes(raw, " # ")[0]
