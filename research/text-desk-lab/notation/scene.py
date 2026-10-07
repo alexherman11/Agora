@@ -79,6 +79,12 @@ the one form. The words:
     capture <field>=<value>      use this value instead of following the frame's; prints (now X: differs) when the
                                  world has moved on. Following is the default and is never written down
     carry                        this part's thing can be picked up (pointer or keys) and put down on a part that says `on drop`
+    on key <key> do <command>    on a text with `on edit`: Enter, Tab, Shift+Tab or Backspace (only with the caret at the
+                                 very start) runs the command instead of its usual work. $head and $tail are the words
+                                 before and after the caret. After it the caret follows the text: into a paragraph
+                                 the command made, or to the end of the one above when this one is gone
+    on click do ... $focus       $focus is the thing whose text the caret is in; such a button does not take the caret
+    on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
     on <gesture> do <command>    click | edit | drag. The command is a desk verb line (`do` is implied); the painter
                                  fills $x $y (drag, click) and $value (edit) at the moment of the gesture. A gesture
@@ -99,7 +105,9 @@ import expr as X
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
-GESTURES = ("click", "edit", "drag", "menu")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
+GESTURES = ("click", "edit", "drag", "menu", "key")
+KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands to its lens (7 Oct: a document's keys)
+PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index", "run")
@@ -1116,8 +1124,20 @@ ACT_COMMANDS = ("do", "look", "read", "examine", "find", "undo", "run", "scene",
 
 
 def _w_on(node, p, val, n, env):
+    # Alex, 7 Oct ('buttons on top'): a button presses a key in the text the caret is in. It is the painter's own act:
+    # the line `press Ctrl+B` is never sent to the desk
+    m = re.fullmatch(r"click press (.+)", val.strip())
+    if m:
+        if m.group(1) not in PRESSES:
+            raise LensRefusal(f"line {n}: `on click press <{'|'.join(PRESSES)}>`; got {p!r}")
+        node["on"].append({"on": "click", "line": "press " + m.group(1)})
+        return
     g, do, cmd = val.partition(" do ")
     drop_part = label = None
+    if g.startswith("key "):
+        label, g = g[4:].strip(), "key"
+        if label not in KEYS:
+            raise LensRefusal(f"line {n}: `on key <{'|'.join(KEYS)}> do <desk command>` on a text that has `on edit`; got {p!r}")
     if g.startswith("drop "):
         drop_part, g = g[5:].strip(), "drop"
     if g.startswith("menu "):
@@ -1126,7 +1146,7 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `on menu "<label>" do <desk command>`: the entry\'s words, quoted; got {p!r}')
         label = label.strip('"')
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
-        raise LensRefusal(f"line {n}: `on <click|edit|drag> do <desk command>`, `on menu \"<label>\" do <desk command>` or `on drop <part> do <desk command>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `on <click|edit|drag> do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
     cmd = cmd.strip()
     if g == "drop" and len(split_batch(cmd)) > 1:
         raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
@@ -1289,6 +1309,8 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: `on edit` on a clamped text: the person would replace words the clamp hides; drop the clamp, or edit through a part that shows the whole value")
+        if any(a["on"] == "key" for a in k["on"]) and not any(a["on"] == "edit" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: `on key` is for a text being written: this part has no `on edit`")
         if k["each"] and k["each"] not in parts:
             raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
         if k["carry"] and any(a["on"] == "drag" for a in k["on"]):
@@ -1352,7 +1374,7 @@ def to_lines(src, roles=None, style=None):
 # ---------------------------------------------------------------------------------------------------------------------
 HOST = ("me", "today", "session", "touched")
 HOST_FRAMES = ("touched", "changed")      # Juniper: $touched (last event on the thing), $touched.by, $changed.<field>; host reads, never in a fence
-GESTURE_FACTS = ("value", "x", "y", "carried")
+GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus")
 
 
 def _refs_of(node):

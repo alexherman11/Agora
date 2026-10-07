@@ -849,6 +849,25 @@ def test_marks_are_asked_for_and_stay_out_of_code():
     assert n["paint"]["runs"] == rs and n["paint"]["marks"] is True and n["paint"]["text"] == t
 
 
+def test_a_texts_keys_and_a_buttons_press():
+    """Alex, 7 Oct (a document editor: Enter, Tab, buttons on top): `on key <key> do ...` on a text being written, with
+    $head and $tail; `$focus` in a click; `on click press Ctrl+B`, which is the painter's and sends no desk line."""
+    import verbs
+    src = ('root : column\n  b : text "B"\n    on click press Ctrl+B\n  h : text "H1"\n    on click do prop $focus block=h1\n'
+           '  w : text "words"\n    on edit do rewrite $item text="$value"\n    on key Enter do split $item "$head" "$tail"\n'
+           '    on key Shift+Tab do prop $item indent=0')
+    _root, parts = scene.parse(src)
+    acts = {k["name"]: k["on"] for k in scene._walk(parts["root"])}
+    assert acts["b"] == [{"on": "click", "line": "press Ctrl+B"}], acts["b"]
+    assert acts["h"][0]["line"] == "do prop $focus block=h1"
+    assert [(a["on"], a.get("label")) for a in acts["w"]] == [("edit", None), ("key", "Enter"), ("key", "Shift+Tab")], acts["w"]
+    assert 'split $item "$head" "$tail"' in acts["w"][1]["line"]
+    assert not any(l.startswith("press") for l in verbs._lens_steps(src)), verbs._lens_steps(src)
+    refused('root : column\n  w : text "x"\n    on key Enter do look', "has no `on edit`")
+    refused('root : column\n  w : text "x"\n    on edit do look\n    on key F5 do look', "on key <Enter|Tab|Shift+Tab|Backspace>")
+    refused('root : column\n  w : text "x"\n    on click press Ctrl+Q', "on click press <Ctrl+B|Ctrl+I|Ctrl+K>")
+
+
 def test_count_word_and_true_size():
     """a1101: `count <selection>` is a size without drawing; $count on a repeat is its size before the clamp."""
     import deskd, lens_ir

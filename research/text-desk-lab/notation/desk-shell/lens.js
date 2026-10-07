@@ -22,9 +22,22 @@
     if (st.text != null) { try { Style.install(st.text, q.get("theme") || undefined); styled = name + "@" + rev; } catch (e) { V.show("style " + name + " refused: " + (e.message || e)); } }
     // Alex, 30 Sep (scrollbars that fit the theme): a style with a `scrollbar` token draws its own bars (lens.html)
     document.documentElement.toggleAttribute("data-bars", !!Style.token("scrollbar"));
+    // Alex, 7 Oct ('not everything should be highlighted text boxes'): a style with a `focus` token (a colour) draws
+    // the ring round the text being written in that colour; the sheet's own colour makes it nothing
+    document.documentElement.toggleAttribute("data-focus", !!Style.token("focus"));
   }
   const V = Viewer(session, who, lens, said, document.getElementById("status"));
   let last = "", sceneAt = 0, def = null;
+
+  // a key's gesture (TEXT.key): sent as the text's own, and the answer comes back so the caret can follow what was made
+  async function sendKey(n, line) {
+    const observed = { ...(n.fence || {}), at: sceneAt, def }, gesture = V.gesture(n.key, false);
+    let r;
+    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture }) })).json(); }
+    catch (e) { V.show(`the answer was lost (${e.message})`); last = ""; await refresh(true); return null; }
+    const t = r.text || r.error || ""; if (r.error || t.startsWith("ERR")) V.show(t);
+    last = ""; await refresh(true); return r;
+  }
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more) {
@@ -80,7 +93,17 @@
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
     for (const a of n.acts) {
-      if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
+      // Alex, 7 Oct (buttons on top of a document): a button that presses a key, or names $focus, acts on the text the
+      // caret is in. It must not take the caret, and its gesture is the text's own: sent with what that text showed.
+      const onText = a.on === "click" && (a.line.startsWith("press ") || a.line.includes("$focus"));
+      if (onText) { el.dataset.tool = "1"; el.addEventListener("mousedown", e => e.preventDefault()); }
+      if (onText) el.addEventListener("click", () => {
+        const t = TEXT.last && TEXT.last.isConnected ? TEXT.last : null;
+        if (!t) return V.show("put the caret in a text first: this button acts on the text being written");
+        if (a.line.startsWith("press ")) { t.focus(); return TEXT.press(t, a.line.slice(6)); }
+        send(t._n, a.line.replace("$focus", () => (t._n.fence || {}).item || ""));
+      });
+      else if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
         if (e.target !== el && a.line.includes("$x")) return;
         const r = el.getBoundingClientRect();
         send(el._n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)));
@@ -193,8 +216,10 @@
     // drawn. Pike (S28): swapping on focus put the caret at the end, because focus comes before the click places it, and
     // the delimiters appearing moved the words under the pointer. So the swap waits for the first change (a key that
     // writes, a paste, a cut), and maps the caret and selection the browser has already placed to the same characters.
-    el.addEventListener("focus", () => { if (!V.repainting) V.hold = n.key; });
+    el.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
     const toSource = () => { if (el._runs) source(el); };
+    el._toSource = toSource;
+    el.addEventListener("keydown", e => TEXT.key(el, e));
     el.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.length === 1) MARKS.key(el, e, toSource); });
     el.addEventListener("keydown", e => { if (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || /^(Backspace|Delete|Enter)$/.test(e.key))) toSource(); });
     const multi = () => { const pp = el._n.paint; return pp.commit ? pp.commit === "ctrl-enter" : !!pp.lines && (pp.lines[1] == null || pp.lines[1] > 1); };
@@ -218,6 +243,48 @@
       if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
   }
+
+  // a text's keys (Alex, 7 Oct: 'Enter should create a new line, tab should indent'). A lens gives a text `on key
+  // Enter|Tab|Shift+Tab|Backspace do ...`; the command may name $head and $tail, the words either side of the caret.
+  // The words typed and not yet sent go with it (the command is told them), so nothing is sent twice. Afterwards the
+  // caret follows the text: into the same part of a thing the command made, or onto the end of the one above when
+  // this one is gone, or it stays.
+  const TEXT = {
+    last: null,
+    esc: v => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n"),
+    caret(el) {                               // the caret as a count of characters of the source
+      const sel = getSelection(); if (!sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+      const r = document.createRange(); r.selectNodeContents(el); r.setEnd(sel.focusNode, sel.focusOffset);
+      return { at: r.toString().length, wide: !sel.isCollapsed };
+    },
+    put(el, at) {                             // the caret at a count of characters (past the end: the end)
+      el.focus(); if (el._toSource) el._toSource();
+      const t = el.firstChild, sel = getSelection();
+      if (t && t.nodeType === 3) sel.setBaseAndExtent(t, Math.min(at, t.data.length), t, Math.min(at, t.data.length)); else sel.selectAllChildren(el), sel.collapseToStart();
+    },
+    press(el, key) { if (el._toSource) MARKS.key(el, { key: key.split("+").pop().toLowerCase(), preventDefault() {} }, el._toSource); },
+    key(el, e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const name = (e.shiftKey ? "Shift+" : "") + e.key, a = el._n.acts.find(x => x.on === "key" && x.label === name);
+      if (!a) return;
+      el._toSource(); const c = this.caret(el); if (!c) return;
+      if (name === "Backspace" && (c.at > 0 || c.wide)) return;        // only at the very start does it join
+      e.preventDefault(); e.stopImmediatePropagation();
+      const src = el.innerText.replace(/\n$/, ""), seen = V.editOrigin(el._n.key, el._n) || el._n, key = el._n.key, item = (el._n.fence || {}).item;
+      const before = [...paint.querySelectorAll("[contenteditable]")].filter(x => x._n && x._n.part === el._n.part);
+      const prev = before[before.indexOf(el) - 1], prevLen = prev ? (prev._n.paint.text || "").length : 0, prevKey = prev && prev._n.key;
+      const whole = /[$](head|tail)/.test(a.line);       // a command told the words takes them: the draft is not sent again
+      if (whole) { V.drop(key); V.hold = null; }
+      const line = a.line.replace("$head", () => this.esc(src.slice(0, c.at))).replace("$tail", () => this.esc(src.slice(c.at)));
+      sendKey(seen, line).then(r => {
+        const made = r && (r.created || [])[0], find = k => paint.querySelector(`[data-key="${CSS.escape(k)}"]`);
+        const same = find(key), born = made && item && find(key.split(item).join(made));
+        if (born) this.put(born, 0);
+        else if (!same && prevKey && find(prevKey)) this.put(find(prevKey), prevLen);
+        else if (same) this.put(same, name === "Backspace" ? 0 : c.at);
+      });
+    },
+  };
 
   // marks (Editor board a3486, 7 Oct): the words a text part carries marks in, when its lens says `marks`. One table
   // holds each mark's element, the source written around it and its key, so a new mark is one more line here and one

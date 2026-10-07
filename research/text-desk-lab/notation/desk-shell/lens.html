@@ -66,6 +66,8 @@
   [data-key] { white-space: pre-line; }
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
   .t-verbatim { white-space: pre; overflow-x: auto; }
+  [data-focus] [contenteditable]:focus { outline: 1px solid var(--t-focus); outline-offset: 2px; }
+  [data-tool] { cursor: pointer; user-select: none; }
   /* marks in a text (a3486): weight and slant are the reader's own signs, so they are not roles of a style */
   .t-mark-strong { font-weight: 700; } .t-mark-stress { font-style: italic; }
   .t-mark-link { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; color: inherit; }
