@@ -517,6 +517,11 @@ class Handler(SimpleHTTPRequestHandler):
                 desk._note_seen(ob["item"], int(ob.get("at", 0)), sorted(fields) if fields else None, obs=sess.actor)
             if car.get("item"):
                 line = line.replace("$carried", car["item"])
+            # 7 Oct: a world that has a log (store.py) gets one record per line: the facts it changed, written beside
+            # the pickle. The world as facts before the line, and after it below; a fault in either is written down
+            # and never refuses the line
+            import store
+            ctx = store.safe_begin(desk, sess.path)
             if line.lower().split(" ")[0] == "worktree":
                 text, desk = worktree.handle(line, sess.name, desk, sess.actor)
                 sess.desk = desk
@@ -550,6 +555,7 @@ class Handler(SimpleHTTPRequestHandler):
             if gid:
                 for e in desk.world.events[n0:]:
                     e["gesture"] = gid          # a1008: kept on what it made, saved with the world
+            store.safe_commit(ctx, desk, line, sess.actor, gid)
         text = r.get("text") or ""
         # Rook: a parse failure came back as error=null. And a refusal in the second step of `look x; do y` hid in the text.
         bad = [l for l in text.splitlines() if l.startswith("ERR")]

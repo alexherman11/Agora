@@ -165,6 +165,15 @@ def main():
             if code:
                 failed.append(f"{Path(name).stem}: {last}"[:300])
         print(f"room tests: {'; '.join(outs)}{took('room tests', t0)}")
+        # 7 Oct: the log beside the world (store.py). The in-memory part: several hundred lines of every kind, then the
+        # log replayed must say what the world says, a world rebuilt from its facts the same facts, and a command put
+        # back by its facts must be the world before it. (test_store.py without --quick also runs the CLI and deskd.)
+        t0 = time.perf_counter()
+        code, out = run(["test_store.py", "--quick"], timeout=300)
+        last = (out.strip().splitlines() or ["?"])[-1]
+        print(f"test_store: {last}{took('test_store', t0)}")
+        if code:
+            failed.append(f"test_store: {last}"[:300])
         # a1505: the door swaps deskd under the live page; a deskd that no longer answers what the door asks (health,
         # events by index, gesture ids) would make every landing visible again
         t0 = time.perf_counter()

@@ -557,7 +557,10 @@ class World:
 
     def hidden_fraction(self, nid):
         n = self.nodes[nid]
-        if not n["parent"]:
+        if not n["parent"] or n["w"] * n["h"] <= 0:
+            # 7 Oct: a crowded flow lays its children out with no room at all (frontier holds 445 boxes of negative
+            # size; a create in f149 left 152 empty ones) and `look` then divided by an area of zero. A box with no
+            # area has nothing of it covered
             return 0.0
         covered = 0.0
         for s in self.children(n["parent"]):

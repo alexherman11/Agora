@@ -220,11 +220,21 @@ class DeskMoo(Desk):
             raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
         hit = name not in ("create", "comment") and self._touched_by_others(nid, mine, others_only=not getattr(self, "_window", ""))
         behind = (bool(hit) and adds) or unread     # a chat line lands; what I missed stays unread (a656), and it marks nothing seen
+        joined = ""
+        if hit and not behind and mine == {"text"}:
+            # 7 Oct: two people in one text. When the log knows what I read and their change is on other lines, mine
+            # is put into the text as it is now (desk._merge_text); what I missed stays unread, as a chat line's does
+            name2, kv2, joined = self._merge_text(nid, name, kv)
+            if name2:
+                name, kv, behind = name2, kv2, True
+            else:
+                hit = dict(hit, clash=joined)
+                joined = ""
         if hit and not behind:
             via = f" through {hit['target']}" if hit["target"] != nid else ""
             who = (f"your {hit['via']}, tripped by {hit['tripped_by']}" if rule_did_unseen(hit, self.world.me)
                    else "you, in your other window" if hit["by"] == self.world.me else hit["by"])
-            raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}); {self._again(nid, mine)} before acting")
+            raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}){hit.get('clash', '')}; {self._again(nid, mine)} before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         v = moo.REGISTRY[name]
         r = v.run(w, nid, kv)
@@ -262,6 +272,8 @@ class DeskMoo(Desk):
                     out += "\n    where: " + self._where_line(cid)   # geometry matters only where things can overlap
         if r.get("note"):
             out += f"\n  {r['note']}"
+        if joined:
+            out += f"\n  {joined}"
         said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
         if said:
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since

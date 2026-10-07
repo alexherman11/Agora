@@ -1570,6 +1570,12 @@ class Desk:
             # a rule's consequence: undo the command that caused it, and everything it caused
             eid = ev["cause"]
             ev = next(e for e in self.world.events if e["id"] == eid)
+        # 7 Oct: in a world with a log, a command is put back whole by the facts its record holds (store.undo_plan):
+        # one way for every verb, judged fact by fact, so an old change comes back when nothing changed the same
+        # facts since. A world without a log, and the one-time migrations, go the verbs' own way below.
+        back = self._undo_record(ev)
+        if back:
+            return back
         group = [ev]
         if ev.get("verb_use"):
             # a world verb's use is undone whole, all its steps (each step was its own command)
@@ -1610,6 +1616,99 @@ class Desk:
         # Jeff lost a lens to this: a refused command, then a bare undo, which reverted something minutes older and said only its number
         said = f"{ev['verb']} {ev['target']}" + (f" {self._fmt_args(ev.get('args'))}" if ev.get("args") else "")
         return f"ok {r['event']}: reverted {eid}, which was: {said[:160]}" + (f"  (made {ev['at'][11:16]})" if ev.get("at") else "")
+
+    def _merge_text(self, nid, verb, kv):
+        """7 Oct: someone changed this text since I read it, and I am changing it too. In a world with a log, what I
+        read is known (store.text_at_event), so the two changes can be compared line by line: when they touch
+        different lines, mine goes into the text as it is now and nothing of theirs is lost. -> (verb, kv, note) to act
+        with, or (None, None, why) when it cannot be done (the same lines; no log; read before the log began)."""
+        ctx = getattr(self, "_store", None)
+        if ctx is None or verb not in ("rewrite", "replace"):
+            return None, None, ""
+        import store
+        w = self.world
+        n = w.nodes.get(nid)
+        sid = n.get("subject") if n else nid
+        s = w.subjects.get(sid)
+        if s is None or s.get("lines") is not None:
+            return None, None, ""
+        seen = self._seen_index(nid)
+        base = store.text_at_event(ctx.log, w, sid, max(seen.get("text", 0), seen.get("*", 0)))
+        if base is None:
+            return None, None, ""
+        theirs = s.get("text") or ""
+        if verb == "replace":
+            old = kv.get("old")
+            if not old or base.count(old) != 1:
+                return None, None, ""
+            mine = base.replace(old, kv.get("new", ""), 1)
+        else:
+            mine = kv.get("text")
+            if mine is None:
+                return None, None, ""
+        merged, clash = store.merge3(base, theirs, mine)
+        if merged is None:
+            return None, None, f"; you and they both changed {clash}"
+        import kinds
+        if kinds.is_lens(s):
+            import lens_ir
+            good = getattr(self, "_lens_good", None)
+            kept = dict(good) if good is not None else None
+            try:          # asked of a text not saved yet: the last-good record must not learn it
+                broke = lens_ir.check(self, s)[0] and not lens_ir.check(self, dict(s, text=merged))[0]
+            finally:
+                if kept is not None:
+                    self._lens_good = kept
+            if broke:
+                return None, None, "; your change and theirs are on different lines, but together the lens does not compile"
+        d_theirs, d_mine = _line_change(base, theirs), _line_change(theirs, merged)
+        said = lambda d: (f"{d[0]} {_numbered('line', d[1])}" if d[1] else d[0])     # noqa: E731
+        note = (f"~ joined: this text was changed since you read it ({said(d_theirs)}); your change ({said(d_mine)}, as "
+                f"numbered now) went into the text as it is now, and theirs is kept. You have not read theirs: read {nid} shows the whole")
+        if verb == "replace" and theirs.count(kv["old"]) == 1:
+            return verb, kv, note
+        return "rewrite", {"text": merged}, note
+
+    ONCE = {"persons_begin", "persons_migrate", "promises_migrate", "lines_declined", "restore_binds", "external", "refuse"}
+
+    def _undo_record(self, ev):
+        """Put back the whole record `ev` belongs to, by its facts. -> the receipt, or None when this world has no
+        log, the event has no record (it is older than the log), or it is one of the once-only changes."""
+        ctx = getattr(self, "_store", None)
+        if ctx is None:
+            return None
+        import store
+        w = self.world
+        rec = ctx.log.record_of_event(ev["id"])
+        if rec is None or not store.facts_of(rec):
+            return None
+        evs = [e for e in (w.event_by_id(p.get("e")) for p in rec["parts"]) if e is not None]
+        if any(self.ONCE & set(e.get("undo") or {}) for e in evs):
+            return None
+        if ev.get("undone") or ev["verb"] == "undo" or any(e.get("undone") for e in evs):
+            raise Refusal(f"{ev['id']} cannot be undone (already undone or is an undo)")
+        words = (rec.get("words") or "")[:120]
+        try:
+            plan = store.undo_plan(ctx.log, rec, store.flatten(w))
+        except store.CannotUndo as e:
+            raise Refusal(f"{ev['id']} cannot be put back: {e}. It was the command `{words}` (record {rec['seq']}); "
+                          "undo what came after it first, or act on the world as it is")
+        touched = store.apply(w, plan)
+        last = None
+        for e in reversed(evs):
+            e["undone"] = True
+            last = w._event("undo", e["id"], {}, {}, note=f"reverted {e['id']}")
+        for t in touched:
+            if t in w.nodes or t in w.subjects:
+                self._mark_seen(t)       # an undo is your own change; what it touched stays seen
+        self._after_mutation()
+        ids = [e["id"] for e in evs]
+        rules = sorted({str(e.get("via"))[5:] for e in evs if str(e.get("via") or "").startswith("rule ")})
+        what = f"{ids[0]}" if len(ids) == 1 else f"{ids[0]}..{ids[-1]} ({len(ids)} events of one command"
+        if len(ids) > 1:
+            what += (f", {len(rules)} rule consequence(s): " + ", ".join(rules) if rules else "") + ")"
+        return (f"ok {last['id']}: reverted {what}, which was: {words}"
+                + (f"  (made {rec['at'][11:16]})" if rec.get("at") else ""))
 
     def cmd_do(self, verb, target, kv):
         if not verb or not target:

@@ -135,6 +135,13 @@ def handle(line, session, desk, actor):
             fork = pickle.loads(pickle.dumps(desk))
             fork._wt = {"base": session, "base_events": len(desk.world.events), "by": actor, "journal": []}
             _fork_path(session, name).write_bytes(pickle.dumps(fork))
+            # 7 Oct: a fork takes its base's log with it (store.py), so it goes on from the same records: its own
+            # are a tail after the base's, and what it changed can be read as facts
+            import shutil
+            import store
+            base_log = store.log_path(SESSIONS / f"{session}.pickle")
+            if base_log.exists():
+                shutil.copyfile(base_log, store.log_path(_fork_path(session, name)))
             return (f"ok forked {session} at event {len(desk.world.events)} as {session}@{name}\n"
                     f"  enter: python explore.py {session}@{name} --as {actor}   or   ?session={session}@{name}&as={actor}\n"
                     f"  the base keeps moving without you; worktree diff {name} shows both sides"), desk

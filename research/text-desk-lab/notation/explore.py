@@ -243,10 +243,22 @@ def main():
         save_desk(path, desk)
         print("reset")
         return
+    # 7 Oct: a world that has a log (store.py) gets one record per line, as it does through deskd: the world as facts
+    # before the line (logged), and the difference written when the next line begins or the lines end
+    import store
+    logged = said = None
+
+    def record():
+        if logged is not None:
+            store.safe_commit(logged, desk, said, said[1:].split()[0].lower() if said.startswith("!") and said[1:].split() else me,
+                              None, window)
+
     for raw in sys.stdin:
         line = raw.rstrip("\n")   # the desk's own grammar handles \n inside values; do not pre-convert
         if not line.strip() or line.startswith("#"):
             continue
+        record()
+        logged, said = store.safe_begin(desk, path), line
         print(f"> {line}")
         if line.startswith("!"):
             # !priya append a10 line="..."   another actor writes to the world directly (a test injection)
@@ -303,6 +315,7 @@ def main():
                       f"Not run: " + " | ".join(rest))
                 print()
             break
+    record()
     per[slot] = (desk.seen, desk.open, desk.last_event_seen)
     save_desk(path, desk)
 
