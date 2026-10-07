@@ -164,7 +164,8 @@ def written(e):
     if e.get("verb") in ("comment", "resolve"):
         texts = [str(args.get("line", ""))]
     elif e.get("verb") == "edit" and {"text", "title", "append"} & set(args):
-        old = (e.get("undo") or {}).get("restore_subject") or {}
+        import kept
+        old = kept.copy_of(e) or {}       # the thing as it was: on the event, or in the world's archive (kept.py)
         if "text" in args:
             texts, gone = changed_lines(old.get("text", ""), args["text"])
         if "append" in args:
@@ -1293,8 +1294,12 @@ class World:
             if nid in self.nodes:
                 self.nodes[nid]["props"] = dict(props)
                 self._bump(nid)
-        elif "restore_subject" in u:
-            r = deepcopy(u["restore_subject"])
+        elif "restore_subject" in u or u.get("kept"):
+            import kept
+            r = deepcopy(kept.copy_of(ev))        # 7 Oct: the copy may be beside the world's file, not on the event
+            if r is None:
+                raise Refusal(f"{event_id} cannot be undone here: the copy of what it changed is kept in the archive of "
+                              f"{u.get('kept')}, which is not beside this world (a copy taken without it)")
             r["rev"] = self.subjects[r["id"]]["rev"] + 1
             self.subjects[r["id"]] = r
             for a in self.appearances_of(r["id"]):

@@ -96,6 +96,9 @@ def save_desk(path, desk, data=None):
     """Write the session atomically: to a temp file, then rename over the old one. Sable's baseline (1): a write killed
     halfway left a pickle that would not load, and the whole session was lost. `data`: the pickled desk, if in hand."""
     tmp = path.with_name(path.name + ".tmp")
+    if data is None:
+        import kept
+        kept.sweep(desk.world, path)      # 7 Oct: the copies undo keeps go beside the file, when the world has an archive
     tmp.write_bytes(data if data is not None else pickle.dumps(desk))
     # 1 Oct (worker-a1568 c1920, Pike e4506): on Windows the rename is refused while any other process has the world
     # open, even only to read it (a copy taken without the lock, a virus scan of a 58 MB file), and the write was lost.

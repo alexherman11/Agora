@@ -494,8 +494,9 @@ class DeskKnife(DeskMoo):
                 if hit and "made_by" not in rec[hit]:
                     put(hit, "made", e)
                 continue
-            if "restore_subject" in u:
-                hit = key.get(u["restore_subject"].get("id"))
+            if "restore_subject" in u or u.get("kept"):
+                import kept
+                hit = key.get(kept.subject_id(e))       # the subject's id is on the event; the copy is not read here
             elif u.get("restore_subjects"):
                 hit = key.get(u["restore_subjects"][0].get("id"))   # a put: the card put, not the ones renumbered quietly
             elif "restore_props" in u:

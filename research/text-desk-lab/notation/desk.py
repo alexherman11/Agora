@@ -939,7 +939,8 @@ class Desk:
     def _edit_said(self, e, bare=False):
         """What one edit did, as its maker would want it said -> (word, "line 8" | numbers if bare | None, old title | None)."""
         a = e.get("args") or {}
-        before = (e.get("undo") or {}).get("restore_subject") or {}
+        import kept
+        before = kept.copy_of(e) or {}
         old = str(before.get("text", ""))
         noun = "line"
         if e["verb"] == "check":

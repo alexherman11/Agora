@@ -138,7 +138,9 @@ def handle(line, session, desk, actor):
             # 7 Oct: a fork takes its base's log with it (store.py), so it goes on from the same records: its own
             # are a tail after the base's, and what it changed can be read as facts
             import shutil
+            import kept
             import store
+            kept.fork(SESSIONS / f"{session}.pickle", _fork_path(session, name))
             base_log = store.log_path(SESSIONS / f"{session}.pickle")
             if base_log.exists():
                 shutil.copyfile(base_log, store.log_path(_fork_path(session, name)))

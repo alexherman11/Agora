@@ -257,7 +257,8 @@ def members_at(w, s, eid):
             args = e.get("args") or {}
             if e.get("verb") == "prop" and not e.get("undone") and e["target"] in apps and \
                     ("members" in args or "members" in str(args.get("remove", "")).split(",")):
-                was = (e.get("undo") or {}).get("restore_subject")
+                import kept
+                was = kept.copy_of(e)
                 if was is not None:
                     return (was.get("props") or {}).get("members", "")
     return (s.get("props") or {}).get("members", "")

@@ -224,6 +224,8 @@ class Session:
         try:
             d = self.desk
             self.per[self.actor] = (d.seen, d.open, d.last_event_seen)
+            import kept
+            kept.sweep(d.world, self.path)      # 7 Oct: the copies undo keeps go beside the file (kept.py), before it is saved
             now = pickle.dumps(d)
             if now != self.before:
                 explore.save_desk(self.path, d, now)
