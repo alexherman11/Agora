@@ -508,8 +508,23 @@
     // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
-    V.show(r.text); report();
+    settle(); V.show(r.text); report();
   }
+  // Alex, 7 Oct (c3674: comments must not push the paragraphs down): parts a style calls `afloat` take no room, so two
+  // of them near each other would lie one on the other. After a paint each is slid down just far enough to clear the
+  // one before it in the same column, as notes in a document's margin are.
+  function settle() {
+    const sel = (Style.afloat || []).join(","); if (!sel) return;
+    const ends = new Map();
+    for (const el of paint.querySelectorAll(sel)) {
+      el.style.transform = "";
+      if (!el.scrollHeight) continue;
+      const r = el.getBoundingClientRect(), col = Math.round(r.left), free = ends.get(col) || 0, down = Math.max(0, free - r.top);
+      if (down) el.style.transform = `translateY(${Math.ceil(down)}px)`;
+      ends.set(col, r.top + down + el.scrollHeight + 8);
+    }
+  }
+  addEventListener("resize", settle);
 
   const report = () => V.report(paint, sceneAt, carrying ? { [carrying.n.key]: "carried" + (carrying.over ? " over " + carrying.over.dataset.key : "") } : {}, q.get("share") === "attention",
     def && { frame: def.frame, style: def.style_rev || "seed" });

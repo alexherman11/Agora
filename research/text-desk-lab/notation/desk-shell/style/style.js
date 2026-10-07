@@ -233,6 +233,7 @@ const Style = (() => {
     });
   }
 
+  let afloat = [];
   function install(src, theme) {
     const st = parse(src);                       // throws Refusal; nothing is installed on a refusal,
     const T = resolveTokens(st, theme);          // so the last working look survives by construction.
@@ -245,10 +246,11 @@ const Style = (() => {
     if (T.card) vars.push(`--surface:${T.card.value}`);
     if (T.gap) vars.push(`--radius:${T.gap.value}px`);
     if (T.text) vars.push(`--font:${family(T.text.family)}`);
-    let out = ":root{" + vars.join(";") + "}\n";
+    afloat = []; let out = ":root{" + vars.join(";") + "}\n";
     for (const name of Object.keys(st.roles)) {
       const lk = lookOf({ as: name }, st, T, { nodes: {} });
       out += `.r-${name.replace(/\./g, "_")}{${decl(lk.css)}}\n`;
+      if (lk.css.height === "0" && lk.css.overflow === "visible") afloat.push(".r-" + name.replace(/[.]/g, "_"));
       if (lk.css["--shy"]) {      // shy: seen when the pointer or the caret is in the part holding it (or the one above), or when it has words of its own to show
         const c = ".r-" + name.replace(/\./g, "_");
         out += [":hover > ", ":hover > * > ", ":focus-within > ", ":focus-within > * > "].map(a => a + c).join(",") + `,${c}:focus{opacity:1}\n`;
@@ -319,6 +321,7 @@ const Style = (() => {
     get style() { return current; },
     get tokens() { return tokens; },
     get theme() { return themeName; },
+    get afloat() { return afloat; },      // the classes of parts that take no room (lens.js keeps them from lying on each other)
     token: n => tokens && tokens[n] ? (tokens[n].value !== undefined ? tokens[n].value : tokens[n]) : null,
     varName: n => `var(--t-${n})`,
     roleClass: n => "r-" + String(n).replace(/\./g, "_"),
