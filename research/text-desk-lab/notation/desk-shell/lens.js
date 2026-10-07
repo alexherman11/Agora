@@ -240,7 +240,7 @@
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
-      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
+      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
   }
 
@@ -272,12 +272,16 @@
       V.drop(key); V.hold = null;
       if (edit && raw !== (n.paint.text || "")) await sendKey(seen, edit.line.replace("$value", () => this.esc(raw)));
       const now = paint.querySelector(`[data-key="${CSS.escape(key)}"]`) || el;
-      await sendKey(now._n, line.replace("$focus", () => (n.fence || {}).item || ""));
+      await sendKey(now._n, line.replace("$focus", () => (n.fence || {}).item || "").replace("$selected", () => this.selected(n)));
       const after = paint.querySelector(`[data-key="${CSS.escape(key)}"]`);
       if (after) this.put(after, c.at);
     },
     // A person types on while Enter is still on its way to the desk (seen live, 7 Oct: the next words landed in the
     // paragraph above). Keys pressed meanwhile are kept, in order, and given to the text the caret lands in.
+    // $selected (Alex, c3669: 'I should be able to hilight text'): the words last highlighted in a text of the same
+    // thing this gesture is about, kept when the caret leaves for a comment box, written in quotation marks with a space after; nothing when none were
+    sel: null,
+    selected(n) { const it = (n.fence || {}).item; return this.sel && it && this.sel.item === it ? "“" + this.esc(this.sel.text.trim()) + "” " : ""; },
     queue: null,
     wait(done) {
       if (!this.queue) this.queue = [];
@@ -356,6 +360,12 @@
     if (!TEXT.queue || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.length === 1 || /^(Enter|Tab|Backspace)$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey }); }
   }, true);
+  document.addEventListener("selectionchange", () => {
+    const sel = getSelection(), el = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    const t = el && el.closest && el.closest("[contenteditable]");
+    if (!t || !t._n || !t._n.paint.marks) return;                // only a text that carries marks is a document's words
+    TEXT.sel = sel.isCollapsed ? null : { item: (t._n.fence || {}).item, text: String(sel) };
+  });
   document.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest(".t-mark-link");
     if (!a || !/^https?:/.test(a.dataset.href || "")) return;

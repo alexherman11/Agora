@@ -84,6 +84,9 @@ the one form. The words:
                                  before and after the caret. After it the caret follows the text: into a paragraph
                                  the command made, or to the end of the one above when this one is gone
     on click do ... $focus       $focus is the thing whose text the caret is in; such a button does not take the caret
+    $selected                    in an edit's or a button's command: the words last highlighted in a text (one with
+                                 `marks`) of the same thing, in quotation marks with a space after; empty when none were. A comment box beside a paragraph
+                                 can quote what was highlighted in it
     on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
     on <gesture> do <command>    click | edit | drag. The command is a desk verb line (`do` is implied); the painter
@@ -1374,7 +1377,7 @@ def to_lines(src, roles=None, style=None):
 # ---------------------------------------------------------------------------------------------------------------------
 HOST = ("me", "today", "session", "touched")
 HOST_FRAMES = ("touched", "changed")      # Juniper: $touched (last event on the thing), $touched.by, $changed.<field>; host reads, never in a fence
-GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus")
+GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected")
 
 
 def _refs_of(node):
