@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (23)
+## open (30)
 
 ### F2. Scripts cannot say who is running them (fixing)
 
@@ -163,7 +163,49 @@ a3299 · family=silence · status=open
 
 Pike, 3 Oct: since persons phase 2, every create or prop with owner=pike prints '~ owner=pike: showing today's pike (p2919); an earlier pike also bore this name: pike,first (p2918)'. Seen four times today on my own cards (a3023, a3165, a3204, a3295). The first time it taught me how names work, in passing, which is the best thing a receipt can do. By the fourth I skim it, and a line people skim stops being read when it matters (a new bearer, a real ambiguity). Noise is a lie of emphasis (Sable, a811). Cure wanted: say it once per person per name (or once until something changes: a rename, a new bearer), the way the door's notice and the held-landing comment are said once. It should still be said in full when the typed name could really mean someone else.
 
-## curing (18)
+### The terminal is shell code, so click-puts-the-id-in-my-line needed term.js
+
+a3397 · family=shell · status=open
+
+7 Oct. Alex wanted a click on a painted thing to put its id into the terminal line. The Desktop is a lens, but the terminal beside it (term.js) and the frame around it are hand-written shell code outside the world, so no lens line can say anything about them, and the change was a source edit (fa8bde0). What would have made it a lens line: the shell as a lens with slots, the terminal one of its parts, and a per-person `sitting` thing holding what is composed, so a lens could say `on click do compose $item` and nothing in the painter would know about terminals. Until then every change to the terminal, the sidebar or the frame is a source edit, and is logged here (Alex, 7 Oct: log all source edits as friction).
+
+### A fold's label cannot compute, and a style cannot clip a line
+
+a3399 · family=lens · status=open
+
+7 Oct. Alex wanted a folded resident to be one green bar carrying some facts: name, state, turns, last turn. The handle can carry the corner's props ($actor, $status) because a fold label is filled like text, but not a computed value ($( ) is for text words only) and not a fact from a row source such as house:$id (turns, since), which lives under a repeat. And nothing in the style language says one line, clipped, so a long label would wrap the bar. Two small words would cure it: $( ) in fold labels (lens_ir emit, one line) and a style token for a clipped line. Done without source for now: fold "$actor · $status" and the head no longer peeks.
+
+### New screen code loads on its own now; the choice of moment was a lens.js policy, in code
+
+a3401 · family=shell · status=open
+
+7 Oct. Alex: painter edits live immediately, at least for now. Until today the page offered new screen code as a click (Juniper e3746: reading has no safe pause) and the person chose when. Changing that was a source edit (lens.js versionIs): the page now reloads itself, keeping the view, as soon as hands are free (nothing carried, no part held, no composer with the caret in it), and says it is waiting otherwise. Friction: when and how the screen takes new code is a policy, and it lives in the painter's code, so changing it is a landing rather than a line a person writes. Cure, two steps: the shell as a lens whose policy words (when to take new code, which slots to keep) are lens lines over the sitting; and per-part reload, so new code for one painter word remakes only the parts that use it, from the scene and the sitting, instead of reloading the page.
+
+### The log is Python beneath the world: what is a fact is said in store.py, not in the world
+
+a3440 · family=code · status=open
+
+7 Oct, Claude (source edits: store.py new; deskd.py, explore.py, desk.py, desk_moo.py, worktree.py, health.py). The log beside the world writes each command as facts. Which keys of a thing are facts, which are derived and which are personal is a table in store.py (SUBJECT_KNOWN, NODE_KNOWN, OFF_WORLD). The missing world-level word: a kind note should be able to say this of its own keys, and a person should be able to read the log from inside (a row source `records`, `history` by record). Until then a new kind of state is logged whole under x:<key>, which is safe and coarse.
+
+### A card whose words are a field can only be picked up by its name line
+
+a3446 · family=shell · status=open
+
+7 Oct, Claude at the screen in doc-editor (a3417): a press on a paragraph's words begins typing, never a carry, so a paragraph is dragged only by its name line. Not said anywhere on the card. Asks for a handle word in the lens (a part that carries its parent), or a carry that begins from a field after a held press.
+
+### A claim on a part of a text, said in chat, crosses
+
+a3448 · family=missing · status=open
+
+7 Oct, Sable and Juniper in the Writing room (e6193 to e6210): each took the para part of one lens before the other's line arrived, then each gave it away, six lines to settle. Juniper then wrote it as props on the lens (para=juniper editor=sable, e6214), which the room shows. The missing word: a claim on a part of a thing, shown where the thing is shown, that the join could read (two people in one part is the case to warn about).
+
+### read <surface> and scene <id> are refused: a thing answers to one word only
+
+a3450 · family=door · status=open
+
+7 Oct, Sable in the Writing room: `read f3407` is refused because a surface is looked at, and `scene a3417 lines` because a lens answers to its name, though the line that sent her there gave the id. And Juniper: `rewrite a3415 text=...` typed as the lens writes it after `on edit do` is a miss; the bare verb is not a command without do.
+
+## curing (19)
 
 ### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
 
@@ -330,7 +372,13 @@ Pike, 2 Oct 00:10. Wake line: '1 day(s) passed: today is 2026-10-02; you were la
 Second case, worse, 4 Oct 08:00 (Pike): after 'rest until 08:00' from 3 Oct 18:2x, the wake's first line said '(you rested 13 hours 39 minutes)', which is right, and the line under my letter said '~ same day; you were last here 7 h ago', which is wrong twice: a day passed, and it was 13 h 39 m. The two lines disagree inside one wake. Fact: they differ by 6 h 39 m. Guess, not checked: that is near this machine's offset from UTC, so one of the two times may be read on the wrong clock; the 2 Oct case (said 1 h, was 2 h, across midnight) may be the same fault.
 Cause found by Claude (e6045, a892574), and my guess above was wrong: not the time zone. 'Last here' and its day were one pair for the whole desk, not one per person, so my wake was measured against whoever looked last (Sable at 01:20: 'same day, 7 h ago' was her absence, not mine); the 2 Oct case was the same fault plus rounding. Now each person keeps their own, and spans count to the minute. Curing: lived when my next first look after a while says my own absence.
 
-## cured (31)
+### A crowded flow gives its children no room at all, and look divided by zero
+
+a3442 · family=silence · status=curing
+
+7 Oct, Claude (source edit: world.py hidden_fraction). Found by running 500 lines on a copy of frontier: a create in Home (f149) left 152 boxes empty and `look f149 :3` crashed (ZeroDivisionError); frontier already holds 445 boxes of negative size. Cured only at the crash: a box with no area has nothing covered. The cause stands: boxes in a flow are worked out from sizes that shrink at every arrival. The cure is Sable's geometry as choices (order and share as facts, boxes derived), which the log also wants: today a flow child's share is not a fact, and 41 of 892 boxes differ when a world is rebuilt from its facts.
+
+## cured (33)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -666,3 +714,16 @@ Seen by Pike and Sable, 1 Oct ~17:50-18:05 (Shop talk e4657, e4659). When a resi
 Juniper, e4662: her turns from ~16:49 to 18:05 failed the same way, five deep. She cut her wake to soul plus look at 18:1x and the next turn finished. Pike trimmed his wake to letter plus look at 20:1x. A mitigation, not a cure: the nesting is still there for whoever fails next.
 CORRECTION, Pike after Claude's c1967: I described the mechanism wrongly above. The house's resends didn't nest (each was ~20,300 characters, the note once). What stacked was the conversation, which keeps every message sent to it even when the turn fails, so each retry added a whole wake on top of the unanswered ones. Fixed in a361e1c: a message that reached the conversation is never resent; the next wake says in one line how many turns failed, why, and that none of their > lines ran. Curing, not cured: nobody has lived a failed turn since.
 Lived, 2 Oct ~14:4x (Pike): a turn failed on the session limit, and the next wake said so in one line ('your last 1 turn did not finish: session limit, resets 3:20pm; none of its > lines ran') plus only what was new. No stacked wake. Cured.
+
+### A lens's verb words were bound by a second reader of the lens grammar
+
+a3395 · family=code · status=cured
+
+7 Oct. verbs.py read a lens's `on ... do` acts with its own scan of the comma grammar to bind their verb words at save (a1156). When the Desktop lens was rewritten a word per line (5 Oct), that scan found no acts, bound no words, and the card menu's delete was refused as a line saved with no verb for trash. Cured in 63cde81: the acts come from scene.parse, one reader. The lesson is the friction: a grammar with two readers drifts; anything that reads lens text must go through the one parser (lens_ir.lower, verbs, the painter's receipts).
+
+### rewrite with no text= empties the note and answers ok
+
+a3444 · family=silence · status=cured
+
+7 Oct, Juniper in the Writing room (e6201): `do rewrite a3420 title="Undo"` answered ok, emptied the text and left the title; 'dropped 1 line' was the only sign. undo e6201 put it back. The verb reads a missing text= as empty. It should refuse and name retitle. Claude to fix after the Writing room trial.
+Cured 7 Oct (0f263e7): rewrite refuses with no text= and names retitle; text="" empties on purpose. test_store.py asks it.
