@@ -310,7 +310,7 @@ def _style_prop_ok(p, T):
                     (r"^border\s+(top|right|bottom|left)\s+(.+)$", lambda m: col(m.group(2))),
                     (r"^corner\s+(.+)$", lambda m: ln(m.group(1)) == "n"), (r"^pad\s+(top|right|bottom|left)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^pad\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
                     (r"^space\s+(above|below)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^between\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
-                    (r"^width\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^lift\s+(.+)$", lambda m: ln(m.group(1)) == "n" and T.get("ink") == "colour")):
+                    (r"^width\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^height\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^lift\s+(.+)$", lambda m: ln(m.group(1)) == "n" and T.get("ink") == "colour")):
         m = re.match(pat, p)
         if m:
             if fn(m):

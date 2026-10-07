@@ -1007,6 +1007,7 @@ STYLE_SAMPLES = [
     "role c : text medium, hide title, ink at 40%, glow, pulse, pulse down",
     "role x : on #fff",
     "role x : pad 12px",
+    "token gap = 8\nrole sheet : height 60em, height gap x40, height 12",
     "role x on paper",
     "present card : title",
     "theme dark of calm\n  role x : ink",

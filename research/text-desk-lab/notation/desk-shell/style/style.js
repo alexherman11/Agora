@@ -157,6 +157,8 @@ const Style = (() => {
     if ((m = p.match(/^pad\s+(.+)$/))) { const l = len(m[1], T); return typeof l === "number" ? { css: { padding: l + "px" } } : null; }
     if ((m = p.match(/^space\s+(above|below)\s+(.+)$/))) { const l = len(m[2], T); return typeof l === "number" ? { css: { [m[1] === "above" ? "margin-top" : "margin-bottom"]: l + "px" } } : null; }
     if ((m = p.match(/^between\s+(.+)$/))) { const l = len(m[1], T); return typeof l === "number" ? { css: { gap: l + "px" } } : null; }
+    // Alex, 7 Oct (a page the shape of a page): a least height, so a nearly empty sheet is still a sheet
+    if ((m = p.match(/^height\s+(.+)$/))) { const l = len(m[1], T); if (l && l.em) return { css: { "min-height": l.em + "em" } }; return typeof l === "number" ? { css: { "min-height": l + "px" } } : null; }
     if ((m = p.match(/^width\s+(.+)$/))) { const l = len(m[1], T); if (l && l.em) return { css: { "max-width": l.em + "em" } }; return typeof l === "number" ? { css: { width: l + "px" } } : null; }
     if ((m = p.match(/^lift\s+(.+)$/))) { const l = len(m[1], T); const c = T.ink && T.ink.value; return typeof l === "number" && c ? { css: { "box-shadow": `0 ${l}px ${l * 3}px ${hexToRgb(c).join(",").replace(/^/, "rgba(")},.10)` } } : null; }
     if (/^text\b/.test(p)) {
