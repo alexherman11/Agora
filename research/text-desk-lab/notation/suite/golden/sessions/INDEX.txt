@@ -125,3 +125,7 @@ rebased bridge/spacing-wish with the working-tree compiler at 43c4bb3 (an intend
 rebased frontier/p-if with the working-tree compiler at 43c4bb3 (an intended change)
 rebased bridge/spacing-wish with the working-tree compiler at 6473444 (an intended change)
 rebased frontier/p-if with the working-tree compiler at 6473444 (an intended change)
+rebased lens/desktop with the working-tree compiler at 9acbe26 (an intended change)
+rebased lens/notes with the working-tree compiler at 9acbe26 (an intended change)
+rebased play2/desktop with the working-tree compiler at 9acbe26 (an intended change)
+rebased play2/notes with the working-tree compiler at 9acbe26 (an intended change)

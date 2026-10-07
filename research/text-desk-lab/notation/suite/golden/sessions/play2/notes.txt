@@ -21,14 +21,6 @@ scene notes · for golden · world @128 · no style=; using the default (calm)
         body a21 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a21 row · 1
           tag a21 "idea" [tag] · key idea
-      card a27 [card] column at 8,8 184x50 = offscreen-part · drag: do move a27 to=$x,$y · key a27
-        title a27 "Rendering, from one scene" [title] · edit: do retitle a27 title="$value"
-        body a27 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
-        tags a27 row · 0 (empty)
-      card a29 [card] column at 8,66 184x50 = offscreen-part · drag: do move a29 to=$x,$y · key a29
-        title a29 "Style tokens" [title] · edit: do retitle a29 title="$value"
-        body a29 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
-        tags a29 row · 0 (empty)
       card a50 [card] column at 1000,700 300x90 = offscreen-part · drag: do move a50 to=$x,$y · key a50
         title a50 "Bug triage" [title] · edit: do retitle a50 title="$value"
         body a50 "An application authored entirely with desk commands. / No JavaScript was written for this. Drop a #bug tag on anything and it appears below. / Tag it #accept to triage it." (~clamp 3: the painter clamps wrapped lines and may show less) [body]
@@ -37,3 +29,11 @@ scene notes · for golden · world @128 · no style=; using the default (calm)
         title a54 "rule r4: accept triages" [title] · edit: do retitle a54 title="$value"
         body a54 "A card that is a running rule." (~clamp 3: the painter clamps wrapped lines and may show less) [body]
         tags a54 row · 0 (empty)
+      card a27 [card] column at 8,8 184x50 = offscreen-part · drag: do move a27 to=$x,$y · key a27
+        title a27 "Rendering, from one scene" [title] · edit: do retitle a27 title="$value"
+        body a27 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
+        tags a27 row · 0 (empty)
+      card a29 [card] column at 8,66 184x50 = offscreen-part · drag: do move a29 to=$x,$y · key a29
+        title a29 "Style tokens" [title] · edit: do retitle a29 title="$value"
+        body a29 "" (~clamp 3: the painter clamps wrapped lines and may show less) [body]
+        tags a29 row · 0 (empty)

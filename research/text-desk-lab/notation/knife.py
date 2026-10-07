@@ -44,6 +44,20 @@ def _leaves(w, fid):
     return out
 
 
+def _in_order(w, fid, made):
+    """Everything inside a surface, each surface before what it holds: a flow in its reading order, a free surface in
+    the order its things were made (`made`: id -> place)."""
+    kids = w.children(fid)
+    if w.nodes[fid].get("layout") == "free":
+        kids = sorted(kids, key=lambda k: made.get(k["id"], len(made)))
+    out = []
+    for k in kids:
+        out.append(k["id"])
+        if k["type"] == "surface":
+            out += _in_order(w, k["id"], made)
+    return out
+
+
 # the selection terms parse_selection reads; the Help binder's selections note must name each (helpnotes.check, a1595)
 TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:",
          "answered-by:", "unanswered:", "due:") + promises.TERMS      # a1587: held-by: asked-of: owed-to: asked-by: awaits:
@@ -113,8 +127,13 @@ def parse_selection(w, token, trash=False, binds=None):
             fid = t[3:]
             if fid not in w.nodes or w.nodes[fid]["type"] != "surface":
                 raise Refusal(f"in: needs a surface id, not {fid}")
-            inside = set(_leaves(w, fid))
-            cands = [c for c in cands if c in inside]
+            # Pike, 7 Oct (a3482): `of in:<document>` listed its paragraphs in the order they were made, so one moved up
+            # the page stayed last in the lens while look read it fourth. What is in a place is listed in that place's
+            # reading order, where it has one: a free surface has none (its order is which card is on top), so there
+            # the order things were made in stands.
+            keep = set(cands)
+            made = {c: k for k, c in enumerate(cands)}
+            cands = [c for c in _in_order(w, fid, made) if c in keep]
         elif t == "hidden":
             cands = [c for c in cands if w.hidden_fraction(c) > 0.05]
         elif t.startswith("also:"):
