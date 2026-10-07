@@ -912,6 +912,13 @@ def test_count_word_and_true_size():
             assert got == ["1. of 1", "2. of 1"], got
             assert "run block" in scene.to_text(sc, "t", "jeff", 0)
             refused("root : column, run block\n  c : text a", "counts along a repeat")
+            # Juniper and Pike: a command computes $( ) as words do (a paragraph was made with block=$(next))
+            src = chr(10).join(["root : column", "  all : column, of kind:note, each c", 'c : text "$title"',
+                                '  let next = "number" when $index = 1', '  let next = "p" otherwise', "  let more = $index + 1",
+                                '  on edit do rewrite $item text="$value"', '  on key Enter do split $item $(next) "$head" "$tail"',
+                                "  on key Tab do prop $item indent=$(more)"])
+            got = [[a["line"].split(" ", 3)[3] for a in k["acts"][1:]] for k in lens_ir.evaluate(desk, src)["kids"][0]["kids"]]
+            assert got == [['number "$head" "$tail"', "indent=2"], ['p "$head" "$tail"', "indent=3"]], got
     finally:
         tmp.unlink(missing_ok=True)
 

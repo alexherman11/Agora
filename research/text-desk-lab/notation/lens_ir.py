@@ -409,8 +409,14 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         safe = {k: (S._cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
         out["id"] = ctx.get("id")
         safe["_frames"] = {k: {kk: (S._cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
+        def act_line(line):
+            # Juniper and Pike, 7 Oct: `do split $item $(next) ...` reached the desk as the words '$(next)', and a
+            # paragraph was made with block=$(next). A command computes $( ) as words do, when the part is built
+            if "$(" not in line:
+                return S._fill(line, safe, track)
+            return S._fill_text(line, safe, track, lambda e: X.run(e, xenv()))[0]
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
-            {"on": a["on"], "line": S._fill(a["line"], safe, track), **{k: a[k] for k in ("part", "label") if a.get(k)}} for a in node["acts"]]
+            {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "label") if a.get(k)}} for a in node["acts"]]
         if node["carry"]:
             if not ctx.get("item"):
                 raise S.LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")
