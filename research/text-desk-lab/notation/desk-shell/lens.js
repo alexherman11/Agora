@@ -412,11 +412,16 @@
     }
     const p = v.painter || v.code; if (!p) return;
     if (painter === null) { painter = p; return; }
-    if (!window.DoorLine) return;
-    if (p === painter) { DoorLine.note(""); return; }
-    const n = ((DoorLine.status && DoorLine.status.news) || []).filter(x => x.ok && x.painter).pop();
-    const which = n && n.commits && n.commits.length ? n.commits.map(c => (c[1].match(/^land (a\d+)/) || [])[1] || c[0]).join(", ") : "";
-    DoorLine.note(`new screen code${which ? ` (${which})` : ""}: click to use it`, reloadKeeping);
+    if (p === painter) { if (window.DoorLine) DoorLine.note(""); return; }
+    // Alex, 7 Oct: "I want painter edits live immediately, at least for now." New screen code loads on its own, keeping
+    // the view (reloadKeeping), as soon as the person's hands are free: nothing carried, no part held, no composer with
+    // the caret in it. While hands are busy the line says it is waiting, and the next tick asks again. (Until today the
+    // line offered a click and the person chose when; Juniper's e3746 argued that reading has no safe pause.)
+    const a = document.activeElement, typing = a && a.isContentEditable && paint.contains(a);
+    if (carrying || V.hold || typing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
+    if (leaving) return; leaving = true;
+    if (window.DoorLine) DoorLine.note("new screen code: loading it, keeping your view");
+    setTimeout(reloadKeeping, 200);
   }
   setInterval(async () => {
     let v; try { v = await (await fetch("/api/version")).json(); } catch (e) { return; }
