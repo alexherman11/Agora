@@ -101,7 +101,7 @@
         const t = TEXT.last && TEXT.last.isConnected ? TEXT.last : null;
         if (!t) return V.show("put the caret in a text first: this button acts on the text being written");
         if (a.line.startsWith("press ")) { t.focus(); return TEXT.press(t, a.line.slice(6)); }
-        send(t._n, a.line.replace("$focus", () => (t._n.fence || {}).item || ""));
+        TEXT.tool(t, a.line);
       });
       else if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
         if (e.target !== el && a.line.includes("$x")) return;
@@ -261,6 +261,20 @@
       el.focus(); if (el._toSource) el._toSource();
       const t = el.firstChild, sel = getSelection();
       if (t && t.nodeType === 3) sel.setBaseAndExtent(t, Math.min(at, t.data.length), t, Math.min(at, t.data.length)); else sel.selectAllChildren(el), sel.collapseToStart();
+    },
+    // a button's command on the text being written (Alex's page, 7 Oct: a heading typed and then made H2 lost its
+    // words and the caret). Words typed and not yet sent are sent first, as the text's own edit; then the command;
+    // then the caret goes back where it was, in the text as it was painted again.
+    async tool(el, line) {
+      const n = el._n, key = n.key, c = this.caret(el) || { at: 0 }, edit = n.acts.find(x => x.on === "edit");
+      if (el._toSource) el._toSource();
+      const raw = el.innerText.replace(/\n$/, ""), seen = V.editOrigin(key, n) || n;
+      V.drop(key); V.hold = null;
+      if (edit && raw !== (n.paint.text || "")) await sendKey(seen, edit.line.replace("$value", () => this.esc(raw)));
+      const now = paint.querySelector(`[data-key="${CSS.escape(key)}"]`) || el;
+      await sendKey(now._n, line.replace("$focus", () => (n.fence || {}).item || ""));
+      const after = paint.querySelector(`[data-key="${CSS.escape(key)}"]`);
+      if (after) this.put(after, c.at);
     },
     press(el, key) { if (el._toSource) MARKS.key(el, { key: key.split("+").pop().toLowerCase(), preventDefault() {} }, el._toSource); },
     key(el, e) {
