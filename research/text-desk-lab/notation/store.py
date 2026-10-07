@@ -19,8 +19,9 @@ A RECORD is one line of JSON: the line someone sent (one press) and everything i
     {seq, shape, at, by, words, press?, saw, parts: [{cause, e, verb, target, args, facts}], ids?, state}
   parts   the events the command made, in order, each with the facts on the things it named; a rule's events say
           `cause: "rule a1088"`, the act's own say "act"
-  facts   [thing, aspect, hash of the value before, value], or without the value when the aspect is gone
-  saw     what its author had been shown of the things it touched: {thing: {aspect: event index}} (the fence's own
+  facts   [thing, aspect, hash of the value before, value], or without the value when the aspect is gone; a long
+          text changed in one place is written as that change, {"$splice": [start, characters gone, what came]}
+  saw     what its author had been shown of the things it touched: {thing: {aspect: last event by then}} (the fence's own
           record); how a later merge tells a real conflict from two unrelated edits
   state   a digest of every fact after the record; the next command checks the world still says so (below)
 
@@ -67,6 +68,7 @@ SUBJECT_KNOWN = set(SUBJECT_PLAIN) | {"id", "rev", "comments", "props", "lines"}
 NODE_PLAIN = ("type", "subject", "title", "layout", "query", "cols", "folded")
 NODE_KNOWN = set(NODE_PLAIN) | {"id", "rev", "parent", "x", "y", "w", "h", "z", "props"}
 ARG_CUT = 200                         # an event's argument longer than this is in the facts; the record keeps its size
+SPLICE_OVER = 400                     # a text longer than this, changed in one place, is written as the change
 
 
 # ---------------------------------------------------------------- values
@@ -190,13 +192,23 @@ def diff(a, b):
     return sorted(out, key=lambda f: _order((f[0], f[1])))
 
 
+def whole(v, old):
+    """A fact's value as it is read from a record: itself, or, for a long text changed in one place, the text before
+    with that place changed ({"$splice": [start, how many characters go, what comes instead]})."""
+    if isinstance(v, dict) and len(v) == 1 and "$splice" in v:
+        start, cut, ins = v["$splice"]
+        old = "" if old is ABSENT or old is None else old
+        return old[:start] + ins + old[start + cut:]
+    return v
+
+
 def patch(flat, facts):
     """Assign facts onto a flat, in place."""
     for tid, aspect, v in facts:
         if v is ABSENT:
             flat.pop((tid, aspect), None)
         else:
-            flat[(tid, aspect)] = v
+            flat[(tid, aspect)] = whole(v, flat.get((tid, aspect), ABSENT))
     return flat
 
 
@@ -418,7 +430,22 @@ def _enc(facts, before):
     """Facts as they are written: [thing, aspect, hash before, value], or without the value when it is gone."""
     out = []
     for tid, aspect, v in facts:
-        hb = h(before.get((tid, aspect), ABSENT))
+        was = before.get((tid, aspect), ABSENT)
+        hb = h(was)
+        if aspect == "text" and isinstance(v, str) and isinstance(was, str) and len(v) > SPLICE_OVER:
+            # a long text changed in one place (a line added to a notebook, one passage replaced) is written as that
+            # change, or every line added to a 40 KB note would write the note again (frontier, 7 Oct)
+            a = 0
+            top = min(len(was), len(v))
+            while a < top and was[a] == v[a]:
+                a += 1
+            z = 0
+            while z < top - a and was[len(was) - 1 - z] == v[len(v) - 1 - z]:
+                z += 1
+            ins = v[a:len(v) - z]
+            if len(ins) * 2 < len(v):
+                out.append([tid, aspect, hb, {"$splice": [a, len(was) - z - a, ins]}])
+                continue
         out.append([tid, aspect, hb] if v is ABSENT else [tid, aspect, hb, v])
     return out
 
@@ -543,7 +570,7 @@ class Log:
                 break
             for tid, aspect, v in facts_of(rec):
                 if (tid, aspect) in keys:
-                    out[(tid, aspect)] = v
+                    out[(tid, aspect)] = v if v is ABSENT else whole(v, out[(tid, aspect)])
         return out
 
     def value_at(self, key, seq):
@@ -670,10 +697,14 @@ def commit(ctx, desk, words, by, press=None, window=None):
             parts.append({"cause": "unnamed", "facts": _enc(loose, ctx.flat0)})
     touched = {f[0] for f in facts} | {subject_of(f[0]) for f in facts} - {None}
     me = by + ("/" + window if window else "")
+    # the fence counts in events (how many the world held when a thing was last shown); a record names the event
+    # itself, the last one made by then, so the number can be read against the world's own ids (Juniper, 7 Oct:
+    # 'text seen at 6209' looked older than her read after e6215, and was the same moment)
+    at = lambda i: w.events[i - 1]["id"] if 0 < i <= len(w.events) else "e0"      # noqa: E731
     saw = {}
     for (obs, nid), v in ctx.seen0.items():
         if nid in touched and obs.split("/")[0] == by and (obs == me or "/" not in obs):
-            saw[nid] = {"*": v} if isinstance(v, int) else dict(v)
+            saw[nid] = {a: at(i) for a, i in ({"*": v} if isinstance(v, int) else v).items()}
     rec = {"state": _move(ctx.state0, ctx.flat0, facts), "at": _now(), "by": by, "words": words, "parts": parts}
     if press:
         rec["press"] = press
@@ -705,7 +736,7 @@ def _move(state, flat0, facts):
         if old is not ABSENT:
             x ^= _fact_word(tid, aspect, old)
         if v is not ABSENT:
-            x ^= _fact_word(tid, aspect, v)
+            x ^= _fact_word(tid, aspect, whole(v, old))
     return f"{x:016x}"
 
 
@@ -757,6 +788,7 @@ def undo_plan(log, rec, flat_now):
         raise CannotUndo(f"record {rec['seq']} changed nothing in the world: there is nothing to put back")
     keys = [(f[0], f[1]) for f in facts]
     before = log.before(rec["seq"], keys)
+    facts = [(tid, aspect, v if v is ABSENT else whole(v, before[(tid, aspect)])) for tid, aspect, v in facts]
     made = {tid for tid, aspect, v in facts if aspect in CREATES and before[(tid, aspect)] is ABSENT}
     # where a thing stands in a flow (`after`) moves whenever a neighbour does: it is not a change to the thing, and
     # apply repairs the order, so by itself it never stops an undo
@@ -817,7 +849,7 @@ def text_at_event(log, w, sid, index):
             break
         for tid, aspect, v in facts_of(rec):
             if (tid, aspect) == key:
-                val = v
+                val = v if v is ABSENT else whole(v, val)
     return "" if val is ABSENT else val
 
 

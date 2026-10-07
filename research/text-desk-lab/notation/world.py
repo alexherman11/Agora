@@ -1137,6 +1137,12 @@ class World:
             verb = "edit"
             replaced = (old, new)
         elif verb == "rewrite":
+            if "text" not in args and "line" not in args:
+                # 7 Oct (Juniper, e6201): `do rewrite a3420 title="Undo"` answered ok and emptied the paragraph: a
+                # missing text= was read as no text. An empty text is said (text=""), never assumed
+                raise Refusal("rewrite needs text=<the new text> (it replaces all the text; text=\"\" empties it). "
+                              + ("To change the title: do retitle <id> title=..." if "title" in args else
+                                 "To change one passage: do replace <id> old=... new=..."))
             new = str(args.get("text", args.get("line", "")))
             if args.get("section"):
                 # Moss: 1.2 KB to read a document, 49 KB to change one word in it. A change may be as small as a section.

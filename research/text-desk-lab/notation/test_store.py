@@ -487,6 +487,32 @@ check("   having read Sable's version, she calls it by its new name and it lands
       c2.error or c2.text[-300:])
 agrees("after joining texts, the log says what the world says")
 
+# ---- found on frontier's own log, 7 Oct: a line added to a 40 KB notebook wrote the notebook again ---------------------------
+BOOK = "\n".join(f"entry {i}: " + "what I did and what I found, at some length, " * 3 for i in range(300))
+r = ok("juniper", f"look {BOARD} :3", f"do create {BOARD} kind=note title=Notebook text={q(BOOK)}")
+NB = r.made
+a = ok("juniper", f"do append {NB} line={q('entry 300: one more line')}")
+b = ok("juniper", f"do replace {NB} old={q('entry 150: ')} new={q('ENTRY 150 (revised): ')}")
+check(f"a line added to a {len(BOOK) // 1000} KB note is a record of under 1 KB (the change, not the note), and so is one passage replaced",
+      size(a.seq) < 1000 and size(b.seq) < 1000 and "$splice" in json.dumps(rec(a.seq)), (size(a.seq), size(b.seq)))
+agrees("   and the log replayed still says what the world says")
+was = store.flatten(W)
+c = ok("juniper", f"do append {NB} line={q('entry 301: to be taken back')}")
+u = run("juniper", f"undo {ev_of(c.seq)}")
+check("   a change written that way is put back like any other", not u.error and not store.diff(was, store.flatten(W)), u.error or u.text)
+check("   and what the text said at an earlier record is still read from the log",
+      LOG.value_at((subj(NB), "text"), a.seq).endswith("entry 300: one more line") and "ENTRY 150" not in LOG.value_at((subj(NB), "text"), a.seq))
+
+# ---- found in the Writing room, 7 Oct (Juniper, e6201): a rewrite with no text= emptied the paragraph and said ok --------
+ok("juniper", f"read {NOTE}")
+had = W.subjects[subj(NOTE)]["text"]
+r = run("juniper", f"do rewrite {NOTE} title={q('A plan')}")
+check("a rewrite with no text= is refused and names retitle; the text is as it was, and no record is made",
+      bool(r.error) and "retitle" in r.error and W.subjects[subj(NOTE)]["text"] == had and r.seq is None, r.error or r.text)
+r = run("juniper", f'do rewrite {NOTE} text=""')
+check('   text="" is how a text is emptied on purpose, and undo puts it back', not r.error and W.subjects[subj(NOTE)]["text"] == ""
+      and not run("juniper", "undo").error and W.subjects[subj(NOTE)]["text"] == had, r.error or W.subjects[subj(NOTE)]["text"][:80])
+
 agrees("at the end: every record replayed says what the world says; a world rebuilt from its facts says the same")
 st = store.stats(LOG)
 print(f"     {st['records']} records ({st['by kind']}); a command's record is {st['mean command bytes']} bytes on average; "
