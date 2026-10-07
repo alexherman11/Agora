@@ -242,6 +242,8 @@ def apply(w, facts, bump=True):
     """Assign facts onto a world's plain state, then repair what is derived from them: a chat's text, the order and
     boxes of the flows that changed, and (bump) the revisions of what was touched. -> the ids touched."""
     facts = list(facts)
+    if hasattr(w, "forget_appearances"):
+        w.forget_appearances()        # nodes are made and taken away here with no event between
     old_order = {}
     for tid, aspect, v in facts:      # the order of every flow about to change, as it is now: the one a thing leaves
         if aspect in ("after", "in", "type"):       # and the one it arrives in
@@ -385,6 +387,8 @@ def apply(w, facts, bump=True):
                 n = w.nodes[k]
                 n["y" if col else "x"], n["x" if col else "y"], n["z"] = i * 1000, 0, i + 1
             w.reflow(fid)
+    if hasattr(w, "forget_appearances"):
+        w.forget_appearances()
     if bump:
         for tid in touched - gone:
             if tid in w.subjects:

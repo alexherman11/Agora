@@ -34,6 +34,9 @@ def _geometry_choices_default():
     return os.environ.get("DESK_GEOMETRY", "") == "choices"
 
 
+_APPEARANCES = __import__("weakref").WeakKeyDictionary()    # world -> ((nodes, events), {subject: [appearance ids]})
+
+
 class Refusal(Exception):
     pass
 
@@ -519,7 +522,22 @@ class World:
         return d
 
     def appearances_of(self, sid):
-        return [n["id"] for n in self.nodes.values() if n["type"] == "appearance" and n["subject"] == sid]
+        # 7 Oct: asked 5,800 times to build the Desktop's scene, each a walk over every node (0.35 s of 1.1). The
+        # answer for every subject is worked out once and kept while no node is made or taken away (a node never
+        # changes its subject); it is never saved with the world
+        key = (id(self.nodes), len(self.nodes), len(self.events))
+        hit = _APPEARANCES.get(self)
+        if hit is None or hit[0] != key:
+            index = {}
+            for n in self.nodes.values():
+                if n["type"] == "appearance":
+                    index.setdefault(n["subject"], []).append(n["id"])
+            hit = _APPEARANCES[self] = (key, index)
+        return list(hit[1].get(sid, ()))
+
+    def forget_appearances(self):
+        """For code that makes and removes nodes with no event between (store.apply): ask again next time."""
+        _APPEARANCES.pop(self, None)
 
     def _overlap(self, a, b):
         ax, ay, aw, ah = self.abs_rect(a)

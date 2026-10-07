@@ -239,6 +239,9 @@ def line_to(e):
     return addressed(args.get("append", "")), False
 
 
+_MEMBER_EVENTS = __import__("weakref").WeakKeyDictionary()   # world -> ((events), {event id: index}, [(index, a members= change)])
+
+
 def members_of(s, at=None, w=None):
     """Chat `s`'s members=, as a set of lower-case names; with `at` (an event id) and the world, as they were just after
     that event (members_at)."""
@@ -250,13 +253,23 @@ def members_at(w, s, eid):
     """a2692 (Pike c2697): chat `s`'s members= as it stood just after event `eid`: the first later change to members=
     that still stands kept the whole subject as it was before (its undo), so that is what it said; with no later change,
     what it says now."""
-    k = next((i for i, e in enumerate(w.events) if e["id"] == eid), None)
-    if k is not None:
-        apps = set(w.appearances_of(s["id"])) | {s["id"]}
-        for e in w.events[k + 1:]:
+    # 7 Oct: asked 214 times to build the Desktop's scene, each a walk over every event (0.5 s of 1.1). Where each
+    # event is, and which events changed a members=, are worked out once per event count; never saved with the world
+    key = (id(w.events), len(w.events))
+    hit = _MEMBER_EVENTS.get(w)
+    if hit is None or hit[0] != key:
+        where, changes = {}, []
+        for i, e in enumerate(w.events):
+            where[e["id"]] = i
             args = e.get("args") or {}
-            if e.get("verb") == "prop" and not e.get("undone") and e["target"] in apps and \
-                    ("members" in args or "members" in str(args.get("remove", "")).split(",")):
+            if e.get("verb") == "prop" and ("members" in args or "members" in str(args.get("remove", "")).split(",")):
+                changes.append((i, e))
+        hit = _MEMBER_EVENTS[w] = (key, where, changes)
+    k = hit[1].get(eid)
+    if k is not None and hit[2]:
+        apps = set(w.appearances_of(s["id"])) | {s["id"]}
+        for i, e in hit[2]:
+            if i > k and not e.get("undone") and e["target"] in apps:
                 import kept
                 was = kept.copy_of(e)
                 if was is not None:

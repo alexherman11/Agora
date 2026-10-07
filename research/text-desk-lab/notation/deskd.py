@@ -190,6 +190,9 @@ def snapshot_for(desk):
     return snap
 
 
+_DESKS = {}      # world file -> ((its time, its size), the desk as this process last saved or loaded it)
+
+
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
@@ -203,7 +206,21 @@ class Session:
 
     def __enter__(self):
         explore.take_lock(self.lock, tries=1200, pause=0.05)
-        desk = pickle.loads(self.path.read_bytes()) if self.path.exists() else explore.fresh()
+        # 7 Oct: the desk this process last saved or loaded is kept in memory, and used again while the file is still
+        # that one (same time and size: nobody else wrote it). Reading and unpickling 13 MB was 80 to 110 ms a request.
+        # Always under the session's lock, as before; the file stays the truth, and any other writer's save is seen
+        key, desk = str(self.path), None
+        try:
+            st = self.path.stat()
+            self.stamp = (st.st_mtime_ns, st.st_size)
+        except OSError:
+            self.stamp = None
+        held = _DESKS.get(key)
+        if held is not None and self.stamp is not None and held[0] == self.stamp:
+            desk = held[1]
+        else:
+            _DESKS.pop(key, None)
+            desk = pickle.loads(self.path.read_bytes()) if self.stamp is not None else explore.fresh()
         desk.world.me = self.actor
         desk._session = self.name
         per = getattr(desk, "_per", None) or {}
@@ -227,8 +244,19 @@ class Session:
             import kept
             kept.sweep(d.world, self.path)      # 7 Oct: the copies undo keeps go beside the file (kept.py), before it is saved
             now = pickle.dumps(d)
+            key = str(self.path)
             if now != self.before:
+                _DESKS.pop(key, None)             # if the save fails, what is in memory is not what the file says
                 explore.save_desk(self.path, d, now)
+                st = self.path.stat()
+                self.stamp = (st.st_mtime_ns, st.st_size)
+            if self.stamp is not None:
+                _DESKS[key] = (self.stamp, d)
+                while len(_DESKS) > 3:
+                    _DESKS.pop(next(iter(_DESKS)))
+        except BaseException:
+            _DESKS.pop(str(self.path), None)
+            raise
         finally:
             explore.release_lock(self.lock)
 
