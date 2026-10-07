@@ -184,6 +184,11 @@ const Style = (() => {
     // colour. Its keyframes exist only for a viewer who has not asked for reduced motion (install), so for one who has,
     // the animation names nothing and the part is still. Every pulse shares one phase (install): six waiting things
     // breathe together as one signal, not six flickers out of step.
+    // Alex, 7 Oct, in the document itself (c3669, c3674): 'comments should not push down the paragraphs' and 'I'm not
+    // liking how many comment lines there are'. afloat: the part takes no room in its row or column and lies over what
+    // follows. shy: the part is unseen until the pointer or the caret is in the part that holds it, or the one above that.
+    if (p === "afloat") return { css: { height: "0", "min-height": "0", overflow: "visible" } };
+    if (p === "shy") return { css: { opacity: "0", "--shy": "1" } };
     if (p === "pulse") return { css: { animation: "r-pulse 2.5s ease-in-out infinite" } };
     const c = colour(p, T); return c ? { css: { color: c } } : null;
   }
@@ -244,6 +249,10 @@ const Style = (() => {
     for (const name of Object.keys(st.roles)) {
       const lk = lookOf({ as: name }, st, T, { nodes: {} });
       out += `.r-${name.replace(/\./g, "_")}{${decl(lk.css)}}\n`;
+      if (lk.css["--shy"]) {      // shy: seen when the pointer or the caret is in the part holding it (or the one above), or when it has words of its own to show
+        const c = ".r-" + name.replace(/\./g, "_");
+        out += [":hover > ", ":hover > * > ", ":focus-within > ", ":focus-within > * > "].map(a => a + c).join(",") + `,${c}:focus{opacity:1}\n`;
+      }
     }
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";
     // A CSS animation starts when its part is painted, so a part repainted or unfolded later would be out of step.

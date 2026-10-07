@@ -318,7 +318,7 @@ def _style_prop_ok(p, T):
             if re.search(r"\s\d+(\.\d+)?$", p) and not re.search(r"[x/]\s*\d+(\.\d+)?$", p):
                 return False, "a bare number is not on the scale: say gap, gap xN or gap /N"
             return False, "names no token of the right kind"
-    if p == "pulse":                               # a1140: the one motion
+    if p in ("pulse", "afloat", "shy"):                               # a1140: the one motion
         return True, ""
     if re.match(r"^text\b", p):
         if T.get(p.split()[0] if p.startswith("text.") else "text") != "text":
