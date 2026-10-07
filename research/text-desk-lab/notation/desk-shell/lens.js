@@ -195,6 +195,7 @@
     // writes, a paste, a cut), and maps the caret and selection the browser has already placed to the same characters.
     el.addEventListener("focus", () => { if (!V.repainting) V.hold = n.key; });
     const toSource = () => { if (el._runs) source(el); };
+    el.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.length === 1) MARKS.key(el, e, toSource); });
     el.addEventListener("keydown", e => { if (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || /^(Backspace|Delete|Enter)$/.test(e.key))) toSource(); });
     const multi = () => { const pp = el._n.paint; return pp.commit ? pp.commit === "ctrl-enter" : !!pp.lines && (pp.lines[1] == null || pp.lines[1] > 1); };
     // Pike (S29): a pasted line break showed on screen and vanished from what was sent ("CampgroundHighway"). The value is
@@ -218,10 +219,52 @@
     });
   }
 
+  // marks (Editor board a3486, 7 Oct): the words a text part carries marks in, when its lens says `marks`. One table
+  // holds each mark's element, the source written around it and its key, so a new mark is one more line here and one
+  // more arm in scene.marks_of. Read, a mark is drawn; edited, it is its source, as a code run is.
+  const MARKS = {
+    kinds: { strong: { tag: "strong", wrap: ["**", "**"], key: "b" }, stress: { tag: "em", wrap: ["*", "*"], key: "i" },
+             both: { tag: "strong", look: "t-mark-strong t-mark-stress" }, link: { tag: "a", wrap: ["[", "](https://)"], key: "k" } },
+    draw(r) {
+      const m = document.createElement(this.kinds[r.mark].tag); m.className = "t-mark " + (this.kinds[r.mark].look || "t-mark-" + r.mark); m.textContent = r.text;
+      if (r.mark === "link") { m.dataset.href = r.href; m.title = r.href + "  (Ctrl+click opens it)"; }
+      return m;
+    },
+    // Ctrl+B and the like, in the source: wrap what is selected, or take the mark off when it is already there
+    key(el, e, toSource) {
+      const kind = Object.values(this.kinds).find(k => k.key === e.key.toLowerCase());
+      if (!kind || !el._n.paint.marks) return false;
+      e.preventDefault(); toSource();
+      const sel = getSelection(), t = el.firstChild;
+      if (!t || t.nodeType !== 3 || !sel.rangeCount || !el.contains(sel.anchorNode)) return true;
+      const a = Math.min(sel.anchorOffset, sel.focusOffset), f = Math.max(sel.anchorOffset, sel.focusOffset), src = t.data, [w0, w1] = kind.wrap;
+      const count = (i, d) => { let c = 0; while (src[i] === "*") { c++; i += d; } return c; };
+      const stars = Math.min(count(a - 1, -1), count(f, 1));   // the stars around the words: 1 stress, 2 strong, 3 both
+      const on = kind.tag !== "a" && (w0 === "**" ? stars >= 2 : stars % 2 === 1);
+      if (on) sel.setBaseAndExtent(t, a - w0.length, t, f + w1.length);
+      const words = src.slice(a, f) || (kind.tag === "a" ? "link" : "");
+      document.execCommand("insertText", false, on ? words : w0 + words + w1);
+      // the words stay selected, so the same key again takes the mark off; a new link leaves its address selected to type over
+      el.normalize(); const t2 = el.firstChild, from = on ? a - w0.length : a + w0.length;
+      if (t2 && t2.nodeType === 3) {
+        if (kind.tag === "a") sel.setBaseAndExtent(t2, a + words.length + 3, t2, a + words.length + 3 + "https://".length);
+        else sel.setBaseAndExtent(t2, from, t2, from + words.length);
+      }
+      return true;
+    },
+  };
+  document.addEventListener("click", e => {
+    const a = e.target.closest && e.target.closest(".t-mark-link");
+    if (!a || !/^https?:/.test(a.dataset.href || "")) return;
+    if (a.closest("[contenteditable]") && !(e.ctrlKey || e.metaKey)) return;     // in a text being written, a click places the caret
+    e.preventDefault(); window.open(a.dataset.href, "_blank", "noopener");
+  });
+
   // runs inside one text leaf: plain words as text, a code run in its role (a block run keeps its lines, verbatim)
   function runs(el, rs) {
     el._runs = rs;
     el.replaceChildren(...rs.map(r => {
+      if (r.mark) return MARKS.draw(r);
       if (!r.role) return document.createTextNode(r.text);
       const s = document.createElement(r.block ? "div" : "span"); s.className = Style.roleClass(r.role);
       if (r.block) s.classList.add("t-verbatim");

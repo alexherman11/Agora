@@ -30,6 +30,10 @@ the one form. The words:
     text <template>              words, with $title $text $kind $due $tags $id $item $it $n, any field of a row
                                  source, and any prop of the thing ($place): the scene prints what it read and
                                  marks a missing prop (no place). Quote it to keep commas and hashes: text "a, b # c"
+    marks                        on words: the text may carry marks, written in it: **strong**, *stressed*, ***both***,
+                                 [label](address). Read, they are drawn; edited, they are their source, and Ctrl+B,
+                                 Ctrl+I, Ctrl+K put one around what is selected or take it off. Not inside code runs;
+                                 marks do not nest. The printer says `marks strong 2, link 1`
     clamp <N>                    on words: at most N lines (printed as ~, the painter clamps wrapped lines).
                                  on a repeat: at most N instances; both printers say how many are left
     of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas), over ids named
@@ -91,7 +95,7 @@ from desk import split_batch
 import expr as X
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
 GESTURES = ("click", "edit", "drag", "menu")      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
@@ -826,6 +830,12 @@ def _w_plain(node, p, val, n, env):
     node["plain"] = True          # Juniper a559: no runs; backticks print as the characters they are
 
 
+def _w_marks(node, p, val, n, env):
+    # Editor board a3486 (7 Oct): the words may carry marks, written in the text itself: **strong**, *stressed*,
+    # [label](address). Read, they are drawn as marks; edited, they are their source (as code runs are, a559)
+    node["marks"] = True
+
+
 def _w_peek(node, p, val, n, env):
     node["peek"] = True           # a1032 (Alex: 'see what they are working on at a glance'): shown while its parent is folded
 
@@ -833,7 +843,31 @@ def _w_peek(node, p, val, n, env):
 _RUNS = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.S)
 
 
-def runs_of(text):
+_MARKS = re.compile(r"BS*BS*BS*(?=BSS)(?P<both>[^*BSn]+?)(?<=BSS)BS*BS*BS*|BS*BS*(?=BSS)(.+?)(?<=BSS)BS*BS*|BS*(?=BSS)([^*BSn]+?)(?<=BSS)BS*|BS[([^BS]BSn]+)BS]BS(([^)BSsBSn]+)BS)".replace("BS", chr(92)))
+
+
+def marks_of(text):
+    """One stretch of plain words -> runs, the marked ones carrying mark=strong|stress|both|link (a link its href). The
+    grammar is closed: two stars, one star, three for both, [label](address); a star beside a space is a star."""
+    out, at = [], 0
+    for m in _MARKS.finditer(text):
+        if m.start() > at:
+            out.append({"text": text[at:m.start()]})
+        if m.group("both") is not None:
+            out.append({"text": m.group("both"), "mark": "both"})
+        elif m.group(2) is not None:
+            out.append({"text": m.group(2), "mark": "strong"})
+        elif m.group(3) is not None:
+            out.append({"text": m.group(3), "mark": "stress"})
+        else:
+            out.append({"text": m.group(4), "mark": "link", "href": m.group(5)})
+        at = m.end()
+    if at < len(text):
+        out.append({"text": text[at:]})
+    return out
+
+
+def runs_of(text, marks=False):
     """Juniper a559: code spans and fences become runs at print, from this closed grammar, with no world effect; the
     words stay the part's source, so the printer's text and the fence are unchanged. -> [{text, role?, block?}] or None."""
     out, at = [], 0
@@ -842,10 +876,12 @@ def runs_of(text):
             out.append({"text": text[at:m.start()]})
         out.append({"text": m.group(1), "role": "code", "block": True} if m.group(1) is not None else {"text": m.group(2), "role": "code"})
         at = m.end()
-    if not out:
-        return None
-    if at < len(text):
+    if at < len(text or ""):
         out.append({"text": text[at:]})
+    if marks:                              # marks are looked for in the plain stretches only: code keeps its stars
+        out = [r2 for r in out for r2 in ([r] if r.get("role") else marks_of(r["text"]))]
+    if not any(r.get("role") or r.get("mark") for r in out):
+        return None
     return out
 
 
@@ -1092,6 +1128,7 @@ WORDS = {
     "share": ("share <weight>", _w_share),
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
+    "marks": ("marks", _w_marks),
     "peek": ("peek", _w_peek),
     "carry": ("carry", _w_carry),
     "role": ("role <name> [when <selection | expr>]", _w_role),
@@ -1186,7 +1223,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1793,8 +1830,14 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append("peek")
         if n.get("plain"):
             bits.append("plain")
-        elif n.get("text") and runs_of(n["text"]):
-            bits.append(f"runs {sum(1 for r in runs_of(n['text']) if r.get('role'))} code")
+        elif n.get("text") and runs_of(n["text"], n.get("marks")):
+            rs = runs_of(n["text"], n.get("marks"))
+            if any(r.get("role") for r in rs) or not n.get("marks"):
+                bits.append(f"runs {sum(1 for r in rs if r.get('role'))} code")
+            if n.get("marks"):
+                bits.append("marks " + (", ".join(f"{k} {c}" for k in ("strong", "stress", "both", "link") for c in [sum(1 for r in rs if r.get("mark") == k)] if c) or "none"))
+        elif n.get("marks"):
+            bits.append("marks none")
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:
@@ -1931,7 +1974,9 @@ def emit(node):
         if node.get("hint"):
             paint["hint"] = node["hint"]
         if not node.get("plain") and node.get("text"):
-            rs = runs_of(node["text"])
+            rs = runs_of(node["text"], node.get("marks"))
+            if node.get("marks"):
+                paint["marks"] = True
             if rs:
                 paint["runs"] = rs            # the text stays the joined words; the fence and the printer do not change
         ons = {a.get("on") for a in (node.get("acts") or [])}

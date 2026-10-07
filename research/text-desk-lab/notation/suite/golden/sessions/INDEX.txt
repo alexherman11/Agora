@@ -121,3 +121,5 @@ rebased studio/to-jeff-the-desktop-as-a-lens-runs-in-13-lines-and-six-things-sto
 rebased studio/to-jeff-three-words-and-one-desk-verb-instead-of-spread with the working-tree compiler at 1881121: 5 Oct, out of the comma lists: the frozen lenses were converted to a word per line (--convert) and 69 prints did not move; a refusal now names the word's own line (shadow: line 4, not 2), and a prose note tagged lens is refused as a word with no part above it
 rebased bridge/spacing-wish with the working-tree compiler at 7168bfa (an intended change)
 rebased frontier/p-if with the working-tree compiler at 7168bfa (an intended change)
+rebased bridge/spacing-wish with the working-tree compiler at 43c4bb3 (an intended change)
+rebased frontier/p-if with the working-tree compiler at 43c4bb3 (an intended change)

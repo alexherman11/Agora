@@ -26,7 +26,7 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     menu                         the entries of the open right-click menu
     choose <label>               click the entry of the open menu with that label
     type <text>                  click into nothing first; types into what has focus (click the part first)
-    key <Enter|Escape|Tab|ArrowDown|...>
+    key <Enter|Escape|Tab|ArrowDown|...>   a held key goes first: key Ctrl+b, key Shift+Enter
     drag <part> <part|x,y>       press on the first, move, release on the second
     hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there
     scroll <part> <dy>           scroll a part by dy pixels
@@ -312,8 +312,14 @@ async def run(url, steps, size, shots, restart=None, still=False):
                 elif s == "key":
                     k = arg()
                     i += 1
-                    code, text = KEYS.get(k, (0, k if len(k) == 1 else ""))
-                    base = dict(key=" " if k == "Space" else k, windowsVirtualKeyCode=code, code=k)
+                    mods = 0                      # Ctrl+b, Shift+Enter: a held key writes nothing itself (7 Oct, for marks)
+                    while "+" in k[1:]:
+                        m, k = k.split("+", 1)
+                        mods |= {"alt": 1, "ctrl": 2, "meta": 4, "shift": 8}[m.lower()]
+                    code, text = KEYS.get(k, (ord(k.upper()) if len(k) == 1 else 0, k if len(k) == 1 else ""))
+                    if mods & 7:
+                        text = ""
+                    base = dict(key=" " if k == "Space" else k, windowsVirtualKeyCode=code, code=k, modifiers=mods)
                     await p.call("Input.dispatchKeyEvent", type="keyDown", text=text, **base)
                     await p.call("Input.dispatchKeyEvent", type="keyUp", **base)
                     await asyncio.sleep(1.2 if k == "Enter" else 0.3)

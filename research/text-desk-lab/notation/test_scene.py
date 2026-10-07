@@ -833,6 +833,22 @@ def test_code_runs_are_automatic_and_plain_opts_out():
     assert "runs" not in m["paint"]
 
 
+def test_marks_are_asked_for_and_stay_out_of_code():
+    """Editor board a3486 (7 Oct): `marks` on a text part reads **strong**, *stressed* and [label](address) in its words.
+    Without the word nothing changes; inside a code run a star is a star; a star beside a space is a star."""
+    t = "a **bold** move, a *soft* one, [the log](https://x.y/z), `co*de*` and 2 * 3 * 4"
+    assert [r.get("role") for r in scene.runs_of(t)] == [None, "code", None], scene.runs_of(t)
+    rs = scene.runs_of(t, True)
+    assert [(r["text"], r.get("mark") or r.get("role")) for r in rs if r.get("mark") or r.get("role")] == [
+        ("bold", "strong"), ("soft", "stress"), ("the log", "link"), ("co*de*", "code")], rs
+    assert rs[5]["href"] == "https://x.y/z" and rs[-1]["text"] == " and 2 * 3 * 4", rs
+    assert "".join(r["text"] for r in scene.runs_of("x **a b** y", True)) == "x a b y"
+    assert scene.runs_of("no marks here", True) is None
+    n = {"text": t, "marks": True, "acts": [], "kids": []}
+    scene.emit(n)
+    assert n["paint"]["runs"] == rs and n["paint"]["marks"] is True and n["paint"]["text"] == t
+
+
 def test_count_word_and_true_size():
     """a1101: `count <selection>` is a size without drawing; $count on a repeat is its size before the clamp."""
     import deskd, lens_ir
