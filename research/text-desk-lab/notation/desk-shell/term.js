@@ -101,4 +101,25 @@
     else if (e.key === "l" && e.ctrlKey) { out.replaceChildren(); e.preventDefault(); }
   });
   box.addEventListener("mouseup", () => { if (!getSelection().toString()) input.focus(); });
+
+  // Alex, 7 Oct: a click on a painted thing puts its id into the line, at the caret, so a command can be aimed by
+  // pointing. A plain click does it when the part has no click of its own and is not a control (a handle, a composer,
+  // a button); Alt+click does it anywhere, and then the part's own click does not run. The id is the part's world
+  // item (a thing or a surface), read from its key: an instance's key ends in the id of what it shows (scene.py), so
+  // the innermost such segment is the thing under the pointer. View state only: nothing is sent.
+  const idOf = el => { const segs = (el.dataset.key || "").split("/"); for (let i = segs.length - 1; i >= 0; i--) if (/^[af]\d+$/.test(segs[i])) return segs[i]; return null; };
+  document.addEventListener("click", e => {
+    if (document.body.dataset.inspector !== "term" || !(e.target instanceof Element)) return;
+    const el = e.target.closest("#paint [data-key]"); if (!el) return;
+    const control = e.target.closest("button, [contenteditable='true'], input, textarea, a, [role='menuitem']");
+    const own = el._n && (el._n.acts || []).some(a => a.on === "click");
+    if (!e.altKey && (control || own)) return;
+    const id = idOf(el); if (!id) return;
+    if (e.altKey) { e.preventDefault(); e.stopPropagation(); }
+    const s = input.selectionStart == null ? input.value.length : input.selectionStart, t = input.selectionEnd == null ? s : input.selectionEnd;
+    const before = input.value.slice(0, s), pad = before && !/\s$/.test(before) ? " " : "";
+    input.setRangeText(pad + id + " ", s, t, "end");
+    if (held) hold(null);
+    input.focus();
+  }, true);
 })();
