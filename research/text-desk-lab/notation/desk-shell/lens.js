@@ -101,7 +101,7 @@
         const t = TEXT.last && TEXT.last.isConnected ? TEXT.last : null;
         if (!t) return V.show("put the caret in a text first: this button acts on the text being written");
         if (a.line.startsWith("press ")) { t.focus(); return TEXT.press(t, a.line.slice(6)); }
-        TEXT.tool(t, a.line);
+        TEXT.wait(TEXT.tool(t, a.line));
       });
       else if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
         if (e.target !== el && a.line.includes("$x")) return;
@@ -276,6 +276,24 @@
       const after = paint.querySelector(`[data-key="${CSS.escape(key)}"]`);
       if (after) this.put(after, c.at);
     },
+    // A person types on while Enter is still on its way to the desk (seen live, 7 Oct: the next words landed in the
+    // paragraph above). Keys pressed meanwhile are kept, in order, and given to the text the caret lands in.
+    queue: null,
+    wait(done) {
+      if (!this.queue) this.queue = [];
+      Promise.resolve(done).catch(() => {}).then(async () => {
+        const keys = this.queue || []; this.queue = null;
+        for (let i = 0; i < keys.length; i++) {
+          const k = keys[i], el = document.activeElement;
+          if (!el || !el.isContentEditable) break;
+          if (k.key.length === 1) { document.execCommand("insertText", false, k.key); continue; }
+          let stopped = false;
+          this.key(el, { key: k.key, shiftKey: k.shiftKey, preventDefault() { stopped = true; }, stopImmediatePropagation() {} });
+          if (stopped) { this.queue.push(...keys.slice(i + 1)); return; }      // that key began another wait: the rest follow it
+          if (k.key === "Backspace") document.execCommand("delete");
+        }
+      });
+    },
     press(el, key) { if (el._toSource) MARKS.key(el, { key: key.split("+").pop().toLowerCase(), preventDefault() {} }, el._toSource); },
     key(el, e) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -290,13 +308,13 @@
       const whole = /[$](head|tail)/.test(a.line);       // a command told the words takes them: the draft is not sent again
       if (whole) { V.drop(key); V.hold = null; }
       const line = a.line.replace("$head", () => this.esc(src.slice(0, c.at))).replace("$tail", () => this.esc(src.slice(c.at)));
-      sendKey(seen, line).then(r => {
+      this.wait(sendKey(seen, line).then(r => {
         const made = r && (r.created || [])[0], find = k => paint.querySelector(`[data-key="${CSS.escape(k)}"]`);
         const same = find(key), born = made && item && find(key.split(item).join(made));
         if (born) this.put(born, 0);
         else if (!same && prevKey && find(prevKey)) this.put(find(prevKey), prevLen);
         else if (same) this.put(same, name === "Backspace" ? 0 : c.at);
-      });
+      }));
     },
   };
 
@@ -334,6 +352,10 @@
       return true;
     },
   };
+  document.addEventListener("keydown", e => {
+    if (!TEXT.queue || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key.length === 1 || /^(Enter|Tab|Backspace)$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey }); }
+  }, true);
   document.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest(".t-mark-link");
     if (!a || !/^https?:/.test(a.dataset.href || "")) return;
