@@ -11,9 +11,17 @@ world verbs, scripts and rules all fill their blanks here, the same way:
     $<handle>      a handle you named (set draft = a98, or create ... as=draft)
     in a verb:     $1 $2 ... its words, $* the rest of the line exactly as said, $this the thing a verb lives on
     in a rule:     $item   the thing it fired on (the target, as in a lens act)
+    the current thing's own words (8 Oct, names.py): in a rule, $title $text $kind $due $tags and any prop ($status)
+                   are $item's; in a verb that lives on a thing they are $this's
+    $house         the outermost surface, whose props are everyone's: $house.<prop>
+    $me.corner, $me.<prop>   a person's corner and the props on their person note
     a part of the thing a blank names (a1027): .title its title, .maker who made it, .<prop> one of its props
                    ($item.asked_by, $1.status); .text its words, .in what holds it, .before and .after its neighbours
                    there (7 Oct); a part it doesn't have refuses, naming the thing
+    $( <expr> )    a value computed where it stands (8 Oct): the lens's expressions (expr.py), over the same names,
+                   with count(<selection>) and sum/min/max($field of <selection>); a value that cannot be computed
+                   refuses with the reason, never fills as none
+    a handle named with as= (create ... as=draft) lives for the reply it was named in; set draft = <id> keeps it
 
 Where they are filled: after the line is parsed, in the values themselves (a target, a selection, a k=v value), so a
 filled value is never read again as desk words or filled a second time ($* may carry '$here' or 'a; b "hi"' through
@@ -30,6 +38,7 @@ its own: its steps see each other's $new, and the caller's next line sees the la
 """
 import re
 
+import names
 from world import Refusal
 
 LIT = ""          # a \$ in the line, kept out of shlex's way until it lands in a value as a plain $
@@ -38,31 +47,45 @@ WORD = re.compile(r"^\$(\d+|[A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_-]*)?$
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
-KNOWN = ("$here $here.<prop> $new $today $me, a handle you set ($name); in a verb $1 $2 $* $this; in a rule $item; "
-         "a thing's parts .title .maker .text .in .before .after .<prop>")
+KNOWN = ("$here $here.<prop> $new $today $me $me.corner $me.<prop> $house $house.<prop>, a handle ($name: set, or as= in this "
+         "reply); in a verb $1 $2 $* $this; in a rule $item; the current thing's own words ($title, $status); a thing's parts "
+         ".title .maker .text .in .before .after .<prop>; a value $( <expr> )")
 
 
 class Ctx:
     """Where a line is being filled. kind: typed | verb | script | rule."""
     binds = None            # a1156: a template's binding (verbs.bind_text), kept with its lines when they were saved
 
-    def __init__(self, kind, args=None, rest="", me=None, this=None, item=None, name="", prev=None, home=None):
+    def __init__(self, kind, args=None, rest="", me=None, this=None, item=None, name="", prev=None, home=None, handles=None):
         self.kind, self.args, self.rest, self.me, self.this, self.item, self.name = kind, args, rest, me, this, item, name
         self.prev = prev        # what was made most recently earlier at this level of this reply (None: nothing yet)
         self.home = home        # a990: the room a template lives in (its bare words are looked up there), or None
+        self.handles = handles if handles is not None else {}     # 8 Oct: the things `as=` named in this reply
 
     @property
     def template(self):
         return self.kind != "typed"
 
 
+SP = "\u2423"       # a space inside $( ... ), kept out of the line's word split until the value is computed or stored
+
+
 def protect(line):
-    """Before a line is split into words: every \\$ becomes LIT, so no parser eats the backslash."""
-    return (line or "").replace("\\$", LIT)
+    """Before a line is split into words: every \\$ becomes LIT, so no parser eats the backslash; and every space
+    inside a `$( ... )` becomes SP, so `n=$(2 + 3)` is one word for the parser and reads back as written."""
+    line = (line or "").replace("\\$", LIT)
+    out, i = "", 0
+    while True:
+        j = line.find("$(", i)
+        k = _close(line, j + 1) if j >= 0 else -1
+        if k < 0:
+            return out + line[i:]
+        out += line[i:j] + line[j:k + 1].replace(" ", SP)
+        i = k + 1
 
 
 def literal(text):
-    return str(text).replace(LIT, "$")
+    return str(text).replace(LIT, "$").replace(SP, " ")
 
 
 def ctx_of(desk):
@@ -91,121 +114,167 @@ def _here(desk, ctx, name):
     return fid
 
 
+def _word_frame(desk, ctx):
+    """The words a template gives: $1 $2 ... $* $this in a verb, $item in a rule. Each is claimed in every host, so a
+    word used where it has no value refuses with what it means (never falls through to a handle of that name)."""
+    def has(name):
+        return name.isdigit() or name in ("this", "item")
+
+    def get(name):
+        if name.isdigit():
+            k = int(name)
+            if ctx.args is None or k < 1:
+                raise Refusal(f"${name} stands for a word after a verb or script; there are none here")
+            if k > len(ctx.args):
+                raise Refusal(f"{ctx.name or 'this'} needs {k} word(s) after it; got {len(ctx.args)}"
+                              + (f". help {ctx.name}" if ctx.name else ""))
+            val = ctx.args[k - 1]
+            if isinstance(val, Refusal):
+                raise val
+            return val
+        if name == "item":
+            if ctx.kind != "rule" or not ctx.item:
+                raise Refusal("$item stands for the target: the thing a rule fired on, or the thing a lens gesture acts on. "
+                              "Did you mean $new, the thing made most recently in this reply?")
+            return ctx.item
+        if name == "this":
+            if ctx.kind != "verb":
+                raise Refusal("$this is the thing a verb lives on; it has a value only inside a verb")
+            if not ctx.this:
+                raise Refusal(f"{ctx.name} says $this but lives on no thing")
+            return ctx.this
+    return names.Frame("word", get, has=has)
+
+
+def _reply_frame(desk, ctx):
+    """$new, and the handles `as=` named earlier in this reply."""
+    def has(name):
+        return name == "new" or name in ctx.handles
+
+    def get(name):
+        if name == "new":
+            if ctx.kind == "rule":
+                raise Refusal("$new: a rule has no earlier line; it acts on $item, the thing it fired on")
+            if not ctx.prev:
+                where = "this verb's earlier steps" if ctx.kind == "verb" else "this reply"
+                raise Refusal(f"$new names the thing made most recently earlier in this reply, and nothing earlier in "
+                              f"{where} made anything (a new reply starts fresh). Use the id a receipt printed")
+            val = ctx.prev[-1]              # a line that made several: the last (Juniper, a806 (10))
+            desk._filled_new = val
+            return val
+        return ctx.handles[name]
+    return names.Frame("reply", get, has=has)
+
+
+def scope_of(desk, ctx):
+    """The frames a typed line, a verb or a rule reads names through (names.py says the order)."""
+    frames = [_word_frame(desk, ctx)]
+    cur = ctx.item if ctx.kind == "rule" else (ctx.this if ctx.kind == "verb" else None)
+    if cur and (cur in desk.world.nodes or cur in desk.world.subjects):
+        frames.append(names.thing_frame(desk.world, cur))
+    frames.append(_reply_frame(desk, ctx))
+    frames.append(names.host_frame(desk, {"me": ctx.me}, here=lambda: _here(desk, ctx, "here")))
+    frames.append(names.handles_frame(getattr(desk, "vars", None)))
+    return names.Scope(frames)
+
+
 def _one(desk, ctx, name, attr):
     """The value of one blank, or a Refusal. attr is '' or '.<word>'."""
-    w = desk.world
     what = "$" + name + attr
-    if name.isdigit():
-        k = int(name)
-        if ctx.args is None or k < 1:
-            raise Refusal(f"{what} stands for a word after a verb or script; there are none here")
-        if k > len(ctx.args):
-            raise Refusal(f"{ctx.name or 'this'} needs {k} word(s) after it; got {len(ctx.args)}"
-                          + (f". help {ctx.name}" if ctx.name else ""))
-        val = ctx.args[k - 1]
-        if isinstance(val, Refusal):
-            raise val
-        return _part(desk, val, attr, what) if attr else val
-    if name == "here":
-        fid = _here(desk, ctx, name)
-        if not attr:
-            return fid
-        p = attr[1:]
-        props = w.nodes[fid].get("props") or {}
-        if p in props and str(props[p]).strip():
-            import persons
-            return str(persons.shown(w, props[p]))      # a1590: a person prop fills as the name
-        if p == "title":
-            return w.nodes[fid]["title"]
-        raise Refusal(f"{what}: {w.nodes[fid]['title']} ({fid}), the room you are in, has no {p}= "
-                      f"(do prop {fid} {p}=<id> gives it one)")
-    if name == "new":
-        if ctx.kind == "rule":
-            raise Refusal("$new: a rule has no earlier line; it acts on $item, the thing it fired on")
-        if not ctx.prev:
-            where = "this verb's earlier steps" if ctx.kind == "verb" else "this reply"
-            raise Refusal(f"$new names the thing made most recently earlier in this reply, and nothing earlier in "
-                          f"{where} made anything (a new reply starts fresh). Use the id a receipt printed")
-        val = ctx.prev[-1]              # a line that made several: the last (Juniper, a806 (10))
-        desk._filled_new = val
-    elif name == "item":
-        if ctx.kind != "rule" or not ctx.item:
-            raise Refusal("$item stands for the target: the thing a rule fired on, or the thing a lens gesture acts on. "
-                          "Did you mean $new, the thing made most recently in this reply?")
-        val = ctx.item
-    elif name == "this":
-        if ctx.kind != "verb":
-            raise Refusal("$this is the thing a verb lives on; it has a value only inside a verb")
-        if not ctx.this:
-            raise Refusal(f"{ctx.name} says $this but lives on no thing")
-        val = ctx.this
-    elif name == "today":
-        today = getattr(desk, "today", None)
-        if not today:
-            raise Refusal("$today is unset; clock YYYY-MM-DD sets it (clock follow keeps it on the wall date)")
-        if attr:
-            raise Refusal(f"{what}: $today has no parts")
-        return today
-    elif name == "me":
-        val = ctx.me or w.me
-        if attr:
-            raise Refusal(f"{what}: $me has no parts")
-        return str(val)
-    elif name in (getattr(desk, "vars", None) or {}):
-        val = desk.vars[name]
-    else:
+    f = scope_of(desk, ctx).frame_for(name)
+    if f is None:
         raise Refusal(f"${name} is no blank here. Blanks: {KNOWN}. A literal dollar sign is written \\$")
-    return _part(desk, val, attr, what) if attr else val
+    if attr:
+        v = f.part(name, attr)
+        if v is not None:
+            return v
+    val = f.get(name)
+    if not attr:
+        return str(val) if name == "me" else val
+    return _part(desk, val, attr, what)
 
 
 def _part(desk, val, attr, what):
-    """A part of the thing a blank names (a1027): .title its title, .maker who made it (the actor of its create), any
-    other word one of its props, as $here.<prop> is of a room. A part it doesn't have refuses, naming the thing."""
-    if attr == ".title":
+    """A part of the thing a blank names (a1027; names.part_of): .title its title, .maker who made it, .text, .in,
+    .before, .after, any other word one of its props. A part it doesn't have refuses, naming the thing."""
+    if attr == ".title" and str(val) in desk.world.nodes:
         return _title(desk, val)
-    w, p = desk.world, attr[1:]
-    try:
-        nid = desk._resolve(str(val))
-    except Refusal:
-        raise Refusal(f"{what}: {val} names no thing, so it has no {p}")
-    sid = w.nodes[nid].get("subject") if nid in w.nodes else nid
-    if p == "maker":
-        import verbs
-        who = verbs._author(w, sid or nid)
-        if not who:
-            raise Refusal(f"{what}: no one is recorded as making {nid} (it was made before this world's log began)")
-        return who
-    props = ((w.subjects[sid].get("props") if sid in w.subjects else w.nodes[nid].get("props")) or {})
-    if p in PLACE and not str(props.get(p) or "").strip():      # a prop of the same name is the author's, and wins
-        return _place(w, nid, p, what)
-    if p in props and str(props[p]).strip():
-        import persons     # a1590: a person prop fills as the person's name (juniper,first for an earlier one): the
-        return str(persons.shown(w, props[p]))     # words that, typed back, mean the same person
-    raise Refusal(f"{what}: {nid} has no {p}= (a thing's parts are .title .maker .text, where it is .in .before .after, and its props)")
+    return names.part_of(desk.world, val, attr[1:], what, resolve=desk._resolve)
 
 
-PLACE = ("in", "before", "after", "text")
+def name_made(desk, alias, ident):
+    """`create ... as=draft` (and group): the handle lives for this reply, in the innermost template (a verb's own
+    steps see it; the caller's later lines in the same reply see it too, through the typed ctx). `set` keeps one."""
+    ctx_of(desk).handles[alias] = ident
 
 
-def _place(w, nid, p, what):
-    """Pike, 7 Oct (Editor board a3472): a verb that makes a paragraph after this one, joins it to the one above or
-    moves it could not say where its thing is. .in is what holds it, .before and .after its neighbours there in the
-    order they are read, .text its words. An edge refuses plainly, so a verb stops instead of acting on nothing."""
-    n = w.nodes.get(nid)
-    if p == "text":
-        s = w.subjects.get(n.get("subject")) if n else w.subjects.get(nid)
-        if s is None or not isinstance(s.get("text"), str):
-            raise Refusal(f"{what}: {nid} has no text (a note has; a chat's words are its lines)")
-        return s["text"]
-    if n is None or not n.get("parent"):
-        raise Refusal(f"{what}: {nid} is in nothing, so it has no {p}")
-    if p == "in":
-        return n["parent"]
-    ids = [k["id"] for k in w.children(n["parent"])]
-    i = ids.index(nid) + (1 if p == "after" else -1)
-    if not 0 <= i < len(ids):
-        raise Refusal(f"{what}: {nid} is {'last' if p == 'after' else 'first'} in {n['parent']}, so nothing is {p} it")
-    return ids[i]
+# ---- $( <expr> ): a value computed where it stands (8 Oct) ------------------------------------------------------------
+def _close(text, i):
+    """The index of the `)` closing the `(` at text[i], or -1."""
+    depth, q = 0, False
+    for k in range(i, len(text)):
+        c = text[k]
+        if c == '"' and text[k - 1:k] != "\\":
+            q = not q
+        if q:
+            continue
+        depth += (c == "(") - (c == ")")
+        if depth == 0:
+            return k
+    return -1
+
+
+def whole_blank(value):
+    """Is this whole value one blank ($new, $here.talk, $draft) or one computed value ($( ... ))?"""
+    v = str(value).replace(SP, " ")
+    return bool(WORD.match(v)) or (v.startswith("$(") and _close(v, 1) == len(v) - 1)
+
+
+def expr_env(desk, ctx):
+    """The expression evaluator's door to a command's names: $x and $x.part through the one resolver; a selection
+    through the desk's own reader; a member's field through part_of."""
+    def get(name):
+        if not name.startswith("$"):
+            return None                     # a bare word in a command's expression names no let; it is none, and says so
+        m = WORD.match(name)
+        if not m:
+            return None
+        try:
+            return str(_one(desk, ctx, m.group(1), m.group(2) or ""))
+        except Refusal:
+            return None
+
+    def select(q):
+        sel = desk._parse_selection(fill(desk, q, ctx=ctx))
+        return list(sel[0]) if sel else []
+
+    def field(i, f):
+        try:
+            return _part(desk, i, "." + f, f"${i}.{f}")
+        except Refusal:
+            return None
+    return {"get": get, "select": select, "field": field, "reads": []}
+
+
+def compute(desk, value, ctx=None, soft=False):
+    """Every `$( <expr> )` in `value` becomes its printed value. A value that cannot be computed refuses with the
+    reason (soft: stays as written, for an echo)."""
+    import expr as X
+    ctx = ctx or ctx_of(desk)
+    out, i = "", 0
+    while True:
+        j = value.find("$(", i)
+        if j < 0:
+            return out + value[i:]
+        k = _close(value, j + 1)
+        if k < 0:
+            return out + value[i:]
+        inner = value[j + 2:k].replace(SP, " ").strip()
+        val, inputs = X.run(inner, expr_env(desk, ctx))
+        if val.is_none() and not soft:
+            raise Refusal(f"$( {inner} ): {val.why}" + (f" ({inputs})" if inputs else ""))
+        out += value[i:j] + (value[j:k + 1].replace(SP, " ") if val.is_none() else X.fmt(val, reach=False))
+        i = k + 1
 
 
 def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
@@ -217,6 +286,8 @@ def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
     value = str(value)
     if text and not ctx.template:
         return literal(value)
+    if "$(" in value:
+        value = compute(desk, value, ctx, soft=soft)
 
     def one(m):
         if m.group(0) == LIT:
@@ -270,7 +341,7 @@ def fill_arg(desk, verb, key, value):
     if ctx_of(desk).template:
         return fill(desk, value)
     kind = _kind(verb, key)
-    if kind == "prose" or (kind == "prop" and not WORD.match(str(value))):
+    if kind == "prose" or (kind == "prop" and not whole_blank(value)):
         return literal(value)
     return fill(desk, value)
 
@@ -284,7 +355,7 @@ def _kind(verb, key):
 def kept(desk, verb, key, value):
     """a1322: the blanks a typed prop value keeps as its own words (wake="look $new"), so the receipt can say so: an
     ok must not hide a blank that will never fill. [] in a template, for text, or for a whole-value blank."""
-    if ctx_of(desk).template or _kind(verb, key) != "prop" or WORD.match(str(value)):
+    if ctx_of(desk).template or _kind(verb, key) != "prop" or whole_blank(value):
         return []
     return [m.group(0) for m in BLANK.finditer(str(value))
             if m.group(1) and m.group(1) != "*" and not m.group(1).isdigit()]

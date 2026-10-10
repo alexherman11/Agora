@@ -114,7 +114,7 @@ KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands t
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
-NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index", "run")
+NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index", "run", "in", "before", "after")
 
 
 class LensRefusal(Exception):
@@ -1520,6 +1520,8 @@ _ASPECT_NAMES = ("title", "text", "due", "tags")
 def _aspect_of_field(f):
     if f in _ASPECT_NAMES:
         return f
+    if f in ("in", "before", "after"):
+        return "place"          # 8 Oct: where a thing is, read as a field, is a read of its place
     if f in NAMES or f in ("value", "x", "y", "n", "count"):
         return None
     return f"prop:{f}"
@@ -1566,8 +1568,11 @@ def _ctx_for(w, nid, state=None):
         n = w.nodes[nid]
         s = w.subjects.get(n.get("subject")) or {}
         item = nid
+    import names
+    place = {p: names.place_of(w, item, p)[0] or "" for p in ("in", "before", "after")} if item else {"in": "", "before": "", "after": ""}
     ctx = {"item": item, "id": n.get("subject") or nid, "title": s.get("title", n.get("title", "")), "text": s.get("text", ""),
            "kind": s.get("kind", n["type"]), "due": s.get("due") or "", "tags": " ".join(s.get("tags") or []),
+           **place,          # 8 Oct (names.py): where a thing is, as fields: $item.in, $trip.before, $after
            "_tags": list(s.get("tags") or []),
            # F11: a surface's props live on the surface itself (a resident's corner carries status, want)
            # a1590: a person prop holds the person; a lens reads the name ($owner = $me holds for today's bearer)

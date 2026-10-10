@@ -1059,6 +1059,42 @@ def test_style_read_once():
     assert out["looks"] is None and out["refusal"].startswith("line 1") and out["escapes"]
 
 
+def _create_text(text):
+    """A lens text as a create's text= value: inner quotes escaped, and every $ escaped (a create's text is judged for blanks)."""
+    return text.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+
+
+def test_place_fields_in_a_lens():
+    """8 Oct (names.py, step 2): where a thing is are fields of it, in a lens as in a command: $in what holds it,
+    $before and $after its neighbours in reading order (empty at an edge), and $frame.in through a named frame. A read
+    of them is fenced as a read of the thing's place."""
+    import deskd, lens_ir
+    tmp = _scratch("_test_place")
+    try:
+        with deskd.Session("_test_place", "jeff") as desk:
+            w = desk.world
+            fid = next(f for f, n in w.nodes.items() if n["type"] == "surface" and n.get("layout") != "free"
+                       and len([k for k in w.children(f) if k["type"] == "appearance"]) >= 2)
+            kids = [k["id"] for k in w.children(fid)]
+            src = chr(10).join([f"root : column, of in:{fid} as c, each card",
+                                'card : text "$title | in $in | before $before | after $after | frame $c.in", on click do look $item'])
+            desk.dispatch("desk", {"line": f"look {fid} :1"})
+            r = desk.dispatch("desk", {"line": f'do create {fid} kind=note tags=lens title=place-lens text="{_create_text(src)}"'})
+            assert "error" not in r, r
+            kids = [k["id"] for k in w.children(fid)]        # the lens note itself is the last thing in fid now
+            sc, text = lens_ir.scene_for(desk, "place-lens")
+            lines = [k["text"] for k in sc["kids"] if k.get("text")]
+            assert lines, text
+            first, last = lines[0], lines[-1]
+            assert f"| in {fid} |" in first and "| before  |" in first and f"| after {kids[1]} |" in first and f"| frame {fid}" in first, first
+            assert f"| before {kids[-2]} |" in last and "| after  |" in last, last
+            first_node = next(k for k in sc["kids"] if k.get("text"))
+            reads = [r for r in (first_node.get("fence") or {}).get("reads", []) if r[0] in (kids[0], w.nodes[kids[0]].get("subject"))]
+            assert any("place" in r[2] for r in reads), (first_node.get("fence"), "a read of $in is a read of the thing's place")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_let_if_and_arithmetic():
     """Alex, 5 Oct: if and arithmetic. `let` names a value from an expression; several lets of one name with `when` are
     an if; aggregates carry their reach; a missing value is none and a guard on it cannot tell; $( ) computes in words."""

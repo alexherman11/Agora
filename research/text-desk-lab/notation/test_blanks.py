@@ -269,6 +269,49 @@ exp = D.cmd_export()
 import re as _re  # noqa: E402
 check("export writes no bare blank", not _re.search(r"(?<!\\)\$(here|new|item|today)\b", exp),
       _re.findall(r".{30}(?<!\\)\$(?:here|new|item|today)\b.{10}", exp)[:3])
+# 10. 8 Oct (names.py, step 2 of the grammar unification): one resolver, $( ) in commands, when on a step, handles
+# that live for a reply, $me.corner and $house
+CALC, GUARD = own("calc-here"), own("guarded")
+reply("claude", f"look {HOME} :1",
+      f'do create {HOME} kind=note title={CALC} tags=verb on=house text="do prop $here n=$(2 + 3) m=$(count(kind:note) > 0)"')
+be(ME)
+got = reply(ME, f"go {BOARD} :1", f"look {BOARD} :1", CALC)
+check("a verb step computes $( ) over the same names: n=5 and a test prints true",
+      props(BOARD).get("n") == "5" and props(BOARD).get("m") == "true", (got, props(BOARD)))
+got = reply(ME, f"do prop {CORNER} q=$(1 + 2) r=\"$(1 + 2) + 1\"")
+check("typed: a prop whose whole value is one $( ) fills; one with words around it stays as typed",
+      props(CORNER).get("q") == "3" and props(CORNER).get("r") == "$(1 + 2) + 1", (got, props(CORNER)))
+got = reply(ME, f'do append {TALK[BOARD]} line="$(1 + 2)"')
+check("typed prose is never computed", "$(1 + 2)" in text_of(TALK[BOARD]), got)
+got = reply(ME, f"do prop {CORNER} bad=$(1 / 0)")
+check("a value that cannot be computed refuses with the reason, never fills as none",
+      "divided by zero" in got[-1][2] and "bad" not in props(CORNER), got[-1])
+reply("claude", f"look {HOME} :1",
+      f'do create {HOME} kind=note title={GUARD} tags=verb on=house text="do prop $here g1=yes when 1 > 2\ndo prop $here g2=yes when 2 > 1\ndo prop $here g3=yes when $nothing > 1"')
+got = reply(ME, f"go {BOARD} :1", f"look {BOARD} :1", GUARD)
+check("a step ending in `when <expr>` runs only when it holds; a false or unknowable guard skips the step and says so",
+      "g1" not in props(BOARD) and props(BOARD).get("g2") == "yes" and "g3" not in props(BOARD)
+      and got[-1][1].count("~ skipped:") == 2 and "can't tell" in got[-1][1], (got, props(BOARD)))
+got = reply(ME, f"do create {CORNER} kind=note title=Handled as=hd", "do prop $hd hx=1")
+hd = next((s for s in W.subjects.values() if s["title"] == "Handled"), None)
+check("as= names the made thing for the rest of the reply",
+      hd is not None and (hd.get("props") or {}).get("hx") == "1" and "(in this reply; set hd" in got[0][1], got)
+got = reply(ME, "do prop $hd hy=1")
+check("a handle named with as= is gone in the next reply (set keeps one)", "no blank here" in got[-1][2], got[-1])
+got = reply(ME, f"do prop {CORNER} mc=$me.corner hs=$house")
+check("$me.corner is my corner and $house the outermost surface",
+      props(CORNER).get("mc") == CORNER and props(CORNER).get("hs") == W.root, (got, props(CORNER)))
+BT = own("bt-rule")
+reply("claude", f"look {HOME} :1",
+      f'do create {HOME} kind=note tags=rule title={BT} text="when tag:{BT} do prop $item echo=$title room=$here"')
+got = reply(ME, f"do create {CORNER} kind=note title=\"Bare words\" tags={BT}")
+bw = next((s for s in W.subjects.values() if s["title"] == "Bare words"), None)
+check("in a rule, the thing's own words are bare: $title is $item.title",
+      bw is not None and (bw.get("props") or {}).get("echo") == "Bare words" and (bw.get("props") or {}).get("room") == HOME,
+      (got, bw and bw.get("props")))
+got = reply(ME, f"do prop {CORNER} nope=$zilch")
+check("an unknown blank still refuses, naming the blanks", "no blank here" in got[-1][2] and "$house" in got[-1][2], got[-1])
+
 print(f"part 1: {time.time() - t0:.0f} s (in memory; nothing saved)")
 
 # part 2: the house's own rest, through the desk process, on a saved copy of the built world (removed after)

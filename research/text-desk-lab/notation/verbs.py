@@ -853,7 +853,11 @@ def run(desk, s, words, me, this=None, rest=None):
     desk._verb_depth = depth + 1
     desk._ctxs = (getattr(desk, "_ctxs", None) or []) + [ctx]
     try:
-        r = desk.dispatch("desk", {"line": body})
+        steps = [guarded(x) for x in _steps(s["text"])]
+        if any(c for _, c in steps):
+            r = _run_guarded(desk, steps, ctx)
+        else:
+            r = desk.dispatch("desk", {"line": body})
     finally:
         desk._verb_depth = depth
         desk._ctxs = desk._ctxs[:-1]
@@ -865,6 +869,45 @@ def run(desk, s, words, me, this=None, rest=None):
         # a806: a use whose step was refused is a refusal (steps before it stay done, and say so), not an ok
         raise Refusal(f"({tag}: {shown})\n" + (r.get("text") or r.get("error")))
     return f"({tag}: {shown})\n{r['text']}"
+
+
+def guarded(step):
+    """8 Oct: a step may end in ` when <expr>`: it runs only when the expression holds (expr.py, the lens's own `if`),
+    judged as the step is reached, over the same names. -> (step, condition or None). Only a tail that reads as an
+    expression is a guard, so words inside quotes and a title ending in `when ready` are left alone."""
+    import expr as X
+    import scene
+    pieces = scene._outside_quotes(step, " when ")
+    if len(pieces) < 2 or not pieces[-1].strip():
+        return step, None
+    cond = pieces[-1].strip()
+    try:
+        X.parse(cond)
+    except X.ExprError:
+        return step, None
+    return " when ".join(pieces[:-1]).strip(), cond
+
+
+def _run_guarded(desk, steps, ctx):
+    """The steps one by one, each judged by its guard first; a step whose guard is false or cannot tell is skipped and
+    the receipt says so; a refusal stops the rest, as a batch does. -> a dispatch-shaped answer."""
+    import blanks
+    import expr as X
+    texts = []
+    for step, cond in steps:
+        if cond:
+            val, ins = X.run(cond, blanks.expr_env(desk, ctx))
+            held = X.holds(val)
+            if not held:
+                why = f"can't tell: {val.why}" if held is None else "is false"
+                texts.append(f"~ skipped: {blanks.show(desk, blanks.protect(step), ctx)}  (when {cond} {why}" + (f"; {ins}" if ins else "") + ")")
+                continue
+        r = desk.dispatch("desk", {"line": step})
+        if "error" in r or r.get("batch_error"):
+            texts.append(r.get("text") or r.get("error") or "")
+            return {"error": r.get("error") or "refused", "text": "\n".join(t for t in texts if t)}
+        texts.append(r.get("text") or "")
+    return {"text": "\n".join(t for t in texts if t)}
 
 
 def _rest(line, n):

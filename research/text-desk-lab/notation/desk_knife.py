@@ -4,6 +4,7 @@ import re
 import shlex
 
 import blanks
+import names
 import harness   # registers launch; provides sync
 import helpnotes
 import knife
@@ -229,6 +230,17 @@ class DeskKnife(DeskMoo):
     RULE_BLANKS = ("item", "here", "today", "me")
     RULE_FORM = "when <selection> do <verb> [target] [k=v ...]   or   on <verb> [by=<actor>] do <verb> ..."
 
+    def _prop_names(self):
+        """Every prop name some thing in the world carries (for a rule's bare words, 8 Oct)."""
+        w = self.world
+        out = set()
+        for x in w.subjects.values():
+            out.update(x.get("props") or {})
+        for n in w.nodes.values():
+            if n.get("type") == "surface":
+                out.update(n.get("props") or {})
+        return out
+
     def _rule_subjects(self):
         w = self.world
         return [s for s in w.subjects.values() if "rule" in (s.get("tags") or []) and w.appearances_of(s["id"])]
@@ -285,9 +297,17 @@ class DeskKnife(DeskMoo):
             name, attr = m.group(1), m.group(2) or ""
             if name == "new":
                 return None, "$new: a rule has no earlier line; it acts on $item, the thing it fired on"
-            if name not in self.RULE_BLANKS and name not in (self.vars or {}):
-                return None, (f"${name}{attr} is no blank in a rule. A rule's blanks: $item $item.title $item.<prop> "
-                              f"$item.maker $here $here.<prop> $today $me, or a handle; a literal dollar sign is \\$")
+            if name.isdigit() or name in ("this", "*"):
+                return None, (f"${name}{attr} is a verb's word; a rule has none. A rule's blanks: $item $item.title $item.<prop> "
+                              f"$item.maker, $item's own words bare ($title, $status), $here $here.<prop> $today $me $house, or a "
+                              f"handle; a literal dollar sign is \\$")
+            if name not in self.RULE_BLANKS and name != "house" and name not in (self.vars or {}) \
+                    and name not in names.FIELDS and name not in self._prop_names():
+                # 8 Oct: a bare word is $item's own field or prop, so a typo must be caught here, while the author is
+                # present: a word no thing in the world carries as a prop is refused; $item.<prop> says it on purpose
+                return None, (f"${name}{attr} is no blank in a rule, and no thing here has a prop {name}=. A rule's blanks: "
+                              f"$item $item.title $item.<prop> $item.maker, $item's own words bare ($title, $status), $here "
+                              f"$here.<prop> $today $me $house, or a handle; for a prop the thing will have, write $item.{name}")
             if attr and name in ("today", "me"):
                 return None, f"${name}{attr}: ${name} has no parts"
         try:
@@ -1278,7 +1298,8 @@ class DeskKnife(DeskMoo):
         if top:
             # a typed line: $new is what this reader made most recently in this same reply, never in an earlier one
             rec = (self._made or {}).get(self._slot())
-            self._ctxs = [blanks.Ctx("typed", prev=rec[1] if rec and rec[0] == self._reply else None)]
+            same = rec and rec[0] == self._reply
+            self._ctxs = [blanks.Ctx("typed", prev=rec[1] if same else None, handles=dict(rec[2]) if same and len(rec) > 2 else {})]
         try:
             return self._one_filled(args, name, whole, top)
         finally:
@@ -1317,7 +1338,7 @@ class DeskKnife(DeskMoo):
         ctx.prev = made or ctx.prev
         if top:
             self._made = dict(self._made or {})
-            self._made[self._slot()] = (self._reply, ctx.prev)
+            self._made[self._slot()] = (self._reply, ctx.prev, dict(ctx.handles))
         if len(self.world.events) > n0:
             # after the receipt is composed, so the receipt describes the command, then the rules; the command's
             # last event is the cause of whatever the rules do, so one undo takes both back
@@ -1921,9 +1942,8 @@ class DeskKnife(DeskMoo):
         alias = kv.pop("as", None) if verb == "create" or (verb == "group" and kv.get("as") not in ("column", "row", "free")) else None
         if alias:
             out = self._do_knife(verb, positional, kv)
-            self.vars = self.vars or {}
-            self.vars[alias] = w.last_created
-            return out + f"\n  ${alias} = {w.last_created}"
+            blanks.name_made(self, alias, w.last_created)      # 8 Oct: for this reply; `set` keeps a handle for good
+            return out + f"\n  ${alias} = {w.last_created} (in this reply; set {alias} = {w.last_created} keeps it)"
         if verb == "put" and ("above" in kv or "status" in kv) and self._parse_selection(positional[0]) is None:
             tid = self._resolve(positional[0], allow_subject=False)
             tn = w.nodes.get(tid)
