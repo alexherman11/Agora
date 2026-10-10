@@ -12,7 +12,8 @@ It is meant to change rarely. It:
   - if the house dies 3 times within 5 minutes of a landing (a commit whose subject begins "land "), reverts that
     landing and says so in its log: the one part of live building that does not depend on the code it protects;
   - for frontier, runs docs_sync.py --watch, so an edit to a design document in the vault or the repo reaches the
-    other copy and the Handbook within a minute; starts it again, at most once a minute, if it dies.
+    other copy and the Handbook within a minute; starts it again, at most once a minute, if it dies. The watch is
+    told the keeper's pid and ends when the keeper does, however that happens, and it refuses to be a second one.
 Log: house-state/keeper.log.
 """
 import os
@@ -64,7 +65,8 @@ def main():
     deskd, house = start(door_args, name="door"), None
     time.sleep(8)                               # the door answers once its first deskd does
     house = start(["house.py", world], env, name="house")
-    docs_args = ["docs_sync.py", "--watch"] if world == "frontier" else None   # handbook_docs.py writes to frontier
+    # handbook_docs.py writes to frontier, so only frontier's keeper runs the watch
+    docs_args = ["docs_sync.py", "--watch", "--with", str(os.getpid())] if world == "frontier" else None
     docs, docs_at = (start(docs_args, env, name="docs_sync"), time.time()) if docs_args else (None, 0.0)
     log(f"keeper: world {world}, the door on {port} (deskd behind it), HEAD {head[:7]}")
     deaths, backoff_until, deskd_at, deskd_wait = [], 0.0, time.time(), 0.0
@@ -78,7 +80,8 @@ def main():
                     deskd_wait = time.time() + 60
                 deskd, deskd_at = start(door_args, name="door"), time.time()
             if docs and docs.poll() is not None and time.time() - docs_at >= 60:
-                log(f"docs_sync exited ({docs.returncode}); starting it again")
+                log("another docs_sync watch holds the lock; trying again" if docs.returncode == 76
+                    else f"docs_sync exited ({docs.returncode}); starting it again")
                 docs, docs_at = start(docs_args, env, name="docs_sync"), time.time()
             if house is None:                          # waiting out a pause after a crash
                 if time.time() >= backoff_until:

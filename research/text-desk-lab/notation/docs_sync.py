@@ -1,6 +1,6 @@
 """docs_sync: keeps the five design documents the same in the repo's docs/ and in Alex's Obsidian vault.
 
-    python docs_sync.py [--watch [seconds]] [--no-handbook]        default: one pass; --watch every 60 s
+    python docs_sync.py [--watch [seconds]] [--with <pid>] [--no-handbook]     default: one pass; --watch every 60 s
 
 Two copies, either may be edited (Alex, 29 Sep: "both stay up to date automatically"). For each document it compares
 the two copies, ignoring line endings (the vault keeps CRLF, the repo LF, and each keeps its own):
@@ -13,6 +13,10 @@ When Agora or Dynamic Desk changes, it runs handbook_docs.py, so the Handbook's 
 Current Implementation's source is the Handbook binder (export_docs.py); an edit made to either markdown copy is still
 carried to the other, and export_docs.py then warns that the export was edited directly, as it always has.
 The last agreed text is kept as a hash in house-state/docs_sync.json (not in git). It never commits.
+The keeper runs the watch (Alex, 9 Oct: it runs with the keeper, dies with the keeper, and there are never two):
+--with <pid> ends the watch within 2 s of that process ending, however it ended, and a watch holds
+house-state/docs_sync.lock for as long as it lives, so a second one says so and exits. The lock is the operating
+system's, on the open file: it goes when its holder does and is never stale.
 """
 import hashlib
 import json
@@ -21,12 +25,16 @@ import sys
 import time
 from pathlib import Path
 
+import explore       # _alive(): is a pid still running
+
 HERE = Path(__file__).resolve().parent
 REPO_DOCS = HERE.parents[2] / "docs"
 VAULT_DOCS = Path("C:/Projects/Agora/docs")
+ANOTHER = 76         # the exit code for "another watch already runs", as the house's is for another house
 NAMES = ["Agora.md", "Agora Constitution.md", "Dynamic Desk.md", "Current Implementation.md", "Previous Work.md"]
 HANDBOOK = {"Agora.md", "Dynamic Desk.md"}
 STATE = HERE / "house-state" / "docs_sync.json"
+LOCK = HERE / "house-state" / "docs_sync.lock"
 
 
 def read(p):
@@ -90,6 +98,24 @@ def one_pass(handbook=True):
     return said
 
 
+def only_one():
+    """The open, locked file, or None when another watch holds it. Keep the result: the lock lasts as long as it does."""
+    LOCK.parent.mkdir(exist_ok=True)
+    f = open(LOCK, "a+")
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
+
+
 def main():
     handbook = "--no-handbook" not in sys.argv
     if "--watch" not in sys.argv:
@@ -97,7 +123,12 @@ def main():
         return
     i = sys.argv.index("--watch")
     every = int(sys.argv[i + 1]) if len(sys.argv) > i + 1 and sys.argv[i + 1].isdigit() else 60
-    print(f"docs_sync: watching every {every} s", flush=True)
+    keeper = int(sys.argv[sys.argv.index("--with") + 1]) if "--with" in sys.argv[:-1] else None
+    held = only_one()
+    if not held:
+        print(time.strftime("%Y-%m-%d %H:%M:%S ") + "docs_sync: another watch is already running; not starting a second", flush=True)
+        sys.exit(ANOTHER)
+    print(f"docs_sync: watching every {every} s" + (f", for as long as {keeper} runs" if keeper else ""), flush=True)
     before = set()
     while True:
         said = one_pass(handbook)
@@ -105,7 +136,12 @@ def main():
             if line not in before:          # a standing refusal is said once, not every pass
                 print(time.strftime("%Y-%m-%d %H:%M:%S "), line, flush=True)
         before = set(said)
-        time.sleep(every)
+        until = time.time() + every
+        while time.time() < until:
+            time.sleep(2)
+            if keeper and not explore._alive(keeper):
+                print(time.strftime("%Y-%m-%d %H:%M:%S ") + f"docs_sync: {keeper} is gone; stopping", flush=True)
+                return
 
 
 if __name__ == "__main__":
