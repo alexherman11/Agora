@@ -78,7 +78,7 @@ def test_a_pulsing_role_is_printed():
     text = ("token ink = #111111\nrole waiting : text down, ink, pulse   # waits on Alex\n"
             "role pulsed : ink, pulse down\nrole chip : ink\n")
     orig = scene.style_source
-    scene.style_source = lambda desk, name: {"text": text} if name == "pixel" else None
+    scene.style_source = lambda desk, name, at=None: {"text": text} if name == "pixel" else None
     try:
         assert scene.pulsing_roles(None, "pixel") == {"waiting"}      # `pulse down` is not the word pulse
         assert scene.pulsing_roles(None, None) == set()               # no calm note, no seed under this stub

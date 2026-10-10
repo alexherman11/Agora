@@ -108,6 +108,7 @@ the pressure that builds against that wall is the research result.
 import pathlib
 import re
 from desk import split_batch
+from world import Refusal
 import expr as X
 import style as style_mod
 import tree
@@ -147,36 +148,48 @@ def _roles():
 # F7 (research/command-center): a style is world data. A note tagged `style` whose title is the style's name holds its
 # source, so it is edited, undone, forked and merged like anything else; a lens names its style with prop style=<name>.
 # The file desk-shell/style/<name>.style is only the seed for a world that has no such note.
-def find_style(desk, name):
+def room_of_thing(w, s):
+    """The room holding a subject's first appearance (None when unplaced or outside every room): the scope a lens's own
+    lookups stand in (9 Oct, step 7: the lens it places, the style that paints it)."""
+    import verbs
+    return verbs.room_holding(w, s["id"]) if s else None
+
+
+def find_style(desk, name, at=None):
+    """A style by name, nearest first (verbs.nearest; 9 Oct, step 7): the room `at` (the lens's), the rooms around it,
+    the house, then unplaced; a tie is refused. None when no note is titled so (the seed file may answer)."""
+    import verbs
     w = desk.world
     hits = [s for s in w.subjects.values() if "style" in (s.get("tags") or []) and s["title"].lower() == name.lower()]
-    placed = [s for s in hits if w.appearances_of(s["id"])]
-    return (placed or hits or [None])[0]
+    try:
+        return verbs.nearest(desk, hits, name, "styles", at)
+    except Refusal as e:
+        raise LensRefusal(str(e))
 
 
-def style_source(desk, name):
+def style_source(desk, name, at=None):
     """-> {name, text, origin, rev} for a style by name, from the world, else from the seed file; None if neither."""
-    s = find_style(desk, name)
+    s = find_style(desk, name, at)
     if s is not None:
         return {"name": name, "text": s["text"], "origin": s["id"], "rev": f"{s['id']}r{s['rev']}"}
     return style_mod.seed(name)
 
 
-def style_roles(desk, name):
+def style_roles(desk, name, at=None):
     """The role names a lens may use under style `name`; None keeps the old behavior (calm.style, the file)."""
     if not name:
         return None
-    st = style_source(desk, name)
+    st = style_source(desk, name, at)
     if st is None:
         raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
     return style_mod.role_names(st["text"])
 
 
-def pulsing_roles(desk, name):
+def pulsing_roles(desk, name, at=None):
     """a1140: the roles whose words include `pulse` in the style the painter installs for a lens (its style=, else calm).
     The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving. A style
     the painter refuses paints nothing, so nothing pulses."""
-    st = style_source(desk, name or "calm") or {}
+    st = style_source(desk, name or "calm", at) or {}
     try:
         roles = style_mod.parse(st.get("text") or "")["roles"]
     except style_mod.StyleRefusal:
@@ -1818,17 +1831,20 @@ def to_text(scene, name, who, at, roots=None, part=None):
     return "\n".join(lines)
 
 
-def find_lens(desk, name):
+def find_lens(desk, name, at=None):
+    """A lens by title, regardless of case, nearest first (verbs.nearest; 9 Oct, step 7): the room `at` (a placing
+    lens's own, else where the line stands), the rooms around it, the house, then unplaced (a removed lens leaves its
+    subject behind). Two at one level, or two in rooms neither nearer, are refused naming each (Pike: the first silently won)."""
     import kinds
+    import verbs
     w = desk.world
     hits = [s for s in w.subjects.values() if kinds.is_lens(s) and s["title"].lower() == name.lower()]
-    if len(hits) > 1:        # a removed lens leaves its subject behind, unplaced; the placed one is the one meant
-        placed = [s for s in hits if w.appearances_of(s["id"])]
-        hits = placed if len(placed) == 1 else hits
-    if len(hits) > 1:        # Pike: two lenses with one title, the first silently won
-        raise LensRefusal(f"{len(hits)} lenses are titled {name!r} ({', '.join(s['id'] for s in hits)}); retitle one so the name means one thing")
-    if hits:
-        return hits[0]
+    try:
+        s = verbs.nearest(desk, hits, name, "lenses", at)
+    except Refusal as e:
+        raise LensRefusal(str(e))
+    if s is not None:
+        return s
     have = [s["title"] for s in w.subjects.values() if kinds.is_lens(s)]
     raise LensRefusal(f"no lens {name!r}. A lens is a thing of kind lens (or a note tagged lens) whose text is the description. Lenses here: {', '.join(have) or 'none'}")
 

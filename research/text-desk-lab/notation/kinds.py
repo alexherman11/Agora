@@ -57,21 +57,43 @@ def known(w):
     return set(BUILT_IN) | set(notes(w))
 
 
-def built_on(w, kind):
+def notes_titled(w, kind):
+    """Every kind note titled `kind`, in id order."""
+    kind = str(kind or "").strip().lower()
+    return sorted((s for s in w.subjects.values() if "kind" in (s.get("tags") or []) and s.get("kind") != "kind"
+                   and str(s.get("title") or "").strip().lower() == kind), key=lambda s: int(re.sub(r"\D", "", s["id"]) or 0))
+
+
+def note_for(w, kind, at=None):
+    """The kind note that describes `kind` from the room `at` (a thing's own room, where its kind is read): nearest
+    first by verbs.ladder (9 Oct, step 7), as a lens or a style is found. -> (subject or None, the others at the same
+    distance). Two at one distance never refuse here (a kind's word must keep meaning something for the verbs that
+    read its chain): the first by id is read, and the receipt says so (table.remarks)."""
+    import verbs
+    cands = notes_titled(w, kind)
+    if not cands or kind in BUILT_IN:
+        return None, []
+    hits, _level = verbs.ladder(w, cands, verbs.place_of_note, at)
+    if not hits:
+        return None, []
+    return hits[0][0], [s for s, _ in hits[1:]]
+
+
+def built_on(w, kind, at=None):
     """What a world kind builds on (its `is` prop), a built-in word; None for a built-in kind."""
-    s = notes(w).get(kind)
+    s = note_for(w, kind, at)[0]
     if s is None:
         return None
     return str((s.get("props") or {}).get("is", "note")).strip().lower() or "note"
 
 
-def chain(w, kind):
+def chain(w, kind, at=None):
     """The kinds a thing of this kind is, most specific first, ending in the built-in chain its base has."""
     seen, out, k = set(), [], kind
     while k and k not in KIND_CHAIN and k not in seen and len(seen) < 8:
         seen.add(k)
         out.append(k)
-        k = built_on(w, k) if k in notes(w) else None
+        k = built_on(w, k, at) if k in notes(w) else None
     base = KIND_CHAIN.get(k) or (["view", "surface", "thing"] if k == "view" else KIND_CHAIN["note"])
     return out + list(base)
 
@@ -83,10 +105,10 @@ def shape(w, kind):
     return "text"
 
 
-def describe(w, kind):
+def describe(w, kind, at=None):
     """A kind's own words: its note's text, or what the host says of a built-in one."""
-    s = notes(w).get(kind) or next((x for x in w.subjects.values() if "kind" in (x.get("tags") or [])
-                                    and str(x.get("title") or "").strip().lower() == kind), None)
+    s = note_for(w, kind, at)[0] or next((x for x in w.subjects.values() if "kind" in (x.get("tags") or [])
+                                          and str(x.get("title") or "").strip().lower() == kind), None)
     if s is not None:
         return (s.get("text") or "").strip() or f"a kind made here, built on {built_on(w, kind)} (its note says nothing more)"
     return {"note": "words: the default kind", "task": "a note with a status and an owner, done by its verbs",

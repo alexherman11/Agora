@@ -158,11 +158,49 @@ def _thing_names(desk, words):
     return out
 
 
+def place_of_note(w, s):
+    """Where a placed note stands, for the ladder: ('room', id) for one inside a room, ('house', None) for one placed
+    outside every room (the Handbook's binders), ('unplaced', None) for a subject with no appearance (9 Oct, step 7:
+    lenses, styles and kind notes resolve by place, as verbs do by `on=`)."""
+    apps = w.appearances_of(s["id"])
+    if not apps:
+        return "unplaced", None
+    r = room_holding(w, apps[0])
+    return ("room", r) if r else ("house", None)
+
+
+def ladder(w, cands, place_of, here, me="", named=()):
+    """The one nearest-first lookup (a990 for verbs; 9 Oct, step 7 of the grammar unification, for lenses, styles and
+    kinds too). `cands` are the subjects answering to a word; `place_of(w, s)` says where each stands: ('actor', name)
+    carried, ('thing', id) on a thing, ('room', id), ('house', None), ('unplaced', None). The levels, nearest first:
+    what `me` carries, a thing among `named`, `here` and the rooms around it, the house, then what is placed nowhere.
+    -> (hits, level): the candidates at the nearest level that has any (one is the answer; more are a tie the caller
+    refuses, never picking one), and the level ('carried', 'thing', a room id, 'house', 'unplaced'); or the candidates
+    in rooms outside the chain with level 'elsewhere' (a typed line may take one; a tie names every door); or ([], None)."""
+    chain = rooms_up(w, here) if here in w.nodes else []
+    levels = {"carried": [], "thing": [], **{r: [] for r in chain}, "house": [], "unplaced": []}
+    elsewhere = []
+    for s in cands:
+        kind, val = place_of(w, s)
+        if kind == "actor" and val == me:
+            levels["carried"].append((s, None))
+        elif kind in ("thing", "room") and (val in named or (w.nodes.get(val) or {}).get("subject") in named):
+            levels["thing"].append((s, val))
+        elif kind == "room":
+            (levels[val] if val in levels else elsewhere).append((s, val))
+        elif kind in ("house", "unplaced"):
+            levels[kind].append((s, None))
+    for level in ["carried", "thing"] + chain + ["house", "unplaced"]:
+        if levels[level]:
+            return levels[level], level
+    return elsewhere, ("elsewhere" if elsewhere else None)
+
+
 def find(desk, word, words, me, at=None):
-    """-> (verb subject, level, thing id or None), or None. Nearest first: what you carry, the things you named, the
-    room the line stands in and the rooms around it (a990), the house. Two verbs answering at the same level refuse
-    with both named: the desk never picks one. Nothing at hand, but a room elsewhere has one: a typed line gets it
-    while it is the only one; a stored line, or a tie, is refused naming every door. `at`: (room, stored), else
+    """-> (verb subject, level, thing id or None), or None. Nearest first (`ladder`): what you carry, the things you
+    named, the room the line stands in and the rooms around it (a990), the house. Two verbs answering at the same level
+    refuse with both named: the desk never picks one. Nothing at hand, but a room elsewhere has one: a typed line gets
+    it while it is the only one; a stored line, or a tie, is refused naming every door. `at`: (room, stored), else
     standing(desk). a1156: a stored line that was bound when saved never looks: its word means the verb it was bound
     to (bound_find); only a typed line, or a stored line saved before bindings, looks here."""
     w, word, me = desk.world, word.lower(), (me or "").lower()
@@ -171,36 +209,40 @@ def find(desk, word, words, me, at=None):
         if entry is not None:
             return bound_find(desk, word, words, me, entry)
     here, stored = standing(desk) if at is None else at
-    chain = rooms_up(w, here) if here in w.nodes else []
-    named = _thing_names(desk, words)
-    levels = {"carried": [], "thing": [], **{r: [] for r in chain}, "house": []}
-    elsewhere = []
-    for s in all_verbs(w):
-        if word not in _names(s["title"]):
-            continue
-        kind, val = where(w, s)
-        if kind == "actor" and val == me:
-            levels["carried"].append((s, None))
-        elif kind in ("thing", "room") and (val in named or (w.nodes.get(val) or {}).get("subject") in named):
-            levels["thing"].append((s, val))
-        elif kind == "room":
-            (levels[val] if val in levels else elsewhere).append((s, val))
-        elif kind == "house":
-            levels["house"].append((s, None))
-    for level in ["carried", "thing"] + chain + ["house"]:
-        hits = levels[level]
-        if len(hits) > 1:
-            where_ = _room_name(w, level) if level in w.nodes else level
-            raise Refusal(f"{len(hits)} verbs answer to {word!r} here ({where_}): "
-                          + ", ".join(f"{w.appearances_of(s['id'])[0]} by {_author(w, s['id']) or '?'}" for s, _ in hits)
-                          + ". Say which by its id: use <id> [words]")
-        if hits:
-            return hits[0][0], ("room" if level in w.nodes else level), hits[0][1]
-    if not elsewhere:
+    cands = [s for s in all_verbs(w) if word in _names(s["title"])]
+    hits, level = ladder(w, cands, where, here, me, _thing_names(desk, words))
+    if level is None:
         return None
-    if len(elsewhere) == 1 and not stored:
-        return elsewhere[0][0], "elsewhere", elsewhere[0][1]
-    raise Refusal(doors(desk, word, elsewhere, here, stored))
+    if level == "elsewhere":
+        if len(hits) == 1 and not stored:
+            return hits[0][0], "elsewhere", hits[0][1]
+        raise Refusal(doors(desk, word, hits, here, stored))
+    if len(hits) > 1:
+        where_ = _room_name(w, level) if level in w.nodes else level
+        raise Refusal(f"{len(hits)} verbs answer to {word!r} here ({where_}): "
+                      + ", ".join(f"{w.appearances_of(s['id'])[0]} by {_author(w, s['id']) or '?'}" for s, _ in hits)
+                      + ". Say which by its id: use <id> [words]")
+    return hits[0][0], ("room" if level in w.nodes else level), hits[0][1]
+
+
+def nearest(desk, cands, name, what, at=None):
+    """A placed note by its name, nearest first: a lens, a style or a kind note (9 Oct, step 7); `what` is the plural
+    noun for the refusal (lenses, styles). `at` is the room the
+    lookup stands in (a lens placing another: its own room; a style: its lens's room; a kind: its thing's room), else
+    where the line being run stands (`standing`). -> the subject, or None when none answers; a tie at one level, or
+    two in rooms neither nearer, is refused naming each and its room, since the desk never picks one."""
+    w = desk.world
+    here = at if at is not None else standing(desk)[0]
+    hits, level = ladder(w, cands, place_of_note, here)
+    if level is None:
+        return None
+    if len(hits) == 1:
+        return hits[0][0]
+    said = ", ".join(f"{(w.appearances_of(s['id']) or [s['id']])[0]}" + (f" in {_room_name(w, r)} ({r})" if r else "") for s, r in hits)
+    if level == "elsewhere":
+        raise Refusal(f"{len(hits)} {what} are titled {name!r}: {said}. From inside a room its own is taken; from here neither is nearer: go there, or retitle one")
+    raise Refusal(f"{len(hits)} {what} are titled {name!r}" + (f" here ({_room_name(w, level)})" if level in w.nodes else "")
+                  + f": {said}; retitle one so the name means one thing")
 
 
 # ---- stored text names its door (a990 (2)): judged when it is saved, while its author is there to fix it ----------

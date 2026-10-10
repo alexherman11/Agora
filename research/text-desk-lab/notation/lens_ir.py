@@ -51,7 +51,7 @@ class Accessor:
         return rs
 
     def define(self, name):
-        s = S.find_lens(self.desk, name)
+        s = S.find_lens(self.desk, name, getattr(self, "home", None))     # 9 Oct: nearest to the placing lens's room
         self.R.append(("define", name, s["id"], s["rev"]))
         return s
 
@@ -157,10 +157,11 @@ def lower(root, parts):
 # ---------------------------------------------------------------------------------------------------------------------
 def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=()):
     props = props or {}
-    root, parts = S.parse(src, roles=S.style_roles(desk, props.get("style")), style=props.get("style"))   # F7: the lens's own style
+    acc = acc or Accessor(desk)
+    # F7: the lens's own style; 9 Oct (step 7): found from the lens's own room (acc.home, set by compile_lens)
+    root, parts = S.parse(src, roles=S.style_roles(desk, props.get("style"), getattr(acc, "home", None)), style=props.get("style"))
     S.resolve(root, parts)
     irs, root = lower(root, parts)
-    acc = acc or Accessor(desk)
     w = desk.world
     count = count if count is not None else [0]
     host = {f: acc.host(f) for f in ("me", "today", "session")}
@@ -562,28 +563,34 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
             dp["lens"], dp["id"] = s["title"], s["id"]
         for k in node.get("kids") or []:
             stamp(k)
+    acc = acc or Accessor(desk)
+    prev_home = getattr(acc, "home", None)
+    acc.home = S.room_of_thing(desk.world, s)      # 9 Oct (step 7): this lens's own lookups (its style, the lenses it places) stand in its room
     try:
-        import persons
-        import verbs
-        b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
-        with persons.reading(desk, (b or {}).get("persons")):
-            sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
-        stamp(sc)
-        good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
-        return sc
-    except S.LensRefusal as e:
-        if getattr(e, "lens", None) is None:
-            e.lens = s            # the innermost lens that refused, so a check can quote its line
-        g = good.get(s["id"])
-        g = {"text": g, "rev": None} if isinstance(g, str) else g
-        if not g:
-            raise
-        del closure[mark:]
-        entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e), refused_in=e.lens)
-        sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc)
-        stamp(sc)
-        sc["broken"] = f"lens {s['title']}: {e}"
-        return sc
+        try:
+            import persons
+            import verbs
+            b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
+            with persons.reading(desk, (b or {}).get("persons")):
+                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
+            stamp(sc)
+            good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
+            return sc
+        except S.LensRefusal as e:
+            if getattr(e, "lens", None) is None:
+                e.lens = s            # the innermost lens that refused, so a check can quote its line
+            g = good.get(s["id"])
+            g = {"text": g, "rev": None} if isinstance(g, str) else g
+            if not g:
+                raise
+            del closure[mark:]
+            entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e), refused_in=e.lens)
+            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc)
+            stamp(sc)
+            sc["broken"] = f"lens {s['title']}: {e}"
+            return sc
+    finally:
+        acc.home = prev_home
 
 
 def _quote_line(s, msg):
@@ -601,7 +608,7 @@ def style_note(desk, s):
     name = (s.get("props") or {}).get("style")
     if not name:
         return "no style=; using the default (calm)"
-    st = S.style_source(desk, name)
+    st = S.style_source(desk, name, S.room_of_thing(desk.world, s))
     if st is None:
         return f"style {name}: no such style"
     c = S.style_check(st["text"])
@@ -628,7 +635,7 @@ def paint_ages(desk, s, closure):
     """a1473, for `scene <lens> ok`: how old each viewer's report of sizes is, the oldest first, and whether it is of the
     lens as it stands."""
     name = (s.get("props") or {}).get("style")
-    rev = (S.style_source(desk, name) or {}).get("rev", "") if name else ""
+    rev = (S.style_source(desk, name, S.room_of_thing(desk.world, s)) or {}).get("rev", "") if name else ""
     vs = S.judge_views(desk, {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}, closure, rev)
     vs = sorted(((a, v) for a, v in vs.items() if v.get("paint")), key=lambda av: str(av[1].get("time")))
     if not vs:
@@ -679,10 +686,11 @@ def scene_for(desk, name, part=None):
     sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
                      frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **S._identity())
     name = (s.get("props") or {}).get("style")
+    home = S.room_of_thing(desk.world, s)          # 9 Oct (step 7): the style nearest the lens's own room
     if name:                                  # F7: which style paints this lens, and which revision of it
-        st = S.style_source(desk, name) or {}
+        st = S.style_source(desk, name, home) or {}
         sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
-    S.mark_pulse(sc, S.pulsing_roles(desk, name))   # a1140: the painter installs this one style for the whole scene
+    S.mark_pulse(sc, S.pulsing_roles(desk, name, home))   # a1140: the painter installs this one style for the whole scene
     sc["views"] = S.judge_views(desk, {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()},
                                 closure, sc["def"].get("style_rev"))
     roots = None

@@ -157,11 +157,11 @@ def _term_rows():
     return rows
 
 
-def declared(w, kind):
+def declared(w, kind, at=None):
     """The slots a kind note declares, one per line in the lens's line form: `seats : number`, `due : date, needed`,
     `status : open|doing|done`. Any other line is prose. -> [Slot]; [] for a kind with no note or no such lines."""
     import kinds
-    s = kinds.notes(w).get(kind)
+    s = kinds.note_for(w, kind, at)[0]
     if s is None:
         return []
     import tree
@@ -281,7 +281,14 @@ def remarks(desk, n0):
                 continue
             seen.add(i)
             kind = moo.kind_of(w, i)
-            decl = declared(w, kind)
+            import kinds
+            import verbs
+            here = verbs.room_holding(w, i)          # 9 Oct (step 7): the kind note nearest the thing describes it
+            note, others = kinds.note_for(w, kind, here)
+            if others:
+                out.append(f"~ {len(others) + 1} kind notes are titled {kind} ({', '.join((w.appearances_of(x['id']) or [x['id']])[0] for x in [note] + others)}); "
+                           f"none is nearer to {i}, so {(w.appearances_of(note['id']) or [note['id']])[0]} is read; retitle or move one so the name means one thing here")
+            decl = declared(w, kind, here)
             if not decl:
                 continue
             n = w.nodes[i]
