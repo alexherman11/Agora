@@ -3,13 +3,22 @@
 > If a system is to serve the creative spirit, it must be entirely comprehensible to a single individual.
 >
 > — Daniel H. H. Ingalls, *[Design Principles Behind Smalltalk](https://archive.esug.org/HistoricalDocuments/Smalltalk80/DesignPrinciples/DesignPrinciples.html)* (1981)
+
+This document is the vision document for the first phase of development, a roughly coherent operating system that is designed for use on any device. This document holds the principles that are to be designed around, while Current Implementation holds our current technical composition, which is likely to change. This document changes slowly.
+
+Modify this document only when:
+- Something in this document is strained by the existing implementation, and we like the implementation.
+- There is a good idea we don't have down that would improve the design overall
+- We have good reason to change our stance on a principle due to new evidence.
+
+Alex makes all final edits to this documents, agents may only propose.
 ## Overview
 
 - **Strong**: we uphold this. It is intuitive, or has arisen as a design requirement from our research.
 - **Leaning**: we think it might be something we should uphold, is currently upheld by wip, or is something we know we want but don't know is possible.
 - **Open**: Actively trying to figure it out
 
-We need a flexible and dynamic visual layer that the human can see and interact with, a simple and extremely dynamic object model that allows us to represent the vast array of things present in or on a computer, and some sort of authority layer that manages permissions for everything in the system. JEFF talks to all three layers, requesting permissions, manipulating the visualization, and editing and minting objects. In order to maximally facilitate ease of modification and creation, agora should whenever possible be composed of one substrate. 
+We need a flexible and dynamic visual layer that the human can see and interact with, a simple and extremely dynamic object model that allows us to represent the vast array of things present in or on a computer, and some sort of authority layer that manages permissions for everything in the system. JEFF talks to all three layers, requesting permissions, manipulating the visualization, and editing and minting objects. JEFF may supervise other agents who handle tasks within the system. Multiple users should be able to collaborate in the same space effectively, without overwriting each other's work. In order to maximally facilitate ease of modification and creation, agora should whenever possible be composed of one substrate. The system should make it easy to improve itself, providing simple paths for friction and wishes to make their way into the world.
 
 **Commitments**: 
 *Strong*
@@ -25,6 +34,7 @@ We need a flexible and dynamic visual layer that the human can see and interact 
 - JEFF should be able to make the full range of objects and applications that present on a normal computer using his basic toolset, though complex graphics like videogames and renderers remain out of scope. 
 *Leaning*
 - Data keeps its meaning after the program that made it is gone.
+- There is one language to learn, and it applies everywhere
 *Open*
 - Are different verbs used at different levels of the system like system, visual, and object? 
 - How do native applications run alongside? 
@@ -34,12 +44,14 @@ An Object (also called a referent) is similar to a file, but rather than being a
 **Commitments:** 
 *Strong*
 - One object can appear in many places, and it's the same object in all of them. Change it anywhere and it changes everywhere.
-- A thing's identity is never reused and survives renames, moves and forks. A copy is a new thing that remembers where it came from.
+- A thing's identity is never reused and survives renames, moves and forks. 
 - Anything you want to point at, comment on or link to (a datapoint, one day of a plan, a paragraph) can become addressable, without everything having to be.
-- Identity should be minted once and never reused
+- There should be a way to identify objects as they move between worlds.
+- Some aspects are public and some are private, some objects are public and some are private.
 *Leaning*
 - Nothing goes silently stale.
 - A value that depends on another either follows it or says plainly that it has stopped following.
+- A copy is a new thing that remembers where it came from.
 *Open*
 - How do many users operate on the same data at the same time?
 - How do we allow concurrent edits on different parts of a document to compose?
@@ -51,9 +63,10 @@ Verbs are the basic structure of language, and using things like flip, tile, and
 - Entering a space should describe what is available there.
 - The rule set should grow and expand dynamically as new use cases are created. 
 - It should be easy to mint new useful verbs from within the desk
+- New verbs should whenever possible enter the world through the world as libraries of existing words.
 
 *Leaning* 
-- Only the verbs shown should apply when entering a space
+- Entering a space should show its relevant verbs
 - Before making a change you know everything it will affect.
 - A change made of many steps should be able to partially succeed if there are good recovery paths, otherwise the change should apply all or nothing.
 ### Appearances and Visualization
