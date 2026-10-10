@@ -10,7 +10,9 @@ It is meant to change rarely. It:
   - restarts the house at once when it exits 75 (it asked, after a landing changed Python); restarts it with a
     pause when it dies otherwise;
   - if the house dies 3 times within 5 minutes of a landing (a commit whose subject begins "land "), reverts that
-    landing and says so in its log: the one part of live building that does not depend on the code it protects.
+    landing and says so in its log: the one part of live building that does not depend on the code it protects;
+  - for frontier, runs docs_sync.py --watch, so an edit to a design document in the vault or the repo reaches the
+    other copy and the Handbook within a minute; starts it again, at most once a minute, if it dies.
 Log: house-state/keeper.log.
 """
 import os
@@ -62,6 +64,8 @@ def main():
     deskd, house = start(door_args, name="door"), None
     time.sleep(8)                               # the door answers once its first deskd does
     house = start(["house.py", world], env, name="house")
+    docs_args = ["docs_sync.py", "--watch"] if world == "frontier" else None   # handbook_docs.py writes to frontier
+    docs, docs_at = (start(docs_args, env, name="docs_sync"), time.time()) if docs_args else (None, 0.0)
     log(f"keeper: world {world}, the door on {port} (deskd behind it), HEAD {head[:7]}")
     deaths, backoff_until, deskd_at, deskd_wait = [], 0.0, time.time(), 0.0
     try:
@@ -73,6 +77,9 @@ def main():
                 if quick:
                     deskd_wait = time.time() + 60
                 deskd, deskd_at = start(door_args, name="door"), time.time()
+            if docs and docs.poll() is not None and time.time() - docs_at >= 60:
+                log(f"docs_sync exited ({docs.returncode}); starting it again")
+                docs, docs_at = start(docs_args, env, name="docs_sync"), time.time()
             if house is None:                          # waiting out a pause after a crash
                 if time.time() >= backoff_until:
                     house = start(["house.py", world], env, name="house")
@@ -106,6 +113,7 @@ def main():
         log("keeper: stopping")
     finally:
         stop(house)
+        stop(docs)
         stop(deskd)
 
 
