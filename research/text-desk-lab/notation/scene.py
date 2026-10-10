@@ -249,8 +249,16 @@ SOURCES = {
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
     "turns": ("turns[:<corner>]", ("resident", "corner", "turn", "at", "said", "acts")),
+    # 8 Oct (step 4, table.py): the desk's own vocabulary as rows, so a lens can show it and `rows slots host=lens` lists
+    # what a lens word takes; kinds with what their things carry and what their notes declare
+    "words": ("words [host=verb|command|lens|term|kind]", ("host", "word", "form", "slots", "doc")),
+    "slots": ("slots [host=... word=...]", ("host", "word", "slot", "type", "needed", "doc")),
+    "kinds": ("kinds", ("kind", "is", "shape", "things", "props", "declared")),
 }
-NAMES = NAMES + tuple(f for _, fs in SOURCES.values() for f in fs)
+# a source's field names: read bare inside their own repeat ($who in `of messages:`); a text's $name that is one of them
+# is no prop of the thing, and no aspect for the fence. 8 Oct: they no longer take a name away from `let` or `as` in
+# every lens (`let shape` stopped compiling when a source gained a field shape): the nearer binding wins, as names.py says
+SOURCE_FIELDS = tuple(dict.fromkeys(f for _, fs in SOURCES.values() for f in fs))
 HOUSE_STATE = pathlib.Path(__file__).resolve().parent / "house-state"   # <world>/house.json, written by house.py
 
 
@@ -335,7 +343,8 @@ def source_head(source):
     """The row source a repeat's `of` names, or its first word when it names none: the word before the first colon
     ('messages:a12'), or `sayings`, whose terms follow it after a space ('sayings for:alex in:a12')."""
     src = str(source).strip()
-    return "sayings" if src.split(" ")[0] == "sayings" else src.partition(":")[0]
+    first = src.split(" ")[0] if src else ""         # 8 Oct (step 3): terms may follow any source after a space
+    return first.partition(":")[0]
 
 
 def saying_rows(desk, terms=""):
@@ -559,6 +568,9 @@ def _rows_of(desk, source, session=None):
     head, _, arg = source.strip().partition(":")
     if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name; house, turns and lines one or none; the rest none
+    if head in ("words", "slots", "kinds"):
+        import table
+        return {"words": table.word_rows, "slots": table.slot_rows, "kinds": table.kind_rows}[head](desk)
     if head == "inbox":
         return saying_rows(desk, "for:" + arg)
     if head == "lines":
@@ -823,7 +835,7 @@ def _w_text(node, p, val, n, env):
     node["text"] = val.strip('"')
     # Juniper, Pike: a lens could not read a thing's own prop ($place). Any name outside NAMES is a prop; the
     # scene prints what it read and marks (no place) when the thing lacks it. Lark's $me now prints (no me): honest.
-    node["props"] = [v for v, dot in re.findall(r"\$(\w+)(\.\w+)?", node["text"]) if not dot and v not in NAMES]
+    node["props"] = [v for v, dot in re.findall(r"\$(\w+)(\.\w+)?", node["text"]) if not dot and v not in NAMES and v not in SOURCE_FIELDS]
 
 
 def _w_clamp(node, p, val, n, env):
@@ -1538,7 +1550,7 @@ def _aspect_of_field(f):
         return f
     if f in ("in", "before", "after"):
         return "place"          # 8 Oct: where a thing is, read as a field, is a read of its place
-    if f in NAMES or f in ("value", "x", "y", "n", "count"):
+    if f in NAMES or f in SOURCE_FIELDS or f in ("value", "x", "y", "n", "count"):
         return None
     return f"prop:{f}"
 

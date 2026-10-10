@@ -1347,6 +1347,8 @@ class DeskKnife(DeskMoo):
             self._run_rules(cause=self.world.events[-1]["id"])
             if top:
                 self._visual_notes(n0, styles0)
+                import table      # 8 Oct (step 4): a kind describes; an unusual value is kept and remarked on
+                self._rule_notes = (self._rule_notes or []) + table.remarks(self, n0)
         if self._rule_notes:
             key = "text" if "text" in r else "error"
             r[key] = r[key] + "\n" + "\n".join(self._rule_notes)
