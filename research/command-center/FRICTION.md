@@ -378,7 +378,7 @@ a3442 · family=silence · status=curing
 
 7 Oct, Claude (source edit: world.py hidden_fraction). Found by running 500 lines on a copy of frontier: a create in Home (f149) left 152 boxes empty and `look f149 :3` crashed (ZeroDivisionError); frontier already holds 445 boxes of negative size. Cured only at the crash: a box with no area has nothing covered. The cause stands: boxes in a flow are worked out from sizes that shrink at every arrival. The cure is Sable's geometry as choices (order and share as facts, boxes derived), which the log also wants: today a flow child's share is not a fact, and 41 of 892 boxes differ when a world is rebuilt from its facts.
 
-## cured (41)
+## cured (42)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -775,3 +775,9 @@ Step 1 of the grammar unification (e2baeae). What was wanted: one reader of a st
 a3750 · family=code · status=cured
 
 Step 2 of the grammar unification (d3a614a). What was wanted: one way to read a $name wherever text is written, and the lens's expressions in commands. What there was: blanks.py (typed lines, verbs, rules) and scene._fill (lenses) each read names from its own list and its own idea of a part; the rule parser kept a third list (RULE_BLANKS); a verb could not compute or test; a handle named with as= lived for ever on the desk. The cure: names.py, a scope of frames both hosts build (the host's words, the current thing, the reply, the host, the handles); the current thing's fields and props bare ($title in a rule); $me.corner, $me.<prop>, $house; $( <expr> ) in commands over the same names with spaces kept out of the word split; a verb step may end in when <expr>; as= names a thing for the reply. Where a thing is ($in $before $after) is a field in a lens too, fenced as its place. Why no world edit could do it: a name's meaning is host code. What the world still lacks: a rule's own `when <expr>` beside `when <selection>` (step 3, when a selection is a value); `.maker` in a lens (costly: a scan of the log per thing; wait for the store); a verb that yields a value (let x = ...), which needs the row table (step 4).
+
+### Five readers of a selection (cured, db01e51)
+
+a3752 · family=code · status=cured
+
+Step 3 of the grammar unification (db01e51). What was wanted: one reader of a selection, and comparisons on any aspect. What there was: knife.parse_selection with hand-written cases for due< due> age< age> and prop:k=v; lens_ir.term_aspects, a second hand table saying what each term reads, for the fence; knife.misnamed, a pre-reader for prop:due; scene.rows, a separate dispatch for row sources that took no terms; and, until step 1, a JavaScript matcher in style.js with terms of its own. The cure: a term table (knife.term_key, ASPECTS, aspects_of, compares): k=v k!=v k<v k>v k<=v k>=v on any aspect or prop, typed by expr.typed; prop:k=v read as k=v; the fence's aspects derived from the same table; a row source followed by terms over its fields, read by find, count() and a lens. Why no world edit could do it: a selection's terms are host code. What the world still lacks: a selection as a value kind of the expression language (then `only when` and a rule's `when` are one evaluator; step 4 may take it); rules over a row source (a rule fires on things, and a row has no id of its own); kind=task and age=N as comparisons (kind: and age<N stand).
