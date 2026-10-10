@@ -1023,18 +1023,40 @@ STYLE_SAMPLES = [
 ]
 
 
-def test_style_check_agrees_with_the_painter():
-    """a1101: scene.style_check mirrors desk-shell/style/style.js; judged against node running the real file."""
-    import pathlib, health      # the same comparison health prints on its own line, with the world's styles too
+def test_style_read_once():
+    """8 Oct (step 1 of the grammar unification): style.py is the one reader. It refuses what style.js refused, on the
+    same line; it names the properties the painter draws nothing for; and it hands any painter resolved looks: colours
+    as hex, lengths in pixels, a face with its size on the ramp, a theme's tokens over the style's own."""
+    import pathlib, style
     here = pathlib.Path(scene.__file__).resolve().parent
-    srcs = [(f"sample {k + 1}", s) for k, s in enumerate(STYLE_SAMPLES)]
-    srcs.append(("calm.style", (here / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")))
-    bad, note = health.style_mirror(srcs)
-    assert not bad, bad
-    if note:
-        print("  (" + note + ")")
     bad = scene.style_check(STYLE_SAMPLES[0])["unread"]
-    assert ("b", "on papr", 7,"names no token of the right kind") in bad
+    assert ("b", "on papr", 7, "names no token of the right kind") in bad
+    assert ("a", "corner 3", 6, "a bare number is not on the scale: say gap, gap xN or gap /N") in bad
+    assert ("c", "hide title", 8, "`present` was removed: a lens says which parts are drawn") in bad
+    assert ("c", "pulse down", 8, "is no property and no colour token") in bad
+    for k, head in ((1, "line 1: colours are named here"), (2, "line 1: 12px is not on the scale"), (4, "line 1: a role line needs"),
+                    (5, "line 1: `present` was removed"), (6, "line 2: a theme may redefine tokens"), (7, "line 2: not a token, role, font or theme")):
+        assert (scene.style_check(STYLE_SAMPLES[k])["refusal"] or "").startswith(head), (k, scene.style_check(STYLE_SAMPLES[k])["refusal"])
+    assert scene.style_check("role x : ink\nwhen kind:note : as=card")["refusal"].startswith("line 2: `when <selection>` was removed")
+    assert scene.style_check(STYLE_SAMPLES[3])["unread"] == [("sheet", "height 12", 2, "a bare number is not on the scale: say gap, gap xN or gap /N")]
+    calm = (here / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")
+    lk = style.looks(calm)
+    card = lk["roles"]["card"]["look"]
+    assert card["on"] == "#FFFFFF" and card["ink"] == "#14171A" and card["pad"] == 12 and card["corner"] == 4 and card["space_below"] == 8
+    assert card["text"]["size"] == 15 and card["text"]["leading"] == 1.5 and card["text"]["family"].startswith("Inter")
+    assert lk["roles"]["meta"]["look"]["text"]["size"] == 11 and lk["roles"]["meta"]["look"]["text"]["tracked"] is True   # text down 2 tracked
+    assert lk["roles"]["glyph"]["look"]["text"]["size"] == 23                                                              # text up 3
+    assert lk["tokens"]["line"]["value"] == "#CDCDCB" and lk["tokens"]["faint"]["value"] == "#E4E3E1"                      # ink at 20%, 10% over paper
+    assert [r["px"] for r in lk["ramp"]] == [10, 11, 13, 15, 17, 20, 23]
+    assert lk["themes"] == ["dark", "print"] and lk["theme"] == ""
+    dark = style.looks(calm, "dark")
+    assert dark["theme"] == "dark" and dark["tokens"]["paper"]["value"] == "#131517" and dark["roles"]["card"]["look"]["on"] == "#191C1F"
+    sheet = style.looks("token gap = 8\nrole sheet : height 60em, width 30em, height gap x40, afloat, shy, pulse")["roles"]["sheet"]["look"]
+    assert sheet == {"height_em": 60.0, "width_em": 30.0, "height": 320, "afloat": True, "shy": True, "pulse": True}
+    fonts = style.looks("font pixel = Silkscreen, monospace\ntoken text.pixel = pixel 13/1.3\nrole t : text.pixel up")
+    assert fonts["roles"]["t"]["look"]["text"] == {"family": "'Silkscreen', monospace", "size": 15, "leading": 1.3} and fonts["fonts"]["pixel"]["face"] == "Silkscreen"
+    out = style.for_painter({"name": "x", "text": "role x on paper"}, None)
+    assert out["looks"] is None and out["refusal"].startswith("line 1") and out["escapes"]
 
 
 def test_let_if_and_arithmetic():

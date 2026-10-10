@@ -18,8 +18,11 @@
   let styled = "";
   async function restyle(name, rev) {
     if (styled === name + "@" + rev) return;
-    const st = await (await fetch(`/api/style?session=${encodeURIComponent(session)}&name=${encodeURIComponent(name)}`)).json();
-    if (st.text != null) { try { Style.install(st.text, q.get("theme") || undefined); styled = name + "@" + rev; } catch (e) { V.show("style " + name + " refused: " + (e.message || e)); } }
+    // 8 Oct: the server reads the style once (style.py) and answers with its looks; a text it refuses comes with the
+    // refusal and no looks, and this page keeps the last style that read
+    const st = await (await fetch(`/api/style?session=${encodeURIComponent(session)}&name=${encodeURIComponent(name)}&theme=${encodeURIComponent(q.get("theme") || "")}`)).json();
+    if (st.looks) { Style.install(st.looks); styled = name + "@" + rev; }
+    else if (st.refusal || st.refused) V.show("style " + name + " refused: " + (st.refusal || st.refused));
     // Alex, 30 Sep (scrollbars that fit the theme): a style with a `scrollbar` token draws its own bars (lens.html)
     document.documentElement.toggleAttribute("data-bars", !!Style.token("scrollbar"));
     // Alex, 7 Oct ('not everything should be highlighted text boxes'): a style with a `focus` token (a colour) draws

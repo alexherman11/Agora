@@ -105,6 +105,7 @@ import pathlib
 import re
 from desk import split_batch
 import expr as X
+import style as style_mod
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
@@ -144,11 +145,9 @@ def _outside_quotes(line, sep):
 
 
 def _roles():
-    try:
-        src = (pathlib.Path(__file__).resolve().parent / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")
-        return {l.split()[1] for l in src.splitlines() if l.startswith("role ") and len(l.split()) > 1}
-    except OSError:
-        return None
+    """The roles of the seed style, for a lens that names no style= (checked against the file, as before)."""
+    st = style_mod.seed("calm")
+    return style_mod.role_names(st["text"]) if st else None
 
 
 # F7 (research/command-center): a style is world data. A note tagged `style` whose title is the style's name holds its
@@ -166,12 +165,7 @@ def style_source(desk, name):
     s = find_style(desk, name)
     if s is not None:
         return {"name": name, "text": s["text"], "origin": s["id"], "rev": f"{s['id']}r{s['rev']}"}
-    f = pathlib.Path(__file__).resolve().parent / "desk-shell" / "style" / f"{pathlib.Path(name).name}.style"
-    if f.exists():
-        import hashlib
-        text = f.read_text(encoding="utf-8")
-        return {"name": name, "text": text, "origin": "file", "rev": "file-" + hashlib.sha256(text.encode()).hexdigest()[:10]}
-    return None
+    return style_mod.seed(name)
 
 
 def style_roles(desk, name):
@@ -181,17 +175,17 @@ def style_roles(desk, name):
     st = style_source(desk, name)
     if st is None:
         raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
-    return {l.split()[1] for l in st["text"].splitlines() if l.startswith("role ") and len(l.split()) > 1}
+    return style_mod.role_names(st["text"])
 
 
 def pulsing_roles(desk, name):
     """a1140: the roles whose words include `pulse` in the style the painter installs for a lens (its style=, else calm).
-    The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving. Read with
-    the painter's own parse (style_parse, below); a style the painter refuses paints nothing, so nothing pulses."""
+    The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving. A style
+    the painter refuses paints nothing, so nothing pulses."""
     st = style_source(desk, name or "calm") or {}
     try:
-        roles = style_parse(st.get("text") or "")["roles"]
-    except LensRefusal:
+        roles = style_mod.parse(st.get("text") or "")["roles"]
+    except style_mod.StyleRefusal:
         return set()
     return {n for n, r in roles.items() if "pulse" in r["props"]}
 
@@ -204,144 +198,20 @@ def mark_pulse(node, roles):
         mark_pulse(k, roles)
 
 
-# a1101 (Pike e2213: "appending style roles says ok but never says the style still parses"): the painter's own parse
-# and property reader (desk-shell/style/style.js: parse, check, resolveTokens, prop), mirrored line for line so an edit's
-# receipt can say what the painter will do with it. test_scene checks this mirror against node running style.js.
-_HEX = re.compile(r"^#[0-9a-fA-F]{3,8}$")
-
-
+# 8 Oct (step 1 of the grammar unification): one reader of a style, style.py. Python reads it and the painter is handed
+# the looks; the mirror that scene.py kept of style.js (a1101), and the node test that held them together, are gone.
 def style_parse(src):
-    """-> {tokens, roles: {name: {props, line}}, clauses, fonts, themes} or raises LensRefusal('line N: ...') as
-    Style.parse throws a Refusal."""
-    out = {"tokens": {}, "roles": {}, "clauses": [], "fonts": {}, "themes": {}}
-    theme = None
-    for n, raw in enumerate(re.split(r"\r?\n", src), 1):
-        indented = bool(re.match(r"^\s+\S", raw))
-        s = re.sub(r"\s+#\s.*$", "", raw.strip()).strip()
-        if not s or (s.startswith("#") and not re.match(r"^#[0-9a-fA-F]{3,8}\b", s)):
-            continue
-        m = re.match(r"^theme\s+(\S+)\s+of\s+(\S+)$", s)
-        if m:
-            theme = m.group(1)
-            out["themes"][theme] = {"of": m.group(2), "tokens": {}, "line": n}
-            continue
-        m = re.match(r"^font\s+([\w-]+)\s*=\s*(.+)$", s)
-        if m:
-            theme = None
-            out["fonts"][m.group(1)] = n
-            continue
-        m = re.match(r"^token\s+([\w.]+)\s*=\s*(.+)$", s)
-        if m:
-            if theme and indented:
-                out["themes"][theme]["tokens"][m.group(1)] = m.group(2).strip()
-            else:
-                theme = None
-                out["tokens"][m.group(1)] = m.group(2).strip()
-            continue
-        if theme and indented and re.match(r"^(role|when|present)\s", s):
-            raise LensRefusal(f"line {n}: a theme may redefine tokens, not roles ({s.split()[1]!r})")
-        if re.match(r"^present\s", s):
-            raise LensRefusal(f"line {n}: `present` was removed. A lens says which parts are drawn")
-        if re.match(r"^(role|when)\s", s):
-            at, kw = s.rfind(" : "), s.split()[0]
-            if at < 0:
-                raise LensRefusal(f'line {n}: a {kw} line needs " : " with spaces before its properties: {kw} <name> : <property>, <property>')
-            head, body = re.sub(r"^\w+\s+", "", s[:at], count=1).strip(), s[at + 3:].strip()
-            theme = None
-            hx = re.search(r"#[0-9a-fA-F]{3,8}\b", body)
-            if hx:
-                raise LensRefusal(f"line {n}: colours are named here; {hx.group(0)!r} may only appear on a token line")
-            px = re.search(r"\b(\d+(?:\.\d+)?)px\b", body)
-            if px:
-                raise LensRefusal(f"line {n}: {px.group(0)} is not on the scale; lengths are gap, gap xN, gap /N, or an em")
-            props = [x.strip() for x in body.split(",") if x.strip()]
-            if kw == "role":
-                out["roles"][head] = {"props": props, "line": n}
-            else:
-                out["clauses"].append({"sel": head, "props": props, "line": n})
-            continue
-        raise LensRefusal(f'line {n}: not a token, role, clause, font or theme line: "{s}"')
-    return out
-
-
-def _style_tokens(st):
-    """Style.js resolveTokens, as types only: name -> 'colour' | 'length' | 'text' | 'word' | None."""
-    raw, done = dict(st["tokens"]), {}
-
-    def get(name, seen):
-        if name in done:
-            return done[name]
-        if name not in raw or name in seen:
-            return None
-        seen.add(name)
-        v = raw[name].strip()
-        if _HEX.match(v):
-            done[name] = "colour"
-            return "colour"
-        m = re.match(r"^([\w.]+)\s+at\s+([\d.]+)%?$", v)
-        if m:
-            base = get(m.group(1), seen)
-            paper = bool(_HEX.match(raw.get("paper", ""))) or get("paper", {"__"})
-            if base == "colour" and paper:
-                done[name] = "colour"
-                return "colour"
-        if re.match(r"^\d+(\.\d+)?$", v):
-            done[name] = "length"
-        elif re.match(r"^([\w-]+)\s+([\d.]+)/([\d.]+)$", v):
-            done[name] = "text"
-        else:
-            done[name] = "word"
-        return done[name]
-    return {k: get(k, set()) for k in raw}
-
-
-def _style_prop_ok(p, T):
-    """Whether style.js prop() can read property `p` (it returns css or a part), under token types T. -> (ok, why)."""
-    def ln(e):
-        m = re.match(r"^([\w.]+)\s*x\s*([\d.]+)$", e) or re.match(r"^([\w.]+)\s*/\s*([\d.]+)$", e) or re.match(r"^([\w.]+)$", e)
-        if m and T.get(m.group(1)) == "length":
-            return "n"
-        return "em" if re.match(r"^([\d.]+)em$", e) else None
-
-    def col(e):
-        m = re.match(r"^([\w.]+)\s+at\s+([\d.]+)%?$", e)
-        if m and T.get(m.group(1)) == "colour" and T.get("paper"):
-            return True
-        return T.get(e) == "colour"
-    for pat, fn in ((r"^(show|hide)\s+\w+$", lambda m: True), (r"^on\s+(.+)$", lambda m: col(m.group(1))),
-                    (r"^([\w.]+)\s*->\s*(.+)$", lambda m: col(m.group(2))), (r"^edge\s+(.+)$", lambda m: col(m.group(1))),
-                    (r"^border\s+(top|right|bottom|left)\s+(.+)$", lambda m: col(m.group(2))),
-                    (r"^corner\s+(.+)$", lambda m: ln(m.group(1)) == "n"), (r"^pad\s+(top|right|bottom|left)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^pad\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
-                    (r"^space\s+(above|below)\s+(.+)$", lambda m: ln(m.group(2)) == "n"), (r"^between\s+(.+)$", lambda m: ln(m.group(1)) == "n"),
-                    (r"^width\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^height\s+(.+)$", lambda m: ln(m.group(1)) is not None), (r"^lift\s+(.+)$", lambda m: ln(m.group(1)) == "n" and T.get("ink") == "colour")):
-        m = re.match(pat, p)
-        if m:
-            if fn(m):
-                return True, ""
-            if re.search(r"\s\d+(\.\d+)?$", p) and not re.search(r"[x/]\s*\d+(\.\d+)?$", p):
-                return False, "a bare number is not on the scale: say gap, gap xN or gap /N"
-            return False, "names no token of the right kind"
-    if p in ("pulse", "afloat", "shy"):                               # a1140: the one motion
-        return True, ""
-    if re.match(r"^text\b", p):
-        if T.get(p.split()[0] if p.startswith("text.") else "text") != "text":
-            return False, "names no text token"
-        m = re.search(r"\bat\s+([\d.]+)\b", p)
-        return (False, f'"text at {m.group(1)}" is not a step of the ramp') if m else (True, "")
-    return (True, "") if col(p) else (False, "is no property and no colour token")
+    """-> {tokens, roles: {name: {props, line}}, fonts, themes} or raises LensRefusal('line N: ...')."""
+    try:
+        return style_mod.parse(src)
+    except style_mod.StyleRefusal as e:
+        raise LensRefusal(str(e))
 
 
 def style_check(src):
     """-> {"refusal": str or None, "roles": n, "tokens": n, "unread": [(role, prop, line, why)]}: what the painter
     will make of this style text."""
-    try:
-        st = style_parse(src)
-    except LensRefusal as e:
-        return {"refusal": str(e), "roles": 0, "tokens": 0, "unread": []}
-    T = _style_tokens(st)
-    unread = [(name, p, r["line"], why) for name, r in st["roles"].items() for p in r["props"]
-              for ok, why in [_style_prop_ok(p, T)] if not ok]
-    return {"refusal": None, "roles": len(st["roles"]), "tokens": len(st["tokens"]), "unread": unread}
+    return style_mod.check(src)
 
 
 def _cmd_value(v):

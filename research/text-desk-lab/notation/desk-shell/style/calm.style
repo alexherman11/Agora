@@ -59,14 +59,8 @@ role refusal   : text.mono down, warn, on warn at 8%, pad gap, corner gap /2, ed
 
 token text.mono = mono 15/1.5
 
-# ---- clauses: styling by the desk's own selection language ----
-
-when kind:note            : as=card
-when kind:doc             : as=card
-when kind:task            : as=card
-when kind:chat            : as=card
-when due                  : ink -> accent
-when comments:open        : show meta
+# ---- clauses (`when <selection> : ...`): REMOVED, 8 Oct. They reached only the windowed shell; a look that
+# depends on the thing is said in the lens (`role x when ...`), which the scene prints and the fence judges.
 
 # ---- presentation: DELETED, round six. ----
 # `present card : title, body :3, meta, tags` was mine from round three. A lens's indented

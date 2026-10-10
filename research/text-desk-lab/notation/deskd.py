@@ -364,11 +364,14 @@ class Handler(SimpleHTTPRequestHandler):
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 return self._json(promises.commission_of(desk.world, q.get("card", "")))
         if u.path == "/api/style":
-            # F7: a style is world data (a note tagged style); the seed file answers only when the world has none
+            # F7: a style is world data (a note tagged style); the seed file answers only when the world has none.
+            # 8 Oct: the answer carries `looks`, the style read once by style.py, so no painter parses style text;
+            # a text the reader refuses comes with `refusal` and no looks, and the painter keeps its last style
             import scene
+            import style
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 st = scene.style_source(desk, q.get("name") or "calm")
-            return self._json(st or {"refused": f"no style {q.get('name')!r}"})
+            return self._json(style.for_painter(st, q.get("theme")) if st else {"refused": f"no style {q.get('name')!r}"})
         if u.path == "/api/events":
             since = int(q.get("since", 0))
             # a1505: the door asks this twice a second for each page it holds; a world file unchanged since the last
@@ -408,8 +411,13 @@ class Handler(SimpleHTTPRequestHandler):
                                                             "viewport": body.get("viewport"), "facts": facts, "boxes": boxes,
                                                             "painted": {"frame": str(p.get("frame") or "")[:400], "style": str(p.get("style") or "")[:80]} if p else None}
             return self._json({"ok": True, "kept": len(facts)})
+        if urlparse(self.path).path == "/api/style":
+            # 8 Oct: a style text read by the one reader, for a page that edits a style it has not saved (the windowed
+            # shell's style panel); nothing is stored
+            import style
+            return self._json(style.for_painter({"text": str(body.get("text", ""))}, body.get("theme")))
         if urlparse(self.path).path != "/api/do":
-            return self._json({"error": "POST /api/do or /api/observe"}, 404)
+            return self._json({"error": "POST /api/do, /api/observe or /api/style"}, 404)
         line = str(body.get("line", "")).strip()
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)

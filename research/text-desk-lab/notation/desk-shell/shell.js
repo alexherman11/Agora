@@ -36,13 +36,20 @@ const Shell = (() => {
       bootSays("style is not loaded: everything below is unstyled, and the apps still work. (Style is not defined — style/style.js did not run)");
       return;
     }
-    try { styleSrc = await (await fetch("style/calm.style?t=" + Date.now())).text(); }
-    catch (e) { bootSays("style/calm.style could not be fetched: everything below is unstyled. (" + e.message + ")"); return; }
-    if (!apply(styleSrc)) bootSays("the style did not parse, so none of it is installed: everything below is unstyled. open the style panel for the refusal.");
+    // 8 Oct: the style is read once, by the server (style.py); this page is handed the looks. The panel's edits go
+    // the same way (POST /api/style), so an unsaved text is judged by the one reader too.
+    let st;
+    try { st = await (await fetch(`/api/style?name=calm&theme=${encodeURIComponent(theme)}&t=${Date.now()}`)).json(); }
+    catch (e) { bootSays("the style could not be fetched (/api/style): everything below is unstyled. (" + e.message + ")"); return; }
+    styleSrc = st.text || "";
+    if (!(await apply(styleSrc))) bootSays("the style did not parse, so none of it is installed: everything below is unstyled. open the style panel for the refusal.");
   }
-  function apply(src) {
-    try { Style.install(src, theme); lastRefusal = null; styleSrc = src; sourceRev++; }
-    catch (e) { if (e instanceof Style.Refusal) { lastRefusal = e; return false; } throw e; }
+  async function apply(src) {
+    let st;
+    try { st = await (await fetch("/api/style", { method: "POST", body: JSON.stringify({ text: src, theme }) })).json(); }
+    catch (e) { lastRefusal = new Style.Refusal(0, "the reader could not be reached: " + e.message); return false; }
+    if (!st.looks) { const m = /^line (\d+): (.*)$/.exec(st.refusal || ""); lastRefusal = new Style.Refusal(m ? +m[1] : 0, m ? m[2] : (st.refusal || "refused"), st.escapes); return false; }
+    Style.install(st.looks); lastRefusal = null; styleSrc = src; sourceRev++;
     return true;
   }
 
@@ -224,9 +231,9 @@ const Shell = (() => {
 
   function barAction(a) {
     if (a === "theme") {
-      const names = ["", ...Object.keys((Style.style && Style.style.themes) || {})];
+      const names = ["", ...Style.themes];
       theme = names[(names.indexOf(theme) + 1) % names.length];
-      apply(styleSrc); if (snapOn) Style.snap(true); paintAll(); return;
+      apply(styleSrc).then(() => { if (snapOn) Style.snap(true); paintAll(); }); return;
     }
     if (a === "snap") { snapOn = !snapOn; Style.snap(snapOn); paintBar(); paintSaid(); return; }
     if (a === "style") { openPanel("style"); return; }
@@ -266,7 +273,7 @@ const Shell = (() => {
       if (b.dataset.p === "close") said.classList.add("hidden"); else { panel = b.dataset.p; paintSaid(); }
     });
     const ed = said.querySelector("#styleed");
-    if (ed) { ed.value = styleSrc; said.querySelector("#styleapply").onclick = () => { if (apply(ed.value)) paintAll(); else paintSaid(); }; }
+    if (ed) { ed.value = styleSrc; said.querySelector("#styleapply").onclick = async () => { if (await apply(ed.value)) paintAll(); else paintSaid(); }; }
   }
 
   // ---------- how far the one style actually reaches ----------

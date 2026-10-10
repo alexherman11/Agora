@@ -11,8 +11,8 @@ Checks, from this checkout:
     the code's and not today's world's
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - test_visit.py passes (a3204): `visit` and `home` through a real door, a version killed, one line written home
-  - the Python mirror of style.js that style receipts use (scene.style_check) agrees with style.js under node, on
-    test_scene's samples, calm.style and every style note in <world>; without node the line says it was not checked
+  - calm.style and every style note in <world> read by the one style reader (style.py; 8 Oct: the painter is handed
+    the looks, so there is no second reader to agree with)
   - the frozen session prints are unchanged in the golden form (suite/sessions.py --check)
   - every lens in <world> that the desk can find still compiles; the list of lenses that compile is printed, so a
     landing can be judged against the list from before it (a lens that was already broken is not the change's fault)
@@ -71,30 +71,17 @@ def check_js():
     return bad, None
 
 
-def style_mirror(srcs):
-    """a1101 (Sable c1212: two parsers of one language is how receipts start to lie): scene.style_check, which the
-    receipts use, against desk-shell/style/style.js run under node, on each (name, text). -> (disagreements, note)."""
-    import json
-    import scene
-    node = shutil.which("node")
-    if not node:
-        return [], "node not found; the Python mirror of style.js is NOT checked, so style receipts may drift unseen"
-    bad = []
+def style_reads(srcs):
+    """8 Oct: one reader of a style (style.py). Each (name, text) must read, and the line says how many of its
+    properties the painter draws nothing for. -> (failures, note)."""
+    import style
+    bad, drawn_nothing = [], 0
     for name, src in srcs:
-        py = scene.style_check(src)
-        r = subprocess.run([node, str(HERE / "desk-shell" / "checks" / "style-read.js")], input=src, capture_output=True,
-                           text=True, encoding="utf-8")
-        if r.returncode:
-            bad.append(f"{name}: style-read.js failed: {(r.stderr.strip().splitlines() or ['?'])[-1][:160]}")
-            continue
-        js = json.loads(r.stdout)
-        if (py["refusal"] or "").split(":")[0] != (js["refusal"] or ""):
-            bad.append(f"{name}: refusal: mirror {py['refusal']!r}, style.js {js['refusal']!r}")
-        mine, theirs = sorted([rl, p] for rl, p, _l, _w in py["unread"]), sorted(js["unread"])
-        if mine != theirs:
-            bad.append(f"{name}: unreadable props differ: mirror only {[x for x in mine if x not in theirs][:3]}, "
-                       f"style.js only {[x for x in theirs if x not in mine][:3]}")
-    return bad, None
+        c = style.check(src)
+        if c["refusal"]:
+            bad.append(f"{name}: {c['refusal']}")
+        drawn_nothing += len(c["unread"])
+    return bad, f"{len(srcs)} read; {drawn_nothing} properties the painter draws nothing for"
 
 
 def world_styles(world):
@@ -208,17 +195,14 @@ def main():
                     failed.append(f"paint {p.stem}: {last}")
             print(f"paint tests: {'; '.join(outs)}{took('paint', t0)}")
         t0 = time.perf_counter()
-        import test_scene
-        srcs = [(f"sample {k + 1}", s) for k, s in enumerate(test_scene.STYLE_SAMPLES)]
-        srcs.append(("calm.style (seed)", (HERE / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8")))
+        srcs = [("calm.style (seed)", (HERE / "desk-shell" / "style" / "calm.style").read_text(encoding="utf-8"))]
         try:
             srcs += world_styles(world)
-        except Exception as e:           # the world's own styles are the best evidence, but the samples still count
+        except Exception as e:           # the world's own styles are the best evidence; the seed still counts
             print(f"  (the world's styles could not be read: {type(e).__name__}: {e})")
-        bad, note = style_mirror(srcs)
-        print(f"style mirror: {note or (f'agrees with style.js on {len(srcs)} styles' if not bad else 'FAILED')}{took('style mirror', t0)}"
-              + "".join(f"\n  {b}" for b in bad))
-        failed += [f"style mirror {b}" for b in bad]
+        bad, note = style_reads(srcs)
+        print(f"styles: {note}{' FAILED' if bad else ''}{took('styles', t0)}" + "".join(f"\n  {b}" for b in bad))
+        failed += [f"style {b}" for b in bad]
         t0 = time.perf_counter()
         code, out = run(["suite/sessions.py", "--check"])
         line = next((l for l in out.splitlines() if "compiler on the working tree" in l), out.strip()[-200:])
