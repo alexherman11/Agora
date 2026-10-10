@@ -378,7 +378,7 @@ a3442 · family=silence · status=curing
 
 7 Oct, Claude (source edit: world.py hidden_fraction). Found by running 500 lines on a copy of frontier: a create in Home (f149) left 152 boxes empty and `look f149 :3` crashed (ZeroDivisionError); frontier already holds 445 boxes of negative size. Cured only at the crash: a box with no area has nothing covered. The cause stands: boxes in a flow are worked out from sizes that shrink at every arrival. The cure is Sable's geometry as choices (order and share as facts, boxes derived), which the log also wants: today a flow child's share is not a fact, and 41 of 892 boxes differ when a world is rebuilt from its facts.
 
-## cured (40)
+## cured (41)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -769,3 +769,9 @@ a3696 · family=silence · status=cured
 a3748 · family=code · status=cured
 
 Step 1 of the grammar unification (e2baeae). What was wanted: one reader of a style text. What there was: style.js parsed, checked, resolved tokens and matched selections in the browser; scene.py kept a line-for-line Python mirror for receipts; health ran the real file under node to prove the two agreed. Three places restated one grammar. Why no world edit could do it: the readers are host code, and a style's meaning (which words it has) lived in two of them. The cure: style.py reads a style once and /api/style hands every painter resolved looks (colours as hex, lengths in px, a face with its size on the ramp); style.js keeps a table from a look's keys to CSS and the page's own duties. Deleted: the JS parser, checker, token resolver and matcher; the Python mirror; the node test; calm.style's six `when` clauses (they reached only the windowed shell; no placed style used one). Lesson: when two readers must agree, the fix is not a test that they do, it is one reader. What the world still lacks: a way to say a look depends on the thing other than `role x when ...` in the lens (that is the right place, so nothing is missing here).
+
+### Two resolvers of a name, and no value in a command (cured, d3a614a)
+
+a3750 · family=code · status=cured
+
+Step 2 of the grammar unification (d3a614a). What was wanted: one way to read a $name wherever text is written, and the lens's expressions in commands. What there was: blanks.py (typed lines, verbs, rules) and scene._fill (lenses) each read names from its own list and its own idea of a part; the rule parser kept a third list (RULE_BLANKS); a verb could not compute or test; a handle named with as= lived for ever on the desk. The cure: names.py, a scope of frames both hosts build (the host's words, the current thing, the reply, the host, the handles); the current thing's fields and props bare ($title in a rule); $me.corner, $me.<prop>, $house; $( <expr> ) in commands over the same names with spaces kept out of the word split; a verb step may end in when <expr>; as= names a thing for the reply. Where a thing is ($in $before $after) is a field in a lens too, fenced as its place. Why no world edit could do it: a name's meaning is host code. What the world still lacks: a rule's own `when <expr>` beside `when <selection>` (step 3, when a selection is a value); `.maker` in a lens (costly: a scan of the log per thing; wait for the store); a verb that yields a value (let x = ...), which needs the row table (step 4).
