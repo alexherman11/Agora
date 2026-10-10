@@ -44,7 +44,8 @@ def test_refusals():
     refused("root : column, derive d = day-n $a", "takes 2 input(s)")
     refused("root : column, capture start=1", "no `the`")
     _, parts = scene.parse("root : column, the tag:trip as trip\n  h : derive d = day-n $trip.start 2, text $d")
-    assert parts["root"]["as"] == "trip" and parts["root"]["kids"][0]["derive"] == [("d", "day-n", ["$trip.start", "2"])]
+    assert parts["root"]["as"] == "trip" and parts["root"]["kids"][0]["let"] == [("d", "day-n($trip.start, 2)", None)]     # 9 Oct: derive reads as a let
+    assert parts["root"]["kids"][0]["words"] == ["let d = day-n($trip.start, 2)", "text $d"], parts["root"]["kids"][0]["words"]
 
 
 def test_a_part_keeps_its_identity_when_the_lens_changes_elsewhere():
@@ -805,18 +806,85 @@ def test_freshness_words_are_host_reads():
 
 
 def test_time_and_date_interpretations():
-    assert scene.INTERPS["time"][1](["e412 prop · 2026-09-25 21:40"]) == ("21:40", None)
-    assert scene.INTERPS["date"][1](["e412 prop · 2026-09-25 21:40"]) == ("2026-09-25", None)
-    assert scene.INTERPS["date"][1](["2026-10-10"]) == ("2026-10-10", None)
-    assert scene.INTERPS["time"][1](["2026-10-10"])[0] is None and scene.INTERPS["time"][1](["soon"])[0] is None
+    """9 Oct (step 5): the interpretations are expression functions (expr.FUNCS), called over Values."""
+    import expr as X
+    f = lambda name, *raw: X.fmt(X.call(name, [X.typed(r) for r in raw]))      # noqa: E731
+    assert f("time", "e412 prop · 2026-09-25 21:40") == "21:40"
+    assert f("date", "e412 prop · 2026-09-25 21:40") == "2026-09-25"
+    assert f("date", "2026-10-10") == "2026-10-10"
+    assert f("time", "2026-10-10") == "none" and f("time", "soon") == "none"
+    assert X.call("time", [X.typed("soon")]).why == "time wants a date-time or a freshness value; got 'soon'"
 
 
 def test_day_or_time():
-    f = scene.INTERPS["day-or-time"][1]
-    assert f(["e4 prop · 2026-09-25 21:40", "2026-09-25"]) == ("21:40", None)
-    assert f(["2026-09-21 09:00", "2026-09-25"]) == ("Mon 21", None)
-    assert f(["2026-09-01", "2026-09-25"]) == ("2026-09-01", None)
-    assert f(["soon", "2026-09-25"])[0] is None
+    import expr as X
+    f = lambda a, b: X.fmt(X.call("day-or-time", [X.typed(a), X.typed(b)]))      # noqa: E731
+    assert f("e4 prop · 2026-09-25 21:40", "2026-09-25") == "21:40"
+    assert f("2026-09-21 09:00", "2026-09-25") == "Mon 21"
+    assert f("2026-09-01", "2026-09-25") == "2026-09-01"
+    assert f("soon", "2026-09-25") == "none"
+
+
+def test_functions_days_and_the_tree_reader():
+    """9 Oct (step 5 of the grammar unification): derive is a let that calls a function; a function's arguments are
+    expressions; days:<a>..<b> is a row source with terms over its fields; `over` a let of kind rows still repeats;
+    tree.read is the one indentation reader, for a lens, a style and a kind note's slot lines."""
+    import deskd, lens_ir, tree, style, expr as X
+    # derive reads as a let, and prints as one; a function over an expression
+    tmp = _scratch("_test_funcs")
+    try:
+        with deskd.Session("_test_funcs", "jeff") as desk:
+            src = chr(10).join(["root : column, let d = 2026-10-05, derive wd = weekday $d, let nxt = weekday(d + 1d), let wk = week-of(day-n(d, 10))",
+                                '  t : text "$wd $nxt $wk"',
+                                "  bad : text x, let z = weekday(\"soon\")",
+                                "  mon : column, of days:2026-10-05..2026-10-18 weekday=Mon as m, each mday",
+                                "  all : column, of days:$d..2026-10-11 as a, each aday",
+                                "  old : column, let days = days-from(d, 2026-10-07), over $days as o, each oday",
+                                'mday : text "$m.n $m.date $m.week"',
+                                'aday : text "$a.n $a.date $a.week"',
+                                'oday : text "$it.n $it.date"'])
+            assert scene.to_lines(src).splitlines()[2] == "  let wd = weekday($d)", scene.to_lines(src).splitlines()[:4]
+            sc = lens_ir.evaluate(desk, src)
+            t, bad, mon, all_, old = sc["kids"]
+            assert t["text"] == "Mon Tue 2026-10-12", t["text"]
+            assert {x["name"]: x["result"] for x in sc["derived"]} == {"d": "2026-10-05", "wd": "Mon", "nxt": "Tue", "wk": "2026-10-12"}
+            assert {x["name"]: x["result"] for x in bad["derived"]} == {"z": "none"}
+            assert [k["text"] for k in mon["kids"]] == ["1 2026-10-05 2026-10-05", "8 2026-10-12 2026-10-12"], [k["text"] for k in mon["kids"]]       # the Mondays, by a term over a field
+            assert mon["n"] == 2 and mon["of"] == "days:2026-10-05..2026-10-18 weekday=Mon", (mon["n"], mon["of"])
+            assert all_["n"] == 7 and all_["kids"][0]["text"] == "1 2026-10-05 2026-10-05", (all_["n"], all_["kids"][0]["text"])
+            assert [k["text"] for k in old["kids"]] == ["1 2026-10-05", "2 2026-10-06", "3 2026-10-07"] and {x["name"]: x["result"] for x in old["derived"]} == {"days": "3 rows"}
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "· wd = Mon (weekday($d); $d=2026-10-05)" in text and "· nxt = Tue (weekday(d + 1d); d=2026-10-05)" in text, text
+            refused("root : column, derive d = weeks-from $a $b", "no interpretation 'weeks-from'")
+            refused("root : column, let d = plus($a)", "no function 'plus'")
+            refused("root : column, let d = weekday($a, $b)", "weekday takes 1 argument(s)")
+            for bad_src, why in (("root : column, of days:2026-10-18..2026-10-05 as d, each x\nx : text a", "not a span of at most a year"),
+                                 ("root : column, of days:soon..2026-10-05 as d, each x\nx : text a", "days takes two dates")):
+                try:
+                    lens_ir.evaluate(desk, bad_src)
+                    raise AssertionError("a bad span was admitted")
+                except scene.LensRefusal as e:
+                    assert why in str(e), str(e)
+            assert scene.rows(desk, "days:2026-10-05..2026-10-07 n>1")[0]["date"] == "2026-10-06"
+    finally:
+        tmp.unlink(missing_ok=True)
+    # the one tree reader: comments, quotes, kids; a line under a word line belongs to the word's part
+    nodes = tree.read('a : column  # a comment\n  b : text "x # y"\n  gap\n    c : text z\n# whole line\n\nd : row')
+    assert [(n.line, n.text, len(n.kids)) for n in nodes] == [(1, "a : column", 2), (7, "d : row", 0)], nodes
+    assert [n.text for n in tree.walk(nodes)] == ["a : column", 'b : text "x # y"', "gap", "c : text z", "d : row"]
+    _, parts = scene.parse("root : column\n  gap\n    kid : text a\n  b : text b")
+    assert [k["name"] for k in parts["root"]["kids"]] == ["kid", "b"] and parts["root"]["gap"] is not None
+    refused("  root : column", "indented part with no parent")
+    refused("gap\nroot : column", "a word with no part above it")
+    # a style in the tree form reads as the comma form, and to_lines prints the tree form
+    flat = "token ink = #111\ntoken gap = 8\nrole card : ink, pad gap\ntheme dark of x\n  token ink = #eee\n"
+    treed = "token ink = #111\ntoken gap = 8\nrole card :\n  ink\n  pad gap  # a comment\ntheme dark of x\n  token ink = #eee\n"
+    a, b = style.parse(flat), style.parse(treed)
+    assert a["roles"]["card"]["props"] == b["roles"]["card"]["props"] == ["ink", "pad gap"] and a["themes"]["dark"]["tokens"] == b["themes"]["dark"]["tokens"] == {"ink": "#eee"}, (a, b)
+    assert style.to_lines(flat) == "token ink = #111\ntoken gap = 8\nrole card :\n  ink\n  pad gap\ntheme dark of x\n  token ink = #eee\n", style.to_lines(flat)
+    assert style.looks(treed)["roles"]["card"]["look"] == style.looks(flat)["roles"]["card"]["look"]
+    assert scene.style_check("theme dark of x\n  token ink = #eee\n  role card : ink")["refusal"].startswith("line 3: a theme may redefine tokens")
+    assert scene.style_check("theme dark of x\n  font x = y")["refusal"].startswith("line 2: not a token line under theme dark")
 
 
 def test_code_runs_are_automatic_and_plain_opts_out():
@@ -883,11 +951,11 @@ def test_count_word_and_true_size():
                                 'c : text "$title ($count)"'])
             sc = lens_ir.evaluate(desk, src)
             line, none, lst = sc["kids"]
-            assert line["text"] == "2 notes" and line["counted"] == ("kind:note", 2), line
+            assert line["text"] == "2 notes" and {x["name"]: x["result"] for x in line["derived"]} == {"count": "2"}, line     # 9 Oct: `count <sel>` is `let count = count(<sel>)`
             assert none.get("absent") and none["why"] == "$count > 0 is false ($count=0)", none
             assert lst["text"] == "1 of 2", lst["text"]
             assert lst["kids"][0]["text"].endswith("(2)") and lst["kids"][-1]["text"] == "all 2", [k["text"] for k in lst["kids"]]
-            assert "· count 2 of kind:note" in scene.to_text(sc, "t", "jeff", 0)
+            assert "· count = 2 (count(kind:note))" in scene.to_text(sc, "t", "jeff", 0)
             # Juniper, 7 Oct: a numbered item could not ask where it stands. $index is the place in the repeat, from 1,
             # in the instance and its kids; a clamp last keeps the true place; an expression can use it
             src = chr(10).join(["root : column", "  all : column, of kind:note, each c", "  end : column, of kind:note, clamp last 1, each c",

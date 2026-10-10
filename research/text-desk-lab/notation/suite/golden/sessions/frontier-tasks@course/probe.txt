@@ -1,3 +1,3 @@
 scene probe · for golden · world @20 · no style=; using the default (calm)
   p a03 column · the prop:role=term -> s02 (a03) as term
-    a a03 "2027-04-14 Wed 2027-04-12" · x = day-n(2027-03-29, 17) = 2027-04-14 · y = weekday(2027-04-14) = Wed · z = week-of(2027-04-14) = 2027-04-12 · read term s02 start=2027-03-29
+    a a03 "2027-04-14 Wed 2027-04-12" · x = 2027-04-14 (day-n($term.start, 17); $term.start=2027-03-29) · y = Wed (weekday($x); $x=2027-04-14) · z = 2027-04-12 (week-of($x); $x=2027-04-14) · read term s02 start=2027-03-29

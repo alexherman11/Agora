@@ -24,13 +24,20 @@ Grammar (precedence low to high):
     atom ::= number | duration (3d 2h 30m 1w) | date (2026-10-05[ 14:30]) | "text" | $name | $frame.field
            | name (a let named above) | none | true | false | '(' expr ')'
            | count(<selection>) | sum($field of <selection>) | min(...) | max(...)
+           | function '(' expr (',' expr)* ')'       weekday($due + 1d), day-n($start, 17), days-from(a, b)
+
+The functions (FUNCS; 9 Oct, step 5 of the grammar unification) are what `derive` used to name from its own closed
+list, now ordinary calls whose arguments are expressions: `derive wd = weekday $d` reads as `let wd = weekday($d)`.
+A function over a date takes a date, a date-time or a freshness value (`e412 prop · 2026-09-25 21:40`); a wrong
+argument is none with the reason, as any expression is. `days-from(a, b)` is a value of kind rows (a table a repeat
+can go `over`); the row source `days:<a>..<b>` is the newer way to say the same under `of`.
 
 The evaluator reads names through an environment the caller supplies (see `evaluate`), so the lens's own frames,
 props, lets and host facts answer, and every read is reported back for the fence and the print."""
 import datetime
 import re
 
-KINDS = ("number", "text", "date", "time", "duration", "bool", "none")
+KINDS = ("number", "text", "date", "time", "duration", "bool", "none", "rows")
 AGGREGATES = ("count", "sum", "min", "max")
 KEYWORDS = ("and", "or", "not", "has", "none", "true", "false", "of") + AGGREGATES
 
@@ -127,9 +134,117 @@ def fmt(val, reach=True):
             s = f"{int(mins)}m" if float(mins).is_integer() else f"{mins:.4g}m"
         if neg:
             s = "-" + s
+    elif val.kind == "rows":
+        s = f"{len(val.v)} rows"
     else:
         s = str(val.v)
     return f"{s} · {val.reach}" if (reach and val.reach) else s
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# functions: what `derive` named from scene.INTERPS until 9 Oct, as calls over expression values. Each takes a list of
+# Values and returns a Value; a wrong argument is none with the reason. The list is closed: a new one is argued for and
+# added here (Pike W6), and it prints as every expression does.
+# ---------------------------------------------------------------------------------------------------------------------
+_FRESH = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?")
+
+
+def _date_in(v):
+    """The date (and the clock, when there is one) inside a value: a date, a date-time, or text that holds one, as a
+    freshness value does (`e412 prop · 2026-09-25 21:40`). -> (date, 'HH:MM' or None), or (None, None)."""
+    if v.kind == "date":
+        return v.v, None
+    if v.kind == "time":
+        return v.v.date(), v.v.strftime("%H:%M")
+    if v.kind == "text":
+        m = _FRESH.search(v.v)
+        if m:
+            try:
+                return datetime.date.fromisoformat(m.group(1)), m.group(2)
+            except ValueError:
+                return None, None
+    return None, None
+
+
+def _f_weekday(args):
+    d, _ = _date_in(args[0])
+    return Value("text", d.strftime("%a")) if d else none(f"weekday wants a date; got {fmt(args[0])!r}")
+
+
+def _f_week_of(args):
+    d, _ = _date_in(args[0])
+    return Value("date", d - datetime.timedelta(days=d.weekday())) if d else none(f"week-of wants a date; got {fmt(args[0])!r}")
+
+
+def _f_day_n(args):
+    d, _ = _date_in(args[0])
+    n = args[1]
+    if d is None or n.kind != "number" or not float(n.v).is_integer():
+        return none(f"day-n wants <date> <n>; got {fmt(args[0])!r} {fmt(n)!r}")
+    return Value("date", d + datetime.timedelta(days=int(n.v) - 1))
+
+
+def day_rows(a, b):
+    """The days from a to b, each a row `n date weekday week`; None with the reason when the span is no span or more
+    than a year (a budget, as the node budget is). Shared by days-from(a, b) and the row source days:<a>..<b>."""
+    if a is None or b is None:
+        return None, "days-from wants <start> <end> as dates"
+    if b < a or (b - a).days > 366:
+        return None, f"days-from: {a} to {b} is not a span of at most a year"
+    out = []
+    for k in range((b - a).days + 1):
+        d = a + datetime.timedelta(days=k)
+        out.append({"n": k + 1, "date": d.isoformat(), "weekday": d.strftime("%a"), "week": (d - datetime.timedelta(days=d.weekday())).isoformat()})
+    return out, None
+
+
+def _f_days_from(args):
+    a, _ = _date_in(args[0])
+    b, _ = _date_in(args[1])
+    if a is None or b is None:
+        return none(f"days-from wants <start> <end> as dates; got {fmt(args[0])!r} {fmt(args[1])!r}")
+    rows, why = day_rows(a, b)
+    return Value("rows", rows) if rows is not None else none(why)
+
+
+def _f_day_or_time(args):
+    """Juniper (day lens a496): the time alone when the day is today, `Mon 28` within a week either way, else the date.
+    Today is an argument, so the read is visible; goldens freeze it per world."""
+    d, clock = _date_in(args[0])
+    today, _ = _date_in(args[1])
+    if not d or not today:
+        return none(f"day-or-time wants a date-time or a freshness value and today; got {fmt(args[0])!r}, {fmt(args[1])!r}")
+    if d == today:
+        return Value("text", clock or d.isoformat())
+    return Value("text", d.strftime("%a %d").replace(" 0", " ") if abs((d - today).days) <= 7 else d.isoformat())
+
+
+def _f_time(args):
+    d, clock = _date_in(args[0])
+    return Value("text", clock) if clock else none(f"time wants a date-time or a freshness value; got {fmt(args[0])!r}")
+
+
+def _f_date(args):
+    d, _ = _date_in(args[0])
+    return Value("date", d) if d else none(f"date wants a date, a date-time or a freshness value; got {fmt(args[0])!r}")
+
+
+FUNCS = {"weekday": (("date",), _f_weekday), "week-of": (("date",), _f_week_of), "day-n": (("date", "n"), _f_day_n),
+         "days-from": (("start", "end"), _f_days_from), "day-or-time": (("when", "today"), _f_day_or_time),
+         "time": (("when",), _f_time), "date": (("when",), _f_date)}
+
+
+def call(name, args):
+    """Apply a function by name to Values. Unknown names and wrong counts are none with the reason."""
+    if name not in FUNCS:
+        return none(f"no function {name!r}; the list is closed: " + ", ".join(f"{k}({', '.join(p)})" for k, (p, _f) in FUNCS.items()))
+    params, fn = FUNCS[name]
+    if len(args) != len(params):
+        return none(f"{name} takes {len(params)} argument(s): {', '.join(params)}; got {len(args)}")
+    bad = [a for a in args if a.is_none()]
+    if bad:
+        return bad[0]
+    return fn(args)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -143,9 +258,23 @@ _TOKEN = re.compile(r"""
   | (?P<str>"[^"]*")
   | (?P<name>\$\w+(?:\.\w+)?)
   | (?P<at>@[\w$.-]+)
+  | (?P<call>[A-Za-z_][\w-]*)(?=\()
   | (?P<word>[A-Za-z_]\w*)
-  | (?P<op><=|>=|!=|!has\b|=|<|>|\+|-|\*|/|\(|\))
+  | (?P<op><=|>=|!=|!has\b|=|<|>|\+|-|\*|/|\(|\)|,)
 """, re.X)
+
+
+def _close_of(text, i):
+    """The index of the `)` that closes the `(` at text[i], counting nested brackets; -1 when there is none."""
+    depth = 0
+    for k in range(i, len(text)):
+        if text[k] == "(":
+            depth += 1
+        elif text[k] == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+    return -1
 
 
 def tokens(text):
@@ -159,8 +288,8 @@ def tokens(text):
         i = m.end()
         if kind == "ws":
             continue
-        if kind == "word" and tok in AGGREGATES and text.startswith("(", i):
-            close = text.find(")", i)
+        if kind == "call" and tok in AGGREGATES:
+            close = _close_of(text, i)          # an aggregate's argument is a selection, kept as written
             if close < 0:
                 raise ExprError(f"{tok}( has no closing ) in {text!r}")
             out.append(("agg", tok, text[i + 1:close].strip()))
@@ -267,6 +396,19 @@ def parse(text):
             if not m:
                 raise ExprError(f"{name}(...) takes `$field of <selection>`; got {inner!r}")
             return ("agg", name, m.group(1), m.group(2).strip())
+        if kind == "call":
+            if t[1] not in FUNCS:
+                raise ExprError(f"no function {t[1]!r} in {text!r}; the list is closed: " + ", ".join(f"{k}({', '.join(p)})" for k, (p, _f) in FUNCS.items()))
+            expect("(")
+            args = []
+            if not take(")"):
+                args.append(p_or())
+                while take(","):
+                    args.append(p_or())
+                expect(")")
+            if len(args) != len(FUNCS[t[1]][0]):
+                raise ExprError(f"{t[1]} takes {len(FUNCS[t[1]][0])} argument(s): {', '.join(FUNCS[t[1]][0])}; got {len(args)} in {text!r}")
+            return ("call", t[1], args)
         if kind == "word":
             if t[1] == "none":
                 return ("lit", none("none, as written"))
@@ -297,7 +439,7 @@ def looks_like(text, lets=()):
     head = re.split(r"[\s(]", s, 1)[0]
     if s[0] in "$(-\"" or s[0].isdigit():
         return True
-    if head in ("not", "none", "true", "false") or (head in AGGREGATES and s.startswith(head + "(")):
+    if head in ("not", "none", "true", "false") or ((head in AGGREGATES or head in FUNCS) and s.startswith(head + "(")):
         return True
     return head in lets and re.fullmatch(r"\w+", head) is not None
 
@@ -456,6 +598,9 @@ def evaluate(tree, env):
         if k == "count":
             ids = env["select"](n[1])
             return Value("number", len(ids))
+        if k == "call":
+            args = [ev(a) for a in n[2]]
+            return _carry(call(n[1], args), *args)
         if k == "agg":
             _, name, field, q = n
             ids = env["select"](q)

@@ -1,16 +1,16 @@
 scene mondays · for golden · world @24 · no style=; using the default (calm)
-  x column · days = days-from(2026-10-01, 2026-10-14) = 14 rows · 14
+  x column · days = 14 rows (days-from(2026-10-01, 2026-10-14)) · 14
     d (absent: $wd = "Mon" is false ($wd=Thu))
     d (absent: $wd = "Mon" is false ($wd=Fri))
     d (absent: $wd = "Mon" is false ($wd=Sat))
     d (absent: $wd = "Mon" is false ($wd=Sun))
-    d "2026-10-05 Mon" · wd = weekday(2026-10-05) = Mon · read it date=2026-10-05 · only when $wd = "Mon" ($wd=Mon) · key 5
+    d "2026-10-05 Mon" · wd = Mon (weekday($it.date); $it.date=2026-10-05) · read it date=2026-10-05 · only when $wd = "Mon" ($wd=Mon) · key 5
     d (absent: $wd = "Mon" is false ($wd=Tue))
     d (absent: $wd = "Mon" is false ($wd=Wed))
     d (absent: $wd = "Mon" is false ($wd=Thu))
     d (absent: $wd = "Mon" is false ($wd=Fri))
     d (absent: $wd = "Mon" is false ($wd=Sat))
     d (absent: $wd = "Mon" is false ($wd=Sun))
-    d "2026-10-12 Mon" · wd = weekday(2026-10-12) = Mon · read it date=2026-10-12 · only when $wd = "Mon" ($wd=Mon) · key 12
+    d "2026-10-12 Mon" · wd = Mon (weekday($it.date); $it.date=2026-10-12) · read it date=2026-10-12 · only when $wd = "Mon" ($wd=Mon) · key 12
     d (absent: $wd = "Mon" is false ($wd=Tue))
     d (absent: $wd = "Mon" is false ($wd=Wed))

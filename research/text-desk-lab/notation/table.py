@@ -164,15 +164,16 @@ def declared(w, kind):
     s = kinds.notes(w).get(kind)
     if s is None:
         return []
+    import tree
     out = []
-    for line in (s.get("text") or "").splitlines():
-        m = re.match(r"^\s*([a-z][\w-]*)\s*:\s*([A-Za-z][\w|-]*)\s*(?:,\s*(needed))?\s*(?:#\s*(.*))?$", line)
+    for node in tree.lines(s.get("text") or ""):      # 9 Oct: the one indentation reader strips the ` # ` comment
+        m = re.match(r"^([a-z][\w-]*)\s*:\s*([A-Za-z][\w|-]*)\s*(?:,\s*(needed))?$", node.text)
         if not m:
             continue
-        name, t, needed, doc = m.groups()
+        name, t, needed = m.groups()
         if t not in TYPES and "|" not in t:
             continue
-        out.append(Slot(name, "choice" if "|" in t else t, bool(needed), (doc or "").strip() or (t if "|" in t else "")))
+        out.append(Slot(name, "choice" if "|" in t else t, bool(needed), t if "|" in t else ""))
     return out
 
 

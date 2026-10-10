@@ -1,3 +1,3 @@
 scene probe · for golden · world @14 · no style=; using the default (calm)
   p a03 column · the prop:role=club -> s02 (a03) as club
-    a a03 "2026-10-14" · x = day-n(2026-10-01, 14) = 2026-10-14 · read club s02 start=2026-10-01 every=14
+    a a03 "2026-10-14" · x = 2026-10-14 (day-n($club.start, $club.every); $club.start=2026-10-01, $club.every=14) · read club s02 start=2026-10-01 every=14

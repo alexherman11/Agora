@@ -1,16 +1,16 @@
 scene reading · for golden · world @59 · no style=; using the default (calm)
   cal a48 row · the tag:readplan -> s47 (a48) as trip
-    days a48 row · days = days-from(2026-10-05, 2026-10-07) = 3 rows · read trip s47 start=2026-10-05 end=2026-10-07 · 3
+    days a48 row · days = 3 rows (days-from($trip.start, $trip.end); $trip.start=2026-10-05, $trip.end=2026-10-07) · read trip s47 start=2026-10-05 end=2026-10-07 · 3
       day a48 [sheet] column · key 1
-        h a48 "Mon 2026-10-05" [heading] · wd = weekday(2026-10-05) = Mon · read it date=2026-10-05
+        h a48 "Mon 2026-10-05" [heading] · wd = Mon (weekday($it.date); $it.date=2026-10-05) · read it date=2026-10-05
         items a48 column · 1 of parts:a48,prop:tripday=1
           item a50 [card] · key a50
             t a50 "Middlemarch by Eliot" [title] · read author=Eliot
       day a48 [sheet] column · key 2
-        h a48 "Tue 2026-10-06" [heading] · wd = weekday(2026-10-06) = Tue · read it date=2026-10-06
+        h a48 "Tue 2026-10-06" [heading] · wd = Tue (weekday($it.date); $it.date=2026-10-06) · read it date=2026-10-06
         items a48 column · 1 of parts:a48,prop:tripday=2
           item a52 [card] · key a52
             t a52 "The Dispossessed by Le Guin" [title] · read author=Le Guin
       day a48 [sheet] column · key 3
-        h a48 "Wed 2026-10-07" [heading] · wd = weekday(2026-10-07) = Wed · read it date=2026-10-07
+        h a48 "Wed 2026-10-07" [heading] · wd = Wed (weekday($it.date); $it.date=2026-10-07) · read it date=2026-10-07
         items a48 column · 0 of parts:a48,prop:tripday=3 (empty)

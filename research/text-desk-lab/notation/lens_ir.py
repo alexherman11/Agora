@@ -136,19 +136,17 @@ def lower(root, parts):
             guard = {"q": node["only"], "src": node["only"]}
         ir = {"part": node["name"], "line": node["line"], "src": node["src"], "ast": node,
               "bind": bind,
-              "lets": [{"name": d, "interp": i, "inputs": ins} for d, i, ins in node["derive"]]
-                      + [{"name": l, "expr": e, "when": c} for l, e, c in node.get("let", [])],
+              "lets": [{"name": l, "expr": e, "when": c} for l, e, c in node.get("let", [])],
               "guard": guard,
               "emit": {"layout": node["layout"], "role": node["role"], "role_when": list(node["role_when"]), "text": node["text"], "clamp": node["clamp"],
                        "at": node["at"], "spread": node.get("spread"), "props": node["props"],
                        **{k: node[k] for k in S.PAINT_WORDS if node.get(k) not in (None, False)}},
               "acts": [dict(a) for a in node["on"]],
-              "place": node["lens"], "carry": node["carry"], "count": node.get("count"),
+              "place": node["lens"], "carry": node["carry"],
               "kids": [one(k) for k in node["kids"]],
               "deps": {"emit": _deps(node["text"]), "guard": _deps(node["only"]), "role": _deps(*[c for _, c in node["role_when"]]),
                        "acts": [_deps(a["line"]) for a in node["on"]],
-                       "lets": [_deps(*[x for x in ins if x.startswith("$")]) for _, _, ins in node["derive"]]
-                               + [_deps(e, c if c and c != "otherwise" else "") for _, e, c in node.get("let", [])]}}
+                       "lets": [_deps(e, c if c and c != "otherwise" else "") for _, e, c in node.get("let", [])]}}
         return ir
     return {name: one(node) for name, node in parts.items()}, root
 
@@ -264,17 +262,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["captured"] = [{"field": k, "value": v, "now": live, "same": (str(live) == str(v))} for k, v, live in ctx["_captured"]]
         if the_state not in ("live",) and not the_state.startswith("->"):
             return out
-        # --- count (a1101): the size of a selection or row source, as $count, without drawing its members
-        if node["count"]:
-            q = S._fill(node["count"], ctx, track)
-            rs = acc.rows(q) if S.source_head(q) in S.SOURCES else None
-            if rs is None:
-                named, ids = acc.select(q)
-                ids = [i for i, _ in named] if named is not None else ids
-                cb.append(["select", q, list(ids)])      # a gesture here was offered under this membership
-            ctx["count"] = len(rs) if rs is not None else len(ids)
-            out["counted"] = (q, ctx["count"])
-        # --- lets
+        # --- lets (`count <selection>` is one of them since 9 Oct: `let count = count(<selection>)`, a1101)
         def xenv():
             """The expression evaluator's door to this part: $names and lets from the frame, selections through the
             accessor (a membership read on the gesture's chain), a member's field through the accessor's thing read."""
@@ -302,19 +290,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             return {"get": get, "select": select, "field": field, "reads": []}
         groups = {}
         for let in node["lets"]:
-            if "expr" in let:
-                groups.setdefault(let["name"], []).append(let)
-                continue
-            dctx = dict(ctx.get("_props") or {})
-            dctx.update(ctx)
-            vals = [S._fill(x, dctx, track) if x.startswith("$") else x for x in let["inputs"]]
-            res, err = S.INTERPS[let["interp"]][1](vals)
-            out.setdefault("derived", []).append({"name": let["name"], "interp": let["interp"], "inputs": vals,
-                                                  "result": (f"{len(res)} rows" if isinstance(res, list) else res), "error": err})
-            if isinstance(res, list):
-                ctx["_" + let["name"]] = res
-            else:
-                ctx[let["name"]] = res or ""
+            groups.setdefault(let["name"], []).append(let)
         for lname, defs in groups.items():      # an if: the first `when` that holds, else `otherwise`; an overlap is said
             held, otherwise = [], None
             for d in defs:
@@ -526,7 +502,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     else:
                         out["kids"].append(cut)
             else:
-                rows_over = ctx.get("_" + b["over"], [])
+                held = (ctx.get("_values") or {}).get(b["over"])         # 9 Oct: a let of kind rows (days-from(a, b))
+                rows_over = held.v if (held is not None and getattr(held, "kind", "") == "rows") else ctx.get("_" + b["over"], [])
                 total = len(rows_over)
                 dcb = cb + frame_reads()
                 for k, v in enumerate(rows_over):

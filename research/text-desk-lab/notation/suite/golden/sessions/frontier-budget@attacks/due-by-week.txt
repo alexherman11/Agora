@@ -1,5 +1,5 @@
 scene due by week · for golden · world @24 · no style=; using the default (calm)
   x column as a · 3 of tag:t
-    r a03 "(done) Alpha due 2026-09-30" · d = day-n(2026-10-01, 0) = 2026-09-30 · read a s02 start=2026-10-01 week=0 · key a03
-    r a05 "Beta due 2027-01-07" · d = day-n(2026-10-01, 99) = 2027-01-07 · read a s04 start=2026-10-01 week=99 · key a05
-    r a23 "Gamma due " · d: (uninterpretable: day-n wants <date> <n>; got '2026-10-01' '') · read a s22 start=2026-10-01 (no a.week on s22) · key a23
+    r a03 "(done) Alpha due 2026-09-30" · d = 2026-09-30 (day-n($a.start, $a.week); $a.start=2026-10-01, $a.week=0) · read a s02 start=2026-10-01 week=0 · key a03
+    r a05 "Beta due 2027-01-07" · d = 2027-01-07 (day-n($a.start, $a.week); $a.start=2026-10-01, $a.week=99) · read a s04 start=2026-10-01 week=99 · key a05
+    r a23 "Gamma due none" · d = none (day-n($a.start, $a.week); $a.start=2026-10-01, $a.week=none) · read a s22 start=2026-10-01 (no a.week on s22) · key a23

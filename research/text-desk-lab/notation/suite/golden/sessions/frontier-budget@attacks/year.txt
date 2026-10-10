@@ -1,5 +1,5 @@
 scene year · for golden · world @24 · no style=; using the default (calm)
-  x column · days = days-from(2026-01-01, 2026-12-31) = 365 rows · 365
+  x column · days = 365 rows (days-from(2026-01-01, 2026-12-31)) · 365
     d row · key 1
       a "2026-01-01" · read it date=2026-01-01
       b "1" · read it n=1

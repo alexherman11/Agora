@@ -63,14 +63,18 @@ the one form. The words:
                                  or (empty), or (ambiguous: a32, a50) with nothing built under it and gestures off
     as <name>                    name this part's thing as a frame; parts below read it as $name.title $name.start
                                  (a prop) and the scene prints `read name s31 start=...`. On a repeat, each instance
-    derive <name> = <interpretation> <inputs>   a named calculation from a closed list (day-n <date> <n>,
-                                 days-from <start> <end> (rows with $it.n $it.date, for over $name), weekday <date>,
-                                 week-of <date>); it prints its inputs and result
+    derive <name> = <function> <inputs>   the older spelling of a let that calls a function (9 Oct): `derive wd =
+                                 weekday $d` reads as `let wd = weekday($d)`, and `scene <lens> lines` prints the let
+    count <selection>            `let count = count(<selection>)` on a part that repeats nothing: $count without
+                                 drawing the members (a1101)
     let <name> = <expr>          a named value (Alex, 5 Oct: if and arithmetic). An expression has + - * / and ( ),
       [when <expr> | otherwise]  comparisons (= != < > <= >= has !has), and, or, not; numbers, "text", dates
                                  (2026-10-05), durations (3d 2h), $names, $frame.field, a let named above; and
                                  count(<selection>), sum($field of <selection>), min(...), max(...), which carry
-                                 their reach ('41 of 43; 2 have none'). Kinds are never coerced: '7' is a number,
+                                 their reach ('41 of 43; 2 have none'); and the functions (expr.FUNCS): weekday(d),
+                                 week-of(d), day-n(d, n), day-or-time(when, today), time(when), date(when),
+                                 days-from(a, b) (a value of kind rows, for `over $name`; `of days:<a>..<b>` is the
+                                 newer way). Kinds are never coerced: '7' is a number,
                                  '2,550 USD' is text and says so. A missing value is none, printed none, never 0.
                                  Several lets of one name with `when` are an if: the first that holds is taken, an
                                  overlap is said, and `otherwise` holds when none of the others do. The scene
@@ -106,6 +110,7 @@ import re
 from desk import split_batch
 import expr as X
 import style as style_mod
+import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
@@ -129,19 +134,8 @@ BUDGET = 5000          # scene nodes. A lens that needs more must say `clamp N` 
 
 
 def _outside_quotes(line, sep):
-    """Split `line` at `sep` wherever it is not inside double quotes."""
-    out, cur, q, i = [], "", False, 0
-    while i < len(line):
-        if line[i] == '"' and (i == 0 or line[i - 1] != "\\"):
-            q = not q
-        if not q and line.startswith(sep, i):
-            out.append(cur)
-            cur, i = "", i + len(sep)
-            continue
-        cur += line[i]
-        i += 1
-    out.append(cur)
-    return out
+    """Split `line` at `sep` wherever it is not inside double quotes (tree.outside_quotes, the one rule since 9 Oct)."""
+    return tree.outside_quotes(line, sep)
 
 
 def _roles():
@@ -249,6 +243,9 @@ SOURCES = {
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
     "turns": ("turns[:<corner>]", ("resident", "corner", "turn", "at", "said", "acts")),
+    # 9 Oct (step 5): the days of a span as rows, what `derive days = days-from a b` + `over $days` built; terms over
+    # its fields keep the Mondays (`of days:$term.start..$term.end weekday=Mon as d`)
+    "days": ("days:<start>..<end>", ("n", "date", "weekday", "week")),
     # 8 Oct (step 4, table.py): the desk's own vocabulary as rows, so a lens can show it and `rows slots host=lens` lists
     # what a lens word takes; kinds with what their things carry and what their notes declare
     "words": ("words [host=verb|command|lens|term|kind]", ("host", "word", "form", "slots", "doc")),
@@ -566,8 +563,18 @@ def rows(desk, source, session=None):
 def _rows_of(desk, source, session=None):
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox")) != bool(arg)):
-        return None      # sections, comments and messages need an id, inbox a name; house, turns and lines one or none; the rest none
+    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox", "days")) != bool(arg)):
+        return None      # sections, comments and messages need an id, inbox a name, days a span; house, turns and lines one or none; the rest none
+    if head == "days":
+        a, _, b = arg.partition("..")
+        da, _ = X._date_in(X.typed(a.strip()))
+        db, _ = X._date_in(X.typed(b.strip()))
+        if da is None or db is None:
+            raise LensRefusal(f"{source}: days takes two dates, days:<start>..<end>; got {arg!r}")
+        rows, why = X.day_rows(da, db)
+        if rows is None:
+            raise LensRefusal(f"{source}: {why}")
+        return rows
     if head in ("words", "slots", "kinds"):
         import table
         return {"words": table.word_rows, "slots": table.slot_rows, "kinds": table.kind_rows}[head](desk)
@@ -889,6 +896,11 @@ def _w_count(node, p, val, n, env):
     if not val.strip():
         raise LensRefusal(f"line {n}: `count <selection or row source>`; got {p!r}")
     node["count"] = val.strip()       # a1101: '7 paused', without drawing the seven
+    # 9 Oct (step 5): the word is `let count = count(<selection>)`, read by the one evaluator; the fence takes the
+    # membership from the let's select, as it took it from the word's
+    if any(l == "count" for l, _, _ in node["let"]):
+        raise LensRefusal(f"line {n}: count is already said on this part")
+    node["let"].append(("count", f"count({val.strip()})", None))
 
 
 def _w_over(node, p, val, n, env):
@@ -896,8 +908,8 @@ def _w_over(node, p, val, n, env):
     val = val.strip()
     if not re.fullmatch(r"\$\w+", val):
         raise LensRefusal(f"line {n}: `over $<list> [as <frame>]` repeats over a list the current thing holds ($tags) or "
-                          f"rows a derive named; got {p!r}. Rows from a source (comments:<id>, sections:<id>; the command "
-                          f"`rows` lists them) go under `of`: `of comments:$item`")
+                          f"the rows a let holds (`let days = days-from($a, $b)`); got {p!r}. Rows from a source (comments:<id>, "
+                          f"days:<a>..<b>; the command `rows` lists them) go under `of`: `of comments:$item`")
     node["over"] = val[1:]
     if asname:
         node["as"] = asname.strip()
@@ -942,17 +954,22 @@ def _w_as(node, p, val, n, env):
 
 
 def _w_derive(node, p, val, n, env):
+    """The older spelling (Pike W6, a closed list of interpretations) of a let that calls a function: `derive wd =
+    weekday $d` is `let wd = weekday($d)` since 9 Oct (step 5), read by the one evaluator and printed as a let. The
+    word records the let's spelling, so `scene <lens> lines` and `--convert` move a lens to it."""
     m = re.fullmatch(r"(\w+) = ([\w-]+)((?: \S+)*)", val)
     if not m:
-        raise LensRefusal(f"line {n}: `derive <name> = <interpretation> <inputs>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `derive <name> = <function> <inputs>` (the older spelling of `let <name> = <function>(<inputs>)`); got {p!r}")
     dname, interp, ins = m.group(1), m.group(2), m.group(3).split()
-    if interp not in INTERPS:
-        raise LensRefusal(f"line {n}: no interpretation {interp!r}. The list is closed: " + ", ".join(f"{k} <{'> <'.join(v[0])}>" for k, v in INTERPS.items()))
-    if len(ins) != len(INTERPS[interp][0]):
-        raise LensRefusal(f"line {n}: {interp} takes {len(INTERPS[interp][0])} input(s): {' '.join(INTERPS[interp][0])}; got {len(ins)}")
-    if dname in NAMES or any(dname == d[0] for d in node["derive"]):
+    if interp not in X.FUNCS:
+        raise LensRefusal(f"line {n}: no interpretation {interp!r}. The list is closed: " + ", ".join(f"{k} <{'> <'.join(v[0])}>" for k, v in X.FUNCS.items()))
+    if len(ins) != len(X.FUNCS[interp][0]):
+        raise LensRefusal(f"line {n}: {interp} takes {len(X.FUNCS[interp][0])} input(s): {' '.join(X.FUNCS[interp][0])}; got {len(ins)}")
+    if dname in NAMES or any(dname == l for l, _, _ in node["let"]):
         raise LensRefusal(f"line {n}: derive {dname}: that name is taken")
-    node["derive"].append((dname, interp, ins))
+    spelled = f"let {dname} = {interp}({', '.join(ins)})"
+    _w_let(node, spelled, spelled[4:], n, env)
+    return spelled
 
 
 def _w_capture(node, p, val, n, env):
@@ -969,8 +986,10 @@ def _w_let(node, p, val, n, env):
     if not m:
         raise LensRefusal(f"line {n}: `let <name> = <expr> [when <expr> | otherwise]`; got {p!r}")
     lname, rest = m.group(1), m.group(2).strip()
-    if lname in NAMES or lname in X.KEYWORDS or any(lname == d[0] for d in node["derive"]):
+    if (lname in NAMES and lname != "count") or lname in X.KEYWORDS:
         raise LensRefusal(f"line {n}: let {lname}: that name is taken")
+    if lname == "count":        # 9 Oct: `let count = count(<sel>)` is what the word `count <sel>` says (a1101)
+        node["count"] = node["count"] or rest
     cond = None
     if rest.endswith(" otherwise"):
         rest, cond = rest[:-len(" otherwise")].strip(), "otherwise"
@@ -1087,7 +1106,7 @@ WORDS = {
     "each": ("each <part>", _w_each),
     "at": ("at item", _w_at),
     "only": ("only when <selection | expr>", _w_only),
-    "derive": ("derive <name> = <interpretation> <inputs>", _w_derive),
+    "derive": ("derive <name> = <function> <inputs>", _w_derive),
     "let": ("let <name> = <expr> [when <expr> | otherwise]", _w_let),
     "capture": ("capture <field>=<value>", _w_capture),
     "spread": ("spread x|y <start> step <n | $prop> to <max>", _w_spread),
@@ -1107,7 +1126,7 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `of`/`over` repeats something; say what with `each <part>`")
     if node["the"] and (node["each"] or node["of"] or node["over"]):
         raise LensRefusal(f"line {n}: `the` names exactly one thing; it cannot repeat (drop `each`, `of` or `over`)")
-    if node["count"] and (node["of"] or node["over"]):
+    if (node["count"] or any(l == "count" for l, _, _ in node["let"])) and (node["of"] or node["over"]):
         raise LensRefusal(f"line {n}: a repeat already has $count, its true size; `count` is for a part that repeats nothing")
     if node["as"] and (node["as"] in NAMES or node["as"] in ("value", "x", "y")):
         raise LensRefusal(f"line {n}: `as {node['as']}` would shadow a built-in name; choose another frame name")
@@ -1121,7 +1140,8 @@ def _check_part(node, n):
         raise LensRefusal(f"line {n}: `capture` holds a field of the thing chosen by `the`; this part has no `the`")
     import knife      # a3359: a selection that names due as a prop is refused here, when the lens is saved, not at a look
     only = None if X.looks_like(node["only"]) else node["only"]
-    for sel in [node["of"], node["the"], only, node["count"]] + [c for _, c in node["role_when"] if not X.looks_like(c)]:
+    counted = None if X.looks_like(node["count"]) else node["count"]
+    for sel in [node["of"], node["the"], only, counted] + [c for _, c in node["role_when"] if not X.looks_like(c)]:
         said = knife.misnamed(sel)
         if said:
             raise LensRefusal(f"line {n}: {said}")
@@ -1145,30 +1165,33 @@ def parse(src, roles=None, style=None):
         row = WORDS.get(word)
         if row is None:
             raise LensRefusal(f"line {n}: a lens cannot say {p!r}. It can say: {vocabulary()}")
-        row[1](node, p, val, n, env)
-        node["words"].append(p)
+        spelled = row[1](node, p, val, n, env)
+        node["words"].append(spelled if isinstance(spelled, str) else p)     # an older spelling records the one form
 
-    for n, raw in enumerate(src.splitlines(), 1):
-        line = _outside_quotes(raw, " # ")[0].rstrip()
-        if not line.strip() or line.strip().startswith("#") or (indent_of(line) == 0 and re.fullmatch(r"lens \S+", line.strip())):   # a header line, `lens <name>`, as the first lenses began; an indented `lens x` is the word
-            continue
-        indent = len(line) - len(line.lstrip())
-        text = line.strip()
+    # 9 Oct (step 5): the lines are read by tree.read, the one indentation reader (a style and a kind note's slot
+    # lines read through it too); what a line means here is a part (`name : ...`) or a word of the part above it.
+    # A line indented under a word line belongs to that word's part, as it did when a word line held no place.
+    def visit(tn, parent):
+        n, text, indent = tn.line, tn.text, tn.indent
         pieces = _outside_quotes(text, " : ")
         head = pieces[0] if len(pieces) > 1 else (text[:-2] if text.endswith(" :") else None)
         if head is None or not re.fullmatch(r"[\w-]+", head):
-            # a word line: it belongs to the nearest part above it with a smaller indent
-            while stack and stack[-1][0] >= indent:
-                stack.pop()
-            if not stack:
+            if parent is None:
                 raise LensRefusal(f"line {n}: {text!r} is a word with no part above it. A part is `name : <what it is>`; "
                                   f"its words are indented under it, one per line")
-            say(stack[-1][1], text, n)
-            continue
-        name, rest = head, (" : ".join(pieces[1:]) if len(pieces) > 1 else "")
+            say(parent, text, n)
+            for kid in tn.kids:
+                visit(kid, parent)
+            return
+        node = _part(head, (" : ".join(pieces[1:]) if len(pieces) > 1 else ""), n, indent, parent)
+        for kid in tn.kids:
+            visit(kid, node)
+
+    def _part(name, rest, n, indent, parent):
+        nonlocal root
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
-                "the": None, "as": None, "derive": [], "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
+                "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
                 "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
@@ -1184,16 +1207,16 @@ def parse(src, roles=None, style=None):
                 raise LensRefusal(f"line {n}: part {name!r} is already defined on line {parts[name]['line']}; one name, one part")
             parts[name] = node
             root = root or name
-            stack = [(0, node)]
         else:
-            while stack and stack[-1][0] >= indent:
-                stack.pop()
-            if not stack:
+            if parent is None:
                 raise LensRefusal(f"line {n}: indented part with no parent")
-            if any(k["name"] == name for k in stack[-1][1]["kids"]):
-                raise LensRefusal(f"line {n}: {stack[-1][1]['name']} already has a child named {name!r}; siblings need different names (they are its address)")
-            stack[-1][1]["kids"].append(node)
-            stack.append((indent, node))
+            if any(k["name"] == name for k in parent["kids"]):
+                raise LensRefusal(f"line {n}: {parent['name']} already has a child named {name!r}; siblings need different names (they are its address)")
+            parent["kids"].append(node)
+        return node
+
+    for top in tree.read(src, skip=lambda text, indent: indent == 0 and re.fullmatch(r"lens \S+", text) is not None):   # a header line, `lens <name>`, as the first lenses began; an indented `lens x` is the word
+        visit(top, None)
     if not root:
         raise LensRefusal("an empty lens shows nothing; start with  window : column")
     every = [k for p in parts.values() for k in _walk(p)]
@@ -1283,7 +1306,6 @@ def _refs_of(node):
     out = []
     srcs = [("text", node["text"] or ""), ("only", node["only"] or ""), ("of", node["of"] or ""), ("the", node["the"] or ""),
             ("lens", node["lens"] or ""), ("count", node["count"] or "")]
-    srcs += [("derive", x) for _, _, ins in node["derive"] for x in ins]
     srcs += [("let", e) for _, e, _c in node["let"]] + [("let", c) for _, _e, c in node["let"] if c and c != "otherwise"]
     if node["only"] and X.looks_like(node["only"]):
         srcs.append(("only", node["only"]))
@@ -1315,8 +1337,6 @@ def resolve(root, parts):
             frames.add(node["as"])
         if node["of"] or node["over"]:
             frames.add("it")
-        for dname, _i, _ins in node["derive"]:
-            lets.add(dname)
         for lname, _e, _c in node["let"]:
             lets.add(lname)
         scopes[id(node)] = {"frames": frames, "lets": lets}
@@ -1378,74 +1398,7 @@ def _walk(node):
         yield from _walk(k)
 
 
-def _date(s):
-    import datetime
-    try:
-        return datetime.date.fromisoformat(str(s).strip())
-    except ValueError:
-        return None
-
-
-def _day_n(vals):
-    d, n = _date(vals[0]), str(vals[1]).strip()
-    if d is None or not n.lstrip("-").isdigit():
-        return None, f"day-n wants <date> <n>; got {vals[0]!r} {vals[1]!r}"
-    import datetime
-    return (d + datetime.timedelta(days=int(n) - 1)).isoformat(), None
-
-
-def _days_from(vals):
-    a, b = _date(vals[0]), _date(vals[1])
-    if a is None or b is None:
-        return None, f"days-from wants <start> <end> as dates; got {vals[0]!r} {vals[1]!r}"
-    import datetime
-    if (b - a).days > 366 or b < a:
-        return None, f"days-from: {vals[0]} to {vals[1]} is not a span of at most a year"
-    return [{"n": k + 1, "date": (a + datetime.timedelta(days=k)).isoformat()} for k in range((b - a).days + 1)], None
-
-
-def _weekday(vals):
-    d = _date(vals[0])
-    return (d.strftime("%a"), None) if d else (None, f"weekday wants a date; got {vals[0]!r}")
-
-
-def _week_of(vals):
-    import datetime
-    d = _date(vals[0])
-    return ((d - datetime.timedelta(days=d.weekday())).isoformat(), None) if d else (None, f"week-of wants a date; got {vals[0]!r}")
-
-
-# Pike W6: named interpretations, a closed and budgeted list like the roles in calm.style. Each is pure over printed
-# inputs and total. There is no +, no if and no nesting; a new one is argued for and added by whoever owns the host.
-def _when(vals, part):
-    """Juniper: a freshness value (`e412 prop · 2026-09-25 21:40`, or a plain date or date-time) shown as its time or
-    its date alone, so a person's screen need not carry the event id and verb; provenance keeps the whole value."""
-    import re as _re
-    m = _re.search(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?", str(vals[0]))
-    if not m:
-        return None, f"{part} wants a date, a date-time or a freshness value; got {vals[0]!r}"
-    if part == "time" and not m.group(2):
-        return None, f"time wants a date-time or a freshness value; got {vals[0]!r}"
-    return (m.group(2) if part == "time" else m.group(1)), None
-
-
-def _day_or_time(vals):
-    """Juniper (day lens a496): `day-or-time <when> <today>`: the time alone when the day is today, `Mon 28` within a
-    week either way, else the date. Today is an input, so the read is visible; goldens freeze it per world."""
-    import re as _re
-    m = _re.search(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?", str(vals[0]))
-    d, today = (_date(m.group(1)) if m else None), _date(vals[1])
-    if not d or not today:
-        return None, f"day-or-time wants a date-time or a freshness value and today; got {vals[0]!r}, {vals[1]!r}"
-    if d == today:
-        return (m.group(2) or d.isoformat()), None
-    return (d.strftime("%a %d").replace(" 0", " ") if abs((d - today).days) <= 7 else d.isoformat()), None
-
-
-INTERPS = {"day-n": (("date", "n"), _day_n), "days-from": (("start", "end"), _days_from),
-           "day-or-time": (("when", "today"), _day_or_time),
-           "weekday": (("date",), _weekday), "week-of": (("date",), _week_of),
-           "time": (("when",), lambda v: _when(v, "time")), "date": (("when",), lambda v: _when(v, "date"))}
+# the interpretations (`_day_n`, `_days_from`, `_weekday`, `_week_of`, `_when`, `_day_or_time`, INTERPS) moved to expr.FUNCS on 9 Oct
 _VAR = re.compile(r"\$(\w+)(?:\.(\w+))?")
 
 
@@ -1509,7 +1462,7 @@ def _fill_text(tpl, ctx, track, run):
 
 
 def _binds(node):
-    return bool(node["the"] or node["of"] or node["over"] or node["as"] or node["derive"] or node.get("let") or node["capture"] or node["only"] or node["each"])
+    return bool(node["the"] or node["of"] or node["over"] or node["as"] or node.get("let") or node["capture"] or node["only"] or node["each"])
 
 
 def _chain_hash(chain):
@@ -1811,11 +1764,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
         for c in n.get("captured") or []:
             bits.append(f"· captured {c['field']}={c['value']} (now {c['now']}: {'same' if c['same'] else 'differs'})")
         for dv in n.get("derived") or []:
-            if dv.get("interp") == "let":
-                bits.append(f"· {dv['name']} = {dv['result']} ({dv['expr']}" + (f"; {dv['inputs_s']}" if dv.get("inputs_s") else "") + ")"
-                            + (f" (overlap: {dv['overlap']} answers held; the first was taken)" if dv.get("overlap") else ""))
-            else:
-                bits.append(f"· {dv['name']} = {dv['interp']}({', '.join(dv['inputs'])}) = {dv['result']}" if not dv["error"] else f"· {dv['name']}: (uninterpretable: {dv['error']})")
+            bits.append(f"· {dv['name']} = {dv['result']} ({dv['expr']}" + (f"; {dv['inputs_s']}" if dv.get("inputs_s") else "") + ")"
+                        + (f" (overlap: {dv['overlap']} answers held; the first was taken)" if dv.get("overlap") else ""))
         for ex, shown, inputs in n.get("computed") or []:
             bits.append(f"· $({ex}) = {shown}" + (f" ({inputs})" if inputs else ""))
         if n.get("read"):
@@ -1836,8 +1786,6 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):
                 bits.append("(" + ", ".join(n["states"]) + ")")
-        if n.get("counted"):
-            bits.append(f"· count {n['counted'][1]} of {n['counted'][0]}")
         if n.get("test"):
             bits.append(f"· only when {n['test']}")
         for a in n["acts"]:

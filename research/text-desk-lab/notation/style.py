@@ -54,40 +54,59 @@ class Unread(Exception):
 # ---------------------------------------------------------------------------------------------------------------------
 # parse
 # ---------------------------------------------------------------------------------------------------------------------
+def _prop_ok(n, body):
+    """A role's property names a token, never a raw colour or a pixel length."""
+    hx = re.search(r"#[0-9a-fA-F]{3,8}\b", body)
+    if hx:
+        raise StyleRefusal(n, f"colours are named here; {hx.group(0)!r} may only appear on a token line",
+                           [f"token <name> = {hx.group(0)}        (a new colour, named, for everyone)", "then say the name instead of the value"])
+    px = re.search(r"\b(\d+(?:\.\d+)?)px\b", body)
+    if px:
+        k = max(1, round(float(px.group(1)) / 8))
+        raise StyleRefusal(n, f"{px.group(0)} is not on the scale; lengths are gap, gap xN, gap /N, or an em",
+                           [f"gap x{k}                       (= {k * 8}px at gap 8)", "token gap = <n>            (moves everything)"])
+
+
 def parse(src):
+    """A style's text as {tokens, token_line, roles: {name: {props, line}}, fonts, themes}. Read through tree.read, the
+    one indentation reader (9 Oct, step 5): a theme's tokens are the lines under it, and a role's properties may be
+    written on its line after ` : `, separated by commas, or one per line under `role <name> :` (the tree form, as a
+    lens's words are written; both read to the same roles and `to_lines` prints the tree form)."""
+    import tree
     out = {"tokens": {}, "token_line": {}, "roles": {}, "fonts": {}, "themes": {}}
-    theme = None
-    for n, raw in enumerate(re.split(r"\r?\n", src or ""), 1):
-        indented = bool(re.match(r"^\s+\S", raw))
-        # A comment is "#" at the start of a line, or " # " with a space on each side: "#" also begins every colour
-        s = re.sub(r"\s+#\s.*$", "", raw.strip()).strip()
-        if not s or (s.startswith("#") and not re.match(r"^#[0-9a-fA-F]{3,8}\b", s)):
-            continue
+
+    def refuse_in_theme(node):
+        s = node.text
+        what = s.split()[1] if len(s.split()) > 1 else "?"
+        raise StyleRefusal(node.line, f"a theme may redefine tokens, not roles ({what!r}); both inhabitants must see one shape",
+                           [f"role {what} : ...                 (change it for everyone, as a deed they will see)",
+                            "do style <this appearance> ...     (change only this one, as an override)"])
+
+    for node in tree.read(src):
+        s, n = node.text, node.line
         m = re.match(r"^theme\s+(\S+)\s+of\s+(\S+)$", s)
         if m:
-            theme = m.group(1)
-            out["themes"][theme] = {"of": m.group(2), "tokens": {}, "line": n}
+            theme = {"of": m.group(2), "tokens": {}, "line": n}
+            out["themes"][m.group(1)] = theme
+            for kid in tree.walk(node.kids):
+                mt = re.match(r"^token\s+([\w.]+)\s*=\s*(.+)$", kid.text)
+                if mt:
+                    theme["tokens"][mt.group(1)] = mt.group(2).strip()
+                elif re.match(r"^(role|when|present)\s", kid.text):
+                    refuse_in_theme(kid)
+                else:
+                    raise StyleRefusal(kid.line, f'not a token line under theme {m.group(1)}: "{kid.text}"', ["token <name> = <value>"])
             continue
         m = re.match(r"^font\s+([\w-]+)\s*=\s*(.+)$", s)
         if m:
-            theme = None
             names = [x.strip() for x in m.group(2).split(",") if x.strip()]
             out["fonts"][m.group(1)] = {"face": names[0] if names else "", "fallback": ", ".join(names[1:]) or "sans-serif", "line": n}
             continue
         m = re.match(r"^token\s+([\w.]+)\s*=\s*(.+)$", s)
         if m:
-            if theme and indented:
-                out["themes"][theme]["tokens"][m.group(1)] = m.group(2).strip()
-            else:
-                theme = None
-                out["tokens"][m.group(1)] = m.group(2).strip()
-                out["token_line"][m.group(1)] = n
+            out["tokens"][m.group(1)] = m.group(2).strip()
+            out["token_line"][m.group(1)] = n
             continue
-        if theme and indented and re.match(r"^(role|when|present)\s", s):
-            what = s.split()[1] if len(s.split()) > 1 else "?"
-            raise StyleRefusal(n, f"a theme may redefine tokens, not roles ({what!r}); both inhabitants must see one shape",
-                               [f"role {what} : ...                 (change it for everyone, as a deed they will see)",
-                                "do style <this appearance> ...     (change only this one, as an override)"])
         if re.match(r"^present\s", s):
             raise StyleRefusal(n, "`present` was removed. A lens says which parts are drawn",
                                ["in the lens:   card : column, role card", "                 title : text $title, role title"])
@@ -97,25 +116,53 @@ def parse(src):
                                ["in the lens:   card : column, role card, role card.due when $due != none"])
         if re.match(r"^role\s", s):
             at = s.rfind(" : ")
+            if at < 0 and s.endswith(" :"):
+                at = len(s) - 2
             if at < 0:
                 raise StyleRefusal(n, 'a role line needs " : " with spaces before its properties',
                                    ["role <name> : <property>, <property>", "(an unspaced colon belongs to a selection, as in kind:note)"])
             head, body = re.sub(r"^\w+\s+", "", s[:at], count=1).strip(), s[at + 3:].strip()
-            theme = None
-            hx = re.search(r"#[0-9a-fA-F]{3,8}\b", body)
-            if hx:
-                raise StyleRefusal(n, f"colours are named here; {hx.group(0)!r} may only appear on a token line",
-                                   [f"token <name> = {hx.group(0)}        (a new colour, named, for everyone)", "then say the name instead of the value"])
-            px = re.search(r"\b(\d+(?:\.\d+)?)px\b", body)
-            if px:
-                k = max(1, round(float(px.group(1)) / 8))
-                raise StyleRefusal(n, f"{px.group(0)} is not on the scale; lengths are gap, gap xN, gap /N, or an em",
-                                   [f"gap x{k}                       (= {k * 8}px at gap 8)", "token gap = <n>            (moves everything)"])
-            out["roles"][head] = {"props": [x.strip() for x in body.split(",") if x.strip()], "line": n}
+            props = []
+            _prop_ok(n, body)
+            props += [x.strip() for x in body.split(",") if x.strip()]
+            for kid in tree.walk(node.kids):            # the tree form: one property per line under the role
+                _prop_ok(kid.line, kid.text)
+                props += [x.strip() for x in kid.text.split(",") if x.strip()]
+            out["roles"][head] = {"props": props, "line": n}
             continue
         raise StyleRefusal(n, f'not a token, role, font or theme line: "{s}"',
                            ["token <name> = <value>", "role <name> : <props>", "font <name> = <Family>, <fallback>", "theme <name> of <style>"])
     return out
+
+
+def to_lines(src):
+    """The style in the tree form: each role's properties one per line under `role <name> :`; tokens, fonts and themes
+    as written. Comments and blank lines are kept where they stand. Raises StyleRefusal when the text does not parse."""
+    import tree
+    parse(src)
+    out, roles = [], {}
+    for node in tree.read(src):
+        if re.match(r"^role\s", node.text):
+            roles[node.line] = node
+    skip = set()
+    for n, raw in enumerate(re.split(r"\r?\n", src or ""), 1):
+        if n in skip:
+            continue
+        node = roles.get(n)
+        if node is None:
+            out.append(raw.rstrip())
+            continue
+        at = node.text.rfind(" : ")
+        if at < 0 and node.text.endswith(" :"):
+            at = len(node.text) - 2
+        head, body = node.text[:at].strip(), node.text[at + 3:].strip()
+        props = [x.strip() for x in body.split(",") if x.strip()]
+        for kid in tree.walk(node.kids):
+            props += [x.strip() for x in kid.text.split(",") if x.strip()]
+            skip.add(kid.line)
+        out.append(f"{head} :")
+        out += [f"  {p}" for p in props]
+    return "\n".join(out).rstrip("\n") + ("\n" if (src or "").endswith("\n") else "")
 
 
 # ---------------------------------------------------------------------------------------------------------------------
