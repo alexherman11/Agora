@@ -378,7 +378,7 @@ a3442 · family=silence · status=curing
 
 7 Oct, Claude (source edit: world.py hidden_fraction). Found by running 500 lines on a copy of frontier: a create in Home (f149) left 152 boxes empty and `look f149 :3` crashed (ZeroDivisionError); frontier already holds 445 boxes of negative size. Cured only at the crash: a box with no area has nothing covered. The cause stands: boxes in a flow are worked out from sizes that shrink at every arrival. The cure is Sable's geometry as choices (order and share as facts, boxes derived), which the log also wants: today a flow child's share is not a fact, and 41 of 892 boxes differ when a world is rebuilt from its facts.
 
-## cured (33)
+## cured (40)
 
 ### F1. A chat reply is signed "Alex" whoever sends it (fixed)
 
@@ -727,3 +727,45 @@ a3444 · family=silence · status=cured
 
 7 Oct, Juniper in the Writing room (e6201): `do rewrite a3420 title="Undo"` answered ok, emptied the text and left the title; 'dropped 1 line' was the only sign. undo e6201 put it back. The verb reads a missing text= as empty. It should refuse and name retitle. Claude to fix after the Writing room trial.
 Cured 7 Oct (0f263e7): rewrite refuses with no text= and names retitle; text="" empties on purpose. test_store.py asks it.
+
+### A verb could not say where its thing is, its neighbours or its words
+
+a3686 · family=code · status=cured
+
+7 Oct, Pike on the Editor board (a3472): a structure verb (new paragraph after, join, move up) could reach only .title, .maker and props. Source edit: blanks.py gained .in .before .after .text (43c4bb3). The missing world-level word was a thing's place; it is a blank's part now, so the verbs themselves (below, join, split, up, down) are world notes.
+
+### A numbered item could not know its number; a let named above a repeat read none inside it
+
+a3688 · family=code · status=cured
+
+7 Oct, Juniper (a3470). Source edits: $index and run <prop> in lens_ir.py/scene.py, and lets crossing into a repeat (43c4bb3, 9acbe26). Still open: two 'role X when' that both hold say nothing of the second.
+
+### Marks, keys and buttons for a text being written needed the painter
+
+a3690 · family=code · status=cured
+
+7 Oct, Alex ('buttons on top', 'Enter should create a new line, tab should indent'). Source edits in lens.js and scene.py: marks; on key <Enter|Tab|Shift+Tab|Backspace> with $head $tail; $focus; on click press; $selected; a key buffer while a gesture is in flight (6473444, 3109985, 09935ac and after). What a lens could not say was anything about the caret. The verbs the keys run are world notes (Pike). Open: undo kept to one document; arrows across paragraphs; marks do not nest; a highlighted stretch is quoted in a comment, not anchored to it.
+
+### A style could not make a page: least height, a part that takes no room, a part unseen until wanted
+
+a3692 · family=code · status=cured
+
+7 Oct, Alex's comments in the document (c3669, c3674) and Juniper. Source edits in style.js and scene.py: height, afloat, shy, token focus, pad <side> (which never drew), and the painter slides afloat parts clear of each other (bad7b6e, c2d6a64 and after). The page's look itself is a world note (style 'page', Juniper).
+
+### A selection listed a place's things in the order made, not the order read
+
+a3694 · family=code · status=cured
+
+7 Oct, Pike (a3482): 'of in:<document>' put a paragraph moved up the page last. Source edit: knife.py lists a flow in its reading order (8ea44d4). Four frozen prints rebased.
+
+### The join receipt named no one, and a comment kept the writer's typed name
+
+a3696 · family=silence · status=cured
+
+7 Oct, Juniper and Sable on the together card (a3474). Source edits: desk.py names who and which events and says what a joined lens does not promise (9acbe26); world.py drops a typed own name from a comment (43c4bb3). Open, from the same day: a refusal printed for a lens's fallback text beside the new text's line (Sable); 'now refusing' said of a lens already refused (Juniper); read printing old lines (Sable); help undo's wording (Pike); create refusing role= on a surface (Pike).
+
+### Two readers of one style (cured, e2baeae)
+
+a3748 · family=code · status=cured
+
+Step 1 of the grammar unification (e2baeae). What was wanted: one reader of a style text. What there was: style.js parsed, checked, resolved tokens and matched selections in the browser; scene.py kept a line-for-line Python mirror for receipts; health ran the real file under node to prove the two agreed. Three places restated one grammar. Why no world edit could do it: the readers are host code, and a style's meaning (which words it has) lived in two of them. The cure: style.py reads a style once and /api/style hands every painter resolved looks (colours as hex, lengths in px, a face with its size on the ramp); style.js keeps a table from a look's keys to CSS and the page's own duties. Deleted: the JS parser, checker, token resolver and matcher; the Python mirror; the node test; calm.style's six `when` clauses (they reached only the windowed shell; no placed style used one). Lesson: when two readers must agree, the fix is not a test that they do, it is one reader. What the world still lacks: a way to say a look depends on the thing other than `role x when ...` in the lens (that is the right place, so nothing is missing here).
