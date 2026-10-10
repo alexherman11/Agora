@@ -225,7 +225,7 @@ def _world_word(desk, step):
         if len(argv) < 2:
             return None
         word = argv[1].lstrip("@").lower()
-        builtin = word in desk._builtin_verbs() and word not in knife.SPECIALIZED
+        builtin = word in desk._builtin_verbs()
         return None if builtin else (word, argv[2:])
     word = argv[0].lstrip("@").lower()
     return None if word in DESK_WORDS else (word, argv[1:])
@@ -233,10 +233,9 @@ def _world_word(desk, step):
 
 def builtin_words(desk):
     """a1156 (4): the words the desk itself answers (its commands, its verbs and their synonyms). A world verb never
-    takes one. The retired built-ins (tidy, reply, stack ...) are not among them: this desk only refuses those, and a
-    world verb may answer them (a990)."""
-    import knife
-    return (set(desk._builtin_verbs()) | DESK_WORDS) - set(knife.SPECIALIZED)
+    takes one. The retired built-ins (tidy, reply, stack ...) are not among them since a990; on 9 Oct (step 6) they
+    became verb notes of the house (houseverbs.py), so a room's tidy stands over the house's as any verb does."""
+    return set(desk._builtin_verbs()) | DESK_WORDS
 
 
 def _desc(w, s):

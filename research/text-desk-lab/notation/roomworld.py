@@ -34,8 +34,9 @@ os.environ["DESKD"] = "off"
 RESIDENTS = ("juniper", "pike", "sable")
 
 
-def build(say=True):
-    """-> (desk, R). say=False leaves the house verb out (for a test that makes its own)."""
+def build(say=True, house=False):
+    """-> (desk, R). say=False leaves the house verb out (for a test that makes its own); house=True seeds the house's
+    verbs (houseverbs.NOTES: tidy gather dedupe reveal done reply; 9 Oct), which a test of a room's own tidy must not have."""
     import explore
     d = explore.fresh()
     d._session = "roomworld-inmemory"
@@ -92,13 +93,18 @@ def build(say=True):
     if say:
         say_id = make(home, 'kind=note title=say tags=verb on=house text="# say something in the room you are in: '
                             'say <words>\\ndo append $here.talk line=\\"$*\\""')
+    house_ids = {}
+    if house:
+        import houseverbs
+        for (word, _t), line in zip(houseverbs.NOTES, houseverbs.lines(home)):
+            house_ids[word] = run("jeff", f"look {home} :1", line)
     w.me = "jeff"
     d.seen, d.open, d.last_event_seen = {}, {root}, len(w.events)
     d._per = {}
     R = SimpleNamespace(HOME=home, BOARD=board, LOUNGE=lounge, DESKTOP=desktop, ARCHIVE=archive, CORNERS=corners_surface,
                         corner=corners, corner_desc=corner_desc, NOTE=note, SHELF=shelf, PRICES=prices, CARDS=cards,
                         TALK={board: board_talk, lounge: lounge_talk}, describe={home: home_desc, board: board_desc,
-                        lounge: lounge_desc, desktop: desktop_desc, archive: archive_desc}, SAY=say_id)
+                        lounge: lounge_desc, desktop: desktop_desc, archive: archive_desc}, SAY=say_id, HOUSE=house_ids)
     return d, R
 
 

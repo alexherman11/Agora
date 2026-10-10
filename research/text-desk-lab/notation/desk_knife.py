@@ -57,7 +57,7 @@ class DeskKnife(DeskMoo):
             return ""
         return super()._geom(nid)
 
-    _hidden_verbs = knife.SPECIALIZED
+    _hidden_verbs = ()      # 9 Oct: no specialized tier to hide; the retired words are verb notes of the house
 
     def _verbs_by_origin(self, nid):
         return knife.general_verbs_by_origin(self.world, nid)
@@ -652,7 +652,7 @@ class DeskKnife(DeskMoo):
             raise Refusal(f"nothing after do; a rule reads {self.RULE_FORM}")
         if verb in ("run", "script"):
             raise Refusal(self.SCRIPTS_DOOR)
-        if verb == "use" or verb not in self._verb_names() or verb in knife.SPECIALIZED:
+        if verb == "use" or verb not in self._verb_names():
             import verbs
             args = [a for a in argv[1:] if a != "now=1"]
             kv = {"now": "1"} if len(args) < len(argv) - 1 else {}
@@ -1576,9 +1576,9 @@ class DeskKnife(DeskMoo):
             if verb in promises.VERBS + promises.HOUSE_VERBS:      # a1587: do accept a2001 is accept a2001
                 return self._promise_verb(verb, arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else "")
             is_target = is_target_word      # a selection term is the target, = or not (Juniper; see SEL)
-            # tier 1: `do sweep porch` may name a verb made in the world; a990: so may a retired built-in's word (tidy,
-            # reply, stack ...), which this desk only refuses, so a world verb answers it first
-            if verb not in self._builtin_verbs() or verb in knife.SPECIALIZED:
+            # tier 1: `do sweep porch` may name a verb made in the world (since 9 Oct the retired built-ins' words,
+            # tidy reply done ..., are verb notes of the house, found here like any other)
+            if verb not in self._builtin_verbs():
                 import verbs
                 hit = verbs.try_line(self, arg, self.world.me)
                 if hit is not None:
@@ -1675,16 +1675,6 @@ class DeskKnife(DeskMoo):
         if name in knife.PAIR_DOC:
             return helpnotes.floor(self, name)
         import verbs
-        if name in knife.SPECIALIZED and verbs.visible(self, name, self.world.me):
-            # a990: a retired built-in's word that a verb made in the world answers (tidy on a room) is that verb
-            return "\n\n".join(verbs.describe(self, s) for s in verbs.visible(self, name, self.world.me))
-        if name in knife.SPECIALIZED:
-            return (f"no verb {name} here; use {self.SPECIALIZED_ALT.get(name, 'a general verb')}. general verbs: "
-                    + " ".join(self._help_verbs()) + "\nselections do the specializing (help selections).")
-        if name in moo.SYNONYMS and name not in moo.REGISTRY and moo.SYNONYMS[name] in knife.SPECIALIZED:
-            # F21: moo would say "read as tidy" and then point at a verb this desk refuses
-            to = moo.SYNONYMS[name]
-            return f"{name} is not a verb here; elsewhere it means {to}, which this desk does not do.\n" + self.cmd_help(to)
         if name not in builtin:
             made = verbs.visible(self, name, self.world.me)      # a verb someone made that you could use
             if made:
@@ -1738,16 +1728,12 @@ class DeskKnife(DeskMoo):
             groups.append(", ".join(house) + " (the house)")
         return groups
 
-    SPECIALIZED_ALT = {"reply": "append (examine the chat: it shows what awaits a reply)", "dedupe": "remove also:<id>",
-                       "reveal": "raise", "tidy": "tile", "split": "group kind:<k>,in:<surface> then tile the surface as=row",
-                       "gather": "move ?<words> into=<surface> one=1", "done": "retitle", "stack": "tile"}
-
     def _help_verbs(self):
         """The verbs help may name: each answers help <verb> here and is done by this desk."""
         return knife.GENERAL + [p for p in knife.PAIR_DOC if p not in knife.GENERAL]     # link is both
 
     def _builtin_verbs(self):
-        return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(knife.SPECIALIZED) | set(moo.REGISTRY) | self._verb_names()
+        return set(knife.GENERAL) | set(knife.PAIR_DOC) | set(moo.REGISTRY) | self._verb_names()
 
     def cmd_examine(self, ident):
         rec = self.record_text(ident) if ident else None     # a1308: an event, comment or link id
@@ -2000,9 +1986,6 @@ class DeskKnife(DeskMoo):
                 made = f" → created {l['id']}\n  {l['id']}: {a} {l['kind']} → {b}"
             return (f"ok {verb} {a} {b}  [{evs[0]}" + (f"..{evs[-1]}" if len(evs) > 1 else "") + f"]{made}\n  now: "
                     + self.line(a, 1) + self.position_note(a) + "\n  now: " + self.line(b, 1) + self.position_note(b))
-        if (verb if verb in moo.REGISTRY else moo.SYNONYMS.get(verb, verb)) in knife.SPECIALIZED:
-            alt = self.SPECIALIZED_ALT.get(verb, "a general verb")
-            raise Refusal(f"no {verb} here; use {alt}. help selections lists the selection forms")
         sel = self._parse_selection(positional[0])
         if sel is None:
             return super().cmd_do(verb, positional[0], kv)
@@ -2010,8 +1993,6 @@ class DeskKnife(DeskMoo):
         if verb not in self._verb_names():
             raise Refusal(f"{verb} is not a verb here; general verbs: " + " ".join(knife.GENERAL) + " (help selections)")
         verb = moo.SYNONYMS.get(verb, verb)
-        if verb in knife.SPECIALIZED:
-            raise Refusal(f"no {verb} here; compose it: help selections")
         if not ids:
             raise Refusal(f"nothing matches {desc}")
         self._fence_selection(ids)

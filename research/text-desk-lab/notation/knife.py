@@ -34,8 +34,9 @@ import persons
 import promises
 from world import Refusal
 
-SPECIALIZED = {"split", "gather", "dedupe", "reveal", "reply", "tidy", "stack", "done"}   # due and tag are property setters: general
-GENERAL = [n for n in moo.REGISTRY if n not in SPECIALIZED]
+# 9 Oct 2026 (step 6): the specialized tier (split gather dedupe reveal reply tidy stack done, refused here with an alternative
+# since a990) is gone; those words are verb notes of the house (houseverbs.py), looked up as any world verb is
+GENERAL = list(moo.REGISTRY)
 
 
 def _leaves(w, fid):
@@ -358,12 +359,7 @@ def trash_left_out(w, token):
 
 
 def general_verbs_by_origin(w, nid):
-    out = {}
-    for origin, names in moo.verbs_by_origin(w, nid).items():
-        keep = [n for n in names if n not in SPECIALIZED]
-        if keep:
-            out[origin] = keep
-    return out
+    return moo.verbs_by_origin(w, nid)
 
 
 PAIR_DOC = {

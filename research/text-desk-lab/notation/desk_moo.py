@@ -36,19 +36,11 @@ class DeskMoo(Desk):
         if n["type"] == "surface":
             kids = w.children(nid)
             if len(kids) >= 2 and n["layout"] == "free" and any(w.hidden_fraction(k["id"]) > 0.05 for k in kids):
-                out += ["tidy", "split"]
+                pass                      # tidy and split are the house's verb notes since 9 Oct, not the desk's to nudge
             elif len(kids) >= 2 and n["layout"] != "free":
                 out.append("sort")
-            if n["layout"] != "free" or not kids:
-                out.append("gather")
         else:
             s = w.subjects[n["subject"]]
-            if w.hidden_fraction(nid) > 0.05:
-                out.append("reveal")
-            if len(w.appearances_of(s["id"])) > 1:
-                out.append("dedupe")
-            if s["kind"] == "chat" and moo.unanswered(w, s["id"]):
-                out.append("reply")
             for c in s.get("comments", []):
                 if not c["resolved"] and c["by"] != "alex":
                     out.append(f"resolve {c['id']}")
