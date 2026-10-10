@@ -92,28 +92,10 @@ class Accessor:
 # ---------------------------------------------------------------------------------------------------------------------
 def term_aspects(q):
     """The aspects of a member that selection `q`'s terms read (sable-8 amended R_g: a `bind many` instance is a member
-    while these hold). -> (subject aspects, appearance aspects). `kind` and `age` are not aspects any verb declares;
-    a kind change would go unfenced here, and age moves only with the clock."""
-    subj, app = set(), {"place"}       # a1327: every selection leaves out what is in a Trash, so a member's place counts
-    for t in [x for x in re.split(r"[,\s]+", q.strip()) if x]:
-        t = t[1:] if t.startswith("-") else t
-        if t.startswith("tag:"):
-            subj.add("tags")
-        elif t.startswith("prop:"):
-            subj.add("prop:" + t[5:].split("=")[0])
-        elif t.startswith("title:"):
-            subj.add("title")
-        elif t.startswith("?"):
-            subj |= {"title", "text", "tags"}
-        elif t.startswith(("due<", "due>", "due:")):
-            subj.add("due")
-        elif t.startswith(("in:", "also:")) or t == "hidden":
-            app.add("place")
-        elif t.startswith(("comments:", "links:", "parts:", "part-of:")):
-            subj.add(t.split(":")[0])
-        elif t.startswith(("answers:", "answered-by:")):
-            subj.add("links")
-    return subj, app
+    while these hold). -> (subject aspects, appearance aspects). 8 Oct: read from the term table (knife.aspects_of), so
+    the fence and the reader cannot drift."""
+    import knife
+    return knife.aspects_of(q)
 
 
 def _member_reads(w, i, q):
@@ -307,6 +289,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 return None if v in (name, "") else v
             def select(q):
                 q = S._fill(q, ctx, track)
+                if S.source_head(q) in S.SOURCES:          # 8 Oct: count(house doing=awake) counts a source's rows
+                    rs = acc.rows(q)
+                    return [r.get("item") or k for k, r in enumerate(rs or [])]
                 named, ids = acc.select(q)
                 ids = [i for i, _ in named] if named is not None else ids
                 cb.append(["select", q, list(ids)])

@@ -33,7 +33,9 @@ HELP_KNIFE = HELP_MOO.replace(
 
 # Juniper: `do prop prop:day=2026-10-10 tripday=1` lost its target, because the selection carries an =. A word that
 # begins with a selection term is the target, = or not (a typed do line and a rule's action alike, a1027)
-SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of|answers|answered-by):|^-?(due|age)[<>]|^[?]")
+SEL = re.compile(r"^-?(kind|tag|in|also|prop|title|comments|links|parts|part-of|answers|answered-by):|^-?[\w-]+(<=|>=|!=|[<>])\S|^[?]")
+# a bare k=v after a verb is its argument, as always; a selection that begins with one is written prop:k=v, or after
+# another term (kind:task,status=done)
 
 
 def is_target_word(a):
@@ -1416,6 +1418,9 @@ class DeskKnife(DeskMoo):
 
     def cmd_find(self, words):
         # round 11b: find also takes a selection, which is the scalable listing view (examine is one thing in depth)
+        import scene
+        if words.strip() and scene.source_head(words.strip()) in scene.SOURCES:     # 8 Oct: a row source, with its terms
+            return scene.rows_text(self, words.strip()).replace("rows ", "find ", 1)
         sel = self._parse_selection(words) if words.strip() else None
         if sel is not None:
             ids, desc = sel

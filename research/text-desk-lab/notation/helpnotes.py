@@ -156,7 +156,7 @@ def floor(desk, word):
 def _targetish():
     import knife
     terms = "|".join(re.escape(t) for t in knife.TERMS)
-    return re.compile(rf'^(?:[<$?"]|[afsecl]\d+$|-?(?:{terms})|-?(?:due|age)[<>]|hidden\b)')
+    return re.compile(rf'^(?:[<$?"]|[afsecl]\d+$|-?(?:{terms})|-?[\w-]+(?:<=|>=|!=|[<>])\S|hidden\b)')
 
 
 def _segments(text_, word):

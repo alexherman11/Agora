@@ -536,10 +536,26 @@ def house_rows(desk, corner=None):
 
 
 def rows(desk, source, session=None):
-    """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection)."""
+    """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection). 8 Oct (step 3):
+    the source may be followed by terms over its fields, read by the one comparison (`house doing=awake`,
+    `messages:a12 who=alex`, `sayings for:claude answered=no`; knife.filter_rows)."""
+    import knife
+    src = source.strip()
+    first, _, rest = src.partition(" ")
+    if source_head(src) == "sayings":
+        own = [t for t in rest.split() if t.startswith(("for:", "in:"))]        # the source's own words
+        terms = [t for t in rest.split() if t not in own]
+        rs = saying_rows(desk, " " + " ".join(own) if own else "")
+    else:
+        terms = [t for t in re.split(r"[,\s]+", rest) if t]
+        rs = _rows_of(desk, first, session)
+    if rs is None or not terms:
+        return rs
+    return knife.filter_rows(desk.world, rs, terms, __import__("persons").active(desk), SOURCES[source_head(src)][0])
+
+
+def _rows_of(desk, source, session=None):
     w = desk.world
-    if source_head(source) == "sayings":
-        return saying_rows(desk, source.strip()[len("sayings"):])
     head, _, arg = source.strip().partition(":")
     if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name; house, turns and lines one or none; the rest none
@@ -600,7 +616,7 @@ def rows(desk, source, session=None):
 def rows_text(desk, source):
     rs = rows(desk, source)
     if rs is None:
-        raise LensRefusal("rows <source>. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
+        raise LensRefusal("rows <source> [k=v k<v ...]. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
     fields = SOURCES[source_head(source)][1]
     lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
     for r in rs:

@@ -245,7 +245,11 @@ def expr_env(desk, ctx):
             return None
 
     def select(q):
-        sel = desk._parse_selection(fill(desk, q, ctx=ctx))
+        import scene
+        q = fill(desk, q, ctx=ctx)
+        if scene.source_head(q) in scene.SOURCES:          # 8 Oct: count(house doing=awake) counts a source's rows
+            return [r.get("item") or k for k, r in enumerate(scene.rows(desk, q) or [])]
+        sel = desk._parse_selection(q)
         return list(sel[0]) if sel else []
 
     def field(i, f):

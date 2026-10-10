@@ -10,8 +10,12 @@ Selections (one token; quote it if it has spaces, or join terms with commas):
   hidden            more than 5% covered
   also:a18          the other appearances of a18's subject
   due<2026-09-20    due before (or due>); due:any, has a due date
+  seats>3  status=done  due<=today  owner!=pike   (8 Oct, step 3 of the grammar unification) any aspect or prop compared
+                    through the lens's expression kinds (expr.typed): numbers as numbers, dates as dates, words as words;
+                    prop:k=v still reads, as k=v; a thing without the aspect never matches
   a20,a22          an explicit list
   terms combine with AND:  kind:image,in:f04   or  "kind:image in:f04"
+  a row source may come first, then terms over its fields:  house doing=awake   messages:a12 who=alex   (scene.rows)
 
 Verbs (all take an id or a selection unless noted):
   move   into= | before= | after= | to= | by=    [one=1 keeps one appearance per subject]
@@ -62,6 +66,101 @@ def _in_order(w, fid, made):
 TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:",
          "answered-by:", "unanswered:", "due:") + promises.TERMS      # a1587: held-by: asked-of: owed-to: asked-by: awaits:
 
+# 8 Oct (step 3): what each term reads, so the fence's record of a member's reads (lens_ir.term_aspects, now aspects_of
+# below) comes from the same table as the reader. Subject aspects, or "place" on the appearance; None: nothing any verb
+# declares (kind, age, the promise terms). A compared aspect (k=v, k<v, prop:k=v) reads `prop:k`, or the field itself.
+ASPECTS = {"tag": {"tags"}, "title": {"title"}, "?": {"title", "text", "tags"}, "due": {"due"}, "comments": {"comments"},
+           "links": {"links"}, "parts": {"parts"}, "part-of": {"part-of"}, "answers": {"links"}, "answered-by": {"links"},
+           "in": {"place"}, "also": {"place"}, "hidden": {"place"}, "kind": set(), "age": set(), "unanswered": set()}
+FIELDS = ("due", "title", "text", "kind", "tags")      # aspects compared by name, not through prop:
+GENERIC = re.compile(r"^([A-Za-z_][\w-]*)(!=|<=|>=|=|<|>)(.*)$")
+
+
+def term_key(t):
+    """-> (name, op, value) of one term: ('kind', ':', 'note'), ('seats', '>', '3'), ('hidden', '', ''), ('?', '', 'a+b')."""
+    t = t[1:] if t.startswith("-") else t
+    if t.startswith("?"):
+        return "?", "", t[1:]
+    if t == "hidden":
+        return "hidden", "", ""
+    if ":" in t and (not GENERIC.match(t) or t.index(":") < min(i for i in (t.find(c) for c in "=<>!") if i >= 0)):
+        name, _, val = t.partition(":")
+        if name == "prop":
+            k, eq, v = val.partition("=")
+            return (k, "=", v) if eq else (k, "has", "")      # prop:k=v is k=v; prop:k alone is 'has k'
+        return name, ":", val
+    m = GENERIC.match(t)
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+    return t, "", ""
+
+
+def aspects_of(q):
+    """The aspects a member of selection `q` was read by: -> (subject aspects, appearance aspects). Every selection
+    leaves out what is in a Trash, so a member's place always counts (a1327)."""
+    subj, app = set(), {"place"}
+    for t in [x for x in re.split(r"[,\s]+", (q or "").strip()) if x]:
+        name, op, _v = term_key(t)
+        if op in ("=", "!=", "<", ">", "<=", ">=", "has"):
+            if name in ("kind", "age"):
+                continue
+            subj.add(name if name in FIELDS else f"prop:{name}")
+            continue
+        asp = ASPECTS.get(name)
+        if asp is None:
+            continue
+        for a in asp:
+            (app if a == "place" else subj).add(a)
+    return subj, app
+
+
+def value_of(w, nid, k):
+    """A thing's value for an aspect or prop name, for a comparison; None when it has none."""
+    n = w.nodes[nid]
+    s = w.subjects.get(n.get("subject")) if n["type"] == "appearance" else None
+    if k == "due":
+        return (s or {}).get("due") or None
+    if k == "title":
+        return w.title(n)
+    if k == "text":
+        return (s or {}).get("text")
+    if k == "kind":
+        return moo.kind_of(w, nid)
+    if k == "tags":
+        return " ".join((s or {}).get("tags") or []) or None
+    props = (n.get("props") if n["type"] == "surface" else (s or {}).get("props")) or {}
+    v = props.get(k)
+    return None if v is None or str(v).strip() == "" else v
+
+
+def compares(w, raw, op, want, k=None, binds=None):
+    """Does a stored value satisfy `op want`? Typed as the lens types values (expr.typed): a number against a number, a
+    date against a date, words against words; kinds that cannot be compared never match. A person prop is the same
+    person, not the same spelling (a1590)."""
+    import expr as X
+    if raw is None or str(raw).strip() == "":
+        return False
+    if op == "has":
+        return True
+    if k in persons.PERSON_KEYS and op in ("=", "!="):
+        hit = persons.matches(w, raw, want, binds)
+        return hit if op == "=" else not hit
+    res = X._cmp(op, X.typed(raw), X.typed(want))
+    return res.kind == "bool" and bool(res.v)
+
+
+def filter_rows(w, rows, terms, binds=None, form="a row source"):
+    """8 Oct: a row source's rows kept by comparison terms over their fields (`house doing=awake`, `messages:a12 who=alex`).
+    Any other kind of term is refused: a row has fields, not a place or tags. `form` is the source as help prints it."""
+    out = list(rows)
+    for t in terms:
+        neg = t.startswith("-")
+        name, op, want = term_key(t)
+        if op not in ("=", "!=", "<", ">", "<=", ">=", "has"):
+            raise Refusal(f"unknown term {t!r}: {form} takes terms over its fields (k=v k!=v k<v k>v k<=v k>=v); kind:, tag:, in: and the like are for things")
+        out = [r for r in out if compares(w, r.get(name), op, want, name, binds) != neg]
+    return out
+
 DUE_DOORS = "use due:any, due<DATE or due>DATE"
 
 
@@ -100,7 +199,7 @@ def parse_selection(w, token, trash=False, binds=None):
             raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
-    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "due:", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t == "hidden" for t in terms + neg):
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "due:", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t == "hidden" or GENERIC.match(t) for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -142,20 +241,23 @@ def parse_selection(w, token, trash=False, binds=None):
                 raise Refusal(f"also: needs an appearance id, not {a}")
             others = set(w.appearances_of(w.nodes[a]["subject"])) - {a}
             cands = [c for c in cands if c in others]
-        elif t.startswith("prop:"):
-            k, eq, v = t[5:].partition("=")
-            if not k:
-                raise Refusal("prop:k=v, or prop:k alone for things that have k")
-            if eq and not v:      # Juniper, Pike: prop:year= matched everything that has a year, silently
-                raise Refusal(f"prop:{k}= has no value; say prop:{k}=<value>, or prop:{k} alone for things that have {k}")
-
-            def okp(nid, k=k, v=v, eq=eq):
-                n = w.nodes[nid]
-                props = (n.get("props") if n["type"] == "surface" else w.subjects[n["subject"]].get("props")) or {}
-                if v and k in persons.PERSON_KEYS and k in props:
-                    return persons.matches(w, props[k], v, binds)      # a1590: the same person, not the same name
-                return (props.get(k) == v) if v else (k in props)
-            cands = [c for c in cands if okp(c)]
+        elif t.startswith("prop:") or (GENERIC.match(t) and not t.startswith(("age<", "age>"))):
+            # 8 Oct (step 3): one comparison for every aspect and prop, typed as the lens types values: prop:k=v is k=v,
+            # due<DATE is the field due compared as a date, seats>3 a prop compared as a number
+            if t.startswith("prop:"):
+                k, eq, v = t[5:].partition("=")
+                if not k:
+                    raise Refusal("prop:k=v, or prop:k alone for things that have k")
+                if eq and not v:      # Juniper, Pike: prop:year= matched everything that has a year, silently
+                    raise Refusal(f"prop:{k}= has no value; say prop:{k}=<value>, or prop:{k} alone for things that have {k}")
+                op = "=" if eq else "has"
+            else:
+                k, op, v = GENERIC.match(t).groups()
+                if not v:
+                    raise Refusal(f"{t} has no value; say {k}{op}<value>, or prop:{k} alone for things that have {k}")
+            if k in ("kind", "age"):
+                raise Refusal(f"{t}: {k} is not compared; say kind:<kind>, or age<N / age>N in days")
+            cands = [c for c in cands if compares(w, value_of(w, c, k), op, v, k, binds)]
         elif t.startswith("age<") or t.startswith("age>"):
             # days since the last event that touched the thing, by the clock; things never touched under a clock have no age
             if not w.today:
@@ -171,15 +273,6 @@ def parse_selection(w, token, trash=False, binds=None):
                 age = w.days_between(d, w.today)
                 return age < n_days if op == "<" else age > n_days
             cands = [c for c in cands if oka(c)]
-        elif t.startswith("due<") or t.startswith("due>"):
-            op, date = t[3], t[4:]
-            def okd(nid, op=op, date=date):
-                n = w.nodes[nid]
-                if n["type"] != "appearance":
-                    return False
-                d = w.subjects[n["subject"]]["due"]
-                return bool(d) and ((d < date) if op == "<" else (d > date))
-            cands = [c for c in cands if okd(c)]
         elif t == "due:any":
             # a3359: has a due date, as comments:any and awaits:any ask; it could only be asked as due<2999-12-31
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.subjects[w.nodes[c]["subject"]]["due"]]
@@ -241,7 +334,7 @@ def parse_selection(w, token, trash=False, binds=None):
             hit = promises.matching(w, t, binds)
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in hit]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> due:any age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>; -term leaves out")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> due:any age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>, and any aspect or prop compared (k=v k!=v k<v k>v k<=v k>=v); -term leaves out")
     for n in neg:
         r = parse_selection(w, n, trash=True, binds=binds)
         if r is None:
