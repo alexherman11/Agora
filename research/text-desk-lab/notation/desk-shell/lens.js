@@ -583,18 +583,53 @@
   // Alex, 7 Oct (c3674: comments must not push the paragraphs down): parts a style calls `afloat` take no room, so two
   // of them near each other would lie one on the other. After a paint each is slid down just far enough to clear the
   // one before it in the same column, as notes in a document's margin are.
+  // 13 Oct (Alex: 'the comment i'm clicked in should be lined up with the text that its attached to. Comments should
+  // stay as close to their text as possible. Expanding a comment should push the others away to make space'): the
+  // floating part in hand (the last one pressed, or the one beside the text pressed) sits exactly at its own place;
+  // the ones after it are slid down only as far as they must be, the ones before it up. With none in hand, each is
+  // slid down just clear of the one before. Places are read from the layout (offsetTop), never from where a part is
+  // mid-slide, so a slide can be eased (style.js) and settle can run again before it ends.
+  let inHand = null;
+  const place = (el, side) => { let v = 0; for (let e = el; e; e = e.offsetParent) v += e[side]; return v; };
   function settle() {
-    const sel = (Style.afloat || []).join(","); if (!sel) return;
-    const ends = new Map();
-    for (const el of paint.querySelectorAll(sel)) {
-      el.style.transform = "";
-      if (!el.scrollHeight) continue;
-      const r = el.getBoundingClientRect(), col = Math.round(r.left), free = ends.get(col) || 0, down = Math.max(0, free - r.top);
-      if (down) el.style.transform = `translateY(${Math.ceil(down)}px)`;
-      ends.set(col, r.top + down + el.scrollHeight + 8);
+    const sel = (Style.afloat || []).join(",");
+    const cols = new Map();
+    for (const el of sel ? paint.querySelectorAll(sel) : []) {
+      const h = el.scrollHeight;
+      if (!h) { el.style.transform = ""; continue; }
+      const c = Math.round(place(el, "offsetLeft"));
+      if (!cols.has(c)) cols.set(c, []);
+      cols.get(c).push({ el, at: place(el, "offsetTop"), h });
+    }
+    const gap = 8;
+    for (const items of cols.values()) {
+      const a = items.findIndex(i => i.el.dataset.key === inHand);
+      if (a >= 0) items[a].y = items[a].at;
+      let free = a >= 0 ? items[a].at + items[a].h + gap : -Infinity;
+      for (let i = a + 1; i < items.length; i++) { const it = items[i]; it.y = Math.max(it.at, free); free = it.y + it.h + gap; }
+      let roof = a >= 0 ? items[a].at - gap : 0;
+      for (let i = a - 1; i >= 0; i--) { const it = items[i]; it.y = Math.min(it.at, roof - it.h); roof = it.y - gap; }
+      for (const it of items) {
+        const d = Math.round(it.y - it.at);
+        it.el.style.transform = d ? `translateY(${d}px)` : "";
+        if (it.el.dataset.key === inHand) it.el.dataset.inhand = "1"; else delete it.el.dataset.inhand;
+      }
     }
     for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
   }
+  // which floating part is in hand: the one pressed, else the one beside what was pressed (the smallest part around
+  // the press that holds exactly one), else none
+  paint.addEventListener("pointerdown", e => {
+    const sel = (Style.afloat || []).join(","); if (!sel || !(e.target instanceof Element)) return;
+    let f = e.target.closest(sel);
+    for (let k = e.target.closest("[data-key]"); !f && k && paint.contains(k); k = k.parentElement && k.parentElement.closest("[data-key]")) {
+      const inside = [...k.querySelectorAll(sel)].filter(x => x.scrollHeight);
+      if (inside.length === 1) f = inside[0];
+      if (inside.length) break;
+    }
+    const key = f ? f.dataset.key : null;
+    if (key !== inHand) { inHand = key; settle(); }
+  }, true);
   addEventListener("resize", settle);
   // what floats moves when its own words grow: the faces arriving, a reply being typed (13 Oct)
   if (document.fonts) document.fonts.ready.then(settle);

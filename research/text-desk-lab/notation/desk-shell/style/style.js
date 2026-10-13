@@ -43,7 +43,7 @@ const Style = (() => {
       if (t.tracked) css["letter-spacing"] = "0.04em";
       return css;
     },
-    afloat: () => ({ height: "0", "min-height": "0", overflow: "visible" }),
+    afloat: () => ({ height: "0", "min-height": "0", overflow: "visible", transition: "transform 140ms ease-out", "will-change": "transform" }),
     shy: () => ({ opacity: "0", "--shy": "1" }),
     pulse: () => ({ animation: "r-pulse 2.5s ease-in-out infinite" }),
   };
