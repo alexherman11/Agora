@@ -1279,3 +1279,23 @@ if __name__ == "__main__":
             n += 1
             print("ok", name)
     print(f"{n} passed")
+
+
+def test_picture_is_a_text_drawn():
+    """13 Oct: `picture` marks a text as a drawing (SVG). It is painted as one, printed as its source, never edited as one."""
+    svg = "<svg viewBox='0 0 10 10'><rect width='5' height='5'/></svg>"
+    src = chr(10).join(["w : column", f'  fig : text "{svg}", picture', '  plain : text "`x`"'])
+    refused("x : column, picture", "prints no text")
+    refused('x : text "a", picture, on edit do rewrite $item text="$value"', "edited as its source")
+    import deskd, lens_ir
+    tmp = _scratch("_test_picture")
+    try:
+        with deskd.Session("_test_picture", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            fig, plain = scene.painter_view(sc)["kids"]
+            assert fig["paint"]["picture"] is True and fig["paint"]["text"] == svg and "runs" not in fig["paint"]
+            assert "picture" not in plain["paint"]
+            assert "picture" in scene.to_text(sc, "w", "jeff", 0)
+    finally:
+        tmp.unlink(missing_ok=True)

@@ -1,7 +1,7 @@
 """gate (6 Oct, Claude, for the Seabright app): the one address people outside this machine reach, in front of the door.
 
     python gate.py [port] --world seabright [--door http://127.0.0.1:8794] [--state DIR] [--lens square]
-                   [--host 127.0.0.1] [--secure] [--reserve alex,claude]
+                   [--host 127.0.0.1] [--secure] [--reserve alex,claude] [--strangers-have-full-rights-here]
     python gate.py invite --by alex [--uses 1] [--days 7] [--name <name>] [--state DIR]
 
 The door and deskd trust whoever reaches them: `as` is a word the caller supplies, and a request with no Origin is a
@@ -12,7 +12,13 @@ it stands in front of the door and is the only thing a reverse proxy points at.
     its maker, how many may use it, when it ends, and who came through it. `gate.py invite` prints its /join path.
   - /join?k=<code> asks for a name once and gives the device a key (a cookie). From then on the gate, not the page,
     says who is acting: it writes `session` and `as` into every request it passes on, whatever the page sent.
-  - A name is held by one device. Names in --reserve (and house, jeff) are never given out here.
+  - A name is held by one device. A name a person of the world bears or bore (read from the world at each join:
+    its persons, and whoever a surface names with actor= or person=) is never given out here, nor are house, jeff
+    and the names in --reserve. If the world cannot be asked, nobody joins.
+  - Whoever came through the gate is a human: the gate says so with each line (came=gate), and the person the desk
+    makes at their first act is kind=human (persons._mint_quietly), not a guess.
+  - It starts only in front of a copy (a world whose name ends in -try) unless it is started with
+    --strangers-have-full-rights-here, and says why (13 Oct, a4164): once inside, a stranger is a member.
   - It passes only what a painter needs (the page's files, scene, style, version, events, observe, do, the stream),
     one world, and refuses the door's own words (visit, home, write home, worktree) and /door/swap.
   - Codes and keys are kept only as SHA-256 hashes, in <state>/gate.json, never in the world.
@@ -35,6 +41,11 @@ from urllib.parse import parse_qs, quote, urlencode, urlparse
 HERE = Path(__file__).resolve().parent
 NAME = re.compile(r"[a-z][a-z0-9_-]{1,23}$")
 ALWAYS_RESERVED = {"house", "jeff", "everyone", "nobody", "all"}
+COPY = "-try"                         # the lab's word for a copy of a world: nobody lives in <world>-try
+DANGER = "--strangers-have-full-rights-here"
+WHY_NOT = ("gate: not started. {world} is not a copy (a copy's name ends in -try), so it is a world someone lives in. "
+           "Through the gate a stranger has a member's full rights, the whole snapshot and every event. "
+           "To start in front of it all the same, add " + DANGER)
 API_GET = {"/api/scene", "/api/style", "/api/version", "/api/events", "/api/snapshot"}
 API_POST = {"/api/do", "/api/observe"}
 DOOR_WORDS = ("visit", "home", "worktree", "write home")
@@ -102,8 +113,30 @@ class Gate:
             self.load()
             return self.open_invite(code)
 
+    def borne(self):
+        """The names the world's own people bear or bore, asked of the world now, or None if it did not answer."""
+        try:
+            c = http.client.HTTPConnection(*self.door, timeout=120)
+            c.request("GET", "/api/snapshot?" + urlencode({"session": self.world, "as": "house"}))
+            r = c.getresponse()
+            snap = json.loads(r.read())
+            c.close()
+            names = set()
+            for s in snap["subjects"].values():
+                if s.get("kind") == "person":
+                    names |= {str(n[0]) for n in (s.get("person") or {}).get("names") or []}
+                    names.add(str((s.get("props") or {}).get("name") or ""))
+            for n in snap["nodes"].values():
+                p = n.get("props") or {}
+                if n.get("type") == "surface":
+                    names |= set(str(p.get("actor") or "").split(",")) | set(str(p.get("person") or "").split(","))
+            return {n.strip().lower() for n in names}
+        except (OSError, ValueError, KeyError, AttributeError, TypeError):
+            return None
+
     def join(self, code, name):
         """-> (a device key, None) or (None, why not). The key is said once."""
+        borne = self.borne()
         with self.lock:
             self.load()
             inv, why = self.open_invite(code)
@@ -112,7 +145,9 @@ class Gate:
             name = (inv.get("name") or name or "").strip().lower()
             if not NAME.match(name):
                 return None, "A name here is 2 to 24 letters, digits, - or _, starting with a letter."
-            if name in self.reserved or any(d["name"] == name for d in self.devices.values()):
+            if borne is None:
+                return None, "This place can't be asked who is in it just now, so nobody can join. Try again in a minute."
+            if name in self.reserved or name in borne or any(d["name"] == name for d in self.devices.values()):
                 return None, f"Someone here is already called {name}. Pick another name."
             key = secrets.token_urlsafe(32)
             self.devices[digest(key)] = {"name": name, "via": digest(code)[:12], "by": inv["by"], "at": time.time()}
@@ -266,6 +301,7 @@ class Handler(BaseHTTPRequestHandler):
             if not GATE.may_speak(dev):
                 return self._json({"text": "", "error": "too many lines at once; wait a few seconds. Nothing was done."}, 429)
         a["session"], a["as"] = GATE.world, name
+        a["came"] = "gate"                # whoever is on this side of the gate is a human (persons._mint_quietly)
         self._pass("POST", u.path, json.dumps(a).encode("utf-8"))
 
     def _upstream(self, method, path, body, timeout):
@@ -338,6 +374,8 @@ def main():
     world = arg(a, "--world")
     if not world:
         sys.exit("gate.py [port] --world <the one world this gate opens>")
+    if not world.endswith(COPY) and DANGER not in a:
+        sys.exit(WHY_NOT.format(world=world))
     GATE = Gate(world, arg(a, "--door", "http://127.0.0.1:8794"), state, lens=arg(a, "--lens", "square"),
                 secure="--secure" in a, reserve=(arg(a, "--reserve", "") or "").split(","))
     srv = ThreadingHTTPServer((arg(a, "--host", "127.0.0.1"), port), Handler)

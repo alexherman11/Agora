@@ -5,7 +5,10 @@
 Starts a door (door.py --no-git) on a free port over a new empty world, and gate.py in front of it, each with its own
 state directory (removed after). No browser: it speaks HTTP as a phone's browser would.
   - without a key: pages and the API answer 401, and nothing reaches the desk;
-  - an invite is used once, ends, and names its maker; a reserved or taken name is refused;
+  - an invite is used once, ends, and names its maker; a reserved or taken name is refused, and so is a name any
+    person of the world bears or bore, with nobody listing it (a4164);
+  - the gate does not start in front of a world that is not a copy unless told so in words that name the danger;
+  - the person the desk makes for someone who came through the gate is kind=human;
   - with a key: a line is signed with the device's name whatever `as` and `session` the request claimed;
   - the door's own words and /door/swap are refused; a POST from another site is refused;
   - the stream passes world events through.
@@ -95,18 +98,43 @@ def main():
     try:
         check("the door answers", wait_for(door + "/api/health"))
         procs.append(subprocess.Popen([PY, str(HERE / "gate.py"), str(gport), "--world", WORLD, "--door", door,
-                                       "--state", gstate, "--reserve", "alex,claude"],
+                                       "--state", gstate, "--reserve", "warden"],
                                       cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         check("the gate answers", wait_for(gate + "/join"))
 
+        # a4164 (1): in front of a world that is not a copy the gate does not start, and says why; told so, it starts
+        lived = WORLD[:-len("-try")]
+        r = subprocess.run([PY, str(HERE / "gate.py"), str(free_port()), "--world", lived, "--door", door, "--state", gstate],
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        check("in front of a world that is not a copy the gate does not start, and says why",
+              r.returncode != 0 and "a stranger has a member's full rights, the whole snapshot and every event" in r.stderr
+              and "--strangers-have-full-rights-here" in r.stderr, (r.returncode, r.stdout, r.stderr))
+        lport = free_port()
+        procs.append(subprocess.Popen([PY, str(HERE / "gate.py"), str(lport), "--world", lived, "--door", door, "--state",
+                                       gstate, "--strangers-have-full-rights-here"],
+                                      cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        check("told in those words, it starts", wait_for(f"http://127.0.0.1:{lport}/join", 30))
+
         def desk(line, who="claude"):
             return json.loads(call(door + "/api/do", {"session": WORLD, "as": who, "line": line, "whole": True})[2])
+
+        def people():
+            subjects = json.loads(call(door + f"/api/snapshot?session={WORLD}&as=house")[2])["subjects"]
+            return {s["props"].get("name"): s["props"].get("kind") for s in subjects.values() if s.get("kind") == "person"}
 
         desk("look")
         made = desk('do create f01 kind=chat title="Square"')
         chat = made.get("created") or []
         check("a chat was made behind the gate", bool(chat), made)
         chat = chat[0] if chat else "a03"
+        # the world's own people: claude and alex have acted, pike is a person who has not, sable was renamed wren
+        desk("person begin")
+        desk(f"look {chat}", who="alex")
+        desk(f'do append {chat} line="here"', who="alex")
+        desk("person new pike kind=resident")
+        desk("person new sable kind=resident")
+        desk("person sable name=wren")
+        check("the world has its own people", {"claude", "alex", "pike", "wren"} <= set(people()), people())
         before = json.loads(call(door + f"/api/events?session={WORLD}&since=0")[2])["total"]
 
         st, _, text = call(gate + "/lens.html")
@@ -121,8 +149,12 @@ def main():
         code = invite(gstate, "--by", "alex")
         st, _, text = call(gate + "/join?k=" + code)
         check("an invite's page names its maker", st == 200 and "alex invited you" in text, (st, text[:300]))
-        st, _, text = call(gate + "/join", f"k={code}&name=alex", form=True)
-        check("a reserved name is refused", st == 200 and "already called alex" in text, (st, text[:300]))
+        st, _, text = call(gate + "/join", f"k={code}&name=warden", form=True)
+        check("a reserved name is refused", st == 200 and "already called warden" in text, (st, text[:300]))
+        for taken in ("alex", "claude", "pike", "wren", "sable"):       # a4164 (2): nobody listed these
+            st, _, text = call(gate + "/join", f"k={code}&name={taken}", form=True)
+            check(f"a name a person of the world bears or bore is refused, unlisted: {taken}",
+                  st == 200 and f"already called {taken}" in text, (st, text[:300]))
         st, _, text = call(gate + "/join", f"k={code}&name=x", form=True)
         check("a one-letter name is refused", st == 200 and "2 to 24" in text, (st, text[:300]))
         st, h, text = call(gate + "/join", f"k={code}&name=Maria", form=True)
@@ -148,7 +180,10 @@ def main():
         check("with a key a line is run", st == 200 and not r.get("error"), (st, text[:400]))
         ev = json.loads(call(door + f"/api/events?session={WORLD}&since={before}")[2])["events"]
         check("it is signed with the device's name, in the gate's world, whatever the request claimed",
-              len(ev) == 1 and ev[0].get("by") == "maria", ev)
+              [(e["verb"], e.get("by")) for e in ev] == [("person", "house"), ("edit", "maria")], ev)
+        # a4164 (3): the person the desk made for her at that act is a human, where a local program's is a guess
+        check("a person made for someone who came through the gate is kind=human",
+              people().get("maria") == "human" and people().get("claude") == "agent", people())
         seen = desk(f"read {chat}")
         check("the chat shows Maria's line", "Maria: hello" in (seen.get("text") or ""), seen)
 
@@ -168,7 +203,7 @@ def main():
                            {**me, "Origin": f"http://127.0.0.1:{gport}"})
         check("a POST from the gate's own page is run", st == 200 and not json.loads(text).get("error"), (st, text[:300]))
         total = json.loads(call(door + f"/api/events?session={WORLD}&since=0")[2])["total"]
-        check("the refused lines made no event", total == before + 2, (before, total))
+        check("the refused lines made no event", total == before + 3, (before, total))     # her person, and two lines
 
         st, _, text = call(gate + "/lens.html", None, me)
         check("with a key the painter's page is served", st == 200 and "<script" in text, (st, text[:200]))

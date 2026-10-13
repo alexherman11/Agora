@@ -114,7 +114,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
 GESTURES = ("click", "edit", "drag", "menu", "key")
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands to its lens (7 Oct: a document's keys)
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
@@ -774,6 +774,12 @@ def _w_marks(node, p, val, n, env):
     node["marks"] = True
 
 
+def _w_picture(node, p, val, n, env):
+    # 13 Oct (Alex: the design-review window needs diagrams): the words are a drawing, written as SVG, and the painter
+    # draws it. The text stays the drawing's source, so a reader of the print can read and write one as any other text.
+    node["picture"] = True
+
+
 def _w_peek(node, p, val, n, env):
     node["peek"] = True           # a1032 (Alex: 'see what they are working on at a glance'): shown while its parent is folded
 
@@ -1110,6 +1116,7 @@ WORDS = {
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
+    "picture": ("picture", _w_picture),
     "peek": ("peek", _w_peek),
     "carry": ("carry", _w_carry),
     "role": ("role <name> [when <selection | expr>]", _w_role),
@@ -1211,7 +1218,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1248,6 +1255,8 @@ def parse(src, roles=None, style=None):
         for wd in ("wrap", "lines", "hint"):
             if k[wd] is not None and k["text"] is None:
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
+        if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `picture` draws a text that is a drawing (SVG): this part " + ("prints no text" if k["text"] is None else "is edited, and a drawing is edited as its source, in a part without `picture`"))
         if k["layout"] == "grid" and not k["tracks"]:
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
@@ -1760,6 +1769,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append(f'hint "{n["hint"]}"')
         if n.get("peek"):
             bits.append("peek")
+        if n.get("picture"):
+            bits.append("picture")
         if n.get("plain"):
             bits.append("plain")
         elif n.get("text") and runs_of(n["text"], n.get("marks")):
@@ -1946,7 +1957,9 @@ def emit(node):
             paint["lines"] = node["lines"]
         if node.get("hint"):
             paint["hint"] = node["hint"]
-        if not node.get("plain") and node.get("text"):
+        if node.get("picture"):
+            paint["picture"] = True
+        if not node.get("plain") and not node.get("picture") and node.get("text"):
             rs = runs_of(node["text"], node.get("marks"))
             if node.get("marks"):
                 paint["marks"] = True

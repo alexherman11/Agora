@@ -36,7 +36,8 @@ const Style = (() => {
     width_em: v => ({ "max-width": v + "em" }),
     lift: (v, look) => ({ "box-shadow": `0 ${v}px ${v * 3}px rgba(${hexToRgb(look.lift_ink || "#000").join(",")},.10)` }),
     text: t => {
-      const css = { "font-family": t.family, "line-height": t.leading, "font-size": px(t.size) };
+      // no joined letters (13 Oct): a pixel face's "fi" drew as one glyph that read as an A ("Arst" for "first")
+      const css = { "font-family": t.family, "line-height": t.leading, "font-size": px(t.size), "font-variant-ligatures": "none" };
       if (t.weight) css["font-weight"] = t.weight;
       if (t.slant) css["font-style"] = "italic";
       if (t.tracked) css["letter-spacing"] = "0.04em";
@@ -64,7 +65,10 @@ const Style = (() => {
       if (!face || loaded.has(face) || typeof document === "undefined") return;
       loaded.add(face);
       const l = document.createElement("link");
-      l.rel = "stylesheet"; l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(face).replace(/%20/g, "+")}&display=swap`;
+      // 13 Oct: `medium` and `strong` are real weights of the face when it has them (asked for alone, a face came in one
+      // weight and the browser faked the rest); a face without them refuses the whole request, and is asked for plainly
+      const href = w => `https://fonts.googleapis.com/css2?family=${encodeURIComponent(face).replace(/%20/g, "+")}${w}&display=swap`;
+      l.rel = "stylesheet"; l.href = href(":wght@400;500;600"); l.onerror = () => { l.onerror = null; l.href = href(""); };
       document.head.appendChild(l);
     });
   }

@@ -580,12 +580,14 @@ class Handler(SimpleHTTPRequestHandler):
                 # a1581 (Sable c1579): a chat line keeps the press it came from, so the world itself refuses a second
                 # line from one Enter, whichever door brought it
                 desk.world.intent, desk.world._intent_k = gid, 0
+                # a4164: a line the gate passed on is a human's; their person, if this act makes it, is kind=human
+                desk.world.through_gate = sess.actor if body.get("came") == "gate" else None
                 try:
                     r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
                                                "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
                 finally:
                     desk._act_home = desk._act_binds = None
-                    desk.world.intent = None
+                    desk.world.intent = desk.world.through_gate = None
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
             created = [i for i in desk.world.nodes if i not in before]      # Wren: the ids a command made, machine-readably
