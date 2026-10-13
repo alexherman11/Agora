@@ -25,7 +25,8 @@ the resident knows comes from the world, and everything it does goes through it:
     knock event per line that named or reached someone (target and cause: the line's event), saying per name what
     happened (woken / in a turn, held for its end / asleep / not a member, not knocked / a person or an agent, not
     knocked), written once per line whatever house runs (record_knocks); `history <corner>` and `examine <line>`
-    show it, and the message that ends a rest begins `~ woken by <who>'s line <m id> (<event>) in "<chat>"`. A wake
+    show it, and the message that ends a rest begins `~ woken by <who>'s line <m id> (<event>) in "<chat>" · it is 13 Oct, 10:46`
+    (a4473: the time now, on the first line of every wake by a call; `~ <who> woke you (wake, eN) · it is ...` too). A wake
     the house starts with no one calling says `(the house started you; no one called)`. Otherwise it is woken when its
     timed rest ends, or, after an untimed rest, while an objective is open (a thing with prop:objective=open, after `breather` seconds) or when
     `wake_every` seconds pass. A plain line in a shared chat (Lounge talk) wakes no one: it goes with whatever reaches
@@ -100,6 +101,13 @@ ANOTHER = 76         # the exit code for "another house already runs this world"
 
 def now():
     return time.time()
+
+
+def it_is():
+    """a4473: the date and time now, as the end of a wake's first line: ' · it is 13 Oct, 10:46' (the day as look's
+    'It is 13 Oct, 10:46.' writes it; the house's own time, the clock the '~ 10:45 in chat' stamps are read from)."""
+    t = time.localtime()
+    return f" · it is {t.tm_mday} {time.strftime('%b, %H:%M', t)}"
 
 
 def limit_reset(detail):
@@ -734,15 +742,16 @@ class House:
         r.save()
         return urgent
 
-    def take(self, r):
+    def take(self, r, at=""):
         """-> everything in the resident's inbox, in order, and empties it: first() before the rest."""
-        lines = self.first(r) + (r.state.pop("inbox", None) or [])
+        lines = self.first(r, at) + (r.state.pop("inbox", None) or [])
         r.save()
         return lines
 
-    def first(self, r):
+    def first(self, r, at=""):
         """a1062: what is said first when a resident is reached, and empties it: who woke it (and why: the last line
-        the waker left that was held, if any), then what was kept for it while it rested, each with its chat and time."""
+        the waker left that was held, if any), then what was kept for it while it rested, each with its chat and time.
+        a4473: `at` (it_is()) goes on the first 'woke you' line, when no woken_by line came before to carry it."""
         calls = r.state.pop("calls", None) or []
         held = r.state.pop("for_you", None) or []
         head = []
@@ -750,7 +759,7 @@ class House:
             why = next((h for h in reversed(held) if h["by"] == c["by"]), None)
             if why is not None:
                 held.remove(why)
-            head.append(c["text"] + (", for the line they left you:\n  " + why["text"] if why else ""))
+            head.append(c["text"] + ("" if head else at) + (", for the line they left you:\n  " + why["text"] if why else ""))
         if held:
             head.append(f"for you while you rested ({len(held)}):\n" + "\n".join("  " + h["text"] for h in held))
         return head
@@ -774,9 +783,12 @@ class House:
     def woken_by(self, r, word="woken by"):
         """a3150 (Claude e5528 (2)): the first line of a wake a line caused, naming it by id, or []; and forgets it.
         '~ woken by juniper's line m12 (e5511) in "Lounge talk"'. At a wake that came for another reason (a timed
-        rest's end, a start) the lines that called it meanwhile are said as 'called by'."""
+        rest's end, a start) the lines that called it meanwhile are said as 'called by'.
+        a4473 (Alex, 13 Oct: 'all agents should know the time ... dont make it like annoying'): the line ends with the
+        time now, ' · it is 13 Oct, 10:46', since a wake by a call runs no look and its lines say only when each was
+        sent."""
         by = list(dict.fromkeys(r.state.pop("knocked_by", None) or []))
-        return [f"~ {word} " + "; ".join(by)] if by else []
+        return [f"~ {word} " + "; ".join(by) + it_is()] if by else []
 
     def record_knocks(self, w, corners):
         """a3150 (Sable c2705 on a1941): one knock event per line that named or reached someone, saying per name what
@@ -931,7 +943,8 @@ class House:
                 r.state["idle_wakes"] = 0
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
-                r.send("\n".join(self.woken_by(r) + self.take(r)))      # a3150: its first line names the line
+                head = self.woken_by(r)                    # a3150: its first line names the line, a4473: and the time
+                r.send("\n".join(head + self.take(r, "" if head else it_is())))
                 if props.get("call"):                      # delivered: clear it, so the next press is a change again
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
             elif not timers or (until and now() < until):  # resting for a while, or no timers: only a call reaches it
@@ -976,7 +989,8 @@ class House:
             # never make the next turn longer. A resident acts only through > lines run after its turn, so none ran
             self.news(self.load(), r, actor, resting=True)
             callers = {c["by"] for c in r.state.get("calls") or []}
-            first, heard = self.woken_by(r, "called by") + self.first(r), self.take(r)
+            head = self.woken_by(r, "called by")
+            first, heard = head + self.first(r, "" if head else it_is()), self.take(r)
             note =(f"(your last {unanswered} turn{'s' if unanswered != 1 else ''} did not finish: {why_not[:200]}. "
                     f"What I sent you is above in this conversation, unanswered, and none of its > lines ran. "
                     f"Answer the newest of it now; below is only what is new since.)")
@@ -989,7 +1003,8 @@ class House:
         # called it, from a resident) comes first, marked for it, before the wake's own look
         self.news(self.load(), r, actor, resting=True)
         callers = {c["by"] for c in r.state.get("calls") or []}
-        first = self.woken_by(r, "called by") + self.first(r)     # a3150: the line that called it, by id, comes first
+        head = self.woken_by(r, "called by")              # a3150: the line that called it, by id, comes first
+        first = head + self.first(r, "" if head else it_is())
         heard = self.take(r)
         news = "\n".join(([undelivered] if undelivered else []) + first + heard)
         if started and not first:
