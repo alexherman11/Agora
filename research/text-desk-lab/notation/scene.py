@@ -1848,6 +1848,49 @@ def to_text(scene, name, who, at, roots=None, part=None):
     return "\n".join(lines)
 
 
+WORDS_BUDGET = 120        # a4179: lines `scene <lens> words` prints before it says how to ask for the rest
+
+
+def to_words(scene, name, who, at, roots=None, part=None, start=1, whole=False):
+    """a4179: a scene's words as one text -> (text, the nodes it showed whole). Each text part's words on their own
+    lines, in the scene's order, whole (no 240-character cut), and nothing else: no keys, roles, reads or gestures.
+    An absent part says nothing, as it paints nothing. Over WORDS_BUDGET lines it prints that many from `start` and
+    says how to ask for the rest; `whole` prints all. A node is shown whole when every line under it printed, so a
+    text cut by its clamp, or lying outside the lines printed, has not been seen."""
+    lines, spans = [], []
+
+    def walk(n):
+        if n.get("absent"):
+            return
+        lo, ok = len(lines), True
+        if n.get("text") and n["text"].strip():
+            t = n["text"].split("\n")
+            keep = t[: n["clamp"]] if n["clamp"] and "n" not in n else t
+            lines.extend(keep)
+            if len(keep) < len(t):
+                lines.append(f"(… {len(t) - len(keep)} more line(s) of {n.get('item') or 'this part'} not shown: clamp {n['clamp']})")
+                ok = False
+        for k in n["kids"]:
+            walk(k)
+        spans.append((n, lo, len(lines), ok))
+
+    for r in ([scene] if roots is None else roots):
+        walk(r)
+    total = len(lines)
+    if start > max(total, 1):
+        raise LensRefusal(f"scene {name} words has {total} line(s); from={start} is past the end")
+    lo = start - 1
+    hi = total if whole else min(total, lo + WORDS_BUDGET)
+    head = (f"scene {name} words" + (f" · part {part}: {len(roots)} match" + ("es" if len(roots) != 1 else "") if roots is not None else "")
+            + f" · for {who} · world @{at} · {total} line" + ("" if total == 1 else "s"))
+    out = [head] + lines[lo:hi]
+    if lo or hi < total:
+        ask = f"scene {name}" + (f" {part}" if part else "") + " words"
+        out.append(f"(lines {lo + 1}-{hi} of {total}: " + (f"{ask} from={hi + 1} for the next, " if hi < total else "")
+                   + f"{ask} :3 for all. Only what is printed here counts as seen)")
+    return "\n".join(out), [n for n, a, b, ok in spans if ok and a >= lo and b <= hi]
+
+
 def find_lens(desk, name, at=None):
     """A lens by title, regardless of case, nearest first (verbs.nearest; 9 Oct, step 7): the room `at` (a placing
     lens's own, else where the line stands), the rooms around it, the house, then unplaced (a removed lens leaves its
@@ -1994,11 +2037,37 @@ def split_scene_arg(desk, arg):
     return name.strip(), rest
 
 
-def scene_for(desk, name, part=None):
+def split_words_arg(desk, arg):
+    """a4179: `scene <lens> [<part path>] words [:3 | from=<n>]` -> (the line without those words, {"start", "whole"}),
+    or (the line, None) when it does not ask for the words. A line that names a lens whole is that lens, so a lens
+    titled `two words` is still itself."""
+    toks = arg.split()
+    opts = {"start": 1, "whole": False}
+    k = len(toks)
+    while k and (toks[k - 1] in (":3", ":full") or toks[k - 1].startswith("from=")):
+        k -= 1
+    if k < 2 or toks[k - 1] != "words":
+        return arg, None
+    try:
+        find_lens(desk, arg.strip())
+        return arg, None
+    except LensRefusal:
+        pass
+    for t in toks[k:]:
+        if t.startswith("from="):
+            if not (t[5:].isdigit() and int(t[5:]) > 0):
+                raise LensRefusal("from=<n> wants the number of the first line to print, from 1")
+            opts["start"] = int(t[5:])
+        else:
+            opts["whole"] = True
+    return " ".join(toks[: k - 1]), opts
+
+
+def scene_for(desk, name, part=None, words=None):
     """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
     accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
     whose whole closure is current; a fallback frame is for reading. The old single-pass evaluator (build, _compile,
     scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds."""
     import lens_ir
-    return lens_ir.scene_for(desk, name, part)
+    return lens_ir.scene_for(desk, name, part, words)

@@ -673,9 +673,11 @@ def part_names(sc):
     return sorted(x for x in out if x)
 
 
-def scene_for(desk, name, part=None):
+def scene_for(desk, name, part=None, words=None):
     """-> (scene, text), as scene.scene_for, through the staged pipeline. With `part`, the text is only the parts that
-    path names (find_parts) and what is inside them; scene["printed"] lists those nodes."""
+    path names (find_parts) and what is inside them; scene["printed"] lists those nodes. With `words` (a4179:
+    {"start": n, "whole": bool}) the text is the scene's words alone (scene.to_words), and scene["said"] lists the
+    nodes it showed whole, each for itself."""
     s = S.find_lens(desk, name)
     closure = []
     acc = Accessor(desk)
@@ -699,8 +701,12 @@ def scene_for(desk, name, part=None):
         if not roots:
             raise S.LensRefusal(f"no part {part!r} in the scene of {s['title']}. Its parts: {' '.join(part_names(sc))}")
         sc["printed"] = roots
-    text = S.to_text(sc, s["title"], desk.world.me, at, roots=roots, part=part)
-    if not (s.get("props") or {}).get("style"):
+    if words is not None:
+        text, sc["said"] = S.to_words(sc, s["title"], desk.world.me, at, roots=roots, part=part,
+                                      start=words.get("start", 1), whole=words.get("whole", False))
+    else:
+        text = S.to_text(sc, s["title"], desk.world.me, at, roots=roots, part=part)
+    if words is None and not (s.get("props") or {}).get("style"):
         head, _, rest = text.partition("\n")
         text = head + " · " + style_note(desk, s) + ("\n" + rest if rest else "")
     if fallen:

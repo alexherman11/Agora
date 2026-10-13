@@ -883,6 +883,17 @@ class DeskKnife(DeskMoo):
         return "\n".join(out)
 
     # ---- export: the desk as the commands that rebuild it (round 11c) --------------------------------
+    def _scene_seen(self, n):
+        """Juniper (reads case): a lens print that showed a status has shown it; each scene node says what it printed."""
+        w = self.world
+        if n.get("item") in w.nodes and n.get("shown"):
+            self._mark_seen(n["item"], n["shown"])
+            if w.nodes[n["item"]].get("subject"):
+                self._mark_seen(w.nodes[n["item"]]["subject"], n["shown"])
+        for fid, asp in (n.get("fshown") or {}).items():
+            if fid in w.nodes or fid in w.subjects:
+                self._mark_seen(fid, asp)
+
     def cmd_export(self):
         """Emit desk commands that rebuild this desk from an empty one. Things are named by title, since ids
         are reassigned on replay. Says what it cannot carry (others' comments, resolved state, exact geometry)."""
@@ -1524,9 +1535,15 @@ class DeskKnife(DeskMoo):
             # the same tree the painter draws, printed: what is shown, where, and what each gesture would do
             import scene
             if not arg.strip():
-                raise Refusal("scene <lens name> [<part path> | ok | lines]. A lens is a note tagged lens; help scene")
+                raise Refusal("scene <lens name> [<part path> | ok | lines] [words]. A lens is a note tagged lens; help scene")
             try:
+                arg, words = scene.split_words_arg(self, arg)      # a4179: scene <lens> [<part path>] words [:3 | from=<n>]
                 name, rest = scene.split_scene_arg(self, arg)
+                if words is not None:
+                    sc, text = scene.scene_for(self, name, rest, words)
+                    for n in sc["said"]:                 # only a part whose words printed whole has been seen
+                        self._scene_seen(n)
+                    return text
                 if rest == "ok":
                     import lens_ir
                     return lens_ir.check(self, scene.find_lens(self, name), ages=True)[1]
@@ -1537,17 +1554,9 @@ class DeskKnife(DeskMoo):
                 sc, text = scene.scene_for(self, name, rest)
             except scene.LensRefusal as e:
                 raise Refusal(str(e))
-            w = self.world
 
             def walk(n):
-                # Juniper (reads case): a lens print that showed a status has shown it; each node says what it printed
-                if n.get("item") in w.nodes and n.get("shown"):
-                    self._mark_seen(n["item"], n["shown"])
-                    if w.nodes[n["item"]].get("subject"):
-                        self._mark_seen(w.nodes[n["item"]]["subject"], n["shown"])
-                for fid, asp in (n.get("fshown") or {}).items():
-                    if fid in w.nodes or fid in w.subjects:
-                        self._mark_seen(fid, asp)
+                self._scene_seen(n)
                 for k in n.get("kids") or []:
                     walk(k)
             for n in sc.get("printed") or [sc]:      # a1101: only what was printed has been seen
@@ -1628,7 +1637,7 @@ class DeskKnife(DeskMoo):
         "vars": "vars",
         "set": "set <name> = <id or title>",
         "rows": "rows [<source>]",
-        "scene": "scene <lens> [<part path>|ok|lines]",
+        "scene": "scene <lens> [<part path>|ok|lines] [words [:3|from=<n>]]",
         "clock": "clock [follow|now|<YYYY-MM-DD>]",
         "worktree": "worktree [fork|diff|merge] [<name>]",
         "use": "use <verb id> [<words>]",
