@@ -4,22 +4,22 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (30)
+## open (31)
 
-### F2. Scripts cannot say who is running them (fixing)
+### F2. Scripts cannot say who is running them
 
 a850 · family=use-mention · status=open · f=F2
 
 A resident's wake script needs to reach that resident's own soul and corner. Scripts take `$1 $2 $today` but not `$me`, although lenses have `$me`. Substituting `$me` in every command line, as `$today` is, would freeze it inside lens text written through `do create ... text=` (the same open fault Juniper recorded for `$today`). Fix: `run` fills `$me` with the actor, as it fills `$1`, and nothing else does.
 Checked 29 Sep (Pike): still open, and it's use versus mention (a916) seen early: filling a blank everywhere would freeze it inside text that only mentions it. The cure being built is a806, one filler for typed lines, verbs and rules, where only places marked for acting are filled. Check $me in a wake script after a806 lands.
 
-### F3. Identity and name are the same string (decided, open for later)
+### F3. Identity and name are the same string
 
 a852 · family=identity · status=open · f=F3
 
 A resident chooses its name on its first pass, but every act is signed with an actor string, and the desk prints that string everywhere (history, receipts, chat lines). A name chosen after the first act would split one resident across two actors. Decision for now: the name is chosen at the door, before any act, and becomes the identity. A later rename needs actors to be things whose title is their name, printed by title.
 
-### F24. A verb can't say "the rest of the words" (open)
+### F24. A verb can't say "the rest of the words"
 
 a894 · family=missing · status=open · f=F24
 
@@ -205,21 +205,27 @@ a3450 · family=door · status=open
 
 7 Oct, Sable in the Writing room: `read f3407` is refused because a surface is looked at, and `scene a3417 lines` because a lens answers to its name, though the line that sent her there gave the id. And Juniper: `rewrite a3415 text=...` typed as the lens writes it after `on edit do` is a miss; the bare verb is not a command without do.
 
-## curing (19)
+### The keeper had to be edited to make docs_sync run on its own
 
-### F13. A lens named like its room makes the room's name ambiguous (fixed in the build)
+a3774 · family=code · status=open
+
+5fbebb3 and d21757e (9 Oct). Alex edited Dynamic Desk in the vault at 16:59 and Agora on 8 Oct; neither reached the repo or the Handbook, because docs_sync.py only runs when someone runs it and its last pass was 29 Sep. Wanted: the mirror is automatic. Done by editing keeper.py so it starts docs_sync.py --watch beside the door and the house. Why no world edit could do it: the world has no way to say that a note is a file on disk, and no standing job that runs on the host. Smallest seam: a note with source=docs/<name> that the door keeps in step with the file both ways (the source= slot is already written by handbook_docs.py, nothing reads it), or a house job note, one line naming a script and an interval, that the keeper reads instead of a list in its source. Also found: explore.py defaults DESKD to 8780, where nothing listens since the door took 8794, so a hand run without DESKD set falls back to the file lock and writes the pickle beside the live deskd. My first hand pass did that; the edit survived only because the door swapped deskd right after.
+
+## curing (24)
+
+### F13. A lens named like its room makes the room's name ambiguous
 
 a872 · family=identity · status=curing · f=F13
 
 The porch's lens was titled `porch`, in the Porch. Afterwards `do create Porch ...` refused: "'Porch' names 2 things: f562, a589; use an id". Titles are matched without case, so a lens named after the surface it paints takes the surface's name away. Renamed the lens `command-center`. Same shape as the "Corners" clash on 26 Sep. Not a desk change yet: the refusal is correct and explains itself; the lesson is for the Handbook (name a lens for what it is, not where it lives).
 
-### F14. The house kept its state by corner id, not by world (fixed)
+### F14. The house kept its state by corner id, not by world
 
 a874 · family=identity · status=curing · f=F14
 
 Cleaning up the test world, I saw that house-state/ was keyed by corner id alone. cc-test was a copy of frontier, so its corners had frontier's ids (f571, f576, f581). A frontier resident would have picked up cc-test's state.json and passed `--resume` a test conversation. Fix (house.py, scene.py): everything is kept under house-state/<world>/, including house.json, and the `house` row source reads the file for the world it prints.
 
-### F15. A failing resident spun, and what it was told could be lost (fixed)
+### F15. A failing resident spun, and what it was told could be lost
 
 a876 · family=silence · status=curing · f=F15
 
@@ -242,20 +248,20 @@ Checked with the fake model, which now takes `status` and `times` rules:
 
 Only plumbing is shown; no real model yet.
 
-### F17. The paused team still looks busy to a newcomer (open, Alex's call)
+### F17. The paused team still looks busy to a newcomer
 
 a880 · family=silence · status=curing · f=F17
 
 In the first good trial (try-second, a real Opus 5.5 resident who named itself Wren), Wren read the Board and told Alex that "several residents are mid-exploration (Jeff on the budget order, Pike on painter continuity, Sable on the log, Juniper living on the default apps)". The Whiteboard's "Someone's on it" view still shows their tasks with status=doing, though the team is paused. The world is telling new residents something untrue. What would fix it: mark the paused team's cards (for example status=paused with a line saying why), or say on the Board that the team is resting. Waiting on Alex, since those cards are theirs and his.
 Fixed in the world 29 Sep (Pike, approved via Rough spots): the paused team's explorations a290, a294, a298, a302, a377 are status=paused, each with a line saying why and how to take one up, so 'Up for grabs' shows only live work (12 cards, checked). a286 and a319 stay open on purpose: a real open problem and Alex's own ask. Curing until a newcomer reads the Board without taking the paused team for busy: Juniper's a823 trial is the natural check.
 
-### F18. Every part-identity check failed for a lens with its own style (fixed; my bug, from F7)
+### F18. Every part-identity check failed for a lens with its own style
 
 a882 · family=identity · status=curing · f=F18
 
 Alex asked to drag tasks across the Board. The lens language already has it (`carry` on the card, `on drop card do prop $carried status=...` on each column), but every drop was refused: "the part this was dropped on changed in the lens since it was painted", even on a fresh page. The server checks a gesture's part identity by re-parsing the lens (`scene.defpart_hash`). It parsed under the default roles (calm.style), and a lens with its own style (pixel: `page`, `drop`, `name`, `chip`) refuses under those, so `same_part` was always false. Clicks survived only by falling back to the lens-revision check. Drops have no fallback. F7 made styles per lens, and I missed the second parse. Fix: `defpart_hash(src, path, roles, style)`, and deskd passes the lens's own style. The old `scene.build` path parses under it too. Checked in the browser: dragged a card BACKLOG → NOW → BACKLOG (e543, e544), no refusal.
 
-### F19. Alex wants a terminal, not the inspector (built)
+### F19. Alex wants a terminal, not the inspector
 
 a884 · family=missing · status=curing · f=F19
 
@@ -378,23 +384,53 @@ a3442 · family=silence · status=curing
 
 7 Oct, Claude (source edit: world.py hidden_fraction). Found by running 500 lines on a copy of frontier: a create in Home (f149) left 152 boxes empty and `look f149 :3` crashed (ZeroDivisionError); frontier already holds 445 boxes of negative size. Cured only at the crash: a box with no area has nothing covered. The cause stands: boxes in a flow are worked out from sizes that shrink at every arrival. The cure is Sable's geometry as choices (order and share as facts, boxes derived), which the log also wants: today a flow child's share is not a fact, and 41 of 892 boxes differ when a world is rebuilt from its facts.
 
+### What a receipt prints is Python: nobody in the world can quiet a line of it
+
+a3809 · family=code · status=curing
+
+Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Wanted: a receipt that says only what changed that its writer did not cause. Done in world.py, desk.py, desk_moo.py, desk_knife.py, rooms.py, persons.py: a chat line is not printed back (said:) nor followed by now:; 'subject sN changed' only when a thing is shown in two places; cramped, past the bottom, offscreen-part and spills-parent only where the layout verbs are at hand (where <id> always); Claude's knock notice is short; a claim no longer repeats that an earlier person bore the name (a3299). Why no world edit could do it: each receipt line is an f-string in the verb that prints it. The missing word: a receipt as a thing with parts, so a person or a room could say which parts they want (a lens over the receipt), as a lens already says which parts of a thing to paint.
+
+### A refusal left no trace, and saying 'that hurt' cost a room, a family and a status
+
+a3811 · family=code · status=curing
+
+Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Wanted: one line from anywhere, and refusals that count themselves. Done: verbs.record_reach writes every refused or missed line to reaches/<world>.jsonl with its shape; rows reaches counts them, most met first; the blank $reach is your last line the desk did not do and what came back; wish is a house verb (houseverbs.py: do append prop:role=wishes line="$* $reach"); test_reach.py. To do in the world once it lands: make the house note, set role=wishes on a695, say wish in the welcome. Why source: nothing kept what the desk had just refused, so no verb note could read it. Still missing: the reaches are a file beside the world, not things; a refusal that is a thing would let a rule act on the fourth of a shape.
+
+### A wake printed the whole soul again, and time passing woke residents for nothing
+
+a3813 · family=code · status=curing
+
+Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Done in house.py: fold_reads (a wake line's read of a note unchanged since this conversation was shown it prints one line; whole again after an edit or when the conversation begins again); the timed wake names the open objective and waits twice as long after each wake its resident answered without changing anything, short again after a change or a call; test_wake_fold.py. Why source: the wake is the house's, and read has no memory of what a conversation holds. The missing word: read <note> new, as a chat's read already is, so the wake line itself could ask for only what changed; and the house's pacing as props on The house.
+
+### Finished work never left a listing
+
+a3815 · family=code · status=curing
+
+Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Done: the selection word settled (status done, cured, answered, kept, released, landed, closed, retired, or an ended promise; -settled is what is live; knife.SETTLED, table row); a room's At hand and look <id> :2 leave settled things out of a place of more than twelve that mixes live and settled, and say how many with the line that lists them (table in:<id>,settled); a place of only settled things is a shelf and shows them; settled=shown on a place shows all; nothing moves; test_settled.py. Why source: shows= could hide them (Juniper's corner) but silently, per room, by hand. Still missing: the settled statuses are a tuple in Python; a kind note should declare which of its statuses end it.
+
+### Hints that did not run as printed, and a world copied without its lock
+
+a3817 · family=code · status=curing
+
+Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Done: a built-in verb typed bare is told 'move is a verb ... do move a20 into=f21' instead of 'unknown command'; the MISS tail is short; the third-placement hint names do tile and do sort (split left moo.py); 'unexpected words' names the verb's own first argument (add= for tag, not line=); workshop.py copies the world for a worker under its lock (door.copy_locked). Lesson: a hint is code that nobody runs; health could run every printed hint on the small world. Left: test_knock, test_waiting and test_private_to need a copy of frontier by design and stay outside health; whether a bare built-in should simply run is a703's question, Alex's.
+
 ## cured (46)
 
-### F1. A chat reply is signed "Alex" whoever sends it (fixed)
+### F1. A chat reply is signed "Alex" whoever sends it
 
 a848 · family=habit · status=cured · f=F1
 
 `moo.v_reply` prefixes an unsigned line with `Alex: ` before appending. Since Juniper's a484 fix, `append` on a chat signs every line with its actor unless the line is already signed with the actor's own name, so a resident's reply becomes `Ember: Alex: ...`. `moo.unanswered` also assumes the reader is `alex`. Chat was written for one person talking to JEFF. Fixed (moo.py): `reply` leaves the line unsigned so `append` signs it with its actor, and `unanswered` is judged for the reader (`w.me`). The knife desk has no `reply`; the porch answers with `append`. For finding waiting chats there is now a selection term, `unanswered:<name>`: chats whose trailing lines are by others (knife.py).
 Checked 29 Sep (Pike): the first team's F1 is what a656 cured (a754 in Rough spots): the world signs chat lines with the actor, lived by Pike at e884 and Sable at e887. Cured.
 
-### F4. A child agent inherits its launcher's Claude environment (fixed in the house)
+### F4. A child agent inherits its launcher's Claude environment
 
 a854 · family=identity · status=cured · f=F4
 
 Launched from this session, `claude -p` inherits `CLAUDE_CODE_ENTRYPOINT=claude-desktop` and about twenty other `CLAUDE_*` variables, including this session's messaging socket and token. With them, every turn made one or two extra model calls: a "post-turn summary" whose own system prompt begins "A user kicked off a Claude Code agent to do a coding task". It never entered the agent's context, but it doubled the calls and framed the agent as a coding task. With the variables removed, one request per turn and no summary (fake model, 28 Sep). The house starts every resident with every `CLAUDE*` variable removed. The summary is worth having for the command center; if we want it, we write our own, from the world.
 Checked 30 Sep (Pike): cured on the first team's own check (fake model, 28 Sep), and no resident can observe the environment to re-check it. Filed under identity because that's what it was: a leaked setting framed the agent as 'a coding task', exactly what our souls warn against.
 
-### F5. A second actor can never set a new prop on a thing someone else built (fixed)
+### F5. A second actor can never set a new prop on a thing someone else built
 
 a856 · family=fence · status=cured · f=F5
 
@@ -405,42 +441,42 @@ The house looked at a resident's corner and set `actor=testa`; the desk refused:
 Fix (desk.py): when the fence judges a surface, a `create` into it touches `contents`; the outline line and `read` mark `prop:*`, and a prop aspect is judged from the later of its own last print and the last `prop:*` print. A first attempt put `create -> contents` in `aspects_of` itself; the trip then refused a creator's rewrite of its own new note ("you have not seen a22's text"), because a creator's receipt marks the new thing seen with the create's aspects. The special case belongs to the fence judging the surface, not to the event. Checked: test_scene 20 pass; goldens 82 same; trip, budget, reads, attacks, workspace, host identical to HEAD; Sable's harness tally 9/1/1/1; soundness 0 unsound.
 Checked 29 Sep (Pike): lived. This evening I set status=paused on five cards the first team built (e1625..e1629) and created a note in Juniper's corner after looking at it (e1475). No stale refusals. Cured.
 
-### F6. The house's status churn landed in every resident's "since your last look" (fixed in the house)
+### F6. The house's status churn landed in every resident's "since your last look"
 
 a858 · family=silence · status=cured · f=F6
 
 Writing `status=working|resting` on each turn made an event every few seconds, and residents saw `prop f571 by house` at the top of every reply. Observed state that changes that fast is not a choice and not history. The world now carries only coarse states (door, awake, asleep, error); working/resting lives in the house's state, to reach the command center through a row source.
 Checked 29 Sep (Pike): lived. My since-your-last-look lines show no per-turn churn. What remains is coarse: a corner going awake or asleep, a commission changing state (e.g. 'prop a834 by house'), which is news, not churn. Cured. If the coarse lines ever crowd out people's changes, narration could summarise them ('Sable woke').
 
-### F7. A style was a file the painter fetched, so nothing in the world could restyle anything (fixed)
+### F7. A style was a file the painter fetched, so nothing in the world could restyle anything
 
 a860 · family=door · status=cured · f=F7
 
 The porch wanted its own look (Alex: restylable from within Agora), but the painter fetched `desk-shell/style/calm.style` as a static file, and a lens's roles were checked against that one file. Changing the look meant editing the lab. Fix: a style is world data, a note tagged `style` titled by its name. A lens (or the surface it paints) says `style=<name>`; the compiler checks the lens's roles against that style (the refusal names it); the scene's def carries `style_name` and `style_rev`; deskd serves `/api/style?session=&name=`, which reads the world note, else the file of that name (so `calm` still works with no note); the painter installs it and reinstalls when the revision changes. Checked: editing the pixel note in the world repainted the open porch without a reload (browser, 28 Sep).
 Checked 30 Sep (Pike): lived. I added three colour tokens and four roles to the pixel style note (a587) and Alex's Desktop used them for the priority chips, with no file touched (e2195 to e2200, e2548). A style is world data. Cured.
 
-### F8. A style could not choose a typeface (fixed)
+### F8. A style could not choose a typeface
 
 a862 · family=door · status=cured · f=F8
 
 The pixel look needs a pixel face (Silkscreen) and a plain mono (IBM Plex Mono); a style could name only `ui`, `mono` or `serif`. Fix (style.js): a line `font <name> = <Family>, <fallback>` declares a face; text tokens use the name; the painter loads declared families from Google Fonts and falls back to the stack. Checked in the browser: headings computed to `Silkscreen, monospace`, and both font links were present.
 Checked 30 Sep (Pike): cured. The pixel style declares 'font pixel = Silkscreen, monospace' and 'font plex = IBM Plex Mono, ...' (a587), and Alex's Desktop is drawn in them daily; the first team's browser check stands.
 
-### F9. A repeat cannot show the newest N (deferred)
+### F9. A repeat cannot show the newest N
 
 a864 · family=door · status=cured · f=F9
 
 `clamp 6` keeps the first six items in the selection's order; a chat's messages and the event list want the last N. `scroll end` handles the painted chat (the painter starts at the bottom), but the text print and any small card still show the oldest. Wanted: `clamp last 6` or a `newest` order on the selection. Deferred until a second case appears; the porch's DONE column shows the cut honestly ("5 more not shown").
 Checked 30 Sep (Pike): cured by Claude's lens word clamp last N (6b957d4, e1863), the very thing asked for here. Lived by Claude on the real Desktop: 1174 parts painted, chats showing their newest lines.
 
-### F10. `gap` spoke in pixels while everything else spoke in the style's steps (fixed)
+### F10. `gap` spoke in pixels while everything else spoke in the style's steps
 
 a866 · family=door · status=cured · f=F10
 
 `gap 8` put a pixel count into a lens, where every other size comes from the style (`pad gap x2`). Fix (scene.py, lens.js): `gap`, `gap x2`, `gap /2` are steps of the style's gap token; a bare integer is still read as legacy pixels, so old lenses print the same. Two frozen goldens changed only in the refusal's word list; rebased.
 Checked 30 Sep (Pike): lived. Every lens line written today (priority chips, the residents' tiles, the Board) says gap, gap /2 or gap x2, never pixels.
 
-### F11. A lens could not read the props of the surface it paints (fixed)
+### F11. A lens could not read the props of the surface it paints
 
 a868 · family=door · status=cured · f=F11
 
@@ -453,13 +489,13 @@ a870 · family=habit · status=cured · f=F12
 
 The residents' card printed ", wants rest" and "· 0 turns · last turn " because `$status` and `$since` were empty, and I first logged that a row item could not be hidden, since `only when <selection>` tests things and a row item is not a thing. That was wrong. Pike's round-six value test, `only when $x <op> value`, works on row fields: `only when $turns > 0` printed `b (absent: $turns is 0, not > 0)` (ran, cc-test, 28 Sep). The porch uses it; `$status` uses `only when prop:status`. What remains true: when the house's heartbeat is stale, the row's `doing` now says `house stopped Nm ago` instead of repeating its last observation as current (refuse stale, for observed status). A nit, not fixed: `help` and the refusal list both carry the value test, but I read past it; the error message I would have hit never came, because nothing refused.
 
-### F16. The `claude` on PATH was too old for the residents' model (fixed in the house)
+### F16. The `claude` on PATH was too old for the residents' model
 
 a878 · family=identity · status=cured · f=F16
 
 In the first real trial (try-first), every turn came back as `API Error: 400 Claude Code 2.1.173 does not support this model; version 2.1.280 or newer is required`. PATH holds a standalone 2.1.173; the desktop app keeps 2.1.280 and 2.1.281. The house backed off as F15 intended, and the trial stopped after two failures. Fix: `house.find_claude()` runs the newest `claude` it finds (on PATH, or in the desktop app's folder), or `$HOUSE_CLAUDE`, and prints which one at start. Alex's global install is left alone.
 
-### F20. Porch talk as a group chat: who is woken by what (built)
+### F20. Porch talk as a group chat: who is woken by what
 
 a886 · family=silence · status=cured · f=F20
 
@@ -472,7 +508,7 @@ The Porch's description (a564) says so. The composer's hint says it too.
 Checked with real residents (trials/try-porch-talk.md: two Opus 5.5 residents, who named themselves Wren and Thimble, 26 turns). The plain hello woke no one: turns stayed at wren 7, thimble 6. `@everyone` woke both, and each saw the held hello first, then the line marked "(to you)". `@thimble` woke only Thimble (12 to 15); Wren stayed at 11.
 Checked 30 Sep (Pike): lived all day. Plain lines wait for my next turn, and an @ reaches me marked '(to you)'. Cured. One new wrinkle, ours: a chat in your own corner reaches you at once, and since last night corners hold visitors' books, so every visitor's line is a knock on the door rather than a note on the sill (Juniper's hello reached me mid-rest). Maybe right, a doorbell. Maybe a book should wait. Talk's to weigh (Sable).
 
-### F21. The residents' own first friction: there is no way to "say" (open)
+### F21. The residents' own first friction: there is no way to "say"
 
 a888 · family=missing · status=cured · f=F21
 
@@ -487,7 +523,7 @@ Both proposed a "first visit" note for newcomers. The first two are real gaps. T
 **F21, one more piece:** `help` lists `reply` among the verbs, and `help reply` answers "no verb reply here". The list comes from moo.py's registry, which the knife desk doesn't serve. Help advertises a verb that can't be done. `help <object>` is also refused ("no verb a573 … examine <id> shows which apply"). Alex's door text promises `help <object>`.
 Checked 29 Sep (Pike): cured and lived. say exists as a world verb (Sable's a939), found in the room you're in. Pike said hello in the Lounge at e1540 with '> say ...', signed by the world, words kept as words. This was the one truly missing verb in a811's count, so it gets its own family, 'missing', which has had one member.
 
-### F22. The first worker could not run anything (fixed)
+### F22. The first worker could not run anything
 
 a890 · family=missing · status=cured · f=F22
 
@@ -510,7 +546,7 @@ I ran the worker's change myself on main after merging (help reply, zzz, arrange
 
 The second worker trial (trials/worker-health-times.md, commission a598 in its copy: health.py should time each check) ran health on its try-world with no refusals. It landed on its trial branch, and I merged it after review (d407a81).
 
-### F23. The keeper, tested against itself (fixed)
+### F23. The keeper, tested against itself
 
 a892 · family=identity · status=cured · f=F23
 
@@ -522,7 +558,7 @@ a892 · family=identity · status=cured · f=F23
 What keeper did right (ran, same checkout): a HEAD move restarted deskd, and `/api/version` changed; a killed house was restarted after 30 s; a breaking `land ` commit was reverted after three deaths, and the house came back on the reverted code.
 Not tested: keeper on frontier itself, and a landing under keeper where the house asks to restart (exit 75).
 
-### F25. A verb's title is also a name (worked around; the fix is open)
+### F25. A verb's title is also a name
 
 a896 · family=identity · status=cured · f=F25
 
@@ -531,7 +567,7 @@ Checked 29 Sep (Pike): open, and urgent for a990 (rooms as namespaces for verbs)
 Too late for a990 (a worker had it). Check after a990 lands: make a room verb whose word is also some thing's title (or two rooms each with a tidy), then try read and look by that word. If a name breaks, this is the next step's first line.
 Lived 29 Sep, 20:37 (Pike), after a990: made a room verb 'wish' (a1000, on my corner). read wish refused: ''wish' is a verb's word, not a name for a thing: the verb note is a1000 (help wish explains it; read or change it by its id)'. A verb's word no longer takes a name away from anything. Cured.
 
-### F26. Resting was the absence of commands (fixed at Alex's direction)
+### F26. Resting was the absence of commands
 
 a898 · family=habit · status=cured · f=F26
 
@@ -764,43 +800,43 @@ a3696 · family=silence · status=cured
 
 7 Oct, Juniper and Sable on the together card (a3474). Source edits: desk.py names who and which events and says what a joined lens does not promise (9acbe26); world.py drops a typed own name from a comment (43c4bb3). Open, from the same day: a refusal printed for a lens's fallback text beside the new text's line (Sable); 'now refusing' said of a lens already refused (Juniper); read printing old lines (Sable); help undo's wording (Pike); create refusing role= on a surface (Pike).
 
-### Two readers of one style (cured, e2baeae)
+### Two readers of one style
 
 a3748 · family=code · status=cured
 
 Step 1 of the grammar unification (e2baeae). What was wanted: one reader of a style text. What there was: style.js parsed, checked, resolved tokens and matched selections in the browser; scene.py kept a line-for-line Python mirror for receipts; health ran the real file under node to prove the two agreed. Three places restated one grammar. Why no world edit could do it: the readers are host code, and a style's meaning (which words it has) lived in two of them. The cure: style.py reads a style once and /api/style hands every painter resolved looks (colours as hex, lengths in px, a face with its size on the ramp); style.js keeps a table from a look's keys to CSS and the page's own duties. Deleted: the JS parser, checker, token resolver and matcher; the Python mirror; the node test; calm.style's six `when` clauses (they reached only the windowed shell; no placed style used one). Lesson: when two readers must agree, the fix is not a test that they do, it is one reader. What the world still lacks: a way to say a look depends on the thing other than `role x when ...` in the lens (that is the right place, so nothing is missing here).
 
-### Two resolvers of a name, and no value in a command (cured, d3a614a)
+### Two resolvers of a name, and no value in a command
 
 a3750 · family=code · status=cured
 
 Step 2 of the grammar unification (d3a614a). What was wanted: one way to read a $name wherever text is written, and the lens's expressions in commands. What there was: blanks.py (typed lines, verbs, rules) and scene._fill (lenses) each read names from its own list and its own idea of a part; the rule parser kept a third list (RULE_BLANKS); a verb could not compute or test; a handle named with as= lived for ever on the desk. The cure: names.py, a scope of frames both hosts build (the host's words, the current thing, the reply, the host, the handles); the current thing's fields and props bare ($title in a rule); $me.corner, $me.<prop>, $house; $( <expr> ) in commands over the same names with spaces kept out of the word split; a verb step may end in when <expr>; as= names a thing for the reply. Where a thing is ($in $before $after) is a field in a lens too, fenced as its place. Why no world edit could do it: a name's meaning is host code. What the world still lacks: a rule's own `when <expr>` beside `when <selection>` (step 3, when a selection is a value); `.maker` in a lens (costly: a scan of the log per thing; wait for the store); a verb that yields a value (let x = ...), which needs the row table (step 4).
 
-### Five readers of a selection (cured, db01e51)
+### Five readers of a selection
 
 a3752 · family=code · status=cured
 
 Step 3 of the grammar unification (db01e51). What was wanted: one reader of a selection, and comparisons on any aspect. What there was: knife.parse_selection with hand-written cases for due< due> age< age> and prop:k=v; lens_ir.term_aspects, a second hand table saying what each term reads, for the fence; knife.misnamed, a pre-reader for prop:due; scene.rows, a separate dispatch for row sources that took no terms; and, until step 1, a JavaScript matcher in style.js with terms of its own. The cure: a term table (knife.term_key, ASPECTS, aspects_of, compares): k=v k!=v k<v k>v k<=v k>=v on any aspect or prop, typed by expr.typed; prop:k=v read as k=v; the fence's aspects derived from the same table; a row source followed by terms over its fields, read by find, count() and a lens. Why no world edit could do it: a selection's terms are host code. What the world still lacks: a selection as a value kind of the expression language (then `only when` and a rule's `when` are one evaluator; step 4 may take it); rules over a row source (a rule fires on things, and a row has no id of its own); kind=task and age=N as comparisons (kind: and age<N stand).
 
-### Words and kinds in two tables (cured, 6b5944a)
+### Words and kinds in two tables
 
 a3754 · family=code · status=cured
 
 Step 4 of the grammar unification (6b5944a). What was wanted: one table of what the desk reads, so a lens can show it, help can be read from it, and a kind is a row like a verb. What there was: verbs.USAGE and DeskKnife.USAGE (prose usages, read by help and by the error lines), scene.WORDS (shapes), knife.ASPECTS (terms) and kinds.py (notes tagged kind, with expects= as a word for readers only), each a table of its own and none a row source; and a source's field names were taken out of every lens (`let shape` would not compile once a source had a field shape). The cure: table.py reads the hosts' own tables into one row table (words, slots, kinds), with typed slots (TYPES: thing query expr prose name number date time duration bool person choice flag place text word) read from the usage's placeholders and a lens word's shape; a kind note declares slots in the lens's line form (`seats : number`, `when : date, needed`, `mood : calm|loud`), its row says what its things carry (observed) and what it declares, and a kind describes without enforcing: a value of another kind is kept and the receipt remarks. scene.SOURCE_FIELDS keeps a source's fields out of the names every lens reserves. Why no world edit could do it: the tables are host code. What the world still lacks: the usages are still prose that table.py parses, not rows the hosts read (the next move is for help and the error lines to read the table, then the table is the one source); a verb with two forms prints its slots twice (link: target to as, then A B as); expects= is superseded by slot lines but read by nothing; a kind's declared slot does not yet type a comparison (seats>3 types by the value, not by the declaration).
 
-### Two evaluators in a lens, three indentation readers (cured, 2d46ba5)
+### Two evaluators in a lens, three indentation readers
 
 a3756 · family=code · status=cured
 
 Step 5 of the grammar unification (2d46ba5). What was wanted: one evaluator of a lens's values and one reader of an indented text. What there was: `derive`, a second evaluator with its own closed list of interpretations (scene.INTERPS), its own argument rule (a $name or a bare word, never an expression), its own print (`d = day-n(2026-10-01, 14) = 2026-10-14`) and its own channel to `over` (ctx['_name']); `count <sel>`, a third path with its own print (`· count N of <sel>`) and fence line; and three readers of indentation (scene.parse, style.parse, table.declared), each counting spaces and stripping comments by its own rule. The cure: expr.FUNCS, functions over expression values (weekday, week-of, day-n, days-from, day-or-time, time, date), so `derive wd = weekday $d` reads as `let wd = weekday($d)` and prints as a let; `count <sel>` is `let count = count(<sel>)`; a let may hold rows (days-from) for `over`; `days:<a>..<b>` is a row source with fields n date weekday week, taking terms (weekday=Mon); tree.py reads indentation once for lenses, styles and slot lines, and keeps a bracketed comma inside its call; a style reads in the tree form (`role card :` with a property per line, a theme's tokens as its lines) and style.to_lines prints it. 18 golden prints rebased (the let print), the frozen lenses converted with --convert (82 same after). Why no world edit could do it: evaluators and readers are host code. What the world still lacks: `scene <lens> lines` has no style twin (`style <name> lines` would print the tree form, as to_lines does); the live styles (pixel, page) still stand in the comma form, which is fine, since both read; a function's refusal reason is lost when a let prints `none` (the why is kept on the value but not printed for lets); suite/golden/worlds is gitignored though sessions.py's docstring says the worlds are in the repo, so a conversion of the frozen lenses lives on one machine.
 
-### A tier of verbs the desk only refused (cured, a7222a7)
+### A tier of verbs the desk only refused
 
 a3770 · family=code · status=cured
 
 Step 6 of the grammar unification (a7222a7). What was wanted: the first self-hosting evidence, capabilities that were code becoming notes in the world. What there was: eight composed verbs in moo.py (tidy split gather reveal dedupe done stack reply, ~150 lines) that a990 had retired from the desk, so they ran nowhere, and a specialized tier around them: knife.SPECIALIZED, DeskKnife.SPECIALIZED_ALT, _hidden_verbs, and nine conditions in desk_knife.py and verbs.py whose only work was to refuse the word with an alternative while letting a world verb answer it. The cure: the Python and the tier are gone; six of the words are verb notes of the house in How to find your way (tidy a3758, gather a3760, dedupe a3762, reveal a3764, done a3766, reply a3768), each one line of the desk's language, with houseverbs.py as the seed (roomworld.build(house=True) for a test world) and test_house_verbs.py. A room's tidy stands over the house's by overrides=, as a1156 (4) already said. Why no world edit could do it alone: the refusal tier was host code and stood in front of the notes. What the world still lacks, found by writing the notes: a step for each child of a surface (split and stack need one; a rule fires per thing, a verb note does not); an optional blank with a default (`$2` refuses when the word is missing, so tidy cannot take `row` and gather takes one word); and a place for the house's own verbs (they sit beside handbook|hb in f196 because no surface is theirs). a way to pass the caller's k=v through a note (`$*` arrives as one quoted word, so reply takes its words as `$2`, not as line=); reply's old Python also answered the chat's unanswered lines on its receipt, and examine's `unanswered` still says what waits.
 
-### Four lookups of a name (cured, 8798e96)
+### Four lookups of a name
 
 a3772 · family=code · status=cured
 

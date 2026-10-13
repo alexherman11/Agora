@@ -758,12 +758,11 @@ Ran: eight focused adapter/notifier tests passed, Ruff passed, and repository py
 
 - **`export_docs.py [session] [--force] [--dry]`** writes this document from the binder *How the desk is built* to `docs/` and to Alex's vault, each with a stamp. The first note is the title and introduction; each later note is a section. A copy edited outside the desk is left alone, with a warning. For `frontier` it also writes `research/object-facet-frontier/desk-export.txt`. Every run also writes `research/command-center/FRICTION.md` through `friction.py`.
 - **`friction.py`** (a778) keeps Rough spots (f747) and `FRICTION.md` one list. `export <session> [--dry]` writes the file from the world: every placed note with a `family=` prop, grouped by status (open, curing, unchecked, cured, then any other), each with its appearance ids and `f=` if it has one. The file's first line says it is generated and one way. It carries no stamp; every export overwrites it whole when it differs, so a hand edit is gone at the next export. `lines [source.md]` prints a `look f747` and one `do create f747 ... f=F<n> status=unchecked family=unsorted` per `## F<n>.` entry, quoted as `export` quotes text; `check <session> [source.md]` compares each placed note with `f=F<n>` against its entry, title and text, and prints `N entries; N identical in the world; K faults`. The source defaults to the frozen hand-written log, `research/archive/FRICTION-by-hand-to-29-Sep.md` (F1 to F32).
-- **`handbook_docs.py [world]`** copies `docs/Agora.md` and `docs/Dynamic Desk.md` verbatim into the Handbook binder *What we're building*, rewriting only on a change.
-- **`docs_sync.py [--watch [s]] [--no-handbook]`** keeps the five design documents the same in `docs/` and the vault, ignoring line endings.
+- **`handbook_docs.py [world]`** copies `docs/Agora.md`, `docs/Dynamic Desk.md` and `AGENTS.md` verbatim into the Handbook binder *What we're building* as the notes Agora, Dynamic Desk and AGENTS.md. Each note says how old it is in two props: `carried=` is when its text was last written there, `revision=` is the commit that last changed the file and that commit's date (`0195f44 of 13 Oct 2026`), or `edited <date> after <commit>, uncommitted` when the file on disk is newer than git. A note is rewritten only when its text is not exactly the file's, and its `revision=` reset only when that moved, so a run with nothing changed makes no event. It exits 1 if a note could not be written.
+- **`docs_sync.py [--watch [s]] [--no-handbook]`** keeps the five design documents the same in `docs/` and the vault, ignoring line endings. For frontier the keeper runs it with `--watch` as a third child and starts it again if it dies (5fbebb3), so nobody has to run a pass. The watch ends within 2 s of the keeper ending (`--with <pid>`) and holds `house-state/docs_sync.lock`, so there is never a second (d21757e).
   - An edit on either side is copied to the other.
   - When both sides moved, it refuses and shows the first difference.
-  - A change to Agora or Dynamic Desk runs `handbook_docs.py`.
-  - Nothing starts it automatically yet.
+  - Each pass compares the three files `handbook_docs.py` carries, and the checkout's HEAD, with what it last carried (`handbook` in `house-state/docs_sync.json`) and runs `handbook_docs.py` when either moved, however the edit arrived. If that fails it asks again every pass until it succeeds. So the Handbook's copies follow the files within one pass (60 s) while the keeper runs.
 - **`desk_mcp.py`** is the desk as an MCP tool over stdio: one tool, `desk {line, as, session, window}`. It validates actor and session names, refuses `!` lines, and runs `explore.py` once per call.
 
 ## Code map
@@ -984,4 +983,4 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 - [[Dynamic Desk]]: the current design and its open questions.
 - [[Previous Work]]: earlier architectures and what they taught.
 
-<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e7127. Edit it there; a direct edit here makes the next export stop and warn. sha1:1945a950af02 -->
+<!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e7519. Edit it there; a direct edit here makes the next export stop and warn. sha1:8e3f86c98179 -->
