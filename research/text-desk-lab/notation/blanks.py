@@ -20,6 +20,9 @@ world verbs, scripts and rules all fill their blanks here, the same way:
     a part of the thing a blank names (a1027): .title its title, .maker who made it, .<prop> one of its props
                    ($item.asked_by, $1.status); .text its words, .in what holds it, .before and .after its neighbours
                    there (7 Oct); a part it doesn't have refuses, naming the thing
+    a part of a part (a3937): each part is read off the one before, $1.before.text the words of the thing before
+                   $1, $here.talk.title, $new.in.title; .title .text .maker are words, so a part after one refuses
+    ${ ... }       braces say where a blank ends, so what follows is words: ${1.title}.md, ${today}th
     $( <expr> )    a value computed where it stands (8 Oct): the lens's expressions (expr.py), over the same names,
                    with count(<selection>) and sum/min/max($field of <selection>); a value that cannot be computed
                    refuses with the reason, never fills as none
@@ -44,8 +47,14 @@ import names
 from world import Refusal
 
 LIT = ""          # a \$ in the line, kept out of shlex's way until it lands in a value as a plain $
-BLANK = re.compile(re.escape(LIT) + r"|\$(\*|\d+|[A-Za-z_][A-Za-z0-9_]*)((?:\.[A-Za-z_][A-Za-z0-9_-]*)?)")
-WORD = re.compile(r"^\$(\d+|[A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_-]*)?$")
+# a3937: a blank is its name and every part after it ($1.before.text), read as one word: a pattern that stopped at the
+# first part filled $1.before and left '.text' behind as plain words, under an ok
+# Braces say where a blank ends, so what follows is words: ${1.title}.md, ${today}th. Groups: name, attr
+BLANK = re.compile(re.escape(LIT) + r"|\$(?P<b>\{)?(?P<name>\*|\d+|[A-Za-z_][A-Za-z0-9_]*)"
+                   r"(?P<attr>(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)(?(b)\})")
+WORD = re.compile(r"^\$(?P<b>\{)?(?P<name>\d+|[A-Za-z_][A-Za-z0-9_]*)(?P<attr>(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)(?(b)\})$")
+PARTS = re.compile(r"\.[A-Za-z_][A-Za-z0-9_-]*")
+WORDS = {".title": "a title", ".text": "a text", ".maker": "a maker's name"}     # parts that are words, not things
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
@@ -188,19 +197,32 @@ def scope_of(desk, ctx):
 
 
 def _one(desk, ctx, name, attr):
-    """The value of one blank, or a Refusal. attr is '' or '.<word>'."""
-    what = "$" + name + attr
+    """The value of one blank, or a Refusal. attr is '' or its parts as written: '.<word>', '.<word>.<word>' ...
+    Each part is read off the value of the one before it (a3937), so $1.before.text is the text of the thing before
+    $1; a part that can't be read refuses naming the blank as far as it got, and nothing is filled."""
     f = scope_of(desk, ctx).frame_for(name)
     if f is None:
         raise Refusal(f"${name} is no blank here. Blanks: {KNOWN}. A literal dollar sign is written \\$")
-    if attr:
-        v = f.part(name, attr)
-        if v is not None:
-            return v
-    val = f.get(name)
-    if not attr:
+    parts = PARTS.findall(attr)
+    if not parts:
+        val = f.get(name)
         return str(val) if name == "me" else val
-    return _part(desk, val, attr, what)
+    val = f.part(name, parts[0])
+    if val is None:
+        val = _part(desk, f.get(name), parts[0], "$" + name + parts[0])
+    seen = "$" + name + parts[0]
+    for was, p in zip(parts, parts[1:]):
+        # the way out, printed with every refusal past the first part: braces end the blank, the rest is words
+        out = f"If {attr[len(seen) - len(name) - 1:]} is words and not a part, end the blank with braces: ${{{seen[1:]}}}{attr[len(seen) - len(name) - 1:]}"
+        if was in WORDS:
+            raise Refusal(f"${name}{attr}: {seen} is words ({WORDS[was]}), not a thing, so it has no {p[1:]} (a part after "
+                          f"a part reads a thing: $1.before.text, $here.talk.title). {out}")
+        try:
+            val = _part(desk, val, p, seen + p)
+        except Refusal as e:
+            raise Refusal(f"{e}. {out}")
+        seen += p
+    return val
 
 
 def _part(desk, val, attr, what):
@@ -249,7 +271,7 @@ def expr_env(desk, ctx):
         if not m:
             return None
         try:
-            return str(_one(desk, ctx, m.group(1), m.group(2) or ""))
+            return str(_one(desk, ctx, m.group("name"), m.group("attr") or ""))
         except Refusal:
             return None
 
@@ -305,7 +327,7 @@ def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
     def one(m):
         if m.group(0) == LIT:
             return "\\$" if soft else "$"
-        name, attr = m.group(1), m.group(2) or ""
+        name, attr = m.group("name"), m.group("attr") or ""
         if name == "*":
             if ctx.args is None:
                 return m.group(0)               # typed: $* is two characters
@@ -371,7 +393,7 @@ def kept(desk, verb, key, value):
     if ctx_of(desk).template or _kind(verb, key) != "prop" or whole_blank(value):
         return []
     return [m.group(0) for m in BLANK.finditer(str(value))
-            if m.group(1) and m.group(1) != "*" and not m.group(1).isdigit()]
+            if m.group("name") and m.group("name") != "*" and not m.group("name").isdigit()]
 
 
 def kept_note(words):

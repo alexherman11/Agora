@@ -872,7 +872,7 @@ def run(desk, s, words, me, this=None, rest=None):
     if not body:
         raise Refusal(f"the verb {w.appearances_of(s['id'])[0]} has no steps yet (its text holds no command lines)")
     name = _names(s["title"])[0]
-    need = sorted({int(m) for m in re.findall(r"\$(\d+)", body)})
+    need = sorted({int(m) for m in re.findall(r"\$\{?(\d+)", body)})
     if need and need[-1] > len(words):
         raise Refusal(f"{name} needs {need[-1]} word(s) after it; got {len(words)}. help {name}")
     ctx = blanks.Ctx("verb", args=[blanks.word(desk, x) for x in words], me=me, this=this, name=name,
