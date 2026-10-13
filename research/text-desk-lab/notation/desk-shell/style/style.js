@@ -36,7 +36,8 @@ const Style = (() => {
     width_em: v => ({ "max-width": v + "em" }),
     lift: (v, look) => ({ "box-shadow": `0 ${v}px ${v * 3}px rgba(${hexToRgb(look.lift_ink || "#000").join(",")},.10)` }),
     text: t => {
-      const css = { "font-family": t.family, "line-height": t.leading, "font-size": px(t.size) };
+      // no joined letters (13 Oct): a pixel face's "fi" drew as one glyph that read as an A ("Arst" for "first")
+      const css = { "font-family": t.family, "line-height": t.leading, "font-size": px(t.size), "font-variant-ligatures": "none" };
       if (t.weight) css["font-weight"] = t.weight;
       if (t.slant) css["font-style"] = "italic";
       if (t.tracked) css["letter-spacing"] = "0.04em";
