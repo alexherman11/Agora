@@ -64,7 +64,10 @@ const Style = (() => {
       if (!face || loaded.has(face) || typeof document === "undefined") return;
       loaded.add(face);
       const l = document.createElement("link");
-      l.rel = "stylesheet"; l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(face).replace(/%20/g, "+")}&display=swap`;
+      // 13 Oct: `medium` and `strong` are real weights of the face when it has them (asked for alone, a face came in one
+      // weight and the browser faked the rest); a face without them refuses the whole request, and is asked for plainly
+      const href = w => `https://fonts.googleapis.com/css2?family=${encodeURIComponent(face).replace(/%20/g, "+")}${w}&display=swap`;
+      l.rel = "stylesheet"; l.href = href(":wght@400;500;600"); l.onerror = () => { l.onerror = null; l.href = href(""); };
       document.head.appendChild(l);
     });
   }

@@ -76,7 +76,8 @@
     if (role) el.className = Style.roleClass(role);
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
-    if (p.text != null) {
+    if (p.text != null && p.picture) picture(el, p.text);
+    else if (p.text != null) {
       const words = V.words(n.key, p.text, n.fence);
       if (p.runs && words === p.text) runs(el, p.runs); else el.textContent = words;
       V.mark(el, n.key);
@@ -377,6 +378,24 @@
   });
 
   // runs inside one text leaf: plain words as text, a code run in its role (a block run keeps its lines, verbatim)
+  // `picture` (13 Oct): the part's text is a drawing written as SVG. Only shapes and words are drawn: an element or
+  // attribute outside these lists is dropped (no script, no foreignObject, no link, no handler, no address), so a
+  // drawing from the world can do nothing but be seen. Its colours may be the style's tokens: fill="var(--t-accent)".
+  const PIC = { els: new Set("svg g path rect circle ellipse line polyline polygon text tspan title desc defs marker lineargradient radialgradient stop clippath".split(" ")),
+    no: /^(on|href$|xlink:|src$|style$)/i };
+  function picture(el, src) {
+    el.classList.add("t-picture");
+    const doc = new DOMParser().parseFromString(src, "image/svg+xml"), root = doc.documentElement;
+    if (!root || root.nodeName.toLowerCase() !== "svg" || doc.querySelector("parsererror")) { el.textContent = "this picture's text is not a drawing (SVG) the painter can read"; el.classList.add(Style.roleClass("cut")); return; }
+    const clean = e => {
+      for (const k of [...e.children]) { if (PIC.els.has(k.nodeName.toLowerCase())) clean(k); else k.remove(); }
+      for (const a of [...e.attributes]) if (PIC.no.test(a.name) || /url\(\s*[^#]|javascript:/i.test(a.value)) e.removeAttribute(a.name);
+    };
+    clean(root);
+    const t = root.querySelector(":scope > title, :scope > desc");
+    root.setAttribute("role", "img"); if (t) root.setAttribute("aria-label", t.textContent.trim());
+    el.replaceChildren(document.importNode(root, true));
+  }
   function runs(el, rs) {
     el._runs = rs;
     el.replaceChildren(...rs.map(r => {
