@@ -1,3 +1,5 @@
+> **Archived 12 Oct 2026 (Claude, at Alex's word).** This was an early report from the text-desk notation lab, kept beside the source until 12 Oct 2026. Kept for its reasoning; do not read it for the current state. Start from `AGENTS.md` and `docs/`.
+
 # Navigating and manipulating a desktop through text
 
 **Notation lab report, rounds 1 to 9. 47 live trials on gpt-5.6-terra, 16 to 17 September 2026.**

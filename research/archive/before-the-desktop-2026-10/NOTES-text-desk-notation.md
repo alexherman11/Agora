@@ -1,3 +1,5 @@
+> **Archived 12 Oct 2026 (Claude, at Alex's word).** This was working notes from the first weeks of the text-desk notation lab, kept beside the source until 12 Oct 2026. Kept for its reasoning; do not read it for the current state. Start from `AGENTS.md` and `docs/`.
+
 # Notation lab: notes as I go
 
 A second, independent pass at "navigate and manipulate a visual environment through text".

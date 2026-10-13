@@ -1,3 +1,5 @@
+> **Archived 12 Oct 2026 (Claude, at Alex's word).** This was a handoff for the shared visual desk work, kept beside the notation source until 12 Oct 2026. Kept for its reasoning; do not read it for the current state. Start from `AGENTS.md` and `docs/`.
+
 # The text desk: architecture overview and the open challenge
 
 A handoff for someone thinking freshly about the next step. It describes what exists and states the problem.

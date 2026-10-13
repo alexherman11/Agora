@@ -4,9 +4,24 @@ Agora is a personal computing environment shared by one person, Alex, and a pers
 
 Right now Agora is a **text desk**: a world of things, surfaces and lenses that people and agents enter and change through a small text language. It lives in `research/text-desk-lab/notation/`. The desk is both the prototype we are building and the place the team lives and works.
 
+**Where it is going (Alex, 12 Oct 2026): the desk is slowly migrating into Alex's actual Windows desktop.** Agora-native apps appear as real windows, a window manager arranges them, and one supervisor holds a shared object space that native apps speak through and other programs publish into. Agents will increasingly act on the PC itself, not only inside the desk.
+
+## Who is reading this
+
+*Draft by Claude, 12 Oct 2026, from Alex's ask to say the kinds of agent apart; his to confirm or rewrite.*
+
+Two kinds of agent work here, and everything else in this file applies to both.
+
+- **Residents** live inside the desk and have only the desk. They hold identity and explore ideas. They do not write code: they manage implementation, testing and research through the natural language interface (today a commission; the Workbench when it exists).
+- **Builders** write code and can act on the PC: the Claude Code sessions that work with Alex, and the coding workers the desk starts. Both work the same way, in the repository and under the practical rules below, usually on behalf of a story that a resident or Alex holds. A helper a builder starts for one piece of work reports back to it and holds nothing afterwards.
+
 ## How we work
 
 **Alex directs the project.** He checks the work, steers the direction, and decides what enters the design documents.
+
+**Alex is the gate for new designs.** A new design or a big idea comes to him first, as an interactive and visual explanation he can question and revise with you. Once he understands and approves it, you build it under your own authority. Everything else is pre-approved: code, testing, exploration, ideation, changing the desk, fixing friction, work under existing Dynamic Desk and Agora ideas, editing documentation.
+
+**Epics, stories, tasks.** The Board holds all three. Agents take and manage stories and epics, and may manage tasks too. In general the agents who hold them do not code: they use the natural language interface to manage implementation, testing and research. Their job is to hold identity and explore ideas, not to think about code.
 
 You are here to help build the larger vision, and that means more than finishing a task:
 
@@ -41,13 +56,15 @@ You are here to help build the larger vision, and that means more than finishing
   - Every note basename stays unique, so `[[links]]` resolve.
   - Design content is never deleted: supersede it with a banner, or move it to `research/archive/`.
   - Never rewrite Alex's own words without his direction; mark your drafts so he can tell them apart.
-- **Research** lives in `research/<lab>/`
+- **Research** lives in `research/<lab>/`. `research/window-lab/` holds the Windows host work; *Current Implementation* describes the desk only until that work is written into it.
 - **The archive** is `research/archive/`. `C:/Projects/Agora` is a data and archive location (Alex's vault, world data, frozen transports); never commit there.
 
 ## Practical rules
 
 - **Git.** Work by hand happens in one checkout, `C:/Projects/Agora4`, on `main`. Workers get their own git worktree from the house and land through it; don't make worktrees or clones yourself, and if a tool offers a worktree mode, choose local. A `research/<lab>-<topic>` branch is the exception, only when an experiment changes `src/` in a way that may not survive: keep one at a time, merge it back with `--no-ff`, then delete it. Alex commits lab rounds and says when to push.
-- **Ask Alex first** before anything irreversible or costly: live model trials, deleting things, external effects, and any change to a design document's status. Everything else, just do and report on the board.
+- **Ask Alex first** before anything irreversible or costly: live model trials, deleting things, external effects, any change to a design document's status, and anything that changes his PC outside this repository that he can't easily undo. New designs go through the gate above. Everything else, just do and report on the board.
+- **Source and world.** Someone else's change must never need an edit to Alex's source. Behaviour belongs in the world (lenses, styles, verbs, rules, kinds). What needs source goes through the repository, reviewed, never live. Log each source edit as a Rough spots note naming the world-level word that was missing.
+- **Acting on the PC.** Say what will appear on Alex's screen before it appears, but don't wait on his approval to test. Give everything an off switch, and stay off kernel drivers, code injection and anything that can stop his other programs or games from running.
 - **Credentials** are never committed. Alex writes `.env` files himself; never paste or write keys into any file.
 - **Tools.** Use the pinned interpreter `C:/Projects/Agora4/.venv/Scripts/python.exe`. Bash heredocs eat backslashes, so use an editor for any source line with escapes.
 

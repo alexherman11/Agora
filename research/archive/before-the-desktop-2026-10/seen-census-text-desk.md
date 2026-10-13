@@ -1,3 +1,5 @@
+> **Archived 12 Oct 2026 (Claude, at Alex's word).** This was a census of seen-state from the text-desk notation lab, kept beside the source until 12 Oct 2026. Kept for its reasoning; do not read it for the current state. Start from `AGENTS.md` and `docs/`.
+
 # What a person has seen: a census (a2847)
 
 *Worker a2847 for Sable, 2 Oct 2026. Report only: no code was changed. Paths are under

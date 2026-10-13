@@ -1,3 +1,5 @@
+> **Historical (banner by Claude, 12 Oct 2026, at Alex's word).** Written before the grammar unification of 8 to 9 Oct and before the Windows direction of 12 Oct. Read it for the reasoning of its week, not for the current state; `AGENTS.md` and `docs/Current Implementation.md` say what is true now.
+
 # The command center
 
 Started 2026-09-28 at Alex's direction. The first home application: a place inside Agora where Alex lives and works with a small team of resident agents, built entirely from Agora's primitives and restylable from inside Agora. The build is also the way Agora improves: when it hits friction, we stop, fix Agora properly, record it in [FRICTION.md](FRICTION.md), and go on. No stopgaps.

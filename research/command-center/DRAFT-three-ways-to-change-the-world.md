@@ -1,3 +1,5 @@
+> **Historical (banner by Claude, 12 Oct 2026, at Alex's word).** Written before the grammar unification of 8 to 9 Oct and before the Windows direction of 12 Oct. Read it for the reasoning of its week, not for the current state; `AGENTS.md` and `docs/Current Implementation.md` say what is true now.
+
 # Three ways to change the world (draft)
 
 > **Draft by Claude, 29 Sep 2026, from a conversation with Alex. Not a design status.** Nothing here is Held, Leaning or Open in *Dynamic Desk* until Alex says so. Alex's words are quoted verbatim and marked; everything else is my proposal. Labels: **[ran]** executed, **[read]** a primary source, **[recall]** remembered, not re-read, **[imagined]** design. Part of the task "Restructuring the desk", beside *Living in the world*.

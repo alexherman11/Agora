@@ -1,3 +1,5 @@
+> **Archived 12 Oct 2026 (Claude, at Alex's word).** This was the notation lab's first friction file. The living record is the Rough spots surface (f747) in the frontier world, exported to research/command-center/FRICTION.md. Kept for its reasoning; do not read it for the current state. Start from `AGENTS.md` and `docs/`.
+
 # Friction session: building my own desk from nothing (2026-09-17)
 
 The notes for this session live **inside the desk** that was built during it. The desk is its own text form:

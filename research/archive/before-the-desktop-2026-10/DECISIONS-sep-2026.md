@@ -1,3 +1,5 @@
+> **Archived 12 Oct 2026 (Claude, at Alex's word).** This was the root decisions list, begun 6 Sep 2026 for the Agora3 design (Linux VM, native packages). None of it describes the text desk or the Windows direction. Kept for its reasoning; do not read it for the current state. Start from `AGENTS.md` and `docs/`.
+
 # Decisions
 
 Each entry records a choice and its reason. Implemented behavior is recorded in
