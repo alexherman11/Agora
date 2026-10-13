@@ -38,6 +38,8 @@ We need a flexible and dynamic visual layer that the human can see and interact 
 *Open*
 - Are different verbs used at different levels of the system like system, visual, and object? 
 - How do native applications run alongside? 
+- How much central processing does agora have? 
+- In what interesting and unique ways can we get multiple device families to work together on Agora, ie what does a mobile agora native interface look and feel like vs a complex overlay of a twitch stream? How do keep track of various versions and keep them together as their code diverges? 
 ### Objects and Aspects
 An Object (also called a referent) is similar to a file, but rather than being a rigid format, it hosts a collection of data, tags, and types known as aspects. Objects should be able to link to other objects, grow and change, and represent anything on the desk, including libraries and code objects.  Objects are the ultimate flexible interface for the future, something that can get built on top of for decades to come without getting cluttered, complicated, or restrictive.
 
@@ -118,6 +120,22 @@ The desktop and shell should be managed by some sort of always running process t
 *Leaning*
 - The shell is as changeable as anything else (bar dock and windows should be reshapable)
 - There is always a way back when something breaks. Something independent can restore and recover even when the whole thing is made of changeable parts. 
+
+*Added 13 Oct 2026: drafted by Claude from Alex's words of 10 to 12 Oct, revised and approved by Alex.*
+
+Agora begins on top of an existing operating system and takes over more of the screen as it earns it. On Windows, Agora-native applications appear as real windows beside ordinary programs, a window manager arranges both, and a home base sits above them. Programs that were never written for Agora join through adapters, which turn as much of a program as they can into objects and carry changes back out.
+
+*Held*
+- Ordinary programs and games keep working beside Agora.
+- Objects belong to no program. A program may create them; any other may use them.
+- One supervisor is the single place objects are created, changed and managed.
+- Nearly everything on the machine can become an object: windows, processes, devices, sound.
+- Agora never needs the host's most fragile mechanisms (drivers, code injection) to do its work.
+
+*Open*
+- What is the supervisor: a window manager, a shell, or something else?
+- How much must a program do in order to join?
+- Does one global log record every change? How does the log interact with changes to things already running on the system? How do we decide what is important enough to add the log?
 ### Applications and their views
 
 Applications are the meat of the user experience, and they own appearances and views, but not objects. They may create and destroy objects, but objects are owned by the system, and each application must have some sort of permissions that allow it to modify the objects its using. Things like zoom, scroll state, and saves are personal state, and should not clutter history or overwrite someone else's personal state.
@@ -139,6 +157,21 @@ Ideally changes should be previewed directly onto the running desk itself, unles
 - How are changes previewed and adopted? 
 - How do useful capabilities and tools from others get adopted into the system?
 
+*Added 13 Oct 2026: drafted by Claude from Alex's words of 10 to 12 Oct, approved by Alex.*
+
+There are two tiers of change. The world tier is lenses, styles, verbs, rules and kinds: it changes live, by anyone with reach, and is safe to receive from a stranger because it is data. The source tier is the painter, the supervisor and anything that needs real code: it changes slowly, is reviewed, and travels through a shared repository.
+
+*Held*
+- Someone else's change never requires an edit to my source.
+- Most edits move out of source over time.
+
+*Leaning*
+- The painter is rich enough that most things we can imagine for a while are in scope, through words that are reusable between applications.
+- Every source edit names the world-level word that would have made it unnecessary.
+
+*Open*
+- When does code that draws become something the world can hold safely?
+
 ## Log and Parallel Work
 
 The desk's organization should be preserved so when you return it looks the same. Undo should be able to undo basically any event, though some events can not be rolled back and should be marked as such in the log. 
@@ -153,6 +186,28 @@ The desk's organization should be preserved so when you return it looks the same
 *Leaning*
 - Merging across complex changes, keeping what doesn't conflict
 - Offline use
+
+## Rooms
+
+*Added 13 Oct 2026: drafted by Claude from Alex's words of 10 to 12 Oct, revised and approved by Alex.*
+
+A room is a space several people are in at once, over the same objects. Each person sees it through their own arrangement and follows the others until they choose to change something; from then on that difference is theirs. A few things are marked shared, and changes to those reach everyone. A stream is a room with one person most others follow, and the video is only one way of looking into it.
+
+*Held*
+- Nothing a visitor does touches my objects unless I make it so.
+- A person chooses how far to diverge from what they are following, and can come back.
+- A room can be joined from any device that runs Agora.
+
+*Leaning*
+- A room is always open; a session is the hours someone is in it.
+- The past of a room is a place that can be entered and continued from.
+- What a visitor makes can be seen, followed and kept by others.
+
+*Open*
+- How do two machines' histories meet?
+- Who may place something where everyone sees it?
+- What does it take for a device to run Agora, ie be able to enter a room? 
+- For something like a stream, how much immersion do people need to have for it to count as being in the room? Do they need to be able to edit the underlying code, or just move them around and edit their own lenses?
 
 ## Authority and responsibility
 
