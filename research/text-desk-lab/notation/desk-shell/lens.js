@@ -203,7 +203,9 @@
     box._from = document.activeElement; pop = box; box.querySelector("button").focus();
   });
   document.addEventListener("pointerdown", e => { if (pop && !pop.contains(e.target)) closeMenu(); }, true);
-  document.addEventListener("scroll", () => closeMenu(), true);
+  // a scroll of the page closes the menu; a scroll inside it does not (Alex, 13 Oct: a comment longer than the box
+  // scrolled the box, and the box and its words were gone)
+  document.addEventListener("scroll", e => { if (pop && e.target instanceof Node && pop.contains(e.target)) return; closeMenu(); }, true);
   addEventListener("blur", () => closeMenu());
   document.addEventListener("keydown", e => {
     if (!pop) return;
