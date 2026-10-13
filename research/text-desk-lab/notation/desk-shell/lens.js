@@ -91,9 +91,12 @@
           if (V.folded("open:" + n.key, false)) { el.classList.remove("clamp"); el.dataset.opened = "1"; }
           el.addEventListener("click", () => {
             if (String(getSelection())) return;                 // highlighting words is not a press
-            const open = el.classList.toggle("clamp") === false;
-            if (!open && el.scrollHeight <= el.clientHeight + 1) { el.classList.remove("clamp"); return; }   // nothing was cut
-            el.dataset.opened = open ? "1" : ""; V.fold("open:" + n.key, open); settle();
+            // the cut texts of one part open and close together: a comment and the replies under it (Alex, 13 Oct)
+            const group = [...el.parentElement.querySelectorAll(":scope > [data-clamped]")];
+            const open = !group.some(g => g.dataset.opened === "1");
+            if (open && !group.some(g => g.scrollHeight > g.clientHeight + 1)) return;        // nothing is cut
+            for (const g of group) { g.classList.toggle("clamp", !open); g.dataset.opened = open ? "1" : ""; V.fold("open:" + g._n.key, open); }
+            settle();
           });
         }
       }
