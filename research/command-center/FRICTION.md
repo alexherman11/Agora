@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (31)
+## open (33)
 
 ### F2. Scripts cannot say who is running them
 
@@ -211,7 +211,22 @@ a3774 · family=code · status=open
 
 5fbebb3 and d21757e (9 Oct). Alex edited Dynamic Desk in the vault at 16:59 and Agora on 8 Oct; neither reached the repo or the Handbook, because docs_sync.py only runs when someone runs it and its last pass was 29 Sep. Wanted: the mirror is automatic. Done by editing keeper.py so it starts docs_sync.py --watch beside the door and the house. Why no world edit could do it: the world has no way to say that a note is a file on disk, and no standing job that runs on the host. Smallest seam: a note with source=docs/<name> that the door keeps in step with the file both ways (the source= slot is already written by handbook_docs.py, nothing reads it), or a house job note, one line naming a script and an interval, that the keeper reads instead of a list in its source. Also found: explore.py defaults DESKD to 8780, where nothing listens since the door took 8794, so a hand run without DESKD set falls back to the file lock and writes the pickle beside the live deskd. My first hand pass did that; the edit survived only because the door swapped deskd right after.
 
-## curing (24)
+### A shell window that could not be placed, closed, removes the thing from its home
+
+a4246 · family=shell · status=open
+
+Found by trying, on a copy, twice (worker a4187, 13 Oct; the runs are in a4239, section 1). In the windowed shell, the Editor's dock button picks the first document anywhere and tries to place it on your screen surface. When the place is refused (the fence: 'you have not looked at s401 yet') or you have no screen, the window opens in the page only, but it holds the document's own appearance in its home. Its drag then sends 'do move' on that appearance, its grip 'do resize' (accepted), and its close 'do remove' (accepted): the document was gone from where it lives. The bar does say '1 not in the world'. The shell was written before the fence, when the place never failed. Not fixed: my commission changed no behaviour. The cause is in shell.js, openBest handing the home appearance to a window that open() then fails to place.
+
+### The full scene print cuts a text at 240 characters and still counts it as read
+
+a4249 · family=silence · status=open
+
+Ran, 13 Oct, on a copy of the world (worker-a4179, for a4179). A paragraph of 324 characters; pike, who had never looked at it, ran scene doc-read body/<its id>. The line printed 240 characters and said '(=240 of 324 chars printed here; read a4204 for all)'. A rewrite of that paragraph was then accepted, and the receipt said 'dropped 1 line(s)' quoting words the reader had never been shown. The control, a rewrite of the next paragraph with no print at all, was refused ('you have not looked at ... yet').
+Why: desk_knife marks every printed node's shown aspects as seen, and the node says 'text' whether or not to_text cut it.
+Not cured here, on Pike's word (do not widen a4179 for it). scene <lens> words does not have the fault: it prints a text whole, and a text its clamp cut is not marked.
+A cure would be small: to_text already knows each cut it makes; a cut node should not say text.
+
+## curing (25)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -414,7 +429,14 @@ a3817 · family=code · status=curing
 
 Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Done: a built-in verb typed bare is told 'move is a verb ... do move a20 into=f21' instead of 'unknown command'; the MISS tail is short; the third-placement hint names do tile and do sort (split left moo.py); 'unexpected words' names the verb's own first argument (add= for tag, not line=); workshop.py copies the world for a worker under its lock (door.copy_locked). Lesson: a hint is code that nobody runs; health could run every printed hint on the small world. Left: test_knock, test_waiting and test_private_to need a copy of frontier by design and stay outside health; whether a bare built-in should simply run is a703's question, Alex's.
 
-## cured (47)
+### A scene's words could not be had as one text: the printer is Python, and it had one form
+
+a4251 · family=code · status=curing
+
+Source edit, a4179 (worker-a4179, 13 Oct): scene.py (to_words, split_words_arg), lens_ir.scene_for, desk_knife (the scene command). The world-level word that was missing: a way to say how a scene prints. A lens says what is shown; how it is printed for a reader of text was one fixed form in to_text (every key, role, let and gesture: about forty lines a paragraph for a document in design-review). 'words' is a second fixed form, also in Python. A reader who wants a third (markdown with a front matter, a table, an outline) needs source again.
+Also missing, and not built on purpose: a lens stood on a thing you name. doc-read reads the document from the reader's reviewing= prop, so reading a document writes where you are reading to the log. That is Sable's story a4013 and goes to Alex first.
+
+## cured (48)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -847,3 +869,9 @@ Step 7 of the grammar unification (8798e96), the last before the workbench. What
 a3990 · family=blanks · status=cured
 
 Source edit for a3937 (blanks.py, 13 Oct, worker-a3937, asked by Pike). What hurt: in a verb, $1.before.text filled $1.before and stored '.text' after it as plain words under an ok (Pike, e6389, e7441). The world-level words that were missing: a part read off a part ($1.before.text, $here.talk.title), which only a helper verb could reach; and a way to say where a blank ends, which did not exist at all: ${1.title}.md. Both are in the filler now. Still missing: a name inside $( ) and a lens's $frame.field take one part only.
+
+### A diagram and real font weights needed source: picture, and the font request
+
+a4231 · family=lens · status=cured
+
+Source edit by Claude, 13 Oct, at Alex's ask ('i need a better painter ... parity on diagrams, fonts, colors'). WANTED: a diagram in a design-review document, and headings in a face's real medium and strong weights. DONE IN THE WORLD: the look itself (style note `review` a4200, the lens a4039). DONE IN SOURCE: scene.py gained the lens word `picture` (a text drawn as SVG, cleaned to shapes and words); lens.js draws it; style.js asks a face for weights 400, 500 and 600 and falls back to asking plainly. WHY NO WORLD EDIT COULD DO IT: a lens can only say words the compiler knows, and the painter draws only text and frames; fonts are loaded by one fixed request. THE SMALLEST SEAM THAT WOULD HAVE MADE IT A WORLD EDIT: (1) a way for the world to hold a painter word: a note that says how a kind of part is drawn, in a small drawing vocabulary the painter already has (shapes, lines, words at places), so a new look of part is a note and not a commit; `picture` is the crude first of these, a whole drawing as text. (2) a font line that names its weights: `font sans = IBM Plex Sans 400 500 600, system-ui`.
