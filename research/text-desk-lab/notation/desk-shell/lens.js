@@ -82,7 +82,21 @@
       if (p.runs && words === p.text) runs(el, p.runs); else el.textContent = words;
       V.mark(el, n.key);
       if (p.wrap === "verbatim") el.classList.add("t-verbatim");
-      if (p.clamp) { el.classList.add("clamp"); el.style.webkitLineClamp = p.clamp; }
+      if (p.clamp) {
+        el.classList.add("clamp"); el.style.webkitLineClamp = p.clamp;
+        // 13 Oct (Alex: a long comment 'can get truncated with a see more type thing'): a clamped text that is cut and
+        // has no press of its own opens on a press and closes on the next. This viewer's own, as a fold is; no event.
+        if (!n.acts.some(a => a.on === "click" || a.on === "edit")) {
+          el.dataset.clamped = "1";
+          if (V.folded("open:" + n.key, false)) { el.classList.remove("clamp"); el.dataset.opened = "1"; }
+          el.addEventListener("click", () => {
+            if (String(getSelection())) return;                 // highlighting words is not a press
+            const open = el.classList.toggle("clamp") === false;
+            if (!open && el.scrollHeight <= el.clientHeight + 1) { el.classList.remove("clamp"); return; }   // nothing was cut
+            el.dataset.opened = open ? "1" : ""; V.fold("open:" + n.key, open); settle();
+          });
+        }
+      }
     }
     if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
     if (p.kind === "frame") frames(el, n, p);
@@ -572,8 +586,12 @@
       if (down) el.style.transform = `translateY(${Math.ceil(down)}px)`;
       ends.set(col, r.top + down + el.scrollHeight + 8);
     }
+    for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
   }
   addEventListener("resize", settle);
+  // what floats moves when its own words grow: the faces arriving, a reply being typed (13 Oct)
+  if (document.fonts) document.fonts.ready.then(settle);
+  let settling; paint.addEventListener("input", () => { clearTimeout(settling); settling = setTimeout(settle, 60); });
 
   const report = () => V.report(paint, sceneAt, carrying ? { [carrying.n.key]: "carried" + (carrying.over ? " over " + carrying.over.dataset.key : "") } : {}, q.get("share") === "attention",
     def && { frame: def.frame, style: def.style_rev || "seed" });
