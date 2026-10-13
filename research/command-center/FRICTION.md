@@ -414,7 +414,7 @@ a3817 · family=code · status=curing
 
 Source edit by Claude, 9 Oct, from a3806 (Pike, Juniper and Sable, m3799 on). In the working tree, health green, not yet committed: Alex lands it. Done: a built-in verb typed bare is told 'move is a verb ... do move a20 into=f21' instead of 'unknown command'; the MISS tail is short; the third-placement hint names do tile and do sort (split left moo.py); 'unexpected words' names the verb's own first argument (add= for tag, not line=); workshop.py copies the world for a worker under its lock (door.copy_locked). Lesson: a hint is code that nobody runs; health could run every printed hint on the small world. Left: test_knock, test_waiting and test_private_to need a copy of frontier by design and stay outside health; whether a bare built-in should simply run is a703's question, Alex's.
 
-## cured (46)
+## cured (47)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -841,3 +841,9 @@ Step 6 of the grammar unification (a7222a7). What was wanted: the first self-hos
 a3772 · family=code · status=cured
 
 Step 7 of the grammar unification (8798e96), the last before the workbench. What was wanted: place as scope for every named definition, as verbs and rules already had it (a990): a room may keep its own cal, its own mood, its own event, and a line finds the nearest. What there was: four lookups. verbs.find climbed a ladder (carried, named thing, the room and the rooms around it, the house, then elsewhere); scene.find_lens looked everywhere and refused two unless exactly one was placed; scene.find_style looked everywhere and took the first placed one silently; kinds.notes kept the first note by iteration order, silently. The cure: verbs.ladder is the climb, shared; verbs.find uses it with `where` (on=); verbs.nearest uses it with place_of_note (the room holding the note, the house outside every room, unplaced last) for scene.find_lens and scene.find_style; kinds.note_for uses it for the note nearest a thing's room (table.declared, table.remarks, kinds.chain). Where a lookup stands: a typed line where its typer is (verbs.standing), a lens placing a lens in its own room (compile_lens sets acc.home), a style in its lens's room, a kind note in the thing's room. A tie at one distance refuses naming each and its room; a kind note's tie is read (the first by id) and said on the receipt, since a kind's word must keep meaning something for the verb chains. test_nearest.py; 4 golden refusals rebased (the wording names appearance ids). Why no world edit could do it: the lookups are host code. What the world still lacks: a `go`-independent way to say where a typed `scene cal` should stand (`scene cal in=f182`); a kind note that is read where neither is nearer could be refused instead of read, once the verb chains read kinds by place too; and the house's own notes (styles, kinds, verbs placed outside every room) have no surface of their own, so `house` as a level means `outside every room`.
+
+### A part of a part of a blank was half filled, and a blank could not say where it ends
+
+a3990 · family=blanks · status=cured
+
+Source edit for a3937 (blanks.py, 13 Oct, worker-a3937, asked by Pike). What hurt: in a verb, $1.before.text filled $1.before and stored '.text' after it as plain words under an ok (Pike, e6389, e7441). The world-level words that were missing: a part read off a part ($1.before.text, $here.talk.title), which only a helper verb could reach; and a way to say where a blank ends, which did not exist at all: ${1.title}.md. Both are in the filler now. Still missing: a name inside $( ) and a lens's $frame.field take one part only.
