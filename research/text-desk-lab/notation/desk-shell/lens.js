@@ -175,7 +175,24 @@
     for (const a of entries) {
       const b = document.createElement("button"); Object.assign(b, { type: "button", textContent: a.label });
       b.className = Style.roleClass("tool") + " " + Style.roleClass("menu.item"); b.setAttribute("role", "menuitem");
-      b.addEventListener("click", () => { closeMenu(); send(el._n, a.line); });
+      // 13 Oct (Alex: right-click a text and comment on it): an entry's line may name $selected, the words highlighted
+      // in this part's thing when the menu opened, and $value, words the entry asks for: pressed, it becomes a box
+      // to type in (Enter sends, Shift+Enter is a new line, Escape leaves), since a line with $value is not yet whole
+      const picked = TEXT.selected(el._n), fill = l => l.replace("$selected", () => picked);
+      b.addEventListener("click", () => {
+        if (!a.line.includes("$value")) { closeMenu(); return send(el._n, fill(a.line)); }
+        const t = document.createElement("textarea"); t.rows = 3; t.placeholder = a.label; t.setAttribute("aria-label", a.label);
+        t.className = Style.roleClass("menu.ask");
+        t.addEventListener("keydown", e => {
+          if (e.key !== "Enter" || e.shiftKey) return;
+          e.preventDefault(); const v = t.value.trim(); if (!v) return;
+          closeMenu(); send(el._n, fill(a.line).replace("$value", () => TEXT.esc(v)));
+        });
+        box.replaceChildren(...(picked ? [Object.assign(document.createElement("div"), { className: Style.roleClass("meta"), textContent: picked.trim() })] : []), t);
+        box.style.left = Math.max(0, Math.min(parseFloat(box.style.left), innerWidth - box.offsetWidth - 4)) + "px";
+        box.style.top = Math.max(0, Math.min(parseFloat(box.style.top), innerHeight - box.offsetHeight - 4)) + "px";
+        t.focus();
+      });
       box.append(b);
     }
     document.body.append(box);
@@ -193,6 +210,7 @@
     if (e.key === "Escape") { closeMenu(true); e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       const bs = [...pop.querySelectorAll("button")], i = bs.indexOf(document.activeElement);
+      if (!bs.length) return;                                    // an entry that is asking for words: the arrows are the text's
       bs[(i + (e.key === "ArrowDown" ? 1 : -1) + bs.length) % bs.length].focus(); e.preventDefault();
     }
   }, true);
@@ -367,6 +385,11 @@
   document.addEventListener("selectionchange", () => {
     const sel = getSelection(), el = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
     const t = el && el.closest && el.closest("[contenteditable]");
+    if (!t && el && el.closest && paint.contains(el)) {          // 13 Oct: words highlighted in a text that is only read, for its part's menu
+      let k = el.closest("[data-key]"); while (k && !(k._n && (k._n.fence || {}).item)) k = k.parentElement && k.parentElement.closest("[data-key]");
+      if (k) TEXT.sel = sel.isCollapsed ? null : { item: k._n.fence.item, text: String(sel) };
+      return;
+    }
     if (!t || !t._n || !t._n.paint.marks) return;                // only a text that carries marks is a document's words
     TEXT.sel = sel.isCollapsed ? null : { item: (t._n.fence || {}).item, text: String(sel) };
   });

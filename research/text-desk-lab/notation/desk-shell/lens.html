@@ -54,6 +54,7 @@
   /* fold ... float: a menu, its open contents drawn over the page below the handle */
   .l-float { position: relative; }
   /* a part's own menu (on menu "<label>" do ...), at the pointer */
+  #menu-pop textarea { font: inherit; color: inherit; background: transparent; border: 0; outline: none; resize: none; width: 36ch; max-width: 80vw; box-sizing: border-box; }
   #menu-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 12ch; box-sizing: border-box; }
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
