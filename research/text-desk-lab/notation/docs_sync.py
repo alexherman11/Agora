@@ -9,7 +9,10 @@ the two copies, ignoring line endings (the vault keeps CRLF, the repo LF, and ea
   - both sides moved away from it, or they differ and were never agreed: refused, both left as they are, and the
     first differing line of each printed. Nothing guesses which edit wins. Make them agree by hand; the next pass
     remembers them.
-When Agora or Dynamic Desk changes, it runs handbook_docs.py, so the Handbook's copies in the world follow.
+The Handbook's copies in the world follow the files (Agora, Dynamic Desk and AGENTS.md): each pass compares the
+repo's three files and the checkout's HEAD with what handbook_docs.py last carried, and runs it when either moved.
+So a copy cannot stay behind because the edit arrived some way this did not make (a commit, an edit to both sides,
+a pass that failed): it is asked again every pass until handbook_docs.py succeeds.
 Current Implementation's source is the Handbook binder (export_docs.py); an edit made to either markdown copy is still
 carried to the other, and export_docs.py then warns that the export was edited directly, as it always has.
 The last agreed text is kept as a hash in house-state/docs_sync.json (not in git). It never commits.
@@ -32,7 +35,7 @@ REPO_DOCS = HERE.parents[2] / "docs"
 VAULT_DOCS = Path("C:/Projects/Agora/docs")
 ANOTHER = 76         # the exit code for "another watch already runs", as the house's is for another house
 NAMES = ["Agora.md", "Agora Constitution.md", "Dynamic Desk.md", "Current Implementation.md", "Previous Work.md"]
-HANDBOOK = {"Agora.md", "Dynamic Desk.md"}
+HANDBOOK = [REPO_DOCS / "Agora.md", REPO_DOCS / "Dynamic Desk.md", REPO_DOCS.parent / "AGENTS.md"]
 STATE = HERE / "house-state" / "docs_sync.json"
 LOCK = HERE / "house-state" / "docs_sync.lock"
 
@@ -64,7 +67,7 @@ def one_pass(handbook=True):
         agreed = json.loads(STATE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         agreed = {}
-    said, moved = [], set()
+    said = []
     for name in NAMES:
         a, b = REPO_DOCS / name, VAULT_DOCS / name
         if not a.exists() or not b.exists():
@@ -79,23 +82,33 @@ def one_pass(handbook=True):
             write(a, tb, a_crlf)
             said.append(f"{name}: the vault's edit copied to the repo")
             agreed[name] = digest(tb)
-            moved.add(name)
         elif last and digest(tb) == last:
             write(b, ta, b_crlf)
             said.append(f"{name}: the repo's edit copied to the vault")
             agreed[name] = digest(ta)
-            moved.add(name)
         else:
             n, x, y = first_difference(ta, tb)
             why = "both copies changed since they last agreed" if last else "the copies differ and have never agreed"
             said.append(f"refused {name}: {why}; nothing written. First difference, line {n}:\n"
                         f"    repo:  {x}\n    vault: {y}")
+    if handbook:
+        said += carry(agreed)
     STATE.write_text(json.dumps(agreed, indent=1), encoding="utf-8")
-    if handbook and moved & HANDBOOK:
-        r = subprocess.run([sys.executable, "handbook_docs.py"], cwd=HERE, capture_output=True, text=True,
-                           encoding="utf-8")
-        said.append("handbook_docs.py: " + ((r.stdout or r.stderr).strip().splitlines() or ["(no output)"])[-1])
     return said
+
+
+def carry(agreed):
+    """Run handbook_docs.py if the files it carries, or the commit that dates them, are not what it last carried."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True, text=True).stdout.strip()
+    now = digest(head + "".join(read(p)[0] for p in HANDBOOK if p.exists()))
+    if agreed.get("handbook") == now:
+        return []
+    r = subprocess.run([sys.executable, "handbook_docs.py"], cwd=HERE, capture_output=True, text=True, encoding="utf-8")
+    lines = [l for l in (r.stdout or "").strip().splitlines() if "already matches" not in l]
+    if r.returncode:
+        return ["handbook_docs.py failed; asking again next pass: " + ((lines or r.stderr.strip().splitlines() or ["(no output)"])[-1])]
+    agreed["handbook"] = now
+    return ["handbook_docs.py: " + l for l in lines]
 
 
 def only_one():
