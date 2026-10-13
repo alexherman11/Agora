@@ -124,7 +124,11 @@
       else if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
         if (e.target !== el && a.line.includes("$x")) return;
         const r = el.getBoundingClientRect();
-        send(el._n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)));
+        // 13 Oct (Alex: 'clicking this checkbox takes too long, i want instant response'): the press shows at once, on
+        // the part itself, while the desk answers; the world's answer still decides what is drawn after
+        el.dataset.pressed = "1";
+        send(el._n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)))
+          .finally(() => { delete el.dataset.pressed; });
       });
       if (a.on === "edit") edits(el, n, a);
       if (a.on === "drag" && p.box) drags(el, n, a);
