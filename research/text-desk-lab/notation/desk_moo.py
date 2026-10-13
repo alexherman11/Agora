@@ -61,9 +61,10 @@ class DeskMoo(Desk):
             self.nudged.add(p)
             pl = w.nodes[p]["layout"]
             if pl == "free":
-                return (f"\n  hint: that is the third placement by hand in {p}. `split {p} by=kind left=image` or "
-                        f"`tidy {p} as=row` arranges everything in one call (help split).")
-            return f"\n  hint: `sort {p} by=due` (or by=title) orders all of {p} in one call."
+                # 9 Oct (a3806): split left moo.py and a bare sort is no command; a hint runs as printed
+                return (f"\n  hint: that is the third placement by hand in {p}. `do tile {p} as=row` (or as=column) "
+                        f"arranges everything in one call (help tile).")
+            return f"\n  hint: `do sort {p} by=due` (or by=title) orders all of {p} in one call."
         return ""
 
     # verbs come from the registry from here on
@@ -287,7 +288,8 @@ class DeskMoo(Desk):
                 self._mark_rev(nid, aspects_of(name, kv))
             self._receipt = True
             try:
-                out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
+                if not adds:      # a3806: a line added to a chat changes nothing else about the chat worth a line
+                    out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
             finally:
                 self._receipt = False
             if w.nodes[nid]["type"] == "surface" and v.level >= 2:

@@ -150,7 +150,10 @@ check("(i) ... and shows hers, not the first's", Bc in shows(MINE) and B2 in sho
 r = say("pike", f"look {B} :1", f'do create {B} kind=task title="For today\'s Juniper" owner=juniper status=open')
 B4 = made(r)
 check("(iii) owner=juniper typed today holds today's Juniper", W.subjects[W.nodes[B4]["subject"]]["props"]["owner"] == JN)
-check("(iii) the receipt reads as typed, and names the door to the first", "owner=juniper" in r and "juniper,first" in r, r)
+# 9 Oct (a3299, a3806): the door to the first is a standing fact, so the claim's receipt no longer repeats it; examine does
+check("(iii) the receipt reads as typed, and does not say the door to the first again", "owner=juniper" in r and "juniper,first" not in r, r)
+ex = say("pike", "examine juniper")
+check("(iii) ... examine juniper is where the door to the first is said", "juniper,first" in ex, ex)
 f = say("pike", "find prop:owner=juniper")
 check("(iii) find prop:owner=juniper is today's Juniper's cards", B4 in f and Bc in f and A not in f, f)
 f = say("pike", "find prop:owner=juniper,first")

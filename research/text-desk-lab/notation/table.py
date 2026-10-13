@@ -154,6 +154,8 @@ def _term_rows():
                  "any aspect or prop compared, typed as the lens types values (8 Oct)"))
     rows.append(("term", "?words", "?word+word", [Slot("words", "text")], "title, text or tags contain every word"))
     rows.append(("term", "hidden", "hidden", [], "more than 5% covered"))
+    rows.append(("term", "settled", "settled", [], "its work is over: status is one of " + " ".join(knife.SETTLED)
+                 + ", or a promise that has ended; -settled is what is live"))
     return rows
 
 

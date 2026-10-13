@@ -63,7 +63,8 @@ import moo     # noqa: E402
 gone = ("tidy", "split", "gather", "reveal", "dedupe", "done", "stack")
 check("moo.REGISTRY holds none of the retired compositions", not any(v in moo.REGISTRY for v in gone), sorted(moo.REGISTRY))
 check("every registered verb is general", knife.GENERAL == list(moo.REGISTRY) and not hasattr(knife, "SPECIALIZED"))
-check("the house's six verbs were made as notes", sorted(HOUSE) == ["dedupe", "done", "gather", "reply", "reveal", "tidy"], HOUSE)
+check("the house's verbs were made as notes (six that were Python, and wish: 9 Oct, a3806)",
+      sorted(HOUSE) == ["dedupe", "done", "gather", "reply", "reveal", "tidy", "wish"], HOUSE)
 
 # 2. help and examine know them as world verbs
 t = reply("juniper", "help tidy")[-1][1]

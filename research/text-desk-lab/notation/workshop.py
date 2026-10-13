@@ -351,9 +351,13 @@ class Workshop:
             self.say(cid, f"the house made {tree} but git does not list it as a worktree, so no worker was started there.")
             return
         try:                              # a copy of the world to try things on, inside the worktree it may touch
-            import shutil
-            shutil.copyfile(HERE / "sessions" / f"{self.house.world}.pickle",
-                            tree / NOTATION / "sessions" / f"{self.house.world}-try.pickle")
+            # 9 Oct (a3806): under the world's own lock, as the door copies it (door.copy_locked; 1 Oct: a bare copy
+            # made the live world drop saves). This was the last bare copy of a live world that a running house makes
+            import door
+            why = door.copy_locked(HERE / "sessions" / f"{self.house.world}.pickle",
+                                   tree / NOTATION / "sessions" / f"{self.house.world}-try.pickle")
+            if why:
+                self.say(cid, f"(the house could not copy the world for trying things: {why})")
         except OSError as e:
             self.say(cid, f"(the house could not copy the world for trying things: {e})")
         wk = Worker(self.house, cid, tree, branch, asked_by)

@@ -33,6 +33,14 @@ NOTES = (
     ("reply", "# reply <chat> \"<words>\": add a line to a chat. It is append by another name (a built-in word until\n"
               "# 9 Oct 2026; now this note). A verb note cannot pass line=... through, so the words are its second word\n"
               "do append $1 line=\"$2\""),
+    # 9 Oct (a3806; Pike, Juniper and Sable, m3799 on): until now the word lived in Pike's corner and wrote to one
+    # chat by id; friction went unwritten because writing it cost a room, a family and a status. The chat is found by
+    # its role, so the note is the same in every world
+    ("wish", "# wish <words>: say that something hurt, was missing, or cost you, from anywhere, in one line.\n"
+             "# It lands in the chat whose prop role=wishes. Your last line the desk did not do, and what the desk\n"
+             "# said back, are added for you ($reach), so there is nothing to copy. No family, no status, and no\n"
+             "# deciding whose fault it was: someone sorts later (rows reaches counts what the desk refused).\n"
+             "do append prop:role=wishes line=\"$* $reach\""),
 )
 
 

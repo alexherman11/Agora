@@ -72,8 +72,25 @@ TERMS = ("kind:", "tag:", "in:", "also:", "prop:", "title:", "comments:", "links
 # declares (kind, age, the promise terms). A compared aspect (k=v, k<v, prop:k=v) reads `prop:k`, or the field itself.
 ASPECTS = {"tag": {"tags"}, "title": {"title"}, "?": {"title", "text", "tags"}, "due": {"due"}, "comments": {"comments"},
            "links": {"links"}, "parts": {"parts"}, "part-of": {"part-of"}, "answers": {"links"}, "answered-by": {"links"},
-           "in": {"place"}, "also": {"place"}, "hidden": {"place"}, "kind": set(), "age": set(), "unanswered": set()}
+           "in": {"place"}, "also": {"place"}, "hidden": {"place"}, "kind": set(), "age": set(), "unanswered": set(),
+           "settled": {"prop:status"}}
 FIELDS = ("due", "title", "text", "kind", "tags")      # aspects compared by name, not through prop:
+# 9 Oct (a3806): a thing is settled when its status says its work is over. One word for it, so a room can show what
+# is live and say how many it left out, and no one has to remember which of five words a kind ends in. A promise is
+# settled when it has ended (promises.state). -settled is what is live
+SETTLED = ("done", "cured", "answered", "kept", "released", "landed", "closed", "retired")
+
+
+def is_settled(w, nid):
+    n = w.nodes.get(nid) or {}
+    s = w.subjects.get(n.get("subject") or nid)
+    if not s:
+        return False
+    if s.get("kind") == "promise":
+        return bool(promises.state(w, s["id"]).get("ended"))
+    return str((s.get("props") or {}).get("status", "")).lower() in SETTLED
+
+
 GENERIC = re.compile(r"^([A-Za-z_][\w-]*)(!=|<=|>=|=|<|>)(.*)$")
 
 
@@ -82,8 +99,8 @@ def term_key(t):
     t = t[1:] if t.startswith("-") else t
     if t.startswith("?"):
         return "?", "", t[1:]
-    if t == "hidden":
-        return "hidden", "", ""
+    if t in ("hidden", "settled"):
+        return t, "", ""
     if ":" in t and (not GENERIC.match(t) or t.index(":") < min(i for i in (t.find(c) for c in "=<>!") if i >= 0)):
         name, _, val = t.partition(":")
         if name == "prop":
@@ -197,10 +214,10 @@ def parse_selection(w, token, trash=False, binds=None):
     for t in terms:
         # Moss: an unknown term fell back to a text search in find and to nothing in scene: two wrong answers, no refusal
         if re.match(r"^-?[a-z]+:\S", t) and not t.lstrip("-").startswith(KNOWN):
-            raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden; help selections)")
+            raise Refusal(f"no selection term {t.split(':')[0].lstrip('-')}: (terms: ?words {' '.join(KNOWN)} due< due> age< age> hidden settled; help selections)")
     neg = [t[1:] for t in terms if t.startswith("-") and len(t) > 1]   # -tag:fixed: everything the term would select is left out
     terms = [t for t in terms if not t.startswith("-")]
-    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "due:", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t == "hidden" or GENERIC.match(t) for t in terms + neg):
+    if not (terms or neg) or not any(t.startswith(("?", "kind:", "tag:", "in:", "also:", "due<", "due>", "due:", "age<", "age>", "prop:", "title:", "comments:", "links:", "parts:", "part-of:", "answers:", "answered-by:", "unanswered:") + promises.TERMS) or t in ("hidden", "settled") or GENERIC.match(t) for t in terms + neg):
         return None
     cands = [n["id"] for n in w.nodes.values() if n["parent"]]
     for t in terms:
@@ -234,6 +251,8 @@ def parse_selection(w, token, trash=False, binds=None):
             keep = set(cands)
             made = {c: k for k, c in enumerate(cands)}
             cands = [c for c in _in_order(w, fid, made) if c in keep]
+        elif t == "settled":
+            cands = [c for c in cands if is_settled(w, c)]
         elif t == "hidden":
             cands = [c for c in cands if w.hidden_fraction(c) > 0.05]
         elif t.startswith("also:"):
@@ -335,7 +354,7 @@ def parse_selection(w, token, trash=False, binds=None):
             hit = promises.matching(w, t, binds)
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.nodes[c]["subject"] in hit]
         else:
-            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden also: due< due> due:any age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>, and any aspect or prop compared (k=v k!=v k<v k>v k<=v k>=v); -term leaves out")
+            raise Refusal(f"unknown selection term {t!r}; terms: ?words kind: tag: in: hidden settled also: due< due> due:any age< age> title: comments:open links:<id> parts:<id> part-of:<id> answers:<id> answered-by:<id> unanswered:<name>, and any aspect or prop compared (k=v k!=v k<v k>v k<=v k>=v); -term leaves out")
     for n in neg:
         r = parse_selection(w, n, trash=True, binds=binds)
         if r is None:

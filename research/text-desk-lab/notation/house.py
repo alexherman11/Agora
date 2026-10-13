@@ -851,7 +851,11 @@ class House:
         w = self.load()
         cfg = self.settings(w)
         corners = self.corners(w)
-        objective = any((s.get("props") or {}).get("objective") == "open" for s in w.subjects.values())
+        open_ = [s for s in w.subjects.values() if (s.get("props") or {}).get("objective") == "open"]
+        objective = bool(open_)
+        # 9 Oct (a3806; Juniper: 'no word of which objective; I guessed'): the timed wake names what is open
+        self.objectives = "; ".join(f"{(w.appearances_of(s['id']) or [s['id']])[0]} \"{str(s.get('title', ''))[:60]}\""
+                                    for s in open_[:3]) + (f" and {len(open_) - 3} more" if len(open_) > 3 else "")
         if not (self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER")):
             # a3150: who each new line knocks is recorded before anyone is served, so 'in a turn' is as the line found
             # them; while a restart waits no one is knocked, so the house that follows records it (as it does the news)
@@ -910,8 +914,14 @@ class House:
             until = r.state.get("rest_until")
             # a1062: when the house would wake it on its own, the latest a held line waits (said in a speaker's receipt)
             last = r.state.get("last_turn", now())
-            r.wakes_at = until or (last + float(cfg["breather"]) if objective else last + float(cfg["wake_every"]))
+            # 9 Oct (a3806; Sable woken about ten times, Juniper five in seven minutes, by an open objective with
+            # nothing new): each timed wake that its resident answered without changing anything doubles the wait
+            # before the next, up to wake_every; a turn that changes the world, or a call, makes it short again. A
+            # resident at work on the objective is still asked every `breather`; one who looked and rested is let be
+            breather = min(float(cfg["breather"]) * 2 ** min(int(r.state.get("idle_wakes", 0)), 12), float(cfg["wake_every"]))
+            r.wakes_at = until or (last + breather if objective else last + float(cfg["wake_every"]))
             if called:                                     # a call ends any rest
+                r.state["idle_wakes"] = 0
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
                 r.send("\n".join(self.woken_by(r) + self.take(r)))      # a3150: its first line names the line
@@ -924,8 +934,10 @@ class House:
                 slept = r.state.pop("rest_for", None) or 0
                 r.state.pop("rest_until", None)
                 self.wake(r, corner, actor, f"(you rested {human(slept)})\n")
-            elif objective and idle >= float(cfg["breather"]):
-                self.wake(r, corner, actor, "(time passes; an objective is open)\n")
+            elif objective and idle >= breather:
+                r.state["idle_wakes"] = int(r.state.get("idle_wakes", 0)) + 1
+                self.wake(r, corner, actor, f"(time passes; an objective is open: {self.objectives}. If nothing in it is "
+                                            f"yours to move now, > rest: I ask again after twice as long each time)\n")
             elif idle >= float(cfg["wake_every"]):
                 self.wake(r, corner, actor, "(time passes)\n")
             else:
@@ -939,6 +951,8 @@ class House:
         line = (corner.get("props") or {}).get("wake") or "look"       # a1027: scripts retired; arrive was the old tree
         r.state["quiet"] = 0
         started = not lead                                # no reason given: the house started its process
+        if r.state.get("lost") or r.state.get("welcome_due"):
+            r.state.pop("wake_read", None)                # a memory that begins again is shown its notes whole again
         if r.state.pop("lost", None):
             lead = "(the house lost our earlier conversation; your soul and the world kept everything)\n" + lead
         # Alex (29 Sep): who they are, one line at the top of every arrival, so a name outlives a fading memory
@@ -977,11 +991,47 @@ class House:
             lead += "(the house started you; no one called)\n"
         lead += "".join(x + "\n" for x in first)
         stored = r.rid if (corner.get("props") or {}).get("wake") else None      # a1156: a wake is stored text
-        r.send(lead + self.act(actor, line, stored=stored, kind="wake") + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
+        woke = self.fold_reads(r, line, self.act(actor, line, stored=stored, kind="wake"))
+        r.send(lead + woke + ("\n" + "\n".join(heard) if heard else ""), "wake", carry=news)
         # a1062: a call delivered by a wake (a resident started from want=rest) is cleared too, so the next is a change
         if ((self.load().nodes.get(r.rid) or {}).get("props") or {}).get("call") in callers:
             self.act("house", f"look {r.rid} :1; do prop {r.rid} remove=call")
         self.set_status(r, corner, "awake")
+
+    def fold_reads(self, r, line, text):
+        """A wake line's `read <note>` whose note has not changed since this conversation was last shown it prints one
+        line instead of the note. 9 Oct (a3806): each corner's wake reads its soul or letter (8 to 16 thousand
+        characters) into a conversation that already holds it; Pike, Juniper and Sable each named it first among what
+        they skip. What was read is kept by the note's revision (state wake_read), and forgotten when the conversation
+        begins again (lost, compacted, fresh), so a memory that lost the note is shown it whole. A chat is left alone:
+        its read already shows only what is new. `read <id> :3`, typed by the resident, always prints the note."""
+        import desk
+        try:
+            w = self.load()
+            parts = desk.split_batch(line)
+            blocks = re.split(r"(?m)^(?=\[\d+\] )", text) if len(parts) > 1 else ["", text]
+            if len(blocks) != len(parts) + 1:
+                return text
+            seen = r.state.setdefault("wake_read", {})
+            for k, part in enumerate(parts, 1):
+                m = re.match(r"read\s+([afs]\d+)\b", part.strip())
+                node = w.nodes.get(m.group(1)) if m else None
+                s = w.subjects.get((node or {}).get("subject") or (m.group(1) if m else ""))
+                if not s or s.get("kind") == "chat":
+                    continue
+                mark, was = [s["id"], s["rev"]], seen.get(part)
+                seen[part] = mark
+                rows = blocks[k].splitlines()
+                at = next((i for i, l in enumerate(rows) if l.startswith(s["id"] + " ")), None)
+                words = len(str(s.get("text", "")).split())
+                if was == mark and at is not None and words > 60:      # a short note costs less than saying so
+                    blocks[k] = "\n".join(rows[:at] + [
+                        f"{m.group(1)} {s['kind']} \"{s['title']}\" · {words}w · unchanged since I last showed it to you in "
+                        f"this conversation, so not printed again (read {m.group(1)} :3 prints it)"]) + "\n\n"
+            return "".join(blocks).rstrip("\n")
+        except Exception as e:        # a wake must arrive whatever the fold thought
+            r.log("fold_reads", f"{type(e).__name__}: {e}"[:200])
+            return text
 
     def after_turn(self, w, r, corner, actor, text):
         if text is None or isinstance(text, dict):     # the process ended, or its turn failed
@@ -990,7 +1040,10 @@ class House:
         if not actor:                          # its name was taken away mid-turn: nothing is done in the world unsigned
             return
         attempts, rest = rest_in(commands_in(text))
+        n0 = len(w.events)
         receipt = self.act(actor, "\n".join(attempts), whole=True) if attempts else ""
+        if attempts and any(e.get("by") == actor and e.get("verb") != "go" for e in self.load().events[n0:]):
+            r.state["idle_wakes"] = 0         # it changed something: an open objective asks again after `breather`
         # Sable c742: a > line nothing answers (a quote) says MISS and stops nothing after it; the desk decides, since
         # a verb made in the world (`> handbook`) answers as well as a command does
         missed = missed_in(receipt)

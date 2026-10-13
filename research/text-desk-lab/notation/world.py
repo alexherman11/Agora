@@ -1259,13 +1259,16 @@ class World:
         for a in apps:
             self._bump(a)
         ev = self._event(verb, via or sid, args, {"restore_subject": before}, actor)
-        note = f"subject {sid} changed; {len(apps)} appearance(s) now show the new content"
-        if args.get("signed"):
-            note += f"\n  said: {args['append']}" + (f"  ({signed_note})" if signed_note else "")
+        # 9 Oct (a3806; Pike, Juniper and Sable, m3799 on): a receipt says what changed that its writer did not cause.
+        # A thing shown in one place changed where it was typed, so only a second appearance is news; a chat line is
+        # not printed back to the one who typed it, only what the world did to it (the signature it dropped)
+        note = f"subject {sid} is shown in {len(apps)} places; each shows the new content" if len(apps) > 1 else ""
+        if signed_note:
+            note += ("\n  " if note else "") + signed_note
         if new_line:
             new_line["ev"] = ev["id"]
             s["lines"].append(new_line)
-            note += f"\n  line {new_line['id']} · to: {', '.join(new_line['to']) or 'nobody'}{new_line_why}"
+            note += ("\n  " if note else "") + f"line {new_line['id']} · to: {', '.join(new_line['to']) or 'nobody'}{new_line_why}"
         if relined is not None:
             s["lines"] = [dict(l, edited=ev["id"]) if "edited" in l and l["edited"] is None else l for l in relined]
             changed_lines = [l["id"] for l in s["lines"] if l.get("edited") == ev["id"]]

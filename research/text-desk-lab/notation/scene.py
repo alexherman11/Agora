@@ -264,6 +264,9 @@ SOURCES = {
     "words": ("words [host=verb|command|lens|term|kind]", ("host", "word", "form", "slots", "doc")),
     "slots": ("slots [host=... word=...]", ("host", "word", "slot", "type", "needed", "doc")),
     "kinds": ("kinds", ("kind", "is", "shape", "things", "props", "declared")),
+    # 9 Oct (a3806): the lines the desk did not do, counted by shape, the most met first (verbs.record_reach): which
+    # refusal or missing word is worth curing shows itself, without anyone deciding whose fault each one was
+    "reaches": ("reaches", ("shape", "n", "who", "kind", "last", "line")),
 }
 # a source's field names: read bare inside their own repeat ($who in `of messages:`); a text's $name that is one of them
 # is no prop of the thing, and no aspect for the fence. 8 Oct: they no longer take a name away from `let` or `as` in
@@ -599,6 +602,9 @@ def _rows_of(desk, source, session=None):
         return house_rows(desk, desk._resolve(arg) if arg else None)
     if head == "turns":
         return turn_rows(desk, desk._resolve(arg) if arg else None)
+    if head == "reaches":
+        import verbs
+        return verbs.reach_rows(desk)
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)

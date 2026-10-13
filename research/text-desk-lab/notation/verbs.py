@@ -988,20 +988,85 @@ def try_line(desk, line, me):
     return run(desk, s, words, me, thing, _rest(line, 1))
 
 
-def record_miss(desk, line):
-    """Every reach nothing answered: reaches/<world>.jsonl (who, what, when). The evidence for which verbs the house
-    needs, written by its inhabitants; kept outside the world, like the house's transcripts."""
+REACHES = __import__("pathlib").Path(__file__).resolve().parent / "reaches"
+
+
+def reach_shape(said):
+    """A refusal with its particulars taken out, so the same refusal met about different things counts as one: ids and
+    numbers become N, quoted words become '…', and only its first sentence is kept."""
+    import re
+    s = str(said).splitlines()[0] if str(said).strip() else ""
+    s = re.sub(r"'[^']*'|\"[^\"]*\"|`[^`]*`", "'…'", s)
+    s = re.sub(r"\b[a-z]{0,2}\d+\b", "N", s)
+    return re.split(r"(?<=[a-z)])[.;:] ", s, 1)[0][:90]
+
+
+def record_reach(desk, line, kind, said=""):
+    """Every line the desk did not do: reaches/<world>.jsonl (who, what, when, and for a refusal what came back and
+    its shape). `kind` is miss (nothing answered the word) or refused (a command or verb said no). Kept outside the
+    world, like the house's transcripts: a refusal is not an event and must not grow the world; `rows reaches` reads
+    it back counted by shape, and $reach hands the last one to a verb (wish). 9 Oct, a3806: until then only misses
+    were written, nothing read them, and some 340 places that refuse left no trace. A world with no name of its own,
+    or a test's (roomworld..., ...-try), keeps nothing."""
     import json
-    import pathlib
     import time
-    world = (getattr(desk, "_session", "") or "unknown").split("@")[0]
-    d = pathlib.Path(__file__).resolve().parent / "reaches"
+    me = desk.world.me
+    last = desk.__dict__.setdefault("_reach_last", {})
+    last[me] = {"at": time.time(), "line": str(line)[:300], "said": str(said)[:300], "kind": kind}
+    world = (getattr(desk, "_session", "") or "").split("@")[0]
+    if not world or world.startswith("roomworld") or world.endswith("-try"):
+        return
     try:
-        d.mkdir(exist_ok=True)
-        with (d / f"{world}.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"at": time.time(), "who": desk.world.me, "line": line}, ensure_ascii=False) + "\n")
+        REACHES.mkdir(exist_ok=True)
+        with (REACHES / f"{world}.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": time.time(), "who": me, "line": str(line)[:300], "kind": kind,
+                                "said": str(said)[:300], "shape": reach_shape(said) if said else ""},
+                               ensure_ascii=False) + "\n")
     except OSError:
         pass
+
+
+def record_miss(desk, line):
+    """A reach nothing answered (record_reach, kind miss): the evidence for which verbs the house needs."""
+    record_reach(desk, line, "miss", "nothing answers to " + repr(str(line).split(None, 1)[0] if str(line).strip() else ""))
+
+
+def last_reach(desk, within=1800):
+    """The acting person's last line the desk did not do, if it was within `within` seconds: what $reach holds."""
+    import time
+    r = (getattr(desk, "_reach_last", None) or {}).get(desk.world.me)
+    return r if r and time.time() - r["at"] <= within else None
+
+
+def reach_rows(desk, limit=40):
+    """rows reaches: what the desk did not do, counted by shape, the most met first. Fields: shape n who kind last line."""
+    import json
+    import time
+    world = (getattr(desk, "_session", "") or "").split("@")[0]
+    out = {}
+    try:
+        lines = (REACHES / f"{world}.jsonl").read_text(encoding="utf-8").splitlines() if world else []
+    except OSError:
+        lines = []
+    for l in lines:
+        try:
+            r = json.loads(l)
+        except ValueError:
+            continue
+        kind = r.get("kind") or "miss"
+        shape = r.get("shape") or ("nothing answers to '…'" if kind == "miss" else "")
+        if kind == "miss":
+            shape = "miss: " + (str(r.get("line", "")).split(None, 1) or [""])[0].lower()
+        row = out.setdefault(shape, {"shape": shape, "n": 0, "who": [], "kind": kind})
+        row["n"] += 1
+        if r.get("who") and r["who"] not in row["who"]:
+            row["who"].append(r["who"])
+        row["last"] = time.strftime("%d %b %H:%M", time.localtime(r.get("at", 0))).lstrip("0")
+        row["line"] = str(r.get("line", ""))[:120]
+    rows = sorted(out.values(), key=lambda r: -r["n"])[:limit]
+    for r in rows:
+        r["who"] = ", ".join(r["who"])
+    return rows
 
 
 def miss(word):

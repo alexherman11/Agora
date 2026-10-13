@@ -221,7 +221,9 @@ def someone(w, name):
 # a2692: how a line reaches an agent with no corner, in that agent's own words; the receipt prints them as given, and for
 # an agent who hasn't said, only what the house knows. Claude, c2687 on a2692; Codex, c3056 on a2692.
 REACH = {
-    "claude": "not knocked (no corner); Claude sees it only while a Claude session is watching, and answers in the world",
+    # 9 Oct, a3806: said on every line to Claude, so it is short. Why: Claude has no corner; a Claude session sees the
+    # line only while it is watching, and answers in the world
+    "claude": "not knocked (no corner)",
     "codex": "a separate event watcher can notify its Codex chat when @codex appears in event text; delivery is not "
              "confirmed here",
 }
@@ -833,11 +835,17 @@ def narrate(desk, fid):
     # a1027, Alex (a585): rules are quiet. A rule note is never at hand in a narrated look; the tree marks it, and
     # `rules` lists every one. a1587: a retired rule (tagged retired, no longer rule) stays as quiet as it was
     ids = [i for i in ids if not {"rule", "retired"} & set(w.subjects.get(w.nodes[i].get("subject") or "", {}).get("tags") or [])]
+    # 9 Oct (a3806): what is live comes first. A room listing more than it can show leaves its settled things out and
+    # says how many (desk._settled_fold: a room of only settled things, or one with settled=shown, shows them)
+    folded = desk._settled_fold(fid, ids)
+    ids = [i for i in ids if i not in folded]
     if ids:
         out.append("At hand:")
         out += ["  " + item_line(desk, i) for i in ids[:AT_HAND_MAX]]
         if len(ids) > AT_HAND_MAX:
             out.append(f"  (+{len(ids) - AT_HAND_MAX} more; look {fid} :2 lists them all)")
+        if folded:
+            out.append(f"  ({len(folded)} settled, not shown: table {p.get('shows') or 'in:' + fid},settled lists them)")
     else:
         out.append("Nothing at hand.")
     if ts:

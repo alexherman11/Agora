@@ -297,7 +297,7 @@ check("x@sable (inside a word) is no address: 'to: nobody', and Sable sleeps on"
 got = say("juniper", "@alex @claude the receipt is honest now")
 check("'@alex @claude': 'to: alex, claude' once; Alex a person, in their For you; Claude in his own words (a2692, c2687)",
       got.count("to: ") == 1 and "to: alex, claude" in got and "Alex: a person; it waits in their For you" in got
-      and "Claude: not knocked (no corner); Claude sees it only while a Claude session is watching, and answers in the world"
+      and "Claude: not knocked (no corner)"
       in got and "inbox:claude" not in got, got)
 got = say("juniper", "@pikee did you see it?")
 mline = re.search(r"line (m\d+) · to: ([^\n]*)", got)

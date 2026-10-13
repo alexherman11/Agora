@@ -253,10 +253,12 @@ class Desk:
         self._cmd_no += 1
         n0 = len(self.world.events)
         r = self._dispatch(name, args)
+        if "error" in r and not r.get("miss") and name == "desk" and not getattr(self, "_in_rules", False):
+            import verbs        # a3806: a refusal leaves a trace (a miss left its own, in repl), counted by shape
+            verbs.record_reach(self, args.get("line", ""), "refused", r["error"])
         if whole and r.get("miss"):
             # a736: a > line nothing answers is a miss. It says MISS, not ERR, so the lines after it go on
-            r = {"text": f"MISS {r['error']}. Nothing ran; a line that is no command changes nothing, so the lines "
-                         f"after it still run", "miss": True}
+            r = {"text": f"MISS {r['error']}. Nothing ran; the lines after it still run", "miss": True}
         elif whole and "error" in r and len(split_batch(args.get("line", ""))) > 1:
             r["error"] += ("\n  (one > line is one command, and a ; in it is part of the words; for several commands, "
                            "put each command on its own > line)")
@@ -387,6 +389,10 @@ class Desk:
         if hit is not None:
             return hit
         verbs.record_miss(self, line)
+        if cmd in self._verb_names():
+            # 9 Oct (a3806; Pike in Wishes, twice in two minutes): a built-in verb typed bare was called an unknown
+            # command, in 235 characters that never said the one word missing. The line that runs is said as printed
+            raise Unanswered(f"{cmd} is a verb, and a verb of the desk's own is typed after do: do {line.strip()}")
         raise Unanswered(f"unknown command {cmd!r}; nothing here answers to it. help lists the desk's commands; "
                       f"a verb anyone can make is a note tagged verb (help verbs)")
 
@@ -694,11 +700,11 @@ class Desk:
             if kids and n["layout"] != "free":
                 axis = "h" if n["layout"] == "column" else "w"
                 share = min(k[axis] for k in kids)
-                if share < 80:
+                if share < 80 and self._geometry_said():
                     bits.append(f"cramped, {share}px each")   # fuller than it is tall: the fold that a screen would show
                 lim = n["h"] if axis == "h" else n["w"]
                 pos = "y" if axis == "h" else "x"
-                spilled = sum(1 for k in kids if k[pos] + k[axis] > lim + 1)
+                spilled = sum(1 for k in kids if k[pos] + k[axis] > lim + 1) if self._geometry_said() else 0
                 if spilled:
                     bits.append(f"{spilled} past the {'bottom' if axis == 'h' else 'right edge'} (offscreen)")
         else:
@@ -748,7 +754,7 @@ class Desk:
         if hid > 0.05:
             by = [r.split()[1] for r in w.relations(nid) if r.startswith("under")]
             bits.append(("hidden" if hid >= 0.95 else f"{int(hid * 100)}% hidden") + (" by " + ",".join(by) if by else ""))
-        for r in w.relations(nid):
+        for r in w.relations(nid) if self._geometry_said() else ():
             if r.startswith(("offscreen", "spills")):
                 bits.append(r)
         if n["type"] == "surface":
@@ -790,8 +796,12 @@ class Desk:
                 kids = self.world.children(nid)
                 if kids and (force_open or deep or nid in self.open):
                     cap = 16 if deep else None   # a deep look folds a long panel; the fold says how to see the rest
+                    folded = [] if deep else self._settled_fold(nid, [k["id"] for k in kids])
+                    kids = [k for k in kids if k["id"] not in folded]
                     for k in kids[:cap]:
                         walk(k["id"], depth + 1, False)
+                    if folded:
+                        lines.append(("  " * (depth + 1)) + f"({len(folded)} settled, not shown: table in:{nid},settled lists them)")
                     if cap and len(kids) > cap:
                         lines.append(("  " * (depth + 1)) + f"(… {len(kids) - cap} more in {nid}; look {nid} :2 lists one line each)")
                 elif kids:
@@ -1791,10 +1801,37 @@ class Desk:
                 self._mark_rev(nid, aspects_of(verb, kv))
             self._receipt = True
             try:
-                out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
+                if not adds:      # a3806: a line added to a chat changes nothing else about the chat worth a line
+                    out += "\n  now: " + self.line(nid, 1) + self.position_note(nid)
             finally:
                 self._receipt = False
         return out
+
+    FOLD_OVER = 12
+
+    def _settled_fold(self, holder, ids):
+        """Which of `ids` (the things a place lists) are left out of its listing as settled. 9 Oct (a3806): finished
+        work never left: 176 of 785 things were done, cured or answered and still listed, and every row costs its
+        reader. Nothing moves: a listing of more than FOLD_OVER things that mixes live and settled shows the live ones
+        and says how many it left out and how to see them. A place whose things are all settled is a shelf and shows
+        them; so does one whose prop says settled=shown. -> the ids left out."""
+        import knife
+        w = self.world
+        if len(ids) <= self.FOLD_OVER or str((w.nodes[holder].get("props") or {}).get("settled", "")).lower() == "shown":
+            return []
+        out = [i for i in ids if w.nodes[i]["type"] == "appearance" and knife.is_settled(w, i)]
+        return out if 0 < len(out) < len(ids) else []
+
+    def _geometry_said(self):
+        """Does a thing's line say how it sits on a screen (cramped, past the bottom, offscreen-part, spills-parent)?
+        Where the layout verbs are at hand (rooms.layout_at_hand: the Desktop and the rooms inside it; everywhere in a
+        world where no room says verbs=layout). Elsewhere the reader is not laying anything out and paid for those
+        words on every row (9 Oct, a3806: 2,496 of the 15,824 characters of one look); `where <id>` says them, always."""
+        key = (len(self.world.events), self.world.me)
+        if getattr(self, "_geo_key", None) != key:
+            import rooms
+            self._geo_key, self._geo_said = key, rooms.layout_at_hand(self)
+        return self._geo_said
 
     def position_note(self, nid):
         n = self.world.nodes.get(nid)

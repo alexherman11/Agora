@@ -541,7 +541,9 @@ def store_args(w, kv, binds=None):
             pid, how = resolve(w, x, binds)
             if pid:
                 out.append(pid)
-                if how and how != "bound":
+                # 9 Oct (a3299, a3806): a typed name is today's bearer, always; that an earlier person bore it too is
+                # a standing fact, said by `examine <name>`, not on every claim. A name no one bears now is still said
+                if how and how != "bound" and not how.startswith("showing today's"):
                     notes.append(f"~ {k}={x}: {how}")
             else:
                 out.append(x)

@@ -8,6 +8,8 @@ world verbs, scripts and rules all fill their blanks here, the same way:
     $new           the thing made most recently earlier in this reply (any kind; of several made by one line, the
                    last); refused, saying why, if nothing in this reply made anything. The receipt says what it was
     $today         the clock's date                     $me   whoever is acting
+    $reach         your last line the desk did not do (refused or missed, within the half hour) and what came back,
+                   as words: `[typed: ... | came back: ...]`; nothing when there is none (9 Oct; the wish verb uses it)
     $<handle>      a handle you named (set draft = a98, or create ... as=draft)
     in a verb:     $1 $2 ... its words, $* the rest of the line exactly as said, $this the thing a verb lives on
     in a rule:     $item   the thing it fired on (the target, as in a lens act)
@@ -47,7 +49,7 @@ WORD = re.compile(r"^\$(\d+|[A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_-]*)?$
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
-KNOWN = ("$here $here.<prop> $new $today $me $me.corner $me.<prop> $house $house.<prop>, a handle ($name: set, or as= in this "
+KNOWN = ("$here $here.<prop> $new $reach $today $me $me.corner $me.<prop> $house $house.<prop>, a handle ($name: set, or as= in this "
          "reply); in a verb $1 $2 $* $this; in a rule $item; the current thing's own words ($title, $status); a thing's parts "
          ".title .maker .text .in .before .after .<prop>; a value $( <expr> )")
 
@@ -149,9 +151,16 @@ def _word_frame(desk, ctx):
 def _reply_frame(desk, ctx):
     """$new, and the handles `as=` named earlier in this reply."""
     def has(name):
-        return name == "new" or name in ctx.handles
+        return name in ("new", "reach") or name in ctx.handles
 
     def get(name):
+        if name == "reach":
+            # 9 Oct, a3806: the acting person's last line the desk did not do, and what came back, so `wish` carries
+            # the evidence without anyone typing it again. Nothing recent: no words (a wish may stand alone)
+            import verbs
+            r = verbs.last_reach(desk)
+            cut = lambda s, n: s if len(s) <= n else s[:n].rstrip() + "…"      # noqa: E731
+            return f"[typed: {cut(r['line'], 160)} | came back: {cut(r['said'], 120)}]" if r else ""
         if name == "new":
             if ctx.kind == "rule":
                 raise Refusal("$new: a rule has no earlier line; it acts on $item, the thing it fired on")

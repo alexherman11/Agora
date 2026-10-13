@@ -1956,8 +1956,11 @@ class DeskKnife(DeskMoo):
                 positional = [w.nodes[hit]["subject"]] + positional[1:]
         if verb not in knife.PAIR_DOC and len(positional) > 1:
             # unquoted values with spaces land here as stray words; refusing beats silently keeping the first word
+            # 9 Oct (a3806): the example named line= for every verb (do tag a23 x was told line="x"); it names the
+            # verb's own first argument now, so the hint runs as printed
+            m = re.match(r"([a-z_]+)=", getattr(moo.REGISTRY.get(verb), "args", "") or "")
             raise Refusal(f"unexpected words after the target: {' '.join(positional[1:])!r}; quote values with spaces, "
-                          f"e.g. line=\"{' '.join(positional[1:])}\"")
+                          f"e.g. {m.group(1) if m else 'line'}=\"{' '.join(positional[1:])}\"")
         if verb == "resolve" and positional[0].startswith("c") and positional[0][1:].isdigit():
             owner, c = w.find_comment(positional[0])
             if owner is None:
@@ -2035,7 +2038,9 @@ class DeskKnife(DeskMoo):
                 out += "\n  " + r["note"]
         else:
             for i in ids:
-                if i in w.nodes:
+                if i in w.nodes and verb == "append":
+                    pass            # a3806: a line added changes nothing else about the chat worth a line (as cmd_do)
+                elif i in w.nodes:
                     out += "\n  now: " + self.line(i, 1) + self.position_note(i)
                 else:
                     out += f"\n  {i} removed"
