@@ -749,7 +749,7 @@ class World:
 
     def content_verbs(self, sid):
         s = self.subjects[sid]
-        v = {"comment": "line=<str>  (a comment on this thing, signed by you)",
+        v = {"comment": "line=<str> [id=<cNN>]  (a comment on this thing, signed by you; with id=, a reply under that comment, which stays open)",
              "link": "to=<id> as=blocks|refers|answers|part-of  (a connection to another thing)"}
         if any(not c["resolved"] for c in s["comments"]):
             v["resolve"] = "id=<cNN> [line=<str>]  (close a comment, optionally with a reply)"
@@ -1042,6 +1042,29 @@ class World:
             own = own if own and own.group(1).casefold() == str(actor).casefold() else None
             if own:
                 line = line[own.end():]
+            # 13 Oct (Alex: 'can we make it so the agents can reply in line ... reply to the comments'): with id=<cNN> the
+            # words are a reply under that comment, which stays open. Until now a reply could only be given by closing
+            # it (resolve line=). A reply calls the comment's writer and whoever replied before, as well as its header.
+            rid = str(args.get("id", "")).strip()
+            if rid:
+                owner, c = self.find_comment(rid)
+                if owner is None or owner["id"] != sid:
+                    raise Refusal(f"{rid} is not a comment on {sid}; read {sid} to see its comments")
+                if c["resolved"]:
+                    raise Refusal(f"{rid} is resolved; a reply is given to an open comment (undo the resolve, or comment anew)")
+                me = "alex" if actor in ("jeff", "alex") else actor
+                c["replies"].append({"by": me, "text": line})
+                s["rev"] += 1
+                for a in apps:
+                    self._bump(a)
+                ev = self._event("comment", via or sid, {"id": rid, "line": line}, {"drop_reply": rid}, actor)
+                ev["changed"] = [sid] + apps
+                import rooms
+                heard = [str(c["by"]).lower()] + [str(r["by"]).lower() for r in c["replies"]] + written(ev)[0]
+                ev["to"] = [n for i, n in enumerate(heard) if n != str(me).lower() and n not in heard[:i]
+                            and n not in rooms.EVERYONE and rooms.someone(self, n)]
+                return {"ok": True, "event": ev["id"], "changed": [sid] + apps,
+                        "note": f"reply added under {rid} by {c['by']} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
             cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor)
             # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
             # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
@@ -1343,6 +1366,11 @@ class World:
             owner, c = self.find_comment(u["drop_comment"])
             if owner:
                 owner["comments"].remove(c)
+                owner["rev"] += 1
+        elif "drop_reply" in u:
+            owner, c = self.find_comment(u["drop_reply"])
+            if c:
+                c["replies"] = c["replies"][:-1]
                 owner["rev"] += 1
         elif "reopen" in u:
             owner, c = self.find_comment(u["reopen"])

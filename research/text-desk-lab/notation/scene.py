@@ -233,7 +233,7 @@ def _cmd_value(v):
 # anything the terminal cannot.
 SOURCES = {
     "sections": ("sections:<id>", ("item", "heading", "words", "text", "index")),
-    "comments": ("comments:<id>", ("item", "cid", "by", "text", "state")),
+    "comments": ("comments:<id>", ("item", "cid", "by", "text", "state", "replies")),
     "actors": ("actors", ("name", "acts", "last", "verb", "target", "read", "behind")),
     "events": ("events", ("eid", "verb", "target", "by", "at", "merged")),
     "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
@@ -614,7 +614,9 @@ def _rows_of(desk, source, session=None):
         return [{"item": nid, "heading": h or "(before the first heading)", "words": len(b.split()), "text": b, "index": k}
                 for k, (h, b) in enumerate(w.sections(s["text"]), 1)]
     if head == "comments":
-        return [{"item": nid, "cid": c["id"], "by": c["by"], "text": c["text"], "state": "resolved" if c["resolved"] else "open"}
+        # replies (13 Oct): the thread under the comment as one text, a line a reply, each signed
+        return [{"item": nid, "cid": c["id"], "by": c["by"], "text": c["text"], "state": "resolved" if c["resolved"] else "open",
+                 "replies": chr(10).join(f"{r['by']}: {r['text']}" for r in c.get("replies") or [])}
                 for c in s.get("comments", [])]
     if head == "messages":
         # a chat's lines: each is signed by its speaker (world.apply signs a chat line with its actor); a line a rule

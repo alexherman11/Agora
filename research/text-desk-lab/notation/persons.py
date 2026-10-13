@@ -200,11 +200,11 @@ def comment_by(w, c, made=None):
 
 
 def reply_by(w, c, i):
-    """The i-th reply on comment c, its author as printed: the resolve event that wrote it names the person."""
+    """The i-th reply on comment c, its author as printed: the event that wrote it (a resolve, or since 13 Oct a comment with id=) names the person."""
     r = (c.get("replies") or [])[i]
     if not on(w):
         return r.get("by")
-    evs = [e for e in w.events if e["verb"] == "resolve" and (e.get("args") or {}).get("id") == c.get("id")
+    evs = [e for e in w.events if e["verb"] in ("resolve", "comment") and (e.get("args") or {}).get("id") == c.get("id")
            and (e.get("args") or {}).get("line") and not e.get("undone")]
     e = evs[i] if i < len(evs) else None
     if e and of_event(w, e) and norm(e.get("by")) == norm(r.get("by")):
