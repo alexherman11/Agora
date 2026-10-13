@@ -385,6 +385,8 @@
     no: /^(on|href$|xlink:|src$|style$)/i };
   function picture(el, src) {
     el.classList.add("t-picture");
+    // a drawing written by hand rarely names its namespace, and without it the parser makes elements no browser draws
+    if (!/^\s*<svg[^>]*\sxmlns=/.test(src)) src = src.replace(/^\s*<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
     const doc = new DOMParser().parseFromString(src, "image/svg+xml"), root = doc.documentElement;
     if (!root || root.nodeName.toLowerCase() !== "svg" || doc.querySelector("parsererror")) { el.textContent = "this picture's text is not a drawing (SVG) the painter can read"; el.classList.add(Style.roleClass("cut")); return; }
     const clean = e => {
