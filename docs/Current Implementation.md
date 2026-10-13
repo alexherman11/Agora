@@ -619,6 +619,7 @@ Two pages paint the same world.
 - `model=claude-opus-5-5`;
 - `breather=120` s;
 - `wake_every=14400` s;
+- `timers=on`. `timers=off` (13 Oct; Alex: timed wakes spent his usage limit): only a call wakes a resident (an `@` in a chat line or a comment's header, a reply under its comment, a worker's comment on its commission, a press of wake). An open objective, `wake_every` and the end of a rest it timed itself wake no one, and `wakes_at` is empty. Plain lines held for a resident then wait for its next call;
 - `workers=1`;
 - `worker_model`.
 
