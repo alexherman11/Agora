@@ -168,6 +168,22 @@ def _scene_key(q):
             int(time.time() // 60), visits)
 
 
+def _report_only(name, was, now):
+    """13 Oct (a4465): a painter's report of its boxes is saved in the world file, so the file moved, and every scene of
+    that world was built and sent whole again (0.3 s and 360 KB, twice after each press) though nothing a painter draws
+    had changed. The scenes and the event count built for the file as it was (`was`: its time and size, read under the
+    lock the report was written under) now stand for the file as the report left it. What lags: the words beside a
+    scene (the inspector's text) show the report's sizes at the next change or the next minute; `scene <lens>` typed
+    at the desk reads them at once, as before."""
+    if not was or not now or was == now:
+        return
+    for k in [k for k in _SCENES if k[0] == name and k[4:6] == was]:
+        _SCENES[k[:4] + now + k[6:]] = _SCENES.pop(k)
+    seen = _EVENTS.get(name)
+    if seen and seen[:2] == was:
+        _EVENTS[name] = now + seen[2:]
+
+
 def snapshot_for(desk):
     """The world as JSON for the Desktop (core.js asks at start, after each of its own acts, and at every change)."""
     snap = desk.snapshot()
@@ -190,7 +206,7 @@ def snapshot_for(desk):
     return snap
 
 
-_DESKS = {}      # world file -> ((its time, its size), the desk as this process last saved or loaded it)
+_DESKS = {}      # world file -> ((its time, its size), the desk as this process last saved or loaded it, {actor: its pickle})
 
 
 class Session:
@@ -200,7 +216,9 @@ class Session:
         if not SESSION_NAME.match(str(name)):
             # review 29 Sep: any string became a file path, `..` included, and was created and saved
             raise BadRequest(f"no session named {str(name)[:80]!r}: a session name is letters, digits, _ @ - (at most 64; no . or slashes)")
-        self.name, self.actor = name, (actor or "alex").lower()
+        # interned: a line's event keeps its actor's name, and a pickle writes one string object once; the same name as a
+        # new object in the next request pickled the same world to different bytes (a4465: every read after a line saved)
+        self.name, self.actor = sys.intern(str(name)), sys.intern(str(actor or "alex").lower())
         self.path = SESSIONS / f"{name}.pickle"
         self.lock = SESSIONS / f"{name}.lock"
 
@@ -216,8 +234,14 @@ class Session:
         except OSError:
             self.stamp = None
         held = _DESKS.get(key)
+        self.pickled, before = {}, None
         if held is not None and self.stamp is not None and held[0] == self.stamp:
             desk = held[1]
+            # 13 Oct (a4465: a click took 600 ms, 100 of each request pickling the 18 MB world twice, reads too): the
+            # pickle this actor's last request ended with is the `before` of their next one, while the desk in memory
+            # is still that one. Only for an actor the desk already knows: entering as them then changes nothing
+            self.pickled = held[2]
+            before = self.pickled.get(self.actor) if self.actor in (getattr(desk, "_per", None) or {}) else None
         else:
             _DESKS.pop(key, None)
             desk = pickle.loads(self.path.read_bytes()) if self.stamp is not None else explore.fresh()
@@ -234,7 +258,7 @@ class Session:
         # rewrite moved the file's time so the house reloaded it under the lock on every pass. A request that
         # changed nothing now writes nothing.
         per[self.actor] = (desk.seen, desk.open, desk.last_event_seen)
-        self.before = pickle.dumps(desk) if self.path.exists() else None
+        self.before = before if before is not None else pickle.dumps(desk) if self.path.exists() else None
         return desk
 
     def __exit__(self, *exc):
@@ -250,8 +274,13 @@ class Session:
                 explore.save_desk(self.path, d, now)
                 st = self.path.stat()
                 self.stamp = (st.st_mtime_ns, st.st_size)
+                self.pickled = {}                 # the world moved: nobody else's last pickle is of this one
             if self.stamp is not None:
-                _DESKS[key] = (self.stamp, d)
+                self.pickled.pop(self.actor, None)
+                self.pickled[self.actor] = now
+                while len(self.pickled) > 2:      # the two who asked last: each is the whole world's size
+                    self.pickled.pop(next(iter(self.pickled)))
+                _DESKS[key] = (self.stamp, d, self.pickled)
                 while len(_DESKS) > 3:
                     _DESKS.pop(next(iter(_DESKS)))
         except BaseException:
@@ -398,7 +427,9 @@ class Handler(SimpleHTTPRequestHandler):
             raise BadRequest("the body must be a JSON object")
         if urlparse(self.path).path == "/api/observe":
             # a painter reports what happened on its screen. Not an event, not undoable, not the world: a viewer's observation.
-            with Session(body.get("session", "desktop"), body.get("as")) as desk:
+            sess = Session(body.get("session", "desktop"), body.get("as"))
+            with sess as desk:
+                was = sess.stamp
                 views = getattr(desk, "_views", None)
                 if views is None:
                     views = desk._views = {}
@@ -410,6 +441,7 @@ class Handler(SimpleHTTPRequestHandler):
                                                             "time": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
                                                             "viewport": body.get("viewport"), "facts": facts, "boxes": boxes,
                                                             "painted": {"frame": str(p.get("frame") or "")[:400], "style": str(p.get("style") or "")[:80]} if p else None}
+            _report_only(sess.name, was, sess.stamp)
             return self._json({"ok": True, "kept": len(facts)})
         if urlparse(self.path).path == "/api/style":
             # 8 Oct: a style text read by the one reader, for a page that edits a style it has not saved (the windowed

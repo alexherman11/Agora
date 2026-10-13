@@ -57,6 +57,15 @@ WATCH = r"""((key, words) => { const now = () => performance.now(), m = window._
 TICKED ="(line => () => { const e = document.querySelector(`[data-key=\"${line}\"]`); return !!e && e.innerText.trim().startsWith('☑'); })"
 
 
+# what was measured (pike, c4634: a number names its source and its world): the code and painter this page is served
+# by, the world's last event, and the lens frame and style revision that were painted (they are things in the world)
+WHAT = r"""(async () => { const q = new URLSearchParams(location.search), s = q.get('session');
+  const v = await (await fetch('/api/version')).json(), n = (await (await fetch(`/api/events?session=${s}&since=999999999`)).json()).total;
+  const last = (await (await fetch(`/api/events?session=${s}&since=${n - 1}`)).json()).events[0] || {};
+  const d = (await (await fetch(`/api/scene?session=${s}&as=${q.get('as')}&lens=${q.get('lens')}&view=painter`)).json()).scene.def;
+  return `painter ${v.painter}, scene shape ${v.shape}; the world copy ends at ${last.id} (${n} events); lens frame ${d.frame}, style ${d.style_name} ${d.style_rev}`; })()"""
+
+
 def screen(world, who, lens, steps):
     out = subprocess.run([sys.executable, str(HERE / "screen.py"), world, "--as", who, "--lens", lens, *steps],
                          capture_output=True, text=True, encoding="utf-8", cwd=HERE)
@@ -81,7 +90,11 @@ def main():
     world = a[0] if a and not a[0].startswith("--") else "frontier-try"
     who = a[a.index("--as") + 1] if "--as" in a else "alex"
     lens = a[a.index("--lens") + 1] if "--lens" in a else "design-review"
-    box = values(screen(world, who, lens, ["js", BOX]))[0]
+    what, box = values(screen(world, who, lens, ["js", WHAT, "js", BOX]))
+    head = subprocess.run(["git", "log", "-1", "--format=%h %s"], capture_output=True, text=True, encoding="utf-8", cwd=HERE).stdout.strip()
+    dirty = subprocess.run(["git", "status", "--short", "--", "."], capture_output=True, text=True, encoding="utf-8", cwd=HERE).stdout.split()[1::2]
+    print(f"source {head[:70]}" + (f" + uncommitted: {' '.join(Path(d).name for d in dirty if not d.endswith('.pickle'))}" if dirty else ""))
+    print(what)
     if not box:
         raise SystemExit(f"proof_press: {lens} as {who} in {world} shows no unticked check box in view")
     arm = f"(window.__m.arm({TICKED}({json.dumps(box['line'])})), 'armed')"
