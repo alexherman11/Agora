@@ -1038,6 +1038,63 @@ def test_scene_for_one_part_and_ok():
         tmp.unlink(missing_ok=True)
 
 
+def test_scene_words_is_the_scene_as_one_text():
+    """a4179: scene <lens> [<part path>] words prints each text part whole on its own line and nothing else; an absent
+    part says nothing; over the budget it prints 120 lines and says how to ask for the rest; and only a part whose
+    words printed whole counts as seen (the full print cuts at 240 characters)."""
+    import deskd
+    tmp = _scratch("_test_words")
+    try:
+        with deskd.Session("_test_words", "jeff") as desk:
+            say = lambda line: (lambda r: r.get("text") or r.get("error"))(desk.dispatch("desk", {"line": line}))   # noqa: E731
+            say("look")
+            say('do create f01 kind=surface title=Doc layout=column')
+            doc = [k for k, n in desk.world.nodes.items() if n.get("title") == "Doc"][0]
+            long = "long " * 70 + "zebra"
+            for kv in ('text="One."', 'text=Two block=h2', f'text="{long}"', 'text=hidden block=secret'):
+                say(f"do create {doc} kind=note title=p {kv}")
+            src = "\\n".join(["root : column", '  head : text \\"$title\\"', f"    the {doc}", "  body : column", f"    of in:{doc}", "    each p",
+                              "p : column", '  let pre = \\"## \\" when $block = \\"h2\\"', '  let pre = \\"\\" otherwise',
+                              '  let show = \\"no\\" when $block = \\"secret\\"', '  let show = \\"yes\\" otherwise',
+                              '  line : text \\"$(pre)$text\\"', '    only when show = \\"yes\\"', "    role body"])
+            assert "compiles" in say(f'do create f01 kind=note tags=lens title=reader text="{src}"')
+            out = say("scene reader words").splitlines()
+            assert out[0].startswith("scene reader words · for jeff · world @") and out[0].endswith("· 4 lines"), out[0]
+            assert out[1:] == ["Doc", "One.", "## Two", long], out
+            part = say("scene reader body words").splitlines()
+            assert "part body: 1 match" in part[0] and part[1:] == ["One.", "## Two", long], part
+            assert "no part 'nope'" in say("scene reader nope words")
+            ids = desk.world.children(doc)
+            three = ids[2]["id"]
+            # what the words print showed whole is seen, each node for itself
+            desk._seen_idx.clear()
+            say("scene reader body/" + ids[0]["id"] + " words")
+            assert "text" in desk._seen_index(ids[0]["id"]) and "text" not in desk._seen_index(three)
+            say("scene reader words")
+            assert "text" in desk._seen_index(three), "a paragraph of 355 characters printed whole is seen"
+            # past the budget: 120 lines, the rest by from= or :3, and what did not print is not seen
+            for k in range(130):
+                say(f"do create {doc} kind=note title=p text=line{k}")
+            last = desk.world.children(doc)[-1]["id"]
+            desk._seen_idx.clear()
+            out = say("scene reader words").splitlines()
+            assert len(out) == 122 and out[0].endswith("· 134 lines"), (len(out), out[0])
+            assert out[-1] == ("(lines 1-120 of 134: scene reader words from=121 for the next, scene reader words :3 for all. "
+                               "Only what is printed here counts as seen)"), out[-1]
+            assert "text" not in desk._seen_index(last) and "text" in desk._seen_index(three)
+            out = say("scene reader words from=121").splitlines()
+            assert out[1] == "line116" and out[-2] == "line129" and out[-1].startswith("(lines 121-134 of 134: scene reader words :3"), out
+            assert "text" in desk._seen_index(last)
+            assert len(say("scene reader words :3").splitlines()) == 135
+            assert "past the end" in say("scene reader words from=500") and "from=<n> wants" in say("scene reader words from=0")
+            # a lens whose own title ends in the word is still itself
+            say('do create f01 kind=note tags=lens title="two words" text="root : text \\"hello\\""')
+            assert say("scene two words").startswith("scene two words · for jeff")
+            assert say("scene two words words").splitlines() == [say("scene two words words").splitlines()[0], "hello"]
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_scene_prints_painted_boxes_and_their_age():
     """a1473: a painter's report carries each part's box and the lens frame it painted; scene prints the box on the
     part's line, marks 0 high, and after an edit says the sizes are of the old lens until a painter reports again."""
