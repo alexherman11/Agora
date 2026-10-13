@@ -230,6 +230,44 @@ check("$x.text is the thing's words", props(paras[0]).get("said") == "the two wo
 check("$x.in is what holds it", W.nodes[W.last_created]["parent"] == page, W.nodes[W.last_created])
 got = reply(ME, f"look {page} :2", f"set top = {paras[0]}", "do prop $top.before mark=none")
 check("the first thing has nothing before it, and says so", f"{paras[0]} is first in {page}" in got[-1][1] + got[-1][2], got[-1])
+# a3937 (Pike, 13 Oct): a part of a part. $1.before.text filled $1.before and left '.text' as words, under an ok
+reply(ME, f"look {page} :1", f'do create {page} kind=note tags=verb title=probe text="do comment \\$1 text=\\"probe: [\\$1.before.text]\\""')
+got = reply(ME, f"look {page} :2", f"probe {paras[1]}")
+check("$1.before.text in a verb is the words of the thing before $1", not got[-1][2] and "probe: [the one words]" in got[-1][1]
+      and f"{paras[0]}.text" not in got[-1][1], got[-1])
+n = len(W.events)
+got = reply(ME, f"look {page} :2", f"probe {paras[0]}")
+check("on the first thing it stops as $1.before does, and makes nothing",
+      f"{paras[0]} is first in {page}, so nothing is before it" in got[-1][1] + got[-1][2] and len(W.events) == n, got[-1])
+got = reply(ME, f"look {page} :2", f"set mid = {paras[1]}", "do prop $mid far=$mid.before.in.title", "do prop $mid.after.before mark=round",
+            "do prop $mid.before.in seen=yes")
+check("typed: a chain fills as a whole value and as a target", not got[-1][2] and props(paras[1]).get("far") == "Page"
+      and props(paras[1]).get("mark") == "round" and (W.nodes[page].get("props") or {}).get("seen") == "yes", (got, props(paras[1])))
+n = len(W.events)
+got = reply(ME, f"look {page} :2", f"set mid = {paras[1]}", "do prop $mid far=$mid.before.title.in")
+check("a part asked of words refuses naming the whole blank, and nothing is written",
+      "$mid.before.title.in: $mid.before.title is words" in got[-1][1] + got[-1][2] and len(W.events) == n
+      and props(paras[1]).get("far") == "Page", got[-1])
+got = reply(ME, f"look {page} :2", f"set mid = {paras[1]}", "do prop $mid far=$mid.before.nope.title")
+check("a part the thing in the middle doesn't have refuses naming the blank as far as it got",
+      f"$mid.before.nope: {paras[0]} has no nope=" in got[-1][1] + got[-1][2] and len(W.events) == n, got[-1])
+# Pike's cases 5 and 6: a dot that is words. Glued, it refuses and prints the way out; braces end the blank
+reply(ME, f"look {page} :1", f'do create {page} kind=note tags=verb title=glued text="do prop \\$1 file=\\"[\\$1.title.md]\\""',
+      f'do create {page} kind=note tags=verb title=braced text="do prop \\$1 file=\\"[\\${{1.title}}.md] \\${{1}}s \\${{1.before.title}}\\""')
+n = len(W.events)
+got = reply(ME, f"look {page} :2", f"glued {paras[1]}")
+said = got[-1][1] + got[-1][2]
+check("[$1.title.md] refuses naming the whole blank and how to write the dot as words, and stores nothing",
+      "$1.title.md: $1.title is words" in said and "${1.title}.md" in said and len(W.events) == n
+      and "file" not in props(paras[1]), got[-1])
+got = reply(ME, f"look {page} :2", f"braced {paras[1]}")
+check("[${1.title}.md] stores the title, then .md as words; ${1}s and ${1.before.title} fill too",
+      not got[-1][2] and props(paras[1]).get("file") == f"[two.md] {paras[1]}s one", (got[-1], props(paras[1])))
+got = reply(ME, f"look {page} :2", "braced")
+check("a verb whose only $1 is in braces still says it needs a word", "needs 1 word(s)" in got[-1][1] + got[-1][2], got[-1])
+got = reply(ME, f"look {page} :2", f"set mid = {paras[1]}", "do prop ${mid.before} mark=braced", "do prop $mid cost=${5}")
+check("typed: a braced blank is a target; ${5} is not a blank", not got[-1][2] and props(paras[0]).get("mark") == "braced"
+      and props(paras[1]).get("cost") == "${5}", (got, props(paras[1])))
 r = rule_note(f"on create by={ME} do prop where=\\$here")
 got = reply(ME, f"look {CORNER} :1", f"do create {CORNER} kind=note title=Ruled2")
 reply(ME, f"look {r} :1", f"do remove {r}")

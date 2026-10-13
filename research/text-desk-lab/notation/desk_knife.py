@@ -296,7 +296,7 @@ class DeskKnife(DeskMoo):
         for m in blanks.BLANK.finditer(line):
             if m.group(0) == blanks.LIT:
                 continue
-            name, attr = m.group(1), m.group(2) or ""
+            name, attr = m.group("name"), m.group("attr") or ""
             if name == "new":
                 return None, "$new: a rule has no earlier line; it acts on $item, the thing it fired on"
             if name.isdigit() or name in ("this", "*"):
