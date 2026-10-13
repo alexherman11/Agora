@@ -414,7 +414,10 @@ def who_for(w, actor):
 def _mint_quietly(w, n):
     pid = w._id("p")
     k = w.next_event_number()
-    w.subjects[pid] = _subject(w, pid, n, kind_guess(w, n), f"e{k + 1}", [(n, k)])
+    # a4164: someone who came through the gate is a human, said by the gate (deskd sets through_gate for that one
+    # line); everyone else is guessed
+    kind = "human" if n and norm(getattr(w, "through_gate", None)) == n else kind_guess(w, n)
+    w.subjects[pid] = _subject(w, pid, n, kind, f"e{k + 1}", [(n, k)])
     _cache.pop(w, None)
     w._event("person", pid, {"new": n, "kind": w.subjects[pid]["props"]["kind"], "first_act": True},
              {"delete": None, "delete_subject": pid}, "house")
