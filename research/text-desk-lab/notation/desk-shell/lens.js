@@ -450,7 +450,7 @@
       if (!line.includes("$quoted")) return line;
       const s = this.sel; this.sel = null;
       document.querySelectorAll("[data-quoting]").forEach(e => { e.dataset.hint = e.dataset.quoting; delete e.dataset.quoting; });
-      return line.replace(/\$quoted_in/g, () => s ? s.item : "").replace(/\$quoted/g, () => s ? this.esc(s.text.trim()) : "");
+      return line.replace(/\$quoted_in\b/g, () => s ? s.item : "").replace(/\$quoted\b/g, () => s ? this.esc(s.text.trim()) : "");
     },
     selected(n) { const it = (n.fence || {}).item; return this.sel && it && this.sel.item === it ? "“" + this.esc(this.sel.text.trim()) + "” " : ""; },
     queue: null,
