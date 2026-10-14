@@ -436,7 +436,7 @@
       if (e.key === "Escape") { e.preventDefault(); if (!V.drop(n.key)) return; V.mark(el, n.key); el.textContent = el._n.paint.text; el.blur(); }
     });
     el.addEventListener("blur", () => {
-      if (V.repainting) return;      // a repaint moved it; the person is still editing it
+      if (V.repainting || el._ahead) return;      // a repaint moved it (the person is still editing it), or a split shown ahead took the caret
       // 14 Oct (Pike: a lone '@' was sent twice from Alex's composer): the window losing focus (a key that opens the
       // window's menu, another program) blurs the text too, and is not the person putting it down. A text whose lens
       // says `commit enter only` (a message) is sent by that key only, and leaving it keeps the draft; any other text
@@ -493,6 +493,26 @@
     sel: null,
     selected(n) { const it = (n.fence || {}).item; return this.sel && it && this.sel.item === it ? "“" + this.esc(this.sel.text.trim()) + "” " : ""; },
     queue: null,
+    ghost: null,                              // the text of a split shown ahead of the desk (ahead), while it is on its way
+    ahead(el, src, at) {
+      const item = (el._n.fence || {}).item; if (!item) return null;
+      // the instance this text stands in: the outermost element above it whose key is this thing's
+      let inst = null;
+      for (let x = el; x && x !== paint; x = x.parentElement) if ((x.dataset.key || "").endsWith("/" + item)) inst = x;
+      if (!inst) return null;
+      const path = []; for (let x = el; x !== inst; x = x.parentElement) path.unshift([...x.parentElement.children].indexOf(x));
+      const copy = inst.cloneNode(true);
+      for (const x of [copy, ...copy.querySelectorAll("[data-key]")]) x.dataset.key = "ahead:" + x.dataset.key;
+      copy.dataset.ahead = "1";
+      let twin = copy; for (const i of path) twin = twin && twin.children[i];
+      if (!twin) return null;
+      el._ahead = true;                        // its leaving is not an edit: the split carries its words
+      el.textContent = src.slice(0, at);
+      twin.textContent = src.slice(at);
+      inst.after(copy);
+      this.ghost = twin; this.put(twin, 0);
+      return copy;
+    },
     wait(done) {
       if (!this.queue) this.queue = [];
       Promise.resolve(done).catch(() => {}).then(async () => {
@@ -523,9 +543,16 @@
       const prev = before[before.indexOf(el) - 1], prevLen = prev ? (prev._n.paint.text || "").length : 0, prevKey = prev && prev._n.key;
       const whole = /[$](head|tail|value)\b/.test(a.line);
       const line = a.line.replace(/\$(head|tail|value)\b/g, (_, word) => this.esc(word === "head" ? src.slice(0, c.at) : word === "tail" ? src.slice(c.at) : src));
+      // Snappy Desk stage 3 (14 Oct, hands go first): a key whose command splits the text at the caret ($head stays,
+      // $tail goes on) is shown split now, before the desk answers: a copy of this text's instance stands after it
+      // with the tail, the caret at its start, and keys typed meanwhile appear in it. It is only a picture: the keys
+      // are still kept and given to the text the desk made, and the next paint replaces the copy (or, refused, takes
+      // it away and says why). Read from the verb, which means the same in every lens, never from a lens's names.
+      const ghost = whole && /^\s*(do\s+)?split\s/.test(a.line) && /[$]head\b/.test(a.line) && /[$]tail\b/.test(a.line) ? this.ahead(el, src, c.at) : null;
       // Keep the draft and its original fence until the command succeeds.
       // A refused split/join must never discard words that exist only here.
       this.wait(sendKey(seen, line, whole ? { key, text: src } : null).then(r => {
+        if (ghost) { ghost.remove(); this.ghost = null; el._ahead = false; }
         if (!r || r.error || /(^|\n)ERR\b/.test(r.text || "")) return;
         const made = r && (r.created || [])[0], find = k => paint.querySelector(`[data-key="${CSS.escape(k)}"]`);
         const same = find(key), born = made && item && find(key.split(item).join(made));
@@ -572,7 +599,14 @@
   };
   document.addEventListener("keydown", e => {
     if (!TEXT.queue || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
-    if (e.key.length === 1 || /^(Enter|Tab|Backspace|Delete)$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey }); }
+    if (e.key.length === 1 || /^(Enter|Tab|Backspace|Delete)$/.test(e.key)) {
+      e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey });
+      // a split shown ahead: what is typed shows in it at once (the keys themselves wait for the text the desk makes)
+      if (TEXT.ghost && TEXT.ghost.isConnected && document.activeElement === TEXT.ghost) {
+        if (e.key.length === 1) document.execCommand("insertText", false, e.key);
+        else if (e.key === "Backspace") document.execCommand("delete");
+      }
+    }
   }, true);
   document.addEventListener("selectionchange", () => {
     const sel = getSelection(), el = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
