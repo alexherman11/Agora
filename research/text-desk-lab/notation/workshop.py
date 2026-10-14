@@ -181,6 +181,9 @@ class Workshop:
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
         self.compared = set()          # (promise, lived commit) this house has said its comparison of, or tried to
+        # 14 Oct (Codex e9951: the house's beat stopped for the minutes a landing's health ran inside its pass): a
+        # landing is judged on a thread beside the house; its outcome is said on the house's own thread, a pass later
+        self.landing = {}              # commission -> {"thread", "result"}: judged now, beside the house
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -276,7 +279,7 @@ class Workshop:
                 if running < int(cfg.get("workers", "1")):
                     self.begin(w, cid, s, cfg)
                 continue
-            if not wk and state in ("working", "waiting", "ready") and (TREES / cid).exists():
+            if not wk and state in ("working", "waiting", "ready", "landing") and (TREES / cid).exists():
                 wk = self.resume(w, cid, s, cfg)      # the house restarted under it: carry on in its own session
             if not wk:
                 continue
@@ -287,8 +290,19 @@ class Workshop:
                 wk.log("turn", {"state": state})
             w = self.house.load()
             s2, state = self.commissions(w).get(cid, (s, state))
+            flight = self.landing.get(cid)
+            if flight is not None:
+                if not flight["thread"].is_alive():
+                    del self.landing[cid]
+                    self.landed(w, cid, s2, wk, flight["result"])
+                continue
             if state == "ready" and not wk.busy:
-                self.land(w, cid, s2, wk)
+                self.land(w, cid, s2, wk, wait=False)
+                continue
+            if state == "landing":
+                # a house that stopped while one was judged: nothing here is judging it, so it is judged again
+                self.say(cid, "the house restarted while this was being judged; judging it again.")
+                self.land(w, cid, s2, wk, wait=False)
                 continue
             if not wk.alive() or wk.busy:
                 continue
@@ -503,9 +517,10 @@ class Workshop:
         warn = [l for l in (r.stdout or "").splitlines() if l.startswith("WARNING")]
         return " Current Implementation and FRICTION.md unchanged." + (f" {warn[0][:200]}" if warn else "")
 
-    def land(self, w, cid, s, wk):
-        """Between passes: the branch is judged in the landing room and goes into main only if it passes (landing.py).
-        Every outcome is said on the commission."""
+    def land(self, w, cid, s, wk, wait=True):
+        """The branch is judged in the landing room and goes into main only if it passes (landing.py). With wait=False
+        (the house's pass) the judging runs on a thread and step() says the outcome when it ends; with wait=True (a test,
+        a hand) it is said before this returns. Every outcome is said on the commission."""
         # 14 Oct (Alex: 'main should only be good working code, and things should land as fast as possible, with
         # uncommitted changes not blocking new code arriving'): a landing no longer waits for the main checkout to be
         # clean, merges there, or reverts there. It is judged on main plus the branch, beside a copy of the live world,
@@ -519,7 +534,23 @@ class Workshop:
         title = re.sub(r"\s+", " ", s["title"])[:80]
         why = {wk.branch: f"land {cid}: {title}\n\nasked by {wk.asked_by}, built by {wk.actor} (commission {cid}); judged "
                           f"in the landing room with a copy of the live world, and landed by the house."}
-        r = landing.land([wk.branch], world=self.house.world, who=wk.actor, why=why)
+        flight = {"result": None}
+
+        def judge():
+            try:
+                flight["result"] = landing.land([wk.branch], world=self.house.world, who=wk.actor, why=why)
+            except Exception as e:          # said on the card, never lost in a thread
+                flight["result"] = {"landed": [], "refused": [(wk.branch, f"the landing failed: {type(e).__name__}: {e}")],
+                                    "parked": [], "text": ""}
+        if wait:
+            judge()
+            return self.landed(w, cid, s, wk, flight["result"])
+        flight["thread"] = threading.Thread(target=judge, name=f"landing {cid}", daemon=True)
+        self.landing[cid] = flight
+        flight["thread"].start()
+
+    def landed(self, w, cid, s, wk, r):
+        """What a landing came to, said on the commission and to its worker (on the house's thread)."""
         if r["landed"]:
             head = r["head"]
             changed = [p for p in git("diff", "--name-only", f"{head}^1", head).stdout.split() if p]
