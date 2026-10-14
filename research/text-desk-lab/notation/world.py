@@ -1294,9 +1294,9 @@ class World:
                             if to:
                                 why_to = f" (this chat's other member{'s' if len(to) > 1 else ''})"
                         # 13 Oct: a chat with with=<names> (a design's conversation: Alex and its author) is open to
-                        # anyone, and every line in it reaches those names besides any its header calls (@claude ...)
+                        # anyone, and a line with no header reaches those names; one that opens with @names is for them (as anywhere)
                         withs = [n.strip().lower() for n in str((s.get("props") or {}).get("with", "")).split(",") if n.strip()]
-                        if withs and "to" not in line_args:
+                        if withs and "to" not in line_args and not header(line)[0]:   # 14 Oct (Pike): a line that opens with names is for them only
                             more = [n for n in withs if n not in to and not rooms.same_person(self, n, str(actor).split("/")[0]) and rooms.someone(self, n)]
                             if more:
                                 to = to + more

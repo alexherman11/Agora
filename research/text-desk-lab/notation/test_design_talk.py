@@ -72,7 +72,7 @@ txt, err = say(B, f"read {TALK}", f'do append {TALK} line="reworded it" about={P
 check("a folded line, to the asker", not err and last_line().get("mark") == "folded" and last_line()["to"] == [A], (txt, err, last_line()))
 
 txt, err = say(A, f"read {TALK}", f'do append {TALK} line="@{C}: what do you think?"')[-1]
-check("@anyone is called besides the author", not err and set(last_line()["to"]) == {C, B}, (txt, err, last_line()))
+check("a line that opens with @names is for them only, not the author too (Pike, 14 Oct)", not err and last_line()["to"] == [C], (txt, err, last_line()))
 
 for line, word in ((f'do append {TALK} line="x" about=a999999', "no thing here"),
                    (f'do append {TALK} line="x" about={PARA} mark=maybe', "mark= is ask"),
