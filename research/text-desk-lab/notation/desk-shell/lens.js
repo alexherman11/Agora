@@ -52,7 +52,12 @@
       last = ""; V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true);
     }
     const t = r.text || r.error || ""; V.answered(n.key, r.error || t.startsWith("ERR") ? t : null, draft, token);
+    // 14 Oct (Alex: 'the conversation should also scroll automatically when i send'): words sent from beside a list
+    // that keeps to its end (a chat) take that list to its end, wherever the reader had scrolled it
+    const ends = []; for (let a = (kept.get(n.key) || {}).el; a && a !== paint && !ends.length; a = a.parentElement)
+      a.querySelectorAll(':scope [data-scroll="end"]').forEach(f => ends.push(f.dataset.key));
     await refresh(true);
+    if (!r.error && draft !== undefined) for (const key of ends) { const f = kept.get(key); if (f) f.el.scrollTop = f.el.scrollHeight; }
     // a1008, the cause of e1851/e1852: typed words live in the element, not in its signature, so a composer whose
     // line was sent was reused still showing it, and its next blur sent it again. Once no draft holds them, they go.
     const k = kept.get(n.key), p = k && k.el._n.paint;
