@@ -443,7 +443,17 @@ class World:
         return fid in self.nodes and self.nodes[fid].get("layout") in ("column", "row")
 
     def _legacy_children(self, fid):
-        kids = [n for n in self.nodes.values() if n["parent"] == fid]
+        ix = self.__dict__.get("_still_kids")
+        if ix is not None:
+            # 14 Oct (Snappy Desk): while a lens is built the world holds still (scene.still): one pass over the nodes
+            # gives every parent its children, instead of one pass per question (378 a build of the design page)
+            if not ix:
+                ix[None] = []
+                for n in self.nodes.values():
+                    ix.setdefault(n["parent"], []).append(n)
+            kids = list(ix.get(fid, ()))
+        else:
+            kids = [n for n in self.nodes.values() if n["parent"] == fid]
         lay = self.nodes[fid]["layout"]
         if lay == "free":
             return sorted(kids, key=lambda n: n.get("z", 0))

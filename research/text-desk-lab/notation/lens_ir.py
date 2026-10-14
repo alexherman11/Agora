@@ -22,37 +22,62 @@ class Accessor:
 
     def __init__(self, desk):
         self.desk, self.w, self.R = desk, desk.world, []
+        # Snappy Desk stage 2 (14 Oct): while a repeat's instance is built, every question asked here is kept with its
+        # answer (one list per instance being built, outer ones too), so the next build can ask them again and keep
+        # the instance when every answer is the same. `nodes` keeps the parts whose fence must be read again then.
+        self.rec, self.nodes, self.entries = [], [], []
+        self._sel = {}
+
+    def _said(self, name, args, ans):
+        for r in self.rec:
+            r.append((name, args, ans))
 
     def value(self, r, a):
         c = S._ctx_for(self.w, r)
         v = c.get(a) if (a in c and not a.startswith("_")) else (c.get("_props") or {}).get(a)
         self.R.append(("value", r, a, S._rev_of(self.w, r)))
+        if self.rec:
+            self._said("value", (r, a), v)
         return v
 
     def thing(self, r, state=None):
         """Every printable value of one thing, as one read of the thing (the printer says which fields were used)."""
         self.R.append(("thing", r, S._rev_of(self.w, r)))
-        return S._ctx_for(self.w, r, state)
+        c = S._ctx_for(self.w, r, state)
+        if self.rec:
+            self._said("thing", (r, state), dict(c))
+        return c
 
     def select(self, q):
-        """Referents matching a selection, in the desk's order, as a membership read."""
-        named = S._named(self.w, q)
-        if named is not None:
-            self.R.append(("select", q, [i for i, _ in named]))
-            return named, None
-        sel = self.desk._parse_selection(q)
-        ids = list(sel[0]) if sel else []
-        self.R.append(("select", q, ids))
-        return None, ids
+        """Referents matching a selection, in the desk's order, as a membership read. Answered once per build: the
+        world holds still while a lens is built."""
+        hit = self._sel.get(q)
+        if hit is None:
+            named = S._named(self.w, q)
+            if named is not None:
+                hit = (tuple(named), None)
+            else:
+                sel = self.desk._parse_selection(q)
+                hit = (None, tuple(sel[0]) if sel else ())
+            self._sel[q] = hit
+        named, ids = hit
+        self.R.append(("select", q, [i for i, _ in named] if named is not None else list(ids)))
+        if self.rec:
+            self._said("select", (q,), hit)
+        return (list(named), None) if named is not None else (None, list(ids))
 
     def rows(self, src):
         rs = S.rows(self.desk, src)
         self.R.append(("rows", src, len(rs) if rs is not None else None))
+        if self.rec:
+            self._said("rows", (src,), None if rs is None else [dict(r) for r in rs])
         return rs
 
     def define(self, name):
         s = S.find_lens(self.desk, name, getattr(self, "home", None))     # 9 Oct: nearest to the placing lens's room
         self.R.append(("define", name, s["id"], s["rev"]))
+        if self.rec:
+            self._said("define", (name,), (s["id"], s["rev"]))
         return s
 
     def touched(self, r, aspect=None):
@@ -72,6 +97,8 @@ class Accessor:
             hit = e
             break
         self.R.append(("touched", r, aspect, hit["id"] if hit else None))
+        if self.rec:
+            self._said("touched", (r, aspect), hit["id"] if hit else None)
         if not hit:
             return None
         wall = (hit.get("at") or "")[:16].replace("T", " ")
@@ -83,7 +110,158 @@ class Accessor:
         v = {"me": self.w.me, "today": getattr(self.desk, "today", None) or getattr(self.w, "today", None),
              "session": getattr(self.desk, "_session", None)}.get(f)
         self.R.append(("host", f, v))
+        if self.rec:
+            self._said("host", (f,), v)
         return v
+
+    def same(self, name, args, was):
+        """Ask again what was asked when an instance was built: -> whether the answer is the one it was built from."""
+        if name == "touched":
+            self.touched(*args)
+            return self.R[-1][3] == was
+        now = getattr(self, name)(*args)
+        if name == "thing":
+            return dict(now) == was
+        if name == "select":
+            return self._sel[args[0]] == was
+        if name == "rows":
+            return (None if now is None else [dict(r) for r in now]) == was
+        if name == "define":
+            return (now["id"], now["rev"]) == was
+        return now == was
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Snappy Desk stage 2 (Alex approved the plan, 14 Oct): views by change. An Enter in one paragraph of a 70-paragraph
+# design rebuilt all 70 (1367 parts, 6268 expressions, ~240 ms). Now each instance of a repeat is kept from the last
+# build of the same lens for the same viewer, and used again when (1) the values it reads from the parts above it are
+# the same (its fingerprint: every $name, $frame.field and bare name its parts mention, its frames, its thing), and (2)
+# every question it asked the world, asked again, has the same answer (Accessor.same). What moves without changing what
+# it shows is read again: each gesture's fence (its reads, with the revisions of now and the reads of the parts above
+# it), its bind, and a repeat's event count. A part that places another lens, stands at its world position, or spreads
+# is never kept, nor what holds one. LENS_REUSE=off turns it off; LENS_REUSE_VERIFY=1 builds every scene twice and says
+# any difference (in house-state/lens-reuse.err); every 25th build is checked so anyway, and a difference is served as
+# the whole build, with what was kept forgotten.
+# ---------------------------------------------------------------------------------------------------------------------
+import os
+import time as _time
+
+_REUSE = {}                 # (session, viewer, lens text, style, props) -> {instance key: entry}, the last build's
+_IR = {}                    # (lens text, style, roles) -> (IR parts, root, what each part reads)
+_OFF = [False]
+_STATS = {"kept": 0, "made": 0, "builds": 0, "differed": 0}
+VERIFY_EVERY = 25
+_IDENT = re.compile(r"(?<![\w$.])([A-Za-z]\w*)")
+
+
+def _fence_reads(w, fields0, ids0, cb):
+    """A gesture's reads (its fence): the things it was built from, with their revisions now, and the selections on
+    its chain. fields0: id -> aspects it showed; ids0: [(id, always)]; cb: the reads of the binds above it."""
+    reads, fields = {}, {k: set(v) for k, v in fields0.items()}
+    for i, always in ids0:
+        r = S._rev_of(w, i)
+        if always or r is not None:
+            reads[i] = r
+    selects = []
+    for e in cb:
+        if e[0] == "select":
+            if e not in selects:
+                selects.append(e)
+        elif S._rev_of(w, e[0]) is not None:
+            reads[e[0]] = S._rev_of(w, e[0])
+            fields.setdefault(e[0], set()).update(e[2])
+    return [[i, r, sorted(fields.get(i) or [])] for i, r in sorted(reads.items())] + selects
+
+
+def _bind(w, out):
+    if out.get("item") in w.nodes and out["acts"]:
+        out["rev"] = w.nodes[out["item"]]["rev"]
+        nd = w.nodes[out["item"]]
+        sj2 = w.subjects.get(nd.get("subject") or "")
+        out["bind"] = {"subject": nd.get("subject"), "subject_rev": sj2["rev"] if sj2 else None, "parent": nd["parent"],
+                       "parent_rev": w.nodes[nd["parent"]]["rev"] if nd["parent"] in w.nodes else None, "units": "px in parent"}
+
+
+def _static(node, irs, memo):
+    """-> (names, frame fields, idents, keepable) of a part and everything inside it, read from its IR alone."""
+    got = memo.get(id(node))
+    if got is not None:
+        return got
+    em, b = node["emit"], node["bind"]
+    words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"]]
+    exprs = [c for _, c in em["role_when"]]
+    if node["guard"]:
+        exprs.append(node["guard"]["src"])
+    for let in node["lets"]:
+        exprs += [let["expr"], let["when"]]
+    for a in node["acts"]:
+        words.append(a.get("line"))
+        exprs.append(a.get("when"))
+    if b:
+        words += [b.get("q"), b.get("of"), b.get("over")]
+    words = [t for t in words if isinstance(t, str)]
+    exprs = [t for t in exprs if isinstance(t, str)] + [t for t in words if "$(" in t]
+    names, ffields, idents = set(), set(), set()
+    for t in words + exprs:
+        for a, f in S._VAR.findall(t):
+            (ffields.add((a, f)) if f else names.add(a))
+    for t in exprs:
+        idents.update(_IDENT.findall(t))
+    keep = not node["place"] and em.get("at") != "item" and not em.get("spread") and not (
+        b and b["kind"] == "many" and (b.get("by") or b.get("run") or b.get("over")))
+    inner = list(node["kids"]) + ([irs[b["each"]]] if b and b["kind"] == "many" and b.get("each") in irs else [])
+    for k in inner:
+        n2, f2, i2, k2 = _static(k, irs, memo)
+        names |= n2
+        ffields |= f2
+        idents |= i2
+        keep = keep and k2
+    got = memo[id(node)] = (frozenset(names), frozenset(ffields), frozenset(idents), keep)
+    return got
+
+
+def _fingerprint(node, irs, memo, ctx, layout):
+    """What an instance reads from the parts above it, as a value: kept instances are used again only when it is equal."""
+    names, ffields, idents, _ = _static(node, irs, memo)
+    props = ctx.get("_props") or {}
+    frames = ctx.get("_frames") or {}
+    vals = ctx.get("_values") or {}
+    fp = [ctx.get("item"), ctx.get("id"), ctx.get("_state"), layout, repr(ctx.get("_captured")),
+          tuple(sorted(frames)), tuple(sorted(ctx.get("_lets") or ()))]
+    for n in sorted(names):
+        fp.append((n, n in ctx, n in props, repr(ctx[n] if n in ctx else props.get(n)), (frames.get(n) or {}).get("id")))
+    for a, f in sorted(ffields):
+        fr = frames.get(a)
+        if fr is None:
+            fp.append((a, f, None))
+            continue
+        v = fr.get(f) if (f in fr and not f.startswith("_")) else (fr.get("_props") or {}).get(f)
+        fp.append((a, f, fr.get("id"), repr(v), f in (fr.get("_captured_fields") or ())))
+    for i in sorted(idents):
+        v = vals.get(i)
+        fp.append((i, repr(ctx.get(i)), (getattr(v, "kind", None), X.fmt(v)) if i in vals else None))
+    return tuple(fp)
+
+
+def _first_diff(a, b, path=""):
+    """-> where two scenes first differ (their reads list R aside), or None."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in sorted(set(a) | set(b), key=str):
+            if k == "R" and not path:
+                continue
+            d = _first_diff(a.get(k), b.get(k), f"{path}.{k}" if k != "kids" else path)
+            if d:
+                return d
+        return None
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return f"{path}: {len(a)} kept, {len(b)} made"
+        for x, y in zip(a, b):
+            d = _first_diff(x, y, f"{path}/{x.get('key') if isinstance(x, dict) else ''}")
+            if d:
+                return d
+        return None
+    return None if a == b else f"{path}: kept {str(a)[:120]!r}, made {str(b)[:120]!r}"
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -163,12 +341,85 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     props = props or {}
     acc = acc or Accessor(desk)
     # F7: the lens's own style; 9 Oct (step 7): found from the lens's own room (acc.home, set by compile_lens)
-    root, parts = S.parse(src, roles=S.style_roles(desk, props.get("style"), getattr(acc, "home", None)), style=props.get("style"))
-    S.resolve(root, parts)
-    irs, root = lower(root, parts)
+    roles = S.style_roles(desk, props.get("style"), getattr(acc, "home", None))
+    ik = (src, props.get("style"), repr(roles))
+    if ik in _IR:          # 14 Oct (stage 2): a lens is read once per text and style, not at every build
+        irs, root, smemo = _IR[ik]
+    else:
+        root, parts = S.parse(src, roles=roles, style=props.get("style"))
+        S.resolve(root, parts)
+        irs, root = lower(root, parts)
+        smemo = {}             # what each part reads (_static), worked out once per lens read
+        _IR[ik] = (irs, root, smemo)
+        while len(_IR) > 64:
+            _IR.pop(next(iter(_IR)))
     w = desk.world
     count = count if count is not None else [0]
     host = {f: acc.host(f) for f in ("me", "today", "session")}
+    # a placed lens is keyed again under its placer after it is built (S._rekey, in place): nothing of it is kept
+    off = _OFF[0] or os.environ.get("LENS_REUSE") == "off" or len(stack) > 1
+    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)))
+    prev = {} if off else _REUSE.get(ck, {})
+    nxt, used = {}, set()
+
+    def instance(each, ictx, key, layout, chain, cb):
+        """One instance of a repeat: the one kept from the last build when nothing it read has changed, else made."""
+        if off or not _static(each, irs, smemo)[3] or key in used:
+            if key in used:
+                nxt.pop(key, None)        # two instances with one key: neither is kept (the second is renamed)
+            used.add(key)
+            return make(each, ictx, key, layout, chain, cb)
+        used.add(key)
+        fp = _fingerprint(each, irs, smemo, ictx, layout)
+        old = prev.get(key)
+        if old is not None and old["fp"] == fp:
+            marks, mark = [len(r) for r in acc.rec], len(acc.R)
+            if all(acc.same(*q) for q in old["asks"]):
+                count[0] += old["count"]
+                if count[0] > S.BUDGET:
+                    raise S.LensRefusal(f"this lens makes more than {S.BUDGET} scene nodes. Put `clamp N` on the repeat (line {each['line']}); the text will say how many are left")
+                delta = len(cb) - old["cb0"]
+                for g in old["nodes"]:
+                    n = g["node"]
+                    if g.get("members"):
+                        n["members"]["at"] = len(w.events)
+                        continue
+                    g["cb"] = list(cb) + g["cb"][old["cb0"]:]
+                    n["reads"] = _fence_reads(w, g["fields0"], g["ids0"], g["cb"])
+                    _bind(w, n)
+                old["cb0"] = len(cb)
+                for k2, e2 in old["inner"]:
+                    e2["cb0"] += delta
+                    nxt[k2] = e2
+                    used.add(k2)
+                for r in acc.nodes:
+                    r.extend(old["nodes"])
+                for r in acc.entries:
+                    r.append((key, old))
+                    r.extend(old["inner"])
+                nxt[key] = old
+                _STATS["kept"] += 1
+                return old["out"]
+            del acc.R[mark:]
+            for r, m in zip(acc.rec, marks):
+                del r[m:]
+        asks, nodes, inner = [], [], []
+        acc.rec.append(asks)
+        acc.nodes.append(nodes)
+        acc.entries.append(inner)
+        c0 = count[0]
+        try:
+            out = make(each, ictx, key, layout, chain, cb)
+        finally:
+            acc.rec.pop()
+            acc.nodes.pop()
+            acc.entries.pop()
+        e = {"fp": fp, "asks": asks, "nodes": nodes, "inner": inner, "count": count[0] - c0, "out": out, "cb0": len(cb)}
+        nxt[key] = e
+        for r in acc.entries:
+            r.append((key, e))
+        _STATS["made"] += 1
+        return out
 
     def spread_of(node, index, kid):
         sp, item = node["emit"].get("spread"), w.nodes.get(kid.get("item") or "")
@@ -437,7 +688,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         if track["missing"]:
             out["missing"] = sorted(set(out.get("missing") or []) | {f"{m} on {frames[m.split('.')[0]].get('id')}" for m in track["missing"]})
         if out["acts"]:
-            reads, fields = {}, {}
+            fields, ids0 = {}, []
             current_node = w.nodes.get(ctx.get("item") or "") or {}
             sj = current_node.get("subject") or current_node.get("id")
             for f in track.get("own", ()):
@@ -446,7 +697,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     fields.setdefault(sj, set()).add(a)
                 if f in ("before", "after") and current_node.get("parent"):
                     parent = current_node["parent"]
-                    reads[parent] = S._rev_of(w, parent)
+                    ids0.append((parent, True))
                     fields.setdefault(parent, set()).add("place")
             for k in track["reads"]:
                 fr, _, fld = k.partition(".")
@@ -456,25 +707,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 a = S._aspect_of_field(fld)
                 if fid and a:
                     fields.setdefault(fid, set()).add(a)
-            for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames and f not in S.HOST_FRAMES]:
-                if i and S._rev_of(w, i) is not None:
-                    reads[i] = S._rev_of(w, i)
-            selects = []
-            for e in cb:
-                if e[0] == "select":
-                    if e not in selects:
-                        selects.append(e)
-                elif S._rev_of(w, e[0]) is not None:
-                    reads[e[0]] = S._rev_of(w, e[0])
-                    fields.setdefault(e[0], set()).update(e[2])
-            out["reads"] = [[i, r, sorted(fields.get(i) or [])] for i, r in sorted(reads.items())] + selects
+            ids0 += [(i, False) for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames and f not in S.HOST_FRAMES] if i]
+            g = {"node": out, "fields0": fields, "ids0": ids0, "cb": list(cb)}
+            out["reads"] = _fence_reads(w, fields, ids0, g["cb"])
             out["defpart"] = {"path": "/".join(n["name"] for n in chain), "hash": S._chain_hash(chain)}
-        if ctx.get("item") in w.nodes and out["acts"]:
-            out["rev"] = w.nodes[ctx["item"]]["rev"]
-            nd = w.nodes[ctx["item"]]
-            sj2 = w.subjects.get(nd.get("subject") or "")
-            out["bind"] = {"subject": nd.get("subject"), "subject_rev": sj2["rev"] if sj2 else None, "parent": nd["parent"],
-                           "parent_rev": w.nodes[nd["parent"]]["rev"] if nd["parent"] in w.nodes else None, "units": "px in parent"}
+            for r in acc.nodes:
+                r.append(g)
+        _bind(w, out)
         count[0] += 1
         if count[0] > S.BUDGET:
             raise S.LensRefusal(f"this lens makes more than {S.BUDGET} scene nodes. Put `clamp N` on the repeat (line {node['line']}); the text will say how many are left")
@@ -501,7 +740,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         if place:
                             r = dict(r, run=place[k])
                         okey = r.get("rid") or r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
-                        out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
+                        out["kids"].append(instance(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
                     if b.get("by"):
@@ -522,15 +761,17 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         base = max(0, total - keep) if b.get("last") else 0      # $index: the place in the whole repeat
                         for k, (i, st) in enumerate(pick(named), base + 1):
                             mcb = cb + shown + ([[i, S._rev_of(w, i), []]] if st != "live" else _member_reads(w, i, sel_text))
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, mcb))
+                            out["kids"].append(instance(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, mcb))
                         out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                     else:
                         total = len(ids)
                         base = max(0, total - keep) if b.get("last") else 0
                         for k, i in enumerate(pick(list(ids)), base + 1):
-                            out["kids"].append(make(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
+                            out["kids"].append(instance(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
                 got = [k["item"] or k["key"] for k in out["kids"]]
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
+                for r in acc.nodes:
+                    r.append({"node": out, "members": True})
                 if total > keep:
                     out["cut"] = total - keep
                     cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
@@ -558,6 +799,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 seen_keys[kid["key"]] = c
                 if c > 1:
                     old = kid["key"]
+                    nxt.pop(old, None)           # a kept instance must not carry a name given for this build's twin
                     kid["key"] = f"{old}#{c}"
                     S._reprefix(kid, old, kid["key"])
             out["n"] = len(out["kids"]) - (1 if out.get("cut") else 0)
@@ -583,6 +825,11 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
 
     sc = make(irs[root], {}, root, cb=cb)
     sc["R"] = list(acc.R)
+    if not off:
+        _REUSE.pop(ck, None)
+        _REUSE[ck] = nxt
+        while len(_REUSE) > 24:
+            _REUSE.pop(next(iter(_REUSE)))
     return sc
 
 
@@ -722,8 +969,28 @@ def scene_for(desk, name, part=None, words=None):
     closure = []
     acc = Accessor(desk)
     import promises
-    with promises.held(desk.world):            # a4838: the world holds still while a lens is built
+    with promises.held(desk.world), S.still(desk.world):     # a4838: the world holds still while a lens is built
         sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc)
+        _STATS["builds"] += 1
+        if os.environ.get("LENS_REUSE") != "off" and (os.environ.get("LENS_REUSE_VERIFY") == "1" or _STATS["builds"] % VERIFY_EVERY == 0):
+            closure2 = []
+            _OFF[0] = True
+            try:
+                sc2 = compile_lens(desk, s, (s["title"].lower(),), [0], closure2, Accessor(desk))
+            finally:
+                _OFF[0] = False
+            S.emit(sc)
+            S.emit(sc2)
+            d = _first_diff(sc, sc2)
+            if d:
+                _STATS["differed"] += 1
+                _REUSE.clear()
+                try:
+                    with open(S.HOUSE_STATE / "lens-reuse.err", "a", encoding="utf-8") as f:
+                        f.write(f"{_time.strftime('%Y-%m-%dT%H:%M:%S')} {getattr(desk, '_session', '')} {s['title']} as {desk.world.me}: {d}\n")
+                except OSError:
+                    pass
+                sc, closure = sc2, closure2
     S.emit(sc)
     at = len(desk.world.events)
     fallen = [c for c in closure if c["status"] == "fallback"]

@@ -109,6 +109,7 @@ Anything else is refused with the line number. There is no escape to raw HTML, C
 the pressure that builds against that wall is the research result.
 """
 
+import contextlib
 import pathlib
 import re
 from desk import split_batch
@@ -507,7 +508,42 @@ def _enum(eid):
     return int(d) if d else 0
 
 
+# 14 Oct (Snappy Desk stage 2): while a lens is built the world holds still, so what is read of the world alone is read
+# once per build, not once per part that asks (a page of 70 paragraphs read its talk's 88 lines 70 times: 6160 person
+# labels, half the build). A value kept here depends on the world and nothing else: no frame, viewer or lens.
+_STILL = {}
+
+
+@contextlib.contextmanager
+def still(w):
+    """While a lens is built from world `w`: answers that depend only on the world are kept until it is done."""
+    if id(w) in _STILL:
+        yield
+        return
+    _STILL[id(w)] = {}
+    w.__dict__["_still_kids"] = {}       # world.py: children read from one index while it holds still
+    try:
+        yield
+    finally:
+        _STILL.pop(id(w), None)
+        w.__dict__.pop("_still_kids", None)
+
+
+def _once(w, key, make):
+    m = _STILL.get(id(w))
+    if m is None:
+        return make()
+    if key not in m:
+        m[key] = make()
+    return m[key]
+
+
 def line_rows(desk, chat=None):
+    """Each call has rows of its own to change; the rows are made once while the world holds still (still)."""
+    return [dict(r) for r in _once(desk.world, ("line_rows", chat), lambda: _line_rows(desk, chat))]
+
+
+def _line_rows(desk, chat=None):
     """a1581: the chat lines (things, m<n>) of one chat or of every chat on the desk, oldest first. A line spoken over
     several text lines is one row; `said` is its words after the signature, `to` who its writer addressed."""
     import persons
@@ -1699,6 +1735,11 @@ def _inst(ctx, node, ictx):
 
 
 def _ctx_for(w, nid, state=None):
+    """Each call has a context of its own to change; it is made once while the world holds still (still)."""
+    return dict(_once(w, ("ctx", nid, state), lambda: _make_ctx(w, nid, state)))
+
+
+def _make_ctx(w, nid, state=None):
     """The values a lens may print for one thing. An appearance id, or a subject id (then item is its first appearance,
     or None when unplaced: Pike found a lens could not name the durable thing at all)."""
     if nid not in w.nodes and nid not in w.subjects:          # named in a lens, gone from the world: the scene says so
