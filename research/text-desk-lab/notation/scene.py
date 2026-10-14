@@ -280,6 +280,10 @@ SOURCES = {
     # 9 Oct (a3806): the lines the desk did not do, counted by shape, the most met first (verbs.record_reach): which
     # refusal or missing word is worth curing shows itself, without anyone deciding whose fault each one was
     "reaches": ("reaches", ("shape", "n", "who", "kind", "last", "line")),
+    # a5052 (14 Oct): the windows a host keeps on the screen (research/window-lab/wm.py), as it last said them, in its
+    # order: witnessed beside the house (witnessed.py), never in the world. name is the host's own for the window (a
+    # repeat keys each by it), kind agora or adopted, pinned/collapsed/focused yes or no, age the seconds since it said so
+    "windows": ("windows", ("name", "title", "lens", "kind", "pinned", "collapsed", "focused", "order", "age", "by")),
 }
 # a source's field names: read bare inside their own repeat ($who in `of messages:`); a text's $name that is one of them
 # is no prop of the thing, and no aspect for the fence. 8 Oct: they no longer take a name away from `let` or `as` in
@@ -786,6 +790,12 @@ def _rows_of(desk, source, session=None):
     if head == "reaches":
         import verbs
         return verbs.reach_rows(desk)
+    if head == "windows":
+        import witnessed
+        doc = witnessed.read(session or getattr(desk, "_session", "") or "", "windows")
+        return [] if doc is None else [{**{f: "" for f in SOURCES["windows"][1]}, **{k: v for k, v in r.items() if k in SOURCES["windows"][1]},
+                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
+                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict) and r.get("name")]
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)
