@@ -698,7 +698,9 @@ def scene_for(desk, name, part=None, words=None):
     s = S.find_lens(desk, name)
     closure = []
     acc = Accessor(desk)
-    sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc)
+    import promises
+    with promises.held(desk.world):            # a4838: the world holds still while a lens is built
+        sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc)
     S.emit(sc)
     at = len(desk.world.events)
     fallen = [c for c in closure if c["status"] == "fallback"]

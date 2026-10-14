@@ -1625,7 +1625,20 @@ def defpart_hash(src, path, roles=None, style=None):
     """Recompute a gesture node's part hash from a lens text and the node's part path (root/repeat/card). The path
     steps into a kid by name, or through `each` into the named part. None when the path no longer exists. `roles` and
     `style` are the lens's own (F7): parsed under the default roles, a lens with its own style refuses, and every
-    part-identity check failed (F18)."""
+    part-identity check failed (F18).
+    14 Oct (a4838): every press asks this of the lens it was painted by; the answer is kept by what it is made of."""
+    key = (src, path, frozenset(roles) if roles is not None else None, style)
+    if key not in _DEFPART:
+        if len(_DEFPART) >= 256:
+            _DEFPART.clear()
+        _DEFPART[key] = _defpart_hash(src, path, roles, style)
+    return _DEFPART[key]
+
+
+_DEFPART = {}
+
+
+def _defpart_hash(src, path, roles, style):
     root, parts = parse(src, roles=roles, style=style)
     names = path.split("/")
     if names[0] not in parts:

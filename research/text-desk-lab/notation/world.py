@@ -256,6 +256,13 @@ class World:
                     return s, l
         return None, None
 
+    def __getstate__(self):
+        # 14 Oct (a4838): the event index is rebuilt on first use; saved with the world, the first read after each change
+        # built it again and the 20 MB world was written again for a cache (deskd saves whatever moved)
+        state = dict(vars(self))
+        state.pop("_ev_index", None)
+        return state
+
     def event_by_id(self, eid):
         if not eid:
             return None
