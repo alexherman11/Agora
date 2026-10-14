@@ -172,15 +172,17 @@ const Viewer = (session, who, lens, said, status) => {
     // has scrolled. The page's inner size and device pixel ratio go with every report: a page's size is not attention.
     report(paint, at, extra, attention, painted) {
       const vp = paint.getBoundingClientRect(), facts = attention ? { ...extra } : {}, boxes = {};
-      const els = [...paint.querySelectorAll("[data-key]")], scrolled = [paint, ...els].filter(e => e.scrollTop || e.scrollLeft);
-      for (const el of els) {
+      // parts come in page order, so the scrolled frames around a part are a stack: [frame, its scroll and all above it]
+      const frames = [[paint, scrollX + paint.scrollLeft, scrollY + paint.scrollTop]];
+      for (const el of paint.querySelectorAll("[data-key]")) {
         const r = el.getBoundingClientRect(), f = [];
         if (!el.getClientRects().length) boxes[el.dataset.key] = "hidden";
         else {
-          let x = r.left + scrollX, y = r.top + scrollY;
-          for (const s of scrolled) if (s !== el && s.contains(el)) { x += s.scrollLeft; y += s.scrollTop; }
-          let b = `${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(x)},${Math.round(y)}`;
+          while (!frames.at(-1)[0].contains(el)) frames.pop();
+          const [, dx, dy] = frames.at(-1);
+          let b = `${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(r.left + dx)},${Math.round(r.top + dy)}`;
           const tall = el.scrollHeight > el.clientHeight + 1, wide = el.scrollWidth > el.clientWidth + 1;
+          if ((tall || wide) && (el.scrollTop || el.scrollLeft)) frames.push([el, dx + el.scrollLeft, dy + el.scrollTop]);
           if (tall || wide) {
             const s = getComputedStyle(el), o = s.overflowX + s.overflowY, scrolls = /auto|scroll/.test(o), clips = scrolls || /hidden|clip/.test(o);
             b += (scrolls ? " scroll" : clips ? " clip" : " spill") + (tall ? ` sh=${el.scrollHeight}` : "") + (wide ? ` sw=${el.scrollWidth}` : "");
