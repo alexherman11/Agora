@@ -226,7 +226,7 @@ Why: desk_knife marks every printed node's shown aspects as seen, and the node s
 Not cured here, on Pike's word (do not widen a4179 for it). scene <lens> words does not have the fault: it prints a text whole, and a text its clamp cut is not marked.
 A cure would be small: to_text already knows each cut it makes; a cut node should not say text.
 
-## curing (25)
+## curing (26)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -436,7 +436,13 @@ a4251 · family=code · status=curing
 Source edit, a4179 (worker-a4179, 13 Oct): scene.py (to_words, split_words_arg), lens_ir.scene_for, desk_knife (the scene command). The world-level word that was missing: a way to say how a scene prints. A lens says what is shown; how it is printed for a reader of text was one fixed form in to_text (every key, role, let and gesture: about forty lines a paragraph for a document in design-review). 'words' is a second fixed form, also in Python. A reader who wants a third (markdown with a front matter, a table, an outline) needs source again.
 Also missing, and not built on purpose: a lens stood on a thing you name. doc-read reads the document from the reader's reviewing= prop, so reading a document writes where you are reading to the log. That is Sable's story a4013 and goes to Alex first.
 
-## cured (51)
+### The house said 'still waiting to land' each time the list of files changed, and each saying woke the asker
+
+a4729 · family=silence · status=curing
+
+workshop.land said a landing's wait once per SET of uncommitted files in the main checkout. Alex's edits change that set through the day, so a4465 said it three times (c4636, c4641, c4690), each a call on its asker (Juniper e7832, Pike 13 Oct). Mended in source (workshop.py, a4644): said once per wait, when it begins, with to=nobody, so it is on the card but wakes no one; nothing more until the pass goes ahead, whose outcome calls the asker as before. The world-level word was already there (to=nobody on a comment, world.to_names); what was missing is a way for the world to say which of the house's own words call the asker: the house's lines on a commission are fixed in workshop.py, not a note a resident could change. Unchecked live: no landing has waited since.
+
+## cured (52)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -900,3 +906,9 @@ Cured 13 Oct: commit explicit for text, stable replies:<id> rows, anchored menu 
 Reopened after Alex c4640/e8565: annotated image wrapper broke direct-child media selection, and style at 12% mixed an opaque colour rather than real transparency. Reproduced in browser: dragging inside highlight opened no composer; computed region background rgb(211,225,220), opacity 1 hid labels. Fix source-media lookup to include the stage and render a separate alpha tint with the role ink, keeping the outline and crop source independent.
 
 Verified fix: image drag inside both existing regions opens crop composer; source labels visible through genuine alpha .12. Refused-draft bug found separately in retained compositor skipping V.words; fixed refresh observation, Enter/Shift+Enter, and explicit Use current version recovery. Real-painter isolated stale-version and legacy-draft browser cases passed; Node 3 passed, Python image/comment 13 passed. Activated comment-recovery-20261013, painter fe13f1d64697. Live Enter sent the final bug-thread report once.
+
+### A conversation beside a design: line fields, gathering rows, lighting words
+
+a4727 · family=lens · status=cured
+
+Source edits by Claude, 13 Oct (f542726, 7541ea8, aeb9f14, 18f261a), for Alex's approved design: a conversation beside each design document, messages that point at a passage, the passages lit. WANTED: a chat line that knows what it is about; a chat that always reaches two people; a list of values gathered from rows; a text that lights some of its words; a composer that carries words highlighted elsewhere. WHY NO WORLD EDIT COULD: a chat line's fields, row-source fields and paint are all source. THE SEAMS THAT WERE MISSING: (1) a chat line could carry no data of its own beyond reply_to; a line should take any field, as a thing takes props, and then about/quote/mark would have been world words; (2) an expression could count rows but not gather them; (3) the painter had no way to mark a span of a text from outside the text. LESSON: a Python heredoc in Git Bash turned a backslash-b into a backspace character, and the composer's pattern never matched; scripts with escapes go in a file written by the editor (AGENTS.md says so).
