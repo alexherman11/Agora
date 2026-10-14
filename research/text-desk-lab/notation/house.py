@@ -1293,7 +1293,8 @@ class House:
                 if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     self.restart_since = getattr(self, "restart_since", None) or now()
                     busy = ([r.rid for r in self.residents.values() if r.busy]
-                            + [c for c, x in self.workshop.workers.items() if x.busy])
+                            + [c for c, x in self.workshop.workers.items() if x.busy]
+                            + [f"landing {c}" for c in self.workshop.landing])      # a landing being judged is never cut
                     if not busy or now() - self.restart_since >= RESTART_GRACE:
                         print("house: the code changed; restarting on it"
                               + (f" (cutting {', '.join(busy)}: each resumes, and is told)" if busy else ""), flush=True)
