@@ -1398,7 +1398,7 @@ def to_lines(src, roles=None, style=None):
 # ---------------------------------------------------------------------------------------------------------------------
 HOST = ("me", "today", "session", "touched")
 HOST_FRAMES = ("touched", "changed")      # Juniper: $touched (last event on the thing), $touched.by, $changed.<field>; host reads, never in a fence
-GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected")
+GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected", "quoted", "quoted_in")   # quoted, quoted_in: 13 Oct
 
 
 def _refs_of(node):
