@@ -52,6 +52,7 @@ def main(argv):
     src = HERE / "sessions" / f"{world}.pickle"
     shutil.copyfile(src, tmp / "bench.pickle")
     deskd.SESSIONS = tmp
+    deskd.STATIC = HERE / "desk-shell"        # deskd reads it from its own argv, which here is the bench's
     import reports                   # a4869: painters' reports are kept beside the world; here, in the scratch folder
     reports.ROOT = tmp / "reports"
     timed(reports, "keep", "report kept (reports.py)")
@@ -160,6 +161,9 @@ def main(argv):
         # the next Enter is pressed on the same paragraph as it is painted now (its fence moved with the split)
         node = next((nd for nd, _a in enters(r["scene"]) if nd["key"] == node["key"]), node) if r.get("scene") else node
     print(f"each Enter, do + scene + observe: {', '.join(f'{t * 1000:.0f}' for t in total)} ms")
+    if "--serve" in argv:             # the copy stays served, for a painter to be measured on it (nothing reaches the world)
+        print(f"serving {base}/lens.html?session=bench&as={who}&lens={lens} for {opt('--serve', '600')} s", flush=True)
+        time.sleep(float(opt("--serve", "600")))
     srv.shutdown()
     if "--keep" not in argv:
         shutil.rmtree(tmp, ignore_errors=True)

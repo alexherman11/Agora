@@ -976,6 +976,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+        if method == "POST" and urlparse(self.path).path == "/api/do":
+            # Snappy Desk (14 Oct): a line has changed the world; every page's stream asks for the new events now, not
+            # at its next half-second check, so another window sees it as soon as its scene is built
+            with DOOR.changed:
+                DOOR.changed.notify_all()
 
     def _stream(self, u):
         """One page's long connection: the world's events (id = the event's index + 1), and the door's news."""
