@@ -932,7 +932,7 @@ def test_a_texts_keys_and_a_buttons_press():
     assert 'split $item "$head" "$tail"' in acts["w"][1]["line"]
     assert not any(l.startswith("press") for l in verbs._lens_steps(src)), verbs._lens_steps(src)
     refused('root : column\n  w : text "x"\n    on key Enter do look', "has no `on edit`")
-    refused('root : column\n  w : text "x"\n    on edit do look\n    on key F5 do look', "on key <Enter|Tab|Shift+Tab|Backspace>")
+    refused('root : column\n  w : text "x"\n    on edit do look\n    on key F5 do look', "on key <Enter|Tab|Shift+Tab|Backspace|Delete>")
     refused('root : column\n  w : text "x"\n    on click press Ctrl+Q', "on click press <Ctrl+B|Ctrl+I|Ctrl+K>")
 
 
