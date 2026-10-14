@@ -40,6 +40,14 @@ WORLDS = HERE / "golden" / "worlds"
 sys.path.insert(0, str(LAB))
 sys.path.insert(0, str(HERE))
 from run import normalise  # noqa: E402
+import tempfile  # noqa: E402
+
+import reports  # noqa: E402
+
+# 14 Oct (a4869 landed again): painter reports are kept by the house beside a world of the same name; a frozen world
+# is named like the live one, so its prints read the live house's reports and its start time. Frozen worlds have no
+# viewers: their reports are read from an empty folder of their own
+reports.ROOT = pathlib.Path(tempfile.mkdtemp(prefix="frozen-reports-"))
 
 
 def git(*args, binary=False):

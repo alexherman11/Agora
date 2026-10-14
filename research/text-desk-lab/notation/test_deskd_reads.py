@@ -1,5 +1,5 @@
-"""deskd, a4465 (13 Oct): a request that only reads pickles the world once and writes nothing, and a painter's report
-does not make the scenes be built again.
+"""deskd, a4465 (13 Oct): a request that only reads pickles the world once and writes nothing. a4869 (14 Oct): a
+painter's report is kept by the house beside the world (reports.py), never in it, and does not outlive the house.
 
     python test_deskd_reads.py
 
@@ -18,6 +18,7 @@ os.environ["DESKD"] = "off"
 sys.argv = sys.argv[:1]
 
 import deskd      # noqa: E402
+import explore    # noqa: E402
 
 tmp = Path(tempfile.mkdtemp(prefix="deskd-reads-"))
 deskd.SESSIONS = tmp
@@ -68,23 +69,83 @@ try:
     # a change is still saved, and seen by the next request
     was = stamp()
     with deskd.Session("w", "alex") as desk:
-        desk._views = {"alex": {"lens": "x", "boxes": {"a": "1x1"}}}
+        desk.dispatch("desk", {"line": f'look; do create {desk.world.root} kind=note title="third"'})
     deskd._DESKS.clear()                                        # as another process would read it: from the file
     with deskd.Session("w", "alex") as desk:
-        check("a change is saved to the file", stamp() != was and getattr(desk, "_views", {}).get("alex", {}).get("lens") == "x")
-    # a painter's report: the scenes and the event count built for the file as it was stand for the file as it is now
-    old, new = (1, 10), (2, 11)
-    deskd._SCENES.clear()
-    deskd._SCENES[("w", "alex", "board", "painter") + old + (None, 5, None)] = ("g1", b"scene of w")
-    deskd._SCENES[("other", "alex", "board", "painter") + old + (None, 5, None)] = ("g2", b"scene of other")
-    deskd._SCENES[("w", "alex", "older", "painter") + (0, 9) + (None, 5, None)] = ("g3", b"an older w")
-    deskd._EVENTS["w"] = old + (7,)
-    deskd._report_only("w", old, new)
-    check("a report keeps the scenes of the world it was written into", deskd._SCENES.get(("w", "alex", "board", "painter") + new + (None, 5, None)) == ("g1", b"scene of w"))
-    check("and no other: another world's scene, and one of an older file, stay where they were",
-          ("other", "alex", "board", "painter") + old + (None, 5, None) in deskd._SCENES and ("w", "alex", "older", "painter") + (0, 9) + (None, 5, None) in deskd._SCENES
-          and len(deskd._SCENES) == 3)
-    check("the event count stands for the new file", deskd._EVENTS["w"] == new + (7,))
+        check("a change is saved to the file", stamp() != was and "third" in [s["title"] for s in desk.world.subjects.values()])
+
+    # a4869: a painter's report is kept by the house beside the world, never in it
+    import json
+    import threading
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+    import reports
+    reports.ROOT = tmp / "reports"
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), deskd.Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    def post(path, body):
+        req = urllib.request.Request(f"http://127.0.0.1:{srv.server_address[1]}{path}", json.dumps(body).encode())
+        try:
+            with urllib.request.urlopen(req) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return json.loads(e.read())
+
+    def say(line, actor="rowan"):
+        return post("/api/do", {"session": "w", "as": actor, "line": line}).get("text") or ""
+
+    say(f'look; do create {desk.world.root} kind=note tags=lens title=boxy text="root : column\\n  a : text \\"seen\\""')
+    say("scene boxy")
+    deskd._DESKS.clear()
+    was, n = stamp(), dumps[0]
+    r = post("/api/observe", {"session": "w", "as": "Alex", "lens": "Boxy", "at": 3, "boxes": {"root": "900x40", "root/a": "900x40"},
+                              "facts": {"x": "1"}, "viewport": {"w": 1000, "h": 800, "sx": 0, "sy": 0}})
+    check("a report is answered as before", r == {"ok": True, "kept": 1}, str(r))
+    check("a report neither loads nor writes the world", stamp() == was and dumps[0] == n, f"file {'moved' if stamp() != was else 'still'}, {dumps[0] - n} pickle(s)")
+    out = say("scene boxy root")
+    check("scene reads it: the viewer, what it reported, and its age", "~ alex is looking: 1000x800 at scroll 0,0" in out
+          and "~ alex: 900x40px" in out and "(0 s ago)" in out, out)
+    post("/api/observe", {"session": "w", "as": "alex", "lens": "boxy", "at": 3, "boxes": {"root": "700x40"}})
+    out = say("scene boxy root")
+    check("one per viewer, the last wins; attention not shared is said so", "700x40px" in out and "900x40px" not in out
+          and out.count("~ alex ") == 1 and "attention not shared" in out, out)
+    check("scene ok gives the age", "painted sizes, oldest first: alex 0 s ago" in say("scene boxy ok"))
+    r = post("/api/observe", {"session": "nowhere", "as": "alex", "lens": "boxy"})
+    check("a report of a world that does not exist makes no world", "error" in r and not (tmp / "nowhere.pickle").exists(), str(r))
+    # a world saved before a4869 holds a report inside it: never read, and gone with the next change
+    with deskd.Session("w", "alex") as desk:
+        pass
+    old = pickle.loads((tmp / "w.pickle").read_bytes())
+    old._views = {"jeff": {"lens": "boxy", "at": 1, "time": "2026-10-13T20:00:00", "boxes": {"root": "1x1"}, "painted": None}}
+    explore.save_desk(tmp / "w.pickle", old, real(old))
+    deskd._DESKS.clear()
+    out = say("scene boxy root")
+    check("a report saved in the world before is not shown", "~ jeff" not in out, out)
+    say(f'look; do create {desk.world.root} kind=note title="fourth"')
+    check("and leaves the file with the next change", not hasattr(pickle.loads((tmp / "w.pickle").read_bytes()), "_views"))
+    # the house starts again: a report does not outlive it
+    reports.serve("another house", "2026-10-14T07:05:00")
+    out = say("scene boxy root")
+    check("after a restart no report from before it is shown, and scene says since when",
+          "~ alex" not in out and "no viewer has reported painting this lens since the house started (" in out, out)
+    check("scene ok says so too", "none reported since the house started (" in say("scene boxy ok"), say("scene boxy ok"))
+    check("and its files are gone", [p.name for p in (tmp / "reports" / "w").iterdir()] == ["host.json"])
+    post("/api/observe", {"session": "w", "as": "alex", "lens": "boxy", "at": 3, "boxes": {"root": "500x40"}})
+    check("the next report is shown", "500x40px" in say("scene boxy root"))
+    srv.shutdown()
+    # a reader outside deskd (explore.py with DESKD=off): the reports of a house still running, none of one that stopped
+    import subprocess
+    host, reports.HOST = reports.HOST, None
+    gone = subprocess.Popen([sys.executable, "-c", "pass"])
+    gone.wait()
+    hj = tmp / "reports" / "w" / "host.json"
+    hj.write_text(json.dumps({"host": str(os.getpid()), "since": "2026-10-14T07:05:00"}), encoding="utf-8")
+    check("outside deskd, a running house's reports are read", "alex" in reports.views("w") and reports.since("w"))
+    hj.write_text(json.dumps({"host": str(gone.pid), "since": "2026-10-14T07:05:00"}), encoding="utf-8")
+    check("outside deskd, a stopped house's reports are not, and no since is claimed",
+          reports.views("w") == {} and reports.since("w") is None, str(reports.views("w")))
+    reports.HOST = host
 finally:
     pickle.dumps = real
     shutil.rmtree(tmp, ignore_errors=True)

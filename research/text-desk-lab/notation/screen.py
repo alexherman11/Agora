@@ -546,6 +546,7 @@ def main():
         if copy:
             for p in copy.parent.glob(copy.stem + "*"):
                 p.unlink(missing_ok=True)
+            shutil.rmtree(HERE / "house-state" / "reports" / copy.stem, ignore_errors=True)   # its painters' reports (reports.py)
 
 
 if __name__ == "__main__":
