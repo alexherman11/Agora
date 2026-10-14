@@ -1779,6 +1779,14 @@ def _ago(iso):
     return (f"{max(s, 0)} s" if s < 90 else f"{s // 60} min" if s < 5400 else f"{s // 3600} h" if s < 172800 else f"{s // 86400} days") + " ago"
 
 
+def reported_views(desk, lens):
+    """The last report of each viewer whose painter showed `lens` (a lens title), as the house keeps them (reports.py,
+    a4869: beside the world, never in it). -> ({viewer: report}, when the house that keeps them started or None)"""
+    import reports
+    session = getattr(desk, "_session", None)
+    return ({a: v for a, v in reports.views(session).items() if v.get("lens") == lens.lower()}, reports.since(session))
+
+
 def judge_views(desk, views, closure, style_rev):
     """a1473: whether each viewer's sizes are of the lens as it stands. A painter reports the frame (each lens in the
     closure at its revision) and the style revision it painted; anything else now means its boxes are of an older lens.
@@ -1855,7 +1863,10 @@ def to_text(scene, name, who, at, roots=None, part=None):
     sized = [v for v in views.values() if v.get("paint")]
     if sized and all(v["paint"]["state"] == "stale" for v in sized):
         lines.append(f"  ! no viewer has painted this lens since {sized[0]['paint']['edit']}; the sizes below are of the old lens")
-    elif not sized and part is not None:
+    if not views and scene.get("reports_since"):
+        # a4869: reports do not outlive the house that received them; one from before it is never shown
+        lines.append(f"  ~ no viewer has reported painting this lens since the house started ({_clock(scene['reports_since'])})")
+    if not sized and part is not None:
         lines.append("  ~ no painted sizes: no viewer has this lens open with a painter that reports them (screen.py paints a copy)")
 
     def rv(v, top=120):
