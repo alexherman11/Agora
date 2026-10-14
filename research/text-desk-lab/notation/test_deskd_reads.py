@@ -134,6 +134,18 @@ try:
     post("/api/observe", {"session": "w", "as": "alex", "lens": "boxy", "at": 3, "boxes": {"root": "500x40"}})
     check("the next report is shown", "500x40px" in say("scene boxy root"))
     srv.shutdown()
+    # a reader outside deskd (explore.py with DESKD=off): the reports of a house still running, none of one that stopped
+    import subprocess
+    host, reports.HOST = reports.HOST, None
+    gone = subprocess.Popen([sys.executable, "-c", "pass"])
+    gone.wait()
+    hj = tmp / "reports" / "w" / "host.json"
+    hj.write_text(json.dumps({"host": str(os.getpid()), "since": "2026-10-14T07:05:00"}), encoding="utf-8")
+    check("outside deskd, a running house's reports are read", "alex" in reports.views("w") and reports.since("w"))
+    hj.write_text(json.dumps({"host": str(gone.pid), "since": "2026-10-14T07:05:00"}), encoding="utf-8")
+    check("outside deskd, a stopped house's reports are not, and no since is claimed",
+          reports.views("w") == {} and reports.since("w") is None, str(reports.views("w")))
+    reports.HOST = host
 finally:
     pickle.dumps = real
     shutil.rmtree(tmp, ignore_errors=True)

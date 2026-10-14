@@ -13,7 +13,7 @@ A report does not outlive the house that received it. The house is the door desk
 or a deskd run alone: a deskd the door swaps in on a landing is the same house and keeps them. The first time a deskd
 of another house touches a session (a report, or a scene built), the reports of the house before are removed and
 host.json says when this one started, so `scene` says no viewer has reported since then, never a report from before.
-A reader outside deskd cannot tell a house that has stopped from one that runs: it reads what the last house kept.
+A reader outside deskd (explore.py with DESKD=off) shows none when the house named in host.json no longer runs.
 """
 import json
 import os
@@ -61,6 +61,18 @@ def _host(d):
         return {}
 
 
+def _stopped(d):
+    """A reader outside deskd: has the house that kept these stopped? Its reports are then from before whatever house
+    comes next, and are not shown (a4869, Sable c4900). The house is a pid (the door's, or a lone deskd's)."""
+    if HOST is not None:
+        return False                      # deskd claims instead
+    host = str(_host(d).get("host") or "")
+    if not host.isdigit():
+        return False
+    import explore
+    return not explore._alive(int(host))
+
+
 def claim(session):
     """In deskd, once per session: reports a house before this one received are removed (they do not outlive it)."""
     d = _dir(session)
@@ -94,7 +106,7 @@ def since(session):
     if d is None:
         return None
     claim(session)
-    return _host(d).get("since")
+    return None if _stopped(d) else _host(d).get("since")
 
 
 def views(session):
@@ -103,6 +115,8 @@ def views(session):
     if d is None:
         return {}
     claim(session)
+    if _stopped(d):
+        return {}
     out = {}
     try:
         files = [p for p in d.glob("*.json") if p.name != "host.json"]
