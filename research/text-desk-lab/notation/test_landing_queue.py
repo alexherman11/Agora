@@ -198,6 +198,42 @@ r = landing.land([b], who="claude")
 check("9. health runs once for a landing on a main already judged (the main it lands on was judged as the last landing)",
       r["landed"] == [b] and runs() - r0 == 1, (runs() - r0, r))
 
+# 10
+(n / "byhand.txt").write_text("committed by hand\n", encoding="utf-8")
+g("add", f"{NOTATION}/byhand.txt")
+g("commit", "-q", "-m", "a commit straight onto main, never judged")
+b = branch("claude/ten", {"ten.txt": "10\n"})
+r0 = runs()
+r = landing.land([b], who="claude")
+check("10. on a main moved by hand (never judged), a landing that passes runs health once, not twice (Codex e9993)",
+      r["landed"] == [b] and runs() - r0 == 1, (runs() - r0, r))
+
+# 11
+(n / "deskd.py").write_text(text("deskd.py").replace("line 7\n", "line seven, by hand\n"), encoding="utf-8")
+(n / "lens.js").write_text("// painter\n// someone else, mid-edit\n", encoding="utf-8")
+was = head()
+hb = landing.hand([str(n / "deskd.py")], who="codex", words="line seven")
+r = landing.land([hb], who="codex")
+dirty = g("status", "--porcelain")
+check("11. a hand landing: the named file as it stands lands, is clean after, and nothing is parked; another edit stays",
+      r["landed"] == [hb] and "line seven, by hand" in g("show", f"HEAD:{NOTATION}/deskd.py") and "deskd.py" not in dirty
+      and not r["parked"] and "lens.js" in dirty and text("lens.js").endswith("mid-edit\n") and g("rev-parse", "HEAD^1") == was,
+      (r, dirty))
+
+# 12
+(n / "BROKEN").write_text("x\n", encoding="utf-8")
+was = head()
+hb = landing.hand([str(n / "BROKEN")], who="codex")
+r = landing.land([hb], who="codex")
+check("12. a hand landing that breaks health: main unmoved, the file still there as it was, the reason given",
+      not r["landed"] and "BROKEN is here" in r["refused"][0][1] and head() == was and (n / "BROKEN").exists(), r)
+(n / "BROKEN").unlink()
+try:
+    landing.hand([str(n / "deskd.py")], who="codex")
+    check("12. a hand landing of files main already has is refused", False)
+except ValueError as e:
+    check("12. a hand landing of files main already has is refused", "nothing to land" in str(e), e)
+
 print(landing.status())
 print(f"{len(fails)} failed" if fails else "all passed")
 subprocess.run(["git", "worktree", "prune"], cwd=LIVE, capture_output=True)
