@@ -111,6 +111,8 @@ def run_desk(args):
     stored = str(args.get("stored") or "").strip()
     if stored and re.fullmatch(r"[fa]\d+", stored):     # a1156: the house's own too: a corner's wake, run as stored text
         cmd += ["--stored", stored]
+    if str(args.get("as_of", "")).isdigit():            # a5068: the house's own too: where a resident's turn began
+        cmd += ["--as-of", str(args["as_of"])]
     try:
         r = subprocess.run(cmd, cwd=HERE, input="\n".join(lines) + "\n", capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=120,

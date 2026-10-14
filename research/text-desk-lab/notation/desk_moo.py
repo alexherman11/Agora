@@ -201,6 +201,7 @@ class DeskMoo(Desk):
         cur = w.nodes[nid]["rev"]
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         adds = self._adds_line(nid, name, kv)
+        self._hold_line(nid, name, kv)    # a5068: a line on an old view of its chat or thread waits
         unread = seen is None and adds      # a834: an added line overwrites nothing, so looking first protects nothing
         if seen is None and not unread:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"

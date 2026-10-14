@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (34)
+## open (35)
 
 ### F2. Scripts cannot say who is running them
 
@@ -232,7 +232,13 @@ a5113 · family=house · status=open
 
 Source edit by Claude, 14 Oct (4113eae, landed as 28e1b05 through itself): landing.py is new; workshop.land() now calls it; health runs test_landing_queue. Before this there was one way into main, the house's merge in the live checkout, and it waited while anyone had uncommitted edits (a4644). Two people working at once blocked each other (Alex, 14 Oct). WORLD-LEVEL WORD MISSING: none at the desk. This is the repository's own door, and it belongs in source. What was missing was a room of its own to judge code in, a cache of what was judged (house-state/landing.json, per commit), and parking for edits in the way (parked/<stamp> branches). ROUGH STILL: the commission state `reverted` now means 'judged and not landed', because main never had it; the word is a misnomer, and renaming it touches the board lenses. Health takes about 2 minutes per judgement, so a landing takes 4-5. The landing room's world copy is taken under the world's lock. AGENTS.md still says one checkout and no worktrees for builders; Alex said 'work in worktrees if you need', and new wording is his to give.
 
-## curing (26)
+### A person's unsent capture had nowhere to live but outside the world
+
+a5145 · family=privacy · status=open
+
+Missing world-level words: a thing that belongs to one person and is readable by no one else until they publish it. The desk restricts no reading, so an unsent capture of Alex's screen (his email, say) could not be a world thing (Sable, a5062 c5088). It is kept by the house instead, in house-state/captures beside the painter reports, through new source: captures.py (and test_captures.py, added to health.py's list). Only its id enters the world, as a prop on his chat draft. The capture tool itself (research/window-lab/capture/) is outside the desk. If the world ever gains private things (one reader until published), captures should move into it and this store retire. worker-a5062, 14 Oct.
+
+## curing (27)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -447,6 +453,12 @@ Also missing, and not built on purpose: a lens stood on a thing you name. doc-re
 a4729 · family=silence · status=curing
 
 workshop.land said a landing's wait once per SET of uncommitted files in the main checkout. Alex's edits change that set through the day, so a4465 said it three times (c4636, c4641, c4690), each a call on its asker (Juniper e7832, Pike 13 Oct). Mended in source (workshop.py, a4644): said once per wait, when it begins, with to=nobody, so it is on the card but wakes no one; nothing more until the pass goes ahead, whose outcome calls the asker as before. The world-level word was already there (to=nobody on a comment, world.to_names); what was missing is a way for the world to say which of the house's own words call the asker: the house's lines on a commission are fixed in workshop.py, not a note a resident could change. Unchecked live: no landing has waited since.
+
+### Explicit composers need a visible default audience, preserved captured context, and unified outgoing plus incoming sayings
+
+a5104 · family=conversation · status=curing
+
+Missing reusable capabilities encountered building task a5076: per-message default_to overridden by explicit header, atomic unknown-recipient refusal, sayings involving:<person> with original reply targets across chats/comments, bounded detached native context snapshots, composer lines bounds, and scroll-end continuity on window resize. Source edits are coordinated with Sable/Claude. Candidate checks in frontier@conversation-check; final evidence pending.
 
 ## cured (58)
 
