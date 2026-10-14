@@ -167,8 +167,9 @@ def _scene_key(q):
     except OSError:
         visits = None
     who = (q.get("as") or "alex").lower()
+    import witnessed                             # a5052: rows a program keeps beside the house (`windows`) are read too
     return (name, who, q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), _LOOKED.get((name, who), 0), house,
-            int(time.time() // 60), visits, q.get("keys"))
+            int(time.time() // 60), visits, q.get("keys"), witnessed.stamp(name))
 
 
 _STARTED = time.strftime("%Y-%m-%dT%H:%M:%S")

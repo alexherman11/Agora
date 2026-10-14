@@ -923,6 +923,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "the body must be JSON"}, 400)
             ok, why = DOOR.swap(code=a.get("code"), argv=a.get("argv"), env=a.get("env"), commits=a.get("commits"))
             return self._json({"ok": ok, "why": why, **DOOR.status()})
+        if urlparse(self.path).path == "/door/witnessed":
+            # a5052: a program that has just rewritten rows it keeps beside the house (witnessed.py) says so, and every
+            # page's stream looks now rather than at its next half-second check
+            if not self._local_program():
+                return self._json({"error": "only a local program may say it rewrote witnessed rows"}, 403)
+            with DOOR.changed:
+                DOOR.changed.notify_all()
+            return self._json({"ok": True})
         if urlparse(self.path).path == "/api/do" and not self._foreign():
             # a2844: the door's own words, and the lines of whoever is away in a version, never reach home's deskd
             try:
@@ -1016,10 +1024,19 @@ class Handler(BaseHTTPRequestHandler):
             n = int(since) if since not in (None, "") else None
         except ValueError:
             n = None
+        import witnessed
         try:
             put("door", DOOR.status())
             told, beat = DOOR.serial, time.time()
+            seen = witnessed.stamp(session)
             while True:
+                # a5052: rows a program keeps beside the house (the windows on the screen) changed without an event. The
+                # painter repaints on any `world` message, so this one goes as world too, with no id: Last-Event-ID
+                # still counts events only. A painter that told the two apart would need a word of its own (lens.js)
+                now_seen = witnessed.stamp(session)
+                if now_seen != seen:
+                    seen = now_seen
+                    put("world", {"witnessed": [n for n, _ in now_seen]})
                 if n is None:                   # a page with no last id starts at the present
                     r = events(10 ** 9)
                     n = r["total"] if r else None
