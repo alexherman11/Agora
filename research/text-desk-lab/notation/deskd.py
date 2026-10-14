@@ -230,7 +230,12 @@ def _trace(line):
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
-    def __init__(self, name, actor):
+    def __init__(self, name, actor, read=False):
+        # 14 Oct (deskd trace: page builds and event checks held the lock 21 s in 3 minutes, a third of it pickling the
+        # whole world twice to learn they had changed nothing): `read` is a request that only looks. It copies nothing
+        # and saves nothing; whatever it touched in memory (a viewer's seen-marks) is saved with the next change to the
+        # world, and a deskd swapped for new code before then forgets it (the viewer sees 'since your last look' again)
+        self.read = read
         if not SESSION_NAME.match(str(name)):
             # review 29 Sep: any string became a file path, `..` included, and was created and saved
             raise BadRequest(f"no session named {str(name)[:80]!r}: a session name is letters, digits, _ @ - (at most 64; no . or slashes)")
@@ -278,6 +283,9 @@ class Session:
         # rewrite moved the file's time so the house reloaded it under the lock on every pass. A request that
         # changed nothing now writes nothing.
         per[self.actor] = (desk.seen, desk.open, desk.last_event_seen)
+        if self.read:
+            self.before = None
+            return desk
         self.before = before if before is not None else pickle.dumps(desk) if self.path.exists() else None
         return desk
 
@@ -285,6 +293,14 @@ class Session:
         try:
             d = self.desk
             self.per[self.actor] = (d.seen, d.open, d.last_event_seen)
+            if self.read:
+                # the desk in memory may now differ from the file (seen-marks): kept, and no one's last pickle stands
+                # for it any more, so the next request that changes anything compares against a fresh one and saves
+                if self.stamp is not None:
+                    _DESKS[str(self.path)] = (self.stamp, d, {})
+                    while len(_DESKS) > 3:
+                        _DESKS.pop(next(iter(_DESKS)))
+                return
             import kept
             kept.sweep(d.world, self.path)      # 7 Oct: the copies undo keeps go beside the file (kept.py), before it is saved
             now = pickle.dumps(d)
@@ -380,7 +396,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if q.get("have") == gen:                 # the painter already has this build: say so in a few bytes
                     return self._json({"same": True, "gen": gen})
                 return self._json(None, body=body)       # the bytes already built: no load, no build, no encode
-            with Session(q.get("session", "desktop"), q.get("as")) as desk:
+            with Session(q.get("session", "desktop"), q.get("as"), read=True) as desk:
                 try:
                     sc, text = scene.scene_for(desk, q.get("lens", ""))
                     if q.get("view") == "painter":      # Pike a494: key, paint, acts, fence, kids; the root keeps its def
@@ -429,7 +445,7 @@ class Handler(SimpleHTTPRequestHandler):
             # a text the reader refuses comes with `refusal` and no looks, and the painter keeps its last style
             import scene
             import style
-            with Session(q.get("session", "desktop"), q.get("as")) as desk:
+            with Session(q.get("session", "desktop"), q.get("as"), read=True) as desk:
                 st = scene.style_source(desk, q.get("name") or "calm")
             return self._json(style.for_painter(st, q.get("theme")) if st else {"refused": f"no style {q.get('name')!r}"})
         if u.path == "/api/events":
@@ -444,7 +460,16 @@ class Handler(SimpleHTTPRequestHandler):
             seen = _EVENTS.get(name)
             if st is not None and seen and seen[:2] == (st.st_mtime_ns, st.st_size) and since >= seen[2]:
                 return self._json({"events": [], "total": seen[2]})
-            with Session(name, q.get("as")) as desk:
+            # 14 Oct: the desk this process holds is the file's (same time and size): the events are read from it with
+            # no lock, since events are only ever appended (58 checks by one page held the lock 6 s in 3 minutes)
+            held = _DESKS.get(str(SESSIONS / f"{name}.pickle")) if st is not None else None
+            if held is not None and held[0] == (st.st_mtime_ns, st.st_size):
+                evs_all = held[1].world.events
+                total = len(evs_all)
+                evs = [{k: v for k, v in e.items() if k != "undo"} for e in evs_all[since:total]]
+                _EVENTS[name] = (st.st_mtime_ns, st.st_size, total)
+                return self._json({"events": evs, "total": total})
+            with Session(name, q.get("as"), read=True) as desk:
                 evs = [{k: v for k, v in e.items() if k != "undo"} for e in desk.world.events[since:]]
                 total = len(desk.world.events)
             if st is not None:
