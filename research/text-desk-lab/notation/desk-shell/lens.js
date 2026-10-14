@@ -280,7 +280,7 @@
       if (!input.value.trim() || post.disabled) return;
       const raw = input.value; post.disabled = discard.disabled = true; state.textContent = "Sending…";
       // The command and quotation belong to the place where composition began, never the latest selection.
-      await send(n, TEXT.quote(action.line).replace("$selected", () => picked).replace("$value", () => TEXT.esc(raw)), raw);
+      await send(n, action.line.replace("$selected", () => picked).replace("$value", () => TEXT.esc(raw)), raw);
       if (!V.drafts.has(key)) drop();
       else { post.disabled = !input.value.trim(); discard.disabled = false; state.textContent = "Not sent — retry or discard"; }
     };
@@ -307,7 +307,7 @@
       // 13 Oct (Alex: right-click a text and comment on it): an entry's line may name $selected, the words highlighted
       // in this part's thing when the menu opened, and $value, words the entry asks for: pressed, it becomes a box
       // to type in (Enter sends, Shift+Enter is a new line, Escape leaves), since a line with $value is not yet whole
-      const picked = TEXT.selected(el._n), fill = l => TEXT.quote(l).replace("$selected", () => picked);
+      const picked = TEXT.selected(el._n), fill = l => l.replace("$selected", () => picked);
       b.addEventListener("click", () => {
         if (!a.line.includes("$value")) { closeMenu(); return send(el._n, fill(a.line)); }
         menuComposer(box, el, a, picked, e.clientX, e.clientY);
@@ -390,7 +390,7 @@
       if (busy || !input.value.trim()) return;
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
       const raw = input.value; busy = true; sync();
-      await send(seen, TEXT.quote(a.line).replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
+      await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
       busy = false;
       if (!V.drafts.has(n.key)) { input.value = ""; openComposers.delete(n.key); }
       sync();
@@ -443,7 +443,7 @@
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
-      if (raw !== (el._n.paint.text || "").trim()) send(seen, TEXT.quote(a.line).replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
+      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
   }
 
@@ -473,7 +473,7 @@
       if (el._toSource) el._toSource();
       const raw = el.innerText.replace(/\n$/, ""), seen = V.editOrigin(key, n) || n;
       V.drop(key); V.hold = null;
-      if (edit && raw !== (n.paint.text || "")) await sendKey(seen, this.quote(edit.line).replace("$value", () => this.esc(raw)));
+      if (edit && raw !== (n.paint.text || "")) await sendKey(seen, edit.line.replace("$value", () => this.esc(raw)));
       const now = paint.querySelector(`[data-key="${CSS.escape(key)}"]`) || el;
       await sendKey(now._n, line.replace("$focus", () => (n.fence || {}).item || "").replace("$selected", () => this.selected(n)));
       const after = paint.querySelector(`[data-key="${CSS.escape(key)}"]`);
@@ -484,15 +484,6 @@
     // $selected (Alex, c3669: 'I should be able to hilight text'): the words last highlighted in a text of the same
     // thing this gesture is about, kept when the caret leaves for a comment box, written in quotation marks with a space after; nothing when none were
     sel: null,
-    // $quoted and $quoted_in (13 Oct; Alex: a message about a design may point at a passage): the words last
-    // highlighted in any thing's text, and that thing's id, for a composer that is not the text itself (a
-    // conversation beside a document). Used once: the next message points at nothing until words are highlighted again
-    quote(line) {
-      if (!line.includes("$quoted")) return line;
-      const s = this.sel; this.sel = null;
-      document.querySelectorAll("[data-quoting]").forEach(e => { e.dataset.hint = e.dataset.quoting; delete e.dataset.quoting; });
-      return line.replace(/\$quoted_in\b/g, () => s ? s.item : "").replace(/\$quoted\b/g, () => s ? this.esc(s.text.trim()) : "");
-    },
     selected(n) { const it = (n.fence || {}).item; return this.sel && it && this.sel.item === it ? "“" + this.esc(this.sel.text.trim()) + "” " : ""; },
     queue: null,
     wait(done) {
@@ -572,14 +563,6 @@
     if (!TEXT.queue || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.length === 1 || /^(Enter|Tab|Backspace)$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey }); }
   }, true);
-  // a composer that points at a passage says which, in its empty hint, while it has the caret (13 Oct)
-  document.addEventListener("focusin", e => {
-    const t = e.target, n = t && t._n;
-    if (!n || !t.isContentEditable || !n.acts.some(a => a.line.includes("$quoted")) || !TEXT.sel) return;
-    if (!("quoting" in t.dataset)) t.dataset.quoting = t.dataset.hint || "";
-    const w = TEXT.sel.text.trim().replace(/\s+/g, " ");
-    t.dataset.hint = "about “" + (w.length > 60 ? w.slice(0, 57) + "…" : w) + "”: " + (t.dataset.quoting || "");
-  });
   document.addEventListener("selectionchange", () => {
     const sel = getSelection(), el = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
     const t = el && el.closest && el.closest("[contenteditable]");
