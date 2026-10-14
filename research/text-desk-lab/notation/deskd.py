@@ -166,7 +166,8 @@ def _scene_key(q):
         visits = (HERE / "house-state" / "visits.json").stat().st_mtime_ns
     except OSError:
         visits = None
-    return (name, (q.get("as") or "alex").lower(), q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), house,
+    who = (q.get("as") or "alex").lower()
+    return (name, who, q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), _LOOKED.get((name, who), 0), house,
             int(time.time() // 60), visits, q.get("keys"))
 
 
@@ -224,6 +225,8 @@ TRACE = Path(__file__).resolve().parent / "house-state" / "deskd-trace.log"
 HOLD = [False]           # set by the server's main: a Session opened by a test or a tool in-process never holds
 PORT = [None]
 LEASES, RELEASED, _DIRTY, _VERSION = {}, set(), {}, {}
+_LOOKS_UNSAVED = {}              # world -> looked at since its file was saved (saved when it is let go, not for that alone)
+_LOOKED = {}                     # (world, person) -> how many times they looked without changing it (their views' cache)
 _CHANGED, _SNAPPED = {}, {}      # world -> when it last changed in memory / was last saved to its file
 SNAPSHOT_QUIET, SNAPSHOT_MOST = 1.0, 10.0       # saved after a second with no change, or every ten while busy
 
@@ -288,7 +291,7 @@ def _take_lease(name):
     return True
 
 
-def _snapshot(name, under_lock=False):
+def _snapshot(name, under_lock=False, looks=False):
     """Save the world this process holds in memory to its file, when something changed since the last save."""
     path, lock = SESSIONS / f"{name}.pickle", SESSIONS / f"{name}.lock"
     if not under_lock:
@@ -296,7 +299,7 @@ def _snapshot(name, under_lock=False):
     try:
         t0 = time.time()
         held = _DESKS.get(str(path))
-        if held is None or not _DIRTY.get(name):
+        if held is None or not (_DIRTY.get(name) or (looks and _LOOKS_UNSAVED.get(name))):
             return False
         d = held[1]
         import kept
@@ -306,7 +309,7 @@ def _snapshot(name, under_lock=False):
         explore.save_desk(path, d, data)
         st = path.stat()
         _DESKS[str(path)] = ((st.st_mtime_ns, st.st_size), d, {})
-        _DIRTY[name], _SNAPPED[name] = False, time.time()
+        _DIRTY[name], _SNAPPED[name], _LOOKS_UNSAVED[name] = False, time.time(), False
         _trace(f"{time.strftime('%H:%M:%S')} {name} - snapshot wait=0 held={(time.time() - t0) * 1000:.0f} saved=yes")
         return True
     finally:
@@ -333,7 +336,7 @@ def _release(name):
     explore.take_lock(lock, tries=1200, pause=0.05)
     try:
         if LEASES.get(name):
-            _snapshot(name, under_lock=True)
+            _snapshot(name, under_lock=True, looks=True)       # its people's seen marks too: the next one starts from them
             LEASES[name] = False
             try:
                 if explore.holder_of(SESSIONS / f"{name}.pickle") == os.getpid():
@@ -436,6 +439,9 @@ class Session:
         # rewrite moved the file's time so the house reloaded it under the lock on every pass. A request that
         # changed nothing now writes nothing.
         per[self.actor] = (desk.seen, desk.open, desk.last_event_seen)
+        # Snappy Desk stage 4 (14 Oct, looking never writes): what the world was before, cheaply, so a held request that
+        # changed no fact of it (a look, a read, a view's request) is not a reason to save it
+        self._facts0 = (len(desk.world.events), store.log_path(self.path).stat().st_size if store.log_path(self.path).exists() else 0)
         if self.read or (self.hold and self.stamp is not None):
             self.before = None
             return desk
@@ -456,10 +462,18 @@ class Session:
             if self.hold and self.stamp is not None and getattr(d, "_snap_at", None):
                 # the world stays in memory (a file that does not yet say which record of the log it holds is saved
                 # once the old way below, so that a world read back from it knows which records to put on); its record is on the log already, and the file is saved in the background
-                _DIRTY[self.name], _CHANGED[self.name] = True, time.time()
-                _VERSION[self.name] = _VERSION.get(self.name, 0) + 1
+                # A request that added no event and no record changed no fact (a look moves only that person's seen
+                # marks, kept in memory and saved with the next change): nothing to save, and no view is stale
+                lp = store.log_path(self.path)
+                if (len(d.world.events), lp.stat().st_size if lp.exists() else 0) != self._facts0:
+                    _DIRTY[self.name], _CHANGED[self.name] = True, time.time()
+                    _VERSION[self.name] = _VERSION.get(self.name, 0) + 1
+                    _SNAPPED.setdefault(self.name, time.time())
+                else:
+                    self._looked = True           # only this person's view of it may differ (since-your-last-look)
+                    _LOOKED[(self.name, self.actor)] = _LOOKED.get((self.name, self.actor), 0) + 1
+                    _LOOKS_UNSAVED[self.name] = True
                 _DESKS[str(self.path)] = (self.stamp, d, {})
-                _SNAPPED.setdefault(self.name, time.time())
                 return
             import kept
             kept.sweep(d.world, self.path)      # 7 Oct: the copies undo keeps go beside the file (kept.py), before it is saved
@@ -489,7 +503,7 @@ class Session:
             t2 = time.perf_counter()
             _trace(f"{time.strftime('%H:%M:%S')} {self.name} {self.actor} {getattr(_REQ, 'what', '?')} "
                    f"wait={(self._t1 - self._t0) * 1000:.0f} held={(t2 - self._t1) * 1000:.0f} "
-                   f"saved={'yes' if getattr(self, '_saved', False) else 'held' if self.hold else 'no'}")
+                   f"saved={'yes' if getattr(self, '_saved', False) else 'looked' if getattr(self, '_looked', False) else 'held' if self.hold else 'no'}")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -899,7 +913,7 @@ if __name__ == "__main__":
                 time.sleep(3)
             for name in [n for n, h in LEASES.items() if h]:      # what is held in memory is saved before going
                 try:
-                    _snapshot(name)
+                    _snapshot(name, looks=True)
                 except Exception:      # noqa: BLE001
                     pass
             os._exit(0)
