@@ -1860,15 +1860,16 @@ def judge_views(desk, views, closure, style_rev):
 
 
 def box_words(b):
-    """A painter's box ("320x840 scroll sh=2400", "hidden") as words for a part's line."""
+    """A painter's box ("320x840@0,48 scroll sh=2400", "hidden") as words for a part's line. a5047: "@x,y" is where the
+    part lies on the page, its left and top in CSS pixels as laid out (no scroll); a report from before it has none."""
     if b == "hidden":
         return "not drawn (folded or hidden)"
-    m = re.match(r"(\d+)x(\d+)", b or "")
+    m = re.match(r"(\d+)x(\d+)(?:@(-?\d+),(-?\d+))?", b or "")
     if not m:
         return f"box {b!r} (unreadable)"
     wd, ht = int(m.group(1)), int(m.group(2))
     kv = dict(re.findall(r"(\w+)=([\d/]+)", b))
-    out = f"{wd}x{ht}px"
+    out = f"{wd}x{ht}px" + (f" at {m.group(3)},{m.group(4)}" if m.group(3) is not None else "")
     if ht == 0 or wd == 0:
         out += f" ({'0 high' if ht == 0 else '0 wide'}: nothing visible)"
     over = " and ".join(x for x in (f"{kv['sh']} high" if "sh" in kv else "", f"{kv['sw']} wide" if "sw" in kv else "") if x)
@@ -1895,6 +1896,9 @@ def to_text(scene, name, who, at, roots=None, part=None):
         # Pike a561: since 0477e78 a viewer publishes attention (viewport, scroll) only when they allow it; say so
         where = (f"is looking: {vp.get('w')}x{vp.get('h')} at scroll {vp.get('sx')},{vp.get('sy')}" if vp.get("w") is not None
                  else "has this open; attention not shared")
+        pg = v.get("page") or {}
+        if pg.get("w") is not None:     # a5047: the page's own size goes with every report
+            where += f" · page {pg['w']}x{pg['h']} at {pg.get('dpr', 1):g}x"
         pa = v.get("paint")
         lines.append(f"  ~ {a} {where} · painted world @{v.get('at')}"
                      + (" (behind)" if v.get("at", at) < at else "") + f" · reported {str(v.get('time', ''))[11:19]}"
