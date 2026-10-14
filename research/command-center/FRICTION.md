@@ -896,3 +896,7 @@ Alex c4601/c4592/c4604: source work is needed for reusable commit explicit (Send
 
 
 Cured 13 Oct: commit explicit for text, stable replies:<id> rows, anchored menu composers, and hash-guarded picture regions. Native review/doc-editor lenses use them. Actual browser checks and 58 regression tests passed; the ordinary doc-editor shy styling also now yields to open composers. See a4574/c4601 for scope and remaining limits.
+
+Reopened after Alex c4640/e8565: annotated image wrapper broke direct-child media selection, and style at 12% mixed an opaque colour rather than real transparency. Reproduced in browser: dragging inside highlight opened no composer; computed region background rgb(211,225,220), opacity 1 hid labels. Fix source-media lookup to include the stage and render a separate alpha tint with the role ink, keeping the outline and crop source independent.
+
+Verified fix: image drag inside both existing regions opens crop composer; source labels visible through genuine alpha .12. Refused-draft bug found separately in retained compositor skipping V.words; fixed refresh observation, Enter/Shift+Enter, and explicit Use current version recovery. Real-painter isolated stale-version and legacy-draft browser cases passed; Node 3 passed, Python image/comment 13 passed. Activated comment-recovery-20261013, painter fe13f1d64697. Live Enter sent the final bug-thread report once.
