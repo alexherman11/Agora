@@ -524,6 +524,7 @@ class Workshop:
             return
         before = health(self.house.world)
         title = re.sub(r"\s+", " ", s["title"])[:80]
+        was = git("rev-parse", "HEAD").stdout.strip()
         r = git("merge", "--no-ff", wk.branch, "-m",
                 f"land {cid}: {title}\n\nasked by {wk.asked_by}, built by {wk.actor} (commission {cid}); landed by the house "
                 f"after the health checks.")
@@ -534,15 +535,21 @@ class Workshop:
             self.say(cid, why + ". Rebase your branch onto main (git rebase main), then set ready again.")
             wk.send(f"~ house: {why}. Rebase onto main (git rebase main) and set ready again.")
             return
+        # 14 Oct (facd14a): the health run takes a minute, and others commit to main meanwhile; `revert HEAD` then took
+        # back Codex's commit made in that minute, not this landing. The landing is its own merge, named by its hash
+        merged = git("rev-parse", "HEAD").stdout.strip()
+        if merged == was:
+            # the branch was in main already (a landing set ready again after a revert that missed it): nothing to judge
+            merged = None
         after = health(self.house.world)
         lost = sorted(set(before.get("lenses_ok") or []) - set(after.get("lenses_ok") or []))
         # a1595: a help note's problem that was there before the merge is the world's, not this landing's (a note is
         # edited in the world at any time); only a new one reverts
         had = {f for f in before.get("failed") or [] if f.startswith("help note: ")}
         reasons = [f for f in after.get("failed") or [] if f not in had]
-        if (not after.get("ok") and (reasons or not after.get("failed"))) or lost:
+        if merged and ((not after.get("ok") and (reasons or not after.get("failed"))) or lost):
             reasons += [f"lens {x} compiled before and no longer does" for x in lost]
-            git("revert", "-m", "1", "--no-edit", "HEAD")
+            git("revert", "-m", "1", "--no-edit", merged)
             self.set_state(cid, "reverted")
             self.say(cid, "landed, then reverted: " + "; ".join(reasons)[:1500] + f". The branch {wk.branch} is kept; fix it and set ready again.")
             wk.send("~ house: your merge failed the health checks and was reverted:\n" + "\n".join(reasons)
