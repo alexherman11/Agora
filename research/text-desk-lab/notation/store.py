@@ -128,61 +128,131 @@ def flatten(w):
     """-> {(thing, aspect): value}: everything the world states, and nothing derived."""
     flat = {}
     for sid, s in w.subjects.items():
-        for k in ("kind", "title"):
-            flat[(sid, k)] = s.get(k)
-        if s.get("due") is not None:
-            flat[(sid, "due")] = s["due"]
-        if s.get("tags"):
-            flat[(sid, "tags")] = list(s["tags"])
-        for k, v in (s.get("props") or {}).items():
-            flat[(sid, f"prop:{k}")] = plain(v)
-        for c in s.get("comments") or ():
-            flat[(sid, f"comment:{c['id']}")] = plain({k: v for k, v in c.items() if k != "id"})
-        lines = s.get("lines")
-        text = s.get("text") or ""
-        if lines is not None:
-            flat[(sid, "lines")] = True
-            for l in lines:
-                flat[(sid, f"line:{l['id']}")] = plain({k: v for k, v in l.items() if k != "id"})
-            if text == "\n".join(l["text"] for l in lines):
-                text = ""             # a chat's text is its lines joined: derived, or every line would store the chat again
-        if text:
-            flat[(sid, "text")] = text
-        for k, v in s.items():
-            if k not in SUBJECT_KNOWN:
-                flat[(sid, f"x:{k}")] = plain(v)
+        _subject_facts(flat, sid, s)
     kids = {}
     for nid, n in w.nodes.items():
         kids.setdefault(n.get("parent"), []).append(n)
-        for k in NODE_PLAIN:
-            if k in n:
-                flat[(nid, k)] = n[k]
-        flat[(nid, "in")] = n.get("parent")
-        for k, v in (n.get("props") or {}).items():
-            flat[(nid, f"prop:{k}")] = plain(v)
-        for k, v in n.items():
-            if k not in NODE_KNOWN:
-                flat[(nid, f"x:{k}")] = plain(v)
+        _node_facts(flat, nid, n)
     choices = bool(getattr(w, "choices", False))
     for fid, group in kids.items():
-        lay = w.nodes[fid].get("layout") if fid in w.nodes else "free"
-        if lay == "free" or fid is None:
-            for n in group:       # a box someone chose
-                flat[(n["id"], "box")] = [n.get("x", 0), n.get("y", 0), n.get("w", 0), n.get("h", 0)]
-                flat[(n["id"], "z")] = n.get("z", 0)
-        elif not choices:
-            # in a flow the boxes are derived from the order; the order is said as what each child comes after, so a
-            # move is three facts, not one per sibling
-            prev = ""
-            for n in w.children(fid) if len(group) > 1 else group:
-                flat[(n["id"], "after")] = prev
-                prev = n["id"]
+        _order_facts(flat, w, fid, group, choices)
+    _loose_facts(flat, w)
+    return flat
+
+
+# 14 Oct (Snappy Desk, stage 1; Alex: 'i approve the whole plan'): the pieces `flatten` is made of, so that a command's
+# record can say only the things it touched (flatten_some) with the very same code that says a whole world
+
+def _subject_facts(flat, sid, s):
+    for k in ("kind", "title"):
+        flat[(sid, k)] = s.get(k)
+    if s.get("due") is not None:
+        flat[(sid, "due")] = s["due"]
+    if s.get("tags"):
+        flat[(sid, "tags")] = list(s["tags"])
+    for k, v in (s.get("props") or {}).items():
+        flat[(sid, f"prop:{k}")] = plain(v)
+    for c in s.get("comments") or ():
+        flat[(sid, f"comment:{c['id']}")] = plain({k: v for k, v in c.items() if k != "id"})
+    lines = s.get("lines")
+    text = s.get("text") or ""
+    if lines is not None:
+        flat[(sid, "lines")] = True
+        for l in lines:
+            flat[(sid, f"line:{l['id']}")] = plain({k: v for k, v in l.items() if k != "id"})
+        if text == "\n".join(l["text"] for l in lines):
+            text = ""             # a chat's text is its lines joined: derived, or every line would store the chat again
+    if text:
+        flat[(sid, "text")] = text
+    for k, v in s.items():
+        if k not in SUBJECT_KNOWN:
+            flat[(sid, f"x:{k}")] = plain(v)
+
+
+def _node_facts(flat, nid, n):
+    for k in NODE_PLAIN:
+        if k in n:
+            flat[(nid, k)] = n[k]
+    flat[(nid, "in")] = n.get("parent")
+    for k, v in (n.get("props") or {}).items():
+        flat[(nid, f"prop:{k}")] = plain(v)
+    for k, v in n.items():
+        if k not in NODE_KNOWN:
+            flat[(nid, f"x:{k}")] = plain(v)
+
+
+def _order_facts(flat, w, fid, group, choices):
+    lay = w.nodes[fid].get("layout") if fid in w.nodes else "free"
+    if lay == "free" or fid is None:
+        for n in group:       # a box someone chose
+            flat[(n["id"], "box")] = [n.get("x", 0), n.get("y", 0), n.get("w", 0), n.get("h", 0)]
+            flat[(n["id"], "z")] = n.get("z", 0)
+    elif not choices:
+        # in a flow the boxes are derived from the order; the order is said as what each child comes after, so a
+        # move is three facts, not one per sibling
+        prev = ""
+        for n in w.children(fid) if len(group) > 1 else group:
+            flat[(n["id"], "after")] = prev
+            prev = n["id"]
+
+
+def _loose_facts(flat, w):
     for l in w.links:
         flat[(l["id"], "link")] = plain({k: v for k, v in l.items() if k != "id"})
     for k, v in vars(w).items():
         if k not in OFF_WORLD:
             flat[("world", k)] = plain(v)
-    return flat
+
+
+def flatten_some(w, flat0, sids, nids):
+    """-> (old, new): the facts of the things a command touched, as `flat0` said them and as the world says them now.
+    Touched are the subjects `sids` and the nodes `nids`; with a node come its siblings before and after (a move changes
+    what each comes after) and, for a surface, its children; links and the world's own facts are always said whole
+    (they are few). Everything else is as it was, so flat0 with `old` taken out and `new` put in is the world now."""
+    parents = set()
+    for nid in nids:
+        if nid in w.nodes:
+            parents.add(w.nodes[nid].get("parent"))
+            if w.nodes[nid].get("type") == "surface":
+                parents.add(nid)
+        if (nid, "in") in flat0:
+            parents.add(flat0[(nid, "in")])
+        if (nid, "type") in flat0 and flat0[(nid, "type")] == "surface":
+            parents.add(nid)
+    groups = {p: [] for p in parents}
+    for n in w.nodes.values():
+        p = n.get("parent")
+        if p in groups:
+            groups[p].append(n)
+    nodeset = set(nids) | {n["id"] for g in groups.values() for n in g}
+    things = set(sids)
+    old = {}
+    for k, v in flat0.items():                 # one pass: the touched things, the old children of the parents, loose facts
+        tid, aspect = k
+        if tid in things or tid in nodeset or tid == "world" or aspect == "link" or (aspect == "in" and v in parents):
+            old[k] = v
+            if aspect == "in" and v in parents:
+                nodeset.add(tid)
+    # an old child found in that pass brings all of its facts (it may have been met before its `in`)
+    old.update({k: v for k, v in flat0.items() if k[0] in nodeset and k not in old})
+    new = {}
+    for sid in things:
+        if sid in w.subjects:
+            _subject_facts(new, sid, w.subjects[sid])
+    for nid in nodeset:
+        if nid in w.nodes:
+            _node_facts(new, nid, w.nodes[nid])
+            parents.add(w.nodes[nid].get("parent"))
+    choices = bool(getattr(w, "choices", False))
+    for p in parents:
+        group = groups.get(p)
+        if group is None:
+            group = groups[p] = [n for n in w.nodes.values() if n.get("parent") == p]
+        part = {}
+        _order_facts(part, w, p, group, choices)
+        new.update({k: v for k, v in part.items() if k[0] in nodeset})
+    _loose_facts(new, w)
+    return old, new
 
 
 def diff(a, b):
@@ -591,6 +661,7 @@ class Ctx:
     def __init__(self, log, flat0, state0, n0, seen0):
         self.log, self.flat0, self.state0, self.n0, self.seen0 = log, flat0, state0, n0, seen0
         self.t0 = time.time()
+        self.quick = None             # (subject ids, node ids) at the start, when the command began from kept facts
 
     def __reduce__(self):
         return (type(None), ())       # pickled with a desk by accident, it is nothing
@@ -613,6 +684,18 @@ def genesis(desk, pickle_path, by="house", why=""):
     return log.append(rec, flat)
 
 
+import weakref  # noqa: E402
+
+# 14 Oct (Snappy Desk, stage 1): a world this process last wrote a record for, and the log's size just after it. While
+# both hold, the world is what that record left, so a command begins from the facts kept in memory (no flatten of the
+# whole world, no digest of every fact: 65 ms of every Enter on the bench). A world loaded again from its file is a new
+# object, and is flattened whole once.
+_MARKS = weakref.WeakKeyDictionary()
+VERIFY_EVERY = 20                   # every 20th quick record is also checked against the whole world flattened
+FULL_VERBS = {"undo", "redo", "merge"}       # commands that put back many things at once are recorded the whole way
+_QUICK = [0]
+
+
 def begin(desk, pickle_path):
     """Before a command: the world as facts. -> a Ctx, or None when this world has no log. When the world is not what
     the last record left (something changed it without a record), that difference is written first, as its own
@@ -622,6 +705,12 @@ def begin(desk, pickle_path):
     if head is None:
         return None
     w = desk.world
+    known = _HEADS.get(str(log.path))
+    size = log.path.stat().st_size
+    if known is not None and known[0] == size and _MARKS.get(w) == (str(log.path), size):
+        desk._store = Ctx(log, known[3], known[2], len(w.events), dict(getattr(desk, "_seen_idx", None) or {}))
+        desk._store.quick = (set(w.subjects), set(w.nodes))
+        return desk._store
     flat0 = flatten(w)
     state0 = digest(flat0)
     if head[1] != state0:
@@ -652,10 +741,25 @@ def commit(ctx, desk, words, by, press=None, window=None):
         return None
     vars(desk).pop("_store", None)
     w = desk.world
-    flat1 = flatten(w)
-    facts = diff(ctx.flat0, flat1)
     events = [e for e in w.events[ctx.n0:] if e.get("verb") not in OFF_VERBS]
+    flat1 = None
+    if ctx.quick is not None and not any(e.get("verb") in FULL_VERBS for e in w.events[ctx.n0:]):
+        flat1, facts, outside = _quick_facts(ctx, w, w.events[ctx.n0:])
+        if outside:
+            # what the check found that no event of this command names: written first, as its own record, as a
+            # command beginning the whole way does; the command's own record then follows from there
+            mid = patch(dict(ctx.flat0), outside)
+            mid_state = _move(ctx.state0, ctx.flat0, outside)
+            ctx.log.append({"state": mid_state, "at": _now(), "by": "?", "words": "",
+                            "parts": [{"cause": "outside", "facts": _enc(outside, ctx.flat0)}],
+                            "note": "the world changed without a record (or a command changed what its events do not name); "
+                                    "found when a quick record was checked against the whole world"}, dict(mid))
+            ctx.flat0, ctx.state0 = mid, mid_state
+    if flat1 is None:
+        flat1 = flatten(w)
+        facts = diff(ctx.flat0, flat1)
     if not facts and not events:
+        _MARKS[w] = (str(ctx.log.path), ctx.log.path.stat().st_size)
         return None
     # each fact goes to the first event of the command that names its thing and touched that aspect, as the fence
     # reads aspects (one reading: desk.event_aspects); else the first that names it; what no event names is the act's
@@ -719,7 +823,49 @@ def commit(ctx, desk, words, by, press=None, window=None):
     if getattr(w, "_ids", None) is not None:
         rec["ids"] = w._ids
     rec["ms"] = int((time.time() - ctx.t0) * 1000)
-    return ctx.log.append(rec, flat1)
+    seq = ctx.log.append(rec, flat1)
+    _MARKS[w] = (str(ctx.log.path), ctx.log.path.stat().st_size)
+    return seq
+
+
+def _quick_facts(ctx, w, events):
+    """-> (flat after, the command's facts, facts no event names), from the things the command's events name and the
+    things it made or removed. Every VERIFY_EVERY-th time, and always with DESK_LOG_VERIFY=1, the answer is checked
+    against the whole world flattened; what it missed is said in the log's .err and returned as the third part."""
+    subs0, nodes0 = ctx.quick
+    flat0 = ctx.flat0
+    names = set()
+    for e in events:
+        names.add(e.get("target"))
+        names.update(e.get("changed") or ())
+    names.discard(None)
+    sids = {n for n in names if n in w.subjects or (n, "kind") in flat0}
+    nids = {n for n in names if n in w.nodes or (n, "type") in flat0}
+    sids |= (set(w.subjects) ^ subs0)
+    nids |= (set(w.nodes) ^ nodes0)
+    for nid in list(nids):
+        sub = (w.nodes.get(nid) or {}).get("subject") or flat0.get((nid, "subject"))
+        if sub:
+            sids.add(sub)
+    old, new = flatten_some(w, flat0, sids, nids)
+    facts = diff(old, new)
+    flat1 = dict(flat0)
+    for k in old:
+        del flat1[k]
+    flat1.update(new)
+    _QUICK[0] += 1
+    if os.environ.get("DESK_LOG_VERIFY") == "1" or _QUICK[0] % VERIFY_EVERY == 0:
+        whole_flat = flatten(w)
+        if whole_flat != flat1:
+            missed = diff(flat1, whole_flat)      # on things the command did not touch, so flat1 there is flat0
+            try:
+                with open(Path(str(ctx.log.path) + ".err"), "a", encoding="utf-8") as f:
+                    f.write(f"--- {_now()} quick record missed {sorted({m[0] for m in missed})[:20]} after "
+                            f"{[(e.get('verb'), e.get('target')) for e in events][:6]}; written as an outside record\n")
+            except OSError:
+                pass
+            return whole_flat, facts, missed
+    return flat1, facts, []
 
 
 def fence_aspect(aspect):

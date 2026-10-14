@@ -328,6 +328,10 @@ except store.CannotUndo as e:
 agrees("after the undo trials (all on copies), the log still says what the world says")
 
 # ---- something changes the world without a record ------------------------------------------------------------------------
+# 14 Oct (Snappy Desk, stage 1): a command in the process that wrote the last record begins from the facts it kept, so a
+# change made in that process behind the log's back is found when a quick record is checked against the whole world:
+# every 20th record, or each one with DESK_LOG_VERIFY=1 (as here). A world loaded from its file is checked the whole way.
+os.environ["DESK_LOG_VERIFY"] = "1"
 W.subjects[subj(CARD2)]["title"] = "changed behind the log's back"
 n = LOG.head()[0]
 r = ok("alex", f"look {CARD1} :1", f"do prop {CARD1} seen=yes")
