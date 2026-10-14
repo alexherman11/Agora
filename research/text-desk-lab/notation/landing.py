@@ -3,6 +3,9 @@ land as fast as possible, with uncommitted changes not blocking new code arrivin
 the same time").
 
     python landing.py <branch> [<branch> ...] [--as <who>] [--why <words>] [--world frontier]
+    python landing.py --files <path> [<path> ...] --as <who> --why <words>    a hand landing: those files, as they
+                                                     stand in the live checkout, judged and landed with no branch made
+                                                     by hand (14 Oct: for whoever must work in the live checkout itself)
     python landing.py --status
 
 Three kinds of room. The live checkout (C:/Projects/Agora4, on main) is what the door, the house and the worlds run;
@@ -206,6 +209,52 @@ def park(paths, why):
     return branch
 
 
+def _holds(p, sha):
+    """Does the live checkout's file `p` hold exactly what commit `sha` has (or both lack it)?"""
+    f = LIVE / p
+    there = subprocess.run(["git", "show", f"{sha}:{p}"], cwd=LIVE, capture_output=True)
+    if there.returncode:
+        return not f.exists()
+    return f.is_file() and f.read_bytes().replace(b"\r\n", b"\n") == there.stdout.replace(b"\r\n", b"\n")
+
+
+def hand(paths, who="?", words=""):
+    """A hand landing (Codex e9779: some builders must work in the live checkout itself): the named files as they stand
+    there now become one commit on main's newest, on a branch hand/<who>-<when>, which lands as any branch does. Nothing
+    in the live checkout is touched first; if it lands, those files are simply clean, since main now holds them. -> the
+    branch, or raises ValueError naming what cannot go."""
+    rel = []
+    for p in paths:
+        q = Path(p)
+        q = (Path.cwd() / q).resolve() if not q.is_absolute() else q.resolve()
+        try:
+            r = q.relative_to(LIVE.resolve()).as_posix()
+        except ValueError:
+            raise ValueError(f"{p} is not in the live checkout ({LIVE})")
+        if r.startswith(BANNED) or r.endswith(".env"):
+            raise ValueError(f"{r} may not land")
+        rel.append(r)
+    if not rel:
+        raise ValueError("no files named")
+    STATE.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    branch = f"hand/{''.join(c if c.isalnum() or c in '-_' else '-' for c in who)}-{stamp}"
+    idx = STATE / f"hand-{stamp}.index"
+    env = {"GIT_INDEX_FILE": str(idx)}
+    try:
+        git("read-tree", "HEAD", cwd=LIVE, env=env, check=True)
+        git("add", "-A", "--", *rel, cwd=LIVE, env=env, check=True)
+        tree = git("write-tree", cwd=LIVE, env=env, check=True).stdout.strip()
+        if tree == git("rev-parse", "HEAD^{tree}", cwd=LIVE, check=True).stdout.strip():
+            raise ValueError("those files are as main has them: nothing to land")
+        msg = f"{words or 'by hand'}\n\nlanded by hand from the live checkout by {who}: {', '.join(rel)}"
+        c = git("commit-tree", tree, "-p", "HEAD", "-m", msg, cwd=LIVE, check=True).stdout.strip()
+        git("branch", branch, c, cwd=LIVE, check=True)
+    finally:
+        idx.unlink(missing_ok=True)
+    return branch
+
+
 def advance(sha, base, why):
     """Move main in the live checkout to `sha` (a descendant of `base`) by fast-forward. -> (moved, parked branch or
     None, why not). Not moved when main is no longer `base` (someone landed meanwhile)."""
@@ -213,7 +262,14 @@ def advance(sha, base, why):
     if head != base:
         return False, None, "main moved while this was judged"
     changed = set(git("diff", "--name-only", base, sha, cwd=LIVE, check=True).stdout.split("\n")) - {""}
-    overlap = sorted(p for p in dirty_in_live() if p in changed)
+    # a file that already holds what lands (a hand landing's own files) is not in the way: nothing to park
+    dirty = [p for p in dirty_in_live() if p in changed]
+    overlap = sorted(p for p in dirty if not _holds(p, sha))
+    same = [p for p in dirty if p not in overlap]
+    if same:
+        # git will not fast-forward over a changed file even when it already holds what comes; staged, it sees that the
+        # file is as the landing has it. Only the staging changes: the file itself is not touched
+        git("add", "--", *same, cwd=LIVE, check=True)
     # what each overlapping file holds now (its writer's words), read before it is put back
     theirs = {p: (LIVE / p).read_bytes() if (LIVE / p).is_file() else None for p in overlap}
     parked = park(overlap, why) if overlap else None
@@ -285,7 +341,6 @@ def _land(branches, world, who, why, depth):
         if not todo:
             return out
         room_at(base)
-        before = judged(world, base, kept)
         merged, refused = merge_in(todo, why)
         out["refused"] += [(b, f"does not merge into main: {w}") for b, w in refused]
         if not merged:
@@ -293,6 +348,13 @@ def _land(branches, world, who, why, depth):
             return out
         sha = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
         after = judged(world, sha, kept)
+        # 14 Oct (Codex e9993: a5062 judged again and again from 16:42 while main moved by hand under it): main alone is
+        # judged only when the landing fails, to tell what it broke from what was already broken. A landing that passes
+        # costs one run of health, so it is less often overtaken
+        before = {"ok": True, "failed": []}
+        if not after.get("ok", True) or after.get("failed"):
+            room_at(base)
+            before = judged(world, base, kept)
         _keep(kept)
         bad = faults(before, after)
         if bad:
@@ -349,17 +411,30 @@ def main(argv):
         return 0
     opt = lambda k, d: argv[argv.index(k) + 1] if k in argv[:-1] else d      # noqa: E731
     skip = {opt("--as", None), opt("--why", None), opt("--world", None)}
+    who, words = opt("--as", os.environ.get("DESK_AS") or "?"), opt("--why", "")
+    files = []
+    if "--files" in argv:
+        rest = argv[argv.index("--files") + 1:]
+        files = rest[:next((k for k, a in enumerate(rest) if a.startswith("--")), len(rest))]
+        try:
+            branch = hand(files, who, words)
+        except ValueError as e:
+            print(f"not landed: {e}")
+            return 1
+        print(f"the files as they stand are {branch}; judging it")
+        argv = [a for a in argv if a not in files] + [branch]
     branches = [a for a in argv if not a.startswith("--") and a not in skip]
     if not branches:
         print(__doc__.split("\n\n")[1])
         return 2
-    who, words = opt("--as", os.environ.get("DESK_AS") or "?"), opt("--why", "")
     why = {b: f"land {b}" + (f": {words}" if words else "") + f"\n\nasked by {who}; judged in the landing room on main "
               f"with a copy of the live world, and landed by fast-forward." for b in branches}
     t0 = time.time()
     r = land(branches, world=opt("--world", "frontier"), who=who, why=why)
     for b in r["landed"]:
         print(f"landed {b} as {r['head']}")
+        if b.startswith("hand/"):
+            git("branch", "-D", b, cwd=LIVE)          # main holds it now; a hand branch that did not land is kept
     for b, w in r["refused"]:
         print(f"not landed {b}: {w}")
     if r.get("main_failing"):
