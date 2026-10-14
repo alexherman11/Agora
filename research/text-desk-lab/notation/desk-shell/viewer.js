@@ -166,13 +166,20 @@ const Viewer = (session, who, lens, said, status) => {
     // "WxH", with "sh=" / "sw=" when its contents are taller / wider than it, "cut=n/m" when n of its m parts are clipped
     // by a box that does not scroll, "out=n/m" (attention only: it depends on where it is scrolled) for one that does,
     // and "hidden" when it is not drawn (inside a fold). `painted` is the lens frame and style revision it was painted at.
+    // a5047 (Alex e9743: a dragged rectangle must find the parts under it; a window manager places windows at the boxes
+    // a page paints): "WxH@x,y", where x,y is the part's left and top in CSS pixels from the page's top left as laid out,
+    // the scroll of every frame around it (the page's own too) taken back out, so a position never tells where anyone
+    // has scrolled. The page's inner size and device pixel ratio go with every report: a page's size is not attention.
     report(paint, at, extra, attention, painted) {
       const vp = paint.getBoundingClientRect(), facts = attention ? { ...extra } : {}, boxes = {};
-      for (const el of paint.querySelectorAll("[data-key]")) {
+      const els = [...paint.querySelectorAll("[data-key]")], scrolled = [paint, ...els].filter(e => e.scrollTop || e.scrollLeft);
+      for (const el of els) {
         const r = el.getBoundingClientRect(), f = [];
         if (!el.getClientRects().length) boxes[el.dataset.key] = "hidden";
         else {
-          let b = `${Math.round(r.width)}x${Math.round(r.height)}`;
+          let x = r.left + scrollX, y = r.top + scrollY;
+          for (const s of scrolled) if (s !== el && s.contains(el)) { x += s.scrollLeft; y += s.scrollTop; }
+          let b = `${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(x)},${Math.round(y)}`;
           const tall = el.scrollHeight > el.clientHeight + 1, wide = el.scrollWidth > el.clientWidth + 1;
           if (tall || wide) {
             const s = getComputedStyle(el), o = s.overflowX + s.overflowY, scrolls = /auto|scroll/.test(o), clips = scrolls || /hidden|clip/.test(o);
@@ -192,7 +199,8 @@ const Viewer = (session, who, lens, said, status) => {
         if (f.length) facts[el.dataset.key] = f.join(", ");
       }
       const view = attention ? { viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } } : {};
-      const body = JSON.stringify({ session, as: who, lens, at, facts, boxes, painted: painted || null, ...view });
+      const page = { w: innerWidth, h: innerHeight, dpr: devicePixelRatio };
+      const body = JSON.stringify({ session, as: who, lens, at, facts, boxes, page, painted: painted || null, ...view });
       // a4869 (Sable c4900): a report does not outlive the house that kept it. When the scene's words name no report of
       // this viewer (`  ~ <who> ` heads each one), the house has none: the same report goes again, once per such text
       const unheard = !text.split("\n").some(l => l.startsWith(`  ~ ${String(who).toLowerCase()} `));

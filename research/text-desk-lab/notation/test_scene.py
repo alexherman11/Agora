@@ -1129,6 +1129,14 @@ def test_scene_prints_painted_boxes_and_their_age():
             out = say("scene boxy root")
             assert "as it stands" in out and "scrolls: contents 300 high" in out and "not drawn (folded or hidden)" in out, out
             assert "0x10px (0 wide: nothing visible)" in out and "clipped: contents 80 high, 2 of 5 parts cut off" in out, out
+            # a5047: a part's left and top on the page beside its size, and the page's own size on the viewer's line
+            reports.keep("_test_boxes", "alex", {"lens": "boxy", "at": len(desk.world.events), "time": "2026-10-01T09:00:00", "viewport": None,
+                                                 "page": {"w": 1280, "h": 800, "dpr": 1.5}, "facts": {},
+                                                 "boxes": {"root": "900x60@0,0 scroll sh=300", "root/z": "240x67@12,340", "root/b": "10x10@-4,2"},
+                                                 "painted": {"frame": scene.scene_for(desk, "boxy")[0]["def"]["frame"], "style": "seed"}})
+            out = say("scene boxy root")
+            assert "~ alex: 240x67px at 12,340" in out and "900x60px at 0,0, scrolls: contents 300 high" in out, out
+            assert "10x10px at -4,2" in out and "attention not shared · page 1280x800 at 1.5x" in out, out
     finally:
         tmp.unlink(missing_ok=True)
         shutil.rmtree(reports.ROOT, ignore_errors=True)
