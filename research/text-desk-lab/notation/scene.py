@@ -114,8 +114,8 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture")   # pike-7 sections 6 and 9, lowered here; fold_open and fold_float are fold's modifiers
-GESTURES = ("click", "edit", "drag", "menu", "key")
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit")   # fold_open and fold_float are fold's modifiers
+GESTURES = ("click", "edit", "drag", "menu", "key", "open")
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands to its lens (7 Oct: a document's keys)
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
@@ -233,7 +233,8 @@ def _cmd_value(v):
 # anything the terminal cannot.
 SOURCES = {
     "sections": ("sections:<id>", ("item", "heading", "words", "text", "index")),
-    "comments": ("comments:<id>", ("item", "cid", "by", "text", "state", "replies")),
+    "comments": ("comments:<id>", ("item", "cid", "by", "text", "state", "replies", "image", "awaiting", "to", "eid", "unread", "unread_count", "reply_count", "latest", "opening_awaiting")),
+    "replies": ("replies:<id>", ("item", "rid", "thread", "by", "text", "index", "awaiting", "to", "eid", "unread")),
     "actors": ("actors", ("name", "acts", "last", "verb", "target", "read", "behind")),
     "events": ("events", ("eid", "verb", "target", "by", "at", "merged")),
     "worktrees": ("worktrees", ("name", "by", "commands", "merged", "behind")),
@@ -248,7 +249,7 @@ SOURCES = {
     # line or comment, `saying` its own id (m<n> or c<n>), `name` its writer as a word an @ can call; answered and
     # before are filled when for:<name> says whose For you it is
     "sayings": ("sayings [for:<name>] [in:<id>]", ("item", "what", "saying", "by", "name", "at", "in", "to", "said",
-                                                    "answered", "edited", "before", "state", "eid")),
+                                                    "answered", "edited", "before", "state", "eid", "thread")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
     "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),
@@ -467,6 +468,27 @@ def saying_rows(desk, terms=""):
                         "answered": answered, "edited": "", "before": "", "state": state,
                         "eid": e["id"] if e else c["id"], "chat": s["title"], "who": by, "open": flip.get(answered, ""),
                         "index": i + 1, "line": "", "_t": (at or "", _enum(e["id"] if e else ""))})
+        # Replies are sayings in their own right: a return message to the opening
+        # author must reach For you even though their own opening comment does not.
+        for c in cs:
+            replies = c.get("replies") or []
+            events = rooms.reply_events(w).get(c["id"], [])
+            for i, (reply, e) in enumerate(zip(replies, events), 1):
+                writer = str(reply.get("by") or "").split("/")[0].lower()
+                to = rooms.comment_to(e)
+                if e.get("args", {}).get("line") != reply.get("text"):
+                    continue
+                if me and (rooms.same_person(w, writer, me) or not rooms.shown(w, s, to, me, comment=True)):
+                    continue
+                answered = ("yes" if any(rooms.same_person(w, r.get("by"), me) for r in replies[i:]) else "no") if me else ""
+                by = str(persons.reply_by(w, c, i - 1) or "")
+                at, eid = e.get("at", ""), e["id"]
+                out.append({"item": where[sid], "what": "reply", "saying": f"{c['id']}/reply/{i}",
+                            "by": by[:1].upper() + by[1:], "name": writer, "at": _clock(at), "in": s["title"],
+                            "to": ", ".join(to), "said": reply["text"], "answered": answered, "edited": "",
+                            "before": "", "state": "resolved" if c.get("resolved") else "open", "eid": eid,
+                            "chat": s["title"], "who": by, "open": flip.get(answered, ""), "index": i, "thread": c["id"],
+                            "line": "", "_t": (at or "", _enum(eid))})
     out.sort(key=lambda r: r.pop("_t"))
     return out
 
@@ -579,7 +601,7 @@ def rows(desk, source, session=None):
 def _rows_of(desk, source, session=None):
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "messages", "inbox", "days")) != bool(arg)):
+    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name, days a span; house, turns and lines one or none; the rest none
     if head == "days":
         a, _, b = arg.partition("..")
@@ -613,11 +635,35 @@ def _rows_of(desk, source, session=None):
     if head == "sections":
         return [{"item": nid, "heading": h or "(before the first heading)", "words": len(b.split()), "text": b, "index": k}
                 for k, (h, b) in enumerate(w.sections(s["text"]), 1)]
+    if head == "replies":
+        import rooms
+        waiting = {c["id"]: rooms.thread_waiting(w, c, w.me) for c in s.get("comments", [])}
+        unread = {c["id"]: rooms.thread_read_state(w, c, w.me)[0] for c in s.get("comments", [])}
+        events = rooms.reply_events(w)
+        return [{"item": nid, "rid": f"{c['id']}/reply/{i}", "thread": c["id"],
+                 "by": r["by"], "text": r["text"], "index": i,
+                 "to": ",".join(rooms.comment_to(e)) if e else "", "eid": e.get("id", ""),
+                 "unread": "yes" if i in unread[c["id"]] else "no",
+                 "awaiting": "yes" if i in waiting[c["id"]] else "no"}
+                for c in s.get("comments", [])
+                for i, r in enumerate(c.get("replies") or [], 1)
+                for e in [events.get(c["id"], [])[i - 1] if i <= len(events.get(c["id"], [])) else {}]]
     if head == "comments":
+        import persons
+        import rooms
+        events = persons.comment_events(w)
         # replies (13 Oct): the thread under the comment as one text, a line a reply, each signed
         return [{"item": nid, "cid": c["id"], "by": c["by"], "text": c["text"], "state": "resolved" if c["resolved"] else "open",
-                 "replies": chr(10).join(f"{r['by']}: {r['text']}" for r in c.get("replies") or [])}
-                for c in s.get("comments", [])]
+                 "replies": chr(10).join(f"{r['by']}: {r['text']}" for r in c.get("replies") or []),
+                 "image": (c.get("image") or {}).get("data_url", ""),
+                 "to": ",".join(rooms.comment_to(e)) if e else "", "eid": e.get("id", ""),
+                 "unread": "yes" if 0 in unread else "no", "unread_count": len(unread),
+                 "reply_count": len(c.get("replies") or []), "latest": latest,
+                 "opening_awaiting": "yes" if 0 in waiting else "no",
+                 "awaiting": "yes" if waiting else "no"}
+                for c in s.get("comments", []) for e in [events.get(c["id"], {})]
+                for unread, latest in [rooms.thread_read_state(w, c, w.me)]
+                for waiting in [rooms.thread_waiting(w, c, w.me)]]
     if head == "messages":
         # a chat's lines: each is signed by its speaker (world.apply signs a chat line with its actor); a line a rule
         # added keeps its whole signature in who ('Alex, via rule r3'), so it never reads as Alex speaking
@@ -759,6 +805,12 @@ def _w_lines(node, p, val, n, env):
     node["lines"] = [int(m.group(1)), int(m.group(2)) if m.group(2) else None]
 
 
+def _w_commit(node, p, val, n, env):
+    if val not in ("explicit", "enter", "ctrl-enter"):
+        raise LensRefusal(f"line {n}: `commit explicit|enter|ctrl-enter`; got {p!r}")
+    node["commit"] = val
+
+
 def _w_hint(node, p, val, n, env):
     m = re.fullmatch(r'"([^"]*)"', val)
     if not m or not m.group(1):
@@ -783,7 +835,9 @@ def _w_picture(node, p, val, n, env):
 
 
 def _w_peek(node, p, val, n, env):
-    node["peek"] = True           # a1032 (Alex: 'see what they are working on at a glance'): shown while its parent is folded
+    if val and (not val.isdigit() or int(val) < 1):
+        raise LensRefusal(f"line {n}: peek [positive line count]")
+    node["peek"] = int(val) if val else True
 
 
 _RUNS = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.S)
@@ -1114,12 +1168,13 @@ WORDS = {
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
+    "commit": ("commit explicit|enter|ctrl-enter", _w_commit),
     "share": ("share <weight>", _w_share),
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
     "picture": ("picture", _w_picture),
-    "peek": ("peek", _w_peek),
+    "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
     "role": ("role <name> [when <selection | expr>]", _w_role),
     "text": ('text "..."', _w_text),
@@ -1254,8 +1309,8 @@ def parse(src, roles=None, style=None):
         for wd in ("gap", "scroll", "fold", "measure"):
             if k[wd] not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
-        for wd in ("wrap", "lines", "hint"):
-            if k[wd] is not None and k["text"] is None:
+        for wd in ("wrap", "lines", "hint", "commit"):
+            if k.get(wd) is not None and k["text"] is None:
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
             raise LensRefusal(f"line {k['line']}: `picture` draws a text that is a drawing (SVG): this part " + ("prints no text" if k["text"] is None else "is edited, and a drawing is edited as its source, in a part without `picture`"))
@@ -1265,6 +1320,10 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `on edit` on a clamped text: the person would replace words the clamp hides; drop the clamp, or edit through a part that shows the whole value")
         if any(a["on"] == "key" for a in k["on"]) and not any(a["on"] == "edit" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: `on key` is for a text being written: this part has no `on edit`")
+        if any(a["on"] == "open" for a in k["on"]) and not k["fold"]:
+            raise LensRefusal(f"line {k['line']}: `on open` needs a fold handle")
+        if type(k["peek"]) is int and k["text"] is None:
+            raise LensRefusal(f"line {k['line']}: `peek <lines>` needs text")
         if k["each"] and k["each"] not in parts:
             raise LensRefusal(f"line {k['line']}: each {k['each']}: no part of that name is defined (unindented) in this lens")
         if k["carry"] and any(a["on"] == "drag" for a in k["on"]):
@@ -1589,6 +1648,8 @@ def _ctx_for(w, nid, state=None):
            # a1590: a person prop holds the person; a lens reads the name ($owner = $me holds for today's bearer)
            "_props": __import__("persons").shown_props(w, s.get("props") or (n.get("props") if n.get("type") == "surface" else None) or {})}
     if s.get("id"):
+        if any(c.get("image") for c in s.get("comments", [])):
+            ctx["_image_regions"] = __import__("image_comments").regions(s)
         import promises      # a1587: who open requests about it ask, read from their events ($asked_of; '' for none)
         ctx["asked_of"] = promises.cell(w, s["id"], "asked_of") if promises.on(w) else ""
     if state:
@@ -1770,7 +1831,7 @@ def to_text(scene, name, who, at, roots=None, part=None):
         if n.get("hint"):
             bits.append(f'hint "{n["hint"]}"')
         if n.get("peek"):
-            bits.append("peek")
+            bits.append("peek" + (f" {n['peek']}" if type(n["peek"]) is int else ""))
         if n.get("picture"):
             bits.append("picture")
         if n.get("plain"):
@@ -1961,6 +2022,8 @@ def emit(node):
             paint["hint"] = node["hint"]
         if node.get("picture"):
             paint["picture"] = True
+            if node.get("image_regions"):
+                paint["regions"] = node["image_regions"]
         if not node.get("plain") and not node.get("picture") and node.get("text"):
             rs = runs_of(node["text"], node.get("marks"))
             if node.get("marks"):
@@ -1970,13 +2033,13 @@ def emit(node):
         ons = {a.get("on") for a in (node.get("acts") or [])}
         if "edit" in ons:
             mx = (node.get("lines") or [1, 1])[1]
-            paint["commit"] = "enter" if (not node.get("lines") or mx == 1) else "ctrl-enter"    # emitted, so the print can say which
+            paint["commit"] = node.get("commit") or ("enter" if (not node.get("lines") or mx == 1) else "ctrl-enter")
         if "click" in ons:
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:
         paint["share"] = node["share"]
     if node.get("peek") and not paint.get("absent"):
-        paint["peek"] = True
+        paint["peek"] = node["peek"]
     node["paint"] = paint
     acts = list(node.get("acts") or [])
     if node.get("fold") and not any(a.get("on") == "fold" for a in acts):

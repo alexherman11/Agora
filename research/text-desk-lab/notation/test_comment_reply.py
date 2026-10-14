@@ -4,7 +4,7 @@
 
 Alex, 13 Oct, in the design-review window: 'can we make it so the agents can reply in line ... reply to the comments'.
 Until now a comment's reply could only be given by closing it (resolve line=). `comment <thing> id=<cNN> line=...`
-adds a reply under that comment and leaves it open; it calls the comment's writer and those who replied before; undo
+adds a reply under that comment and leaves it open; it calls the original conversation partners; undo
 takes that one reply away; the comments rows carry the thread. Builds its own small world (roomworld.py).
 """
 import os

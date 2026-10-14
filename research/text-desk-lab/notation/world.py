@@ -218,10 +218,12 @@ class World:
         return sid
 
     # ---- comments, links, sections (round 9) ---------------------------
-    def add_comment(self, sid, by, text, actor=None):
+    def add_comment(self, sid, by, text, actor=None, image=None):
         cid = self._id("c")
         s = self.subjects[sid]
         s["comments"].append({"id": cid, "by": by, "text": text, "resolved": False, "replies": []})
+        if image is not None:
+            s["comments"][-1]["image"] = image
         s["rev"] += 1
         for a in self.appearances_of(sid):
             self._bump(a)
@@ -717,7 +719,8 @@ class World:
         v = {}
         if n["type"] == "appearance" and (self.subjects.get(n["subject"]) or {}).get("kind") == "promise":
             # a1587: a promise's words are its maker's and it never leaves quietly; it ends by its own verbs
-            return {"comment": "line=<str>  (a comment on this promise, signed by you)",
+            return {"comment": "line=<str> [id=<cNN>] [to=<names>]  (a signed comment or reply on this promise)",
+                    "markread": "id=<cNN> through=<eNN>  (read through a displayed message for the caller)",
                     "link": "to=<id> as=blocks|refers|answers|part-of  (a connection to another thing)"}
         if n["parent"]:
             parent = self.nodes[n["parent"]]
@@ -749,7 +752,8 @@ class World:
 
     def content_verbs(self, sid):
         s = self.subjects[sid]
-        v = {"comment": "line=<str> [id=<cNN>]  (a comment on this thing, signed by you; with id=, a reply under that comment, which stays open)",
+        v = {"markread": "id=<cNN> through=<eNN>  (read through a displayed message, for the caller; does not answer)",
+             "comment": "line=<str> [id=<cNN>] [to=<names>]  (a signed comment; with id=, an open-thread reply; to= overrides header and thread recipients)",
              "link": "to=<id> as=blocks|refers|answers|part-of  (a connection to another thing)"}
         if any(not c["resolved"] for c in s["comments"]):
             v["resolve"] = "id=<cNN> [line=<str>]  (close a comment, optionally with a reply)"
@@ -799,7 +803,7 @@ class World:
         n = self.nodes[target]
         before = deepcopy(n)
         changed = [target]
-        if verb in ("append", "retitle", "rekind", "rewrite", "replace", "edit", "comment", "resolve", "check", "link", "unlink"):
+        if verb in ("append", "retitle", "rekind", "rewrite", "replace", "edit", "comment", "markread", "resolve", "check", "link", "unlink"):
             if n["type"] != "appearance":
                 raise Refusal(f"{verb} needs an appearance or subject, not a surface")
             return self._apply_subject(verb, n["subject"], None, args, actor, via=target)
@@ -1032,7 +1036,25 @@ class World:
         before = deepcopy(s)
         apps = self.appearances_of(sid)
         replaced = None
+        if verb == "markread":
+            import rooms
+            import persons
+            cid, through = str(args.get("id", "")), str(args.get("through", ""))
+            owner, c = self.find_comment(cid)
+            if owner is None or owner["id"] != sid:
+                raise Refusal(f"{cid} is not a comment on {sid}")
+            events = [persons.comment_events(self).get(cid, {}), *rooms.reply_events(self).get(cid, [])]
+            if not any(e.get("id") == through for e in events):
+                raise Refusal("through= must name an active message event in this thread")
+            ev = self._event("markread", via or sid, {"id": cid, "through": through}, {}, actor)
+            return {"ok": True, "event": ev["id"], "changed": [], "note": f"{cid} read through {through}; reply status unchanged"}
         if verb == "comment":
+            image = None
+            if "image_context" in args:
+                if args.get("id"):
+                    raise Refusal("a reply keeps its original comment's image; select a region in a new comment")
+                from image_comments import validate
+                image = validate(args["image_context"], via or sid, s["text"])
             line = str(args.get("line", args.get("text", ""))).strip()
             if not line:
                 raise Refusal("comment needs line=")
@@ -1044,7 +1066,7 @@ class World:
                 line = line[own.end():]
             # 13 Oct (Alex: 'can we make it so the agents can reply in line ... reply to the comments'): with id=<cNN> the
             # words are a reply under that comment, which stays open. Until now a reply could only be given by closing
-            # it (resolve line=). A reply calls the comment's writer and whoever replied before, as well as its header.
+            # it (resolve line=). Replies use their explicit address or the original thread partners.
             rid = str(args.get("id", "")).strip()
             if rid:
                 owner, c = self.find_comment(rid)
@@ -1057,24 +1079,30 @@ class World:
                 s["rev"] += 1
                 for a in apps:
                     self._bump(a)
-                ev = self._event("comment", via or sid, {"id": rid, "line": line}, {"drop_reply": rid}, actor)
+                reply_args = {"id": rid, "line": line}
+                if "to" in args:
+                    reply_args["to"] = args["to"]
+                ev = self._event("comment", via or sid, reply_args, {"drop_reply": rid}, actor)
                 ev["changed"] = [sid] + apps
                 import rooms
-                heard = [str(c["by"]).lower()] + [str(r["by"]).lower() for r in c["replies"]] + written(ev)[0]
-                ev["to"] = [n for i, n in enumerate(heard) if n != str(me).lower() and n not in heard[:i]
-                            and n not in rooms.EVERYONE and rooms.someone(self, n)]
+                ev["to"] = rooms.reply_to(self, c, ev)
                 return {"ok": True, "event": ev["id"], "changed": [sid] + apps,
-                        "note": f"reply added under {rid} by {c['by']} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
-            cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor)
+                        "note": f"reply added under {rid} by {me} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
+            cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor, image)
             # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
             # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
             # them: the house tells a resident every string an event's args hold. A comment from before this has no
             # `to`, and For you (rooms.shown) never counts it: a line written before the rule wasn't a call.
             import rooms
             ev = self.events[-1]
-            ev["to"] = [n for n in written(ev)[0] if n not in rooms.EVERYONE and rooms.someone(self, n)]
+            if "to" in args:
+                ev["args"]["to"] = args["to"]
+            names = to_names(args["to"]) if "to" in args else written(ev)[0]
+            ev["to"] = [n for n in names if n not in rooms.EVERYONE and rooms.someone(self, n)
+                        and not rooms.same_person(self, n, str(actor).split("/")[0])]
             return {"ok": True, "event": self.events[-1]["id"], "changed": [sid] + apps, "created": cid,
-                    "note": f"comment {cid} added on {sid}" + ("; the world signs for you, your typed name was dropped" if own else "")}
+                    "note": f"comment {cid} added on {sid}" + ("; the world signs for you, your typed name was dropped" if own else "")
+                    + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
         if verb == "resolve":
             cid = str(args.get("id", args.get("comment", "")))
             owner, c = self.find_comment(cid)

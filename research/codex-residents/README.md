@@ -144,6 +144,106 @@ The watcher authorizes advice and read-only investigation, not deployments,
 worker commissions, or live-service restarts. The Desk and resident processes
 are separate and were not restarted to install it.
 
+## Visual playtester event wakeups (13 October 2026)
+
+**Role superseded later on 13 October:** Alex assigned this same chat the general
+`@codex` worker role. Its event prompt now covers implementation, investigation
+and testing under his standing instructions and repository rules, with replies
+in the originating Desk conversation. Existing paths retain their visual-tester
+names to preserve the cursor and delivery records. Previously dismissed requests
+are not automatically replayed; check their present ownership and context first.
+
+The separate `desk-visual-playtester-codex` minute heartbeat was deleted at
+Alex's request. `visual_event_listener.py` now waits on Windows directory-change
+notifications, checks the Frontier file's metadata, and reads new events through
+the existing HTTP event API. It never reads pickle contents. Healthy waits have
+no timer; failure recovery is described below. There is no model turn for an
+unchanged or unaddressed event batch.
+The missing world capability is a subscribable event stream; file notifications
+are a local adapter, not a new Desk API or a native-world replay guarantee.
+
+It preserves the playtester's independent cursor and pending queue at
+`local/codex-residents/visual-playtester-01a1172a.json`. It uses the currently
+installed, unmodified app-tools bridge to send candidates to the existing
+playtester chat. Self/house events and previously notified IDs do not cause
+another delivery. Mentions inside quotations can still be candidates; the agent
+reviews them. A successful app delivery is distinct from a finished playtest.
+The agent acknowledges with `ack <ids> --note <verified reply or no-op reason>`.
+Ingestion and acknowledgments share a lock. A crash between delivery and saving
+the receipt can repeat a notification, so the agent checks existing replies.
+
+From `C:/Projects/Agora4`, with the pinned interpreter:
+
+```powershell
+& .venv/Scripts/python.exe research/codex-residents/visual_event_listener.py stop
+# Explicit one-off check while the listener runs:
+& .venv/Scripts/python.exe research/codex-residents/visual_event_listener.py check
+```
+
+Local `visual-event-config.json` pins the chat, Node and bundled MCP server.
+`visual-event-status.json` records state/errors; the control directory holds the
+off switch. **13 Oct restart repair:** the limited, interactive-user Windows task
+`AgoraDeskListener-Codex-01a1172a` starts a hidden supervisor at Alex's login.
+The supervisor blocks on the listener process and restarts it after an unexpected
+exit. Windows task failure restart is also configured, but it did not relaunch
+our manually started task during the first crash test; child recovery is therefore
+owned by the tested supervisor, not inferred from task settings.
+
+Healthy listening still waits on directory notifications indefinitely. Only a
+failed HTTP/bridge call uses a reconnect delay (2, 4, 8 seconds, capped at 60).
+Recovery does not need another world write. Missing world files during a restart
+are recoverable; a backward event count is refused without resetting the cursor.
+The durable pending/notified/handled state survives process replacement.
+
+`listener_bridge.py` no longer depends on inherited session environment. It
+discovers the app's named pipes, verifies the owning process against the configured
+installed Codex package path, and probes the pinned destination chat read-only
+through the unchanged bundled MCP server before sending. A stale preferred pipe
+is replaced after discovery. No app database, authentication, or private transport
+implementation is modified. If the app is closed, pending messages stay queued
+and reconnect attempts continue. A crash after accepted delivery but before its
+receipt is saved can still repeat a notification; this is at-least-once delivery.
+
+Install/update the task, stop, resume, or remove it:
+
+```powershell
+& research/codex-residents/install_listener.ps1
+& .venv/Scripts/python.exe research/codex-residents/visual_event_listener.py stop
+# Resume after an intentional stop:
+Remove-Item -LiteralPath local/codex-residents/visual-event-control/stop -ErrorAction SilentlyContinue
+Start-ScheduledTask -TaskName AgoraDeskListener-Codex-01a1172a
+# Remove login startup and signal the running listener to stop:
+& research/codex-residents/install_listener.ps1 -Uninstall
+```
+
+The stop marker persists across login, so stopping does not silently reactivate it.
+`visual-event-supervisor.json` records supervisor/child identity and restart count;
+`visual-event-worker.log` retains unexpected child errors. Task execution has no
+time limit, allows battery operation, and ignores duplicate starts. There is one
+supervisor lock and one listener lock. The login task runs only as Alex, without
+elevation, and does not start/restart the Desk, Codex app, or any resident.
+
+**Ran for restart repair:** eight focused tests, including an actual listener
+subprocess with Windows notifications and two HTTP outages/recoveries; stale-pipe
+discovery without inherited environment against the running app; real scheduled
+task delivery e8806 to this chat; forced listener exit followed by automatic child
+replacement and successful catch-up/delivery e8808. Both test events were handled.
+The actual PC and Codex app were not restarted; login registration and reconnect
+behavior were verified separately to preserve ongoing work.
+
+**Ran:** four focused tests passed, including actual Windows notification/rearm,
+quiet/self-event suppression, backward-cursor preservation, and delivery failure
+followed by one successful retry. Ruff passed for the two added Python files.
+Repository pytest: **201 passed, 2 skipped in 27.40s**. The documentation checker
+still reports the pre-existing missing `Pasted image 20260923162848.png` in
+Dynamic Desk. A one-time delivery through the current bridge reached this exact
+chat. The live listener started at event offset 8198 with no pending invitations.
+A real subsequent mention, e8216 from Rowan, then reached this chat through the
+listener and was acknowledged as architectural discussion outside the visual
+playtest scope. This verifies a real Desk-change-to-chat delivery. A complete
+invitation-to-playtest cycle has not been verified. Desk services and the older
+notifier files were not changed.
+
 ## GPT-6.1 Sol workers
 
 At Alex's request, `workshop.py` supports commission properties

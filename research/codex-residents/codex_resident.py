@@ -1,4 +1,4 @@
-"""Codex SDK transport for the house's existing text-only resident protocol.
+"""Codex SDK transport for house messages, including explicitly selected image crops.
 
 No desk code is imported here. The house owns identity, the welcome, wake/rest,
 news, commands and commissions. This process only turns a user message into
@@ -35,6 +35,27 @@ tool_search search_tool skill_search tool_suggest deferred_executor
 request_permissions request_permissions_tool request_rule current_time_reminder
 default_mode_request_user_input skill_mcp_dependency_install sleep_tool
 """.split()
+
+
+def resident_inputs(content):
+    if isinstance(content, str):
+        return content
+    result = []
+    for block in content:
+        if block.get("type") == "text":
+            result.append({"type": "text", "text": block["text"]})
+        elif block.get("type") == "image":
+            source = block.get("source") or {}
+            if source.get("type") != "base64" or source.get("media_type") != "image/png":
+                raise ValueError("Resident images must be selected PNG crops")
+            import base64
+            raw = base64.b64decode(source["data"], validate=True)
+            if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > 2 * 1024 * 1024:
+                raise ValueError("Invalid resident PNG crop")
+            result.append({"type": "image", "url": "data:image/png;base64," + source["data"]})
+        else:
+            raise ValueError("Unsupported resident input block")
+    return result
 
 
 class ThreadIdentity(BaseModel):
@@ -242,11 +263,7 @@ def serve(args):
             if message.get("type") != "user":
                 raise ValueError("Expected a house user message")
             content = message["message"]["content"]
-            text = (
-                content
-                if isinstance(content, str)
-                else "\n".join(c["text"] for c in content if c.get("type") == "text")
-            )
+            text = resident_inputs(content)
             turn_id = client.turn_start(
                 started.thread.id, text, {"effort": args.reasoning, "environments": []}
             ).turn.id

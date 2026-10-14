@@ -1,17 +1,41 @@
 """Exercise the real Codex runtime with local mock inference (no live model)."""
 
 import json
+import os
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from codex_resident import MODEL, ThreadEnvelope, deny, receive, runtime_config, thread_parameters
+from codex_resident import (
+    MODEL,
+    ThreadEnvelope,
+    deny,
+    receive,
+    resident_inputs,
+    runtime_config,
+    thread_parameters,
+)
 from openai_codex.client import CodexClient
 
 
 def main():
     requests, events = [], []
+    attachment = os.environ.get("RESIDENT_PROBE_IMAGE")
+    blocks = [{"type": "text", "text": "The door probe."}]
+    if attachment:
+        import base64
+
+        blocks.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": base64.b64encode(Path(attachment).read_bytes()).decode(),
+                },
+            }
+        )
 
     class Model(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -86,7 +110,7 @@ def main():
                     params["modelProvider"] = "resident_probe"
                     started = client.request("thread/start", params, response_model=ThreadEnvelope)
                     turn = client.turn_start(
-                        started.thread.id, "The door probe.", {"effort": "medium"}
+                        started.thread.id, resident_inputs(blocks), {"effort": "medium"}
                     ).turn.id
                     assert receive(client, turn, events.append)
                 finally:
@@ -101,7 +125,10 @@ def main():
             "reply": [e for e in events if e.get("type") in ("assistant", "result")],
             "kind": "actual compiled runtime, local mock inference; no live model",
         }
-        output = Path(__file__).parent / "runtime-inventory.json"
+        output = Path(
+            os.environ.get("RESIDENT_PROBE_OUTPUT")
+            or Path(__file__).parent / "runtime-inventory.json"
+        )
         output.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(
             json.dumps(
@@ -124,6 +151,16 @@ def main():
             "Resident runtime exposed tools"
         )
         assert not req.get("instructions"), "Resident runtime injected system instructions"
+        if attachment:
+            image_inputs = [
+                b
+                for i in req.get("input", [])
+                for b in i.get("content", [])
+                if b.get("type") == "input_image"
+            ]
+            assert len(image_inputs) == 1 and image_inputs[0]["image_url"].startswith(
+                "data:image/png;base64,"
+            )
         assert [
             i
             for i in req.get("input", [])

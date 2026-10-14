@@ -23,6 +23,7 @@ clock, and names each actor's presence: asleep (want=rest), resting (between tur
 """
 
 import re
+import weakref
 
 from world import Refusal
 
@@ -341,6 +342,117 @@ KNOCK_UNDO = ("{eid} is the house's record of whom a line knocked: it changed no
 NOT_MEMBER = "not a member, not knocked"
 
 
+def comment_to(e):
+    """The address saved when a comment was sent; legacy events keep their header rule."""
+    from world import written
+    return e["to"] if "to" in e else written(e)[0]
+
+
+def comment_falls_back(e):
+    """Only an opening comment without explicit to= also calls its thing's holder."""
+    args = e.get("args") or {}
+    return e.get("verb") == "comment" and not args.get("id") and "to" not in args
+
+
+_thread_events = weakref.WeakKeyDictionary()
+_thread_reads = weakref.WeakKeyDictionary()
+
+
+def thread_read_state(w, c, actor):
+    """Viewer-relative unread message indices and the latest displayed event.
+
+    A checkpoint only covers the supplied event, so a reply arriving during an
+    open gesture is still unread. Read state never answers a request for feedback.
+    """
+    import persons
+    key = (getattr(w, "_eseq", 0), len(w.events))
+    hit = _thread_reads.get(w)
+    if hit is None or hit[0] != key:
+        index = {}
+        for e in w.events:
+            if e.get("verb") == "markread" and not e.get("undone"):
+                a = e["args"]
+                who = str(e["by"]).split("/")[0]
+                k = (a["id"], who)
+                index[k] = max(index.get(k, 0), int(a["through"][1:]))
+        hit = key, index
+        _thread_reads[w] = hit
+    through = max((v for (cid, who), v in hit[1].items()
+                   if cid == c["id"] and same_person(w, who, actor)), default=0)
+    messages = [c, *(c.get("replies") or [])]
+    events = [persons.comment_events(w).get(c["id"], {}), *reply_events(w).get(c["id"], [])]
+    unread = {i for i, (m, e) in enumerate(zip(messages, events))
+              if e and int(e["id"][1:]) > through and not same_person(w, m.get("by"), actor)}
+    latest = next((e["id"] for e in reversed(events) if e), "")
+    return unread, latest
+
+
+def reply_events(w):
+    """Active reply events, in the same order as each stored comment's replies."""
+    key = (getattr(w, "_eseq", 0), len(w.events))
+    hit = _thread_events.get(w)
+    if hit is None or hit[0] != key:
+        index = {}
+        for e in w.events:
+            args = e.get("args") or {}
+            if e.get("verb") in ("comment", "resolve") and args.get("id") and args.get("line") and not e.get("undone"):
+                index.setdefault(args["id"], []).append(e)
+        hit = key, index
+        _thread_events[w] = hit
+    return hit[1]
+
+
+def thread_waiting(w, c, actor):
+    """Message indices awaiting this actor's reply (0 is the opening comment).
+
+    This is a reply status, never a claim that a displayed message was read.
+    Opening/collapsing a card does not change it.
+    """
+    import persons
+    if c.get("resolved"):
+        return set()
+    messages = [c, *(c.get("replies") or [])]
+    events = [persons.comment_events(w).get(c["id"]), *reply_events(w).get(c["id"], [])]
+    last_own = max((i for i, m in enumerate(messages) if same_person(w, m.get("by"), actor)), default=-1)
+    return {i for i, (m, e) in enumerate(zip(messages, events))
+            if i > last_own and e and e.get("args", {}).get("line") == m.get("text")
+            and not same_person(w, m.get("by"), actor)
+            and any(same_person(w, n, actor) for n in comment_to(e))}
+
+
+def reply_to(w, comment, event):
+    """Explicit addresses win; otherwise reply to the original thread partners.
+
+    Past repliers are not subscribers. The opening comment's native to= establishes
+    its partners, independently of the kind, location, or lens displaying it.
+    An unaddressed conversation acquires its counterpart from the first respondent.
+    """
+    from world import to_names, written
+    named = written(event)[0]
+    if "to" in (event.get("args") or {}):
+        candidates = to_names(event["args"]["to"])
+    elif named:
+        candidates = named
+    else:
+        opening = next((e for e in reversed(w.events)
+                        if not e.get("undone") and (e.get("undo") or {}).get("drop_comment") == comment["id"]), {})
+        partners = opening.get("to") or []
+        if not any(not same_person(w, p, comment["by"]) for p in partners):
+            counterpart = next((r["by"] for r in comment.get("replies", [])
+                                if not same_person(w, r["by"], comment["by"])), None)
+            if counterpart:
+                partners = [counterpart]
+        candidates = [comment["by"], *partners]
+    out = []
+    writer = str(event.get("by") or "").split("/")[0]
+    for name in candidates:
+        name = str(name).lower()
+        if name not in EVERYONE and someone(w, name) and not same_person(w, name, writer) \
+                and not any(same_person(w, name, other) for other in out):
+            out.append(name)
+    return out
+
+
 def reached(w, e):
     """a3150: whom event `e` named or reached, as the house's knock reads it (house.news asks the same calls, line_to
     and world.written, in the same order) -> {name: how}, in order; {} for a line that calls no one (a plain line in
@@ -361,7 +473,7 @@ def reached(w, e):
     s = w.subjects.get(sid)
     chat = bool(s) and s["kind"] == "chat" and "append" in args
     comment = e.get("verb") == "comment" and bool(s)
-    to = line_to(e)[0] if chat else written(e)[0]
+    to = line_to(e)[0] if chat else comment_to(e) if comment else written(e)[0]
     named = [n for n in to if n not in EVERYONE]
     if not (chat or comment or named):
         return {}
@@ -369,7 +481,7 @@ def reached(w, e):
     for fid, n in w.nodes.items():
         p = n.get("props") or {}
         actor = p.get("actor")
-        if n["type"] != "surface" or p.get("role") != "resident" or not actor or by == actor:
+        if n["type"] != "surface" or p.get("role") != "resident" or not actor or same_person(w, by.split("/")[0], actor):
             continue
         asked = comment and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
         if by == "house" and not asked:
@@ -384,7 +496,7 @@ def reached(w, e):
                 out[str(actor).lower()] = "call" if kind_of(w, by) == "person" else "book"
             elif called:
                 out[str(actor).lower()] = NOT_MEMBER
-        elif called or (comment and (mine or asked)):
+        elif called or (comment_falls_back(e) and (mine or asked)):
             out[str(actor).lower()] = "call"
     if by == "house":
         return out

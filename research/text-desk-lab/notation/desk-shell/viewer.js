@@ -16,15 +16,39 @@ const Viewer = (session, who, lens, said, status) => {
   // today's paint. It stays, marked; the person copies it, drops it (Escape) and starts from the current text.
   const unknownOrigin = "origin unknown: this kept draft has no record of what it was typed against; copy it if you need it, then Escape and start from the current text";
   for (const d of drafts.values()) if (!d.seen && !d.shown) d.why = unknownOrigin;
-  let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed (Enter sends, Escape drops)` : "";
+  let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed` : "";
   let text = "", told = "";
   const foldStore = `lens-folds:${session}:${who}:${lens}`;
   let folds; try { folds = JSON.parse(localStorage.getItem(foldStore)) || {}; } catch { folds = {}; }
   const pending = new Map();      // key -> the draft generation in flight (codex team: a request in flight is viewer state)
   const refusal = why => (/^refused/.test(why) ? "" : "refused: ") + why;      // deskd's own sentences already begin so
-  const both = (key, d) => `${refusal(d.why)}\nunsent, yours: "${d.text}"\nnow in the world: "${d.shown.text}"\nEnter sends yours over what is now there; Escape keeps it and drops yours`;
+  const both = (key, d) => `${refusal(d.why)}\nunsent, yours: "${d.text}"\nnow in the world: "${d.shown.text}"\nReview the current version before sending again.`;
   const v = {
     drafts, hold: null, repainting: false,
+    recoverLayout(root) {
+      // A wrapper added to a lens changes path keys. Recover only a unique match
+      // on the stable row/thing plus leaf path, and require review before sending.
+      const nodes = [], walk = n => { nodes.push(n); (n.kids || []).forEach(walk); }; walk(root);
+      const keys = new Set(nodes.map(n => n.key));
+      const tail = key => { const parts = key.split('/'); let i = parts.length - 1;
+        while (i >= 0 && !/^[asfcm]\d+$/.test(parts[i])) i--; return i >= 0 ? parts.slice(i).join('/') : null; };
+      const missing = [...drafts].filter(([key]) => !keys.has(key) && !pending.has(key));
+      let recovered = 0;
+      for (const [key, draft] of missing) {
+        const suffix = tail(key); if (!suffix || missing.filter(([k]) => tail(k) === suffix).length !== 1) continue;
+        const item = (draft.shown || draft.seen)?.fence?.item;
+        const matches = nodes.filter(n => tail(n.key) === suffix && (!item || n.fence?.item === item)
+          && (n.acts || []).some(a => a.on === 'edit'));
+        if (matches.length !== 1 || drafts.has(matches[0].key)) continue;
+        const target = matches[0].key;
+        drafts.set(target, { text: draft.text, previousOrigin: draft.shown || draft.seen || draft.previousOrigin,
+          why: 'layout changed; review the current field before sending your kept words' });
+        drafts.delete(key);
+        for (const n of nodes) if (target.startsWith(n.key + '/') && n.paint?.fold) v.fold(n.key, false);
+        recovered++;
+      }
+      if (recovered) { notice = `kept ${recovered} draft(s) through the layout change; review the current field before sending`; v.show(); }
+    },
     // Pike (run 1): a refusal was written and then overwritten by the repaint (6 of 7 unseen). It stays until the next
     // gesture, in the inspector and in a live status region a screen reader announces (codex team, pike-8 section 2).
     show(t) {
@@ -71,6 +95,7 @@ const Viewer = (session, who, lens, said, status) => {
     // a kept draft remembers what it was typed against, so sending it after a reload is fenced on that, not on today's paint
     typed(key, words, fence) {
       const d = drafts.get(key), seen = d ? (d.shown || d.seen) : fence;
+      if (d && d.refused && seen) notice = "draft kept; edited against the version shown";
       drafts.set(key, { text: words, why: seen ? "typed here, not sent" : unknownOrigin, seen }); v.show();
     },
     // the fence a draft is sent on: what it was typed against, or the value shown beside a refused draft; null means
@@ -81,6 +106,14 @@ const Viewer = (session, who, lens, said, status) => {
       if (d.refused) return d.shown;
       if (d.seen) return d.seen;
       d.why = unknownOrigin; notice = unknownOrigin; v.hold = null; v.show(); return null;
+    },
+    // An explicit composer can offer recovery against the version visibly shown here.
+    // This is a person's separate review action, never an automatic rebase or send.
+    useCurrent(key, current) {
+      if (pending.has(key) || !current || !current.fence) return false;
+      const d = drafts.get(key); if (!d) return false;
+      drafts.set(key, { text: d.text, seen: current, why: "typed here, not sent" });
+      notice = "draft kept; using the version shown here"; v.show(); return true;
     },
     // what a text leaf shows: the draft if there is one; a refused draft records the world's value drawn beside it
     words(key, now, fence) {

@@ -40,6 +40,7 @@
   .l-grid > [data-key] { min-width: 0; }
   .l-cells { display: contents; }
   [data-folded="1"] > [data-key]:not([data-peek]) { display: none; }   /* `peek`: a summary a folded part keeps showing */
+  [data-folded="1"] > [data-peek-lines] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--peek-lines); overflow: hidden; }
   [data-folded="1"] { flex: 0 0 auto !important; }
   /* the painter's own buttons (fold handles) wear only their role: the browser's button box is not a look anyone chose */
   /* door.js (a1505): the quiet line of what code changed today; in the terminal's head, else at the bottom right */
@@ -54,7 +55,19 @@
   /* fold ... float: a menu, its open contents drawn over the page below the handle */
   .l-float { position: relative; }
   /* a part's own menu (on menu "<label>" do ...), at the pointer */
-  #menu-pop textarea { font: inherit; color: inherit; background: transparent; border: 0; outline: none; resize: none; width: 36ch; max-width: 80vw; box-sizing: border-box; }
+  #menu-pop textarea, .menu-draft textarea { font: inherit; color: inherit; background: transparent; border: 0; resize: vertical; width: 36ch; max-width: 80vw; box-sizing: border-box; }
+  .menu-draft { position: fixed; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box; }
+  .menu-draft[hidden], .composer-actions[hidden] { display: none; }
+  .explicit-composer textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; font: inherit; color: inherit; background: transparent; border: 0; }
+  .explicit-composer[data-composing="true"] { opacity: 1 !important; } /* an open draft outlives a shy role's hover */
+  .composer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5em; }
+  .composer-actions button:disabled { opacity: .5; cursor: default; }
+  .picture-stage { position: relative; }
+  .picture-stage > svg, .picture-stage > img { display: block; width: 100%; height: auto; }
+  .picture-region { position: absolute; box-sizing: border-box; pointer-events: none; background: transparent !important; }
+  /* A style's `at N%` mixes an opaque colour with paper; actual overlays need alpha.
+     Keep the role's outline solid and tint only its interior, using the role's ink. */
+  .picture-region::before { content: ""; position: absolute; inset: 0; background: currentColor; opacity: .12; pointer-events: none; }
   #menu-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 12ch; box-sizing: border-box; }
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
@@ -90,6 +103,7 @@
 <script src="style/style.js"></script>
 <script src="viewer.js"></script>
 <script src="door.js"></script>
+<script src="image-comments.js"></script>
 <script src="lens.js"></script>
 <script src="term.js"></script>
 </body>

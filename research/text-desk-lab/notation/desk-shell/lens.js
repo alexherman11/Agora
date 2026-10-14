@@ -43,11 +43,11 @@
   }
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
-  async function send(n, line, draft, more) {
+  async function send(n, line, draft, more, attachment) {
     const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
-    const observed = { ...(n.fence || {}), at: sceneAt, def, ...more }, gesture = V.gesture(n.key, draft !== undefined);   // a1008
+    const observed = { ...(n.fence || {}), at: sceneAt, def, ...more }, gesture = attachment?.gesture || V.gesture(n.key, draft !== undefined);
     let r;
-    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture }) })).json(); }
+    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture, image_context: attachment?.image }) })).json(); }
     catch (e) {      // a1008: the next scene is painted even if it is unchanged, so the kept draft can be sent again (same id)
       last = ""; V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true);
     }
@@ -56,9 +56,27 @@
     // a1008, the cause of e1851/e1852: typed words live in the element, not in its signature, so a composer whose
     // line was sent was reused still showing it, and its next blur sent it again. Once no draft holds them, they go.
     const k = kept.get(n.key), p = k && k.el._n.paint;
-    if (p && p.text != null && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
+    if (k && k.el._composer) k.el._composer.sync();
+    else if (p && p.text != null && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
       if (p.runs) runs(k.el, p.runs); else k.el.textContent = p.text; V.mark(k.el, n.key);
     }
+    return r;
+  }
+  let imageCommentsBusy = () => false;
+  async function startImageComments() {
+    try {
+      // A retained HTML page can meet newer JS during a live update. An optional
+      // interaction must never stop the entire lens from painting.
+      if (typeof ImageComments !== "function") await new Promise((resolve, reject) => {
+        const script = document.createElement("script"); script.src = "image-comments.js";
+        const timer = setTimeout(() => reject(new Error("image comment controls did not load")), 5000);
+        script.onload = () => { clearTimeout(timer); resolve(); };
+        script.onerror = () => { clearTimeout(timer); reject(new Error("image comment controls did not load")); };
+        document.head.append(script);
+      });
+      imageCommentsBusy = ImageComments(paint, (n, line, observed, attachment) => send(n, line, undefined, observed, attachment),
+        () => ({ at: sceneAt, def }), () => V.show("Image selection could not be captured. Please try again."));
+    } catch (e) { V.show(`The document is available, but ${e.message}. Reload to retry image comments.`); }
   }
 
   // Iris, Astra: a part whose painting did not change keeps its element; only what changed is made again. Pike (run 1):
@@ -68,6 +86,9 @@
     const old = kept.get(n.key), p = n.paint || {};
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
+    if (old && old.el._composer && old.el._composer.config === JSON.stringify([p, n.acts])) {
+      old.el._n = n; old.sig = sig; old.el._composer.sync(); next.set(n.key, old); return old.el;
+    }
     if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { tracks(old.el); next.set(n.key, old); return old.el; } }
     const el = document.createElement("div");
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
@@ -76,7 +97,7 @@
     if (role) el.className = Style.roleClass(role);
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
-    if (p.text != null && p.picture) picture(el, p.text);
+    if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
     else if (p.text != null) {
       const words = V.words(n.key, p.text, n.fence);
       if (p.runs && words === p.text) runs(el, p.runs); else el.textContent = words;
@@ -113,6 +134,7 @@
     if (p.lines) { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
+    if (Number.isInteger(p.peek)) { el.dataset.peekLines = p.peek; el.style.setProperty("--peek-lines", p.peek); }
     for (const a of n.acts) {
       // Alex, 7 Oct (buttons on top of a document): a button that presses a key, or names $focus, acts on the text the
       // caret is in. It must not take the caret, and its gesture is the text's own: sent with what that text showed.
@@ -166,12 +188,15 @@
     el._fold = f => { V.fold(n.key, f); set(f); };
     const group = p.fold && p.fold.group;
     if (group) el.dataset.foldGroup = group;
+    const opened = () => { for (const a of el._n.acts.filter(a => a.on === "open")) send(el._n, a.line); };
     h.addEventListener("click", () => {
-      if (float) { set(el.dataset.folded !== "1"); return; }
+      if (float) { const f = el.dataset.folded !== "1"; set(f); settle(); if (!f) opened(); return; }
       const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f);
       // `fold ... group <name>` (Alex, 30 Sep): opening one folds its open siblings in the same group, an accordion
       if (!f && group && el.parentElement)
         [...el.parentElement.children].forEach(s => { if (s !== el && s.dataset.foldGroup === group && s.dataset.folded !== "1" && s._fold) s._fold(true); });
+      settle();
+      if (!f) opened();
     });
     el.prepend(h); set(float ? dflt : V.folded(n.key, dflt));
   }
@@ -180,13 +205,61 @@
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
 
   // Alex, 29 Sep ("native right click behavior"): a part's own menu, from its `on menu "<label>" do ...` entries, opened
-  // by a right-click or the menu key anywhere on it (the innermost part that has entries). Text being edited, a part
-  // with no entries, and a right-click with Shift keep the browser's own menu. An entry sends its line as a click does.
+  // by a right-click or the menu key anywhere on it (the innermost part that has entries), including editable words.
+  // Input composers, a part with no entries, and Shift-right-click keep the browser's menu.
   let pop = null;
+  const menuDrafts = new Map();
+  function placeMenuDrafts() {
+    for (const d of menuDrafts.values()) {
+      const anchor = paint.querySelector(`[data-key="${CSS.escape(d.anchor)}"]`);
+      if (!anchor || !anchor.getClientRects().length) { d.box.hidden = true; continue; }
+      const r = anchor.getBoundingClientRect(), view = paint.getBoundingClientRect();
+      d.box.hidden = r.bottom < view.top || r.top > view.bottom;
+      d.box.style.left = Math.max(4, Math.min(r.left + d.dx, innerWidth - d.box.offsetWidth - 4)) + "px";
+      d.box.style.top = (r.top + d.dy) + "px";
+    }
+  }
+  function menuComposer(box, el, action, picked, x, y) {
+    const key = el._n.key + "/composer/" + action.label;
+    closeMenu();
+    if (menuDrafts.has(key)) { menuDrafts.get(key).input.focus(); return; }
+    const n = { key, fence: el._n.fence }, r = el.getBoundingClientRect();
+    if (!x && !y) { x = r.left + 8; y = r.top + 8; }
+    box.removeAttribute("id"); box.classList.add("menu-draft"); box.setAttribute("role", "group");
+    box.setAttribute("aria-label", action.label + " draft");
+    const input = document.createElement("textarea"); input.rows = 4; input.placeholder = action.label;
+    input.setAttribute("aria-label", action.label); input.className = Style.roleClass("menu.ask");
+    const bar = document.createElement("div"); bar.className = "composer-actions";
+    const post = document.createElement("button"), discard = document.createElement("button");
+    post.type = discard.type = "button"; post.textContent = "Send"; discard.textContent = "Discard";
+    post.className = Style.roleClass("button"); discard.className = Style.roleClass("tool");
+    const state = document.createElement("span"); state.className = Style.roleClass("meta"); state.textContent = "Unsent";
+    bar.append(post, discard, state);
+    box.replaceChildren(...(picked ? [Object.assign(document.createElement("div"), { className: Style.roleClass("meta"), textContent: picked.trim() })] : []), input, bar);
+    const d = { box, input, anchor: el._n.key, dx: x - r.left, dy: y - r.top };
+    menuDrafts.set(key, d); document.body.append(box); placeMenuDrafts();
+    const drop = () => { box.remove(); menuDrafts.delete(key); };
+    input.addEventListener("input", () => { V.typed(key, input.value, n); post.disabled = !input.value.trim(); });
+    post.disabled = true;
+    post.onclick = async () => {
+      if (!input.value.trim() || post.disabled) return;
+      const raw = input.value; post.disabled = discard.disabled = true; state.textContent = "Sending…";
+      // The command and quotation belong to the place where composition began, never the latest selection.
+      await send(n, action.line.replace("$selected", () => picked).replace("$value", () => TEXT.esc(raw)), raw);
+      if (!V.drafts.has(key)) drop();
+      else { post.disabled = !input.value.trim(); discard.disabled = false; state.textContent = "Not sent — retry or discard"; }
+    };
+    discard.onclick = () => { if (V.drop(key)) drop(); };
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); post.click(); }
+      if (e.key === "Escape") { e.preventDefault(); input.blur(); }
+    });
+    input.focus();
+  }
   function closeMenu(refocus) { if (!pop) return; const back = pop._from; pop.remove(); pop = null; if (refocus && back && back.focus) back.focus(); }
   document.addEventListener("contextmenu", e => {
     const t = e.target instanceof Element ? e.target : null;
-    if (e.shiftKey || !t || t.isContentEditable || t.closest("input, textarea")) return;
+    if (e.shiftKey || !t || t.closest("input, textarea")) return;
     const el = t.closest("[data-menu]");
     const entries = el && paint.contains(el) && el._n ? el._n.acts.filter(a => a.on === "menu") : [];
     if (!entries.length) return;
@@ -202,17 +275,7 @@
       const picked = TEXT.selected(el._n), fill = l => l.replace("$selected", () => picked);
       b.addEventListener("click", () => {
         if (!a.line.includes("$value")) { closeMenu(); return send(el._n, fill(a.line)); }
-        const t = document.createElement("textarea"); t.rows = 3; t.placeholder = a.label; t.setAttribute("aria-label", a.label);
-        t.className = Style.roleClass("menu.ask");
-        t.addEventListener("keydown", e => {
-          if (e.key !== "Enter" || e.shiftKey) return;
-          e.preventDefault(); const v = t.value.trim(); if (!v) return;
-          closeMenu(); send(el._n, fill(a.line).replace("$value", () => TEXT.esc(v)));
-        });
-        box.replaceChildren(...(picked ? [Object.assign(document.createElement("div"), { className: Style.roleClass("meta"), textContent: picked.trim() })] : []), t);
-        box.style.left = Math.max(0, Math.min(parseFloat(box.style.left), innerWidth - box.offsetWidth - 4)) + "px";
-        box.style.top = Math.max(0, Math.min(parseFloat(box.style.top), innerHeight - box.offsetHeight - 4)) + "px";
-        t.focus();
+        menuComposer(box, el, a, picked, e.clientX, e.clientY);
       });
       box.append(b);
     }
@@ -226,7 +289,8 @@
   document.addEventListener("pointerdown", e => { if (pop && !pop.contains(e.target)) closeMenu(); }, true);
   // a scroll of the page closes the menu; a scroll inside it does not (Alex, 13 Oct: a comment longer than the box
   // scrolled the box, and the box and its words were gone)
-  document.addEventListener("scroll", e => { if (pop && e.target instanceof Node && pop.contains(e.target)) return; closeMenu(); }, true);
+  document.addEventListener("scroll", e => { placeMenuDrafts(); if (pop && e.target instanceof Node && pop.contains(e.target)) return; closeMenu(); }, true);
+  addEventListener("resize", placeMenuDrafts);
   addEventListener("blur", () => closeMenu());
   document.addEventListener("keydown", e => {
     if (!pop) return;
@@ -255,7 +319,59 @@
     kids.forEach((c, i) => { if (i < p.tracks.length) c.style.gridColumn = String(i + 1); });
   }
 
+  const openComposers = new Set();
+  function composer(el, n, a) {
+    el.replaceChildren(); el.classList.add("explicit-composer");
+    const input = document.createElement("textarea"), actions = document.createElement("div");
+    input.setAttribute("aria-label", n.paint.hint || "Draft"); input.placeholder = n.paint.hint || "Write…";
+    actions.className = "composer-actions";
+    const post = document.createElement("button"), discard = document.createElement("button"), recover = document.createElement("button"), status = document.createElement("span");
+    post.type = discard.type = "button"; post.textContent = "Send"; discard.textContent = "Discard";
+    recover.type = "button"; recover.textContent = "Use current version"; recover.className = Style.roleClass("button");
+    post.className = Style.roleClass("button"); discard.className = Style.roleClass("tool"); status.className = Style.roleClass("meta");
+    actions.append(post, discard, recover, status); el.append(input, actions);
+    let busy = false, picked = TEXT.selected(n);
+    const sync = () => {
+      // Reused elements must observe the refreshed value too. Otherwise a refused draft
+      // never gets `shown`, and the next keystroke loses its origin while keeping its text.
+      const words = V.words(n.key, el._n.paint.text || "", el._n.fence);
+      const d = V.drafts.get(n.key);
+      if (document.activeElement !== input) input.value = words;
+      const open = openComposers.has(n.key) || !!d;
+      el.dataset.composing = String(open);
+      input.rows = open ? 4 : 1; actions.hidden = !open;
+      const unknown = !!d && !d.seen && !d.shown;
+      post.disabled = busy || !input.value.trim() || unknown; discard.disabled = busy;
+      recover.hidden = !unknown; recover.disabled = busy;
+      status.textContent = busy ? "Sending…" : unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — review and send again" : "Unsent";
+      V.mark(el, n.key); settle();
+    };
+    el._composer = { config: JSON.stringify([n.paint, n.acts]), sync };
+    input.value = V.words(n.key, n.paint.text || "", n.fence);
+    input.addEventListener("focus", () => { if (!openComposers.has(n.key) && !V.drafts.has(n.key)) picked = TEXT.selected(el._n); openComposers.add(n.key); V.hold = n.key; sync(); });
+    input.addEventListener("blur", () => { if (!V.repainting) { V.hold = null; sync(); } });
+    input.addEventListener("input", () => { V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
+    post.onclick = async () => {
+      if (busy || !input.value.trim()) return;
+      const seen = V.editOrigin(n.key, el._n); if (!seen) return;
+      const raw = input.value; busy = true; sync();
+      await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
+      busy = false;
+      if (!V.drafts.has(n.key)) { input.value = ""; openComposers.delete(n.key); }
+      sync();
+    };
+    discard.onclick = () => { if (V.drop(n.key)) { input.value = n.paint.text || ""; openComposers.delete(n.key); sync(); } };
+    recover.onclick = () => {
+      if (V.useCurrent(n.key, { key: n.key, fence: el._n.fence, text: el._n.paint.text || "" })) { sync(); input.focus(); }
+    };
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); post.click(); }
+      if (e.key === "Escape") { e.preventDefault(); input.blur(); }
+    });
+    sync();
+  }
   function edits(el, n, a) {
+    if (n.paint.commit === "explicit") return composer(el, n, a);
     el.contentEditable = "plaintext-only";
     // Juniper a559 (870ec2d): a part with runs is read as runs and edited as its source, so what is written is what is
     // drawn. Pike (S28): swapping on focus put the caret at the end, because focus comes before the click places it, and
@@ -431,6 +547,11 @@
     no: /^(on|href$|xlink:|src$|style$)/i };
   function picture(el, src) {
     el.classList.add("t-picture");
+    if (!src.trim()) { el.replaceChildren(); return; }
+    if (/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(src)) {
+      const img = new Image(); img.src = src; img.alt = "Selected image region";
+      img.draggable = false; img.style.width = "100%"; el.replaceChildren(img); return;
+    }
     // a drawing written by hand rarely names its namespace, and without it the parser makes elements no browser draws
     if (!/^\s*<svg[^>]*\sxmlns=/.test(src)) src = src.replace(/^\s*<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
     const doc = new DOMParser().parseFromString(src, "image/svg+xml"), root = doc.documentElement;
@@ -443,6 +564,24 @@
     const t = root.querySelector(":scope > title, :scope > desc");
     root.setAttribute("role", "img"); if (t) root.setAttribute("aria-label", t.textContent.trim());
     el.replaceChildren(document.importNode(root, true));
+  }
+  function pictureRegions(el, regions) {
+    const media = el.querySelector(":scope > svg, :scope > img");
+    if (!media || !regions.length) return;
+    const stage = document.createElement("div"); stage.className = "picture-stage";
+    el.replaceChildren(stage); stage.append(media);
+    for (const region of regions.filter(r => r.current)) {
+      const box = document.createElement("div"); box.className = "picture-region " + Style.roleClass("region");
+      const [x, y, w, h] = region.rect;
+      Object.assign(box.style, { left: x * 100 + "%", top: y * 100 + "%", width: w * 100 + "%", height: h * 100 + "%" });
+      box.setAttribute("role", "img"); box.setAttribute("aria-label", `Comment region by ${region.by}`);
+      box.dataset.comment = region.id; stage.append(box);
+    }
+    if (regions.some(r => !r.current)) {
+      const note = document.createElement("div"); note.className = Style.roleClass("meta");
+      note.textContent = "An image comment refers to an earlier version; its region is not overlaid here.";
+      el.append(note);
+    }
   }
   function runs(el, rs) {
     el._runs = rs;
@@ -577,24 +716,26 @@
     // 30 Sep (Alex: the Desktop kept going blank over the node budget): a refused scene keeps the last good paint on
     // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
+    V.recoverLayout(r.scene);
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
-    settle(); V.show(r.text); report();
+    settle(); placeMenuDrafts(); V.show(r.text); report();
   }
   // Alex, 7 Oct (c3674: comments must not push the paragraphs down): parts a style calls `afloat` take no room, so two
   // of them near each other would lie one on the other. After a paint each is slid down just far enough to clear the
   // one before it in the same column, as notes in a document's margin are.
-  // 13 Oct (Alex: 'the comment i'm clicked in should be lined up with the text that its attached to. Comments should
-  // stay as close to their text as possible. Expanding a comment should push the others away to make space'): the
-  // floating part in hand (the last one pressed, or the one beside the text pressed) sits exactly at its own place;
-  // the ones after it are slid down only as far as they must be, the ones before it up. With none in hand, each is
-  // slid down just clear of the one before. Places are read from the layout (offsetTop), never from where a part is
-  // mid-slide, so a slide can be eased (style.js) and settle can run again before it ends.
+  // 13 Oct follow-up: expanding cards overlapped until the next paint, and pointer-down anchoring could move a
+  // displaced handle out from under its click. Keep document order, use each paragraph's position as a minimum,
+  // and move neighbors synchronously after the gesture or a size change. The pressed part remains highlighted.
   let inHand = null;
+  const floatSizes = new ResizeObserver(() => settle());
+  const watchedFloats = new Set();
   const place = (el, side) => { let v = 0; for (let e = el; e; e = e.offsetParent) v += e[side]; return v; };
   function settle() {
     const sel = (Style.afloat || []).join(",");
     const cols = new Map();
+    for (const el of watchedFloats) if (!el.isConnected) { floatSizes.unobserve(el); watchedFloats.delete(el); }
     for (const el of sel ? paint.querySelectorAll(sel) : []) {
+      for (const child of el.children) if (!watchedFloats.has(child)) { watchedFloats.add(child); floatSizes.observe(child); }
       const h = el.scrollHeight;
       if (!h) { el.style.transform = ""; continue; }
       const c = Math.round(place(el, "offsetLeft"));
@@ -603,14 +744,13 @@
     }
     const gap = 8;
     for (const items of cols.values()) {
-      const a = items.findIndex(i => i.el.dataset.key === inHand);
-      if (a >= 0) items[a].y = items[a].at;
-      let free = a >= 0 ? items[a].at + items[a].h + gap : -Infinity;
-      for (let i = a + 1; i < items.length; i++) { const it = items[i]; it.y = Math.max(it.at, free); free = it.y + it.h + gap; }
-      let roof = a >= 0 ? items[a].at - gap : 0;
-      for (let i = a - 1; i >= 0; i--) { const it = items[i]; it.y = Math.min(it.at, roof - it.h); roof = it.y - gap; }
+      let free = -Infinity;
+      for (const it of items) { it.y = Math.max(it.at, free); free = it.y + it.h + gap; }
       for (const it of items) {
         const d = Math.round(it.y - it.at);
+        // Height changes must move all neighbors in the same frame. Interpolating
+        // only their positions leaves expanded text underneath a moving card.
+        it.el.style.transition = "none";
         it.el.style.transform = d ? `translateY(${d}px)` : "";
         if (it.el.dataset.key === inHand) it.el.dataset.inhand = "1"; else delete it.el.dataset.inhand;
       }
@@ -628,12 +768,14 @@
       if (inside.length) break;
     }
     const key = f ? f.dataset.key : null;
-    if (key !== inHand) { inHand = key; settle(); }
+    if (key !== inHand) inHand = key;
   }, true);
   addEventListener("resize", settle);
   // what floats moves when its own words grow: the faces arriving, a reply being typed (13 Oct)
   if (document.fonts) document.fonts.ready.then(settle);
-  let settling; paint.addEventListener("input", () => { clearTimeout(settling); settling = setTimeout(settle, 60); });
+  paint.addEventListener("input", settle);
+  paint.addEventListener("click", settle);
+  paint.addEventListener("load", settle, true);
 
   const report = () => V.report(paint, sceneAt, carrying ? { [carrying.n.key]: "carried" + (carrying.over ? " over " + carrying.over.dataset.key : "") } : {}, q.get("share") === "attention",
     def && { frame: def.frame, style: def.style_rev || "seed" });
@@ -658,6 +800,7 @@
     if (f) { f.focus(); const t = f.firstChild; if (t && t.nodeType === 3 && carried.focus.caret != null) getSelection().collapse(t, Math.min(carried.focus.caret, t.length)); }
   }
   await refresh().catch(() => {});
+  startImageComments();
   setInterval(() => refresh().catch(() => {}), 1500);   // the server restarting is not an error worth a console line
   // a1505: the door (door.py) holds one long connection per page. A world event repaints at once (the 1.5 s poll stays
   // for what changes without an event: the clock, the house); the door's news feeds the quiet line (door.js).
@@ -697,8 +840,8 @@
     // the view (reloadKeeping), as soon as the person's hands are free: nothing carried, no part held, no composer with
     // the caret in it. While hands are busy the line says it is waiting, and the next tick asks again. (Until today the
     // line offered a click and the person chose when; Juniper's e3746 argued that reading has no safe pause.)
-    const a = document.activeElement, typing = a && a.isContentEditable && paint.contains(a);
-    if (carrying || V.hold || typing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
+    const a = document.activeElement, typing = a && (a.isContentEditable && paint.contains(a) || a.matches("input,textarea"));
+    if (carrying || V.hold || typing || imageCommentsBusy() || menuDrafts.size || openComposers.size) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
     if (leaving) return; leaving = true;
     if (window.DoorLine) DoorLine.note("new screen code: loading it, keeping your view");
     setTimeout(reloadKeeping, 200);

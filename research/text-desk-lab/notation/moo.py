@@ -352,11 +352,18 @@ def unanswered(w, sid, me="alex"):
     return list(reversed(out))
 
 
-@verb("comment", ["appearance"], "Leave a comment on this thing, signed by you. Comments show under read. The @names "
-      "that open it call them, as a chat line's header does (`@ana @ben: ...`); an @ later is a mention and calls no one, "
-      "and the receipt says to: and names it.", "line=<str>", 'do comment a20 line="Which timezone?"')
+@verb("comment", ["appearance"], "Leave a signed comment on any thing, or reply under an open comment with id=. "
+      "to= names recipients explicitly (to=nobody calls no one); otherwise a leading @header names them. "
+      "An unaddressed reply goes to the original thread partners, excluding you. Read and rows comments:/replies: "
+      "show the same native thread to every lens and tool.", "line=<str> [id=<cNN>] [to=<names>]", 'do comment a20 line="Which timezone?" to=pike')
 def v_comment(w, nid, a):
     return _prim(w, "comment", nid, a)
+
+
+@verb("markread", ["appearance"], "Mark this thread read for the caller through a displayed message event; does not answer it.",
+      "id=<cNN> through=<eNN>", "do markread a20 id=c03 through=e12")
+def v_markread(w, nid, a):
+    return _prim(w, "markread", nid, a)
 
 
 @verb("resolve", ["appearance"], "Close a comment on this thing, optionally with a reply.", "id=<cNN> [line=<str>]", 'do resolve a20 id=c03 line="UTC, per the parser notes."')

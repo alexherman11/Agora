@@ -386,6 +386,8 @@ class Resident:
             self.state["unanswered_why"] = why
         elif pending.get("carry"):
             self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + pending["carry"]).strip("\n")
+        if not (pending.get("delivered") and self.state.get("session")):
+            self.state.setdefault("image_comments", []).extend(pending.get("image_comments") or [])
         self.save()
 
     def start(self, model):
@@ -460,9 +462,12 @@ class Resident:
                 text = welcome + "\n\n---\n" + text
             self.state.pop("welcome_due", None)
         self.state["last_sent"] = now()
-        self.state["pending"] = {"kind": kind, "carry": carry or ""}      # cleared when its turn ends well
+        refs = self.state.pop("image_comments", [])
+        self.state["pending"] = {"kind": kind, "carry": carry or "", "image_comments": refs}
         self.save()
-        msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+        from image_comments import content
+        blocks = [{"type": "text", "text": text}] + (content(self.house.load(), refs) if refs else [])
+        msg = {"type": "user", "message": {"role": "user", "content": blocks}}
         try:
             self.proc.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
             self.proc.stdin.flush()
@@ -653,7 +658,7 @@ class House:
             return bool(s) and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
         for e in w.events[start:]:
-            if e.get("by") == actor or e.get("undone"):
+            if rooms.same_person(w, str(e.get("by") or "").split("/")[0], actor) or e.get("undone"):
                 continue
             sid = e["target"]
             if sid in w.nodes and w.nodes[sid]["type"] == "appearance":
@@ -711,22 +716,24 @@ class House:
             # note, task or comment reaches that person only as a header, the rule a chat line has (a2715): a comment by
             # the @names that open it, a note edit by the headers of the lines it added, never the rest of the note
             # again (Pike a611, Claude e4918, Sable c2804). A mid-line @ is a mention, and calls no one.
-            m = [n for n in written(e)[0] if n not in rooms.EVERYONE and rooms.same_person(w, n, actor)]
+            to = rooms.comment_to(e) if e["verb"] == "comment" else written(e)[0]
+            m = [n for n in to if n not in rooms.EVERYONE and rooms.same_person(w, n, actor)]
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
+                address = "in your thread" if e["verb"] == "comment" and args.get("id") else f"as @{m[0]}"
                 if waits:                                          # a1566: a call is kept first, and knocks
-                    self._hold(r, e, f"~ {at} {e['by']} called you{where}, as @{m[0]} ({e['id']}): {said[:300]}")
+                    self._hold(r, e, f"~ {at} {e['by']} called you{where}, {address} ({e['id']}): {said[:300]}")
                     urgent = True
                     self._knocked(r, e, s, resting)
                     continue
-                inbox.append(f"~ {e['by']} called you{where}, as @{m[0]} ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} called you{where}, {address} ({e['id']}): {said[:300]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
-            elif e["verb"] == "comment" and sid in mine:
+            elif rooms.comment_falls_back(e) and sid in mine:
                 inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
-            elif e["verb"] == "comment" and asked(s):
+            elif rooms.comment_falls_back(e) and asked(s):
                 inbox.append(f"~ {e['by']} on your commission \"{s['title']}\" ({e['id']}): {said[:1500]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
@@ -762,6 +769,13 @@ class House:
     def _knocked(self, r, e, s, resting):
         """a3150: remember which line ended this rest, for the wake's first line (woken_by). Only while it rests: a
         line heard with a receipt woke no one."""
+        cid = (e.get("undo") or {}).get("drop_comment") or (e.get("args") or {}).get("id")
+        if e.get("verb") in ("comment", "resolve") and cid and s:
+            c = next((c for c in s.get("comments", []) if c["id"] == cid), None)
+            if c and c.get("image"):
+                refs = r.state.setdefault("image_comments", [])
+                if cid not in refs:
+                    refs.append(cid)
         if not resting:
             return
         mid = (e.get("args") or {}).get("line_id")

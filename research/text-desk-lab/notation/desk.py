@@ -1091,6 +1091,9 @@ class Desk:
             out += "\ncomments:"
             for c in s["comments"]:
                 out += f"\n  {c['id']} {persons.comment_by(w, c)}: {c['text']}" + (" (resolved)" if c["resolved"] else " (open)")
+                if c.get("image"):
+                    from image_comments import describe
+                    out += "\n      " + describe(c["image"])
                 for i, r in enumerate(c["replies"]):
                     out += f"\n      {persons.reply_by(w, c, i)}: {r['text']}"
         links = w.links_of(s["id"])
@@ -1251,15 +1254,22 @@ class Desk:
         or 'to: nobody', and the mid-line @s it only mentions (world.written, the house's own reading). "" when what it
         wrote has no @ to speak of, or when it made a chat line (that line's receipt says its address)."""
         import rooms
-        from world import MENTION_NOTE, written
+        from world import MENTION_NOTE, to_names, written
         w = self.world
-        calls, heard = [], []
+        calls, heard, directed = [], [], False
         for e in (x for x in w.events if x["id"] in set(eids)):
             c, m = written(e)
+            args = e.get("args") or {}
+            if e.get("verb") == "comment":
+                if "to" in args:
+                    c, m, directed = to_names(args["to"]), [], True
+                elif args.get("id"):
+                    c, directed = rooms.comment_to(e), True
+                c = [n for n in c if not rooms.same_person(w, n, str(e.get("by", "")).split("/")[0])]
             calls += [n for n in c if n not in calls]
             heard += [n for n in m if n not in heard]
         heard = [n for n in heard if n not in calls]
-        if not calls and not heard:
+        if not calls and not heard and not directed:
             return ""
         everyone = [n for n in calls if n in rooms.EVERYONE]
         no_one = [n for n in calls if n not in everyone and not rooms.someone(w, n)]
@@ -1499,6 +1509,9 @@ class Desk:
             out.append(f"{rid} comment by {persons.comment_by(w, c, ev)} on {self._title_line(owner['id'])} · "
                        + ("resolved" if c["resolved"] else "open"))
             out.append("  " + c["text"].replace("\n", "\n  "))
+            if c.get("image"):
+                from image_comments import describe
+                out.append("  " + describe(c["image"]))
             for i, r in enumerate(c.get("replies") or []):
                 out.append(f"    {persons.reply_by(w, c, i)}: {r['text']}")
             if ev:

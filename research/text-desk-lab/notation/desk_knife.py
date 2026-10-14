@@ -1295,6 +1295,17 @@ class DeskKnife(DeskMoo):
             # lines of one call are one reply, and a later call starts a new one
             import uuid
             self._reply = args.get("reply") or uuid.uuid4().hex
+        if args.get("image_context") is not None:
+            from image_comments import command_target
+            try:
+                target = command_target(args.get("line", ""))
+            except Refusal as exc:
+                return {"error": str(exc)}
+            self._image_comment = (target, args["image_context"])
+            try:
+                return super().dispatch(name, {**args, "whole": True})
+            finally:
+                self._image_comment = None
         return super().dispatch(name, args)
 
     def _echo(self, part):
@@ -1903,7 +1914,7 @@ class DeskKnife(DeskMoo):
             # here in find's own words (it was stored, and the view said 'query not evaluable' at every look)
             self._parse_selection(str(kv["query"]))
         promises.guard_props(w, verb, kv)         # a1587: owe= and awaiting= are promises now, in a world that has them
-        if positional and verb not in ("comment", "resolve", "link", "unlink") and promises.on(w):
+        if positional and verb not in ("comment", "markread", "resolve", "link", "unlink") and promises.on(w):
             try:
                 sel = self._parse_selection(positional[0])
                 hit = [i for i in (sel[0] if sel else [self._resolve(positional[0])]) if promises.is_promise(w, i)]
@@ -1939,6 +1950,12 @@ class DeskKnife(DeskMoo):
 
     def _do_knife(self, verb, positional, kv):
         w = self.world
+        attachment = getattr(self, "_image_comment", None)
+        if attachment is not None:
+            self._image_comment = None
+            if verb != "comment" or positional != [attachment[0]] or "id" in kv:
+                raise Refusal("image context belongs to one new comment on its selected image")
+            kv["image_context"] = attachment[1]
         if not positional:
             raise Refusal("do needs a target after the verb")
         alias = kv.pop("as", None) if verb == "create" or (verb == "group" and kv.get("as") not in ("column", "row", "free")) else None

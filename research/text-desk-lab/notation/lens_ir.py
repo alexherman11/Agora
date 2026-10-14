@@ -367,6 +367,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 out["missing"] = missing
         if ctx.get("_state") and ctx["_state"] != "live":
             out["state"] = ctx["_state"]
+        if em.get("picture") and ctx.get("item"):
+            original = acc.thing(ctx["item"])
+            if out.get("text") == original.get("text"):
+                out["image_regions"] = original.get("_image_regions", [])
         # --- acts
         safe = {k: (S._cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
         out["id"] = ctx.get("id")
@@ -464,7 +468,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     for k, r in enumerate(rs[first:first + keep], first):
                         if place:
                             r = dict(r, run=place[k])
-                        okey = r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
+                        okey = r.get("rid") or r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
                         out["kids"].append(make(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)

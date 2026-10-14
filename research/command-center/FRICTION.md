@@ -436,7 +436,7 @@ a4251 · family=code · status=curing
 Source edit, a4179 (worker-a4179, 13 Oct): scene.py (to_words, split_words_arg), lens_ir.scene_for, desk_knife (the scene command). The world-level word that was missing: a way to say how a scene prints. A lens says what is shown; how it is printed for a reader of text was one fixed form in to_text (every key, role, let and gesture: about forty lines a paragraph for a document in design-review). 'words' is a second fixed form, also in Python. A reader who wants a third (markdown with a front matter, a table, an outline) needs source again.
 Also missing, and not built on purpose: a lens stood on a thing you name. doc-read reads the document from the reader's reviewing= prop, so reading a document writes where you are reading to the log. That is Sable's story a4013 and goes to Alex first.
 
-## cured (48)
+## cured (51)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -875,3 +875,24 @@ Source edit for a3937 (blanks.py, 13 Oct, worker-a3937, asked by Pike). What hur
 a4231 · family=lens · status=cured
 
 Source edit by Claude, 13 Oct, at Alex's ask ('i need a better painter ... parity on diagrams, fonts, colors'). WANTED: a diagram in a design-review document, and headings in a face's real medium and strong weights. DONE IN THE WORLD: the look itself (style note `review` a4200, the lens a4039). DONE IN SOURCE: scene.py gained the lens word `picture` (a text drawn as SVG, cleaned to shapes and words); lens.js draws it; style.js asks a face for weights 400, 500 and 600 and falls back to asking plainly. WHY NO WORLD EDIT COULD DO IT: a lens can only say words the compiler knows, and the painter draws only text and frames; fonts are loaded by one fixed request. THE SMALLEST SEAM THAT WOULD HAVE MADE IT A WORLD EDIT: (1) a way for the world to hold a painter word: a note that says how a kind of part is drawn, in a small drawing vocabulary the painter already has (shapes, lines, words at places), so a new look of part is a note and not a commit; `picture` is the crude first of these, a whole drawing as text. (2) a font line that names its weights: `font sans = IBM Plex Sans 400 500 600, system-ui`.
+
+### A menu entry could not ask for words or carry highlighted text
+
+a4446 · family=lens · status=cured
+
+Source edit by Claude, 13 Oct (20433fc), at Alex's ask: 'i need the agora native right click options to work on the window. I want to be able to add comments on text'. WANTED: highlight words in a paragraph, right-click, Comment, type. WHAT EXISTED: `on menu` entries that send a whole line, and $selected only in a text being edited. DONE IN SOURCE (lens.js, lens.html): a menu entry whose line names $value becomes a box to type in when pressed; a menu line may name $selected; words highlighted in a text that is only read are kept for its part's menu. DONE IN THE WORLD: four entries on a paragraph of design-review (a4039), and roles menu.item and menu.ask in style review. THE SEAM THAT WAS MISSING: a gesture could not ask its person for anything. `$value` in a menu line is the first asking; the general word would be a gesture that names its blanks and how each is asked (words, one of several, a number), which is also what a slider or a one-of-many choice in a review document needs.
+
+### Replies under comments, a menu that lost its words, and wakes that could not be switched off: three source edits
+
+a4450 · family=code · status=cured
+
+Three source edits by Claude, 13 Oct, each at Alex's ask in the design-review window. (1) b5cc6c7, world.py: `comment <thing> id=<cNN> line=` is a reply under a comment that stays open ('reply to the comments'). No world edit could do it: a comment's replies could only be written by resolve. The missing seam: a comment is not yet a thing a verb can be said on (a1570, lines as things, would have made a reply a world verb). (2) 155d9de, lens.js: a scroll inside the menu's own box closed it and lost a long comment. A bug; the lesson is that the menu's draft is kept nowhere, unlike a text's draft. (3) 6ae5dfa, house.py: timers=off on the house note; only a call wakes a resident ('none of this wake on timers stuff, its wasting my usage limit'). The world could set breather and wake_every but not switch a kind of wake off, and a rest a resident timed itself always ended in a wake. The missing seam: what wakes a resident is house code; it should be rules in the world that a person can read and turn off one by one.
+
+### Missing explicit composers, reply rows, and image-region context
+
+a4609 · family=habit · status=cured
+
+Alex c4601/c4592/c4604: source work is needed for reusable commit explicit (Send/Discard, no blur submission), separately addressable reply rows, persistent anchored menu drafts, and image-region overlays tied to source revision. Library tree and appearance remain authored lens/style changes. Codex owns this bounded editor work.
+
+
+Cured 13 Oct: commit explicit for text, stable replies:<id> rows, anchored menu composers, and hash-guarded picture regions. Native review/doc-editor lenses use them. Actual browser checks and 58 regression tests passed; the ordinary doc-editor shy styling also now yields to open composers. See a4574/c4601 for scope and remaining limits.

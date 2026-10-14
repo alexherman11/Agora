@@ -153,3 +153,5 @@ rebased frontier-pike@lensdev/host with the working-tree compiler at 9603cd2: st
 rebased frontier-pike@lensdev/outline with the working-tree compiler at 9603cd2: step 7 of the grammar unification: a lens is found nearest first by verbs.nearest (the one ladder verbs use); two titled alike at one distance are refused as before, the refusal now naming their appearance ids
 rebased bridge/spacing-wish with the working-tree compiler at 0d197bb (an intended change)
 rebased frontier/p-if with the working-tree compiler at 0d197bb (an intended change)
+rebased bridge/spacing-wish with the working-tree compiler at 766ecd4 (an intended change)
+rebased frontier/p-if with the working-tree compiler at 766ecd4 (an intended change)

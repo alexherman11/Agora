@@ -33,6 +33,7 @@ def app_call(config, name, arguments):
         [config["node"], config["server"]], stdin=subprocess.PIPE,
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         text=True, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW,
+        env={**os.environ, **config.get("bridge_env", {})},
     )
     lines = queue.Queue()
 
@@ -48,9 +49,12 @@ def app_call(config, name, arguments):
         proc.stdin.flush()
 
     def receive(request_id):
-        deadline = time.monotonic() + 45
+        deadline = time.monotonic() + config.get("bridge_timeout", 45)
         while True:
-            line = lines.get(timeout=max(0.1, deadline - time.monotonic()))
+            try:
+                line = lines.get(timeout=max(0.1, deadline - time.monotonic()))
+            except queue.Empty as exc:
+                raise TimeoutError("Codex app bridge did not answer") from exc
             if line is None:
                 raise RuntimeError("Codex app bridge closed before answering")
             message = json.loads(line)

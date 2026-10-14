@@ -584,7 +584,8 @@ class Handler(SimpleHTTPRequestHandler):
                 desk.world.through_gate = sess.actor if body.get("came") == "gate" else None
                 try:
                     r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
-                                               "reply": str(body.get("reply") or "") or None})   # a806: $new within one reply
+                                               "reply": str(body.get("reply") or "") or None,
+                                               "image_context": body.get("image_context")})
                 finally:
                     desk._act_home = desk._act_binds = None
                     desk.world.intent = desk.world.through_gate = None

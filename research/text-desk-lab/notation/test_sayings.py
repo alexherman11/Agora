@@ -152,8 +152,8 @@ check("an undone comment is gone from For you", row("sayings for:alex", q4) is N
 now = {c["id"]: (c["id"], c["text"], c["resolved"]) for s in W.subjects.values() for c in s["comments"]}
 moved = [b for b in before if b[0] != cid and now.get(b[0]) != b]
 check("(iv) no comment's id, text or resolved state changed, but the one Sable resolved", not moved and now[cid][2] is True, moved)
-check("(iv) a comment keeps its c id and a line its m id: no saying has two",
-      all(re.fullmatch(r"c\d+", r["saying"]) if r["what"] == "comment" else re.fullmatch(r"m\d+", r["saying"])
+check("(iv) comments and lines keep their ids; a reply has its thread and stable ordinal",
+      all(re.fullmatch({"comment": r"c\d+", "line": r"m\d+", "reply": r"c\d+/reply/\d+"}[r["what"]], r["saying"])
           for r in rows("sayings")), [r["saying"] for r in rows("sayings")][:40])
 
 # ---- chat lines are sayings too, read as For you always read them ----------------------------------------------
