@@ -22,7 +22,8 @@ A look's keys (the painter's table maps each to its medium):
     space above|below <len>      margin                between <len>                           gap between children
     height <len|em>              least height          width <len|em>                          width (px) or widest (em)
     lift <len>                   a shadow              text [up|down [n]] [medium|strong] [slant] [tracked]  the face
-    afloat  shy  pulse           flags: takes no room; unseen until near; the one motion
+    afloat  shy  pulse  wave     flags: takes no room; unseen until near; the motions (pulse: the part breathes;
+                                 wave, 14 Oct: each character rises in turn, as typing dots do)
 """
 import hashlib
 import pathlib
@@ -335,7 +336,7 @@ def read_prop(p, T, fonts):
         if re.search(r"\btracked\b", p):
             face["tracked"] = True
         return {"text": face}
-    if p in ("afloat", "shy", "pulse"):
+    if p in ("afloat", "shy", "pulse", "wave"):
         return {p: True}
     c = _colour(p, T)
     if c is None:

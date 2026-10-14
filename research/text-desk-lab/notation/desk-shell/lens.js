@@ -98,6 +98,9 @@
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
     if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
+    // `wave` (14 Oct): a role that waves draws each character as its own span, each a beat after the one before
+    else if (p.text != null && role && ((Style.style || {}).roles || {})[role] && Style.style.roles[role].look.wave)
+      el.replaceChildren(...[...p.text].map((ch, i) => Object.assign(document.createElement("span"), { className: "t-wave", textContent: ch, style: `--i:${i}` })));
     else if (p.text != null) {
       const words = V.words(n.key, p.text, n.fence);
       if (p.runs && words === p.text) runs(el, p.runs); else el.textContent = words;
@@ -394,11 +397,16 @@
     el.addEventListener("cut", toSource);
     el.addEventListener("input", () => V.typed(n.key, el.innerText, { key: n.key, fence: el._n.fence }));
     el.addEventListener("keydown", e => {
-      if (e.key === "Enter" && !e.shiftKey && (!multi() || e.ctrlKey || e.metaKey)) { e.preventDefault(); el.blur(); }   // commit is emitted (75e39d8)
+      if (e.key === "Enter" && !e.shiftKey && (!multi() || e.ctrlKey || e.metaKey)) { e.preventDefault(); el._committing = true; el.blur(); }   // commit is emitted (75e39d8)
       if (e.key === "Escape") { e.preventDefault(); if (!V.drop(n.key)) return; V.mark(el, n.key); el.textContent = el._n.paint.text; el.blur(); }
     });
     el.addEventListener("blur", () => {
       if (V.repainting) return;      // a repaint moved it; the person is still editing it
+      // 14 Oct (Pike: a lone '@' was sent twice from Alex's composer): the window losing focus (a key that opens the
+      // window's menu, another program) blurs the text too, and is not the person putting it down. And a text whose
+      // lens says `commit enter|ctrl-enter` is sent by that key only; leaving it keeps the draft
+      const committing = el._committing; el._committing = false;
+      if (!document.hasFocus() || (el._n.paint.commit && el._n.paint.commit !== "explicit" && !committing)) { V.hold = null; return; }
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown

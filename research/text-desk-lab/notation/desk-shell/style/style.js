@@ -46,6 +46,7 @@ const Style = (() => {
     afloat: () => ({ height: "0", "min-height": "0", overflow: "visible", transition: "transform 140ms ease-out", "will-change": "transform" }),
     shy: () => ({ opacity: "0", "--shy": "1" }),
     pulse: () => ({ animation: "r-pulse 2.5s ease-in-out infinite" }),
+    wave: () => ({ "white-space": "pre" }),     // 14 Oct: its characters are spans the painter makes (lens.js wave)
   };
   for (const side of ["top", "right", "bottom", "left"]) {
     TABLE["border_" + side] = v => ({ ["border-" + side]: `1px solid ${v}` });
@@ -95,6 +96,10 @@ const Style = (() => {
     }
     // a1140: the language's one motion, only for a viewer who has not asked for reduced motion; every pulse in one phase
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";
+    // 14 Oct (Alex: 'an animation on those three dots, ideally a cool animation'): `wave`, each character rising in
+    // turn and brightening, then settling; still for a viewer who asked for reduced motion
+    out += "@media (prefers-reduced-motion: no-preference){@keyframes r-wave{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-0.35em);opacity:1}}"
+      + ".t-wave{display:inline-block;animation:r-wave 1.3s ease-in-out infinite;animation-delay:calc(var(--i) * 0.16s)}}\n";
     if (!pinned && typeof document !== "undefined" && document.addEventListener) { pinned = true; document.addEventListener("animationstart", e => {
       if (e.animationName === "r-pulse") e.target.getAnimations().forEach(a => { if (a.animationName === "r-pulse") a.startTime = 0; });
     }, true); }
