@@ -114,7 +114,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit")   # fold_open and fold_float are fold's modifiers
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "light")   # fold_open and fold_float are fold's modifiers
 GESTURES = ("click", "edit", "drag", "menu", "key", "open")
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands to its lens (7 Oct: a document's keys)
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
@@ -252,7 +252,7 @@ SOURCES = {
                                                     "answered", "edited", "before", "state", "eid", "thread")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
-    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),
+    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid", "about", "quote", "mark")),
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room", "item")),   # item: the corner, so a gesture on a row acts on it (30 Sep, wake/rest)
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
@@ -519,7 +519,8 @@ def line_rows(desk, chat=None):
                         "by": persons.by(w, e) if e else "unknown",      # a1568: the event's person, as printed
                         "at": _clock(e.get("at", "")) if e else "", "to": ", ".join(l["to"]),
                         "said": l["text"][m.end():] if m else l["text"], "edited": "edited" if l.get("edited") else "",
-                        "reply_to": l.get("reply_to", ""), "eid": l.get("ev") or l["id"], "_t": (e or {}).get("at", "")})
+                        "reply_to": l.get("reply_to", ""), "eid": l.get("ev") or l["id"], "_t": (e or {}).get("at", ""),
+                        "about": l.get("about", ""), "quote": l.get("quote", ""), "mark": l.get("mark", "")})
     out.sort(key=lambda r: r.pop("_t") or "")
     return out
 
@@ -803,6 +804,15 @@ def _w_lines(node, p, val, n, env):
     if not m or int(m.group(1)) < 1 or (m.group(2) and int(m.group(2)) < int(m.group(1))):
         raise LensRefusal(f"line {n}: `lines <min>..<max>` (grows, then scrolls; `lines 3..` for no top); got {p!r}")
     node["lines"] = [int(m.group(1)), int(m.group(2)) if m.group(2) else None]
+
+
+def _w_light(node, p, val, n, env):
+    # 13 Oct (Alex: comments live on the text): `light "<passages>"` lights each passage named, one a line, where it
+    # stands in this part's words; a template filled as text is (`light "$(spots)"`). Paint only: the words are unchanged
+    m = re.fullmatch(r'"([^"]*)"', val)
+    if not m or not m.group(1):
+        raise LensRefusal(f'line {n}: `light "<passages, one a line>"` (a template: light "$(spots)"); got {p!r}')
+    node["light"] = m.group(1)
 
 
 def _w_commit(node, p, val, n, env):
@@ -1174,6 +1184,7 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
     "picture": ("picture", _w_picture),
+    "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
     "role": ("role <name> [when <selection | expr>]", _w_role),
@@ -1275,7 +1286,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "light": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1309,7 +1320,7 @@ def parse(src, roles=None, style=None):
         for wd in ("gap", "scroll", "fold", "measure"):
             if k[wd] not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
-        for wd in ("wrap", "lines", "hint", "commit"):
+        for wd in ("wrap", "lines", "hint", "commit", "light"):
             if k.get(wd) is not None and k["text"] is None:
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
@@ -1834,6 +1845,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append("peek" + (f" {n['peek']}" if type(n["peek"]) is int else ""))
         if n.get("picture"):
             bits.append("picture")
+        if n.get("light"):
+            bits.append("light " + str(len([x for x in str(n["light"]).split(chr(10)) if x.strip()])))
         if n.get("plain"):
             bits.append("plain")
         elif n.get("text") and runs_of(n["text"], n.get("marks")):
@@ -2022,6 +2035,8 @@ def emit(node):
             paint["hint"] = node["hint"]
         if node.get("picture"):
             paint["picture"] = True
+        if node.get("light") and str(node["light"]).strip():
+            paint["light"] = [x.strip() for x in str(node["light"]).split(chr(10)) if x.strip()]
             if node.get("image_regions"):
                 paint["regions"] = node["image_regions"]
         if not node.get("plain") and not node.get("picture") and node.get("text"):

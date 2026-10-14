@@ -78,6 +78,7 @@
   .boxed { position: absolute; box-sizing: border-box; overflow: hidden; margin: 0; }
   .clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
   [data-clamped][data-cut="1"], [data-clamped][data-opened="1"] { cursor: pointer; }   /* a cut text opens on a press, and closes */
+  :where(mark[data-light]) { background: none; color: inherit; }   /* `light`: a passage's look is its role's */
   [data-key] { white-space: pre-line; }
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
   .t-verbatim { white-space: pre; overflow-x: auto; }

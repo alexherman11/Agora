@@ -268,6 +268,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             """The expression evaluator's door to this part: $names and lets from the frame, selections through the
             accessor (a membership read on the gesture's chain), a member's field through the accessor's thing read."""
             vals = ctx.get("_values") or {}
+            rowbag = []
             def get(name):
                 bare = name[1:] if name.startswith("$") else name
                 if "." not in bare and bare in vals:
@@ -279,13 +280,18 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             def select(q):
                 q = S._fill(q, ctx, track)
                 if S.source_head(q) in S.SOURCES:          # 8 Oct: count(house doing=awake) counts a source's rows
-                    rs = acc.rows(q)
-                    return [r.get("item") or k for k, r in enumerate(rs or [])]
+                    rs = acc.rows(q) or []
+                    # 13 Oct: each row is its own member, so join($quote of lines:f3 about=a9) reads the row's own field
+                    keys = [f"\x00row{len(rowbag) + k}" for k in range(len(rs))]
+                    rowbag.extend(rs)
+                    return keys
                 named, ids = acc.select(q)
                 ids = [i for i, _ in named] if named is not None else ids
                 cb.append(["select", q, list(ids)])
                 return ids
             def field(i, f):
+                if isinstance(i, str) and i.startswith("\x00row"):
+                    return rowbag[int(i[4:])].get(f)
                 tc = acc.thing(i)
                 return tc.get(f) if (f in tc and not f.startswith("_")) else (tc.get("_props") or {}).get(f)
             return {"get": get, "select": select, "field": field, "reads": []}
@@ -361,6 +367,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     out["computed"] = computed
             else:
                 out["text"] = S._fill(em["text"], fill_ctx, track)
+            if em.get("light"):              # 13 Oct: the passages to light, filled as the words are
+                lt = em["light"]
+                out["light"] = (S._fill_text(lt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in lt
+                                else S._fill(lt, fill_ctx, track))
             if em["props"]:
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:

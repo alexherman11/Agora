@@ -101,6 +101,7 @@
     else if (p.text != null) {
       const words = V.words(n.key, p.text, n.fence);
       if (p.runs && words === p.text) runs(el, p.runs); else el.textContent = words;
+      if (p.light && words === p.text) light(el, p.light);
       V.mark(el, n.key);
       if (p.wrap === "verbatim") el.classList.add("t-verbatim");
       if (p.clamp) {
@@ -581,6 +582,21 @@
       const note = document.createElement("div"); note.className = Style.roleClass("meta");
       note.textContent = "An image comment refers to an earlier version; its region is not overlaid here.";
       el.append(note);
+    }
+  }
+  // `light` (13 Oct; Alex: comments live on the text): each passage named is wrapped where it first stands in the
+  // drawn words, in role `light`; a passage not found (the words changed since) is simply not lit
+  function light(el, passages) {
+    for (const want of passages) {
+      const words = want.replace(/^[“"]|[”"]$/g, "").trim(); if (!words) continue;
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let node, done = false;
+      while (!done && (node = walk.nextNode())) {
+        if (node.parentElement && node.parentElement.closest("mark")) continue;
+        const i = node.data.indexOf(words); if (i < 0) continue;
+        const r = document.createRange(); r.setStart(node, i); r.setEnd(node, i + words.length);
+        const m = document.createElement("mark"); m.className = Style.roleClass("light"); m.dataset.light = words;
+        r.surroundContents(m); done = true;
+      }
     }
   }
   function runs(el, rs) {

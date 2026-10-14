@@ -1175,7 +1175,10 @@ class World:
                     out.append(str(args.get("line", args.get("text", ""))))
             args = {"text": "\n".join(out)}
             verb = "edit"
-        line_args = {k: args[k] for k in ("to", "reply_to") if k in args}       # a1581: a chat line's own words
+        line_args = {k: args[k] for k in ("to", "reply_to", "about", "quote", "mark") if k in args}       # a1581: a chat line's own words
+        # 13 Oct (Alex: a conversation about a design, where a message may point at a passage): a line may say what it
+        # is about (a thing's id), the words of it meant (quote=), and what it is (mark=ask: it wants an answer;
+        # mark=folded: the point was taken into the thing, nothing is asked)
         if verb == "append":
             args = {"append": args.get("line", args.get("text", args.get("append", "")))}
             verb = "edit"
@@ -1246,6 +1249,13 @@ class World:
                     # Sable c1579: the line's identity is minted with the press, so a press sent twice is one line
                     return {"ok": True, "event": None, "changed": [],
                             "note": f"already said, as {done['id']} ({done.get('ev')}): this press made that line; nothing new was done"}
+                about = str(line_args.get("about", "")).strip()
+                if about and about not in self.nodes and about not in self.subjects:
+                    raise Refusal(f"about={about} is no thing here (a line is about a thing's id: a12, f3)")
+                if str(line_args.get("mark", "")).strip() not in ("", "ask", "folded"):
+                    raise Refusal("mark= is ask (it wants an answer) or folded (the point was taken in; nothing is asked)")
+                if str(line_args.get("quote", "")).strip() and not about:
+                    raise Refusal("quote= names words of the thing the line is about: say about=<id> too")
                 reply = str(line_args.get("reply_to", "")).strip()
                 if reply and self.find_line(reply)[1] is None:
                     raise Refusal(f"reply_to={reply} is not a chat line's id (a line's id is m<n>: examine a chat's line, or read its receipt)")
@@ -1283,9 +1293,20 @@ class World:
                             to = rooms.private_others(self, s, actor)
                             if to:
                                 why_to = f" (this chat's other member{'s' if len(to) > 1 else ''})"
+                        # 13 Oct: a chat with with=<names> (a design's conversation: Alex and its author) is open to
+                        # anyone, and every line in it reaches those names besides any its header calls (@claude ...)
+                        withs = [n.strip().lower() for n in str((s.get("props") or {}).get("with", "")).split(",") if n.strip()]
+                        if withs and "to" not in line_args:
+                            more = [n for n in withs if n not in to and not rooms.same_person(self, n, str(actor).split("/")[0]) and rooms.someone(self, n)]
+                            if more:
+                                to = to + more
+                                why_to = f" (with= of this chat: {', '.join(more)})"
                         new_line = {"id": self._id("m"), "text": line.strip("\n"), "to": to, "ev": None}
                         if str(line_args.get("reply_to", "")).strip():
                             new_line["reply_to"] = str(line_args["reply_to"]).strip()
+                        for k in ("about", "quote", "mark"):
+                            if str(line_args.get(k, "")).strip():
+                                new_line[k] = str(line_args[k]).strip()
                         if key:
                             new_line["intent"] = key
                         args = dict(args, line_id=new_line["id"], to=",".join(to) or "nobody")

@@ -38,7 +38,7 @@ import datetime
 import re
 
 KINDS = ("number", "text", "date", "time", "duration", "bool", "none", "rows")
-AGGREGATES = ("count", "sum", "min", "max")
+AGGREGATES = ("count", "sum", "min", "max", "join")      # join (13 Oct): the texts, one a line, in order
 KEYWORDS = ("and", "or", "not", "has", "none", "true", "false", "of") + AGGREGATES
 
 
@@ -614,6 +614,10 @@ def evaluate(tree, env):
             if len(kinds) > 1 or (name == "sum" and not kinds <= {"number", "duration"}):
                 return none(f"{field} is not all one kind: " + ", ".join(sorted(kinds)))
             kind = have[0].kind
+            if name == "join":                 # 13 Oct: texts of a selection or a row source, one a line
+                res = Value("text", "\n".join(str(v.v) for v in have))
+                res.reach = f"{len(have)} of {len(ids)}"
+                return res
             if name == "sum":
                 total = sum((v.v for v in have), datetime.timedelta() if kind == "duration" else 0)
                 res = Value(kind, total)
