@@ -115,7 +115,10 @@ def mentions(text, writer=None):
 
 MENTION_NOTE = "a mid-line @ is a mention ({}); put names first to call them"
 # append's own words, never a chat line's fields (14 Oct: a line takes any other field, as a thing takes props)
-LINE_OWN = {"line", "text", "append", "to", "reply_to", "section", "signed", "line_id", "no_one", "fields", "id"}
+LINE_OWN = {
+    "line", "text", "append", "to", "default_to", "reply_to", "section",
+    "signed", "line_id", "no_one", "fields", "id",
+}
 
 
 def to_names(value):
@@ -1206,7 +1209,8 @@ class World:
                     out.append(str(args.get("line", args.get("text", ""))))
             args = {"text": "\n".join(out)}
             verb = "edit"
-        line_args = {k: args[k] for k in ("to", "reply_to") if k in args}       # a1581: a chat line's own words
+        # a1581: a chat line's own words
+        line_args = {k: args[k] for k in ("to", "default_to", "reply_to") if k in args}
         # 13 Oct (Alex: a conversation about a design, where a message may point at a passage), made general 14 Oct (Alex:
         # 'make those changes more general purpose'): a chat line takes fields of its own, as a thing takes props
         # (about=a42 quote="..." mark=ask). The world judges only about=, which names a thing; what any other field
@@ -1289,6 +1293,20 @@ class World:
                 reply = str(line_args.get("reply_to", "")).strip()
                 if reply and self.find_line(reply)[1] is None:
                     raise Refusal(f"reply_to={reply} is not a chat line's id (a line's id is m<n>: examine a chat's line, or read its receipt)")
+                # A caller may supply a visible fallback audience while leaving the
+                # writer's explicit header in charge. Validate before any mutation.
+                if "default_to" in line_args and "to" not in line_args:
+                    import rooms
+                    signed, _ = self.sign_chat_line(str(args["append"]), actor)
+                    names = (addressed(signed) if header(signed)[0]
+                             else to_names(line_args["default_to"]))
+                    names = [n for n in names
+                             if not rooms.same_person(self, n, str(actor).split("/")[0])]
+                    unknown = [n for n in names if not rooms.someone(self, n)]
+                    if not names or unknown:
+                        detail = ": unknown " + ", ".join(unknown) if unknown else ""
+                        raise Refusal("choose a recipient before sending" + detail)
+                    line_args["to"] = ",".join(names)
             if "title" in args:
                 s["title"] = str(args["title"])
             if "text" in args:

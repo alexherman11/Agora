@@ -396,6 +396,8 @@ class Resident:
             self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + pending["carry"]).strip("\n")
         if not (pending.get("delivered") and self.state.get("session")):
             self.state.setdefault("image_comments", []).extend(pending.get("image_comments") or [])
+            self.state.setdefault("message_contexts", []).extend(
+                pending.get("message_contexts") or [])
         self.save()
 
     def start(self, model):
@@ -471,10 +473,33 @@ class Resident:
             self.state.pop("welcome_due", None)
         self.state["last_sent"] = now()
         refs = self.state.pop("image_comments", [])
-        self.state["pending"] = {"kind": kind, "carry": carry or "", "image_comments": refs}
+        contexts = self.state.pop("message_contexts", [])
+        self.state["pending"] = {"kind": kind, "carry": carry or "",
+                                 "image_comments": refs, "message_contexts": contexts}
         self.save()
         from image_comments import content
         blocks = [{"type": "text", "text": text}] + (content(self.house.load(), refs) if refs else [])
+        if contexts:
+            from message_context import model_content
+            from world import Refusal
+            world = self.house.load()
+            for mid in dict.fromkeys(contexts):
+                _, line = world.find_line(mid)
+                saved = (line or {}).get("fields", {}).get("context")
+                if saved:
+                    try:
+                        attached = model_content(world, saved, session=self.house.world)
+                        for block in attached:
+                            if block.get("type") == "text":
+                                block["text"] = (
+                                    f"Attached to native message {mid}:\n" + block["text"])
+                        blocks.extend(attached)
+                    except (ValueError, Refusal) as exc:
+                        blocks.append({"type": "text",
+                                       "text": f"{mid}: saved context unavailable: {exc}"})
+                else:
+                    blocks.append({"type": "text",
+                                   "text": f"{mid}: saved context is no longer available."})
         msg = {"type": "user", "message": {"role": "user", "content": blocks}}
         try:
             self.proc.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
@@ -786,6 +811,19 @@ class House:
     def _knocked(self, r, e, s, resting):
         """a3150: remember which line ended this rest, for the wake's first line (woken_by). Only while it rests: a
         line heard with a receipt woke no one."""
+        mid = (e.get("args") or {}).get("line_id")
+        if mid and s:
+            line = next((line for line in s.get("lines", []) if line["id"] == mid), None)
+            if line and (line.get("fields") or {}).get("context"):
+                # A corner's owner hears its chat even when a line calls someone
+                # else. Attachments follow the stored address, not that ambient feed.
+                import rooms
+                world = self.load()
+                actor = (world.nodes.get(r.rid, {}).get("props") or {}).get("actor")
+                if actor and rooms.calls(world, s, rooms.line_to(e)[0], actor):
+                    refs = r.state.setdefault("message_contexts", [])
+                    if mid not in refs:
+                        refs.append(mid)
         cid = (e.get("undo") or {}).get("drop_comment") or (e.get("args") or {}).get("id")
         if e.get("verb") in ("comment", "resolve") and cid and s:
             c = next((c for c in s.get("comments", []) if c["id"] == cid), None)

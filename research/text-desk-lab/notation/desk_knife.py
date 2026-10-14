@@ -1964,6 +1964,104 @@ class DeskKnife(DeskMoo):
 
     def _do_knife(self, verb, positional, kv):
         w = self.world
+        # Private captures enter recorded state only with the writer's send.
+        # context_from opts into consuming only the composer's observed IDs from
+        # a native draft. Both native edits finish before hooks see either one.
+        if verb == "append" and ("captures" in kv or "context_from" in kv):
+            kv = dict(kv)
+            live = "captures" in kv
+            captures = kv.pop("captures", "")
+            source = kv.pop("context_from", "")
+            from message_context import CAP_ID, resolve
+            actor = str(w.me).split("/")[0]
+            session = getattr(self, "_session", "")
+            if source:
+                import json
+
+                import rooms
+                import verbs
+                if len(positional) != 1 or not re.fullmatch(r"[as]\d+", positional[0]):
+                    raise Refusal("context_from sends to one literal native chat id")
+                target = w.subject_of(positional[0])
+                chat = w.subjects.get(target) or {}
+                if chat.get("kind") != "chat" or chat.get("lines") is None:
+                    raise Refusal("context_from needs a chat with native lines")
+                if not re.fullmatch(r"[asf]\d+", str(source)):
+                    raise Refusal("context_from needs a literal native draft id")
+                draft = self._resolve(source)
+                if draft in w.subjects:
+                    draft = next(iter(w.appearances_of(draft)), None)
+                    if draft is None:
+                        raise Refusal("context_from needs a placed native draft")
+                owner = moo.props_of(w, draft).get("actor")
+                owner_pid = persons.resolve(w, owner)[0] if owner else None
+                actor_pid = persons.resolve(w, actor)[0]
+                if owner and not (owner_pid and owner_pid == actor_pid) and \
+                        not rooms.same_person(w, owner, actor):
+                    raise Refusal("context_from belongs to another actor")
+                if live:
+                    selected = str(captures).split()
+                    if len(selected) > 8 or any(not CAP_ID.fullmatch(cid) for cid in selected):
+                        raise Refusal("captures needs at most eight observed cap-<digits> ids")
+                elif kv.get("context"):
+                    # A journaled send has its captured values already. Replaying
+                    # never calls the private capture store or picks up new IDs.
+                    kv["context"] = resolve(session, actor, kv["context"])
+                    selected = [c["id"] for c in json.loads(kv["context"])["captures"]]
+                else:
+                    raise Refusal(
+                        "context_from needs explicit observed captures= or durable context=")
+
+                def attached():
+                    value = str(moo.props_of(w, draft).get("context") or "")
+                    ids = value.split()
+                    if len(value) > 4096 or any(not CAP_ID.fullmatch(cid) for cid in ids):
+                        raise Refusal("the draft context is not a list of capture ids")
+                    if live and not set(selected) <= set(ids):
+                        raise Refusal("a selected capture is no longer attached; review the draft")
+                    return ids
+
+                attached()
+                if live and selected:
+                    kv["context"] = resolve(session, actor, " ".join(selected))
+                # An explicitly empty selection is ordinary text, even if another
+                # window attached something since the composer was painted.
+                if not selected:
+                    return self._do_knife(verb, positional, kv)
+                pending = attached()
+                remaining = [cid for cid in pending if cid not in set(selected)]
+                n0, hooks = len(w.events), self.hooks
+                seen = dict(self.seen)
+                try:
+                    self.hooks = []
+                    out = self._do_knife(verb, positional, kv)
+                    appended = any((e.get("args") or {}).get("line_id")
+                                   for e in w.events[n0:])
+                    if appended and remaining != pending:
+                        result = moo.v_prop(w, draft, {"context": " ".join(remaining)})
+                        event = w.event_by_id(result["event"])
+                        event.setdefault("changed", []).extend(result.get("changed", []))
+                        event["via"] = "prop"
+                        event["window"] = getattr(self, "_window", "") or ""
+                except Exception:
+                    verbs.rollback(self, n0)
+                    self.seen.clear()
+                    self.seen.update(seen)
+                    raise
+                finally:
+                    self.hooks = hooks
+                if appended:
+                    try:
+                        self._after_mutation()
+                    except Exception:
+                        verbs.rollback(self, n0)
+                        self.seen.clear()
+                        self.seen.update(seen)
+                        raise
+                return out + (f"\n  sent context detached from {source}; "
+                              f"{len(remaining)} attachment(s) remain" if appended else "")
+            if captures:
+                kv["context"] = resolve(session, actor, captures)
         attachment = getattr(self, "_image_comment", None)
         if attachment is not None:
             self._image_comment = None
