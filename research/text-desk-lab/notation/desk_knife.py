@@ -1,5 +1,6 @@
 """The knife desk (round 7): the MOO desk with general verbs only, selections as targets, and pair verbs."""
 
+import os
 import re
 import shlex
 
@@ -1371,7 +1372,12 @@ class DeskKnife(DeskMoo):
         if top:
             self._made = dict(self._made or {})
             self._made[self._slot()] = (self._reply, ctx.prev, dict(ctx.handles))
-        if len(self.world.events) > n0:
+        # 14 Oct (Snappy Desk): a step of a world verb is not a deed of its own: the rules answer the verb once it is
+        # done (its own line comes back here with every step's events), not after each step. A split of 5 steps chose
+        # each standing rule's things over the whole world 5 times (65 of its 150 ms); an event rule still sees every
+        # step's events, from its cursor. DESK_RULES_PER_STEP=1 keeps the old way.
+        inner = getattr(self, "_verb_depth", 0) > 0 and os.environ.get("DESK_RULES_PER_STEP") != "1"
+        if len(self.world.events) > n0 and not inner:
             # after the receipt is composed, so the receipt describes the command, then the rules; the command's
             # last event is the cause of whatever the rules do, so one undo takes both back
             self._run_rules(cause=self.world.events[-1]["id"])
