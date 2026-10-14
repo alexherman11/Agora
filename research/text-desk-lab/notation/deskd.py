@@ -208,6 +208,24 @@ def snapshot_for(desk):
 
 _DESKS = {}      # world file -> ((its time, its size), the desk as this process last saved or loaded it, {actor: its pickle})
 
+# 14 Oct (Alex: 'the whole interface is super slow'; the lock was held 41% of 20 s, 39 holds, median 191 ms): one line
+# per request that takes a world's lock, saying what asked, how long it waited and held, and whether it saved, so the
+# queue's makeup is read, not guessed. house-state/deskd-trace.log, cut to its last 2 MB. DESKD_TRACE=off stops it.
+_REQ = __import__("threading").local()
+TRACE = Path(__file__).resolve().parent / "house-state" / "deskd-trace.log"
+
+
+def _trace(line):
+    if os.environ.get("DESKD_TRACE") == "off":
+        return
+    try:
+        if TRACE.exists() and TRACE.stat().st_size > 2_000_000:
+            TRACE.write_text(TRACE.read_text(encoding="utf-8")[-1_000_000:], encoding="utf-8")
+        with TRACE.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
+
 
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
@@ -223,7 +241,9 @@ class Session:
         self.lock = SESSIONS / f"{name}.lock"
 
     def __enter__(self):
+        self._t0 = time.perf_counter()
         explore.take_lock(self.lock, tries=1200, pause=0.05)
+        self._t1 = time.perf_counter()
         # 7 Oct: the desk this process last saved or loaded is kept in memory, and used again while the file is still
         # that one (same time and size: nobody else wrote it). Reading and unpickling 13 MB was 80 to 110 ms a request.
         # Always under the session's lock, as before; the file stays the truth, and any other writer's save is seen
@@ -272,6 +292,7 @@ class Session:
             if now != self.before:
                 _DESKS.pop(key, None)             # if the save fails, what is in memory is not what the file says
                 explore.save_desk(self.path, d, now)
+                self._saved = True
                 st = self.path.stat()
                 self.stamp = (st.st_mtime_ns, st.st_size)
                 self.pickled = {}                 # the world moved: nobody else's last pickle is of this one
@@ -288,6 +309,10 @@ class Session:
             raise
         finally:
             explore.release_lock(self.lock)
+            t2 = time.perf_counter()
+            _trace(f"{time.strftime('%H:%M:%S')} {self.name} {self.actor} {getattr(_REQ, 'what', '?')} "
+                   f"wait={(self._t1 - self._t0) * 1000:.0f} held={(t2 - self._t1) * 1000:.0f} "
+                   f"saved={'yes' if getattr(self, '_saved', False) else 'no'}")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -342,6 +367,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _get(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        _REQ.what = u.path.rsplit("/", 1)[-1] + (":" + q["lens"] if q.get("lens") else "")
         if u.path == "/api/snapshot":
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 snap = snapshot_for(desk)
@@ -428,6 +454,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _post(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        _REQ.what = urlparse(self.path).path.rsplit("/", 1)[-1] + (":" + "_".join(str(body.get("line") or "").split()[:2])[:40]
+                                                                   if isinstance(body, dict) and body.get("line") else "")
         if not isinstance(body, dict):
             raise BadRequest("the body must be a JSON object")
         if urlparse(self.path).path == "/api/observe":
