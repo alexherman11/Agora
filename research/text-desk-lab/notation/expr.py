@@ -302,7 +302,23 @@ def tokens(text):
 # ---------------------------------------------------------------------------------------------------------------------
 # parse -> a small tree of tuples
 # ---------------------------------------------------------------------------------------------------------------------
+_PARSED = {}
+
+
 def parse(text):
+    """-> the tree of `text`. 14 Oct (a4838): a lens evaluates the same few lets and guards for every thing it shows
+    (4600 parses of a few dozen texts on a 134-thing page, 15% of its build), so a tree is kept by its text; nothing
+    changes a tree once made (evaluate only reads it)."""
+    tree = _PARSED.get(text)
+    if tree is None:
+        tree = _parse(text)
+        if len(_PARSED) >= 4096:
+            _PARSED.clear()
+        _PARSED[text] = tree
+    return tree
+
+
+def _parse(text):
     toks = tokens(text)
     pos = [0]
 
