@@ -432,7 +432,7 @@
       if (el._toSource) el._toSource();
       const raw = el.innerText.replace(/\n$/, ""), seen = V.editOrigin(key, n) || n;
       V.drop(key); V.hold = null;
-      if (edit && raw !== (n.paint.text || "")) await sendKey(seen, edit.line.replace("$value", () => this.esc(raw)));
+      if (edit && raw !== (n.paint.text || "")) await sendKey(seen, this.quote(edit.line).replace("$value", () => this.esc(raw)));
       const now = paint.querySelector(`[data-key="${CSS.escape(key)}"]`) || el;
       await sendKey(now._n, line.replace("$focus", () => (n.fence || {}).item || "").replace("$selected", () => this.selected(n)));
       const after = paint.querySelector(`[data-key="${CSS.escape(key)}"]`);
