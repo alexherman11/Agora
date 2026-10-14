@@ -15,11 +15,14 @@ commission:
   - their comments come back to it as messages, the way news reaches a resident;
   - waiting costs nothing: an idle process uses no model.
 
-**Landing** happens between passes, so no resident's desk call is in flight:
+**Landing** happens between passes, so no resident's desk call is in flight, through landing.py (14 Oct, Alex: main
+only good working code, landed fast, never blocked by uncommitted edits), the same path any builder lands by:
   1. the branch may touch code and docs, never worlds (sessions/) or .env;
-  2. health is taken before, then the branch is merged (--no-ff, one commit per commission), then health again;
-  3. the lenses that compiled before must still compile, and every check must pass, or the merge is reverted
-     (git revert: history keeps both);
+  2. it is merged (--no-ff, one commit per commission) onto main in the landing room (.worktrees/house-landing),
+     beside a copy of the live world, and health is run there; main's own health is kept, so this is one run;
+  3. the lenses that compiled on main must still compile, and nothing may fail that did not fail on main, or it does
+     not land (main never has it); if it passes, main moves to it by fast-forward. Uncommitted edits in the main
+     checkout never stop it: one in a file it changes is kept on parked/<when> and put back on top;
   4. in frontier, Current Implementation is exported from its Handbook binder (the worker keeps that true), and
      FRICTION.md from Rough spots, each committed if it changed;
   5. the result goes back as a comment and the worktree is removed.
@@ -42,7 +45,7 @@ TREES = REPO / ".worktrees"
 PY = Path(sys.executable)
 # Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
 # call) and deskd restarts on every commit; only these, which the house process itself runs, need the house to restart
-HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py"}
+HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py", "landing.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 
 PROTOCOL = """You are a worker in Agora's house: a disposable builder for one commission, then gone.
@@ -501,85 +504,57 @@ class Workshop:
         return " Current Implementation and FRICTION.md unchanged." + (f" {warn[0][:200]}" if warn else "")
 
     def land(self, w, cid, s, wk):
-        """Between passes: merge, check, keep or revert. Every outcome is said on the commission."""
-        # Alex, 30 Sep: code is edited by hand in the main checkout while the house runs. A landing merges there and
-        # runs health on what is on disk, so a half-made edit could fail a good landing (and its revert) or pass a bad
-        # one. While tracked code there has uncommitted changes, the landing waits (still ready), and says so once.
-        dirty = [l[3:] for l in (git("status", "--porcelain", "--untracked-files=no").stdout or "").splitlines()
-                 if l[3:].endswith((".py", ".js", ".html", ".css")) and "/sessions/" not in l]
-        if dirty:
-            # said once per wait, when it begins, remembered in the worker's own state: kept in memory it was said
-            # again by every new house, and each saying woke the asker (Juniper e4478, 1 Oct: four times in a morning).
-            # a4644 (Juniper e7832, Pike 13 Oct): it was once per SET of files, and the list changes as Alex edits, so
-            # a4465 said it three times (c4636, c4641, c4690), each a knock. A changed list is not news; the wait
-            # ends only by this pass going ahead, and what it comes to (landed, reverted, does not merge) is said then.
-            # The card's last house comment is asked too, for a worker state from before this (or a lost one).
-            # Pike c4717: said on the card with to=nobody, so it wakes no one (the asker cannot commit Alex's edits, and
-            # sees it among the changes the next time something real wakes them); the outcome still calls them.
-            said = [e for e in w.events if e["by"] == "house" and e["verb"] == "comment" and e["target"] in (cid, s["id"])]
-            last = " ".join(str(v) for v in (said[-1].get("args") or {}).values() if isinstance(v, str)) if said else ""
-            if not wk.state.get("held") and WAITING not in last:
-                self.say(cid, WAITING + ": the main checkout has uncommitted edits to "
-                         + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
-                         + ". It lands on the first pass after they are committed or put back. Nothing more is said "
-                           "here until then, whatever else is edited meanwhile.", to="nobody")
-            if wk.state.get("held") != dirty:
-                wk.state["held"] = dirty
-                wk.save()
-            return
+        """Between passes: the branch is judged in the landing room and goes into main only if it passes (landing.py).
+        Every outcome is said on the commission."""
+        # 14 Oct (Alex: 'main should only be good working code, and things should land as fast as possible, with
+        # uncommitted changes not blocking new code arriving'): a landing no longer waits for the main checkout to be
+        # clean, merges there, or reverts there. It is judged on main plus the branch, beside a copy of the live world,
+        # in a room of its own; main moves only when it passes. Someone's uncommitted edit in a file it changes is kept
+        # on a parked/ branch and put back on top. (Until 14 Oct: a4644, Pike c4717, facd14a; their reasons were the
+        # main checkout's, and it is no longer where a landing happens.)
+        import landing
         if wk.state.pop("held", None) is not None:
             wk.save()
         self.set_state(cid, "landing")
-        changed = [p for p in git("diff", "--name-only", f"HEAD...{wk.branch}").stdout.split() if p]
-        banned = [p for p in changed if p.startswith(f"{NOTATION}/sessions/") or p.endswith(".env") or p == ".env"]
-        if not changed or banned:
-            why = "nothing to land: the branch has no commits beyond main" if not changed else \
-                  f"the branch touches what workers may not: {', '.join(banned)}. Take those out of the branch and set ready again"
-            self.set_state(cid, "working")
-            self.say(cid, why)
-            wk.send(f"~ house: {why}")
-            return
-        before = health(self.house.world)
         title = re.sub(r"\s+", " ", s["title"])[:80]
-        was = git("rev-parse", "HEAD").stdout.strip()
-        r = git("merge", "--no-ff", wk.branch, "-m",
-                f"land {cid}: {title}\n\nasked by {wk.asked_by}, built by {wk.actor} (commission {cid}); landed by the house "
-                f"after the health checks.")
-        if r.returncode:
-            git("merge", "--abort")
-            why = f"the branch does not merge into main: {(r.stdout + r.stderr).strip()[-400:]}"
-            self.set_state(cid, "working")
-            self.say(cid, why + ". Rebase your branch onto main (git rebase main), then set ready again.")
-            wk.send(f"~ house: {why}. Rebase onto main (git rebase main) and set ready again.")
+        why = {wk.branch: f"land {cid}: {title}\n\nasked by {wk.asked_by}, built by {wk.actor} (commission {cid}); judged "
+                          f"in the landing room with a copy of the live world, and landed by the house."}
+        r = landing.land([wk.branch], world=self.house.world, who=wk.actor, why=why)
+        if r["landed"]:
+            head = r["head"]
+            changed = [p for p in git("diff", "--name-only", f"{head}^1", head).stdout.split() if p]
+            parked = "".join(f" Someone's uncommitted edits to the same files were kept on {p['branch']} and put back on "
+                             f"top" + (f"; these conflicted and are only on that branch: {', '.join(p['conflicts'])}"
+                                       if p["conflicts"] else "") + "." for p in r["parked"])
+            self.set_state(cid, "landed", landed=head)
+            failing = (" Main was already failing, and still is (not this landing's): " + "; ".join(r["main_failing"])[:400]
+                       + ".") if r.get("main_failing") else ""
+            self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(r["text"].splitlines())[:600]
+                     + failing + parked + self.export_docs(cid))
+            self.compare_lived(self.house.load())     # a3165: a promise reported as of a commit ends here, or stays open
+            self.finish(cid, wk, keep_branch=False)
+            if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
+                self.restart_wanted = True
             return
-        # 14 Oct (facd14a): the health run takes a minute, and others commit to main meanwhile; `revert HEAD` then took
-        # back Codex's commit made in that minute, not this landing. The landing is its own merge, named by its hash
-        merged = git("rev-parse", "HEAD").stdout.strip()
-        if merged == was:
-            # the branch was in main already (a landing set ready again after a revert that missed it): nothing to judge
-            merged = None
-        after = health(self.house.world)
-        lost = sorted(set(before.get("lenses_ok") or []) - set(after.get("lenses_ok") or []))
-        # a1595: a help note's problem that was there before the merge is the world's, not this landing's (a note is
-        # edited in the world at any time); only a new one reverts
-        had = {f for f in before.get("failed") or [] if f.startswith("help note: ")}
-        reasons = [f for f in after.get("failed") or [] if f not in had]
-        if merged and ((not after.get("ok") and (reasons or not after.get("failed"))) or lost):
-            reasons += [f"lens {x} compiled before and no longer does" for x in lost]
-            git("revert", "-m", "1", "--no-edit", merged)
+        why = r["refused"][0][1] if r["refused"] else "it did not land, and landing.py said nothing about why"
+        if why.startswith("judged and not landed"):
+            # the word stays 'reverted' (residents' rules and promises read it); nothing was reverted: main never had it
             self.set_state(cid, "reverted")
-            self.say(cid, "landed, then reverted: " + "; ".join(reasons)[:1500] + f". The branch {wk.branch} is kept; fix it and set ready again.")
-            wk.send("~ house: your merge failed the health checks and was reverted:\n" + "\n".join(reasons)
+            self.say(cid, why[:1500] + f". Main never had it. The branch {wk.branch} is kept; fix it and set ready again.")
+            wk.send("~ house: your branch failed the checks in the landing room and did not land:\n" + why
                     + "\nFix it on your branch and set the commission ready again.")
             return
-        head = git("rev-parse", "--short", "HEAD").stdout.strip()
-        self.set_state(cid, "landed", landed=head)
-        self.say(cid, f"landed as {head}: {len(changed)} file(s). Health after: " + " · ".join(after.get("text", "").splitlines())[:600]
-                 + self.export_docs(cid))
-        self.compare_lived(self.house.load())     # a3165: a promise reported as of a commit ends here, or stays open
-        self.finish(cid, wk, keep_branch=False)
-        if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
-            self.restart_wanted = True
+        if why.startswith("does not merge"):
+            why = "the branch " + why
+            self.set_state(cid, "working")
+            self.say(cid, why + ". Merge main into your branch (git merge main), then set ready again.")
+            wk.send(f"~ house: {why}. Merge main into your branch (git merge main) and set ready again.")
+            return
+        if why.startswith("the branch touches"):
+            why += ". Take those out of the branch and set ready again"
+        self.set_state(cid, "working")
+        self.say(cid, why)
+        wk.send(f"~ house: {why}")
 
 
 class Worker:

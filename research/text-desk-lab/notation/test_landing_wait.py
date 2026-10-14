@@ -1,18 +1,19 @@
-"""test_landing_wait: a landing that waits says so once, and knocks its asker once (a4644, Pike and Juniper 13 Oct).
+"""test_landing_wait: a commission's landing never waits on anyone's uncommitted edits, and what it comes to is said
+once (landing.py, Alex 14 Oct: "uncommitted changes not blocking new code arriving"; before: a4644, Pike c4717).
 
     python test_landing_wait.py
 
 A small world in memory (roomworld.py) and a git repository of its own in a temporary folder, standing in for the
-main checkout. The workshop's own land() runs with a stand-in house whose lines go through the desk's dispatch; health
-and the docs export are stubbed (they run the lab's real world), and so is finish (it removes a worktree). Who a house
-comment knocks is read by rooms.reached, the reading the house's knock record uses. The story:
-  1. pike's commission is ready and main has an uncommitted edit: one comment saying it waits and on what, to=nobody,
-     so it wakes no one (Pike c4717: the asker cannot act on a wait; the outcome still calls them);
-  2. passes go by with the same edit, then with another file edited too, then with only that other file: nothing said;
-  3. a new house (the worker's state from before this change, without held=) meets the same wait: nothing said;
-  4. the edits are committed and it lands: the card says landed, and pike is knocked once for it;
-  5. a second commission waits, is refused (nothing to land), and waits again: each wait is said once, and only the
-     refusal knocks.
+main checkout, laid out as the lab is. The workshop's own land() runs with a stand-in house whose lines go through the
+desk's dispatch; it lands through landing.py, whose health is stubbed (it fails when the judged code holds a file
+BROKEN); the docs export and finish are stubbed too. Who a house comment knocks is read by rooms.reached.
+  1. pike's commission is ready while the main checkout has an uncommitted edit elsewhere: it lands at once, says so
+     once, knocks pike once, and the edit is untouched (until 14 Oct it waited until the edit was committed)
+  2. an uncommitted edit in a file the branch changes, other lines: it lands, the card says the edit was kept on a
+     parked/ branch and put back, and the edit is in the file over the landing
+  3. a branch that fails the checks: commission=reverted, the card says main never had it, main has not moved
+  4. a branch with nothing beyond main: back to working, said once
+  5. a branch that does not merge: back to working, told to merge main into it
 """
 import os
 import re
@@ -25,15 +26,20 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
+NOTATION = "research/text-desk-lab/notation"
+tmp = tempfile.TemporaryDirectory()
+REPO = Path(tmp.name) / "live"
+os.environ["LANDING_LIVE"] = str(REPO)
+os.environ["LANDING_ROOM"] = str(Path(tmp.name) / "room")
 
 import roomworld   # noqa: E402
 import house       # noqa: E402
 import rooms       # noqa: E402
 import workshop    # noqa: E402
+import landing     # noqa: E402
 
 fails = []
-WAITING = "ready, and waiting to land"     # how the house begins a wait on a card (workshop.WAITING; spelled out, so
-                                           # this runs on the code from before it, to show what it was)
+WAITING = "ready, and waiting to land"     # how the house began a wait on a card until 14 Oct
 
 
 def check(name, ok, detail=""):
@@ -70,7 +76,8 @@ class House:
         return W
 
     def act(self, who, line):
-        out = say(who, *[p.strip() for p in line.split(";")])
+        from desk import split_batch           # ; outside quotes, as the house's own act splits a line
+        out = say(who, *[p.strip() for p in split_batch(line)])
         if "ERR" in out:
             print("house refused:", line[:120], "->", out[-300:])
         return out
@@ -89,8 +96,6 @@ class Wk:
         self.heard.append(text)
 
 
-tmp = tempfile.TemporaryDirectory()
-REPO = Path(tmp.name)
 ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
 
 
@@ -101,37 +106,49 @@ def git(*args):
 
 
 def write(name, text, msg=None):
-    (REPO / name).parent.mkdir(parents=True, exist_ok=True)
-    (REPO / name).write_text(text, encoding="utf-8")
+    p = REPO / NOTATION / name
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
     if msg:
-        git("add", "--", name)
+        git("add", "--", f"{NOTATION}/{name}")
         git("commit", "-q", "-m", msg)
 
 
+def read(name):
+    return (REPO / NOTATION / name).read_text(encoding="utf-8")
+
+
+REPO.mkdir()
 git("init", "-q", "-b", "main")
-write("lab/a.py", "a = 1\n")
-write("lab/b.js", "b = 1\n")
-write("lab/c.py", "c = 1\n")
+git("config", "core.autocrlf", "false")
+write("a.py", "a = 1\n")
+write("b.js", "".join(f"b{i} = {i}\n" for i in range(12)))
+write(".gitignore", "house-state/\nsessions/\n")
 git("add", "-A")
 git("commit", "-q", "-m", "start")
 
 _git = workshop.git
 workshop.git = lambda *a, cwd=REPO, **k: _git(*a, cwd=cwd, **k)     # its default cwd is the real checkout
 workshop.REPO = REPO
-workshop.health = lambda world, cwd=None: {"ok": True, "lenses_ok": [], "failed": [], "text": "all well"}
+landing.health = lambda world, cwd: ({"ok": False, "lenses_ok": [], "failed": ["BROKEN is here"], "text": "broken"}
+                                     if (Path(cwd) / "BROKEN").exists() else
+                                     {"ok": True, "lenses_ok": [], "failed": [], "text": "all well"})
 WS = workshop.Workshop(House())
 WS.export_docs = lambda cid: ""
 WS.compare_lived = lambda w: None
 WS.finish = lambda cid, wk, keep_branch: None
 
 
-def commission(title, branch_file):
+def commission(title, files, base="main"):
     t = say("pike", f"look {B} :1", f'do create {B} kind=task title="{title}" owner=pike asked_by=pike status=open')
     card = re.findall(r"created (a\d+)", t)[-1]
     say("pike", f"look {card} :1", f"do prop {card} commission=asked")
     say("house", f"look {card} :1", f"do prop {card} commission=ready")
-    git("checkout", "-q", "-b", f"worker/{card}")
-    write(branch_file, f"# {title}\n", f"{card}: {title}")
+    git("checkout", "-q", "-b", f"worker/{card}", base)
+    for name, text in files.items():
+        write(name, text)
+    git("add", "-A")
+    git("commit", "-q", "-m", f"{card}: {title}")
     git("checkout", "-q", "main")
     return card, W.nodes[card]["subject"], Wk(card)
 
@@ -144,90 +161,70 @@ def house_said(sid, since):
     return said, knocks
 
 
-def wakes_pike(since):
-    """-> whether what happened since event `since` would wake pike from a rest, by the house's own news()."""
-    from types import SimpleNamespace
-    h = house.House.__new__(house.House)
-    r = SimpleNamespace(rid=rooms.corner_of(W, "pike"), state={"cursor": since}, save=lambda: None)
-    return h.news(W, r, "pike", resting=True)
-
-
 def text(e):
     return " ".join(str(v) for v in (e.get("args") or {}).values() if isinstance(v, str))
+
+
+def state(sid):
+    return (W.subjects[sid].get("props") or {}).get("commission")
 
 
 def land(card, sid, wk):
     WS.land(W, card, W.subjects[sid], wk)
 
 
-# ---- 1. ready, and main has an uncommitted edit: said once, knocked once -------------------------------------------
-K1, S1, wk1 = commission("Doors", "lab/doors.py")
+# ---- 1. ready, with someone's uncommitted edit elsewhere: lands at once ----------------------------------------------
+K1, S1, wk1 = commission("Doors", {"doors.py": "# Doors\n"})
 start = len(W.events)
-write("lab/a.py", "a = 2  # Alex, by hand\n")
+write("a.py", "a = 2  # Alex, by hand, not committed\n")
 land(K1, S1, wk1)
 said, knocks = house_said(S1, start)
-check("1. one comment says it waits, and on what", len(said) == 1 and WAITING in text(said[0])
-      and "lab/a.py" in text(said[0]), [text(e) for e in said])
-check("1. pike is not woken by it (to=nobody: the asker cannot act on a wait, Pike c4717)", not knocks
-      and said[0].get("to") == [], [(text(e), e.get("to")) for e in said])
-check("1. it is still ready, not landed", (W.subjects[S1].get("props") or {}).get("commission") == "ready",
-      W.subjects[S1].get("props"))
+check("1. it lands at once: commission=landed, and the card says so once", state(S1) == "landed" and len(said) == 1
+      and text(said[0]).startswith("landed as ") and not any(WAITING in text(e) for e in said), [text(e) for e in said])
+check("1. pike is knocked once, for the landing", len(knocks) == 1, [text(e) for e in knocks])
+check("1. the uncommitted edit is untouched, and main has the landing", read("a.py").startswith("a = 2  # Alex")
+      and read("doors.py") == "# Doors\n", read("a.py"))
 
-# ---- 2. passes with the same edit, then a different file in the way: nothing said ----------------------------------
-for _ in range(3):
-    land(K1, S1, wk1)
-write("lab/b.js", "b = 2  # and another\n")
-land(K1, S1, wk1)
-git("checkout", "-q", "--", "lab/a.py")
-land(K1, S1, wk1)
-land(K1, S1, wk1)
-said, knocks = house_said(S1, start)
-check("2. same edit, a file added, a file put back: still the one comment", len(said) == 1, [text(e) for e in said])
-check("2. and nobody knocked", not knocks, [text(e) for e in knocks])
-check("2. the house's news() would not wake pike for any of it", not wakes_pike(start))
-check("2. the worker's state follows what is in the way", wk1.state.get("held") == ["lab/b.js"], wk1.state)
-
-# ---- 3. a new house, its worker's state without held= (from before, or lost): the card's word is asked ---------------
-wk1.state.pop("held")
-land(K1, S1, wk1)
-said, _ = house_said(S1, start)
-check("3. a state without held= does not say it again: the card already says it waits", len(said) == 1,
-      [text(e) for e in said])
-
-# ---- 4. committed: it lands, said once, knocked once --------------------------------------------------------------
-git("add", "-A")
-git("commit", "-q", "-m", "Alex's edit")
+# ---- 2. an uncommitted edit in a file the branch changes, on other lines ---------------------------------------------
+K2, S2, wk2 = commission("Bees", {"b.js": read("b.js").replace("b1 = 1\n", "b1 = 'one'\n")})
+write("b.js", read("b.js").replace("b10 = 10\n", "b10 = 'ten, by hand'\n"))
 mark = len(W.events)
-land(K1, S1, wk1)
-said, knocks = house_said(S1, mark)
-check("4. the card says it landed", len(said) == 1 and text(said[0]).startswith("landed as "), [text(e) for e in said])
-check("4. pike is knocked once for that", len(knocks) == 1, [text(e) for e in knocks])
-check("4. and news() wakes pike for it", wakes_pike(mark))
-check("4. the wait is forgotten", "held" not in wk1.state, wk1.state)
-check("4. commission=landed", (W.subjects[S1].get("props") or {}).get("commission") == "landed", W.subjects[S1].get("props"))
+land(K2, S2, wk2)
+said, _ = house_said(S2, mark)
+check("2. it lands, and the card says the edit was kept on a parked/ branch and put back", state(S2) == "landed"
+      and "parked/" in text(said[0]) and "put back" in text(said[0]), [text(e) for e in said])
+check("2. the edit is in the file, over the landing", "b1 = 'one'" in read("b.js") and "b10 = 'ten, by hand'" in read("b.js"),
+      read("b.js"))
+git("checkout", "--", f"{NOTATION}/b.js")
 
-# ---- 5. every wait is its own: a later wait on another commission begins afresh, and one after a refusal too --------
-K2, S2, wk2 = commission("Windows", "lab/windows.py")
-start2 = len(W.events)
-write("lab/c.py", "c = 2\n")
-land(K2, S2, wk2)
-land(K2, S2, wk2)
-said, knocks = house_said(S2, start2)
-check("5. a second commission's wait is said once on its own card", len(said) == 1 and WAITING in text(said[0]),
-      [text(e) for e in said])
-git("checkout", "-q", "--", "lab/c.py")
-git("branch", "-q", "-f", "worker/" + K2, "main")          # its branch has nothing beyond main: refused, back to working
-land(K2, S2, wk2)
-say("house", f"look {K2} :1", f"do prop {K2} commission=ready")
-write("lab/c.py", "c = 3\n")
-land(K2, S2, wk2)
-land(K2, S2, wk2)
-said, knocks = house_said(S2, start2)
-check("5. after the pass went ahead (refused), a new wait is news, said once",
-      [WAITING in text(e) for e in said] == [True, False, True], [text(e) for e in said])
-check("5. the refusal, which the asker acts on, is the one knock", [text(e) for e in knocks]
-      == ["nothing to land: the branch has no commits beyond main"], [text(e) for e in knocks])
+# ---- 3. a branch that fails the checks ------------------------------------------------------------------------------
+was = git("rev-parse", "HEAD")
+K3, S3, wk3 = commission("Broken", {"BROKEN": "x\n"})
+mark = len(W.events)
+land(K3, S3, wk3)
+said, knocks = house_said(S3, mark)
+check("3. commission=reverted, the card says main never had it, and why", state(S3) == "reverted" and len(said) == 1
+      and "Main never had it" in text(said[0]) and "BROKEN is here" in text(said[0]), [text(e) for e in said])
+check("3. main has not moved", git("rev-parse", "HEAD") == was and not (REPO / NOTATION / "BROKEN").exists())
+check("3. the worker is told, and pike knocked once", any("did not land" in h for h in wk3.heard) and len(knocks) == 1,
+      (wk3.heard, [text(e) for e in knocks]))
 
-workshop.git = _git
-print(f"\n{'all passed' if not fails else str(len(fails)) + ' FAILED: ' + '; '.join(fails)}")
+# ---- 4. nothing beyond main ------------------------------------------------------------------------------------------
+K4, S4, wk4 = commission("Nothing", {"nothing.txt": "n\n"})
+git("branch", "-q", "-f", f"worker/{K4}", "main")
+mark = len(W.events)
+land(K4, S4, wk4)
+said, _ = house_said(S4, mark)
+check("4. nothing to land: back to working, said once", state(S4) == "working" and len(said) == 1
+      and "nothing to land" in text(said[0]), [text(e) for e in said])
+
+# ---- 5. does not merge -----------------------------------------------------------------------------------------------
+K5, S5, wk5 = commission("Clash", {"doors.py": "# a different door\n"}, base=git("rev-list", "--max-parents=0", "HEAD"))
+mark = len(W.events)
+land(K5, S5, wk5)
+said, _ = house_said(S5, mark)
+check("5. does not merge: back to working, told to merge main into the branch", state(S5) == "working"
+      and "does not merge" in text(said[0]) and "git merge main" in text(said[0]), [text(e) for e in said])
+
+print(f"{len(fails)} FAILED" if fails else "all passed")
 sys.exit(1 if fails else 0)
