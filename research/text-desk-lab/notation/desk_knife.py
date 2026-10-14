@@ -252,10 +252,18 @@ class DeskKnife(DeskMoo):
         tag it rule. An undone event counts for nothing, so an undo gives the rule back to whoever came before."""
         w = self.world
         cache = self._rule_authors = self._rule_authors or {}
-        if sid in cache and cache[sid][0] == len(w.events):
-            return cache[sid][1]
-        ids, who = {sid} | set(w.appearances_of(sid)), None
-        for e in w.events:
+        ids, n = {sid} | set(w.appearances_of(sid)), len(w.events)
+        had = cache.get(sid)
+        if had is not None and had[0] == n:
+            return had[1]
+        # 14 Oct (a4838): read again from the start only when it must be (an undo among the new events changes what
+        # came before; the rule's appearances changed); else only the events since the last answer. Asked per rule per
+        # step of a command, the whole history (9191 events) was a third of a paragraph split
+        start, who = 0, None
+        if had is not None and len(had) > 2 and had[2] == ids and had[0] <= n \
+                and not any(e["verb"] == "undo" for e in w.events[had[0]:]):
+            start, who = had[0], had[1]
+        for e in w.events[start:]:
             if e.get("undone") or e["verb"] == "undo":
                 continue
             a = e.get("args") or {}
@@ -266,7 +274,7 @@ class DeskKnife(DeskMoo):
             elif e["target"] in ids and ((e["verb"] == "edit" and ("text" in a or "append" in a))
                                          or (e["verb"] == "tag" and "rule" in str(a.get("add", "")).split(","))):
                 who = e["by"]
-        cache[sid] = (len(w.events), who)
+        cache[sid] = (n, who, ids)
         return who
 
     @staticmethod

@@ -37,6 +37,7 @@ holder (kept, released or carried?), or for a request its asker (withdraw or kee
 the one it was asked for (release or confirm?).
 """
 
+import contextlib
 import json
 import re
 import shlex
@@ -282,8 +283,42 @@ def about_sid(w, st):
     return w.subject_of(a) if a and (a in w.nodes or a in w.subjects) else None
 
 
+_HELD = {}       # id(world) -> {card sid: [promise sids about it]}, while a lens is built on that world (it holds still)
+
+
+@contextlib.contextmanager
+def held(w):
+    """While a lens is built: which promises are about which card is read once, not once per thing shown."""
+    if id(w) in _HELD:
+        yield
+        return
+    _HELD[id(w)] = None
+    try:
+        yield
+    finally:
+        _HELD.pop(id(w), None)
+
+
+def _about_index(w):
+    out = {}
+    for x in all_sids(w):
+        card = about_sid(w, {"about": (w.subjects[x].get("props") or {}).get("about", "")})
+        if card:
+            out.setdefault(card, []).append(x)
+    return out
+
+
 def open_about(w, card_sid):
-    return [st for st in (state(w, x) for x in all_sids(w)) if is_open(st) and about_sid(w, st) == card_sid]
+    # 14 Oct (a4838): a lens asks this of every thing it shows ($asked_of); a promise's about= is its prop as stored, so
+    # only those about this card have their state read from the events (it was every promise, for every thing: 40% of
+    # a 134-thing page's build)
+    if id(w) in _HELD:
+        if _HELD[id(w)] is None:
+            _HELD[id(w)] = _about_index(w)
+        about = _HELD[id(w)].get(card_sid, [])
+    else:
+        about = _about_index(w).get(card_sid, [])
+    return [st for st in (state(w, x) for x in about) if is_open(st)]
 
 
 def testimony(w, card_sid, holder=None):
