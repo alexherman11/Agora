@@ -678,10 +678,16 @@ class Handler(SimpleHTTPRequestHandler):
             # a1473: each painted part's box ("WxH sh=.. cut=n/m" or "hidden"), and the lens frame it was painted at
             boxes = {str(k)[:200]: str(v)[:60] for k, v in list((body.get("boxes") or {}).items())[:6000]}
             p = body.get("painted") if isinstance(body.get("painted"), dict) else {}
+            # a5047: the page's inner size and device pixel ratio, with every report (a page's size is not attention)
+            g = body.get("page") if isinstance(body.get("page"), dict) else {}
+            try:
+                page = {"w": round(float(g["w"])), "h": round(float(g["h"])), "dpr": round(float(g.get("dpr") or 1), 3)} if g else None
+            except (KeyError, TypeError, ValueError):
+                page = None
             reports.keep(name, str(body.get("as") or "alex").lower(),
                          {"lens": str(body.get("lens", "")).lower(), "at": int(body.get("at", 0)),
                           "time": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
-                          "viewport": body.get("viewport"), "facts": facts, "boxes": boxes,
+                          "viewport": body.get("viewport"), "page": page, "facts": facts, "boxes": boxes,
                           "painted": {"frame": str(p.get("frame") or "")[:400], "style": str(p.get("style") or "")[:80]} if p else None})
             return self._json({"ok": True, "kept": len(facts)})
         if urlparse(self.path).path == "/api/release":

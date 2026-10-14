@@ -1,0 +1,48 @@
+font sans = Segoe UI, system-ui, sans-serif
+font mono = Cascadia Code, ui-monospace, monospace
+token paper = #F5F4F0
+token card = #FFFFFF
+token ink = #282B28
+token accent = #286655
+token soft = ink at 60%
+token faint = ink at 13%
+token wash = accent at 7%
+token focus = accent at 30%
+token scrollbar = ink at 22%
+token scrollbar_w = 5
+token gap = 8
+token ramp = 1.16
+token text = sans 15/1.6
+token text.mono = mono 12/1.5
+role desk : on paper, ink, text
+role page : on paper, ink, text, pad gap x2
+role header : pad top gap, pad bottom gap /2
+role title : text up 2 strong, ink
+role brand : text.mono down tracked, accent
+role subtitle : text down, soft, space below gap x2
+role feed : pad right gap /2
+role message : text, ink, pad gap x1.5, space below gap x2, border bottom faint
+role mine : on card, text, ink, pad gap x1.5, corner gap x1.5, space below gap x2
+role question : on wash, edge accent, corner gap
+role author : text medium, ink
+role meta : text down, soft
+role place : text down, accent, space below gap
+role body : text, ink, space above gap /2
+role response : text down, soft, space above gap
+role dock : on card, ink, text, pad gap x1.5, edge faint, corner gap x1.5, space above gap
+role recipient : text down medium, accent, pad left gap
+role shortcuts : space above gap /2, space below gap
+role tool : text down, soft, pad gap /2
+role attachment : on wash, pad gap, corner gap, space below gap
+role composer : text, ink, on card
+role button : on accent, card, text down medium, pad gap, pad left gap x2, pad right gap x2, corner gap
+role hint : text down, soft, space above gap
+role activity : text down, accent, space below gap
+role mark : ink
+role menu.item : text down, ink, pad gap
+role popup : on card, edge faint, corner gap, pad gap
+theme dark of conversation-style
+  token paper = #1D211F
+  token card = #272D29
+  token ink = #E8EBE6
+  token accent = #8DCDB4

@@ -61,6 +61,7 @@
   .menu-draft { position: fixed; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box; }
   .menu-draft[hidden], .composer-actions[hidden] { display: none; }
   .explicit-composer textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; font: inherit; color: inherit; background: transparent; border: 0; }
+  .explicit-composer textarea:focus-visible { outline: 2px solid var(--t-focus, currentColor); outline-offset: 2px; border-radius: .3em; }
   .explicit-composer[data-composing="true"] { opacity: 1 !important; } /* an open draft outlives a shy role's hover */
   .composer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5em; }
   .composer-actions button:disabled { opacity: .5; cursor: default; }
