@@ -29,7 +29,8 @@
 //  7. Every new word gets a test from an imagined real use, its row in docs/Current Implementation.md, and a Rough
 //     spots note (f747) naming what was missing. Try it in a scratch lens before a shared one.
 //  Smells: a lens or role name in source; behaviour that depends on DOM nearness; a fix to your own fix within a day;
-//  a painter global that two parts read.
+//  a painter global that two parts read; a default filled in by the compiler read as if the lens had said it (14 Oct:
+//  "a text whose lens says commit enter" read every editable text, and documents stopped saving on leaving).
 (async () => {
   const q = new URLSearchParams(location.search);
   const session = q.get("session") || "lens", who = q.get("as") || "alex", lens = q.get("lens") || "notes";
@@ -433,10 +434,12 @@
     el.addEventListener("blur", () => {
       if (V.repainting) return;      // a repaint moved it; the person is still editing it
       // 14 Oct (Pike: a lone '@' was sent twice from Alex's composer): the window losing focus (a key that opens the
-      // window's menu, another program) blurs the text too, and is not the person putting it down. And a text whose
-      // lens says `commit enter|ctrl-enter` is sent by that key only; leaving it keeps the draft
+      // window's menu, another program) blurs the text too, and is not the person putting it down. A text whose lens
+      // says `commit enter only` (a message) is sent by that key only, and leaving it keeps the draft; any other text
+      // is saved on leaving, as an editor does. (From 09:26 to the fix the first rule held for every text, and words
+      // edited in a document were not saved on leaving: a fix that read a default as a lens's word.)
       const committing = el._committing; el._committing = false;
-      if (!document.hasFocus() || (el._n.paint.commit && el._n.paint.commit !== "explicit" && !committing)) { V.hold = null; return; }
+      if (!document.hasFocus() || (el._n.paint.commit_only && !committing)) { V.hold = null; return; }
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown

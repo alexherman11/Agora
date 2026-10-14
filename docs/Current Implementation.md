@@ -460,7 +460,7 @@ A new paint word needs only a table row, because `PAINT_WORDS` passes it through
 
 A gesture is a desk command written in the lens, and `do` is implied unless the line starts with a reading command.
 - `click` fills `$x $y`.
-- `edit` fills `$value`. It commits on Enter or Ctrl-Enter (`paint.commit`); `on edit` on clamped text is refused.
+- `edit` fills `$value`. It commits on Enter or Ctrl-Enter (`paint.commit`), and on leaving the text; `on edit` on clamped text is refused. Since 14 Oct `commit enter only` (or `ctrl-enter only`) is for a message: only the key sends it, and leaving keeps the draft (`paint.commit_only`). The window losing focus never sends.
 - `drag` fills `$x $y`, and is painted only on a node with a box.
 - `key` (7 Oct, 3109985): `on key <Enter|Tab|Shift+Tab|Backspace> do <command>`, on a text that also has `on edit`. The command may name `$head` and `$tail`, the words either side of the caret; Backspace is handed over only at the very start of the text.
 - `on click press <Ctrl+B|Ctrl+I|Ctrl+K>` makes a button that presses that key in the text the caret is in. It is the painter's own act: the line is never sent to the desk.

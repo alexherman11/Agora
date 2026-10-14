@@ -118,7 +118,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "light")   # fold_open and fold_float are fold's modifiers
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
@@ -841,9 +841,14 @@ def _w_light(node, p, val, n, env):
 
 
 def _w_commit(node, p, val, n, env):
-    if val not in ("explicit", "enter", "ctrl-enter"):
-        raise LensRefusal(f"line {n}: `commit explicit|enter|ctrl-enter`; got {p!r}")
-    node["commit"] = val
+    # 14 Oct: `commit enter only` (or ctrl-enter only): the key sends and nothing else does; leaving the text keeps the
+    # draft. For a message, which is an act toward someone; an edit of words already there is saved on leaving too
+    m = re.fullmatch(r"(explicit|enter|ctrl-enter)( only)?", val.strip())
+    if not m or (m.group(2) and m.group(1) == "explicit"):
+        raise LensRefusal(f"line {n}: `commit explicit|enter|ctrl-enter [only]`; got {p!r}")
+    node["commit"] = m.group(1)
+    if m.group(2):
+        node["commit_only"] = True
 
 
 def _w_hint(node, p, val, n, env):
@@ -1215,7 +1220,7 @@ WORDS = {
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
-    "commit": ("commit explicit|enter|ctrl-enter", _w_commit),
+    "commit": ("commit explicit|enter|ctrl-enter [only]", _w_commit),
     "share": ("share <weight>", _w_share),
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
@@ -2091,6 +2096,8 @@ def emit(node):
         if "edit" in ons:
             mx = (node.get("lines") or [1, 1])[1]
             paint["commit"] = node.get("commit") or ("enter" if (not node.get("lines") or mx == 1) else "ctrl-enter")
+            if node.get("commit_only"):
+                paint["commit_only"] = True
         if "click" in ons:
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:

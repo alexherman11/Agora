@@ -140,6 +140,16 @@ try:
 except scene.LensRefusal as e:
     check("a `when` that is not an expression is refused when the lens is read", "when" in str(e), e)
 
+# 14 Oct: a message is sent by its key only (`commit enter only`); an edit of words already there says nothing and is
+# saved on leaving too. The compiler fills `commit` for every edited text, so the painter must not read that as the lens's word
+CM = chr(10).join(["w : column", '  say : text ""', "    commit enter only", f'    on edit do append {TALK} line="$value"',
+                   '  doc : text "$text"', f"    the {PARA}", '    on edit do rewrite $item text="$value"'])
+csc = lens_ir.evaluate(D, CM)
+scene.emit(csc)
+cp = {k["key"].split("/")[-1]: k["paint"] for k in scene.painter_view(csc)["kids"]}
+check("`commit enter only` reaches the paint; an edit that said nothing is not `only`",
+      cp["say"].get("commit_only") is True and cp["doc"].get("commit") == "enter" and not cp["doc"].get("commit_only"), cp)
+
 # `on select`: the gesture is offered like any, and the lens says where a highlight is kept (here, a prop on a desk
 # note of the viewer's own), so a second template lights it beside the passages talked about
 txt, err = say(A, f"look {CORNER} :1", f'do create {CORNER} kind=note title="mine" text="" role=reviewer quoting={PARA} quote="The builder"')[-1]

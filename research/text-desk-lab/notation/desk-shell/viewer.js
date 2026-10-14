@@ -218,6 +218,12 @@ const Viewer = (session, who, lens, said, status) => {
       // has its key, else to the one now at its place among its siblings, else to its parent; never to the page's top
       const fk = ed && ed.dataset && ed.dataset.key, up = fk && ed.parentElement, at = up ? [...up.children].indexOf(ed) : -1;
       const pk = up && up.dataset && up.dataset.key;
+      // 14 Oct (Alex: 'cursor keeps jumping to the beginning of the line'): a text being written that is made again
+      // took focus at its start; the caret is carried as a count of characters into the words, so it lands where it was
+      let off = null;
+      if (ed && ed.isContentEditable && s.rangeCount && ed.contains(s.focusNode)) {
+        const r = document.createRange(); r.selectNodeContents(ed); r.setEnd(s.focusNode, s.focusOffset); off = r.toString().length;
+      }
       const places = v.places();
       v.repainting = true;
       try {
@@ -227,6 +233,13 @@ const Viewer = (session, who, lens, said, status) => {
           const q = k => document.querySelector(`[data-key="${CSS.escape(k)}"]`), same = q(fk), parent = pk && q(pk);
           const next = same || (parent && (parent.children[at] || parent.children[at - 1])) || parent;
           if (next) { if (!next.hasAttribute("tabindex") && !next.isContentEditable && !/^(BUTTON|A|INPUT|TEXTAREA)$/.test(next.tagName)) next.tabIndex = -1; next.focus(); }
+          if (next && next === same && off != null && next.isContentEditable) {
+            const w = document.createTreeWalker(next, NodeFilter.SHOW_TEXT); let t, left = off;
+            while ((t = w.nextNode()) && left > t.length) left -= t.length;
+            if (t) s.collapse(t, left); else { s.selectAllChildren(next); s.collapseToEnd(); }
+            v.place(places);
+            return;
+          }
         }
         v.place(places);
         const moved = sel && (s.anchorNode !== sel[0] || s.anchorOffset !== sel[1] || s.focusNode !== sel[2] || s.focusOffset !== sel[3]);
