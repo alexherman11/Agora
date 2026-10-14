@@ -1090,12 +1090,13 @@ class Desk:
         if s.get("comments"):
             out += "\ncomments:"
             for c in s["comments"]:
-                out += f"\n  {c['id']} {persons.comment_by(w, c)}: {c['text']}" + (" (resolved)" if c["resolved"] else " (open)")
+                out += f"\n  {c['id']} {persons.comment_by(w, c)}: {c['text']}" + (" (resolved" if c["resolved"] else " (open") \
+                    + (f", mark={c['mark']})" if c.get("mark") else ")")          # a5007: mark=ask, a question
                 if c.get("image"):
                     from image_comments import describe
                     out += "\n      " + describe(c["image"])
                 for i, r in enumerate(c["replies"]):
-                    out += f"\n      {persons.reply_by(w, c, i)}: {r['text']}"
+                    out += f"\n      {persons.reply_by(w, c, i)}: {r['text']}" + (f" (mark={r['mark']})" if r.get("mark") else "")
         links = w.links_of(s["id"])
         if links:
             out += "\nlinks:"
@@ -1507,7 +1508,7 @@ class Desk:
                         f"{self._title_line(ev['target'])}), then undone. history {rid} shows both")
             owner, c = obj
             out.append(f"{rid} comment by {persons.comment_by(w, c, ev)} on {self._title_line(owner['id'])} · "
-                       + ("resolved" if c["resolved"] else "open"))
+                       + ("resolved" if c["resolved"] else "open") + (f" · mark={c['mark']}" if c.get("mark") else ""))
             out.append("  " + c["text"].replace("\n", "\n  "))
             if c.get("image"):
                 from image_comments import describe

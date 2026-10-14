@@ -772,7 +772,7 @@ class World:
     def content_verbs(self, sid):
         s = self.subjects[sid]
         v = {"markread": "id=<cNN> through=<eNN>  (read through a displayed message, for the caller; does not answer)",
-             "comment": "line=<str> [id=<cNN>] [to=<names>]  (a signed comment; with id=, an open-thread reply; to= overrides header and thread recipients)",
+             "comment": "line=<str> [id=<cNN>] [to=<names>] [mark=ask]  (a signed comment; with id=, an open-thread reply; to= overrides header and thread recipients; mark=ask: a question)",
              "link": "to=<id> as=blocks|refers|answers|part-of  (a connection to another thing)"}
         if any(not c["resolved"] for c in s["comments"]):
             v["resolve"] = "id=<cNN> [line=<str>]  (close a comment, optionally with a reply)"
@@ -1083,6 +1083,10 @@ class World:
             own = own if own and own.group(1).casefold() == str(actor).casefold() else None
             if own:
                 line = line[own.end():]
+            # a5007 (Alex, a4934: 'the asker is woken for two things only: the builder has a question, or it has landed'):
+            # mark= says what a comment is, as a chat line's field does; mark=ask, a question, is the one the house reads
+            # (rooms.builder_quiet). Until now a comment took mark= and dropped it without a word.
+            mark = str(args.get("mark", "")).strip().lower()
             # 13 Oct (Alex: 'can we make it so the agents can reply in line ... reply to the comments'): with id=<cNN> the
             # words are a reply under that comment, which stays open. Until now a reply could only be given by closing
             # it (resolve line=). Replies use their explicit address or the original thread partners.
@@ -1094,13 +1098,15 @@ class World:
                 if c["resolved"]:
                     raise Refusal(f"{rid} is resolved; a reply is given to an open comment (undo the resolve, or comment anew)")
                 me = "alex" if actor in ("jeff", "alex") else actor
-                c["replies"].append({"by": me, "text": line})
+                c["replies"].append({"by": me, "text": line, **({"mark": mark} if mark else {})})
                 s["rev"] += 1
                 for a in apps:
                     self._bump(a)
                 reply_args = {"id": rid, "line": line}
                 if "to" in args:
                     reply_args["to"] = args["to"]
+                if mark:
+                    reply_args["mark"] = mark
                 ev = self._event("comment", via or sid, reply_args, {"drop_reply": rid}, actor)
                 ev["changed"] = [sid] + apps
                 import rooms
@@ -1116,6 +1122,8 @@ class World:
             ev = self.events[-1]
             if "to" in args:
                 ev["args"]["to"] = args["to"]
+            if mark:
+                ev["args"]["mark"] = s["comments"][-1]["mark"] = mark
             names = to_names(args["to"]) if "to" in args else written(ev)[0]
             ev["to"] = [n for n in names if n not in rooms.EVERYONE and rooms.someone(self, n)
                         and not rooms.same_person(self, n, str(actor).split("/")[0])]
