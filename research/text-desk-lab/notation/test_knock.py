@@ -142,8 +142,9 @@ check("Juniper's @pike: one knock event, target and cause her line's event, line
       len(k) == 1 and k[0]["target"] == eid and k[0]["cause"] == eid and k[0]["args"] == {"line": mid, "pike": "woken"}
       and k[0]["by"] == "house" and k[0]["knocked"] == [PIKE], k)
 got = sent(PIKE)
-check("Pike's wake begins with the line that caused it, by id; 'for you while you rested' follows",
-      got.splitlines()[0] == f"~ woken by juniper's line {mid} ({eid}) in \"Lounge talk\""
+IT_IS = r" · it is \d{1,2} [A-Z][a-z]{2}, \d\d:\d\d"       # a4473: the time now ends the wake's first line
+check("Pike's wake begins with the line that caused it, by id, and the time now; 'for you while you rested' follows",
+      re.fullmatch(re.escape(f"~ woken by juniper's line {mid} ({eid}) in \"Lounge talk\"") + IT_IS, got.splitlines()[0])
       and got.splitlines()[1] == "for you while you rested (1):" and "@pike the lens" in got, got[:500])
 hist = H.act("sable", f"history {PIKE}")
 check("history <Pike's corner> shows the knock with the line's id", f"knock {eid} line={mid} pike=woken by house" in hist, hist)
@@ -271,7 +272,7 @@ if nid:
     H.step()
     got = sent(PIKE)
     check("an @pike header in a comment: 'pike: woken', and the wake begins '~ woken by juniper's comment (eN) on ...'",
-          what(e["id"]) == {"pike": "woken"} and got.splitlines()[0] == f"~ woken by juniper's comment ({e['id']}) on \"a3150 knock test\"",
+          what(e["id"]) == {"pike": "woken"} and re.fullmatch(re.escape(f"~ woken by juniper's comment ({e['id']}) on \"a3150 knock test\"") + IT_IS, got.splitlines()[0]),
           (what(e["id"]), got[:300]))
     n = len(knocks())
     H.act("juniper", f"do comment {nid.group(1)} line=\"a comment that names no one\"")
@@ -282,6 +283,26 @@ if nid:
           and "knock e" not in got and "knock in" not in got, got[:600])
 else:
     check("made a note to comment on", False, note)
+
+# 8b. a4473: every wake by a call ends its first line with the time now and adds no line: a comment on a thing in his
+# own corner, a worker's comment on his commission, wake <name>
+mine = re.search(r"created (a\d+)", H.act("pike", f"do create {PIKE} kind=note title=\"a4473 mine\" text=\"a note\""))
+job = re.search(r"created (a\d+)", H.act("pike", f"do create {w.nodes[LOUNGE]['parent']} kind=task title=\"a4473 job\" asked_by=pike"))
+for name, who, target, first, rows in (
+        ("a comment on a thing in his own corner", "juniper", mine, r"~ woken by juniper's comment \(e\d+\) on \"a4473 mine\"", 2),
+        ("a worker's comment on his commission", "worker-a1", job, r"~ woken by worker-a1's comment \(e\d+\) on \"a4473 job\"", 2)):
+    rest(PIKE)
+    got = H.act(who, f"look {target.group(1)} :1; do comment {target.group(1)} line=\"a word on it\"") if target else "not made"
+    H.step()
+    lines = sent(PIKE).splitlines()
+    check(f"{name}: the wake's first line ends with the time now, and the wake is {rows} lines, as before",
+          len(lines) == rows and re.fullmatch(first + IT_IS, lines[0]) and "a word on it" in lines[1], (got[-300:], lines))
+rest(PIKE)
+H.act("juniper", "wake pike")
+H.step()
+lines = sent(PIKE).splitlines()
+check("wake pike: its one line '~ juniper woke you (wake, eN)' ends with the time now",
+      len(lines) == 1 and re.fullmatch(r"~ juniper woke you \(wake, e\d+\)" + IT_IS, lines[0]), lines)
 
 # 9. the reading the record uses is the knock's own: every 'woken' was sent something, across this whole run
 wl = H.load()

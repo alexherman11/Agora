@@ -126,8 +126,11 @@ got = sent(PIKE)
 lines = got.splitlines()
 check("Juniper's @pike reaches Pike at once, and his rest ends", "@pike the lens" in got
       and not res(PIKE).state.get("rest_until") and not res(PIKE).state.get("for_you"), (got[:600], res(PIKE).state.get("rest_until")))
-check("a3150: the wake's first line names the line that caused it, by its ids",
-      bool(lines) and re.fullmatch(r"~ woken by juniper's line m\d+ \(e\d+\) in \"Lounge talk\"", lines[0]), got[:600])
+IT_IS = r" · it is \d{1,2} [A-Z][a-z]{2}, \d\d:\d\d"       # a4473: the time now ends the wake's first line
+n_lines = len(lines)
+check("a3150: the wake's first line names the line that caused it, by its ids; a4473: and ends with the time now",
+      bool(lines) and re.fullmatch(r"~ woken by juniper's line m\d+ \(e\d+\) in \"Lounge talk\"" + IT_IS, lines[0]), got[:600])
+check("a4473: the time adds no line: the wake is its first line, the heading and the one line kept", n_lines == 3, got[:600])
 check("the line comes next, under 'for you while you rested', with its chat and time",
       len(lines) > 2 and lines[1] == "for you while you rested (1):" and "Lounge talk" in lines[2]
       and "@pike the lens" in lines[2] and re.search(r"~ \d\d:\d\d in chat", lines[2]), got[:600])
@@ -170,8 +173,8 @@ if BOOK:
           and ev["by"] == "juniper" and ev.get("via") == "wake" and ev["args"].get("call") == "juniper", ev)
     H.step()
     got = sent(PIKE)
-    check("Pike's wake names Juniper and the line she left", got.startswith("~ juniper woke you (wake, e")
-          and "for the line they left you:" in got.splitlines()[0] and "notes from this morning" in got.splitlines()[1], got[:600])
+    check("Pike's wake names Juniper, the time now (a4473) and the line she left",
+          re.match(r"~ juniper woke you \(wake, e\d+\)" + IT_IS + ", for the line they left you:$", got.splitlines()[0]) and "notes from this morning" in got.splitlines()[1], got[:600])
     check("the call is cleared once delivered", "call" not in (H.load().nodes[PIKE].get("props") or {}), H.load().nodes[PIKE].get("props"))
 
     # a timed rest's end: a held line is first, after who he is and how long he rested, before the wake's own look
