@@ -189,6 +189,7 @@ said("pike", "look lounge")
 got = said("pike", f'do append {TALK} line="pike, having looked from Home"')
 check("look lounge from Home, then speak there: the receipt names no unread lines",
       not got[2] and "haven't" not in got[1] and "from others" not in got[1], got)
+reply("sable", f"read {TALK}")       # a5068: Pike spoke since Sable last read; unread, her line would wait
 reply("sable", f'do append {TALK} line="{" ".join(["long"] * 50)}"')
 said("pike", "look lounge")
 got = said("pike", f'do append {TALK} line="again"')

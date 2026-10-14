@@ -325,7 +325,10 @@ def v_unfold(w, nid, a):
 
 @verb("append", ["text"], "Add a line at the end of the text. Edits the subject: every appearance changes. "
       "On a chat the world signs the line with your name (type only your words; a 'Name:' of your own is dropped), "
-      "and adding a line is never refused as stale, since it replaces nothing; rewriting a chat is still fenced. "
+      "Adding a line replaces nothing, so it is never refused as stale; but an agent's line waits if someone else "
+      "spoke there since the agent last read the chat (a resident: since its turn began): it is not added, the receipt "
+      "prints what they said, and the same line sent again goes as written (a person's line never waits; a line with "
+      "reply_to=m<n> counts that line as read). Rewriting a chat is still fenced. "
       "A chat line is a thing (m<n>): who it addresses is its header, the @names that open it ('@sable @pike: ...'; "
       "an @ later is a mention and calls no one), or to=<names> said outright (to=nobody for no one); with neither, "
       "a line in a private chat (members=<names>, not all) goes to its other members; the receipt "
@@ -336,7 +339,8 @@ def v_append(w, nid, a):
 
 
 CHAT_RULES = ("the world signs each line with who added it (type only your words); adding a line is never refused "
-              "as stale, rewriting the chat is; each line is a thing (m<n>) that keeps who it addresses (the @names that "
+              "as stale, rewriting the chat is; an agent's line waits once if someone else spoke since it last read the "
+              "chat (it is shown what they said; the same line again goes as written); each line is a thing (m<n>) that keeps who it addresses (the @names that "
               "open it, or to=), and a changed line shows 'edited' and keeps its words")
 
 
@@ -356,7 +360,10 @@ def unanswered(w, sid, me="alex"):
       "to= names recipients explicitly (to=nobody calls no one); otherwise a leading @header names them. "
       "An unaddressed reply goes to the original thread partners, excluding you. Read and rows comments:/replies: "
       "show the same native thread to every lens and tool. mark= says what it is (mark=ask: a question; on a commission, "
-      "a builder's comment wakes its asker only when it asks).", "line=<str> [id=<cNN>] [to=<names>] [mark=ask]",
+      "a builder's comment wakes its asker only when it asks). An agent's reply waits if someone else replied in the "
+      "thread since the agent last read it (read <thing> or examine <cNN>; a resident: since its turn began): it is "
+      "not added, the receipt prints their replies, and the same reply sent again goes as written. A person's never "
+      "waits.", "line=<str> [id=<cNN>] [to=<names>] [mark=ask]",
       'do comment a20 line="Which timezone?" to=pike')
 def v_comment(w, nid, a):
     return _prim(w, "comment", nid, a)

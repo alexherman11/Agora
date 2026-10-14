@@ -222,7 +222,7 @@ def unmarked_in(reply):
     return n
 
 
-def deskd_do(world, who, text, whole=False, stored=None, kind=None):
+def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
     """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
     or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736).
     kind (a3204): the line is signed `who` but is the house's own, 'rest' or 'wake'; it is sent as by=house with that
@@ -237,6 +237,7 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None):
     for k, line in enumerate(lines):
         body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply,
                            **({"stored": stored} if stored else {}),
+                           **({"as_of": as_of} if as_of is not None else {}),
                            **({"by": "house", "kind": kind} if kind else {})}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
@@ -589,16 +590,19 @@ class House:
             self.desk, self.mtime = export_docs.load(self.world), m
         return self.desk.world
 
-    def act(self, who, line, whole=False, stored=None, kind=None):
+    def act(self, who, line, whole=False, stored=None, kind=None, as_of=None):
         """Desk lines as `who`. Through deskd when it is up, so residents and the painter run the same code (one host);
         otherwise the same path a desk tool call takes, one fresh process per call. whole (a736): each line is one
         command, a ; in it is words; for a resident's > lines. The house's own lines (wake strings) keep ; as a
         separator. stored (a1156): the node whose stored line this is (a corner, for its wake): it stands there and
         its words mean what they were bound to when it was set. kind (a3204): a line the house sends as a resident
-        that is not the resident's own: 'rest' (its answer is only logged) or 'wake' (its answer opens their wake)."""
-        text = deskd_do(self.world, who, line, whole, stored, kind)
+        that is not the resident's own: 'rest' (its answer is only logged) or 'wake' (its answer opens their wake).
+        as_of (a5068): where the resident's turn began, the event count its news had reached when the turn's input was
+        sent; its chat lines and thread replies are judged on what that turn was shown."""
+        text = deskd_do(self.world, who, line, whole, stored, kind, as_of)
         if text is None:
-            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored})
+            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored,
+                                         **({"as_of": as_of} if as_of is not None else {})})
         return text
 
     def misses(self, r, actor, lines):
@@ -1124,7 +1128,8 @@ class House:
             return
         attempts, rest = rest_in(commands_in(text))
         n0 = len(w.events)
-        receipt = self.act(actor, "\n".join(attempts), whole=True) if attempts else ""
+        # a5068: news runs only between turns, so the cursor is where this turn's input left off (a2870 Revision 2)
+        receipt = self.act(actor, "\n".join(attempts), whole=True, as_of=r.state.get("cursor")) if attempts else ""
         if attempts and any(e.get("by") == actor and e.get("verb") != "go" for e in self.load().events[n0:]):
             r.state["idle_wakes"] = 0         # it changed something: an open objective asks again after `breather`
         # Sable c742: a > line nothing answers (a quote) says MISS and stops nothing after it; the desk decides, since
