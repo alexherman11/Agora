@@ -3,6 +3,8 @@
 A LENS is a short text that says how some part of the world is shown and what each gesture means. It lives in
 the world as an ordinary note tagged `lens`, so it is edited with desk commands, undone, forked in a worktree,
 and read by anyone. A lens is not code. The host that interprets it is small, fixed, and knows no app.
+Before adding a word here, read the guidance at the top of desk-shell/lens.js (14 Oct): name the missing capability,
+not the case; shared state is world data; one rule beats a guess.
 
     world + lens  ->  SCENE  ->  text   (scene <lens>, what an agent reads)
                              ->  pixels (desk-shell/lens.html, a generic painter)
@@ -93,9 +95,11 @@ the one form. The words:
                                  can quote what was highlighted in it
     on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
-    on <gesture> do <command>    click | edit | drag. The command is a desk verb line (`do` is implied); the painter
-                                 fills $x $y (drag, click) and $value (edit) at the moment of the gesture. A gesture
-                                 carries the item revision and the lens revision it was painted under; stale is refused.
+    on <gesture> do <command>    click | edit | drag | select. The command is a desk verb line (`do` is implied); the painter
+                                 fills $x $y (drag, click) and $value (edit; select: the words highlighted) at the moment
+                                 of the gesture. A gesture carries the item revision and the lens revision it was painted
+                                 under; stale is refused.
+    on <gesture> when <test> do  the gesture is there only where the test holds (can't tell is not), as `only when` judges
 
 Every placed part carries the world's visibility facts (= offscreen-part, 43% hidden by f52). Painters report what
 only they know back through POST /api/observe; the scene prints it per viewer as ~ (viewport, cut by the clamp,
@@ -115,7 +119,11 @@ import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "light")   # fold_open and fold_float are fold's modifiers
-GESTURES = ("click", "edit", "drag", "menu", "key", "open")
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
+# 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
+# too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
+# the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
+# kept is the lens's word (a prop on the viewer's own desk, a line, a thing), so it is world data anyone can read.
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands to its lens (7 Oct: a document's keys)
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
@@ -252,7 +260,7 @@ SOURCES = {
                                                     "answered", "edited", "before", "state", "eid", "thread")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
-    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid", "about", "quote", "mark")),
+    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),   # and each line's own fields
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room", "item")),   # item: the corner, so a gesture on a row acts on it (30 Sep, wake/rest)
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
@@ -520,9 +528,23 @@ def line_rows(desk, chat=None):
                         "at": _clock(e.get("at", "")) if e else "", "to": ", ".join(l["to"]),
                         "said": l["text"][m.end():] if m else l["text"], "edited": "edited" if l.get("edited") else "",
                         "reply_to": l.get("reply_to", ""), "eid": l.get("ev") or l["id"], "_t": (e or {}).get("at", ""),
-                        "about": l.get("about", ""), "quote": l.get("quote", ""), "mark": l.get("mark", "")})
+                        **line_fields(l)})
     out.sort(key=lambda r: r.pop("_t") or "")
+    # 14 Oct: a line's own fields (about=, quote=, mark=, or any a writer gave) are row fields; a line without one
+    # reads it as empty, as long as some line here has it
+    extra = sorted({k for r in out for k in r} - set(SOURCES["lines"][1]))
+    for r in out:
+        for k in extra:
+            r.setdefault(k, "")
     return out
+
+
+def line_fields(l):
+    """A chat line's own fields (world.py LINE_OWN says which words are not fields). Lines of 13 Oct kept about, quote
+    and mark beside the text; since 14 Oct any field is kept under `fields`."""
+    own = {k: l[k] for k in ("about", "quote", "mark") if l.get(k)}
+    own.update({k: v for k, v in (l.get("fields") or {}).items() if k not in SOURCES["lines"][1]})
+    return own
 
 
 def away(desk):
@@ -705,6 +727,8 @@ def rows_text(desk, source):
     if rs is None:
         raise LensRefusal("rows <source> [k=v k<v ...]. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
     fields = SOURCES[source_head(source)][1]
+    if source_head(source) == "lines":          # 14 Oct: and the fields the lines were given
+        fields = fields + tuple(sorted({k for r in rs for k in r} - set(fields)))
     lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
     for r in rs:
         lines.append("  " + " · ".join(f"{f}={str(r.get(f, ''))[:60]!r}" if " " in str(r.get(f, "")) else f"{f}={str(r.get(f, ''))[:60]}" for f in fields if f != "text" or len(fields) < 6))
@@ -809,10 +833,11 @@ def _w_lines(node, p, val, n, env):
 def _w_light(node, p, val, n, env):
     # 13 Oct (Alex: comments live on the text): `light "<passages>"` lights each passage named, one a line, where it
     # stands in this part's words; a template filled as text is (`light "$(spots)"`). Paint only: the words are unchanged
-    m = re.fullmatch(r'"([^"]*)"', val)
-    if not m or not m.group(1):
-        raise LensRefusal(f'line {n}: `light "<passages, one a line>"` (a template: light "$(spots)"); got {p!r}')
-    node["light"] = m.group(1)
+    # 14 Oct: more than one template, each its passages (light "$(spots)" "$(mine)")
+    parts = re.findall(r'"([^"]*)"', val)
+    if not parts or not any(parts) or re.sub(r'"[^"]*"', "", val).strip():
+        raise LensRefusal(f'line {n}: `light "<passages, one a line>" ["<more>" ...]` (a template: light "$(spots)"); got {p!r}')
+    node["light"] = chr(10).join(x for x in parts if x)
 
 
 def _w_commit(node, p, val, n, env):
@@ -1145,6 +1170,12 @@ def _w_on(node, p, val, n, env):
         return
     g, do, cmd = val.partition(" do ")
     drop_part = label = when = None
+    # 14 Oct (Alex: comments from the right-click box 'go to the ether' on a design, whose margin is not shown; then
+    # 'make those changes more general purpose'): any gesture may say `when <test>`, and is there only where the test
+    # holds (can't tell is not), so one part can act one way on a plain document and another on a design
+    m = re.fullmatch(r'((?:menu\s+"[^"]+")|[^"]*?)\s+when\s+(.+)', g.strip())
+    if m:
+        g, when = m.group(1), m.group(2)
     if g.startswith("key "):
         label, g = g[4:].strip(), "key"
         if label not in KEYS:
@@ -1152,15 +1183,17 @@ def _w_on(node, p, val, n, env):
     if g.startswith("drop "):
         drop_part, g = g[5:].strip(), "drop"
     if g.startswith("menu "):
-        # 14 Oct (Alex: comments from the right-click box 'go to the ether' on a design, whose margin is not shown):
-        # `on menu "<label>" when <test> do ...` offers the entry only where the test holds, so one part can comment
-        # in the margin on a plain document and speak in the conversation on a design
-        m = re.fullmatch(r'"([^"]+)"(?:\s+when\s+(.+))?', g[5:].strip())
+        m = re.fullmatch(r'"([^"]+)"', g[5:].strip())
         if not m:
             raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
-        label, when, g = m.group(1), m.group(2), "menu"
+        label, g = m.group(1), "menu"
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
-        raise LensRefusal(f"line {n}: `on <click|edit|drag> do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
+    if when:
+        try:
+            X.parse(when)
+        except X.ExprError as e:
+            raise LensRefusal(f"line {n}: `when {when}`: {e}")
     cmd = cmd.strip()
     if g == "drop" and len(split_batch(cmd)) > 1:
         raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
@@ -1531,6 +1564,11 @@ def _fill(tpl, ctx, track=None):
             return "" if v is None else str(v)
         if a in ctx and track is not None:
             track.setdefault("own", set()).add(a)
+        if a not in ctx and (frames.get(a) or {}).get("id"):
+            # 14 Oct: a frame's bare name is its thing, as $item is the current one (`on select do prop $r ...`)
+            if track is not None:
+                track["frames"].add(a)
+            return str(frames[a].get("item") or frames[a]["id"])
         return str(ctx[a]) if a in ctx else m.group(0)
 
     return _VAR.sub(rep, tpl)

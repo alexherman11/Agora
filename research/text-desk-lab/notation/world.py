@@ -114,6 +114,8 @@ def mentions(text, writer=None):
 
 
 MENTION_NOTE = "a mid-line @ is a mention ({}); put names first to call them"
+# append's own words, never a chat line's fields (14 Oct: a line takes any other field, as a thing takes props)
+LINE_OWN = {"line", "text", "append", "to", "reply_to", "section", "signed", "line_id", "no_one", "fields", "id"}
 
 
 def to_names(value):
@@ -1175,10 +1177,13 @@ class World:
                     out.append(str(args.get("line", args.get("text", ""))))
             args = {"text": "\n".join(out)}
             verb = "edit"
-        line_args = {k: args[k] for k in ("to", "reply_to", "about", "quote", "mark") if k in args}       # a1581: a chat line's own words
-        # 13 Oct (Alex: a conversation about a design, where a message may point at a passage): a line may say what it
-        # is about (a thing's id), the words of it meant (quote=), and what it is (mark=ask: it wants an answer;
-        # mark=folded: the point was taken into the thing, nothing is asked)
+        line_args = {k: args[k] for k in ("to", "reply_to") if k in args}       # a1581: a chat line's own words
+        # 13 Oct (Alex: a conversation about a design, where a message may point at a passage), made general 14 Oct (Alex:
+        # 'make those changes more general purpose'): a chat line takes fields of its own, as a thing takes props
+        # (about=a42 quote="..." mark=ask). The world judges only about=, which names a thing; what any other field
+        # means is the lens's and the help's to say. A field is a lower-case word that is not one of append's own.
+        line_fields = {k: str(v).strip() for k, v in args.items()
+                       if k not in LINE_OWN and re.fullmatch(r"[a-z][a-z0-9_]*", k) and str(v).strip()} if verb == "append" else {}
         if verb == "append":
             args = {"append": args.get("line", args.get("text", args.get("append", "")))}
             verb = "edit"
@@ -1249,13 +1254,9 @@ class World:
                     # Sable c1579: the line's identity is minted with the press, so a press sent twice is one line
                     return {"ok": True, "event": None, "changed": [],
                             "note": f"already said, as {done['id']} ({done.get('ev')}): this press made that line; nothing new was done"}
-                about = str(line_args.get("about", "")).strip()
+                about = line_fields.get("about", "")
                 if about and about not in self.nodes and about not in self.subjects:
                     raise Refusal(f"about={about} is no thing here (a line is about a thing's id: a12, f3)")
-                if str(line_args.get("mark", "")).strip() not in ("", "ask", "folded"):
-                    raise Refusal("mark= is ask (it wants an answer) or folded (the point was taken in; nothing is asked)")
-                if str(line_args.get("quote", "")).strip() and not about:
-                    raise Refusal("quote= names words of the thing the line is about: say about=<id> too")
                 reply = str(line_args.get("reply_to", "")).strip()
                 if reply and self.find_line(reply)[1] is None:
                     raise Refusal(f"reply_to={reply} is not a chat line's id (a line's id is m<n>: examine a chat's line, or read its receipt)")
@@ -1293,8 +1294,9 @@ class World:
                             to = rooms.private_others(self, s, actor)
                             if to:
                                 why_to = f" (this chat's other member{'s' if len(to) > 1 else ''})"
-                        # 13 Oct: a chat with with=<names> (a design's conversation: Alex and its author) is open to
-                        # anyone, and a line with no header reaches those names; one that opens with @names is for them (as anywhere)
+                        # 13 Oct: with=<names> is a chat's standing audience, as members= is a private chat's: a line
+                        # with no header and no to= reaches them; one that opens with @names is for those names (as
+                        # anywhere). Any chat may say it; the design conversations were the first to
                         withs = [n.strip().lower() for n in str((s.get("props") or {}).get("with", "")).split(",") if n.strip()]
                         if withs and "to" not in line_args and not header(line)[0]:   # 14 Oct (Pike): a line that opens with names is for them only
                             more = [n for n in withs if n not in to and not rooms.same_person(self, n, str(actor).split("/")[0]) and rooms.someone(self, n)]
@@ -1304,9 +1306,9 @@ class World:
                         new_line = {"id": self._id("m"), "text": line.strip("\n"), "to": to, "ev": None}
                         if str(line_args.get("reply_to", "")).strip():
                             new_line["reply_to"] = str(line_args["reply_to"]).strip()
-                        for k in ("about", "quote", "mark"):
-                            if str(line_args.get(k, "")).strip():
-                                new_line[k] = str(line_args[k]).strip()
+                        if line_fields:
+                            new_line["fields"] = dict(line_fields)
+                            args = dict(args, fields=" ".join(sorted(line_fields)))
                         if key:
                             new_line["intent"] = key
                         args = dict(args, line_id=new_line["id"], to=",".join(to) or "nobody")

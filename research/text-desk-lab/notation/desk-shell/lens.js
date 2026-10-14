@@ -8,6 +8,28 @@
 // It paints the scene's painter contract (pike-7 section 6: key, paint, acts, fence, kids) and sends gestures back as
 // desk command lines. It knows paint kinds, roles and interaction primitives, and nothing else: no app, no kind, no
 // colour, no size. `fence` is opaque: returned with a gesture, never drawn, never compared.
+//
+// BEFORE YOU ADD TO THE PAINTER OR THE COMPILER (Alex, 14 Oct: "make those changes more general purpose", and leave
+// guidance where you and workers will read it; drafted by Claude). This applies to scene.py, lens_ir.py and world.py too.
+//  1. Behaviour lives in the world. What Alex asks for should end as words in a lens, a style, a verb or a help note that
+//     a resident can change without source. Source adds vocabulary; it never answers one lens's need directly.
+//  2. Name the missing word, not the case. If your comment names one lens, one role, one document kind or one chat, the
+//     change is bespoke: find the capability underneath (a gesture, a field, a test) and add that instead.
+//     Seen 13-14 Oct: `$quoted` (the last words highlighted anywhere) became `on select`, which writes the highlight
+//     where the lens says; a chat line's about/quote/mark became any field on any line; `when` on menu entries became
+//     `when` on every gesture.
+//  3. Shared state is world data. What more than one viewer, or an agent, might read (a highlight, a choice, a mode)
+//     belongs in props, lines or things, read by ordinary $reads. The painter keeps only this viewer's hands: caret,
+//     draft, scroll, fold, the menu that is open.
+//  4. One rule that holds everywhere beats a guess. "The list nearest the sender scrolls" was a guess; "a list that
+//     keeps to its end goes there when this viewer's own gesture grows it" is a rule anyone can predict.
+//  5. Widen a word's shape before adding a sibling. A special case for one gesture or one field is a second grammar.
+//  6. The world judges only what it must (an id names a thing). What a value means (mark=ask) is the lens's and the
+//     help's to say; enumerating a lens's values in source fixes one design into the engine.
+//  7. Every new word gets a test from an imagined real use, its row in docs/Current Implementation.md, and a Rough
+//     spots note (f747) naming what was missing. Try it in a scratch lens before a shared one.
+//  Smells: a lens or role name in source; behaviour that depends on DOM nearness; a fix to your own fix within a day;
+//  a painter global that two parts read.
 (async () => {
   const q = new URLSearchParams(location.search);
   const session = q.get("session") || "lens", who = q.get("as") || "alex", lens = q.get("lens") || "notes";
@@ -52,12 +74,14 @@
       last = ""; V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true);
     }
     const t = r.text || r.error || ""; V.answered(n.key, r.error || t.startsWith("ERR") ? t : null, draft, token);
-    // 14 Oct (Alex: 'the conversation should also scroll automatically when i send'): words sent from beside a list
-    // that keeps to its end (a chat) take that list to its end, wherever the reader had scrolled it
-    const ends = []; for (let a = (kept.get(n.key) || {}).el; a && a !== paint && !ends.length; a = a.parentElement)
-      a.querySelectorAll(':scope [data-scroll="end"]').forEach(f => ends.push(f.dataset.key));
+    // 14 Oct (Alex: 'the conversation should also scroll automatically when i send'): a list that keeps to its end
+    // (scroll end) and grows by this viewer's own gesture goes to its end, wherever the reader had scrolled it
+    const had = new Map([...paint.querySelectorAll('[data-scroll="end"]')].map(f => [f.dataset.key, new Set([...f.children].map(c => c.dataset.key))]));
     await refresh(true);
-    if (!r.error && draft !== undefined) for (const key of ends) { const f = kept.get(key); if (f) f.el.scrollTop = f.el.scrollHeight; }
+    if (!r.error) for (const f of paint.querySelectorAll('[data-scroll="end"]')) {
+      const was = had.get(f.dataset.key);
+      if (was && [...f.children].some(c => c.dataset.key && !was.has(c.dataset.key))) f.scrollTop = f.scrollHeight;
+    }
     // a1008, the cause of e1851/e1852: typed words live in the element, not in its signature, so a composer whose
     // line was sent was reused still showing it, and its next blur sent it again. Once no draft holds them, they go.
     const k = kept.get(n.key), p = k && k.el._n.paint;
@@ -564,6 +588,23 @@
     if (!t || !t._n || !t._n.paint.marks) return;                // only a text that carries marks is a document's words
     TEXT.sel = sel.isCollapsed ? null : { item: (t._n.fence || {}).item, text: String(sel) };
   });
+  // `on select` (14 Oct; Alex: what he highlighted should stay lit while he writes about it, and agents should be able
+  // to highlight too): words let go of in a part's text send the nearest `on select` line with $value the words; a
+  // click there that highlights nothing sends it once with $value empty. Where it is kept is the lens's word, so a
+  // highlight is world data: it survives a repaint, and anyone (an agent too) can read or write it.
+  let selSent = "";
+  function selectGesture() {
+    const sel = getSelection(), at = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    let k = at && at.closest && paint.contains(at) ? at.closest("[data-key]") : null;
+    while (k && !(k._n && k._n.acts.some(a => a.on === "select"))) k = k.parentElement && k.parentElement.closest("[data-key]");
+    if (!k) return;
+    const words = sel.isCollapsed ? "" : String(sel).replace(/\s+/g, " ").trim(), sig = words && k._n.key + " " + words;
+    if (sig === selSent) return;
+    selSent = sig;
+    send(k._n, k._n.acts.find(a => a.on === "select").line.replace(/\$value\b/g, () => TEXT.esc(words)));
+  }
+  document.addEventListener("pointerup", () => setTimeout(selectGesture, 0));
+  document.addEventListener("keyup", e => { if (e.shiftKey || e.key === "Shift") selectGesture(); });
   document.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest(".t-mark-link");
     if (!a || !/^https?:/.test(a.dataset.href || "")) return;
