@@ -35,7 +35,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 ROOM_TESTS = ("test_room_verbs.py", "test_room_look.py", "test_room_reads.py", "test_blanks.py", "test_prop_fields.py",
               "test_house_words.py", "test_house_cols.py", "test_persons.py", "test_persons_stored.py", "test_lines.py", "test_kinds.py",
-              "test_help_notes.py", "test_promises.py", "test_lived.py", "test_rules.py", "test_lanes.py", "test_bound_words.py", "test_rule_bound.py", "test_calls.py", "test_sayings.py", "test_due_any.py", "test_kept.py", "test_queries.py", "test_table.py", "test_house_verbs.py", "test_nearest.py", "test_reach.py", "test_wake_fold.py", "test_settled.py", "test_comment_reply.py", "test_design_talk.py", "test_landing_wait.py", "test_landing_queue.py", "test_bench_talk.py", "test_builder_asks.py", "test_line_waits.py")
+              "test_help_notes.py", "test_promises.py", "test_lived.py", "test_rules.py", "test_lanes.py", "test_bound_words.py", "test_rule_bound.py", "test_calls.py", "test_sayings.py", "test_due_any.py", "test_kept.py", "test_queries.py", "test_table.py", "test_house_verbs.py", "test_nearest.py", "test_reach.py", "test_wake_fold.py", "test_settled.py", "test_comment_reply.py", "test_design_talk.py", "test_landing_wait.py", "test_landing_queue.py", "test_bench_talk.py", "test_builder_asks.py", "test_line_waits.py", "test_captures.py")
 HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
 
 
