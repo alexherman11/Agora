@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (33)
+## open (34)
 
 ### F2. Scripts cannot say who is running them
 
@@ -225,6 +225,12 @@ Ran, 13 Oct, on a copy of the world (worker-a4179, for a4179). A paragraph of 32
 Why: desk_knife marks every printed node's shown aspects as seen, and the node says 'text' whether or not to_text cut it.
 Not cured here, on Pike's word (do not widen a4179 for it). scene <lens> words does not have the fault: it prints a text whole, and a text its clamp cut is not marked.
 A cure would be small: to_text already knows each cut it makes; a cut node should not say text.
+
+### Landing queue: code reaches main only judged, in a room of its own; uncommitted edits never block it
+
+a5113 · family=house · status=open
+
+Source edit by Claude, 14 Oct (4113eae, landed as 28e1b05 through itself): landing.py is new; workshop.land() now calls it; health runs test_landing_queue. Before this there was one way into main, the house's merge in the live checkout, and it waited while anyone had uncommitted edits (a4644). Two people working at once blocked each other (Alex, 14 Oct). WORLD-LEVEL WORD MISSING: none at the desk. This is the repository's own door, and it belongs in source. What was missing was a room of its own to judge code in, a cache of what was judged (house-state/landing.json, per commit), and parking for edits in the way (parked/<stamp> branches). ROUGH STILL: the commission state `reverted` now means 'judged and not landed', because main never had it; the word is a misnomer, and renaming it touches the board lenses. Health takes about 2 minutes per judgement, so a landing takes 4-5. The landing room's world copy is taken under the world's lock. AGENTS.md still says one checkout and no worktrees for builders; Alex said 'work in worktrees if you need', and new wording is his to give.
 
 ## curing (26)
 
