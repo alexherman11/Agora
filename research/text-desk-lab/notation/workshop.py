@@ -196,8 +196,11 @@ class Workshop:
                     return e.get("by")
         return "alex"
 
-    def say(self, cid, line):
-        self.house.act("house", f"read {cid}; do comment {cid} line={json.dumps(line, ensure_ascii=False)}")
+    def say(self, cid, line, to=None):
+        """The house's word on a commission. It calls the asker (house.news), unless to= says whom it is for instead:
+        to=nobody is said on the card and wakes no one (a4644: a landing's wait, which the asker cannot act on)."""
+        self.house.act("house", f"read {cid}; do comment {cid} line={json.dumps(line, ensure_ascii=False)}"
+                                + (f" to={to}" if to else ""))
 
     def set_state(self, cid, state, **more):
         extra = "".join(f" {k}={json.dumps(str(v), ensure_ascii=False)}" for k, v in more.items())
@@ -494,13 +497,15 @@ class Workshop:
             # a4465 said it three times (c4636, c4641, c4690), each a knock. A changed list is not news; the wait
             # ends only by this pass going ahead, and what it comes to (landed, reverted, does not merge) is said then.
             # The card's last house comment is asked too, for a worker state from before this (or a lost one).
+            # Pike c4717: said on the card with to=nobody, so it wakes no one (the asker cannot commit Alex's edits, and
+            # sees it among the changes the next time something real wakes them); the outcome still calls them.
             said = [e for e in w.events if e["by"] == "house" and e["verb"] == "comment" and e["target"] in (cid, s["id"])]
             last = " ".join(str(v) for v in (said[-1].get("args") or {}).values() if isinstance(v, str)) if said else ""
             if not wk.state.get("held") and WAITING not in last:
                 self.say(cid, WAITING + ": the main checkout has uncommitted edits to "
                          + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
                          + ". It lands on the first pass after they are committed or put back. Nothing more is said "
-                           "here until then, whatever else is edited meanwhile.")
+                           "here until then, whatever else is edited meanwhile.", to="nobody")
             if wk.state.get("held") != dirty:
                 wk.state["held"] = dirty
                 wk.save()

@@ -6,11 +6,13 @@ A small world in memory (roomworld.py) and a git repository of its own in a temp
 main checkout. The workshop's own land() runs with a stand-in house whose lines go through the desk's dispatch; health
 and the docs export are stubbed (they run the lab's real world), and so is finish (it removes a worktree). Who a house
 comment knocks is read by rooms.reached, the reading the house's knock record uses. The story:
-  1. pike's commission is ready and main has an uncommitted edit: one comment saying it waits and on what; one knock;
+  1. pike's commission is ready and main has an uncommitted edit: one comment saying it waits and on what, to=nobody,
+     so it wakes no one (Pike c4717: the asker cannot act on a wait; the outcome still calls them);
   2. passes go by with the same edit, then with another file edited too, then with only that other file: nothing said;
   3. a new house (the worker's state from before this change, without held=) meets the same wait: nothing said;
   4. the edits are committed and it lands: the card says landed, and pike is knocked once for it;
-  5. a second commission waits, lands, and a later wait on a third begins afresh: each wait is said once.
+  5. a second commission waits, is refused (nothing to land), and waits again: each wait is said once, and only the
+     refusal knocks.
 """
 import os
 import re
@@ -25,10 +27,13 @@ sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 
 import roomworld   # noqa: E402
+import house       # noqa: E402
 import rooms       # noqa: E402
 import workshop    # noqa: E402
 
 fails = []
+WAITING = "ready, and waiting to land"     # how the house begins a wait on a card (workshop.WAITING; spelled out, so
+                                           # this runs on the code from before it, to show what it was)
 
 
 def check(name, ok, detail=""):
@@ -139,6 +144,14 @@ def house_said(sid, since):
     return said, knocks
 
 
+def wakes_pike(since):
+    """-> whether what happened since event `since` would wake pike from a rest, by the house's own news()."""
+    from types import SimpleNamespace
+    h = house.House.__new__(house.House)
+    r = SimpleNamespace(rid=rooms.corner_of(W, "pike"), state={"cursor": since}, save=lambda: None)
+    return h.news(W, r, "pike", resting=True)
+
+
 def text(e):
     return " ".join(str(v) for v in (e.get("args") or {}).values() if isinstance(v, str))
 
@@ -153,9 +166,10 @@ start = len(W.events)
 write("lab/a.py", "a = 2  # Alex, by hand\n")
 land(K1, S1, wk1)
 said, knocks = house_said(S1, start)
-check("1. one comment says it waits, and on what", len(said) == 1 and workshop.WAITING in text(said[0])
+check("1. one comment says it waits, and on what", len(said) == 1 and WAITING in text(said[0])
       and "lab/a.py" in text(said[0]), [text(e) for e in said])
-check("1. pike is knocked once for it", len(knocks) == 1, [text(e) for e in knocks])
+check("1. pike is not woken by it (to=nobody: the asker cannot act on a wait, Pike c4717)", not knocks
+      and said[0].get("to") == [], [(text(e), e.get("to")) for e in said])
 check("1. it is still ready, not landed", (W.subjects[S1].get("props") or {}).get("commission") == "ready",
       W.subjects[S1].get("props"))
 
@@ -169,7 +183,8 @@ land(K1, S1, wk1)
 land(K1, S1, wk1)
 said, knocks = house_said(S1, start)
 check("2. same edit, a file added, a file put back: still the one comment", len(said) == 1, [text(e) for e in said])
-check("2. and still the one knock", len(knocks) == 1, [text(e) for e in knocks])
+check("2. and nobody knocked", not knocks, [text(e) for e in knocks])
+check("2. the house's news() would not wake pike for any of it", not wakes_pike(start))
 check("2. the worker's state follows what is in the way", wk1.state.get("held") == ["lab/b.js"], wk1.state)
 
 # ---- 3. a new house, its worker's state without held= (from before, or lost): the card's word is asked ---------------
@@ -187,6 +202,7 @@ land(K1, S1, wk1)
 said, knocks = house_said(S1, mark)
 check("4. the card says it landed", len(said) == 1 and text(said[0]).startswith("landed as "), [text(e) for e in said])
 check("4. pike is knocked once for that", len(knocks) == 1, [text(e) for e in knocks])
+check("4. and news() wakes pike for it", wakes_pike(mark))
 check("4. the wait is forgotten", "held" not in wk1.state, wk1.state)
 check("4. commission=landed", (W.subjects[S1].get("props") or {}).get("commission") == "landed", W.subjects[S1].get("props"))
 
@@ -197,7 +213,7 @@ write("lab/c.py", "c = 2\n")
 land(K2, S2, wk2)
 land(K2, S2, wk2)
 said, knocks = house_said(S2, start2)
-check("5. a second commission's wait is said once on its own card", len(said) == 1 and workshop.WAITING in text(said[0]),
+check("5. a second commission's wait is said once on its own card", len(said) == 1 and WAITING in text(said[0]),
       [text(e) for e in said])
 git("checkout", "-q", "--", "lab/c.py")
 git("branch", "-q", "-f", "worker/" + K2, "main")          # its branch has nothing beyond main: refused, back to working
@@ -208,8 +224,9 @@ land(K2, S2, wk2)
 land(K2, S2, wk2)
 said, knocks = house_said(S2, start2)
 check("5. after the pass went ahead (refused), a new wait is news, said once",
-      [workshop.WAITING in text(e) for e in said] == [True, False, True], [text(e) for e in said])
-check("5. three comments, three knocks: each is news", len(knocks) == 3, [text(e) for e in knocks])
+      [WAITING in text(e) for e in said] == [True, False, True], [text(e) for e in said])
+check("5. the refusal, which the asker acts on, is the one knock", [text(e) for e in knocks]
+      == ["nothing to land: the branch has no commits beyond main"], [text(e) for e in knocks])
 
 workshop.git = _git
 print(f"\n{'all passed' if not fails else str(len(fails)) + ' FAILED: ' + '; '.join(fails)}")
