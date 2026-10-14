@@ -210,9 +210,27 @@ class Desk:
     read_cap = None # round 11 (lean): at most this many read/examine commands per call; the rest are folded, visibly
 
     def dispatch(self, name, args):
+        # Worktree recording happens once per call, after a batch may have stopped.
+        # Keep the actual steps and their event ranges, including read-only steps;
+        # matching appends by target alone would confuse two sends to one chat.
+        journal = {"line": args.get("line", ""), "steps": []}
+
+        def one(step_args, step_name="desk", whole=False):
+            n0 = len(self.world.events)
+            result = self._one(step_args, step_name, whole=whole)
+            journal["steps"].append({
+                "line": step_args.get("line", ""),
+                "events": [e["id"] for e in self.world.events[n0:]],
+                "ok": "error" not in result and not result.get("miss"),
+            })
+            if getattr(self, "_wt", None) is not None and name == "desk":
+                self._journal_dispatch = journal
+            return result
+
+        self.__dict__.pop("_journal_dispatch", None)
         if name == "desk" and args.get("whole"):
             # a736: a line a resident typed after > is one command; a ; in it is words (the desk may still refuse them)
-            return self._one({"line": args.get("line", "")}, whole=True)
+            return one({"line": args.get("line", "")}, whole=True)
         if self.batch and name == "desk":
             parts = split_batch(args.get("line", ""))
             if parts and parts[0].lower().startswith("script "):
@@ -229,7 +247,7 @@ class Desk:
                                         f"Not run: {'; '.join(rest)}. Ask for them in another call, or narrow with find)")
                             break
                     shown = self._echo(part)
-                    r = self._one({"line": part})
+                    r = one({"line": part})
                     body = r["text"] if "text" in r else "ERR " + r["error"]
                     outs.append(f"[{i + 1}] {shown}\n{body}")
                     if "error" in r:
@@ -240,7 +258,7 @@ class Desk:
                                         f"Fix [{i + 1}] and resubmit them in one call)")
                         break
                 return {"text": "\n\n".join(outs), "batch": len(parts), "batch_error": error}
-        return self._one(args, name)
+        return one(args, name)
 
     _cmd_no = 0
 

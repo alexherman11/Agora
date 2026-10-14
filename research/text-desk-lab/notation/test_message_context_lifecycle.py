@@ -197,6 +197,143 @@ def test_durable_send_detaches_only_intersection_on_replay(case):
     assert [e["verb"] for e in case.w.events[n0:]] == ["edit"]
 
 
+@pytest.fixture
+def batch_case(case, monkeypatch):
+    import verbs
+
+    # Refusal diagnostics must stay in memory in these isolated replay tests.
+    monkeypatch.setattr(verbs, "record_reach", lambda *args: None)
+    case.desk.batch = True
+    case.desk._wt = {"journal": []}
+    case.w.subjects[case.sid]["props"]["context"] = "cap-1 cap-2"
+    case.original = copy.deepcopy(case.desk)
+    return case
+
+
+def record_batch(case, line):
+    n0, ids = len(case.w.events), worktree.ids_of(case.desk)
+    result = case.desk.dispatch("desk", {"line": line})
+    worktree.record(case.desk, line, "alex", ids, n0)
+    assert not hasattr(case.desk, "_journal_dispatch")
+    journal = case.desk._wt["journal"][-1]["line"]
+    assert "captures=" not in journal
+    case.service.sent_copy.side_effect = case.service.CaptureError("private capture deleted")
+    replayed = case.original.dispatch("desk", {"line": journal})
+    assert not replayed.get("error") and not replayed.get("batch_error"), replayed
+    assert store.flatten(case.original.world) == store.flatten(case.w)
+    return result, journal
+
+
+def test_read_then_capture_append_batch_replays_after_private_capture_removed(batch_case):
+    case = batch_case
+    line = (
+        f'read {case.chat}; do append {case.chat} line="Words; inside the message" '
+        f'captures="cap-1" context_from={case.draft}'
+    )
+    result, journal = record_batch(case, line)
+    assert not result["batch_error"]
+    assert journal.startswith(f"read {case.chat}; do append {case.chat}")
+    assert case.service.sent_copy.call_count == 1
+    assert moo.props_of(case.original.world, case.draft)["context"] == "cap-2"
+
+
+@pytest.mark.parametrize("second_id", ["cap-1", "cap-2"])
+def test_two_capture_appends_to_same_chat_use_their_own_step_events(batch_case, second_id):
+    case = batch_case
+
+    def copied(session, actor, cid):
+        return dict(case.capture, id=cid)
+
+    case.service.sent_copy.side_effect = copied
+    # Reusing a private capture in two separate sends is valid without consuming
+    # a draft. The matching capture IDs and chat alone cannot identify the step.
+    line = (
+        f'read {case.chat}; do append {case.chat} line="First" captures="cap-1"; '
+        f'do append {case.chat} line="Second" captures="{second_id}"'
+    )
+    result, _ = record_batch(case, line)
+    assert not result["batch_error"]
+    lines = case.original.world.subjects[case.chat]["lines"]
+    assert [row["text"] for row in lines] == ["Alex: First", "Alex: Second"]
+    assert [json.loads(row["fields"]["context"])["captures"][0]["id"] for row in lines] == [
+        "cap-1",
+        second_id,
+    ]
+    assert case.service.sent_copy.call_count == 2
+
+
+def test_partial_capture_batch_records_only_successful_prefix(batch_case):
+    case = batch_case
+    line = (
+        f'read {case.chat}; do append {case.chat} line="Sent" captures="cap-1" '
+        f"context_from={case.draft}; "
+        f'do append {case.chat} line="Refused" captures="cap-2" context_from={case.draft} '
+        "reply_to=m999999; "
+        f'do append {case.chat} line="Never attempted" captures="cap-2" '
+        f"context_from={case.draft}"
+    )
+    case.service.sent_copy.side_effect = lambda session, actor, cid: dict(case.capture, id=cid)
+    result, journal = record_batch(case, line)
+    assert result["batch_error"]
+    assert "Refused" not in journal and "Never attempted" not in journal
+    assert moo.props_of(case.original.world, case.draft)["context"] == "cap-2"
+    assert len(case.original.world.subjects[case.chat]["lines"]) == 1
+
+
+def test_read_limit_does_not_journal_unrun_capture_send(batch_case):
+    case = batch_case
+    case.desk.read_cap = case.original.read_cap = 1
+    line = (
+        f'do append {case.chat} line="Sent" captures="cap-1" context_from={case.draft}; '
+        f"read {case.chat}; read {case.chat}; "
+        f'do append {case.chat} line="Not run" captures="cap-2" context_from={case.draft}'
+    )
+    result, journal = record_batch(case, line)
+    assert "later command(s) not run" in result["text"]
+    assert "Not run" not in journal
+    assert case.service.sent_copy.call_count == 1
+
+
+def test_failed_capture_after_ordinary_edit_is_not_journaled(batch_case):
+    case = batch_case
+    case.service.sent_copy.side_effect = case.service.CaptureError("capture unavailable")
+    line = (
+        f"read {case.draft}; do prop {case.draft} status=ready; "
+        f'do append {case.chat} line="Refused" captures="cap-1" context_from={case.draft}'
+    )
+    result, journal = record_batch(case, line)
+    assert result["batch_error"]
+    assert "Refused" not in journal
+    assert moo.props_of(case.original.world, case.draft)["status"] == "ready"
+    assert not case.original.world.subjects[case.chat]["lines"]
+
+
+def test_capture_batch_without_exact_dispatch_receipt_refuses_to_guess(batch_case):
+    case = batch_case
+    line = f'read {case.chat}; do append {case.chat} line="Sent" captures="cap-1"'
+    n0 = len(case.w.events)
+    case.desk.dispatch("desk", {"line": line})
+    with pytest.raises(Refusal, match="dispatch receipt"):
+        message_context.durable_command(line, case.w, case.w.events[n0:])
+    with pytest.raises(Refusal, match="dispatch receipt"):
+        message_context.durable_command(
+            line, case.w, case.w.events[n0:], dispatch={"line": "different", "steps": []}
+        )
+
+
+def test_ambiguous_context_events_within_one_step_are_not_guessed(batch_case):
+    case = batch_case
+    line = f'read {case.chat}; do append {case.chat} line="Sent" captures="cap-1"'
+    n0 = len(case.w.events)
+    case.desk.dispatch("desk", {"line": line})
+    dispatch = case.desk._journal_dispatch
+    saved = case.w.subjects[case.chat]["lines"][-1]["fields"]["context"]
+    case.w.apply("append", case.chat, None, {"line": "Rule copy", "context": saved}, "alex")
+    dispatch["steps"][-1]["events"].append(case.w.events[-1]["id"])
+    with pytest.raises(Refusal, match="one durable created context"):
+        message_context.durable_command(line, case.w, case.w.events[n0:], dispatch=dispatch)
+
+
 def test_deskd_duplicate_gesture_after_restart_does_not_resend_or_consume(
     case, monkeypatch, tmp_path
 ):

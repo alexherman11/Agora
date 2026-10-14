@@ -1003,6 +1003,13 @@ evidence without private files. The house delivers captured content only to addr
 residents, labels its source message, and reports current object revision separately.
 Captured wording is never silently replaced by newer wording.
 
+Batched capture sends journal each successful dispatch step against its own event IDs,
+including two sends to the same chat; failed and unrun tails are excluded. Replay tests
+remove access to private captures and compare complete native state. Explicitly unresolved
+screen references retain quoted words and report current identity unavailable, without
+inventing or looking up an object ID. Follow-up checks: 99 focused tests passed, repository
+tests 201 passed / 2 skipped, and the newly landed agent-line fence's standalone tests passed.
+
 **Ran:** browser input at 320/420/600px, draft recovery and refusal, a 1298-character
 multiline message to two recipients, original-thread reply, and capture/send after source
 change. Repository tests: 201 passed, 2 skipped; scene/thread tests: 54 passed; focused

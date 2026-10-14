@@ -108,6 +108,54 @@ def test_missing_and_wrong_owner_refuse(case):
             mc.resolve("frontier", "alex", "cap-1")
 
 
+def test_unresolved_reference_preserves_words_without_guessing_native_identity(case):
+    _, capture, service = case
+    capture["refs"] = [
+        {
+            "resolved": "no",
+            "world": "frontier",
+            "role": "chat",
+            "lens": "conversation",
+            "words": 'Visible words; "quoted" evidence',
+            "why": "Several visible rows matched",
+        }
+    ]
+    saved = mc.resolve("frontier", "alex", "cap-1")
+    service.sent_copy.side_effect = service.CaptureError("removed")
+    assert mc.resolve("frontier", "alex", saved) == saved
+
+    class NoIdentityLookup:
+        @property
+        def nodes(self):
+            raise AssertionError("unresolved references must never look up a native item")
+
+    blocks = mc.model_content(NoIdentityLookup(), saved, session="frontier")
+    text = blocks[0]["text"]
+    current = json.loads(text.split("CURRENT status (captured words above are retained): ")[1])
+    assert current == [
+        {
+            "world": "frontier",
+            "status": "unavailable",
+            "reason": "captured reference has no exact native identity",
+        }
+    ]
+    assert '"resolved":"no"' in text and 'Visible words; \\"quoted\\" evidence' in text
+    assert '"item"' not in text and '"subject"' not in text and '"rev"' not in text
+    readable = mc.summary(saved)
+    assert 'Visible words; "quoted" evidence' in readable
+    assert "chat / conversation" in readable
+    assert "unresolved (no exact native identity)" in readable
+    assert "current unavailable" in readable and "Several visible rows matched" in readable
+
+
+@pytest.mark.parametrize("resolved", [None, "yes", False])
+def test_missing_item_requires_explicitly_unresolved_reference(case, resolved):
+    _, capture, _ = case
+    capture["refs"] = [{"world": "frontier", "words": "Visible words", "resolved": resolved}]
+    with pytest.raises(Refusal):
+        mc.resolve("frontier", "alex", "cap-1")
+
+
 def test_png_validation_and_model_image_block(case):
     world, capture, _ = case
     capture["image"] = png()

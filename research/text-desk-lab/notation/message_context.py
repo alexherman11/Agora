@@ -98,8 +98,11 @@ def _validate(envelope):
         _need(type(refs) is list and len(refs) <= 64)
         for ref in refs:
             _need(type(ref) is dict)
-            for key in ("world", "item", "words"):
+            keys = ("world", "words") if ref.get("resolved") == "no" else ("world", "item", "words")
+            for key in keys:
                 _need(key in ref and type(ref[key]) is str)
+            if "item" in ref:
+                _need(type(ref["item"]) is str)
             for key in ("revision", "rev"):
                 if ref.get(key) is not None:
                     _need(type(ref[key]) is int and 0 <= ref[key] <= 2**63 - 1)
@@ -153,7 +156,12 @@ def resolve(session, actor, value):
 
 
 def _current(world, ref, session):
-    result = {"world": ref["world"], "item": ref["item"]}
+    result = {"world": ref["world"]}
+    if ref.get("resolved") == "no":
+        return dict(
+            result, status="unavailable", reason="captured reference has no exact native identity"
+        )
+    result["item"] = ref["item"]
     if not session or ref["world"] != session:
         return dict(
             result, status="unavailable", reason="current world identity is unknown or differs"
@@ -226,9 +234,15 @@ def summary(storedJSON):
             labels = " / ".join(
                 short(ref.get(key), 60) for key in ("kind", "role", "lens") if ref.get(key)
             )
-            source = f"{short(ref['world'], 80)}/{short(ref['item'], 80)}"
-            detail = f" · subject {short(ref['subject'], 80)}" if ref.get("subject") else ""
-            detail += f" · revision {ref['rev']}" if ref.get("rev") is not None else ""
+            if ref.get("resolved") == "no":
+                source = f"{short(ref['world'], 80)} · unresolved (no exact native identity)"
+                detail = " · current unavailable"
+                if ref.get("why"):
+                    detail += " · " + short(ref["why"], 400)
+            else:
+                source = f"{short(ref['world'], 80)}/{short(ref['item'], 80)}"
+                detail = f" · subject {short(ref['subject'], 80)}" if ref.get("subject") else ""
+                detail += f" · revision {ref['rev']}" if ref.get("rev") is not None else ""
             lines.append(f"{labels + ' · ' if labels else ''}{source}{detail}")
             if ref["words"]:
                 lines.append("Captured words: " + short(ref["words"], 800))
@@ -245,35 +259,71 @@ def summary(storedJSON):
     )
 
 
-def durable_command(line, world, new_events):
-    """Make one literal capture-bearing append replayable using its actual line.
+def durable_command(line, world, new_events, *, dispatch=None):
+    """Freeze each successful capture append against its actual dispatch step.
 
     context_from, when present, stays in the command: replay consumes only the IDs
-    retained in durable context and never opens a private capture. Other command
-    forms are unchanged. A recognized capture append with no durable
-    created line is refused rather than recording a private-store dependency.
+    retained in durable context and never opens a private capture. Batch receipts
+    retain the successful prefix; refused and unrun steps must not be retried on
+    merge. Without a matching receipt, batched capture sends cannot be journaled.
     """
-    from desk import split_batch, unescape_value
+    from desk import split_batch
+
+    parts = split_batch(line)
+    if dispatch is not None and dispatch.get("line") == line:
+        steps = dispatch["steps"]
+        if not any(_capture_pairs(part) for part in parts + [s["line"] for s in steps]):
+            return line
+        events = {event["id"]: event for event in new_events}
+        out = []
+        for step in steps:
+            if not step["ok"]:
+                break
+            made = [events[eid] for eid in step["events"] if eid in events]
+            out.append(_durable_append(step["line"], world, made))
+        return "; ".join(out)
+    if len(parts) > 1:
+        _need(
+            not any(_capture_pairs(part) for part in parts),
+            "cannot record batched capture appends without their dispatch receipt",
+        )
+        return line
+    return _durable_append(line, world, new_events)
+
+
+def _capture_pairs(line):
+    """Read capture syntax without inferring which command actually executed."""
+    from desk import unescape_value
 
     try:
         words = shlex.split(line)
     except ValueError:
-        return line
+        return None
     if (
-        len(split_batch(line)) != 1
-        or len(words) < 4
-        or words[:2] != ["do", "append"]
-        or not re.fullmatch(r"[as]\d+", words[2])
+        len(words) < 4
+        or [word.lower() for word in words[:2]] != ["do", "append"]
         or any("=" not in word for word in words[3:])
     ):
-        return line
+        return None
     pairs = [
         (key, unescape_value(value))
         for key, _, value in (word.partition("=") for word in words[3:])
     ]
     captures = dict(pairs).get("captures", "")
-    if not captures or not all(CAP_ID.fullmatch(cid) for cid in captures.split()):
+    return (words, pairs) if captures.split() else None
+
+
+def _durable_append(line, world, new_events):
+    parsed = _capture_pairs(line)
+    if parsed is None:
         return line
+    words, pairs = parsed
+    captures = dict(pairs)["captures"]
+    _need(
+        re.fullmatch(r"[as]\d+", words[2])
+        and all(CAP_ID.fullmatch(cid) for cid in captures.split()),
+        "cannot record capture append without one literal native chat and capture ids",
+    )
     target = world.subject_of(words[2])
     expected = set(captures.split())
     matches = []
