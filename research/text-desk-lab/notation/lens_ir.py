@@ -674,12 +674,10 @@ def paint_ages(desk, s, closure):
     lens as it stands."""
     name = (s.get("props") or {}).get("style")
     rev = (S.style_source(desk, name, S.room_of_thing(desk.world, s)) or {}).get("rev", "") if name else ""
-    views, since = S.reported_views(desk, s["title"])
-    vs = S.judge_views(desk, views, closure, rev)
+    vs = S.judge_views(desk, {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()}, closure, rev)
     vs = sorted(((a, v) for a, v in vs.items() if v.get("paint")), key=lambda av: str(av[1].get("time")))
     if not vs:
-        return (" · painted sizes: none reported" + (f" since the house started ({S._clock(since)})" if since else "")
-                + " (no viewer has it open with a painter that reports them)")
+        return " · painted sizes: none reported (no viewer has it open with a painter that reports them)"
     say = {"current": "current", "stale": None, "unknown": "revision unknown"}
     return " · painted sizes, oldest first: " + "; ".join(
         f"{a} {v['paint']['age']} ({say[v['paint']['state']] or 'before ' + v['paint']['edit']})" for a, v in vs)
@@ -735,10 +733,8 @@ def scene_for(desk, name, part=None, words=None):
         st = S.style_source(desk, name, home) or {}
         sc["def"].update(style_name=name, style_rev=st.get("rev", ""))
     S.mark_pulse(sc, S.pulsing_roles(desk, name, home))   # a1140: the painter installs this one style for the whole scene
-    views, since = S.reported_views(desk, s["title"])
-    sc["views"] = S.judge_views(desk, views, closure, sc["def"].get("style_rev"))
-    if since:
-        sc["reports_since"] = since
+    sc["views"] = S.judge_views(desk, {a: v for a, v in (getattr(desk, "_views", None) or {}).items() if v.get("lens") == s["title"].lower()},
+                                closure, sc["def"].get("style_rev"))
     roots = None
     if part:
         roots = find_parts(sc, part)

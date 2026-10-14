@@ -1098,9 +1098,8 @@ def test_scene_words_is_the_scene_as_one_text():
 def test_scene_prints_painted_boxes_and_their_age():
     """a1473: a painter's report carries each part's box and the lens frame it painted; scene prints the box on the
     part's line, marks 0 high, and after an edit says the sizes are of the old lens until a painter reports again."""
-    import deskd, reports, tempfile, shutil, pathlib
+    import deskd
     tmp = _scratch("_test_boxes")
-    root, reports.ROOT = reports.ROOT, pathlib.Path(tempfile.mkdtemp(prefix="reports-"))   # a4869: kept beside the world
     try:
         with deskd.Session("_test_boxes", "jeff") as desk:
             say = lambda line: (lambda r: r.get("text") or r.get("error"))(desk.dispatch("desk", {"line": line}))   # noqa: E731
@@ -1110,8 +1109,8 @@ def test_scene_prints_painted_boxes_and_their_age():
             sc, _ = scene.scene_for(desk, "boxy")
 
             def paint(boxes, sc=sc):          # what deskd's /api/observe keeps for a painter that reported
-                reports.keep("_test_boxes", "alex", {"lens": "boxy", "at": len(desk.world.events), "time": "2026-10-01T09:00:00", "viewport": None,
-                                                     "facts": {}, "boxes": boxes, "painted": {"frame": sc["def"]["frame"], "style": "seed"}})
+                desk._views = {"alex": {"lens": "boxy", "at": len(desk.world.events), "time": "2026-10-01T09:00:00", "viewport": None,
+                                        "facts": {}, "boxes": boxes, "painted": {"frame": sc["def"]["frame"], "style": "seed"}}}
             paint({"root": "900x40", "root/a": "900x40", "root/z": "900x0"})
             out = say("scene boxy root")
             assert "sizes are of the lens as it stands" in out and "~ alex: 900x40px" in out, out
@@ -1131,8 +1130,6 @@ def test_scene_prints_painted_boxes_and_their_age():
             assert "0x10px (0 wide: nothing visible)" in out and "clipped: contents 80 high, 2 of 5 parts cut off" in out, out
     finally:
         tmp.unlink(missing_ok=True)
-        shutil.rmtree(reports.ROOT, ignore_errors=True)
-        reports.ROOT = root
 
 
 STYLE_SAMPLES = [

@@ -30,7 +30,6 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import reports
 import scene
 from desk import aspects_of, aspects_meet, event_aspects
 
@@ -169,17 +168,20 @@ def _scene_key(q):
             int(time.time() // 60), visits, q.get("keys"))
 
 
-_STARTED = time.strftime("%Y-%m-%dT%H:%M:%S")
-_HOUSE = []
-
-
-def _house():
-    """a4869: the first request this process answers makes it the receiver of painters' reports (reports.py) for its
-    house: the door it runs behind (DESKD_PARENT), or itself when it runs alone. A test that only opens Sessions is not
-    a house, and leaves the reports kept beside the live world alone."""
-    if not _HOUSE:
-        _HOUSE.append(True)
-        reports.serve(os.environ.get("DESKD_PARENT") or os.getpid(), _STARTED)
+def _report_only(name, was, now):
+    """13 Oct (a4465): a painter's report of its boxes is saved in the world file, so the file moved, and every scene of
+    that world was built and sent whole again (0.3 s and 360 KB, twice after each press) though nothing a painter draws
+    had changed. The scenes and the event count built for the file as it was (`was`: its time and size, read under the
+    lock the report was written under) now stand for the file as the report left it. What lags: the words beside a
+    scene (the inspector's text) show the report's sizes at the next change or the next minute; `scene <lens>` typed
+    at the desk reads them at once, as before."""
+    if not was or not now or was == now:
+        return
+    for k in [k for k in _SCENES if k[0] == name and k[4:6] == was]:
+        _SCENES[k[:4] + now + k[6:]] = _SCENES.pop(k)
+    seen = _EVENTS.get(name)
+    if seen and seen[:2] == was:
+        _EVENTS[name] = now + seen[2:]
 
 
 def snapshot_for(desk):
@@ -243,9 +245,6 @@ class Session:
         else:
             _DESKS.pop(key, None)
             desk = pickle.loads(self.path.read_bytes()) if self.stamp is not None else explore.fresh()
-            # a4869: painters' reports were kept in the world until 14 Oct; now beside it (reports.py). Dropped before
-            # `before` is taken, so it costs no write of its own: it leaves the file with the next change
-            desk.__dict__.pop("_views", None)
         desk.world.me = self.actor
         desk._session = self.name
         per = getattr(desk, "_per", None) or {}
@@ -323,7 +322,6 @@ class Handler(SimpleHTTPRequestHandler):
         return (origin is not None and origin not in own) or self.headers.get("Sec-Fetch-Site") == "cross-site"
 
     def do_GET(self):
-        _house()
         if self.path.startswith("/api/") and self._foreign():
             return self._json({"error": "deskd answers only its own pages"}, 403)
         try:
@@ -332,7 +330,6 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": str(e)}, 400)
 
     def do_POST(self):
-        _house()
         if self._foreign():
             return self._json({"error": "deskd answers only its own pages"}, 403)
         try:
@@ -435,19 +432,21 @@ class Handler(SimpleHTTPRequestHandler):
             raise BadRequest("the body must be a JSON object")
         if urlparse(self.path).path == "/api/observe":
             # a painter reports what happened on its screen. Not an event, not undoable, not the world: a viewer's observation.
-            # a4869: so it is kept beside the world by the house (reports.py), and the world file is neither loaded nor written
-            name = body.get("session", "desktop")
-            if not SESSION_NAME.match(str(name)) or not (SESSIONS / f"{name}.pickle").exists():
-                raise BadRequest(f"no world named {str(name)[:80]!r} to report a view of")
-            facts = {str(k)[:200]: str(v)[:60] for k, v in list((body.get("facts") or {}).items())[:400]}
-            # a1473: each painted part's box ("WxH sh=.. cut=n/m" or "hidden"), and the lens frame it was painted at
-            boxes = {str(k)[:200]: str(v)[:60] for k, v in list((body.get("boxes") or {}).items())[:6000]}
-            p = body.get("painted") if isinstance(body.get("painted"), dict) else {}
-            reports.keep(name, str(body.get("as") or "alex").lower(),
-                         {"lens": str(body.get("lens", "")).lower(), "at": int(body.get("at", 0)),
-                          "time": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
-                          "viewport": body.get("viewport"), "facts": facts, "boxes": boxes,
-                          "painted": {"frame": str(p.get("frame") or "")[:400], "style": str(p.get("style") or "")[:80]} if p else None})
+            sess = Session(body.get("session", "desktop"), body.get("as"))
+            with sess as desk:
+                was = sess.stamp
+                views = getattr(desk, "_views", None)
+                if views is None:
+                    views = desk._views = {}
+                facts = {str(k)[:200]: str(v)[:60] for k, v in list((body.get("facts") or {}).items())[:400]}
+                # a1473: each painted part's box ("WxH sh=.. cut=n/m" or "hidden"), and the lens frame it was painted at
+                boxes = {str(k)[:200]: str(v)[:60] for k, v in list((body.get("boxes") or {}).items())[:6000]}
+                p = body.get("painted") if isinstance(body.get("painted"), dict) else {}
+                views[(body.get("as") or "alex").lower()] = {"lens": str(body.get("lens", "")).lower(), "at": int(body.get("at", 0)),
+                                                            "time": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+                                                            "viewport": body.get("viewport"), "facts": facts, "boxes": boxes,
+                                                            "painted": {"frame": str(p.get("frame") or "")[:400], "style": str(p.get("style") or "")[:80]} if p else None}
+            _report_only(sess.name, was, sess.stamp)
             return self._json({"ok": True, "kept": len(facts)})
         if urlparse(self.path).path == "/api/style":
             # 8 Oct: a style text read by the one reader, for a page that edits a style it has not saved (the windowed

@@ -17,7 +17,7 @@ const Viewer = (session, who, lens, said, status) => {
   const unknownOrigin = "origin unknown: this kept draft has no record of what it was typed against; copy it if you need it, then Escape and start from the current text";
   for (const d of drafts.values()) if (!d.seen && !d.shown) d.why = unknownOrigin;
   let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed` : "";
-  let text = "", told = "", unheardIn = null;
+  let text = "", told = "";
   let shownNotice = "", noticeTimer;
   const foldStore = `lens-folds:${session}:${who}:${lens}`;
   let folds; try { folds = JSON.parse(localStorage.getItem(foldStore)) || {}; } catch { folds = {}; }
@@ -193,12 +193,7 @@ const Viewer = (session, who, lens, said, status) => {
       }
       const view = attention ? { viewport: { w: Math.round(vp.width), h: Math.round(vp.height), sx: Math.round(paint.scrollLeft), sy: Math.round(paint.scrollTop) } } : {};
       const body = JSON.stringify({ session, as: who, lens, at, facts, boxes, painted: painted || null, ...view });
-      // a4869 (Sable c4900): a report does not outlive the house that kept it. When the scene's words name no report of
-      // this viewer (`  ~ <who> ` heads each one), the house has none: the same report goes again, once per such text
-      const unheard = !text.split("\n").some(l => l.startsWith(`  ~ ${String(who).toLowerCase()} `));
-      if (body !== told || (unheard && text !== unheardIn)) {
-        told = body; unheardIn = unheard ? text : null; fetch("/api/observe", { method: "POST", body });
-      }
+      if (body !== told) { told = body; fetch("/api/observe", { method: "POST", body }); }
     },
     // where each scrolling frame is: plain data, so a page reloaded for new painter code (a1505) can carry it.
     // Scroll end (chat): a frame this viewer had at its end stays at its end; one never seen before starts there.

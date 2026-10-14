@@ -52,9 +52,6 @@ def main(argv):
     src = HERE / "sessions" / f"{world}.pickle"
     shutil.copyfile(src, tmp / "bench.pickle")
     deskd.SESSIONS = tmp
-    import reports                   # a4869: painters' reports are kept beside the world; here, in the scratch folder
-    reports.ROOT = tmp / "reports"
-    timed(reports, "keep", "report kept (reports.py)")
     if "--nolog" not in argv:
         t = time.perf_counter()
         store.genesis(pickle.loads((tmp / "bench.pickle").read_bytes()), tmp / "bench.pickle", why="bench")
