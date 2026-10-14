@@ -244,7 +244,8 @@
     post.className = Style.roleClass("button"); discard.className = Style.roleClass("tool");
     const state = document.createElement("span"); state.className = Style.roleClass("meta"); state.textContent = "Unsent";
     bar.append(post, discard, state);
-    box.replaceChildren(...(picked ? [Object.assign(document.createElement("div"), { className: Style.roleClass("meta"), textContent: picked.trim() })] : []), input, bar);
+    // 14 Oct (Alex: the box grew as wide as the words it quoted; they are highlighted right above it): no copy of them here
+    box.replaceChildren(input, bar);
     const d = { box, input, anchor: el._n.key, dx: x - r.left, dy: y - r.top };
     menuDrafts.set(key, d); document.body.append(box); placeMenuDrafts();
     const drop = () => { box.remove(); menuDrafts.delete(key); };

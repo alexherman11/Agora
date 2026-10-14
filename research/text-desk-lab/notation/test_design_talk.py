@@ -96,7 +96,18 @@ scene.emit(sc)
 pv = scene.painter_view(sc)
 lit = [k["kids"][0]["paint"].get("light") for k in pv["kids"][0]["kids"] if k["kids"] and k["kids"][0]["paint"].get("text", "").startswith("A change")]
 check("the passage talked about is lit in the paragraph's paint", lit == [["A change is a room."]], lit)
-check("light is printed as a count", "light 1" in scene.to_text(sc, "w", A, 0), scene.to_text(sc, "w", A, 0)[:600])
+MENU = chr(10).join(["w : column", f"  of in:{CORNER}", "  each para",
+                     "para : column", f'  let talkable = "yes" when $talk != ""', '  let talkable = "no" otherwise',
+                     '  on menu "Comment" when talkable = "no" do comment $item line="$value"',
+                     f'  on menu "Comment" when talkable = "yes" do append {TALK} line="$value" about=$item quote="$quoted"',
+                     '  words : text "$text"'])
+for src, verb in ((MENU, "comment"), (MENU.replace('when $talk != ""', 'when $text != ""'), "append")):
+    msc = lens_ir.evaluate(D, src)
+    scene.emit(msc)
+    acts = [a for k in scene.painter_view(msc)["kids"] for a in k.get("acts", []) if a["on"] == "menu"]
+    check(f"a menu entry with `when` is offered only where its test holds: {verb} (14 Oct: a design's comments go to its conversation)",
+          acts and [a["line"].split(" ")[1] for a in acts] == [verb] * len(acts), acts)
+check("light is printed as a count","light 1" in scene.to_text(sc, "w", A, 0), scene.to_text(sc, "w", A, 0)[:600])
 
 print(f"\n{len(fails)} failed" if fails else "\nall passed")
 sys.exit(1 if fails else 0)

@@ -1144,7 +1144,7 @@ def _w_on(node, p, val, n, env):
         node["on"].append({"on": "click", "line": "press " + m.group(1)})
         return
     g, do, cmd = val.partition(" do ")
-    drop_part = label = None
+    drop_part = label = when = None
     if g.startswith("key "):
         label, g = g[4:].strip(), "key"
         if label not in KEYS:
@@ -1152,10 +1152,13 @@ def _w_on(node, p, val, n, env):
     if g.startswith("drop "):
         drop_part, g = g[5:].strip(), "drop"
     if g.startswith("menu "):
-        label, g = g[5:].strip(), "menu"
-        if not re.fullmatch(r'"[^"]+"', label):
-            raise LensRefusal(f'line {n}: `on menu "<label>" do <desk command>`: the entry\'s words, quoted; got {p!r}')
-        label = label.strip('"')
+        # 14 Oct (Alex: comments from the right-click box 'go to the ether' on a design, whose margin is not shown):
+        # `on menu "<label>" when <test> do ...` offers the entry only where the test holds, so one part can comment
+        # in the margin on a plain document and speak in the conversation on a design
+        m = re.fullmatch(r'"([^"]+)"(?:\s+when\s+(.+))?', g[5:].strip())
+        if not m:
+            raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
+        label, when, g = m.group(1), m.group(2), "menu"
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
         raise LensRefusal(f"line {n}: `on <click|edit|drag> do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
     cmd = cmd.strip()
@@ -1165,7 +1168,8 @@ def _w_on(node, p, val, n, env):
     # unless it begins with one of the desk's own reading or session commands.
     if cmd.split(" ")[0] not in ACT_COMMANDS:
         cmd = "do " + cmd
-    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {})})
+    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {}),
+                       **({"when": when.strip()} if when else {})})
 
 
 # word -> (shape as a reader sees it, setter). A layout word is its own name.
