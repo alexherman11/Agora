@@ -43,6 +43,7 @@ PY = Path(sys.executable)
 # Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
 # call) and deskd restarts on every commit; only these, which the house process itself runs, need the house to restart
 HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py"}
+WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 
 PROTOCOL = """You are a worker in Agora's house: a disposable builder for one commission, then gone.
 
@@ -487,15 +488,19 @@ class Workshop:
         dirty = [l[3:] for l in (git("status", "--porcelain", "--untracked-files=no").stdout or "").splitlines()
                  if l[3:].endswith((".py", ".js", ".html", ".css")) and "/sessions/" not in l]
         if dirty:
-            # said once per set of files, remembered in the worker's own state: kept in memory it was said again by
-            # every new house, and each saying woke the asker (Juniper e4478, 1 Oct: four times in a morning)
-            line = ("ready, and waiting to land: the main checkout has uncommitted edits to "
-                    + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
-                    + ". It lands on the first pass after they are committed or put back.")
+            # said once per wait, when it begins, remembered in the worker's own state: kept in memory it was said
+            # again by every new house, and each saying woke the asker (Juniper e4478, 1 Oct: four times in a morning).
+            # a4644 (Juniper e7832, Pike 13 Oct): it was once per SET of files, and the list changes as Alex edits, so
+            # a4465 said it three times (c4636, c4641, c4690), each a knock. A changed list is not news; the wait
+            # ends only by this pass going ahead, and what it comes to (landed, reverted, does not merge) is said then.
+            # The card's last house comment is asked too, for a worker state from before this (or a lost one).
             said = [e for e in w.events if e["by"] == "house" and e["verb"] == "comment" and e["target"] in (cid, s["id"])]
             last = " ".join(str(v) for v in (said[-1].get("args") or {}).values() if isinstance(v, str)) if said else ""
-            if wk.state.get("held") != dirty and line not in last:
-                self.say(cid, line)
+            if not wk.state.get("held") and WAITING not in last:
+                self.say(cid, WAITING + ": the main checkout has uncommitted edits to "
+                         + ", ".join(dirty[:6]) + (" and more" if len(dirty) > 6 else "")
+                         + ". It lands on the first pass after they are committed or put back. Nothing more is said "
+                           "here until then, whatever else is edited meanwhile.")
             if wk.state.get("held") != dirty:
                 wk.state["held"] = dirty
                 wk.save()
