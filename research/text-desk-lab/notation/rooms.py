@@ -216,6 +216,24 @@ def someone(w, name):
         return "agent"
     if any(str(e.get("by") or "").split("/")[0].lower() == a for e in w.events):
         return "agent"
+    if builder_on(w, a, live=False):
+        return "agent"           # a5001: a builder the house has named (worker=) before its first act
+    return None
+
+
+BUILDING = ("working", "waiting", "ready", "landing")
+
+
+def builder_on(w, name, live=True):
+    """a5001: the commission card (an appearance id) whose worker= is `name`, or None; with `live`, only while the
+    commission is underway (BUILDING), when the house sends what calls it to it as its next turn (workshop.heard)."""
+    a = str(name or "").split("/")[0].strip().lower()
+    if not a.startswith("worker-"):
+        return None
+    for sid, s in w.subjects.items():
+        p = s.get("props") or {}
+        if str(p.get("worker", "")).lower() == a and (not live or p.get("commission") in BUILDING):
+            return next(iter(w.appearances_of(sid)), sid)
     return None
 
 
@@ -527,7 +545,10 @@ def reached(w, e):
         if same_person(w, x, by.split("/")[0]) or any(same_person(w, x, a) for a in out):
             continue
         kind = someone(w, x)
-        if chat and kind and not is_member(w, s, x):
+        card = builder_on(w, x)
+        if card:
+            out[x] = f"a builder at work on {card}; it hears this at its next turn"
+        elif chat and kind and not is_member(w, s, x):
             out[x] = NOT_MEMBER
         elif kind == "resident":
             continue                                   # a corner with want=rest still says actor=, so it is above
@@ -657,6 +678,11 @@ def waiting_note(desk, nid, text):
                 out.append(f"{name}: a member of this chat; it waits in their For you")
             else:
                 out.append(f"{name}: a person; it waits in their For you")
+            continue
+        card = builder_on(w, a)
+        if card:
+            # a5001: the house sends a line that calls a builder to it as its next turn, member or not (workshop.heard)
+            out.append(f"{name}: a builder at work on {card}; it hears this at its next turn")
             continue
         if kind != "resident":
             # an agent's own word on how a line reaches them is said as given, even where they are not a member (a
