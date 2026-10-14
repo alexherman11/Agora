@@ -150,6 +150,16 @@ cp = {k["key"].split("/")[-1]: k["paint"] for k in scene.painter_view(csc)["kids
 check("`commit enter only` reaches the paint; an edit that said nothing is not `only`",
       cp["say"].get("commit_only") is True and cp["doc"].get("commit") == "enter" and not cp["doc"].get("commit_only"), cp)
 
+# 14 Oct: a value computed into a command is escaped as a $name's is, so a quote in words stays inside the value
+txt, err = say(A, f"look {CORNER} :1", f'do create {CORNER} kind=note title="q" text="He said \\"no\\" twice"')[-1]
+QT = W.last_created
+QL = chr(10).join(["w : column", f"  the {QT}", '  let said = $text', '  t : text "x"', f'    on click do append {TALK} line="$(said)"'])
+qsc = lens_ir.evaluate(D, QL)
+scene.emit(qsc)
+qline = scene.painter_view(qsc)["kids"][0]["acts"][0]["line"]
+txt, err = say(A, f"read {TALK}", qline)[-1]
+check("a computed value with a quote in it stays one value in the command", not err and last_line()["text"].endswith('He said "no" twice'), (qline, txt, err))
+
 # `on select`: the gesture is offered like any, and the lens says where a highlight is kept (here, a prop on a desk
 # note of the viewer's own), so a second template lights it beside the passages talked about
 txt, err = say(A, f"look {CORNER} :1", f'do create {CORNER} kind=note title="mine" text="" role=reviewer quoting={PARA} quote="The builder"')[-1]

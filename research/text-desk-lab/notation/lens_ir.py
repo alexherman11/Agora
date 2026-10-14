@@ -390,7 +390,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             # paragraph was made with block=$(next). A command computes $( ) as words do, when the part is built
             if "$(" not in line:
                 return S._fill(line, safe, track)
-            return S._fill_text(line, safe, track, lambda e: X.run(e, xenv()))[0]
+            return S._fill_text(line, safe, track, lambda e: X.run(e, xenv()), esc=S._cmd_value)[0]
         def offered(a):                  # 14 Oct: `on menu "<label>" when <test>`: the entry is there only where it holds
             return not a.get("when") or X.holds(X.run(a["when"], xenv())[0]) is True
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [

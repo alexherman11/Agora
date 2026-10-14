@@ -1579,7 +1579,7 @@ def _fill(tpl, ctx, track=None):
     return _VAR.sub(rep, tpl)
 
 
-def _fill_text(tpl, ctx, track, run):
+def _fill_text(tpl, ctx, track, run, esc=None):
     """Words with `$( <expr> )` inside: each expression is computed by `run(text) -> (Value, inputs)` and printed in its
     place, with its reach; then the plain $names are filled. -> (text, [(expr, printed, inputs)])."""
     out, computed, i = "", [], 0
@@ -1603,7 +1603,10 @@ def _fill_text(tpl, ctx, track, run):
         computed.append((inner, shown, inputs))
         # in the words themselves: the bare value, with a short reach only when it is partial ('6 (1 of 2)'); the scene
         # print beside the part says the whole reach (a1448: reach is part of the value, and the eye must see partiality)
-        out += tpl[i:j] + X.fmt(val, reach=False) + (f" ({val.reach.split(';')[0]})" if val.partial and val.reach else "")
+        put = X.fmt(val, reach=False) + (f" ({val.reach.split(';')[0]})" if val.partial and val.reach else "")
+        # 14 Oct: in a command a computed value is escaped as a $name's is (_cmd_value), so words with a quote in them
+        # stay one value and never end the command early
+        out += tpl[i:j] + (esc(put) if esc else put)
         i = k + 1
     return _fill(out, ctx, track), computed
 
