@@ -165,7 +165,7 @@ def _scene_key(q):
     except OSError:
         visits = None
     return (name, (q.get("as") or "alex").lower(), q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, house,
-            int(time.time() // 60), visits)
+            int(time.time() // 60), visits, q.get("keys"))
 
 
 def _report_only(name, was, now):
@@ -359,6 +359,11 @@ class Handler(SimpleHTTPRequestHandler):
                     sc, text = scene.scene_for(desk, q.get("lens", ""))
                     if q.get("view") == "painter":      # Pike a494: key, paint, acts, fence, kids; the root keeps its def
                         sc = dict(scene.painter_view(sc), **{"def": sc.get("def")})
+                        # A retained page may still run the previous painter while
+                        # its person types. Offer only key semantics it implements.
+                        keys = set(q.get("keys", "Enter,Tab,Shift+Tab,Backspace").split(","))
+                        for node in scene._walk(sc):
+                            node["acts"] = [a for a in node["acts"] if a.get("on") != "key" or a.get("label") in keys]
                     out = {"scene": sc, "text": text, "events_total": len(desk.world.events)}
                 except scene.LensRefusal as e:
                     out = {"refused": str(e), "events_total": len(desk.world.events)}
