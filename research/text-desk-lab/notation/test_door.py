@@ -64,6 +64,8 @@ D, R = roomworld.build()
 D._session = WORLD
 saved = HERE / "sessions" / f"{WORLD}.pickle"
 saved.write_bytes(pickle.dumps(D))
+# 14 Oct (Snappy Desk): with a log, as frontier has, a deskd keeps the world in memory and the swaps hand it over
+subprocess.run([sys.executable, "store.py", "begin", WORLD, "test"], cwd=HERE, capture_output=True, check=True)
 state = tempfile.mkdtemp(prefix="test-door-")
 port = free_port()
 base = f"http://127.0.0.1:{port}"
@@ -171,12 +173,19 @@ try:
     door = start_door()
     check("a door started again on the same state still has the day's news",
           [n["to"] for n in get(base + "/door/status")["news"]] == ["test-1", "test-2", "test-broken", "test-3"])
+    again = get(f"{base}/api/events?session={WORLD}&since={total0}")
+    check("and the world it reads has every event the stopped one answered (it was held in memory, and saved going)",
+          again["total"] == evs["total"] and all(any(e.get("gesture") == g for e in again["events"]) for g in made),
+          (again["total"], evs["total"]))
+    r = subprocess.run([sys.executable, "store.py", "check", WORLD], cwd=HERE, capture_output=True, text=True, encoding="utf-8")
+    check("and its log and its file agree", r.returncode == 0, r.stdout[-800:] + r.stderr[-400:])
 finally:
     if door is not None:
         door.terminate()
         door.wait()
         time.sleep(3.5)
-    for p in (saved, saved.with_suffix(".lock")):
+    for p in (saved, saved.with_suffix(".lock"), saved.with_suffix(".writer"), *saved.parent.glob(f"{WORLD}.log.jsonl*"),
+              *saved.parent.glob(f"{WORLD}.undo*")):
         p.unlink(missing_ok=True)
     shutil.rmtree(state, ignore_errors=True)
 

@@ -42,7 +42,7 @@ def load(session):
     except SystemExit as e:        # the house calls this every pass: a busy lock is a failed step, retried, not an exit
         raise RuntimeError(str(e)) from None
     try:
-        return pickle.loads((SESSIONS / f"{session}.pickle").read_bytes())
+        return explore.load_desk(SESSIONS / f"{session}.pickle")
     finally:
         explore.release_lock(lock)
 

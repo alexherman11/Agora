@@ -60,7 +60,7 @@ explore.save_desk(SAVED, D)
 def world():
     explore.take_lock(SESS / f"{WORLD}.lock")
     try:
-        return pickle.loads(SAVED.read_bytes()).world
+        return explore.load_desk(SAVED).world      # 14 Oct: the world is its file and the log written after it
     finally:
         explore.release_lock(SESS / f"{WORLD}.lock")
 

@@ -101,6 +101,12 @@ def main(argv):
     srv = ThreadingHTTPServer(("127.0.0.1", 0), deskd.Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}"
+    # 14 Oct (Snappy Desk step 2): as deskd's main does, the world held in memory and saved in the background, unless
+    # DESKD_HOLD=off (the old way, a save at every change). The background saves are not in any request's time
+    import os
+    deskd.HOLD[0], deskd.PORT[0] = os.environ.get("DESKD_HOLD") != "off", srv.server_address[1]
+    threading.Thread(target=deskd._snapshotter, daemon=True).start()
+    print(f"world held in memory: {'yes' if deskd.HOLD[0] else 'no (DESKD_HOLD=off)'}")
 
     def call(path, body=None):
         SPENT.clear()

@@ -35,6 +35,7 @@ import scene
 from desk import aspects_of, aspects_meet, event_aspects
 
 import explore
+import store
 import worktree
 
 HERE = Path(__file__).resolve().parent
@@ -165,7 +166,7 @@ def _scene_key(q):
         visits = (HERE / "house-state" / "visits.json").stat().st_mtime_ns
     except OSError:
         visits = None
-    return (name, (q.get("as") or "alex").lower(), q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, house,
+    return (name, (q.get("as") or "alex").lower(), q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), house,
             int(time.time() // 60), visits, q.get("keys"))
 
 
@@ -213,6 +214,139 @@ _REQ = __import__("threading").local()
 TRACE = Path(__file__).resolve().parent / "house-state" / "deskd-trace.log"
 
 
+# 14 Oct (Snappy Desk, stage 1, step 2; Alex approved: the log is the world's record, and one writer). The deskd that
+# holds a world's writer lease (<world>.writer beside it) keeps the world in memory: a command appends its record to
+# the log (store.py, flushed to disk before anyone is answered) and the world's file is saved in the background, at
+# a second's pause (or every ten while busy), instead of the whole world being copied and written on every request. Any other process that
+# reads the file puts on the records written since (store.catch_up); any other writer is refused (explore.save_desk).
+# A new deskd (a landing) asks the holder to save and let go at its first change; a holder that died is replaced, and
+# its world is read back with its log. DESKD_HOLD=off keeps the old way: copy and save on every request.
+HOLD = [False]           # set by the server's main: a Session opened by a test or a tool in-process never holds
+PORT = [None]
+LEASES, RELEASED, _DIRTY, _VERSION = {}, set(), {}, {}
+_CHANGED, _SNAPPED = {}, {}      # world -> when it last changed in memory / was last saved to its file
+SNAPSHOT_QUIET, SNAPSHOT_MOST = 1.0, 10.0       # saved after a second with no change, or every ten while busy
+
+
+def _trim():
+    """At most three worlds kept in memory, the oldest let go first; never one held with changes its file lacks."""
+    for key in list(_DESKS):
+        if len(_DESKS) <= 3:
+            return
+        name = Path(key).stem
+        if not (LEASES.get(name) and _DIRTY.get(name)):
+            _DESKS.pop(key, None)
+
+
+def _lease_file(name):
+    return SESSIONS / f"{name}.writer"
+
+
+def _ask_release(name):
+    """Another live deskd holds the lease (the one before a landing): ask it to save and let go. -> True if it did."""
+    try:
+        lease = json.loads(_lease_file(name).read_text(encoding="utf-8"))
+        port = int(lease.get("port"))
+        req = __import__("urllib.request").request.Request(f"http://127.0.0.1:{port}/api/release",
+                                                           json.dumps({"session": name}).encode(),
+                                                           {"Content-Type": "application/json"})
+        with __import__("urllib.request").request.urlopen(req, timeout=15) as r:
+            return bool(json.loads(r.read()).get("released"))
+    except Exception:      # noqa: BLE001
+        return False
+
+
+def _hold(name):
+    """Called before a change takes the world's lock. -> True when this process holds the lease (it may keep the world
+    in memory); False when it must save as before. Refuses (BadRequest) when another live deskd holds it and will not
+    let go, since a second writer would lose its newer world."""
+    if not HOLD[0] or os.environ.get("DESKD_HOLD") == "off" or name in RELEASED:
+        return False
+    if LEASES.get(name):
+        return True
+    path, until = SESSIONS / f"{name}.pickle", time.time() + 20
+    if not store.log_path(path).exists():
+        return False          # a world with no log has no record but its file: saved at every change, as before
+    other = explore.holder_of(path)
+    while other is not None and other != os.getpid() and not _ask_release(name):
+        # the one before may be going (the door stops it after it saves): asked again until it is gone or answers
+        if time.time() > until:
+            raise BadRequest(f"{name} is held by another world server (pid {other}) that did not let go; nothing was "
+                             f"done, try again in a moment")
+        time.sleep(0.1)
+        other = explore.holder_of(path)
+    return None          # free now: taken under the lock (Session.__enter__), where no one else can take it between
+
+
+def _take_lease(name):
+    other = explore.holder_of(SESSIONS / f"{name}.pickle")
+    if other is not None and other != os.getpid():
+        return False
+    _lease_file(name).write_text(json.dumps({"pid": os.getpid(), "port": PORT[0], "code": CODE_VERSION,
+                                             "since": time.strftime("%Y-%m-%dT%H:%M:%S")}), encoding="utf-8")
+    LEASES[name] = True
+    return True
+
+
+def _snapshot(name, under_lock=False):
+    """Save the world this process holds in memory to its file, when something changed since the last save."""
+    path, lock = SESSIONS / f"{name}.pickle", SESSIONS / f"{name}.lock"
+    if not under_lock:
+        explore.take_lock(lock, tries=1200, pause=0.05)
+    try:
+        t0 = time.time()
+        held = _DESKS.get(str(path))
+        if held is None or not _DIRTY.get(name):
+            return False
+        d = held[1]
+        import kept
+        kept.sweep(d.world, path)
+        store.mark_snapshot(d, path)
+        data = pickle.dumps(d)
+        explore.save_desk(path, d, data)
+        st = path.stat()
+        _DESKS[str(path)] = ((st.st_mtime_ns, st.st_size), d, {})
+        _DIRTY[name], _SNAPPED[name] = False, time.time()
+        _trace(f"{time.strftime('%H:%M:%S')} {name} - snapshot wait=0 held={(time.time() - t0) * 1000:.0f} saved=yes")
+        return True
+    finally:
+        if not under_lock:
+            explore.release_lock(lock)
+
+
+def _snapshotter():
+    while True:
+        time.sleep(0.25)
+        now = time.time()
+        for name in [n for n, dirty in list(_DIRTY.items()) if dirty and LEASES.get(n)]:
+            if now - _CHANGED.get(name, 0) < SNAPSHOT_QUIET and now - _SNAPPED.get(name, 0) < SNAPSHOT_MOST:
+                continue          # still being changed: the log has it, and the file waits for a pause
+            try:
+                _snapshot(name)
+            except Exception:      # noqa: BLE001
+                store._fault(store.log_path(SESSIONS / f"{name}.pickle"), f"snapshot of {name}")
+
+
+def _release(name):
+    """Asked by the deskd that comes next: save now, give the lease back, and never take it again."""
+    lock = SESSIONS / f"{name}.lock"
+    explore.take_lock(lock, tries=1200, pause=0.05)
+    try:
+        if LEASES.get(name):
+            _snapshot(name, under_lock=True)
+            LEASES[name] = False
+            try:
+                if explore.holder_of(SESSIONS / f"{name}.pickle") == os.getpid():
+                    _lease_file(name).unlink()
+            except OSError:
+                pass
+        RELEASED.add(name)
+        _DESKS.pop(str(SESSIONS / f"{name}.pickle"), None)
+        return True
+    finally:
+        explore.release_lock(lock)
+
+
 def _trace(line):
     if os.environ.get("DESKD_TRACE") == "off":
         return
@@ -233,7 +367,7 @@ class Session:
         # whole world twice to learn they had changed nothing): `read` is a request that only looks. It copies nothing
         # and saves nothing; whatever it touched in memory (a viewer's seen-marks) is saved with the next change to the
         # world, and a deskd swapped for new code before then forgets it (the viewer sees 'since your last look' again)
-        self.read = read
+        self.read, self.hold = read, False
         if not SESSION_NAME.match(str(name)):
             # review 29 Sep: any string became a file path, `..` included, and was created and saved
             raise BadRequest(f"no session named {str(name)[:80]!r}: a session name is letters, digits, _ @ - (at most 64; no . or slashes)")
@@ -245,8 +379,14 @@ class Session:
 
     def __enter__(self):
         self._t0 = time.perf_counter()
+        hold = False if self.read else _hold(self.name)        # may ask the deskd before this one to let go (no lock held)
         explore.take_lock(self.lock, tries=1200, pause=0.05)
         self._t1 = time.perf_counter()
+        try:
+            self.hold = _take_lease(self.name) if hold is None else hold
+        except BaseException:
+            explore.release_lock(self.lock)
+            raise
         # 7 Oct: the desk this process last saved or loaded is kept in memory, and used again while the file is still
         # that one (same time and size: nobody else wrote it). Reading and unpickling 13 MB was 80 to 110 ms a request.
         # Always under the session's lock, as before; the file stays the truth, and any other writer's save is seen
@@ -258,6 +398,18 @@ class Session:
             self.stamp = None
         held = _DESKS.get(key)
         self.pickled, before = {}, None
+        if hold is None and held is not None:
+            # the lease taken just now: what this process kept from before (a read, while another held the world) may
+            # be behind the log the other wrote. Read again, file and log (test_door: one press in 72 was lost here)
+            _DESKS.pop(key, None)
+            held = None
+        elif held is not None and not LEASES.get(self.name) and held[0] == self.stamp and store.catch_up(held[1], self.path):
+            held = _DESKS[key] = (held[0], held[1], {})      # another holds it: what it logged since is put on
+        if held is not None and self.stamp is not None and held[0] != self.stamp and LEASES.get(self.name):
+            # the lease's holder is the one writer: a file changed under it was written by someone who should not have,
+            # and the world in memory is newer than it. Kept; said in the log's faults
+            store._fault(store.log_path(self.path), f"{self.name}: the file changed under the world server that holds it")
+            self.stamp = held[0]
         if held is not None and self.stamp is not None and held[0] == self.stamp:
             desk = held[1]
             # 13 Oct (a4465: a click took 600 ms, 100 of each request pickling the 18 MB world twice, reads too): the
@@ -267,7 +419,7 @@ class Session:
             before = self.pickled.get(self.actor) if self.actor in (getattr(desk, "_per", None) or {}) else None
         else:
             _DESKS.pop(key, None)
-            desk = pickle.loads(self.path.read_bytes()) if self.stamp is not None else explore.fresh()
+            desk = explore.load_desk(self.path) if self.stamp is not None else explore.fresh()
             # a4869: painters' reports were kept in the world until 14 Oct; now beside it (reports.py). Dropped before
             # `before` is taken, so it costs no write of its own: it leaves the file with the next change
             desk.__dict__.pop("_views", None)
@@ -284,7 +436,7 @@ class Session:
         # rewrite moved the file's time so the house reloaded it under the lock on every pass. A request that
         # changed nothing now writes nothing.
         per[self.actor] = (desk.seen, desk.open, desk.last_event_seen)
-        if self.read:
+        if self.read or (self.hold and self.stamp is not None):
             self.before = None
             return desk
         self.before = before if before is not None else pickle.dumps(desk) if self.path.exists() else None
@@ -299,17 +451,26 @@ class Session:
                 # for it any more, so the next request that changes anything compares against a fresh one and saves
                 if self.stamp is not None:
                     _DESKS[str(self.path)] = (self.stamp, d, {})
-                    while len(_DESKS) > 3:
-                        _DESKS.pop(next(iter(_DESKS)))
+                    _trim()
+                return
+            if self.hold and self.stamp is not None and getattr(d, "_snap_at", None):
+                # the world stays in memory (a file that does not yet say which record of the log it holds is saved
+                # once the old way below, so that a world read back from it knows which records to put on); its record is on the log already, and the file is saved in the background
+                _DIRTY[self.name], _CHANGED[self.name] = True, time.time()
+                _VERSION[self.name] = _VERSION.get(self.name, 0) + 1
+                _DESKS[str(self.path)] = (self.stamp, d, {})
+                _SNAPPED.setdefault(self.name, time.time())
                 return
             import kept
             kept.sweep(d.world, self.path)      # 7 Oct: the copies undo keeps go beside the file (kept.py), before it is saved
+            store.mark_snapshot(d, self.path)   # which record of the log the file holds (store.catch_up reads it)
             now = pickle.dumps(d)
             key = str(self.path)
             if now != self.before:
                 _DESKS.pop(key, None)             # if the save fails, what is in memory is not what the file says
                 explore.save_desk(self.path, d, now)
                 self._saved = True
+                _VERSION[self.name] = _VERSION.get(self.name, 0) + 1
                 st = self.path.stat()
                 self.stamp = (st.st_mtime_ns, st.st_size)
                 self.pickled = {}                 # the world moved: nobody else's last pickle is of this one
@@ -319,8 +480,7 @@ class Session:
                 while len(self.pickled) > 2:      # the two who asked last: each is the whole world's size
                     self.pickled.pop(next(iter(self.pickled)))
                 _DESKS[key] = (self.stamp, d, self.pickled)
-                while len(_DESKS) > 3:
-                    _DESKS.pop(next(iter(_DESKS)))
+                _trim()
         except BaseException:
             _DESKS.pop(str(self.path), None)
             raise
@@ -329,7 +489,7 @@ class Session:
             t2 = time.perf_counter()
             _trace(f"{time.strftime('%H:%M:%S')} {self.name} {self.actor} {getattr(_REQ, 'what', '?')} "
                    f"wait={(self._t1 - self._t0) * 1000:.0f} held={(t2 - self._t1) * 1000:.0f} "
-                   f"saved={'yes' if getattr(self, '_saved', False) else 'no'}")
+                   f"saved={'yes' if getattr(self, '_saved', False) else 'held' if self.hold else 'no'}")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -460,6 +620,14 @@ class Handler(SimpleHTTPRequestHandler):
                 st = (SESSIONS / f"{name}.pickle").stat() if SESSION_NAME.match(str(name)) else None
             except OSError:
                 st = None
+            held = _DESKS.get(str(SESSIONS / f"{name}.pickle")) if st is not None else None
+            if held is not None and LEASES.get(name):
+                # Snappy Desk: the world this process holds is ahead of its file (saved in the background), and is the
+                # world; read with no lock, since events are only ever appended
+                evs_all = held[1].world.events
+                total = len(evs_all)
+                return self._json({"events": [{k: v for k, v in e.items() if k != "undo"} for e in evs_all[since:total]],
+                                   "total": total})
             seen = _EVENTS.get(name)
             if st is not None and seen and seen[:2] == (st.st_mtime_ns, st.st_size) and since >= seen[2]:
                 return self._json({"events": [], "total": seen[2]})
@@ -502,6 +670,14 @@ class Handler(SimpleHTTPRequestHandler):
                           "viewport": body.get("viewport"), "facts": facts, "boxes": boxes,
                           "painted": {"frame": str(p.get("frame") or "")[:400], "style": str(p.get("style") or "")[:80]} if p else None})
             return self._json({"ok": True, "kept": len(facts)})
+        if urlparse(self.path).path == "/api/release":
+            # Snappy Desk: the deskd after this one (a landing) asks it to save the world it holds and let go
+            if body.get("all"):           # the door, before it stops this deskd
+                return self._json({"released": [n for n in [n for n, h in list(LEASES.items()) if h] if _release(n)]})
+            name = str(body.get("session", ""))
+            if not SESSION_NAME.match(name):
+                raise BadRequest("release needs a session")
+            return self._json({"released": _release(name)})
         if urlparse(self.path).path == "/api/style":
             # 8 Oct: a style text read by the one reader, for a page that edits a style it has not saved (the windowed
             # shell's style panel); nothing is stored
@@ -705,11 +881,27 @@ if __name__ == "__main__":
     SESSIONS.mkdir(exist_ok=True)
     STATIC.mkdir(exist_ok=True)
     print(f"deskd on http://localhost:{port}  static={STATIC}", flush=True)
+    HOLD[0], PORT[0] = os.environ.get("DESKD_HOLD") != "off", port
+    __import__("threading").Thread(target=_snapshotter, daemon=True).start()
+
+    def take_over():
+        # a new deskd (a landing) asks the one before to save what it holds and let go as soon as it starts, before
+        # the door stops it (a door older than 14 Oct stops it without asking); the one before saves at every change
+        # until then, and this one takes the lease at its first change
+        for f in SESSIONS.glob("*.writer") if HOLD[0] else ():
+            if explore.holder_of(f.with_suffix(".pickle")) not in (None, os.getpid()):
+                _ask_release(f.stem)
+    __import__("threading").Thread(target=take_over, daemon=True).start()
     if os.environ.get("DESKD_PARENT"):
         # a1505: a deskd the door started goes when the door goes (a stopped door on Windows leaves its children running)
         def orphaned(pid=int(os.environ["DESKD_PARENT"])):
             while explore._alive(pid):
                 time.sleep(3)
+            for name in [n for n, h in LEASES.items() if h]:      # what is held in memory is saved before going
+                try:
+                    _snapshot(name)
+                except Exception:      # noqa: BLE001
+                    pass
             os._exit(0)
         __import__("threading").Thread(target=orphaned, daemon=True).start()
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

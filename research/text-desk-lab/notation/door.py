@@ -120,6 +120,13 @@ class Backend:
         while self.busy > 0 and time.time() < t and self.alive():
             time.sleep(0.1)
         if self.alive():
+            # Snappy Desk (14 Oct): a deskd keeps the worlds it holds in memory and saves them in the background; it is
+            # asked to save them and let go before it is stopped (what it has not saved is on the log either way)
+            try:
+                ask(self.port, "/api/release", method="POST", body=json.dumps({"all": True}).encode(),
+                    headers={"Content-Type": "application/json"}, timeout=30)
+            except Exception:      # noqa: BLE001
+                pass
             self.proc.terminate()
             try:
                 self.proc.wait(timeout=20)

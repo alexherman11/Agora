@@ -828,6 +828,59 @@ def commit(ctx, desk, words, by, press=None, window=None):
     return seq
 
 
+def mark_snapshot(desk, pickle_path):
+    """Before a world is pickled to its file: which record of its log the file will hold (seq, byte after it). A world
+    read back from that file puts on any record written after it (catch_up)."""
+    log = Log(log_path(pickle_path))
+    head = log.head() if log.exists() else None
+    if head is not None:
+        desk._snap_at = (head[0], log.path.stat().st_size)
+
+
+def catch_up(desk, pickle_path):
+    """14 Oct (Snappy Desk, stage 1, step 2; Alex approved the log as the world's record): the world server keeps the
+    world in memory and saves its file in the background, so a world read from its file (after a crash, or by a reader
+    in another process) may be behind its log. The records written after the file's snapshot are put on: their facts
+    onto the world, their events into its history (as the record says them: arguments cut long, no undo copy; undo of
+    such a record goes through the log). -> how many records were put on."""
+    at = getattr(desk, "_snap_at", None)
+    if not at:
+        return 0
+    log = Log(log_path(pickle_path))
+    if not log.exists():
+        return 0
+    seq0, byte0 = at
+    head = log.head()
+    if head is None or head[0] <= seq0:
+        return 0
+    w = desk.world
+    flat, n = None, 0
+    for rec, end in log.records(byte0 if byte0 <= log.path.stat().st_size else 0):
+        if rec["seq"] <= seq0:
+            continue
+        if flat is None:
+            flat = flatten(w)
+        facts = [(t, a, v if v is ABSENT else whole(v, flat.get((t, a), ABSENT))) for t, a, v in facts_of(rec)]
+        patch(flat, facts)
+        apply(w, facts)
+        for p in rec.get("parts") or ():
+            eid = str(p.get("e") or "")
+            if not eid:
+                continue
+            w.events.append({"id": eid, "verb": p.get("verb"), "target": p.get("target"), "args": p.get("args") or {},
+                             "by": p.get("by") or rec.get("by"), "at": rec.get("at"), "cmd": rec.get("words", ""),
+                             "note": "put back from the log: the world's file was saved before it"})
+            if eid[1:].isdigit():
+                w._eseq = max(getattr(w, "_eseq", 0) or 0, int(eid[1:]))
+        if rec.get("ids") is not None:
+            w._ids = max(getattr(w, "_ids", 0) or 0, rec["ids"])
+        desk._snap_at = (rec["seq"], end)
+        n += 1
+    if n:
+        vars(w).pop("_ev_index", None)
+    return n
+
+
 def _quick_facts(ctx, w, events):
     """-> (flat after, the command's facts, facts no event names), from the things the command's events name and the
     things it made or removed. Every VERIFY_EVERY-th time, and always with DESK_LOG_VERIFY=1, the answer is checked

@@ -95,10 +95,18 @@ def release_lock(lock, anyone=False):
 def save_desk(path, desk, data=None):
     """Write the session atomically: to a temp file, then rename over the old one. Sable's baseline (1): a write killed
     halfway left a pickle that would not load, and the whole session was lost. `data`: the pickled desk, if in hand."""
+    writer = holder_of(path)
+    if writer is not None and writer != os.getpid():
+        # 14 Oct (Snappy Desk; Alex: one writer): a world server keeps this world in memory and saves it itself; a
+        # second writer would put an older world over its newer one. Send the line through the door instead.
+        raise RuntimeError(f"{path.stem} is held by its world server (pid {writer}), which saves it itself; "
+                           f"send the line through the door (DESKD), not to the file")
     tmp = path.with_name(path.name + ".tmp")
     if data is None:
         import kept
+        import store
         kept.sweep(desk.world, path)      # 7 Oct: the copies undo keeps go beside the file, when the world has an archive
+        store.mark_snapshot(desk, path)   # which record of the log this file holds (store.catch_up reads it)
     tmp.write_bytes(data if data is not None else pickle.dumps(desk))
     # 1 Oct (worker-a1568 c1920, Pike e4506): on Windows the rename is refused while any other process has the world
     # open, even only to read it (a copy taken without the lock, a virus scan of a 58 MB file), and the write was lost.
@@ -111,6 +119,27 @@ def save_desk(path, desk, data=None):
         except PermissionError:
             time.sleep(wait)
     os.replace(tmp, path)
+
+
+def holder_of(path):
+    """The pid of the live world server holding this world's writer lease (<world>.writer beside it), or None."""
+    p = Path(path).with_suffix(".writer")
+    try:
+        pid = int(json.loads(p.read_text(encoding="utf-8")).get("pid"))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+    return pid if _alive(str(pid)) else None
+
+
+def load_desk(path):
+    """A world read from its file, with any log records written after the file was saved put on (store.catch_up)."""
+    desk = pickle.loads(Path(path).read_bytes())
+    import store
+    try:
+        store.catch_up(desk, path)
+    except Exception:      # noqa: BLE001
+        store._fault(store.log_path(path), "catch_up")
+    return desk
 
 
 def fresh():
@@ -206,7 +235,7 @@ def main():
     if "--reset" in sys.argv or not path.exists():
         desk = fresh()
     else:
-        desk = pickle.loads(path.read_bytes())
+        desk = load_desk(path)
     # --as <name>: a visitor works under their own name for this visit (events say by <name>); the owner is jeff
     me = desk.world.me = sys.argv[sys.argv.index("--as") + 1].lower() if "--as" in sys.argv[:-1] else "jeff"
     # what has been seen, what is open and the since-your-last-look mark belong to each person, not to the session
