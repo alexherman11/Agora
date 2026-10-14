@@ -99,7 +99,9 @@ def sent(rid):
 
 def say(who, line, where=LOUNGE):
     """-> (the event id of the line, its m id or None, the receipt)"""
-    got = H.act(who, f"do append {where} line={house.json.dumps(line)}")
+    # a5068: a resident's line is judged on its turn's view, which the house passes (as_of); here, a turn begun now
+    turn = len(H.load().events) if who in ("pike", "juniper", "sable") else None
+    got = H.act(who, f"do append {where} line={house.json.dumps(line)}", as_of=turn)
     e = next(x for x in reversed(H.load().events) if (x.get("args") or {}).get("append") is not None and x["by"] == who)
     return e["id"], (e.get("args") or {}).get("line_id"), got
 

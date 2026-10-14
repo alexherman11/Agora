@@ -97,7 +97,9 @@ def sent(rid):
 
 
 def say(who, line, where=LOUNGE):
-    return H.act(who, f"do append {where} line={house.json.dumps(line)}")
+    # a5068: a resident's line is judged on its turn's view, which the house passes (as_of); here, a turn begun now
+    turn = len(H.load().events) if who in ("pike", "juniper", "sable") else None
+    return H.act(who, f"do append {where} line={house.json.dumps(line)}", as_of=turn)
 
 
 def rest(rid, seconds):
@@ -287,7 +289,8 @@ check("a comment's x@pike (inside a word, a1581's rule) does not wake him", not 
 import rooms   # noqa: E402
 rest(PIKE, 3600)
 rest(SABLE, 3600)
-got = H.act("juniper", f"do append {LOUNGE} line={house.json.dumps('Sable asked about this, @sable said it first')} to=pike")
+got = H.act("juniper", f"do append {LOUNGE} line={house.json.dumps('Sable asked about this, @sable said it first')} to=pike",
+             as_of=len(H.load().events))       # a5068: a resident's turn begun now, as the house passes it
 check("a line stored to=pike whose words say @sable: 'to: pike' once, 'Pike: woken', nothing about Sable",
       got.count("to: ") == 1 and "to: pike" in got and "Pike: woken" in got and "\n  Sable:" not in got, got)
 H.step()

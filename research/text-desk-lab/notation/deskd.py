@@ -866,12 +866,14 @@ class Handler(SimpleHTTPRequestHandler):
                 desk.world.intent, desk.world._intent_k = gid, 0
                 # a4164: a line the gate passed on is a human's; their person, if this act makes it, is kind=human
                 desk.world.through_gate = sess.actor if body.get("came") == "gate" else None
+                # a5068: where a resident's turn began (the house's news cursor), so its chat line is judged on that
+                desk._as_of = int(body["as_of"]) if str(body.get("as_of", "")).strip().isdigit() else None
                 try:
                     r = desk.dispatch("desk", {"line": line, "whole": bool(body.get("whole")),    # a736: a > line is one command
                                                "reply": str(body.get("reply") or "") or None,
                                                "image_context": body.get("image_context")})
                 finally:
-                    desk._act_home = desk._act_binds = None
+                    desk._act_home = desk._act_binds = desk._as_of = None
                     desk.world.intent = desk.world.through_gate = None
                 worktree.record(desk, line, sess.actor, allids, n0)
             total = len(desk.world.events)
