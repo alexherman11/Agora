@@ -18,6 +18,7 @@ const Viewer = (session, who, lens, said, status) => {
   for (const d of drafts.values()) if (!d.seen && !d.shown) d.why = unknownOrigin;
   let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed` : "";
   let text = "", told = "";
+  let shownNotice = "", noticeTimer;
   const foldStore = `lens-folds:${session}:${who}:${lens}`;
   let folds; try { folds = JSON.parse(localStorage.getItem(foldStore)) || {}; } catch { folds = {}; }
   const pending = new Map();      // key -> the draft generation in flight (codex team: a request in flight is viewer state)
@@ -49,12 +50,19 @@ const Viewer = (session, who, lens, said, status) => {
       }
       if (recovered) { notice = `kept ${recovered} draft(s) through the layout change; review the current field before sending`; v.show(); }
     },
-    // Pike (run 1): a refusal was written and then overwritten by the repaint (6 of 7 unseen). It stays until the next
-    // gesture, in the inspector and in a live status region a screen reader announces (codex team, pike-8 section 2).
+    // Keep the full refusal in the inspector and draft marker. Its brief notice
+    // occupies a reserved footer row, never the words being read or edited.
+    notify(message) { notice = message; shownNotice = ""; v.show(); },
     show(t) {
       if (t !== undefined) text = t;
       said.textContent = (notice ? notice + "\n\n" : "") + text;
-      if (status) { status.textContent = notice; status.hidden = !notice; }
+      if (status && notice !== shownNotice) {
+        clearTimeout(noticeTimer); shownNotice = notice;
+        const lines = notice.split("\n").map(s => s.trim()).filter(Boolean);
+        const summary = lines.find(s => /^(ERR|refused:)/.test(s) && !s.includes("since your last look")) || lines[0] || "";
+        status.textContent = summary; status.title = notice; status.hidden = !notice;
+        if (notice) noticeTimer = setTimeout(() => { status.hidden = true; }, 4500);
+      }
       try { localStorage.setItem(store, JSON.stringify([...drafts])); } catch {}
     },
     // one send per key at a time; the token is the draft generation that was submitted
@@ -80,6 +88,7 @@ const Viewer = (session, who, lens, said, status) => {
       const cur = drafts.get(key), newer = token && token.draft !== undefined && cur !== token.draft;
       if (!newer) v.hold = null;
       if (err) {
+        shownNotice = "";
         notice = refusal(err);
         // pike-8 section 3: a refused draft is kept, and the world's current value will be drawn beside it (both sides);
         // a resend is fenced on the value shown, never on a fresher one the person has not seen

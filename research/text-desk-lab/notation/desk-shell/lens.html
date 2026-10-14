@@ -10,8 +10,8 @@
 <style>
   /* layout mechanics only: no colour, no size, no font may appear here */
   html, body { margin: 0; height: 100%; }
-  body { display: grid; grid-template-columns: 1fr minmax(0, 40%); }
-  body[data-inspector="off"] { display: block; }
+  body { display: grid; grid-template-columns: 1fr minmax(0, 40%); grid-template-rows: minmax(0, 1fr) 2em; }
+  body[data-inspector="off"] { grid-template-columns: minmax(0, 1fr); }
   body[data-inspector="off"] #said { display: none; }
   /* term.js: the right-hand pane is a desk terminal by default; ?side=scene shows the scene text, ?inspect=0 neither */
   body[data-inspector="term"] #said { display: none; }
@@ -25,12 +25,14 @@
   #paint, #said { overflow: auto; min-width: 0; }
   /* the painted root is a flex item of the window: with `share` it takes the window's height and its shares split it
      (Alex, 29 Sep: no infinite scroll, the window is bounded); without one it keeps its own height and #paint scrolls */
-  #paint { height: 100%; display: flex; flex-direction: column; }
+  #paint { height: 100%; min-height: 0; display: flex; flex-direction: column; grid-column: 1; grid-row: 1; }
+  #said, #term { grid-column: 2; grid-row: 1; min-height: 0; }
   #paint > [data-key] { flex-shrink: 0; }
   .l-grid[data-bounded] > [data-key] { min-height: 0; }
   /* the live refusal region (codex team, pike-8): announced to screen readers; shown when the inspector is off */
-  #status { position: fixed; inset: auto 1rem 1rem auto; z-index: 10; max-width: min(60ch, calc(100vw - 2rem));
-    max-height: 30vh; overflow: auto; white-space: pre-wrap; box-sizing: border-box; }
+  #status { grid-column: 1 / -1; grid-row: 2; min-width: 0; max-height: 2em; overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box; }
+  body:has(#status:not([hidden])) #door.door-fixed { visibility: hidden; }
   body[data-inspector="on"] #status { clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
   #said { white-space: pre; margin: 0; }
   .l-column { display: flex; flex-direction: column; }

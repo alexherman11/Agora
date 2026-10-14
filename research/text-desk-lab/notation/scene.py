@@ -124,7 +124,7 @@ GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
 # the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
 # kept is the lens's word (a prop on the viewer's own desk, a line, a thing), so it is world data anyone can read.
-KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace")      # the keys a text hands to its lens (7 Oct: a document's keys)
+KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace", "Delete")      # boundary deletion is authored in either direction
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.

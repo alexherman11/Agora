@@ -56,13 +56,17 @@
   let last = "", sceneAt = 0, def = null;
 
   // a key's gesture (TEXT.key): sent as the text's own, and the answer comes back so the caret can follow what was made
-  async function sendKey(n, line) {
+  async function sendKey(n, line, consume) {
     const observed = { ...(n.fence || {}), at: sceneAt, def }, gesture = V.gesture(n.key, false);
     let r;
     try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture }) })).json(); }
-    catch (e) { V.show(`the answer was lost (${e.message})`); last = ""; await refresh(true); return null; }
-    const t = r.text || r.error || ""; if (r.error || t.startsWith("ERR")) V.show(t);
-    last = ""; await refresh(true); return r;
+    catch (e) { last = ""; await refresh(true); V.notify(`the answer was lost (${e.message}); your draft is kept`); return null; }
+    const t = r.error || r.text || "", failed = r.error || /(^|\n)ERR\b/.test(t);
+    if (!failed) { if (consume) V.drop(consume.key); V.hold = null; }
+    else if (consume) V.answered(consume.key, t, consume.text);
+    last = ""; await refresh(true);
+    if (failed) V.notify(t);               // a refresh must not erase the refusal
+    return r;
   }
 
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
@@ -440,6 +444,9 @@
       // edited in a document were not saved on leaving: a fix that read a default as a lens's word.)
       const committing = el._committing; el._committing = false;
       if (!document.hasFocus() || (el._n.paint.commit_only && !committing)) { V.hold = null; return; }
+      // Focusing rendered marks without changing them is not an edit. Their
+      // visible text omits the source delimiters, so saving it would strip marks.
+      if (!V.drafts.has(n.key)) { V.hold = null; return; }
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
@@ -498,24 +505,28 @@
           this.key(el, { key: k.key, shiftKey: k.shiftKey, preventDefault() { stopped = true; }, stopImmediatePropagation() {} });
           if (stopped) { this.queue.push(...keys.slice(i + 1)); return; }      // that key began another wait: the rest follow it
           if (k.key === "Backspace") document.execCommand("delete");
+          if (k.key === "Delete") document.execCommand("forwardDelete");
         }
       });
     },
     press(el, key) { if (el._toSource) MARKS.key(el, { key: key.split("+").pop().toLowerCase(), preventDefault() {} }, el._toSource); },
     key(el, e) {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
       const name = (e.shiftKey ? "Shift+" : "") + e.key, a = el._n.acts.find(x => x.on === "key" && x.label === name);
       if (!a) return;
       el._toSource(); const c = this.caret(el); if (!c) return;
-      if (name === "Backspace" && (c.at > 0 || c.wide)) return;        // only at the very start does it join
+      if (name === "Backspace" && (c.at > 0 || c.wide)) return;
+      if (name === "Delete" && (c.at < el.innerText.replace(/\n$/, "").length || c.wide)) return;
       e.preventDefault(); e.stopImmediatePropagation();
       const src = el.innerText.replace(/\n$/, ""), seen = V.editOrigin(el._n.key, el._n) || el._n, key = el._n.key, item = (el._n.fence || {}).item;
-      const before = [...paint.querySelectorAll("[contenteditable]")].filter(x => x._n && x._n.part === el._n.part);
+      const before = [...paint.querySelectorAll("[contenteditable]")].filter(x => x._n && x._n.part === el._n.part && x._n.fence?.bind?.parent === el._n.fence?.bind?.parent);
       const prev = before[before.indexOf(el) - 1], prevLen = prev ? (prev._n.paint.text || "").length : 0, prevKey = prev && prev._n.key;
-      const whole = /[$](head|tail)/.test(a.line);       // a command told the words takes them: the draft is not sent again
-      if (whole) { V.drop(key); V.hold = null; }
-      const line = a.line.replace("$head", () => this.esc(src.slice(0, c.at))).replace("$tail", () => this.esc(src.slice(c.at)));
-      this.wait(sendKey(seen, line).then(r => {
+      const whole = /[$](head|tail|value)\b/.test(a.line);
+      const line = a.line.replace(/\$(head|tail|value)\b/g, (_, word) => this.esc(word === "head" ? src.slice(0, c.at) : word === "tail" ? src.slice(c.at) : src));
+      // Keep the draft and its original fence until the command succeeds.
+      // A refused split/join must never discard words that exist only here.
+      this.wait(sendKey(seen, line, whole ? { key, text: src } : null).then(r => {
+        if (!r || r.error || /(^|\n)ERR\b/.test(r.text || "")) return;
         const made = r && (r.created || [])[0], find = k => paint.querySelector(`[data-key="${CSS.escape(k)}"]`);
         const same = find(key), born = made && item && find(key.split(item).join(made));
         if (born) this.put(born, 0);
@@ -560,8 +571,8 @@
     },
   };
   document.addEventListener("keydown", e => {
-    if (!TEXT.queue || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key.length === 1 || /^(Enter|Tab|Backspace)$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey }); }
+    if (!TEXT.queue || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    if (e.key.length === 1 || /^(Enter|Tab|Backspace|Delete)$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); TEXT.queue.push({ key: e.key, shiftKey: e.shiftKey }); }
   }, true);
   document.addEventListener("selectionchange", () => {
     const sel = getSelection(), el = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);

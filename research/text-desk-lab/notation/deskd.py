@@ -579,13 +579,16 @@ class Handler(SimpleHTTPRequestHandler):
                                            "events_total": len(desk.world.events), "line": line})
                     continue
                 cur = desk.world.subjects.get(sid) or desk.world.nodes.get(sid)
-                if cur is not None and cur["rev"] != rev and fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields):
-                    continue              # it moved, but on an aspect this gesture never read
-                if cur is None or cur["rev"] != rev:
+                unchanged = cur is not None and (cur["rev"] == rev or (fields and not touched_aspects(desk.world, sid, rev, cur["rev"], fields)))
+                if not unchanged:
                     return self._json({"text": None, "error": f"refused: a value this gesture was built from has changed: {sid} (you saw revision {rev}, "
                                        f"it is now {cur['rev'] if cur else 'gone'}); nothing was done. The view will repaint.",
                                        "events_total": len(desk.world.events), "line": line})
-                desk._note_seen(ob["item"], int(ob.get("at", 0)), sorted(fields) if fields else None, obs=sess.actor)
+                # Each validated read belongs to its own thing. A command may change
+                # several things shown together; recording every read on the clicked
+                # item left the other targets unseen (and the command refused).
+                desk.seen[sid] = cur["rev"]
+                desk._note_seen(sid, len(desk.world.events), sorted(fields) if fields else None, obs=sess.actor)
             if car.get("item"):
                 line = line.replace("$carried", car["item"])
             # 7 Oct: a world that has a log (store.py) gets one record per line: the facts it changed, written beside

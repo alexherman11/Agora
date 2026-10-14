@@ -100,6 +100,10 @@ def term_aspects(q):
 
 def _member_reads(w, i, q):
     """The [id, rev, aspects] entries that say `i` is a member of select(q)."""
+    if S._named(w, q) is not None:
+        # Naming an identity does not read its placement or its children. Its
+        # live/unplaced/gone state is carried by the named selection instead.
+        return []
     subj, app = term_aspects(q)
     n = w.nodes.get(i)
     sid = n.get("subject") if n else (i if i in w.subjects else None)
@@ -287,12 +291,22 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     return keys
                 named, ids = acc.select(q)
                 ids = [i for i, _ in named] if named is not None else ids
-                cb.append(["select", q, list(ids)])
+                cb.append(["select", q, [list(x) for x in named] if named is not None else list(ids)])
                 return ids
             def field(i, f):
                 if isinstance(i, str) and i.startswith("\x00row"):
                     return rowbag[int(i[4:])].get(f)
                 tc = acc.thing(i)
+                # An aggregate's member fields are real reads too. Recording only
+                # membership let a computed command carry old text without its
+                # revision, and left its target unseen at dispatch.
+                aspect = S._aspect_of_field(f)
+                nd = w.nodes.get(i)
+                if nd:
+                    cb.append([i, nd["rev"], ["place"]])
+                owner = (nd.get("subject") or i) if nd else i
+                if aspect and owner and S._rev_of(w, owner) is not None:
+                    cb.append([owner, S._rev_of(w, owner), [aspect]])
                 return tc.get(f) if (f in tc and not f.startswith("_")) else (tc.get("_props") or {}).get(f)
             return {"get": get, "select": select, "field": field, "reads": []}
         groups = {}
@@ -424,11 +438,16 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["missing"] = sorted(set(out.get("missing") or []) | {f"{m} on {frames[m.split('.')[0]].get('id')}" for m in track["missing"]})
         if out["acts"]:
             reads, fields = {}, {}
-            sj = (w.nodes.get(ctx.get("item") or "") or {}).get("subject")
+            current_node = w.nodes.get(ctx.get("item") or "") or {}
+            sj = current_node.get("subject") or current_node.get("id")
             for f in track.get("own", ()):
                 a = S._aspect_of_field(f)
                 if a and sj:
                     fields.setdefault(sj, set()).add(a)
+                if f in ("before", "after") and current_node.get("parent"):
+                    parent = current_node["parent"]
+                    reads[parent] = S._rev_of(w, parent)
+                    fields.setdefault(parent, set()).add("place")
             for k in track["reads"]:
                 fr, _, fld = k.partition(".")
                 if fr in S.HOST_FRAMES:
@@ -494,6 +513,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in
                     shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]
                              + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []
+                    if named is not None and not shown:
+                        shown = [["select", sel_text, [list(x) for x in named]]]
                     order = [x[0] for x in named] if named is not None else list(ids)
                     place = dict(zip(order, S.run_places([moo.props_of(w, i).get(b["run"]) for i in order]))) if b.get("run") else {}
                     if named is not None:
