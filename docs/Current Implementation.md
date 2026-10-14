@@ -1018,6 +1018,11 @@ context lifecycle/delivery tests: 31 passed. Copied-world health: passed in 114.
 resident attachment reply remain pending integration checks. The prototype currently
 shows the latest 80 exchanges; older-history browsing, recipient completion and deletion
 of removed/sent private capture files are not implemented in the conversation UI.
+The working indicator uses an exact single-recipient comparison. Multiple recipients
+remain valid for sending, but do not show a combined activity indicator; interpolating
+the comma-separated list into the row query was found to refuse the whole lens and was
+replaced with a safe per-row comparison. The corrected multi-recipient scene and removal
+of one attachment while retaining the others were checked in the live browser.
 
 ## Related documents
 

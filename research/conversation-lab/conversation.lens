@@ -72,7 +72,7 @@ message : column
 writing : column
   role dock
   activity : column
-    of house resident=$draft.to doing=working
+    of house doing=working
     each working
   audience : row
     label : text "To"
@@ -125,4 +125,5 @@ attachment : column
     summary : text "$summary"
       role meta
 working : text "$resident is working • • •"
+  only when $draft.to = $resident
   role activity
