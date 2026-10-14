@@ -983,6 +983,47 @@ The growth measure (`research/object-facet-frontier/experiments/growth/measure.p
 
 **For "comments keep their place" and "work apart": text with element identity (POSITION 8.3).** *Not built.* The order is anchored comments first, then the text gateway, then a CRDT only if offline writing becomes near-term.
 
+## Conversation prototype (14 October 2026)
+
+This addition records the candidate separately from the older whole-document audit above.
+Its full current contract is in Handbook note `a243`, under “Conversation prototype and
+captured context”. The normal export was attempted and preserved this file because it
+already differs from its export stamp; existing text has not been overwritten.
+
+The native lens and style live in `research/conversation-lab/`. The general
+`sayings involving:<person>` source combines their own outgoing and explicitly addressed
+incoming lines, comments and replies while retaining original reply targets. `default_to`
+supplies a visible selected audience when no explicit header or `to=` is present.
+Explicit composers preserve drafts, support multiline input and show refusal reasons.
+
+`captures <ids>` shows private attachment previews. Sending with
+`captures="observed ids" context_from=<draft>` stores the captured evidence on the message
+and detaches only those IDs atomically; later attachments remain. Replay uses the stored
+evidence without private files. The house delivers captured content only to addressed
+residents, labels its source message, and reports current object revision separately.
+Captured wording is never silently replaced by newer wording.
+
+Batched capture sends journal each successful dispatch step against its own event IDs,
+including two sends to the same chat; failed and unrun tails are excluded. Replay tests
+remove access to private captures and compare complete native state. Explicitly unresolved
+screen references retain quoted words and report current identity unavailable, without
+inventing or looking up an object ID. Follow-up checks: 99 focused tests passed, repository
+tests 201 passed / 2 skipped, and the newly landed agent-line fence's standalone tests passed.
+
+**Ran:** browser input at 320/420/600px, draft recovery and refusal, a 1298-character
+multiline message to two recipients, original-thread reply, and capture/send after source
+change. Repository tests: 201 passed, 2 skipped; scene/thread tests: 54 passed; focused
+context lifecycle/delivery tests: 31 passed. Copied-world health: passed in 114.0s,
+20 active lenses compile, zero unexpected refusals. Real desktop selection and a real
+resident attachment reply remain pending integration checks. The prototype currently
+shows the latest 80 exchanges; older-history browsing, recipient completion and deletion
+of removed/sent private capture files are not implemented in the conversation UI.
+The working indicator uses an exact single-recipient comparison. Multiple recipients
+remain valid for sending, but do not show a combined activity indicator; interpolating
+the comma-separated list into the row query was found to refuse the whole lens and was
+replaced with a safe per-row comparison. The corrected multi-recipient scene and removal
+of one attachment while retaining the others were checked in the live browser.
+
 ## Related documents
 
 - [[Agora]]: purpose and experience.

@@ -222,7 +222,7 @@ def unmarked_in(reply):
     return n
 
 
-def deskd_do(world, who, text, whole=False, stored=None, kind=None):
+def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
     """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
     or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736).
     kind (a3204): the line is signed `who` but is the house's own, 'rest' or 'wake'; it is sent as by=house with that
@@ -237,6 +237,7 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None):
     for k, line in enumerate(lines):
         body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply,
                            **({"stored": stored} if stored else {}),
+                           **({"as_of": as_of} if as_of is not None else {}),
                            **({"by": "house", "kind": kind} if kind else {})}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
@@ -396,6 +397,8 @@ class Resident:
             self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + pending["carry"]).strip("\n")
         if not (pending.get("delivered") and self.state.get("session")):
             self.state.setdefault("image_comments", []).extend(pending.get("image_comments") or [])
+            self.state.setdefault("message_contexts", []).extend(
+                pending.get("message_contexts") or [])
         self.save()
 
     def start(self, model):
@@ -471,10 +474,33 @@ class Resident:
             self.state.pop("welcome_due", None)
         self.state["last_sent"] = now()
         refs = self.state.pop("image_comments", [])
-        self.state["pending"] = {"kind": kind, "carry": carry or "", "image_comments": refs}
+        contexts = self.state.pop("message_contexts", [])
+        self.state["pending"] = {"kind": kind, "carry": carry or "",
+                                 "image_comments": refs, "message_contexts": contexts}
         self.save()
         from image_comments import content
         blocks = [{"type": "text", "text": text}] + (content(self.house.load(), refs) if refs else [])
+        if contexts:
+            from message_context import model_content
+            from world import Refusal
+            world = self.house.load()
+            for mid in dict.fromkeys(contexts):
+                _, line = world.find_line(mid)
+                saved = (line or {}).get("fields", {}).get("context")
+                if saved:
+                    try:
+                        attached = model_content(world, saved, session=self.house.world)
+                        for block in attached:
+                            if block.get("type") == "text":
+                                block["text"] = (
+                                    f"Attached to native message {mid}:\n" + block["text"])
+                        blocks.extend(attached)
+                    except (ValueError, Refusal) as exc:
+                        blocks.append({"type": "text",
+                                       "text": f"{mid}: saved context unavailable: {exc}"})
+                else:
+                    blocks.append({"type": "text",
+                                   "text": f"{mid}: saved context is no longer available."})
         msg = {"type": "user", "message": {"role": "user", "content": blocks}}
         try:
             self.proc.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
@@ -564,16 +590,19 @@ class House:
             self.desk, self.mtime = export_docs.load(self.world), m
         return self.desk.world
 
-    def act(self, who, line, whole=False, stored=None, kind=None):
+    def act(self, who, line, whole=False, stored=None, kind=None, as_of=None):
         """Desk lines as `who`. Through deskd when it is up, so residents and the painter run the same code (one host);
         otherwise the same path a desk tool call takes, one fresh process per call. whole (a736): each line is one
         command, a ; in it is words; for a resident's > lines. The house's own lines (wake strings) keep ; as a
         separator. stored (a1156): the node whose stored line this is (a corner, for its wake): it stands there and
         its words mean what they were bound to when it was set. kind (a3204): a line the house sends as a resident
-        that is not the resident's own: 'rest' (its answer is only logged) or 'wake' (its answer opens their wake)."""
-        text = deskd_do(self.world, who, line, whole, stored, kind)
+        that is not the resident's own: 'rest' (its answer is only logged) or 'wake' (its answer opens their wake).
+        as_of (a5068): where the resident's turn began, the event count its news had reached when the turn's input was
+        sent; its chat lines and thread replies are judged on what that turn was shown."""
+        text = deskd_do(self.world, who, line, whole, stored, kind, as_of)
         if text is None:
-            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored})
+            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored,
+                                         **({"as_of": as_of} if as_of is not None else {})})
         return text
 
     def misses(self, r, actor, lines):
@@ -786,6 +815,19 @@ class House:
     def _knocked(self, r, e, s, resting):
         """a3150: remember which line ended this rest, for the wake's first line (woken_by). Only while it rests: a
         line heard with a receipt woke no one."""
+        mid = (e.get("args") or {}).get("line_id")
+        if mid and s:
+            line = next((line for line in s.get("lines", []) if line["id"] == mid), None)
+            if line and (line.get("fields") or {}).get("context"):
+                # A corner's owner hears its chat even when a line calls someone
+                # else. Attachments follow the stored address, not that ambient feed.
+                import rooms
+                world = self.load()
+                actor = (world.nodes.get(r.rid, {}).get("props") or {}).get("actor")
+                if actor and rooms.calls(world, s, rooms.line_to(e)[0], actor):
+                    refs = r.state.setdefault("message_contexts", [])
+                    if mid not in refs:
+                        refs.append(mid)
         cid = (e.get("undo") or {}).get("drop_comment") or (e.get("args") or {}).get("id")
         if e.get("verb") in ("comment", "resolve") and cid and s:
             c = next((c for c in s.get("comments", []) if c["id"] == cid), None)
@@ -1086,7 +1128,8 @@ class House:
             return
         attempts, rest = rest_in(commands_in(text))
         n0 = len(w.events)
-        receipt = self.act(actor, "\n".join(attempts), whole=True) if attempts else ""
+        # a5068: news runs only between turns, so the cursor is where this turn's input left off (a2870 Revision 2)
+        receipt = self.act(actor, "\n".join(attempts), whole=True, as_of=r.state.get("cursor")) if attempts else ""
         if attempts and any(e.get("by") == actor and e.get("verb") != "go" for e in self.load().events[n0:]):
             r.state["idle_wakes"] = 0         # it changed something: an open objective asks again after `breather`
         # Sable c742: a > line nothing answers (a quote) says MISS and stops nothing after it; the desk decides, since
@@ -1250,7 +1293,8 @@ class House:
                 if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     self.restart_since = getattr(self, "restart_since", None) or now()
                     busy = ([r.rid for r in self.residents.values() if r.busy]
-                            + [c for c, x in self.workshop.workers.items() if x.busy])
+                            + [c for c, x in self.workshop.workers.items() if x.busy]
+                            + [f"landing {c}" for c in self.workshop.landing])      # a landing being judged is never cut
                     if not busy or now() - self.restart_since >= RESTART_GRACE:
                         print("house: the code changed; restarting on it"
                               + (f" (cutting {', '.join(busy)}: each resumes, and is told)" if busy else ""), flush=True)

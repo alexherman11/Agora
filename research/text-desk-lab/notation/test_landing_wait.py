@@ -226,5 +226,29 @@ said, _ = house_said(S5, mark)
 check("5. does not merge: back to working, told to merge main into the branch", state(S5) == "working"
       and "does not merge" in text(said[0]) and "git merge main" in text(said[0]), [text(e) for e in said])
 
+# ---- 6. the house's pass does not wait on the judging ---------------------------------------------------------------
+# Codex e9951, 14 Oct: the house's beat stopped for the minutes a landing's health ran inside its pass
+import time   # noqa: E402
+K6, S6, wk6 = commission("Slow", {"slow.py": "# slow\n"})
+wk6.busy, wk6.alive, wk6.turns_ended = False, (lambda: True), (lambda: [])
+WS.workers[K6] = wk6
+fast = landing.health
+landing.health = lambda world, cwd: (time.sleep(1.5), fast(world, cwd))[1]
+try:
+    mark = len(W.events)
+    t0 = time.perf_counter()
+    WS.step(W, {"workers": "1"})
+    took = time.perf_counter() - t0
+    check("6. a pass that starts a landing returns before it is judged; the card says landing", took < 1.0
+          and state(S6) == "landing" and K6 in WS.landing, (round(took, 2), state(S6)))
+    WS.landing[K6]["thread"].join(30)
+    WS.step(W, {"workers": "1"})
+    said, knocks = house_said(S6, mark)
+    check("6. the pass after it ends says the outcome, once: landed", state(S6) == "landed" and K6 not in WS.landing
+          and [text(e) for e in said if text(e).startswith("landed as ")] and len(knocks) == 1, [text(e) for e in said])
+finally:
+    landing.health = fast
+    WS.workers.pop(K6, None)
+
 print(f"{len(fails)} FAILED" if fails else "all passed")
 sys.exit(1 if fails else 0)

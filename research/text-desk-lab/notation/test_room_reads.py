@@ -102,8 +102,11 @@ check("the Lounge narrated from Home does not offer a $here verb", "(say <words>
 reply(ME, f"go {HOME} :1", f"go {LOUNGE}")
 reply(OTHER, "say a line after pike looked")
 got = reply(ME, "say second")
-check("someone speaks after the look: '1 line from others you haven't seen'",
-      not got[-1][2] and "1 line from others you haven't seen" in got[-1][1], got)
+# a5068: an agent's line on an old view waits, shown what was said; the same line again goes as written
+check("someone speaks after the look: the line waits, and the receipt prints theirs",
+      "held, not sent" in (got[-1][1] + got[-1][2]) and "a line after pike looked" in (got[-1][1] + got[-1][2]), got)
+got = reply(ME, "say second")
+check("and the same line again goes, with nothing from others unseen", not got[-1][2] and not behind(got[-1][1]), got)
 
 # 3. a line the look cuts is not read, for the receipt
 reply(OTHER, f"say {LONG}")

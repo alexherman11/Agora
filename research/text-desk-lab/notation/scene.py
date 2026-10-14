@@ -241,6 +241,7 @@ def _cmd_value(v):
 # somewhere; here it gets named fields. `rows <source>` prints the same rows in the desk, so a lens never sees
 # anything the terminal cannot.
 SOURCES = {
+    "captures": ("captures [cap-<id> ...]", ("cid", "label", "summary", "remaining")),
     "sections": ("sections:<id>", ("item", "heading", "words", "text", "index")),
     "comments": ("comments:<id>", ("item", "cid", "by", "text", "state", "replies", "image", "awaiting", "to", "eid", "unread", "unread_count", "reply_count", "latest", "opening_awaiting")),
     "replies": ("replies:<id>", ("item", "rid", "thread", "by", "text", "index", "awaiting", "to", "eid", "unread")),
@@ -257,8 +258,10 @@ SOURCES = {
     # a3319 (lines phase 2): chat lines and comments as they are stored, two kinds read through one showing. `what` is
     # line or comment, `saying` its own id (m<n> or c<n>), `name` its writer as a word an @ can call; answered and
     # before are filled when for:<name> says whose For you it is
-    "sayings": ("sayings [for:<name>] [in:<id>]", ("item", "what", "saying", "by", "name", "at", "in", "to", "said",
-                                                    "answered", "edited", "before", "state", "eid", "thread")),
+    "sayings": ("sayings [for:<name>] [in:<id>] (or involving:<name>)",
+                ("item", "what", "saying", "by", "name", "at", "in", "to", "said",
+                 "answered", "edited", "before", "state", "eid", "thread",
+                 "source", "line", "reply_to", "mark", "context", "context_summary")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
     "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),   # and each line's own fields
@@ -393,23 +396,32 @@ def saying_rows(desk, terms=""):
       before    a2692: 'addressed to you before you were a member of this chat', for a line that never knocked them
                 (Pike c2697: the knock is a happening, read as membership was; For you is a showing, read as it is).
     A row also answers to the names For you's rows had (chat, who, open, index, line), so `inbox:<name>` is this
-    source under its first name."""
+    source under its first name.
+
+    `involving:<name>` instead keeps their own outgoing sayings and explicitly
+    addressed incoming sayings (subject to incoming chat membership). Broadcasts
+    alone do not qualify. It does not infer read, answered or agreement state.
+    Native lines remain one row even when their text spans several lines."""
     import persons
     import rooms
     from world import addressed_before
     w = desk.world
-    me, only = "", None
+    me, involving, only = "", "", None
     for t in str(terms).replace(",", " ").split():
         k, _, v = t.partition(":")
         if k == "for" and v:
             me = v.lower()
+        elif k == "involving" and v:
+            involving = v.lower()
         elif k == "in" and v:
             nid = desk._resolve(v)
             only = (w.nodes.get(nid) or {}).get("subject") or (nid if nid in w.subjects else None)
             if only is None:
                 raise LensRefusal(f"sayings in:{v}: {v} has no lines or comments to list")
         else:
-            raise LensRefusal(f"sayings: unknown term {t!r}; sayings [for:<name>] [in:<id>], e.g. sayings for:$me")
+            raise LensRefusal(f"sayings: unknown term {t!r}; " + SOURCES["sayings"][0])
+    if me and involving:
+        raise LensRefusal("sayings takes either for:<name> or involving:<name>, not both")
     where = {}
     for nid, n in w.nodes.items():
         if n["type"] == "appearance" and n["subject"] not in where:
@@ -423,8 +435,14 @@ def saying_rows(desk, terms=""):
         if s["kind"] == "chat" and not (me and not rooms.is_member(w, s, me)):
             tl = text_lines(w, sid)
             mine_after = False              # walking back from the end: has a line of mine come after this one?
+            listed = set()
             for k in range(len(tl) - 1, -1, -1):
                 text, line, (at, eid) = tl[k]
+                if involving and line is not None:
+                    if line["id"] in listed:
+                        continue
+                    listed.add(line["id"])
+                    text = line["text"]
                 m = w.SPEAKER.match(text)
                 who = m.group(1).lower() if m else ""
                 if me and who == me:
@@ -446,12 +464,32 @@ def saying_rows(desk, terms=""):
                 by = m.group(0).rstrip(" \t:") if m else ""
                 answered = ("yes" if mine_after else "no") if me else ""
                 # eid keys the row (the line's own event), so a line keeps its place in the painter as newer ones arrive
-                out.append({"item": where[sid], "what": "line", "saying": line["id"] if line else "", "by": by,
+                row = {"item": where[sid], "what": "line",
+                            "saying": line["id"] if line else "", "by": by,
                             "name": who, "at": _clock(at), "in": s["title"], "to": ", ".join(to), "said": said,
                             "answered": answered, "edited": "edited" if line and line.get("edited") else "",
                             "before": before, "state": "", "eid": eid or f"{where[sid]}-{k + 1}",
                             "chat": s["title"], "who": by, "open": flip.get(answered, ""), "index": k + 1,
-                            "line": line["id"] if line else "", "_t": (at or "", _enum(eid))})
+                            "line": line["id"] if line else "", "_t": (at or "", _enum(eid)),
+                            "source": sid, "thread": "",
+                            "reply_to": line.get("reply_to", "") if line else "",
+                            "mark": "", "context": ""}
+                # An authored field may describe a line, never forge its identity,
+                # author, recipients, source or presentation bookkeeping.
+                if line:
+                    reserved = set(SOURCES["sayings"][1]) | set(row)
+                    extra = {key: value for key, value in line_fields(line).items()
+                             if key not in reserved and not key.startswith("_")
+                             and isinstance(value, str)}
+                    row.update(extra)
+                    for key in ("mark", "context"):
+                        value = line_fields(line).get(key, "")
+                        row[key] = value if isinstance(value, str) else ""
+                row["context_summary"] = ""
+                if row["context"]:
+                    from message_context import summary
+                    row["context_summary"] = summary(row["context"])
+                out.append(row)
         cs = s.get("comments") or []
         for i, c in enumerate(cs):
             e = made.get(c["id"])
@@ -480,7 +518,9 @@ def saying_rows(desk, terms=""):
                         "at": _clock(at), "in": s["title"], "to": ", ".join(to or []), "said": c["text"],
                         "answered": answered, "edited": "", "before": "", "state": state,
                         "eid": e["id"] if e else c["id"], "chat": s["title"], "who": by, "open": flip.get(answered, ""),
-                        "index": i + 1, "line": "", "_t": (at or "", _enum(e["id"] if e else ""))})
+                        "index": i + 1, "line": "", "_t": (at or "", _enum(e["id"] if e else "")),
+                        "source": sid, "thread": c["id"], "reply_to": "",
+                        "mark": "", "context": ""})
         # Replies are sayings in their own right: a return message to the opening
         # author must reach For you even though their own opening comment does not.
         for c in cs:
@@ -501,8 +541,41 @@ def saying_rows(desk, terms=""):
                             "to": ", ".join(to), "said": reply["text"], "answered": answered, "edited": "",
                             "before": "", "state": "resolved" if c.get("resolved") else "open", "eid": eid,
                             "chat": s["title"], "who": by, "open": flip.get(answered, ""), "index": i, "thread": c["id"],
-                            "line": "", "_t": (at or "", _enum(eid))})
+                            "line": "", "_t": (at or "", _enum(eid)),
+                            "source": sid, "reply_to": "", "mark": "", "context": ""})
     out.sort(key=lambda r: r.pop("_t"))
+    if involving:
+        target = persons.resolve(w, involving)[0] if persons.on(w) else None
+        viewer = persons.name_now(w, target) if target else involving
+
+        def matches(name, event, author=False):
+            if target:
+                # Stored names belong to the person at the event, not whoever
+                # might take up that same name later.
+                pid = persons.of_event(w, event) if author and \
+                    persons.norm(event.get("by")) == persons.norm(name) else None
+                pid = pid or (name if persons.is_pid(w, name) else
+                              persons.at(w, name, _enum(event["id"])) if event.get("id") else
+                              persons.today(w, name))
+                return pid == target
+            return rooms.same_person(w, name, involving)
+
+        def included(row):
+            event = w.event_by_id(row["eid"]) or {}
+            if matches(row["name"], event, author=True):
+                return True
+            named = [name.strip() for name in row["to"].split(",")
+                     if name.strip() and name.strip() not in rooms.EVERYONE]
+            if not any(matches(name, event) for name in named):
+                return False
+            return row["what"] != "line" or rooms.is_member(
+                w, w.subjects[row["source"]], viewer)
+
+        out = [row for row in out if included(row)]
+    extra = {key for row in out for key in row} - set(SOURCES["sayings"][1])
+    for row in out:
+        for key in extra:
+            row.setdefault(key, "")
     return out
 
 
@@ -649,8 +722,35 @@ def rows(desk, source, session=None):
     import knife
     src = source.strip()
     first, _, rest = src.partition(" ")
+    if source_head(src) == "captures":
+        ids = list(dict.fromkeys(rest.split()))
+        if len(ids) > 8 or any(not re.fullmatch(r"cap-\d+", cid) for cid in ids):
+            raise LensRefusal("captures takes at most eight cap-<id> references")
+        if not ids:
+            return []
+        try:
+            import captures
+        except ImportError:
+            return [{"cid": cid, "label": "Attachment unavailable",
+                     "summary": "Capture service unavailable; this attachment is kept.",
+                     "remaining": " ".join(other for other in ids if other != cid)}
+                    for cid in ids]
+        rows = []
+        capture_session = session or getattr(desk, "_session", "")
+        actor = str(desk.world.me).split("/")[0]
+        for cid in ids:
+            try:
+                value = captures.load_capture(capture_session, actor, cid)
+                refs = value.get("refs") or []
+                label = f"{len(refs)} native item(s)" if refs else "Image selection"
+                summary = captures.preview(capture_session, actor, cid)
+            except captures.CaptureError as exc:
+                label, summary = "Attachment unavailable", str(exc)
+            rows.append({"cid": cid, "label": label, "summary": summary,
+                         "remaining": " ".join(other for other in ids if other != cid)})
+        return rows
     if source_head(src) == "sayings":
-        own = [t for t in rest.split() if t.startswith(("for:", "in:"))]        # the source's own words
+        own = [t for t in rest.split() if t.startswith(("for:", "involving:", "in:"))]
         terms = [t for t in rest.split() if t not in own]
         rs = saying_rows(desk, " " + " ".join(own) if own else "")
     else:

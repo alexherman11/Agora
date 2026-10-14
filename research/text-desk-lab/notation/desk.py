@@ -210,9 +210,27 @@ class Desk:
     read_cap = None # round 11 (lean): at most this many read/examine commands per call; the rest are folded, visibly
 
     def dispatch(self, name, args):
+        # Worktree recording happens once per call, after a batch may have stopped.
+        # Keep the actual steps and their event ranges, including read-only steps;
+        # matching appends by target alone would confuse two sends to one chat.
+        journal = {"line": args.get("line", ""), "steps": []}
+
+        def one(step_args, step_name="desk", whole=False):
+            n0 = len(self.world.events)
+            result = self._one(step_args, step_name, whole=whole)
+            journal["steps"].append({
+                "line": step_args.get("line", ""),
+                "events": [e["id"] for e in self.world.events[n0:]],
+                "ok": "error" not in result and not result.get("miss"),
+            })
+            if getattr(self, "_wt", None) is not None and name == "desk":
+                self._journal_dispatch = journal
+            return result
+
+        self.__dict__.pop("_journal_dispatch", None)
         if name == "desk" and args.get("whole"):
             # a736: a line a resident typed after > is one command; a ; in it is words (the desk may still refuse them)
-            return self._one({"line": args.get("line", "")}, whole=True)
+            return one({"line": args.get("line", "")}, whole=True)
         if self.batch and name == "desk":
             parts = split_batch(args.get("line", ""))
             if parts and parts[0].lower().startswith("script "):
@@ -229,7 +247,7 @@ class Desk:
                                         f"Not run: {'; '.join(rest)}. Ask for them in another call, or narrow with find)")
                             break
                     shown = self._echo(part)
-                    r = self._one({"line": part})
+                    r = one({"line": part})
                     body = r["text"] if "text" in r else "ERR " + r["error"]
                     outs.append(f"[{i + 1}] {shown}\n{body}")
                     if "error" in r:
@@ -240,7 +258,7 @@ class Desk:
                                         f"Fix [{i + 1}] and resubmit them in one call)")
                         break
                 return {"text": "\n\n".join(outs), "batch": len(parts), "batch_error": error}
-        return self._one(args, name)
+        return one(args, name)
 
     _cmd_no = 0
 
@@ -573,7 +591,8 @@ class Desk:
     def _adds_line(self, nid, verb, kv):
         """Sable a656: a line added to a chat replaces nothing, so it is never refused as stale (in a live room every
         message was refused if someone else spoke first). Rewriting, retitling or removing a chat stays fenced, and the
-        adder's receipt does not count as reading the lines it did not see. Appends to notes are unchanged."""
+        adder's receipt does not count as reading the lines it did not see. Appends to notes are unchanged.
+        a5068: not stale, but an agent's line can wait (_hold_line), when someone else spoke there since it last saw."""
         if verb == "edit":
             if set(kv or {}) != {"append"}:
                 return False
@@ -1097,6 +1116,7 @@ class Desk:
                     out += "\n      " + describe(c["image"])
                 for i, r in enumerate(c["replies"]):
                     out += f"\n      {persons.reply_by(w, c, i)}: {r['text']}" + (f" (mark={r['mark']})" if r.get("mark") else "")
+                self._thread_shown(c)          # a5068: this thread is seen up to here
         links = w.links_of(s["id"])
         if links:
             out += "\nlinks:"
@@ -1240,6 +1260,186 @@ class Desk:
         bits = ([f"{count} line{'s' if count > 1 else ''} from others you haven't seen"] if count else []) + (
             [f"{part} line{'s' if part > 1 else ''} from others you were shown cut"] if part else [])
         return "; ".join(bits) + f"; read {nid}"
+
+    # ---- a5068: an agent's line waits if the thread moved -------------------------------------------------------
+    # Alex, 14 Oct (a4708, e9790): 'when someone sends a message under you, you get that as a response before your
+    # tool call to send a message goes out. that way you never send and then have to send again.' A chat line or a
+    # reply under a comment carries what its sender had seen there; a line by someone else added since holds it, the
+    # receipt prints those lines whole, and the same line sent again goes as written (they are shown now). A person at
+    # a window is never held (their painter shows lines as they arrive), nor is a rule, nor the house.
+    HOLD_SHOWN = 10       # lines a hold prints whole at most; the earlier are counted and named
+
+    def _never_held(self):
+        w = self.world
+        me = str(w.me or "").split("/")[0].lower()
+        if getattr(self, "_in_rules", False) or not me or me == "house" or getattr(w, "through_gate", None):
+            return True
+        import persons
+        import rooms
+        pid = persons.today(w, me) if persons.on(w) else None
+        if pid and ((w.subjects.get(pid) or {}).get("props") or {}).get("kind") == "human":
+            return True
+        return rooms.kind_of(w, me) == "person"
+
+    def _turn_at(self):
+        """A resident's view is fixed at the start of its turn (a2870 Revision 2): the house says where (as_of, the
+        event count its news had reached when this turn's input was sent). None for anyone else, or when not said."""
+        at = getattr(self, "_as_of", None)
+        if at is None:
+            return None
+        import rooms
+        return int(at) if rooms.kind_of(self.world, str(self.world.me).split("/")[0]) == "resident" else None
+
+    def _before_turn(self, e, at):
+        """Did event `e` come before the turn began at event count `at`? Event numbers rise and are never issued
+        again, so it is the number of the last event the turn's input had reached that decides."""
+        w = self.world
+        last = w.events[min(at, len(w.events)) - 1]["id"] if at > 0 and w.events else "e0"
+        return int(e["id"][1:]) <= int(last[1:])
+
+    def _thread_seen(self, cid):
+        recs = getattr(self, "_thread_reads", None) or {}
+        obs = self._observer()
+        return recs.get((obs, cid), recs.get((obs.split("/")[0], cid)))
+
+    def _thread_shown(self, c):
+        """A print of comment `c` with its replies whole (read, examine c<n>): this reader has seen the thread up to
+        its latest message, by event number (an event number is never issued again)."""
+        if getattr(self, "_receipt", False):
+            return
+        import persons
+        import rooms
+        w = self.world
+        evs = [persons.comment_events(w).get(c["id"])] + list(rooms.reply_events(w).get(c["id"], []))
+        top = max((int(e["id"][1:]) for e in evs if e), default=0)
+        if getattr(self, "_thread_reads", None) is None:
+            self._thread_reads = {}
+        key = (self._observer(), c["id"])
+        self._thread_reads[key] = max(top, self._thread_reads.get(key) or 0)
+
+    def _hold_line(self, nid, verb, kv):
+        """a5068: refuse (hold) an agent's chat line or thread reply when someone else has spoken there since what it
+        had seen, printing what they said; marks it shown, so the same line sent again goes through."""
+        if getattr(self, "_in_rules", False):
+            return
+        if self._adds_line(nid, verb, kv):
+            said = self._chat_moved(nid, kv)
+        elif verb == "comment" and str((kv or {}).get("id", "")).strip():
+            said = self._thread_moved(str(kv["id"]).strip())
+        else:
+            return
+        if said:
+            raise Refusal(said)
+
+    def _chat_moved(self, nid, kv):
+        import hashlib
+        import rooms
+        w = self.world
+        n = w.nodes.get(nid)
+        s = w.subjects.get(n.get("subject") if n else nid)
+        if not s or s["kind"] != "chat" or s.get("lines") is None:
+            return ""             # a chat whose lines are not things (none live today) keeps the old rule
+        at = self._turn_at()
+        if at is None:
+            obs, reads = self._observer(), getattr(self, "_chat_reads", None) or {}
+            raw = reads.get((obs, s["id"])) or reads.get((obs.split("/")[0], s["id"]))
+            if raw is None or raw[1] >= s["text"].count("\n") + 1:
+                return ""         # no read, or a run to the end (rewritten or not, nothing is new): no digest needed
+        text_lines = s["text"].splitlines()
+        rec = self._chat_run(s)
+        me = str(w.me).split("/")[0]
+        if at is None and (rec is None or rec[1] >= len(text_lines)):
+            # the run reaches the end: nothing new to this reader (the common case, and cheap). With no read at all
+            # there is no view to be behind: the line goes, and its receipt says the chat is unread (a834)
+            return ""
+        reply =str((kv or {}).get("reply_to", "")).strip()
+        rk = next((k for k, l in enumerate(s["lines"]) if l["id"] == reply), None) if reply else None
+        corner = rooms.corner_of(w, me) if at is not None else None
+        mine = corner is not None and any(a["type"] == "appearance" and a.get("subject") == s["id"]
+                                           and rooms._within(w, a, corner) for a in w.nodes.values())
+        member = at is not None and (mine or rooms.member(w, s, me))
+        new, k = [], 0
+        for i, l in enumerate(s["lines"]):
+            start, k = k, k + len(l["text"].split("\n"))
+            e = w.event_by_id(l.get("ev"))
+            by = str((e or {}).get("by") or "").split("/")[0]
+            if not e or not by or by == "house" or rooms.same_person(w, by, me):
+                continue
+            if rk is not None and i <= rk:
+                continue          # the line you answer you were shown, and what came before it was there
+            # a line inside the run was there when you read, even one a look skipped past or cut (a951, a986): the
+            # receipt still counts those. Only a line added after your read is new to your view, and waits
+            ran = rec is None or start < rec[1]
+            if at is None:
+                if ran:
+                    continue
+            else:
+                if self._before_turn(e, at) and (ran or member or rooms.calls(w, s, rooms.line_to(e)[0], me)):
+                    continue      # a resident was shown it before this turn: read, or told by the house
+            new.append((l, e))
+        if not new or self._never_held():     # asked last: it walks the world's surfaces, and most lines need none of it
+            return ""
+        # shown now: the run reaches the end, so the same line sent again is judged on what came after this
+        if getattr(self, "_chat_reads", None) is None:
+            self._chat_reads = {}
+        self._chat_reads[(self._observer(), s["id"])] = (rec[0] if rec else 0, len(text_lines),
+                                                         hashlib.sha1("\n".join(text_lines).encode()).hexdigest(),
+                                                         tuple(rec[3]) if rec else (), tuple(rec[4]) if rec else ())
+        return self._held_words(nid, f"in chat \"{s['title']}\" ({nid})", [
+            (l["id"], e, l["text"]) for l, e in new], "line")
+
+    def _thread_moved(self, cid):
+        import persons
+        import rooms
+        w = self.world
+        owner, c = w.find_comment(cid)
+        if c is None:
+            return ""             # the world says what is wrong with the id
+        me = str(w.me).split("/")[0]
+        seen = self._thread_seen(cid)
+        at = self._turn_at()
+        if seen is None and at is None:
+            return ""             # never shown this thread: no view to be behind, as with a chat never read
+        opening = persons.comment_events(w).get(cid)
+        base = seen if seen is not None else (int(opening["id"][1:]) if opening else 0)   # you name the comment you answer
+        evs =rooms.reply_events(w).get(cid, [])
+        new = []
+        for r, e in zip(c.get("replies") or [], evs):
+            by = str(e.get("by") or "").split("/")[0]
+            if not by or by == "house" or rooms.same_person(w, by, me):
+                continue
+            num = int(e["id"][1:])
+            if at is None:
+                if num <= base:
+                    continue
+            else:
+                told = any(rooms.same_person(w, x, me) for x in
+                           (rooms.named_to(e) if rooms.builder_quiet(w, e, owner) else rooms.comment_to(e)))
+                if self._before_turn(e, at) and (num <= base or told):
+                    continue
+            new.append((f"reply under {cid},", e, r["text"]))
+        if not new or self._never_held():
+            return ""
+        if getattr(self, "_thread_reads", None) is None:
+            self._thread_reads = {}
+        self._thread_reads[(self._observer(), cid)] = max([int(e["id"][1:]) for _, e, _ in new] + [base])
+        where = next(iter(w.appearances_of(owner["id"])), owner["id"])
+        return self._held_words(where, f"in the thread under {cid} on \"{owner['title']}\" ({where})", new, "reply")
+
+    def _held_words(self, nid, where, new, what):
+        """The hold's receipt, written for a resident reading it cold: what waits, what was said, what to do next."""
+        import persons
+        w = self.world
+        many = len(new) > 1
+        out = [f"held, not sent: {len(new)} new {what}{'s' if many else ''} by others {where} since you last saw it. "
+               f"Your {'line' if what == 'line' else 'reply'} was not added. {'They say' if many else 'It says'}:"]
+        if len(new) > self.HOLD_SHOWN:
+            out.append(f"  ({len(new) - self.HOLD_SHOWN} earlier not printed here; read {nid} shows them)")
+        for ident, e, text in new[-self.HOLD_SHOWN:]:
+            out.append(f"  {ident} {persons.by(w, e)} ({e['id']}): " + str(text).replace("\n", "\n    "))
+        out.append("To send yours as written, send the same command again: you have been shown these now, so it goes "
+                   "through. To answer them instead, change it; a changed line is judged afresh, on what is said after this.")
+        return "\n".join(out)
 
     def _chat_waits(self, nid, kv):
         """a1062, a1566: what a chat line's receipt says about whom it took and what happened to each (rooms)."""
@@ -1515,6 +1715,7 @@ class Desk:
                 out.append("  " + describe(c["image"]))
             for i, r in enumerate(c.get("replies") or []):
                 out.append(f"    {persons.reply_by(w, c, i)}: {r['text']}")
+            self._thread_shown(c)              # a5068: this thread is seen up to here
             if ev:
                 out.append(f"  made by {ev['id']}" + (f" at {str(ev.get('at'))[:16].replace('T', ' ')}" if ev.get("at") else ""))
             out.append(f"  read {(w.appearances_of(owner['id']) or [owner['id']])[0]} shows every comment on it"
@@ -1765,6 +1966,7 @@ class Desk:
         cur = w.nodes[nid]["rev"] if nid in w.nodes else w.subjects[nid]["rev"]
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         adds = self._adds_line(nid, verb, kv)
+        self._hold_line(nid, verb, kv)    # a5068: a line on an old view of its chat or thread waits
         if seen is None and not adds:     # a834: an added line overwrites nothing, so looking first protects nothing
             raise Refusal(f"you have not looked at {nid} yet; look, read or where it first")
         behind = (seen != cur and adds) or seen is None     # a chat line lands; what I missed stays unread, and nothing is marked seen

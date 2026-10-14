@@ -1,0 +1,129 @@
+window : column
+  share 1
+  role page
+  header : row
+    role header
+    title : text "Conversation"
+      share 1
+      role title
+    live : text "AGORA"
+      role brand
+  subtitle : text "One place to talk, wherever you are working."
+    role subtitle
+  feed : column
+    share 1
+    scroll end
+    role feed
+    of sayings involving:alex
+    clamp last 80
+    each message
+  compose : column
+    of prop:role=conversation-draft,prop:actor=$me as draft
+    each writing
+message : column
+  role message
+  role mine when $name = "alex"
+  role question when $mark = "ask"
+  head : row
+    who : text "$by"
+      role author
+      share 1
+    at : text "$at"
+      role meta
+  destination : text "to $to"
+    role meta
+  place : text "$in"
+    role place
+    only when $item != "FEED_ID"
+  body : text "$said"
+    marks
+    role body
+  details : column
+    fold "Context"
+    only when $context != ""
+    words : text "$context_summary"
+      role meta
+  answer : column
+    fold "Reply here"
+    role response
+    let recipient = $to when $name = "alex"
+    let recipient = $name otherwise
+    chatreply : text ""
+      only when $what = "line"
+      role composer
+      hint "Reply in this conversation…"
+      lines 2..8
+      commit explicit
+      on edit do append $item line="$value" default_to="$(recipient)" reply_to=$line
+    commentreply : text ""
+      only when $what = "comment"
+      role composer
+      hint "Reply on the original comment…"
+      lines 2..8
+      commit explicit
+      on edit do reply $item id=$saying line="$value"
+    threadreply : text ""
+      only when $what = "reply"
+      role composer
+      hint "Reply on the original thread…"
+      lines 2..8
+      commit explicit
+      on edit do reply $item id=$thread line="$value"
+writing : column
+  role dock
+  activity : column
+    of house doing=working
+    each working
+  audience : row
+    label : text "To"
+      role meta
+    recipient : text "$to"
+      share 1
+      role recipient
+      hint "Names separated by commas"
+      commit enter only
+      on edit do prop $item to="$value"
+  people : row
+    role shortcuts
+    r : text "Rowan"
+      role tool
+      on click do prop $item to=rowan
+    c : text "Claude"
+      role tool
+      on click do prop $item to=claude
+    p : text "Pike"
+      role tool
+      on click do prop $item to=pike
+    s : text "Sable"
+      role tool
+      on click do prop $item to=sable
+    more : text "Codex"
+      role tool
+      on click do prop $item to=codex
+  attachments : column
+    of captures $draft.context
+    each attachment
+  say : text ""
+    role composer
+    hint "Write a message…"
+    lines 3..10
+    commit explicit
+    on edit do append FEED_ID line="$value" default_to="$draft.to" captures="$draft.context" context_from="$draft"
+  help : text "Enter sends · Shift Enter adds a line · @name overrides To"
+    role hint
+attachment : column
+  role attachment
+  top : row
+    label : text "$label"
+      share 1
+      role meta
+    remove : text "Remove"
+      role tool
+      on click do prop $draft context="$remaining"
+  details : column
+    fold "Preview · $cid"
+    summary : text "$summary"
+      role meta
+working : text "$resident is working • • •"
+  only when $draft.to = $resident
+  role activity
