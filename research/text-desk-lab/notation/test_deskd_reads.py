@@ -106,10 +106,13 @@ try:
     out = say("scene boxy root")
     check("scene reads it: the viewer, what it reported, and its age", "~ alex is looking: 1000x800 at scroll 0,0" in out
           and "~ alex: 900x40px" in out and "(0 s ago)" in out, out)
-    post("/api/observe", {"session": "w", "as": "alex", "lens": "boxy", "at": 3, "boxes": {"root": "700x40"}})
+    post("/api/observe", {"session": "w", "as": "alex", "lens": "boxy", "at": 3, "boxes": {"root": "700x40@8,132"},
+                          "page": {"w": 1280, "h": 800, "dpr": 1.25}})
     out = say("scene boxy root")
     check("one per viewer, the last wins; attention not shared is said so", "700x40px" in out and "900x40px" not in out
           and out.count("~ alex ") == 1 and "attention not shared" in out, out)
+    check("a part's place and the page's size are kept without attention (a5047)",
+          "~ alex: 700x40px at 8,132" in out and "attention not shared · page 1280x800 at 1.25x" in out, out)
     check("scene ok gives the age", "painted sizes, oldest first: alex 0 s ago" in say("scene boxy ok"))
     r = post("/api/observe", {"session": "nowhere", "as": "alex", "lens": "boxy"})
     check("a report of a world that does not exist makes no world", "error" in r and not (tmp / "nowhere.pickle").exists(), str(r))

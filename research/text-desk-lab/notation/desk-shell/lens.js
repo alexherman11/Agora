@@ -126,6 +126,7 @@
     if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { tracks(old.el); next.set(n.key, old); return old.el; } }
     const el = document.createElement("div");
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
+    el.id = "part:" + n.key;  // stable native part identity for platform accessibility clients
     next.set(n.key, { el, sig }); if (p.why) el.dataset.why = p.why;
     const role = p.role || (p.state || p.cut ? "cut" : null);    // a bind that is not live, or a clamp's leaf, says so in `cut`
     if (role) el.className = Style.roleClass(role);
@@ -169,7 +170,7 @@
     // a grid given a share is bounded, so it divides its height among its rows and its cells fill them; a cell with
     // `scroll` then scrolls inside the window instead of the page growing (Alex, 29 Sep: the window is bounded)
     if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
-    if (p.lines) { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
+    if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
     if (Number.isInteger(p.peek)) { el.dataset.peekLines = p.peek; el.style.setProperty("--peek-lines", p.peek); }
@@ -378,12 +379,24 @@
       if (document.activeElement !== input) input.value = words;
       const open = openComposers.has(n.key) || !!d;
       el.dataset.composing = String(open);
-      input.rows = open ? 4 : 1; actions.hidden = !open;
+      const bounds = el._n.paint.lines;
+      input.rows = bounds ? bounds[0] : open ? 4 : 1;
+      actions.hidden = !open && !bounds;
+      if (bounds) {
+        const line = parseFloat(getComputedStyle(input).lineHeight) || parseFloat(getComputedStyle(input).fontSize) * 1.5;
+        input.style.height = "auto";
+        input.style.height = Math.max(line * bounds[0], Math.min(input.scrollHeight, line * (bounds[1] || 30), innerHeight * .4)) + "px";
+        input.style.overflowY = "auto";
+      }
       const unknown = !!d && !d.seen && !d.shown;
       post.disabled = busy || !input.value.trim() || unknown; discard.disabled = busy;
       recover.hidden = !unknown; recover.disabled = busy;
-      status.textContent = busy ? "Sending…" : unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — review and send again" : "Unsent";
-      V.mark(el, n.key); settle();
+      status.textContent = busy ? "Sending…" : unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "";
+      status.setAttribute("aria-live", "polite");
+      V.mark(el, n.key);
+      // An empty composer has no saved current text to compare with a refused draft.
+      if (!el.dataset.now) delete el.dataset.now;
+      settle();
     };
     el._composer = { config: JSON.stringify([n.paint, n.acts]), sync };
     input.value = V.words(n.key, n.paint.text || "", n.fence);
@@ -502,7 +515,7 @@
       if (!inst) return null;
       const path = []; for (let x = el; x !== inst; x = x.parentElement) path.unshift([...x.parentElement.children].indexOf(x));
       const copy = inst.cloneNode(true);
-      for (const x of [copy, ...copy.querySelectorAll("[data-key]")]) x.dataset.key = "ahead:" + x.dataset.key;
+      for (const x of [copy, ...copy.querySelectorAll("[data-key]")]) { x.dataset.key = "ahead:" + x.dataset.key; x.removeAttribute("id"); }
       copy.dataset.ahead = "1";
       let twin = copy; for (const i of path) twin = twin && twin.children[i];
       if (!twin) return null;
@@ -821,6 +834,37 @@
   });
 
   let held = null;                               // the last scene answer painted, carried over a reload for new painter code
+  // A frame following its end keeps doing so when its viewport or content is
+  // resized, including line wrapping and a growing composer. Scrolling away
+  // explicitly ends that following; the next resize must not pull the reader back.
+  const followed = new Map();
+  const endSizes = new ResizeObserver(entries => {
+    const frames = new Set(entries.map(x => x.target.dataset.scroll === "end" ? x.target : x.target.parentElement));
+    for (const frame of frames) {
+      const state = followed.get(frame); if (!state) continue;
+      if (state.end) frame.scrollTop = frame.scrollHeight;
+      state.height = frame.clientHeight; state.width = frame.clientWidth;
+    }
+  });
+  function followEnds() {
+    for (const [frame, state] of followed) if (!frame.isConnected) {
+      endSizes.unobserve(frame); state.kids.forEach(k => endSizes.unobserve(k)); followed.delete(frame);
+    }
+    for (const frame of paint.querySelectorAll('[data-scroll="end"]')) {
+      let state = followed.get(frame);
+      if (!state) {
+        state = { end: frame.scrollHeight - frame.scrollTop - frame.clientHeight < 3,
+          height: frame.clientHeight, width: frame.clientWidth, kids: new Set() };
+        followed.set(frame, state); endSizes.observe(frame);
+        frame.addEventListener("scroll", () => {
+          if (state.height === frame.clientHeight && state.width === frame.clientWidth)
+            state.end = frame.scrollHeight - frame.scrollTop - frame.clientHeight < 3;
+        });
+      }
+      for (const child of state.kids) if (child.parentElement !== frame) { endSizes.unobserve(child); state.kids.delete(child); }
+      for (const child of frame.children) if (!state.kids.has(child)) { state.kids.add(child); endSizes.observe(child); }
+    }
+  }
   async function refresh(force) {
     const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
     const keys = encodeURIComponent("Enter,Tab,Shift+Tab,Backspace,Delete");
@@ -838,7 +882,7 @@
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
     V.recoverLayout(r.scene);
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
-    settle(); placeMenuDrafts(); V.show(r.text); report();
+    settle(); followEnds(); placeMenuDrafts(); V.show(r.text); report();
   }
   // Alex, 7 Oct (c3674: comments must not push the paragraphs down): parts a style calls `afloat` take no room, so two
   // of them near each other would lie one on the other. After a paint each is slid down just far enough to clear the

@@ -89,6 +89,9 @@ def record(desk, line, actor, before_ids, events_before):
         # what the line actually changed, by id: a command may name its target by title, a handle or a selection,
         # and the merge must still see it (review 29 Sep: a title-named change merged over the base's and lost it)
         made = w.events[events_before:]
+        if any("context" in (e.get("args") or {}).get("fields", "").split() for e in made):
+            from message_context import durable_command
+            line = durable_command(line, w, made)
         touched = {e["target"] for e in made} | {c for e in made for c in (e.get("changed") or [])}
         wt["journal"].append({"line": line, "by": actor,
                               "created": sorted(ids_of(desk) - before_ids, key=_num),
