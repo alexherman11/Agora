@@ -57,6 +57,9 @@ Talking: whoever commissioned you is {asked_by}. Speak to them through the desk 
   do comment {task} line="..."
 Do this when you need to widen your scope, when a design decision should not be yours alone, or when you are stuck.
 Then end your turn; their answer comes back to you as a message. Short progress notes are welcome too.
+Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). It reaches you as
+'~ <who> called you in "<chat>" (<id>), line m<n> ...': answer there, not on the commission, naming them:
+  do append <id> line="@<who>: ..." reply_to=m<n>
 
 Never: touch {notation}/sessions/ (the worlds) or any .env file; push; delete what you did not make; edit
 src/agora3/prompts/jeff.md.
@@ -307,14 +310,23 @@ class Workshop:
             sid = e["target"]
             if sid in w.nodes and w.nodes[sid]["type"] == "appearance":
                 sid = w.nodes[sid]["subject"]
-            said = " ".join(str(v) for v in (e.get("args") or {}).values() if isinstance(v, str))
+            args = e.get("args") or {}
+            said = " ".join(str(v) for v in args.values() if isinstance(v, str))
             if e["verb"] == "comment" and sid == s["id"]:
                 out.append(f"~ {e['by']} on your commission ({e['id']}): {said[:2000]}")
             elif written is None and f"@{wk.actor}" in said.lower():
                 out.append(f"~ {e['by']} mentioned you ({e['id']}): {said[:2000]}")
-            elif written is not None and wk.actor.lower() in (rooms.line_to(e)[0] if "line_id" in (e.get("args") or {})
+            elif written is not None and wk.actor.lower() in (rooms.line_to(e)[0] if "line_id" in args
                                                               else written(e)[0]):
-                out.append(f"~ {e['by']} called you ({e['id']}): {said[:2000]}")
+                # a5001 (Pike, Workbench piece 1): a call says where it was made, so the builder answers there: a chat
+                # line by its chat and m id (its words only; the stored to= and signature were glued on before)
+                subj = w.subjects.get(sid) or {}
+                where = e["target"] if e["target"] in w.nodes else next(iter(w.appearances_of(sid)), sid)
+                if "line_id" in args:
+                    out.append(f"~ {e['by']} called you in \"{subj.get('title', '')}\" ({where}), line {args['line_id']} "
+                               f"({e['id']}): {str(args.get('append', ''))[:2000]}")
+                else:
+                    out.append(f"~ {e['by']} called you on \"{subj.get('title', '')}\" ({where}) ({e['id']}): {said[:2000]}")
         wk.state["cursor"] = len(w.events)
         wk.save()
         return out
