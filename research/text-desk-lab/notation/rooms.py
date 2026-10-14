@@ -365,6 +365,9 @@ def builder_quiet(w, e, s):
             and by != "house" and kind_of(w, by) == "agent" and (e.get("args") or {}).get("mark") != "ask")
 
 
+QUIET_NOTE = "; it wakes nobody: it stays on the card for whoever looks (mark=ask makes it a question, which wakes the asker)"
+
+
 def named_to(e):
     """a5007: whom a comment names itself, its to= or else its @header: for a reply, without the thread's partners."""
     from world import to_names, written

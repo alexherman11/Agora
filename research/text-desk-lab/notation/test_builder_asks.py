@@ -99,6 +99,7 @@ check("1. a builder's progress comment and done report are kept on the card", "E
       and sum(c["by"] == WK for c in W.subjects[W.nodes[K]["subject"]]["comments"]) == 2, (out, out2))
 check("1. and pike, resting, is not woken by them (RED before a5007)", not woke, lines)
 check("1. nor does the knock record say they called pike", not knocks_pike(at), knocks_pike(at))
+check("1. the builder's receipt says it wakes nobody, and how to ask", "it wakes nobody" in out and "mark=ask" in out, out)
 
 # ---- 2. a question: woken, and named a question ----------------------------------------------------------------------
 at = len(W.events)
@@ -134,11 +135,14 @@ out = builder(f'id={cid} line="noted, starting with the simplest"', who=WK2, on=
 woke, lines, _ = pike_rests(at)
 check("4. an unmarked reply under pike's thread does not wake pike", "ERR" not in out and not woke and not knocks_pike(at),
       (out, lines, knocks_pike(at)))
+check("4. its receipt says it wakes nobody, not 'to: pike'", "it wakes nobody" in out and "to: pike" not in out
+      and W.events[-1].get("to") == [], out)
 at = len(W.events)
 out = builder(f'id={cid} line="should it tile or float?" mark=ask', who=WK2, on=K2)
 woke, lines, first = pike_rests(at)
 check("4. a reply marked mark=ask wakes pike, in the thread, as a question", woke and "asks you (a question)" in " ".join(lines)
       and "in your thread" in " ".join(lines) and len(knocks_pike(at)) == 1, (out, lines))
+check("4. and its receipt says to: pike", "to: pike" in out and "wakes nobody" not in out, out)
 txt = say("pike", f"read {K2}")
 check("4. read shows the reply's mark", "should it tile or float? (mark=ask)" in txt, txt)
 

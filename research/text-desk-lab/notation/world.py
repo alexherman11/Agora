@@ -1110,9 +1110,12 @@ class World:
                 ev = self._event("comment", via or sid, reply_args, {"drop_reply": rid}, actor)
                 ev["changed"] = [sid] + apps
                 import rooms
-                ev["to"] = rooms.reply_to(self, c, ev)
+                quiet = rooms.builder_quiet(self, ev, s)
+                # a5007: a builder's unmarked reply has no thread partners: it reaches only whom it names itself
+                ev["to"] = rooms.reply_to(self, c, ev) if not quiet or "to" in args or written(ev)[0] else []
                 return {"ok": True, "event": ev["id"], "changed": [sid] + apps,
-                        "note": f"reply added under {rid} by {me} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
+                        "note": f"reply added under {rid} by {me} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")
+                        + (rooms.QUIET_NOTE if quiet and not ev["to"] else "")}
             cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor, image)
             # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
             # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
@@ -1129,7 +1132,8 @@ class World:
                         and not rooms.same_person(self, n, str(actor).split("/")[0])]
             return {"ok": True, "event": self.events[-1]["id"], "changed": [sid] + apps, "created": cid,
                     "note": f"comment {cid} added on {sid}" + ("; the world signs for you, your typed name was dropped" if own else "")
-                    + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
+                    + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")
+                    + (rooms.QUIET_NOTE if not ev["to"] and rooms.builder_quiet(self, ev, s) else "")}
         if verb == "resolve":
             cid = str(args.get("id", args.get("comment", "")))
             owner, c = self.find_comment(cid)
