@@ -789,8 +789,7 @@
   let held = null;                               // the last scene answer painted, carried over a reload for new painter code
   async function refresh(force) {
     const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
-    const keys = encodeURIComponent("Enter,Tab,Shift+Tab,Backspace,Delete");
-    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter&keys=${keys}${have}`)).json();
+    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter${have}`)).json();
     if (r.same) return;                          // deskd: nothing changed since the build this page has
     return paintAnswer(r, force);
   }

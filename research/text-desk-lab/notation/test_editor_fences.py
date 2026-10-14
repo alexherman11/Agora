@@ -39,7 +39,6 @@ def door(tmp_path, monkeypatch):
         ) as result:
             return json.load(result)
 
-    request.base_url = f"http://127.0.0.1:{server.server_port}"
     yield deskd, request
     server.shutdown()
     server.server_close()
@@ -184,25 +183,3 @@ sheet : column
         f'do append {chat} line="This must not go to an old conversation"', "fresh-viewer", observed
     )
     assert "changed" in refused["error"]
-
-
-def test_retained_painter_is_not_given_new_key_semantics(door):
-    deskd, request = door
-    request("look")
-    with deskd.Session("editor-test", "maker") as desk:
-        root = desk.world.root
-    source = 'root : text "word"\n  on edit do look\n  on key Delete do look\n'
-    lens = request(f'do create {root} kind=note title="keys-check" text={json.dumps(source)}')[
-        "created"
-    ][0]
-    assert not request(f"do tag {lens} add=lens").get("error")
-    url = request.base_url + "/api/scene?session=editor-test&as=maker&lens=keys-check&view=painter"
-
-    def keys(url):
-        with urllib.request.urlopen(url, timeout=10) as response:
-            tree = json.load(response)["scene"]
-        return [a["label"] for n in leaves(tree) for a in n.get("acts", []) if a["on"] == "key"]
-
-    assert keys(url) == []
-    assert keys(url + "&keys=Enter,Backspace,Delete") == ["Delete"]
-    assert keys(url) == []  # The new page's cached scene must not leak to the old one.
