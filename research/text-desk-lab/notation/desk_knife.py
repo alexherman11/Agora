@@ -152,7 +152,7 @@ class DeskKnife(DeskMoo):
                 out.append(f"{indent}* … {len(tl) - limit} more line(s) folded; read {nid} for all")
         for c in s.get("comments", []):
             ct = c["text"] if len(c["text"]) <= 160 else c["text"][:160] + "… (read " + nid + " for all)"
-            out.append(f"{indent}* {c['id']} {persons.comment_by(w, c)} ({'resolved' if c['resolved'] else 'open'}): {ct}")
+            out.append(f"{indent}* {c['id']} {persons.comment_by(w, c)} ({'resolved' if c['resolved'] else 'open'}{', mark=' + c['mark'] if c.get('mark') else ''}): {ct}")
         for l in w.links_of(s["id"]):
             other = l["to"] if l["from"] == s["id"] else l["from"]
             ot = w.subjects[other]["title"]

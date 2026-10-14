@@ -355,7 +355,9 @@ def unanswered(w, sid, me="alex"):
 @verb("comment", ["appearance"], "Leave a signed comment on any thing, or reply under an open comment with id=. "
       "to= names recipients explicitly (to=nobody calls no one); otherwise a leading @header names them. "
       "An unaddressed reply goes to the original thread partners, excluding you. Read and rows comments:/replies: "
-      "show the same native thread to every lens and tool.", "line=<str> [id=<cNN>] [to=<names>]", 'do comment a20 line="Which timezone?" to=pike')
+      "show the same native thread to every lens and tool. mark= says what it is (mark=ask: a question; on a commission, "
+      "a builder's comment wakes its asker only when it asks).", "line=<str> [id=<cNN>] [to=<names>] [mark=ask]",
+      'do comment a20 line="Which timezone?" to=pike')
 def v_comment(w, nid, a):
     return _prim(w, "comment", nid, a)
 

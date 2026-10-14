@@ -6,7 +6,8 @@ Builds its own small world in memory (roomworld.py) and never saves it; every de
 dispatch. Checks, by the card's goals: (i) a comment opening '@alex: ...' on a card shows in Alex's For you naming
 the card, and an answer addressed to its writer lands as a comment on the card and reaches them; (ii) For you is
 `sayings for:<name>`, a lens draws it with no inbox: source, and inbox:<name> is the same rows under its first name;
-(iii) a headerless worker comment on a commission still knocks whoever asked and is not in their For you; (iv) no
+(iii) a headerless worker comment on a commission knocks whoever asked only when marked mark=ask (a5007), and is not
+in their For you either way; (iv) no
 comment's id, text or resolved state changes by being listed, and a comment from before the rule (no stored
 address) is never counted; (v) the showing asks rooms.calls: changing it changes the rows, with no lens edit; and the
 endings: you answer (a reply, or a later comment on the thing), or the writer withdraws; someone else's resolve
@@ -56,10 +57,10 @@ def say(me, line, whole=True):
     return (r.get("text") or "") + (("\nERROR " + r["error"]) if r.get("error") else "")
 
 
-def comment(me, thing, words):
+def comment(me, thing, words, extra=""):
     """-> (comment id, its event, the receipt)"""
     say(me, f"read {thing}")
-    t = say(me, f"do comment {thing} line=\"{words}\"")
+    t = say(me, f"do comment {thing} line=\"{words}\"" + (" " + extra if extra else ""))
     m = re.search(r"comment (c\d+) added", t)
     if not m:
         raise RuntimeError(f"no comment was made: {t}")
@@ -110,9 +111,13 @@ check("a name that is no one, and @everyone, are not stored as a comment's addre
 
 # ---- (iii) called is not shown ---------------------------------------------------------------------------------
 wc, wev, _ = comment("worker-a1", CARD, "report: the tests pass, nothing else was checked")
-check("(iii) a headerless worker comment on Juniper's commission still knocks her",
-      rooms.reached(W, wev).get("juniper") == "call", rooms.reached(W, wev))
-check("(iii) and is not in her For you", row("sayings for:juniper", wc) is None, rows("sayings for:juniper"))
+check("(iii) a5007: a headerless, unmarked worker comment on Juniper's commission does not knock her (a report waits on "
+      "the card)", "juniper" not in rooms.reached(W, wev), rooms.reached(W, wev))
+qc, qev, _ = comment("worker-a1", CARD, "a question: which card first?", "mark=ask")
+check("(iii) one marked mark=ask, a question, still knocks her", rooms.reached(W, qev).get("juniper") == "call",
+      rooms.reached(W, qev))
+check("(iii) and neither is in her For you", row("sayings for:juniper", wc) is None and row("sayings for:juniper", qc) is None,
+      rows("sayings for:juniper"))
 hc, hev, _ = comment("pike", R.corner_desc["sable"], "a note left on a thing in Sable's corner")
 check("a headerless comment on a thing in Sable's corner knocks her and is not shown",
       rooms.reached(W, hev).get("sable") == "call" and row("sayings for:sable", hc) is None, rooms.reached(W, hev))

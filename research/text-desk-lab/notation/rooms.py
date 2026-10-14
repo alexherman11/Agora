@@ -372,6 +372,27 @@ def comment_falls_back(e):
     return e.get("verb") == "comment" and not args.get("id") and "to" not in args
 
 
+def builder_quiet(w, e, s):
+    """a5007 (Alex, a4934: 'the asker is woken for two things only: the builder has a question, or it has landed'; Pike
+    e9702: any agent, a reply too): is `e` a builder's comment on a commission that calls no one by the card alone? An
+    agent's comment or reply on a thing with commission=, not marked mark=ask, reaches only whom it names itself (an
+    @header or to=): not the asker, not the corner the card sits in, not the thread's partners. The house's own word
+    (landed, reverted, ...) is not a builder's, and a resident's or a person's comment is unchanged."""
+    by = str(e.get("by") or "").split("/")[0].lower()
+    return (e.get("verb") == "comment" and bool(s) and bool((s.get("props") or {}).get("commission"))
+            and by != "house" and kind_of(w, by) == "agent" and (e.get("args") or {}).get("mark") != "ask")
+
+
+QUIET_NOTE = "; it wakes nobody: it stays on the card for whoever looks (mark=ask makes it a question, which wakes the asker)"
+
+
+def named_to(e):
+    """a5007: whom a comment names itself, its to= or else its @header: for a reply, without the thread's partners."""
+    from world import to_names, written
+    args = e.get("args") or {}
+    return to_names(args["to"]) if "to" in args else written(e)[0]
+
+
 _thread_events = weakref.WeakKeyDictionary()
 _thread_reads = weakref.WeakKeyDictionary()
 
@@ -476,7 +497,8 @@ def reached(w, e):
     and world.written, in the same order) -> {name: how}, in order; {} for a line that calls no one (a plain line in
     a shared chat), an undone one, and the house's own bookkeeping. For a resident, how is 'call' (it ends a rest: a
     chat line addressed to them or to everyone in a chat they are in, a person's line in their own corner's chat, an
-    @header in a comment or a note's added lines, a comment on a thing in their corner or on their commission) or
+    @header in a comment or a note's added lines, a comment on a thing in their corner or on their commission, a
+    builder's only when it asks: builder_quiet) or
     'book' (a resident's or agent's plain line in their own corner's chat: it waits for their next wake). For anyone
     else it is the words the record keeps: not a member of the chat, a person, an agent, or no one by that name."""
     import persons
@@ -491,7 +513,8 @@ def reached(w, e):
     s = w.subjects.get(sid)
     chat = bool(s) and s["kind"] == "chat" and "append" in args
     comment = e.get("verb") == "comment" and bool(s)
-    to = line_to(e)[0] if chat else comment_to(e) if comment else written(e)[0]
+    quiet = comment and builder_quiet(w, e, s)
+    to = line_to(e)[0] if chat else named_to(e) if quiet else comment_to(e) if comment else written(e)[0]
     named = [n for n in to if n not in EVERYONE]
     if not (chat or comment or named):
         return {}
@@ -514,7 +537,7 @@ def reached(w, e):
                 out[str(actor).lower()] = "call" if kind_of(w, by) == "person" else "book"
             elif called:
                 out[str(actor).lower()] = NOT_MEMBER
-        elif called or (comment_falls_back(e) and (mine or asked)):
+        elif called or (comment_falls_back(e) and (mine or asked) and not quiet):
             out[str(actor).lower()] = "call"
     if by == "house":
         return out

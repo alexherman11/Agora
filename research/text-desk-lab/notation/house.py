@@ -680,7 +680,7 @@ class House:
                 # morning, and the only sign was their absence from a view that hides failures.
                 if not (e["verb"] == "comment" and asked(s)):
                     continue
-            said = " ".join(str(v) for v in args.values() if isinstance(v, str))
+            said = " ".join(str(v) for k, v in args.items() if isinstance(v, str) and k != "mark")   # a5007: a mark is said in words
             waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # kept, first and marked for it
             if e["verb"] == "prop" and e["target"] == r.rid and args.get("call"):
                 # Alex, 30 Sep: the Desktop's wake button sets call=<who> on the corner (want=awake alone changed
@@ -724,25 +724,33 @@ class House:
             # note, task or comment reaches that person only as a header, the rule a chat line has (a2715): a comment by
             # the @names that open it, a note edit by the headers of the lines it added, never the rest of the note
             # again (Pike a611, Claude e4918, Sable c2804). A mid-line @ is a mention, and calls no one.
-            to = rooms.comment_to(e) if e["verb"] == "comment" else written(e)[0]
+            # a5007 (Alex, a4934): a builder's comment on a commission wakes its asker only when it asks (mark=ask); one
+            # unmarked reaches only whom it names itself (rooms.builder_quiet, which the knock record asks too)
+            quiet = rooms.builder_quiet(w, e, s)
+            asks = e["verb"] == "comment" and args.get("mark") == "ask"
+            to = rooms.named_to(e) if quiet else rooms.comment_to(e) if e["verb"] == "comment" else written(e)[0]
             m = [n for n in to if n not in rooms.EVERYONE and rooms.same_person(w, n, actor)]
             if m:
                 where = f" on \"{s['title']}\"" if s else ""
                 address = "in your thread" if e["verb"] == "comment" and args.get("id") else f"as @{m[0]}"
+                how = "asks you (a question)" if asks else "called you"
                 if waits:                                          # a1566: a call is kept first, and knocks
-                    self._hold(r, e, f"~ {at} {e['by']} called you{where}, {address} ({e['id']}): {said[:300]}")
+                    self._hold(r, e, f"~ {at} {e['by']} {how}{where}, {address} ({e['id']}): {said[:300]}")
                     urgent = True
                     self._knocked(r, e, s, resting)
                     continue
-                inbox.append(f"~ {e['by']} called you{where}, {address} ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} {how}{where}, {address} ({e['id']}): {said[:300]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
+            elif quiet:
+                continue
             elif rooms.comment_falls_back(e) and sid in mine:
-                inbox.append(f"~ {e['by']} commented on \"{s['title']}\" ({e['id']}): {said[:300]}")
+                inbox.append(f"~ {e['by']} {'asks a question' if asks else 'commented'} on \"{s['title']}\" ({e['id']}): {said[:300]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
             elif rooms.comment_falls_back(e) and asked(s):
-                inbox.append(f"~ {e['by']} on your commission \"{s['title']}\" ({e['id']}): {said[:1500]}")
+                inbox.append(f"~ {e['by']}{' asks you a question' if asks else ''} on your commission \"{s['title']}\" "
+                             f"({e['id']}): {said[:1500]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
         r.state["cursor"] = len(w.events)
@@ -789,8 +797,9 @@ class House:
             return
         mid = (e.get("args") or {}).get("line_id")
         line = bool(s) and s["kind"] == "chat" and "append" in (e.get("args") or {})
+        asks = e.get("verb") == "comment" and (e.get("args") or {}).get("mark") == "ask"      # a5007: it names a question
         what = (f"line {mid} ({e['id']})" if mid else f"line ({e['id']})") if line \
-            else f"{'comment' if e['verb'] in ('comment', 'resolve') else e['verb']} ({e['id']})"
+            else f"{'question' if asks else 'comment' if e['verb'] in ('comment', 'resolve') else e['verb']} ({e['id']})"
         where = (f" in \"{s['title']}\"" if line else f" on \"{s['title']}\"") if s else ""
         r.state.setdefault("knocked_by", []).append(f"{e['by']}'s {what}{where}")
 

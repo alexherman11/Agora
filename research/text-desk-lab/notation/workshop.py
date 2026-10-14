@@ -53,10 +53,14 @@ you work; nothing you do reaches them until the house lands your branch. The lab
 AGENTS.md, above this protocol, is how we work here: its principles and evidence labels (ran / read / imagined) apply
 to you. This protocol adds only what is particular to a worker.
 
-Talking: whoever commissioned you is {asked_by}. Speak to them through the desk tool, as a comment on the commission:
-  do comment {task} line="..."
-Do this when you need to widen your scope, when a design decision should not be yours alone, or when you are stuck.
-Then end your turn; their answer comes back to you as a message. Short progress notes are welcome too.
+Talking: whoever commissioned you is {asked_by}. Speak to them through the desk tool, as a comment on the commission.
+A comment wakes them only when you mark it as a question:
+  do comment {task} line="..." mark=ask
+Ask when you need to widen your scope, when a design decision should not be yours alone, or when you are stuck; then
+end your turn, and their answer comes back to you as a message. A comment without mark=ask wakes nobody: it stays on
+the card for whoever looks, so progress notes, plans and your done report go there unmarked. (A comment that opens
+with @name, or says to=name, still calls that person: use it only when you mean to call them.) Your landing, and what
+the house says on the card, wake {asked_by} on their own.
 Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). It reaches you as
 '~ <who> called you in "<chat>" (<id>), line m<n> ...': answer there, not on the commission, naming them:
   do append <id> line="@<who>: ..." reply_to=m<n>
@@ -97,7 +101,8 @@ the house exports it from the binder when your branch lands.
 Finishing: commit your change on your branch (git add the files you changed; git commit). Then, through the desk:
   do comment {task} line="done: what changed; what you ran and what it printed; what you did not check"
   do prop {task} commission=ready
-The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both.
+The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both. The done
+comment is unmarked: it waits on the card, where {asked_by} reads it when the landing wakes them.
 
 When main moves under you (another landing touched your files), bring it in yourself, in your worktree:
   git merge main             (or git rebase main; resolve conflicts with Edit, then git add and git commit)

@@ -772,7 +772,7 @@ class World:
     def content_verbs(self, sid):
         s = self.subjects[sid]
         v = {"markread": "id=<cNN> through=<eNN>  (read through a displayed message, for the caller; does not answer)",
-             "comment": "line=<str> [id=<cNN>] [to=<names>]  (a signed comment; with id=, an open-thread reply; to= overrides header and thread recipients)",
+             "comment": "line=<str> [id=<cNN>] [to=<names>] [mark=ask]  (a signed comment; with id=, an open-thread reply; to= overrides header and thread recipients; mark=ask: a question)",
              "link": "to=<id> as=blocks|refers|answers|part-of  (a connection to another thing)"}
         if any(not c["resolved"] for c in s["comments"]):
             v["resolve"] = "id=<cNN> [line=<str>]  (close a comment, optionally with a reply)"
@@ -1083,6 +1083,10 @@ class World:
             own = own if own and own.group(1).casefold() == str(actor).casefold() else None
             if own:
                 line = line[own.end():]
+            # a5007 (Alex, a4934: 'the asker is woken for two things only: the builder has a question, or it has landed'):
+            # mark= says what a comment is, as a chat line's field does; mark=ask, a question, is the one the house reads
+            # (rooms.builder_quiet). Until now a comment took mark= and dropped it without a word.
+            mark = str(args.get("mark", "")).strip().lower()
             # 13 Oct (Alex: 'can we make it so the agents can reply in line ... reply to the comments'): with id=<cNN> the
             # words are a reply under that comment, which stays open. Until now a reply could only be given by closing
             # it (resolve line=). Replies use their explicit address or the original thread partners.
@@ -1094,19 +1098,24 @@ class World:
                 if c["resolved"]:
                     raise Refusal(f"{rid} is resolved; a reply is given to an open comment (undo the resolve, or comment anew)")
                 me = "alex" if actor in ("jeff", "alex") else actor
-                c["replies"].append({"by": me, "text": line})
+                c["replies"].append({"by": me, "text": line, **({"mark": mark} if mark else {})})
                 s["rev"] += 1
                 for a in apps:
                     self._bump(a)
                 reply_args = {"id": rid, "line": line}
                 if "to" in args:
                     reply_args["to"] = args["to"]
+                if mark:
+                    reply_args["mark"] = mark
                 ev = self._event("comment", via or sid, reply_args, {"drop_reply": rid}, actor)
                 ev["changed"] = [sid] + apps
                 import rooms
-                ev["to"] = rooms.reply_to(self, c, ev)
+                quiet = rooms.builder_quiet(self, ev, s)
+                # a5007: a builder's unmarked reply has no thread partners: it reaches only whom it names itself
+                ev["to"] = rooms.reply_to(self, c, ev) if not quiet or "to" in args or written(ev)[0] else []
                 return {"ok": True, "event": ev["id"], "changed": [sid] + apps,
-                        "note": f"reply added under {rid} by {me} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
+                        "note": f"reply added under {rid} by {me} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")
+                        + (rooms.QUIET_NOTE if quiet and not ev["to"] else "")}
             cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor, image)
             # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
             # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
@@ -1116,12 +1125,15 @@ class World:
             ev = self.events[-1]
             if "to" in args:
                 ev["args"]["to"] = args["to"]
+            if mark:
+                ev["args"]["mark"] = s["comments"][-1]["mark"] = mark
             names = to_names(args["to"]) if "to" in args else written(ev)[0]
             ev["to"] = [n for n in names if n not in rooms.EVERYONE and rooms.someone(self, n)
                         and not rooms.same_person(self, n, str(actor).split("/")[0])]
             return {"ok": True, "event": self.events[-1]["id"], "changed": [sid] + apps, "created": cid,
                     "note": f"comment {cid} added on {sid}" + ("; the world signs for you, your typed name was dropped" if own else "")
-                    + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")}
+                    + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")
+                    + (rooms.QUIET_NOTE if not ev["to"] and rooms.builder_quiet(self, ev, s) else "")}
         if verb == "resolve":
             cid = str(args.get("id", args.get("comment", "")))
             owner, c = self.find_comment(cid)
