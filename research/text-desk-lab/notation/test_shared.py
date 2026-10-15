@@ -118,6 +118,9 @@ c = shared.check({"id": "s0", "title": "Rows", "text": "add a row source in scen
 check("1. a file a card says it is in (in_files) is a note naming that card and its owner",
       c["hold"] == [] and [x[1] for x in c["claimed"]] == [claimer] and claimer in c["text"] and "(codex)" in c["text"]
       and claimer in c["worker"], c)
+say("pike", f"look {claimer} :1", f"do prop {claimer} in_files=none")
+c = shared.check({"id": "s0", "title": "Rows", "text": "add a row source in scene.py, none of it hard"}, REPO, W)
+check("1. in_files=none: out of every file again", c["claimed"] == [] and c["key"] == "", c)
 
 # ---- 2 and 3. the house at ask time -----------------------------------------------------------------------------------
 

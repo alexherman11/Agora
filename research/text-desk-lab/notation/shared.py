@@ -54,7 +54,7 @@ def claims(w, but=None):
     out = []
     for sid, s in w.subjects.items():
         said = str((s.get("props") or {}).get("in_files") or "").strip()
-        if not said or sid == but:
+        if not said or said.lower() in ("none", "-") or sid == but:      # in_files=none: out of every file again
             continue
         apps = w.appearances_of(sid)
         for word in re.split(r"[\s,]+", said):
