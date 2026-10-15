@@ -13,10 +13,11 @@ The table is closed on purpose: named verbs, no program to run, no shell line, n
 Settings are props on the lens note the home base paints (home-base, a5208), read through the door each time it opens:
     hotkey=Ctrl+Alt+J      the key that shows or hides it (Ctrl, Alt, Shift, Win + a letter, digit, F1-F24 or Space)
     monitor=main           main, or 1, 2 ... in the order Windows lists its monitors
-    hide_taskbar=no        yes hides the taskbar while the home base is shown (read here; hud.py does the hiding)
+    hide_taskbar=yes       no leaves the taskbar showing; yes covers it while the home base is shown (hud.py covers the
+                           whole monitor, never hides the taskbar's own window, so a killed home base leaves it whole)
 A prop that is missing or does not read keeps its default, and settings() says which ones did not.
 
-What hud.py adds to use this (a5300; written for Claude, since hud.py is Claude's uncommitted work):
+What hud.py adds to use this (a5300's hook, put into hud.py by a5394):
     import host_verbs                                                         # beside import witnessed
     witnessed.write(self.a.world, "host", host_verbs.rows(), by="hud")        # in Hud.say_desktop, beside the desktop
     def host(self, verb, words=""):                                           # on Api
@@ -35,7 +36,7 @@ import threading
 import urllib.request
 from ctypes import wintypes as wt
 
-DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "no"}
+DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes"}
 
 
 # -- the verbs: name -> (what it does, what words it takes, how). Each `how` gets the home base and the words, and
