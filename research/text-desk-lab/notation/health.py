@@ -177,12 +177,14 @@ def verdict(key, group, code, out):
         return last, None
     if group == "test_scene":
         return last, f"test_scene: {last}"
+    # a5288: a failure names its cause: the test's own FAIL lines follow its last line (test_visit's did already)
+    bad = [l[5:].strip() for l in out.splitlines() if l.startswith("FAIL ")]
+    why = f": {'; '.join(bad)}" if bad and last.strip() not in ("; ".join(bad), f"FAIL {bad[-1]}") else ""
     if group == "visit test":
-        bad = [l[5:] for l in out.splitlines() if l.startswith("FAIL ")]
-        return last, f"test_visit: {last}{': ' + '; '.join(bad) if bad else ''}"[:300]
+        return last, f"test_visit: {last}{why}"[:300]
     if group == "paint":
         return last, f"paint {key}: {last}"
-    return last, f"{key}: {last}"[:300]
+    return last, f"{key}: {last}{why}"[:300]
 
 
 def affected(changed):

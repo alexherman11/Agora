@@ -202,13 +202,27 @@ def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
     return data
 
 
+def log(what, **said):
+    """a5288: one line per batch, judgement and outcome in house-state/landing-log.jsonl, so the time a landing took
+    can be read afterwards: which runs, how long each, what stopped them."""
+    try:
+        STATE.mkdir(parents=True, exist_ok=True)
+        with open(STATE / "landing-log.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "pid": os.getpid(), "what": what, **said}) + "\n")
+    except OSError:
+        pass
+
+
 def judged(world, sha, kept, **how):
     """Health of commit `sha` (the room is at it), from what is kept or by running it. Only a whole run is kept: one
     stopped at a failure, or run for some checks only (`how`, health's options), judges this landing and no other."""
     if sha in kept.get("health", {}):
         return kept["health"][sha]
     copy_world(world, ROOM / NOTATION)
+    t0 = time.time()
     h = health(world, ROOM / NOTATION, **how)
+    log("health", sha=sha[:7], how={k: v for k, v in how.items() if k != "changed"}, seconds=round(time.time() - t0, 1),
+        ok=h.get("ok"), stopped=h.get("stopped"), failed=(h.get("failed") or [])[:4])
     if not h.get("partial"):
         kept.setdefault("health", {})[sha] = {k: h.get(k) for k in ("ok", "lenses_ok", "failed", "failed_checks", "text",
                                                                     "seconds")}
@@ -438,11 +452,13 @@ def _serve():
     branches = list(dict.fromkeys(b for e in batch for b in e["branches"]))
     why = {b: w for e in batch for b, w in (e.get("why") or {}).items()}
     who = ", ".join(dict.fromkeys(e["who"] for e in batch))
+    log("batch", branches=branches)
     try:
         r = _land(branches, batch[0]["world"], who, why, 0)
     except Exception as e:          # said to every asker, never lost
         r = {"landed": [], "refused": [(b, f"the landing failed: {type(e).__name__}: {e}") for b in branches],
              "head": None, "heads": {}, "parked": [], "text": "", "texts": {}}
+    log("answered", landed=r["landed"], refused=[[b, w[:200]] for b, w in r["refused"]])
     answers = {}
     for e in batch:
         mine = e["branches"]

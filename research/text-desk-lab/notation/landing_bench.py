@@ -4,8 +4,8 @@
 
 A clone of this repository in a temporary folder stands in for the live checkout, beside a copy of this worktree's
 world (sessions/frontier-try.pickle, as frontier). Ten branches each add one comment line to a different lab file, as
-a small change does; with --broken, the fourth instead makes kinds.is_lens say no to every note (a real break: lenses
-stop compiling and test_kinds fails). Main is judged once first, untimed, as the last landing leaves it judged.
+a small change does; with --broken, the third (kinds.py) instead makes kinds.is_lens say no to every note (a real
+break: lenses stop compiling and test_kinds fails). Main is judged once first, untimed, as the last landing leaves it judged.
 
   before     main's landing.py and health.py (one landing at a time, health one check after another), with only
              the hand/parked name fix, so that main's test_landing_queue does not fail on its own collision
@@ -64,8 +64,7 @@ def main(argv):
             b = f"bench/{k}-{Path(f).stem}"
             git("checkout", "-q", "-b", b, "main", cwd=live)
             p = lab / f
-            if broken and k == 3:
-                p = lab / "kinds.py"
+            if broken and f == "kinds.py":
                 p.write_text(p.read_text(encoding="utf-8") + "\n\ndef is_lens(s):          # bench: a real break\n"
                              "    return False\n", encoding="utf-8")
             else:
@@ -102,6 +101,9 @@ def main(argv):
             t, out = ends[b]
             said = " | ".join(l for l in out.strip().splitlines() if l.startswith(("landed", "not landed", "judged in")))
             print(f"{b}: asked at {asked - start:5.0f} s, answered at {t - start:5.0f} s (waited {t - asked:4.0f} s): {said[:300]}")
+        logf = lab / "house-state" / "landing-log.jsonl"
+        for line in (logf.read_text(encoding="utf-8").splitlines() if logf.exists() else []):
+            print("  log", line[:400])
         kept = json.loads((lab / "house-state" / "landing.json").read_text(encoding="utf-8"))
         runs = len(kept.get("health", {}))
         landed = sum(len(x["branches"]) for x in kept.get("landed", []))
