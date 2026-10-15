@@ -212,7 +212,8 @@ eid, mid, got = say("juniper", "@pike @sable @alex @claude four of you")
 H.step()
 check("'@pike @sable @alex @claude': Pike woken, Sable in a turn, Alex a person, Claude an agent, in one event",
       what(eid) == {"pike": "woken", "sable": "in a turn, held for its end",
-                    "alex": "a person, not knocked (it waits in their For you)", "claude": "an agent, not knocked"}, what(eid))
+                    "alex": "a person, not knocked (it waits in their For you)",
+                    "claude": "not knocked (no Claude session is listening)"}, what(eid))   # a5267: no listener runs
 check("and the record agrees with what the house did: Pike was sent it, Sable nothing yet",
       "four of you" in sent(PIKE) and not res(SABLE).sent, res(SABLE).sent)
 res(SABLE).busy = False
