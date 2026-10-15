@@ -3,9 +3,10 @@
     python hud.py [--lens home-base] [--as alex] [--world frontier] [--show]     run it (one instance)
     python hud.py --stop                                                          end the running one
 
-Ctrl+Alt+J shows it over everything, or hides it; Esc hides it. Shown, it covers the main monitor's work area (the
-taskbar stays) with the painter (lens.html through the door) showing one lens, painted over a frosted copy of what was
-on the screen the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl+Alt+J.
+Ctrl+Alt+J shows it over everything, or hides it; Esc hides it. Shown, it covers the main monitor, taskbar too (or only
+its work area when the lens note says hide_taskbar=no; settings and host verbs in host_verbs.py, a5300) with the
+painter (lens.html through the door) showing one lens, painted over a frosted copy of what was on the screen
+the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl+Alt+J.
 
 What it is made of, from the research of 10 to 12 Oct (a3909):
   - a native Agora window: a frameless window of our own holding the browser engine that ships with Windows (WebView2,
@@ -44,6 +45,7 @@ PIDFILE = STATE / "hud.pid"
 NOTATION = HERE.parents[0] / "text-desk-lab" / "notation"
 sys.path.insert(0, str(NOTATION))
 import witnessed  # noqa: E402
+import host_verbs  # noqa: E402  (a5300: what the home base can be asked, and its settings)
 import media  # noqa: E402  (a5245: the music controller)
 
 user32, dwmapi, kernel32 = ctypes.windll.user32, ctypes.windll.dwmapi, ctypes.windll.kernel32
@@ -111,6 +113,16 @@ def work_area():
     mi.cbSize = ctypes.sizeof(mi)
     user32.GetMonitorInfoW(m, ctypes.byref(mi))
     r = mi.rcWork
+    return r.left, r.top, r.right - r.left, r.bottom - r.top
+
+
+def whole_monitor(area):
+    """The whole monitor that holds a work area, the taskbar's strip included (a5394)."""
+    x, y, w, h = area
+    mi = MONITORINFO()
+    mi.cbSize = ctypes.sizeof(mi)
+    user32.GetMonitorInfoW(user32.MonitorFromPoint(wt.POINT(x + w // 2, y + h // 2), 2), ctypes.byref(mi))
+    r = mi.rcMonitor
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 
@@ -187,6 +199,13 @@ class Hud:
         self.thumbs = {}              # source hwnd -> (thumbnail id, last rect)
         self.keys_tid = None
         self.lock = threading.Lock()
+        self.settings = dict(host_verbs.DEFAULTS)
+
+    def area(self):
+        """Where it shows: the work area, or the whole monitor when hide_taskbar=yes (a5394). It covers the taskbar and
+        never hides the taskbar's own window, so a home base that is put away, stopped or killed has nothing to restore."""
+        a = host_verbs.work_area(self.settings["monitor"])
+        return whole_monitor(a) if self.settings.get("hide_taskbar") == "yes" else a
 
     # -- the page
     def url(self):
@@ -196,7 +215,7 @@ class Hud:
     def frost(self):
         """A still, blurred and darkened copy of the work area as it is now, as a data address for the page."""
         from PIL import ImageGrab, ImageFilter, ImageEnhance
-        x, y, w, h = work_area()
+        x, y, w, h = self.area()
         im = ImageGrab.grab(bbox=(x, y, x + w, y + h)).convert("RGB")
         im = im.resize((max(1, w // 6), max(1, h // 6)))
         im = im.filter(ImageFilter.GaussianBlur(6))
@@ -220,6 +239,7 @@ class Hud:
         for r in rows:
             r["front"] = "yes" if self.front and r["name"] == str(self.front) else "no"
         witnessed.write(self.a.world, "desktop", rows, by="hud")
+        witnessed.write(self.a.world, "host", host_verbs.rows(), by="hud")
         witnessed.write(self.a.world, "media", media.rows(), by="hud")
         try:
             urllib.request.urlopen(urllib.request.Request(self.door + "/door/witnessed", data=b"{}", method="POST"),
@@ -287,11 +307,12 @@ class Hud:
     def show(self):
         if self.shown:
             return
+        self.settings = host_verbs.settings(self.door, self.a.world, self.a.lens)     # a prop changed takes effect now
         fg = user32.GetForegroundWindow()
         self.front = fg if fg and fg != self.hwnd else None
         self.dress(self.frost())
         self.say_desktop()
-        x, y, w, h = work_area()
+        x, y, w, h = self.area()
         user32.SetWindowPos(self.hwnd, wt.HWND(-1), x, y, w, h, 0x40)         # topmost, shown
         self.window.show()
         user32.SetForegroundWindow(self.hwnd)
@@ -336,8 +357,9 @@ class Hud:
     # -- keys
     def keys(self):
         self.keys_tid = kernel32.GetCurrentThreadId()
-        if not user32.RegisterHotKey(None, HK_TOGGLE, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_J):
-            print("hud: Ctrl+Alt+J is taken by another program; only --show and --stop work", flush=True)
+        mods, vk = host_verbs.hotkey(self.settings["hotkey"]) or (MOD_CONTROL | MOD_ALT, VK_J)      # read once
+        if not user32.RegisterHotKey(None, HK_TOGGLE, mods | MOD_NOREPEAT, vk):
+            print(f"hud: {self.settings['hotkey']} is taken by another program; only --show and --stop work", flush=True)
         msg = wt.MSG()
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
             if msg.message == WM_HOTKEY and msg.wParam == HK_TOGGLE:
@@ -346,7 +368,8 @@ class Hud:
                 self.hide()
             elif msg.message == WM_APP + 1:
                 if msg.wParam:
-                    user32.RegisterHotKey(None, HK_ESC, MOD_NOREPEAT, VK_ESCAPE)
+                    if not user32.RegisterHotKey(None, HK_ESC, MOD_NOREPEAT, VK_ESCAPE):
+                        print("hud: Esc is taken by another program; the page's put-away still works", flush=True)
                 else:
                     user32.UnregisterHotKey(None, HK_ESC)
         user32.UnregisterHotKey(None, HK_TOGGLE)
@@ -384,13 +407,15 @@ class Hud:
     def closed(self):
         witnessed.clear(self.a.world, "desktop")
         witnessed.clear(self.a.world, "media")
+        witnessed.clear(self.a.world, "host")
         if self.keys_tid:
             user32.PostThreadMessageW(self.keys_tid, WM_QUIT, 0, 0)
         PIDFILE.unlink(missing_ok=True)
 
     def run(self):
         import webview
-        x, y, w, h = work_area()
+        self.settings = host_verbs.settings(self.door, self.a.world, self.a.lens)
+        x, y, w, h = host_verbs.work_area(self.settings["monitor"])
         self.window = webview.create_window("Agora home base", self.url(), js_api=Api(self), x=x, y=y, width=w,
                                             height=h, frameless=True, on_top=True, hidden=True, easy_drag=False,
                                             background_color="#0D100F", text_select=True)
@@ -412,6 +437,10 @@ class Api:
     def hide(self):
         self._hud.hide()
         return True
+
+    def host(self, verb, words=""):
+        """A lens's `on click host <verb> [words]` (a5300): 'ok ...' or 'ERR ...', never raises."""
+        return host_verbs.call(self._hud, verb, words)
 
 
 def alive(pid):
@@ -443,6 +472,7 @@ def main():
         PIDFILE.unlink(missing_ok=True)
         witnessed.clear(a.world, "desktop")
         witnessed.clear(a.world, "media")
+        witnessed.clear(a.world, "host")
         return
     if old and alive(old):
         print("hud: already running as", old)
