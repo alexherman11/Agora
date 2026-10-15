@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_room_verbs (a990, rooms step 2b): rooms show their verbs and are namespaces for new ones (show, don't lock).
 
     python test_room_verbs.py

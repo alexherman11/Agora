@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_table (8 Oct 2026, step 4 of the grammar unification): the row table.
 
     python test_table.py

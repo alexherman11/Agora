@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_captures (14 Oct 2026, a5062): a control-screen capture is kept by the house, off the world, until it is sent.
 
     python test_captures.py

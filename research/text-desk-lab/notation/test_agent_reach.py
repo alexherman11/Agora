@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_agent_reach (a5267): @claude and @codex are knocked like the residents when a listener of theirs runs, and the
 receipt and the knock record say truthfully what happened when none does.
 

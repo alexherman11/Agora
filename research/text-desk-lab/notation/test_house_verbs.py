@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_house_verbs (9 Oct 2026, step 6 of the grammar unification): the retired built-ins are verb notes of the house.
 
     python test_house_verbs.py

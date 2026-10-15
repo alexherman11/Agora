@@ -280,18 +280,31 @@ SOURCES = {
     "words": ("words [host=verb|command|lens|term|kind]", ("host", "word", "form", "slots", "doc")),
     "slots": ("slots [host=... word=...]", ("host", "word", "slot", "type", "needed", "doc")),
     "kinds": ("kinds", ("kind", "is", "shape", "things", "props", "declared")),
-    # 9 Oct (a3806): the lines the desk did not do, counted by shape, the most met first (verbs.record_reach): which
-    # refusal or missing word is worth curing shows itself, without anyone deciding whose fault each one was
-    "reaches": ("reaches", ("shape", "n", "who", "kind", "last", "line")),
-    # a5052 (14 Oct): the windows a host keeps on the screen (research/window-lab/wm.py), as it last said them, in its
-    # order: witnessed beside the house (witnessed.py), never in the world. name is the host's own for the window (a
-    # repeat keys each by it), kind agora or adopted, pinned/collapsed/focused yes or no, age the seconds since it said so
-    "windows": ("windows", ("name", "title", "lens", "kind", "pinned", "collapsed", "focused", "order", "age", "by")),
-    # 15 Oct (the home base, JEFF's HUD): rows any living program keeps beside the house under a name of its own, with the
-    # fields it wrote (read them through a frame, `of witnessed:desktop as w` and $w.title), and order, age and by. A
-    # program says what it sees without a source edit per program; `windows` is the first such source, kept by its name
-    "witnessed": ("witnessed:<name>", ("order", "age", "by")),
+    # reaches, windows and witnessed are files of their own in sources/ (a5296), read below
 }
+
+
+# a5296 (a5261 point 4: every new source was a line here and a branch in _rows_of, so two builders adding one conflicted):
+# a source may be one file in sources/, <name>.py, saying USAGE (as a refusal prints it), FIELDS, ARG ("none", "needed"
+# or "optional": whether `<name>:<arg>` takes one), OPEN (True: its rows may carry fields beyond FIELDS, printed after
+# them) and rows(desk, arg, session) -> [dict]. Adding a source is adding a file; nothing here changes.
+SOURCE_DIR = pathlib.Path(__file__).resolve().parent / "sources"
+SOURCE_FILES = {}        # name -> {"arg", "open", "rows"}
+
+
+def _load_sources(folder=SOURCE_DIR):
+    import importlib.util
+    for p in sorted(pathlib.Path(folder).glob("*.py")):
+        if p.stem.startswith("_") or p.stem in SOURCES:
+            continue             # a name the table above already has keeps it: a file never takes a source over
+        spec = importlib.util.spec_from_file_location(f"agora_source_{p.stem}", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        SOURCES[p.stem] = (mod.USAGE, tuple(mod.FIELDS))
+        SOURCE_FILES[p.stem] = {"arg": getattr(mod, "ARG", "none"), "open": bool(getattr(mod, "OPEN", False)), "rows": mod.rows}
+
+
+_load_sources()
 # a source's field names: read bare inside their own repeat ($who in `of messages:`); a text's $name that is one of them
 # is no prop of the thing, and no aspect for the fence. 8 Oct: they no longer take a name away from `let` or `as` in
 # every lens (`let shape` stopped compiling when a source gained a field shape): the nearer binding wins, as names.py says
@@ -771,7 +784,12 @@ def rows(desk, source, session=None):
 def _rows_of(desk, source, session=None):
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days", "witnessed")) != bool(arg)):
+    own = SOURCE_FILES.get(head)
+    if own:                  # a5296: a source that is a file of its own (sources/)
+        if own["arg"] != "optional" and (own["arg"] == "needed") != bool(arg.strip()):
+            return None
+        return own["rows"](desk, arg.strip(), session or getattr(desk, "_session", "") or "")
+    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name, days a span; house, turns and lines one or none; the rest none
     if head == "days":
         a, _, b = arg.partition("..")
@@ -794,21 +812,6 @@ def _rows_of(desk, source, session=None):
         return house_rows(desk, desk._resolve(arg) if arg else None)
     if head == "turns":
         return turn_rows(desk, desk._resolve(arg) if arg else None)
-    if head == "reaches":
-        import verbs
-        return verbs.reach_rows(desk)
-    if head == "windows":
-        import witnessed
-        doc = witnessed.read(session or getattr(desk, "_session", "") or "", "windows")
-        return [] if doc is None else [{**{f: "" for f in SOURCES["windows"][1]}, **{k: v for k, v in r.items() if k in SOURCES["windows"][1]},
-                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
-                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict) and r.get("name")]
-    if head == "witnessed":
-        import witnessed
-        doc = witnessed.read(session or getattr(desk, "_session", "") or "", arg.strip())
-        return [] if doc is None else [{**{k: v if isinstance(v, (str, int, float)) else __import__("json").dumps(v) for k, v in r.items()},
-                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
-                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict)]
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)
@@ -886,7 +889,8 @@ def rows_text(desk, source):
     if rs is None:
         raise LensRefusal("rows <source> [k=v k<v ...]. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
     fields = SOURCES[source_head(source)][1]
-    if source_head(source) in ("lines", "witnessed"):     # 14 Oct: and the fields the lines (15 Oct: or a program) gave them
+    if source_head(source) == "lines" or (SOURCE_FILES.get(source_head(source)) or {}).get("open"):
+        # 14 Oct: and the fields the lines (15 Oct: or a program, a source file saying OPEN) gave them
         fields = fields + tuple(sorted({k for r in rs for k in r} - set(fields)))
     lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
     for r in rs:

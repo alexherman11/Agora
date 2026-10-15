@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_nearest (9 Oct 2026, step 7 of the grammar unification): lenses, styles and kinds resolve by place, nearest first,
 as verbs do (verbs.ladder is the one lookup).
 
