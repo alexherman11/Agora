@@ -72,6 +72,7 @@ def say(me, *lines):
 
 class House:
     world = "roomworld-inmemory"
+    dir = Path(tmp.name) / "house-state"      # a5292: step 6's pass meets step 3's reverted card and returns it
 
     def load(self):
         return W
@@ -95,6 +96,9 @@ class Wk:
 
     def send(self, text):
         self.heard.append(text)
+
+    def alive(self):                # a5292: a refused landing tells a worker that is running (test_landing_return)
+        return True
 
 
 ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
