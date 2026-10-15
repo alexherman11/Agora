@@ -104,6 +104,16 @@ def test_style_rewrite_api_response_succeeds_and_native_write_is_durable(case):
     assert facts == store.flatten(saved.world)
 
 
+def test_selection_refusal_is_a_lens_refusal(case):
+    # a5398: a let's count() over in:<a note> raised the native Refusal out of the compiler
+    with pytest.raises(scene.LensRefusal, match="in: needs a surface id") as error:
+        lens_ir.Accessor(case.desk).select(f"kind:task,in:{case.item}")
+    assert isinstance(error.value.__cause__, Refusal)
+    case.lens["text"] = f'root : column\n  let k = count(kind:task,in:{case.item})\n  t : text "$(k)"'
+    ok, note = lens_ir.check(case.desk, case.lens)
+    assert not ok and "in: needs a surface id" in note
+
+
 def test_unexpected_row_source_bug_still_propagates(case, monkeypatch):
     def broken(*args):
         raise RuntimeError("unexpected row source bug")
