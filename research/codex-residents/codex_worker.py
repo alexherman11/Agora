@@ -27,15 +27,29 @@ HERE = Path(__file__).resolve().parent
 MODEL = "gpt-6.1-sol"
 
 
-def runtime_config(directory):
+def pinned_catalog(model):
+    """The pinned catalog that lists `model`, with the hash its lock expects. a5284: Astra workers use the residents'
+    catalog (model-catalog.json, pinned by runtime-lock.json); Sol keeps its own. -> (path, sha256)."""
+    for name, lock_name in (("worker-model-catalog.json", "worker-runtime-lock.json"),
+                            ("model-catalog.json", "runtime-lock.json")):
+        path = HERE / name
+        slugs = {m.get("slug") for m in json.loads(path.read_text(encoding="utf-8")).get("models", [])}
+        if model in slugs:
+            lock = json.loads((HERE / lock_name).read_text(encoding="utf-8"))
+            return path, lock["catalog_sha256"]
+    raise RuntimeError(f"Requested model unavailable: {model} is in no pinned catalog; no substitution")
+
+
+def runtime_config(directory, model=MODEL):
     if importlib.metadata.version("openai-codex") != SDK_VERSION:
         raise RuntimeError(f"Worker requires openai-codex=={SDK_VERSION}")
     lock = json.loads((HERE / "worker-runtime-lock.json").read_text(encoding="utf-8"))
-    catalog = HERE / "worker-model-catalog.json"
-    for path, expected in ((Path(lock["binary"]), lock["binary_sha256"]),
-                           (catalog, lock["catalog_sha256"])):
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise RuntimeError(f"Pinned worker runtime changed: {path}")
+    catalog, catalog_sha = pinned_catalog(model)
+    binary = os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]      # as the resident adapter: still hash-checked
+    for path, expected in ((Path(binary), lock["binary_sha256"]),
+                           (catalog, catalog_sha)):
+        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            raise RuntimeError(f"Pinned worker runtime changed or missing: {path}; recheck the inventory")
     enabled = {"shell_tool", "unified_exec", "apply_patch_freeform", "view_image",
                "web_search", "web_search_request", "standalone_web_search"}
     overrides = [f"features.{name}=false" for name in DISABLED if name not in enabled]
@@ -59,7 +73,7 @@ def runtime_config(directory):
             os.environ.pop(key)
     env = {"CODEX_HOME": str(PROFILE)}
     return CodexConfig(
-        codex_bin=lock["binary"], cwd=str(directory), env=env,
+        codex_bin=binary, cwd=str(directory), env=env,
         config_overrides=tuple(overrides), client_name="agora_desk_worker",
         client_title="Agora Desk worker",
     )
@@ -99,7 +113,7 @@ def serve(args):
 
     threading.Thread(target=read_input, daemon=True).start()
     prompt = Path(args.prompt_file).read_text(encoding="utf-8")
-    with CodexClient(runtime_config(directory), approval_handler=deny) as client:
+    with CodexClient(runtime_config(directory, args.model), approval_handler=deny) as client:
         client.initialize()
         if args.model not in {m.model for m in client.model_list(True).data}:
             raise RuntimeError(f"Requested model unavailable: {args.model}; no substitution")

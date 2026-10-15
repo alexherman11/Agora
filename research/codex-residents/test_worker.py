@@ -1,5 +1,7 @@
 """Worker provider routing must preserve existing conversations."""
 
+import hashlib
+import json
 import sys
 import types
 from pathlib import Path
@@ -8,6 +10,26 @@ from unittest.mock import patch
 
 import pytest
 from prepare_worker import TARGET, candidate
+
+
+def pinned_bytes(path):
+    """The catalog as it was hashed: the main checkout's CRLF bytes (a worktree checks it out with LF)."""
+    raw = path.read_bytes()
+    return {hashlib.sha256(raw).hexdigest(), hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()}
+
+
+def test_pinned_catalog_per_model():
+    """a5284: Astra workers use the residents' pinned catalog; Sol keeps the worker's; nothing else is substituted."""
+    from codex_worker import pinned_catalog
+    path, sha = pinned_catalog("gpt-6-astra")
+    assert path.name == "model-catalog.json"
+    assert sha == json.loads((path.parent / "runtime-lock.json").read_text(encoding="utf-8"))["catalog_sha256"]
+    assert sha in pinned_bytes(path)
+    path, sha = pinned_catalog("gpt-6.1-sol")
+    assert path.name == "worker-model-catalog.json"
+    assert sha in pinned_bytes(path)
+    with pytest.raises(RuntimeError, match="no substitution"):
+        pinned_catalog("gpt-5")
 
 
 def test_provider_selection_and_resume_guard(tmp_path):
