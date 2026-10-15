@@ -46,6 +46,7 @@ const Style = (() => {
     afloat: () => ({ height: "0", "min-height": "0", overflow: "visible", transition: "transform 140ms ease-out", "will-change": "transform" }),
     shy: () => ({ opacity: "0", "--shy": "1" }),
     pulse: () => ({ animation: "r-pulse 2.5s ease-in-out infinite" }),
+    align: v => ({ "align-self": { start: "flex-start", end: "flex-end", center: "center", stretch: "stretch" }[v] }),   // 15 Oct
     wave: () => ({ "white-space": "pre" }),     // 14 Oct: its characters are spans the painter makes (lens.js wave)
   };
   for (const side of ["top", "right", "bottom", "left"]) {
