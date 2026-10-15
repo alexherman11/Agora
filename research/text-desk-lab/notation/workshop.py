@@ -412,6 +412,8 @@ class Workshop:
         import explore
         live, out = Path(live or HERE / "sessions" / f"{self.house.world}.pickle"), {}
         for cid, wk in list(self.workers.items()):
+            if getattr(wk, "tree", None) is None:
+                continue
             to = Path(wk.tree) / NOTATION / "sessions" / f"{self.house.world}-try.pickle"
             if not to.exists() or not live.exists():     # a worker with no copy is not given one here (begin does)
                 continue
@@ -866,7 +868,10 @@ class Workshop:
                      + failing + parked + self.export_docs(cid))
             self.compare_lived(self.house.load())     # a3165: a promise reported as of a commit ends here, or stays open
             self.finish(cid, wk, keep_branch=False)
-            self.refresh_copies()                     # a5296: the others try things on the world as it is now
+            try:
+                self.refresh_copies()                 # a5296: the others try things on the world as it is now
+            except Exception:                         # a copy left stale never stops a landing being said
+                pass
             if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
                 self.restart_wanted = True
             return
