@@ -146,5 +146,41 @@ src = (HERE / "door.py").read_text(encoding="utf-8")
 check("7. the door's stream says world, with no id, when witnessed rows change",
       'put("world", {"witnessed"' in src and "witnessed.stamp(session)" in src)
 
+# 8 (15 Oct, the home base): any program's rows under a name of its own, `witnessed:<name>`, every field it wrote
+DESK = "\n".join([
+    "screen : row",
+    "  of witnessed:desktop program=notepad as w",
+    "  each tile",
+    "tile : column",
+    "  role pane",
+    "  role pinned when $w.front = yes",
+    '  t : text "$w.title, $w.program, $w.order"',
+])
+say(f"look {R.BOARD} :1", f'do create {R.BOARD} kind=note tags=lens title=desk-test style=wm-test-style text="{esc(DESK)}"')
+witnessed.write(WORLD, "desktop", [{"name": "131072", "title": "Notes", "program": "notepad", "front": "yes"},
+                                   {"name": "65800", "title": "Inbox", "program": "outlook", "front": "no", "extra": {"a": 1}},
+                                   {"name": "917504", "title": "Draft", "program": "notepad", "front": "no"}], by="hud")
+rows = scene.rows(D, "witnessed:desktop")
+check("8. witnessed:<name> passes every field the program wrote, with order, age and by",
+      [r["name"] for r in rows] == ["131072", "65800", "917504"] and rows[1]["program"] == "outlook"
+      and rows[1]["extra"] == '{"a": 1}' and rows[2]["order"] == 3 and rows[0]["by"] == "hud", rows)
+sc, _ = scene.scene_for(D, "desk-test")
+ks = keys(sc)
+text = say("scene desk-test")
+check("8. a lens repeats over it through a frame, keyed by name, terms filter, a role reads a field",
+      "screen/131072" in ks and "screen/917504" in ks and "screen/65800" not in ks
+      and "Notes, notepad, 1" in text and "Draft, notepad, 3" in text and "[pinned, since" in text, (ks, text[:2000]))
+check("8. witnessed alone names no source; a stopped program's rows are none",
+      scene.rows(D, "witnessed") is None and scene.rows(D, "witnessed:nobody") == [], scene.rows(D, "witnessed"))
+witnessed.clear(WORLD, "desktop")
+
+# 9 (15 Oct): a style's `align` says where a part stands across its parent's flow
+import style as style_mod   # noqa: E402
+lk = style_mod.looks("token ink = #111111\ntoken gap = 8\nrole a : align end, ink\nrole b : align left")["roles"]
+check("9. align end is a look; align with another word is unread with the reason",
+      lk["a"]["look"].get("align") == "end" and lk["b"]["unread"] and "start, center, end" in lk["b"]["unread"][0][1], lk)
+js = (HERE / "desk-shell" / "style" / "style.js").read_text(encoding="utf-8")
+check("9. the browser painter draws align as align-self", 'align: v => ({ "align-self"' in js)
+
 print(f"{len(fails)} FAILED" if fails else "all passed")
 sys.exit(1 if fails else 0)

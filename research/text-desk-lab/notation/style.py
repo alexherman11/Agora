@@ -22,6 +22,7 @@ A look's keys (the painter's table maps each to its medium):
     space above|below <len>      margin                between <len>                           gap between children
     height <len|em>              least height          width <len|em>                          width (px) or widest (em)
     lift <len>                   a shadow              text [up|down [n]] [medium|strong] [slant] [tracked]  the face
+    align start|center|end|stretch   where the part stands across its parent's flow (15 Oct)
     afloat  shy  pulse  wave     flags: takes no room; unseen until near; the motions (pulse: the part breathes;
                                  wave, 14 Oct: each character rises in turn, as typing dots do)
 """
@@ -338,6 +339,10 @@ def read_prop(p, T, fonts):
         return {"text": face}
     if p in ("afloat", "shy", "pulse", "wave"):
         return {p: True}
+    if (m := re.match(r"^align\s+(start|center|end|stretch)$", p)):
+        return {"align": m.group(1)}      # 15 Oct: where the part stands across its parent's flow (a chat's own lines at the end)
+    if re.match(r"^align\b", p):
+        raise Unread("align takes start, center, end or stretch")
     c = _colour(p, T)
     if c is None:
         raise Unread("is no property and no colour token")
