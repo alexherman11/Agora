@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (35)
+## open (37)
 
 ### F2. Scripts cannot say who is running them
 
@@ -238,6 +238,23 @@ a5145 · family=privacy · status=open
 
 Missing world-level words: a thing that belongs to one person and is readable by no one else until they publish it. The desk restricts no reading, so an unsent capture of Alex's screen (his email, say) could not be a world thing (Sable, a5062 c5088). It is kept by the house instead, in house-state/captures beside the painter reports, through new source: captures.py (and test_captures.py, added to health.py's list). Only its id enters the world, as a prop on his chat draft. The capture tool itself (research/window-lab/capture/) is outside the desk. If the world ever gains private things (one reader until published), captures should move into it and this store retire. worker-a5062, 14 Oct.
 
+### Witnessed rows: a program outside the desk keeps rows a lens repeats over (windows)
+
+a5179 · family=lens · status=open
+
+Source edits by Claude, 14 Oct, for the window manager prototype (a5052): witnessed.py (new), scene.py (the `windows` row source), deskd.py (a scene's cache key reads witnessed rows), door.py (a page's stream repaints when they change; POST /door/witnessed says so at once).
+WORLD-LEVEL WORD MISSING: a row source that a program outside the desk keeps, witnessed and with age, never in the world's log. Painter reports (a4869) were the only such thing, and they could not be repeated over. Now witnessed.py keeps one file per source beside the house, and a source whose writer has stopped has no rows. Only `windows` is named today; the next one (a capture, a sensor) needs a line in scene.SOURCES naming its fields.
+ROUGH STILL: (1) the painter repaints only on a `world` message, so a change to witnessed rows is sent as `world` with no id; lens.js has no word for 'what a scene reads changed, not the world' (lens.js is Codex's for now, a4039). (2) A layout's part is matched to a window by the last segment of its key, so a part named like a window (w2) would be taken for it. (3) The host learns a lens's lesser= by reading `find` text through the door; there is no read-only answer for one thing's props as data.
+
+### Home base: a program's rows and a part's side (two source words)
+
+a5214 · family=code · status=open
+
+Claude, 15 Oct, building the home base (a3874) and its chat. Two source edits, both landing by hand through the queue.
+1. A row source can only be named in scene.py. The home base wants the windows open on Alex's screen, which a program outside the desk sees (hud.py), and the only way for a lens to read them was a new entry in scene.SOURCES, as `windows` was for the window manager yesterday. Missing word: a source a program declares by writing it. Cured in part with `witnessed:<name>`: any living program's rows beside the house, every field it wrote, read through a frame. Still missing: declaring a source from the world itself (a feed, a mailbox), which the information streams design will need.
+2. A style could not say where a part stands across its parent's flow, so a chat could not put Alex's own lines at the right. Missing word: `align start|center|end|stretch`.
+Friction met on the way, not cured: a lens that names a source the running desk does not know made `do rewrite` answer 502 instead of a refusal (Codex is already on this: lens_ir and test_lens_row_refusal in the live checkout); an empty prop is none, so `only when $draft.reply_to != ""` can't tell, and the cure is `($draft.reply_to or "") != ""`, which nobody would guess.
+
 ## curing (27)
 
 ### F13. A lens named like its room makes the room's name ambiguous
@@ -460,7 +477,7 @@ a5104 · family=conversation · status=curing
 
 Missing reusable capabilities encountered building task a5076: per-message default_to overridden by explicit header, atomic unknown-recipient refusal, sayings involving:<person> with original reply targets across chats/comments, bounded detached native context snapshots, composer lines bounds, and scroll-end continuity on window resize. Source edits are coordinated with Sable/Claude. Candidate checks in frontier@conversation-check; final evidence pending.
 
-## cured (58)
+## cured (59)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -966,3 +983,9 @@ Source edits by Claude, 14 Oct (96008fb, 410ac29), Snappy Desk stage 2 (views by
 a4974 · family=painter · status=cured
 
 Source edits by Claude, 14 Oct (e0ac4f9, 9f27357, 8d0438a), Snappy Desk stages 3 and 4, at Alex's approval of the plan. (1) Hands go first: the painter shows a split the moment Enter is pressed when the key's command splits at the caret ($head stays, $tail goes on), read from the verb, never from a lens's names; keys typed meanwhile show in it; the next paint replaces it, a refusal takes it back and says why. The missing world word, if one is wanted: a way for a lens to say how any gesture looks before the desk answers (today only split is foreseen, because only the verb's meaning is known to the painter). (2) Looking never writes: a held request that adds no event and no log record saves nothing; that person's seen marks ride with the next change, or are saved when the world server lets go. (3) Rules answer a world verb once it is done, not after each of its steps (a split's 5 steps chose each rule's things 5 times). Ran on a frontier copy: the split on screen in 3 ms (was ~250); a press's do 109-116 -> 65-76 ms. Off switches: DESK_RULES_PER_STEP=1; the others are in the commits. WANTED STILL: test_waiting.py calls scene.inbox_rows, gone since c0088bb.
+
+### Two hand landings in one second asked for the same branch name
+
+a5315 · family=house · status=cured
+
+landing.hand named its branch hand/<who>-<YYYYmmdd-HHMMSS>, to the second. test_landing_queue steps 11 and 12 each make a hand landing by codex; on a fast run they fell in the same second, the second `git branch` failed ('a branch named hand/codex-... already exists'), and the landing room refused every branch (a5245 met it 15 Oct; ran it in the worktree and it failed the same way, with landing.py exactly as main has it). The same can happen live when one builder hand-lands twice quickly. Fixed (landing.py, a5245, commit 876c2b6): a taken name gets -2, -3 ... after it, and its temporary index file is named to match. Ran: test_landing_queue all passed; health.py frontier-try all green. Source edit, not world: the missing word was none at the world level; this is the house's own landing code.
