@@ -37,7 +37,7 @@ class Home:
 
 h = Home()
 names = [r["name"] for r in H.rows()]
-check("the rows are the verbs, each with what it does", names == ["bring", "hide", "media.play", "media.next", "media.prev"]
+check("the rows are the verbs, each with what it does", names == ["bring", "hide", "window", "media.play", "media.next", "media.prev"]
       and all(r["about"] for r in H.rows()), H.rows())
 check("hide hides", H.call(h, "hide") == "ok hidden" and h.did[-1] == ("hide",), h.did)
 check("bring takes the window's handle, as the build filled it", H.call(h, "bring", "1312") == "ok brought 1312 forward"
@@ -47,6 +47,17 @@ r = H.call(h, "bring", "Notepad")
 check("bring refuses words that are not a handle, and does nothing", r.startswith("ERR bring takes") and h.did[-1] == ("bring", 77), r)
 r = H.call(h, "shutdown")
 check("an unknown verb is refused, naming the ones there are", r.startswith("ERR the home base has no verb 'shutdown'") and "media.next" in r, r)
+# a5500: window <lens> opens a lens as its own window (lens_window, stood in for here: nothing reaches the screen)
+import lens_window  # noqa: E402
+opened = []
+lens_window.open_window = lambda lens, who, world: opened.append((lens, who, world)) or type("P", (), {"pid": 42})()
+h.a = type("A", (), {"who": "alex", "world": "frontier"})()
+r = H.call(h, "window", "command-center")
+check("window opens the lens as the home base's person in its world, and puts the home base away",
+      r == "ok opened command-center as a window (process 42)" and opened == [("command-center", "alex", "frontier")]
+      and h.did[-1] == ("hide",), (r, opened, h.did))
+r = H.call(h, "window", "C:/Windows/notepad.exe")
+check("window takes a lens's name only, never a path or a program", r.startswith("ERR window takes") and len(opened) == 1, r)
 check("a verb that fails says so instead of raising", H.call(type("X", (), {"hide": lambda s: 1 / 0})(), "hide").startswith("ERR hide failed: ZeroDivisionError"))
 
 p = H.parse_props('a5208 note "home-base" · style=home-style hotkey=Ctrl+Shift+F9 monitor=2 note="a b" · 277w')

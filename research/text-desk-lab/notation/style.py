@@ -30,6 +30,8 @@ A look's keys (the painter's table maps each to its medium):
                                  wave, 14 Oct: each character rises in turn, as typing dots do)
     glide                        flag (a5504): when a repaint puts the same thing somewhere else (a card that changed
                                  lane), it travels there from where it was; a thing newly shown fades in
+    touch                        flag (a5500, 15 Oct): the part answers the pointer: it rises and brightens under it,
+                                 and sinks while pressed (a dock's icons). Brightens only, for reduced motion
 """
 import hashlib
 import pathlib
@@ -352,7 +354,7 @@ def read_prop(p, T, fonts):
         if re.search(r"\btracked\b", p):
             face["tracked"] = True
         return {"text": face}
-    if p in ("afloat", "shy", "pulse", "wave"):
+    if p in ("afloat", "shy", "pulse", "wave", "touch"):
         return {p: True}
     if (m := re.match(r"^align\s+(start|center|end|stretch)$", p)):
         return {"align": m.group(1)}      # 15 Oct: where the part stands across its parent's flow (a chat's own lines at the end)

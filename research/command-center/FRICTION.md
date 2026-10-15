@@ -261,7 +261,7 @@ a5341 · family=missing-word · status=open
 
 a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; new listeners.py; the Codex listener) so that @claude and @codex are knocked when a listener of theirs runs. The missing world-level word: a thing that says 'this agent is reachable, through this, and here is what it handed on', as a corner says it for a resident. Today it is a witnessed row (listener-<name>), which is right for liveness (it dies with the process) but cannot be written from the desk, and what it delivered is not kept in the world. If a world word appeared for it (a reach= prop on a person/agent record, or a kind for a door to an outside session), the receipt's words would move into the world.
 
-## curing (30)
+## curing (31)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -504,6 +504,15 @@ worker-a5398, 15 Oct, building the home base's viewer (design a5460; lenses home
 2. A native refusal inside a lens selection escaped the compiler and crashed the command that triggered the check (here `count(kind:task,in:$item)` with a note open, which asks in: of a note). Cured in lens_ir.Accessor.select, as Codex cured row sources in f90d49a: it is now the lens's refusal. This also cures a5372.
 3. Not cured, lived with: a placed lens starts empty, so home-note, home-chat and home-surface each find the viewer note again (`of prop:role=home-view,prop:actor=$me as v`, then `of $v.viewing`). Missing word: a lens stood on a thing (a4228, f4358, waiting on Alex): `lens home-$kind on $r`. With it the kind lenses lose their first two parts, and viewing= can move into the window's own values.
 Also met: `let n` is refused as taken ($n is a built-in), with no word on what took it.
+
+### HUD dock (a5500): a style could not say how a part answers the pointer; the home base could not open an app as a window
+
+a5579 · family=missing-word · status=curing
+
+worker-a5500, 15 Oct, building the home base's dock (lens home-dock, Alex's dock f5565, both in f5204). Two source edits, one friction lived with.
+1. A style had no word for how a part answers the pointer. A button looked the same under the pointer and while pressed (only the painter's own 45% dim on a press in flight), so a dock of icons felt dead. Missing word: a role flag. Cured in source: `touch` (style.py read_prop; style.js draws :hover brighter and raised 3px, :active darker and at 94%; only the brightness for a viewer who asks for reduced motion). Wider cure nobody has argued for: role variants by pointer state (`role x.hover`), so the style says the look rather than one fixed answer.
+2. The home base could not open an Agora app as its own window. Missing word: a host verb. Cured as one entry in research/window-lab/host_verbs.py, `window <lens>`, through lens_window.open_window (split out of its main). Live only once Claude's hud.py hook (a5300 c5383) is in; until then the dock carries no window icon on Alex's screen.
+3. Lived with: `on click host` takes no `when`, and its verb can't be a $field (the verb is checked when the lens compiles), so a dock icon can't say 'ask the host whatever my note says'. Each kind of act is its own part with `only when` (view, chat, window), the glyph and label written three times. Also: an escaped double quote inside a lens text is drawn with its backslash.
 
 ## cured (60)
 
