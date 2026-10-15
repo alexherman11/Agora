@@ -45,7 +45,8 @@ Everything is kept per world: two worlds can hold the same corner ids (a copy of
 never resume another world's conversation.
 Settings are props on the Desktop's note "The house": model, breather, wake_every, timers (off: only a call wakes a
 resident, never an open objective, wake_every or the end of a timed rest; 13 Oct), and for workers: workers (how many at
-once, default 1) and worker_model (default: model). Replay never wakes anyone.
+once, default 1), worker_model (default: model) and worker_pool (a5284: each provider's share of them, e.g.
+"2 claude, 2 codex gpt-6-astra"; a card's own worker_provider and worker_model win). Replay never wakes anyone.
 
 Workers (workshop.py): a task with prop commission=asked is taken up by a disposable worker with real tools in its own
 git worktree; it talks to whoever asked through comments on the commission, and the house lands its branch between
@@ -90,7 +91,8 @@ except ImportError:
 COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", "history", "examine", "help", "do",
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
-DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "timers": "on"}
+DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
+            "timers": "on"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for

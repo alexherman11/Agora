@@ -119,6 +119,16 @@ When main moves under you (another landing touched your files), bring it in your
 then re-make any goldens you changed and run health again before setting ready."""
 
 
+CODEX_MODEL = "gpt-6.1-sol"       # codex_worker.MODEL: what a codex card that names no model runs
+# a5284: what a Codex worker's sandbox stopped on 1 Oct (a1666 c1884, c1885, c1686), said to it so it does not stop again
+CODEX_LIMITS = """
+Your sandbox cannot write .git (on 1 Oct `git add` failed: index.lock, Permission denied). Don't commit and don't work
+around it: leave your changes in the worktree, and when you set commission=ready the house commits everything in it
+outside sessions/ to your branch, then lands it. The headless browser (screen.py) did not start in this sandbox either
+(Chrome's IPC pipe was refused): if your change needs a painter check, say in your done comment that you could not look.
+"""
+
+
 def git(*args, cwd=REPO, check=False, timeout=120):
     r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=timeout)
     if check and r.returncode:
@@ -321,10 +331,15 @@ class Workshop:
                 # Sable c3142, 30 Sep: nine asked, none started from 18:25 to 19:50, because three idle workers (two
                 # waiting on someone, one reported) held all three slots. Only a worker at work holds one now; a waiting
                 # one keeps its process, and when it is answered the house may briefly run one over the number.
-                running = sum(1 for c, x in self.workers.items() if x.alive()
-                              and (x.busy or (cs.get(c) or (None, ""))[1] in ("working", "ready", "landing")))
-                if running < int(cfg.get("workers", "1")):
-                    self.begin(w, cid, s, cfg)
+                # a5284 (a5261 point 1, 15 Oct): a card that is ready or landing held one too, and runs no model; its
+                # worker holds a slot again only while a turn is out (busy), as when a landing sends it back to work
+                running = [x for c, x in self.workers.items() if x.alive()
+                           and (x.busy or (cs.get(c) or (None, ""))[1] == "working")]
+                if len(running) >= int(cfg.get("workers", "1")):
+                    continue
+                lane = self.lane(cid, s, cfg, running)
+                if lane is not False:
+                    self.begin(w, cid, s, cfg, lane)
                 continue
             # a5292: a reverted card is underway too (a4869's worker was told of its revert, the house restarted mid-turn,
             # and nothing resumed it: two comments to it went unheard and Claude finished it by hand)
@@ -366,6 +381,53 @@ class Workshop:
             elif state in ("working", "reverted") and wk.state.get("turns", 0) > 0:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
                 self.unfinished(w, cid, wk)
+
+    # ---- the pool ----------------------------------------------------------------------------------------------
+    @staticmethod
+    def pool(cfg):
+        """The house note's worker_pool, e.g. "2 claude, 2 codex gpt-6-astra": lanes of <how many> <provider> [model],
+        each a provider's share of the workers (a5284, Alex 15 Oct: two Claude and two Astra). -> [{n, provider, model}],
+        [] when it is unset or says nothing it can read (then every card runs as it says, Claude unless it names one)."""
+        lanes = []
+        for part in str(cfg.get("worker_pool") or "").split(","):
+            words = part.split()
+            if (len(words) >= 2 and words[0].isdigit() and words[1] in ("claude", "codex")
+                    and words[1] not in [ln["provider"] for ln in lanes]):     # one lane per provider: the first says
+                lanes.append({"n": int(words[0]), "provider": words[1], "model": words[2] if len(words) > 2 else ""})
+        return lanes
+
+    def provider_of(self, cid, s):
+        """The provider a card is held to: its own worker_provider, else the one its saved worker conversation belongs
+        to (a re-asked card resumes it, and a conversation never moves between providers), else None (the pool picks)."""
+        said = ((s.get("props") or {}).get("worker_provider") or "").strip()
+        if said:
+            return said
+        try:
+            st = json.loads((self.house.dir / f"worker-{cid}" / "state.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, AttributeError):
+            return None
+        return (st.get("session_provider") or "claude") if st.get("session") else None
+
+    def lane(self, cid, s, cfg, running):
+        """Which lane of the pool an asked card starts in: None (no pool, or a provider the pool has no lane for: only
+        `workers` bounds it), a lane, or False (its lane is full: it waits). A card held to no provider takes the lane
+        with the most room, the first listed on a tie, so four cards on "2 claude, 2 codex" start two and two."""
+        lanes = self.pool(cfg)
+        if not lanes:
+            return None
+        used = {}
+        for x in running:
+            p = x.state.get("session_provider") or "claude"
+            used[p] = used.get(p, 0) + 1
+        held = self.provider_of(cid, s)
+        if held:
+            mine = [ln for ln in lanes if ln["provider"] == held]
+            if not mine:
+                return None
+            return mine[0] if used.get(held, 0) < sum(ln["n"] for ln in mine) else False
+        room = [(ln["n"] - used.get(ln["provider"], 0), -i, ln) for i, ln in enumerate(lanes)]
+        free, _, best = max(room, key=lambda r: r[:2])
+        return best if free > 0 else False
 
     def heard(self, w, cid, s, wk):
         """Comments on its commission by anyone but itself and the house, and calls of it anywhere: a chat line's stored
@@ -415,8 +477,13 @@ class Workshop:
         listed = git("worktree", "list", "--porcelain").stdout or ""
         return any(Path(l[9:].strip()).resolve() == tree.resolve() for l in listed.splitlines() if l.startswith("worktree "))
 
-    def begin(self, w, cid, s, cfg):
+    def begin(self, w, cid, s, cfg, lane=None):
         asked_by = self.asked_by(w, s)
+        chosen = {}
+        if lane and not (s.get("props") or {}).get("worker_provider"):
+            # the pool chose: written on the card, so it shows, and a restart or resume runs the same provider and model
+            chosen = {"worker_provider": lane["provider"], **({"worker_model": lane["model"]} if lane["model"] else {})}
+            s = {**s, "props": {**(s.get("props") or {}), **chosen}}
         branch, tree = f"worker/{cid}", TREES / cid
         TREES.mkdir(exist_ok=True)
         if tree.exists() and not self.real_tree(tree):
@@ -455,7 +522,7 @@ class Workshop:
         wk.state.pop("retry_at", None)
         returning = bool(wk.state.get("session"))     # a re-asked commission resumes its worker's conversation
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
-        self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor)
+        self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor, **chosen)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
         if returning:      # 1 Oct (a1566): it remembered edits that the old worktree took with it
@@ -640,18 +707,26 @@ class Workshop:
         self.say(cid, f"its worker was told the failure, and its turn ended without setting ready or asking anything. "
                       f"It waits on you." + (f" Its last words: {last[-1][:300]}" if last else ""))
 
+    def commit_for(self, wk, message):
+        """Everything uncommitted in a worker's worktree, outside sessions/, committed to its branch by the house.
+        -> how many files, 0 when there was nothing (or no worktree)."""
+        if not (Path(wk.tree).exists() and self.real_tree(Path(wk.tree))):
+            return 0
+        dirty = [l for l in (git("status", "--porcelain", "--untracked-files=all", cwd=wk.tree).stdout or "").splitlines()
+                 if not l[3:].strip('"').startswith(f"{NOTATION}/sessions/")]
+        if dirty:
+            git("add", "-A", "--", ".", f":(exclude){NOTATION}/sessions", cwd=wk.tree)
+            r = git("commit", "-m", message, cwd=wk.tree)
+            wk.log("kept", {"files": len(dirty), "ok": r.returncode == 0, "out": (r.stdout + r.stderr)[-300:]})
+        return len(dirty)
+
     def finish(self, cid, wk, keep_branch):
         wk.stop()
         self.workers.pop(cid, None)
-        if keep_branch and wk.tree.exists() and self.real_tree(wk.tree):
+        if keep_branch:
             # 1 Oct (a1566): the remove below is --force, so a stopped worker's uncommitted edits were lost with it.
             # Whatever it had not committed goes onto its branch first (never the world copy in sessions/)
-            dirty = [l for l in (git("status", "--porcelain", "--untracked-files=all", cwd=wk.tree).stdout or "").splitlines()
-                     if not l[3:].strip('"').startswith(f"{NOTATION}/sessions/")]
-            if dirty:
-                git("add", "-A", "--", ".", f":(exclude){NOTATION}/sessions", cwd=wk.tree)
-                r = git("commit", "-m", f"{cid}: uncommitted work kept by the house when its worker was finished", cwd=wk.tree)
-                wk.log("kept", {"files": len(dirty), "ok": r.returncode == 0, "out": (r.stdout + r.stderr)[-300:]})
+            self.commit_for(wk, f"{cid}: uncommitted work kept by the house when its worker was finished")
         if wk.tree.exists():
             git("worktree", "remove", "--force", str(wk.tree))
             try:
@@ -696,6 +771,9 @@ class Workshop:
         failure = wk.state.pop("failure", None)       # a5292: set ready again, so the last failure is answered
         if held is not None or failure is not None:
             wk.save()
+        if wk.state.get("session_provider") == "codex":
+            # a5284: a Codex worker's sandbox cannot write .git (a1666 c1884), so its work is committed here (CODEX_LIMITS)
+            self.commit_for(wk, f"{cid}: {wk.actor}'s work, committed by the house (its sandbox cannot write .git)")
         self.set_state(cid, "landing")
         title = re.sub(r"\s+", " ", s["title"])[:80]
         why = {wk.branch: f"land {cid}: {title}\n\nasked by {wk.asked_by}, built by {wk.actor} (commission {cid}); judged "
@@ -788,14 +866,16 @@ class Worker:
                 task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
                 props = task.get("props") or {}
                 provider = props.get("worker_provider", "claude")
-                model = props.get("worker_model") or model
+                # a5284: a codex card that names no model runs the adapter's own (codex_worker.MODEL), never the
+                # house's Claude model
+                model = props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL)
                 bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
                 if bound != provider:
                     raise ValueError(f"{self.cid}: saved worker conversation belongs to {bound}, not {provider}; preserved")
                 if provider == "codex":
                     adapter = HERE.parents[1] / "codex-residents" / "codex_worker.py"
                     instructions = self.dir / "worker-prompt.txt"
-                    instructions.write_text(prompt + "\n\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\n", encoding="utf-8")
+                    instructions.write_text(prompt + "\n\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\n" + CODEX_LIMITS, encoding="utf-8")
                     cmd = [str(PY), str(adapter), "--model", model,
                            "--reasoning", props.get("worker_reasoning", "medium"),
                            "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
