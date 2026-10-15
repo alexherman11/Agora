@@ -234,6 +234,24 @@ try:
 except ValueError as e:
     check("12. a hand landing of files main already has is refused", "nothing to land" in str(e), e)
 
+# 13
+import time   # noqa: E402
+lockf = landing.STATE / "landing.lock"
+holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+lockf.write_text(str(holder.pid), encoding="utf-8")
+os.utime(lockf, (time.time() - 300, time.time() - 300))        # held five minutes, as a long judgement holds it
+try:
+    landing._lock(wait=2)
+    check("13. a landing's lock held by a living landing, for minutes, is waited for, never broken", False, "it was taken")
+except SystemExit as e:
+    check("13. a landing's lock held by a living landing, for minutes, is waited for, never broken",
+          lockf.read_text(encoding="utf-8").strip() == str(holder.pid), e)
+holder.kill()
+holder.wait()
+got = landing._lock(wait=5)
+check("13. a lock whose holder has died is taken", lockf.read_text(encoding="utf-8").strip() == str(os.getpid()))
+landing._unlock(got)
+
 print(landing.status())
 print(f"{len(fails)} failed" if fails else "all passed")
 subprocess.run(["git", "worktree", "prune"], cwd=LIVE, capture_output=True)
