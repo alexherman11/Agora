@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (39)
+## open (38)
 
 ### F2. Scripts cannot say who is running them
 
@@ -261,13 +261,7 @@ a5341 · family=missing-word · status=open
 
 a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; new listeners.py; the Codex listener) so that @claude and @codex are knocked when a listener of theirs runs. The missing world-level word: a thing that says 'this agent is reachable, through this, and here is what it handed on', as a corner says it for a resident. Today it is a witnessed row (listener-<name>), which is right for liveness (it dies with the process) but cannot be written from the desk, and what it delivered is not kept in the world. If a world word appeared for it (a reach= prop on a person/agent record, or a kind for a door to an outside session), the receipt's words would move into the world.
 
-### A lens selection with a space inside `of` crashed the save check instead of refusing
-
-a5372 · family=code · status=open
-
-worker-a5300, 15 Oct, in frontier-try with explore.py: `do replace` that made a lens line `of in:f5204 kind:note as h` raised world.Refusal "no such id 'f5204 kind:note'" out of desk_knife._visual_notes -> lens_ir.check -> Accessor.select -> _parse_selection, a traceback instead of the usual '~ ! lens does not compile' line (the comma form `in:f5204,kind:note` works). Ran once; not fixed (not my commission). The cure is likely lens_ir.check catching Refusal as it catches LensRefusal.
-
-## curing (28)
+## curing (30)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -489,11 +483,27 @@ a5104 · family=conversation · status=curing
 
 Missing reusable capabilities encountered building task a5076: per-message default_to overridden by explicit header, atomic unknown-recipient refusal, sayings involving:<person> with original reply targets across chats/comments, bounded detached native context snapshots, composer lines bounds, and scroll-end continuity on window resize. Source edits are coordinated with Sable/Claude. Candidate checks in frontier@conversation-check; final evidence pending.
 
+### A lens selection with a space inside `of` crashed the save check instead of refusing
+
+a5372 · family=code · status=curing
+
+worker-a5300, 15 Oct, in frontier-try with explore.py: `do replace` that made a lens line `of in:f5204 kind:note as h` raised world.Refusal "no such id 'f5204 kind:note'" out of desk_knife._visual_notes -> lens_ir.check -> Accessor.select -> _parse_selection, a traceback instead of the usual '~ ! lens does not compile' line (the comma form `in:f5204,kind:note` works). Ran once; not fixed (not my commission). The cure is likely lens_ir.check catching Refusal as it catches LensRefusal.
+
 ### A fold's handle could only sit on its own line, above its summary
 
 a5473 · family=lens · status=curing
 
 Found by worker-a5359, 15 Oct, building the home base's board (a5359, Alex c5367: a card must open in place on a press on its title and be one line closed). The missing word: a fold whose handle stands beside its peek and whose peek is the press. Every fold's handle was drawn on its own line above the part, so a card with a one-line peek was two lines closed, and a press on its title did nothing (a clamped title opened only itself). Tried in the world first: a float (not in place), afloat on the handle (clipped, and presses missed it), one clamped text holding the whole card (a lens text can't hold a line break; test_backslash_n_in_a_lens_is_data). Source edit: `fold ... inline` (scene.py, lens.js, lens.html; test_fold_inline), opt-in so the folds that peek today keep their handle above. Still open beside it: a3399, a fold's label cannot compute ($( ) stays literal in it).
+
+### Home base viewer (a5398): a typed phrase can't reach a selection; a placed lens can't be handed its thing
+
+a5488 · family=missing-word · status=curing
+
+worker-a5398, 15 Oct, building the home base's viewer (design a5460; lenses home-viewer, home-note, home-chat, home-surface in f5204). Two source edits, one friction left in the world.
+1. A find box could not search for two words. A selection splits on spaces and commas and has no quoting, so `of ?$v.find` with find=home base asked for ?home and a term 'base', and the lens refused. Missing word: a way to turn typed words into one term. Cured in source with the function `words-of(text)` (expr.py): `let q = words-of($v.find)` then `of ?$q` is ?home+base. A quoted selection value would be the wider cure; nobody has argued for it yet.
+2. A native refusal inside a lens selection escaped the compiler and crashed the command that triggered the check (here `count(kind:task,in:$item)` with a note open, which asks in: of a note). Cured in lens_ir.Accessor.select, as Codex cured row sources in f90d49a: it is now the lens's refusal. This also cures a5372.
+3. Not cured, lived with: a placed lens starts empty, so home-note, home-chat and home-surface each find the viewer note again (`of prop:role=home-view,prop:actor=$me as v`, then `of $v.viewing`). Missing word: a lens stood on a thing (a4228, f4358, waiting on Alex): `lens home-$kind on $r`. With it the kind lenses lose their first two parts, and viewing= can move into the window's own values.
+Also met: `let n` is refused as taken ($n is a built-in), with no word on what took it.
 
 ## cured (60)
 
