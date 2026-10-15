@@ -59,10 +59,6 @@ def main(argv):
             assert stamp in src
             (lab / "landing.py").write_text(src.replace(stamp, stamp + ' + f"-{time.time_ns() % 1000000}"'), encoding="utf-8")
             git("commit", "-q", "-am", "bench: main's landing and health", cwd=live)
-        (lab / "sessions").mkdir(exist_ok=True)
-        for ext in (".pickle", ".log.jsonl"):
-            if (HERE / "sessions" / f"frontier-try{ext}").exists():
-                shutil.copyfile(HERE / "sessions" / f"frontier-try{ext}", lab / "sessions" / f"frontier{ext}")
         branches = []
         for k, f in enumerate(FILES):
             b = f"bench/{k}-{Path(f).stem}"
@@ -77,6 +73,12 @@ def main(argv):
             git("commit", "-q", "-am", f"bench {k}", cwd=live)
             git("checkout", "-q", "main", cwd=live)
             branches.append(b)
+        # after the branches: sessions/frontier.pickle is tracked (an old one), and a copy made before went into one
+        (lab / "sessions").mkdir(exist_ok=True)
+        for ext in (".pickle", ".log.jsonl"):
+            if (HERE / "sessions" / f"frontier-try{ext}").exists():
+                shutil.copyfile(HERE / "sessions" / f"frontier-try{ext}", lab / "sessions" / f"frontier{ext}")
+        (lab / "house-state").mkdir(exist_ok=True)
         t0 = time.time()
         prime = ("import landing; k = landing._kept(); b = landing.git('rev-parse', 'HEAD', cwd=landing.LIVE).stdout.strip(); "
                  "landing.room_at(b); h = landing.judged('frontier', b, k); landing._keep(k); print(h.get('ok'), h.get('failed'))")

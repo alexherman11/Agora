@@ -376,7 +376,10 @@ def main():
                 srcs += world_styles(world)
             except Exception as e:       # the world's own styles are the best evidence; the seed still counts
                 note = f"  (the world's styles could not be read: {type(e).__name__}: {e})"
-            inproc["styles"] = (style_reads(srcs), note, round(time.perf_counter() - t1, 1))
+            try:
+                inproc["styles"] = (style_reads(srcs), note, round(time.perf_counter() - t1, 1))
+            except Exception as e:       # noqa: BLE001  (before, this ended health with a traceback)
+                inproc["error"] = f"{type(e).__name__}: {e}"
         side = threading.Thread(target=in_process, daemon=True)
         if wanted("styles"):
             side.start()
@@ -386,33 +389,42 @@ def main():
         groups = {}
         for key, args, timeout, group in checks:
             groups.setdefault(group, []).append(key)
+
+        def print_styles():
+            if not wanted("styles"):
+                return
+            ran.add("styles")
+            if "styles" not in inproc:     # the reader itself broke
+                failed.append(("styles", f"style: the styles could not be read: {inproc.get('error', '?')}"))
+                print(f"styles: could not be read ({inproc.get('error', '?')}) FAILED")
+                return
+            (bad, note), why, s = inproc["styles"]
+            seconds["styles"] = s
+            if why:
+                print(why)
+            print(f"styles: {note}{' FAILED' if bad else ''} ({s:.1f}s)" + "".join(f"\n  {b}" for b in bad))
+            failed.extend(("styles", f"style {b}") for b in bad)
         for group, keys in groups.items():
+            if group == "session prints":
+                print_styles()
             done = [k for k in keys if k in results]
             ran |= set(done)
             shown = []
-            for k in keys:
-                if k not in results:
-                    shown.append(f"{k}: not run, the run stopped at a failure")
-                    continue
+            for k in done:
                 code, out, s = results[k]
                 last, fault = verdict(k, group, code, out)
                 shown.append(f"{k}: {last}" if group in ("room tests", "paint") else last)
                 if fault:
                     failed.append((k, fault))
+            if len(done) < len(keys):
+                shown.append(f"{len(keys) - len(done)} not run: the run stopped at a failure")
             seconds[group] = round(sum(results[k][2] for k in done), 1)
-            label = {"room tests": "room tests", "paint": "paint tests", "door test": "door test",
-                     "visit test": "visit test", "session prints": "session prints"}.get(group, group)
+            label = {"paint": "paint tests"}.get(group, group)
             print(f"{label}: {'; '.join(shown)} ({seconds[group]:.1f}s)")
-        if "paint" not in groups and not only and not any(Path(b).exists() for b in BROWSERS):
-            print(f"paint tests: no browser here; {len(list(HERE.glob('test_*_paint.py')))} not run (0.0s)")
-        if wanted("styles"):
-            (bad, note), why, s = inproc["styles"]
-            ran.add("styles")
-            seconds["styles"] = s
-            if why:
-                print(why)
-            print(f"styles: {note}{' FAILED' if bad else ''} ({s:.1f}s)" + "".join(f"\n  {b}" for b in bad))
-            failed += [("styles", f"style {b}") for b in bad]
+            if group == "visit test" and not only and not any(Path(b).exists() for b in BROWSERS):
+                print(f"paint tests: no browser here; {len(list(HERE.glob('test_*_paint.py')))} not run (0.0s)")
+        if "session prints" not in groups:
+            print_styles()
     # a1595: help's words are notes in the world's Help binder; the code must still be what they say. A problem names
     # the note, who made it and last changed it, and the code's place. It fails health; the house excuses a problem the
     # world already had before a landing (workshop.land), so a note's edit never reverts someone else's code

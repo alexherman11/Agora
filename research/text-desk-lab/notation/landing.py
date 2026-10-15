@@ -123,6 +123,7 @@ def _kept():
 
 
 def _keep(data):
+    STATE.mkdir(parents=True, exist_ok=True)
     tmp = STATE / "landing.json.tmp"
     tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
     os.replace(tmp, STATE / "landing.json")
