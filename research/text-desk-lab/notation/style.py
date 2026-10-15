@@ -21,10 +21,15 @@ A look's keys (the painter's table maps each to its medium):
     corner <len>                 rounded corners       pad <len> | pad <side> <len>            padding
     space above|below <len>      margin                between <len>                           gap between children
     height <len|em>              least height          width <len|em>                          width (px) or widest (em)
-    lift <len>                   a shadow              text [up|down [n]] [medium|strong] [slant] [tracked]  the face
+    lift <len>                   a shadow, in the `shadow` token's colour when the style has one, else the ink's
+    text [up|down [n]] [medium|strong] [slant] [tracked]  the face
     align start|center|end|stretch   where the part stands across its parent's flow (15 Oct)
+    rail <colour>                a bar down the leading edge, as a lane's colour on a card (a5504)
+    glow <colour>                a halo of the colour that slowly breathes: a part that is alive (a5504)
     afloat  shy  pulse  wave     flags: takes no room; unseen until near; the motions (pulse: the part breathes;
                                  wave, 14 Oct: each character rises in turn, as typing dots do)
+    glide                        flag (a5504): when a repaint puts the same thing somewhere else (a card that changed
+                                 lane), it travels there from where it was; a thing newly shown fades in
 """
 import hashlib
 import pathlib
@@ -308,11 +313,21 @@ def read_prop(p, T, fonts):
         return need_len(m.group(1), "width", em_ok=True)
     if (m := re.match(r"^lift\s+(.+)$", p)):
         out = need_len(m.group(1), "lift")
-        ink = T.get("ink")
+        # a5504: a dark style's shadow is not its ink (a light ink drew a glow under every card); a `shadow` token wins
+        sh = T.get("shadow")
+        ink = sh if sh and sh["type"] == "colour" else T.get("ink")
         if not ink or ink["type"] != "colour":
             raise Unread("names no token of the right kind")
         out["lift_ink"] = ink["value"]
+        if ink is sh:
+            out["lift_shadow"] = True
         return out
+    if (m := re.match(r"^rail\s+(.+)$", p)):
+        return need_col(m.group(1), "rail")         # a5504: a lane's colour, a bar down the part's leading edge
+    if (m := re.match(r"^glow\s+(.+)$", p)):
+        return need_col(m.group(1), "glow")         # a5504: the part breathes a halo of this colour (alive, working)
+    if p == "glide":
+        return {"glide": True}                      # a5504: the part moves from where its thing was painted before
     if re.match(r"^text\b", p):
         tok = p.split()[0] if p.startswith("text.") else "text"
         t = T.get(tok)
