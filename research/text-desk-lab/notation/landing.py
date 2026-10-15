@@ -186,7 +186,7 @@ def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
     first failure of a check not in `excuse`; `only` runs just those checks. Run without them, it is all of health."""
     args = [sys.executable, "health.py", world, "--json"]
     if changed:
-        args += ["--changed", ",".join(changed)]
+        args += ["--changed", ",".join(list(changed)[:300])]     # it only orders; a command line has a length
     if only:
         args += ["--only", ",".join(only)]
     if fail_fast:
