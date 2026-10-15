@@ -151,6 +151,7 @@
           if (V.folded("open:" + n.key, false)) { el.classList.remove("clamp"); el.dataset.opened = "1"; }
           el.addEventListener("click", () => {
             if (String(getSelection())) return;                 // highlighting words is not a press
+            if (el.closest("[data-fold-inline] > [data-peek]")) return;   // a5359: in an inline fold's peek, the press opens the fold
             // the cut texts of one part open and close together: a comment and the replies under it (Alex, 13 Oct)
             const group = [...el.parentElement.querySelectorAll(":scope > [data-clamped]")];
             const open = !group.some(g => g.dataset.opened === "1");
@@ -224,6 +225,20 @@
     const lab = (p.fold && p.fold.label) || "";                  // the lens's handle label is drawn, not only announced
     const set = f => { el.dataset.folded = f ? "1" : ""; el.setAttribute("aria-expanded", String(!f)); h.textContent = (f ? "▸" : "▾") + (lab ? " " + lab : ""); h.setAttribute("aria-expanded", String(!f)); if (el.parentElement) tracks(el.parentElement); };
     if (float) { el.classList.add("l-float"); el._close = () => set(true); }
+    // a5359 (Alex c5367: a card opens in place on a press on its title): `fold ... inline` draws the handle beside the
+    // part's peek on one line (lens.html), and a press anywhere on the peek is a press on the handle, unless it lands on
+    // a control of the peek's own (a part with a click or an edit, a link, a button) or ends a highlight
+    if (p.fold && p.fold.inline) {
+      el.dataset.foldInline = "1";
+      el.addEventListener("click", e => {
+        if (h.contains(e.target) || String(getSelection())) return;
+        const peek = e.target.closest && e.target.closest("[data-peek]");
+        if (!peek || peek.parentElement !== el) return;
+        for (let t = e.target; t && t !== el; t = t.parentElement)
+          if (t.matches("a, button, input, textarea, [contenteditable='true']") || (t._n && t._n.acts.some(a => a.on === "click" || a.on === "edit"))) return;
+        h.click();
+      });
+    }
     el._fold = f => { V.fold(n.key, f); set(f); };
     const group = p.fold && p.fold.group;
     if (group) el.dataset.foldGroup = group;
