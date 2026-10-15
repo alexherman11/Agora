@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (37)
+## open (39)
 
 ### F2. Scripts cannot say who is running them
 
@@ -255,6 +255,18 @@ Claude, 15 Oct, building the home base (a3874) and its chat. Two source edits, b
 2. A style could not say where a part stands across its parent's flow, so a chat could not put Alex's own lines at the right. Missing word: `align start|center|end|stretch`.
 Friction met on the way, not cured: a lens that names a source the running desk does not know made `do rewrite` answer 502 instead of a refusal (Codex is already on this: lens_ir and test_lens_row_refusal in the live checkout); an empty prop is none, so `only when $draft.reply_to != ""` can't tell, and the cure is `($draft.reply_to or "") != ""`, which nobody would guess.
 
+### Source edit (a5267): no world word says how a session the house does not run is reached
+
+a5341 · family=missing-word · status=open
+
+a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; new listeners.py; the Codex listener) so that @claude and @codex are knocked when a listener of theirs runs. The missing world-level word: a thing that says 'this agent is reachable, through this, and here is what it handed on', as a corner says it for a resident. Today it is a witnessed row (listener-<name>), which is right for liveness (it dies with the process) but cannot be written from the desk, and what it delivered is not kept in the world. If a world word appeared for it (a reach= prop on a person/agent record, or a kind for a door to an outside session), the receipt's words would move into the world.
+
+### A lens selection with a space inside `of` crashed the save check instead of refusing
+
+a5372 · family=code · status=open
+
+worker-a5300, 15 Oct, in frontier-try with explore.py: `do replace` that made a lens line `of in:f5204 kind:note as h` raised world.Refusal "no such id 'f5204 kind:note'" out of desk_knife._visual_notes -> lens_ir.check -> Accessor.select -> _parse_selection, a traceback instead of the usual '~ ! lens does not compile' line (the comma form `in:f5204,kind:note` works). Ran once; not fixed (not my commission). The cure is likely lens_ir.check catching Refusal as it catches LensRefusal.
+
 ## curing (27)
 
 ### F13. A lens named like its room makes the room's name ambiguous
@@ -477,7 +489,7 @@ a5104 · family=conversation · status=curing
 
 Missing reusable capabilities encountered building task a5076: per-message default_to overridden by explicit header, atomic unknown-recipient refusal, sayings involving:<person> with original reply targets across chats/comments, bounded detached native context snapshots, composer lines bounds, and scroll-end continuity on window resize. Source edits are coordinated with Sable/Claude. Candidate checks in frontier@conversation-check; final evidence pending.
 
-## cured (59)
+## cured (60)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -989,3 +1001,9 @@ Source edits by Claude, 14 Oct (e0ac4f9, 9f27357, 8d0438a), Snappy Desk stages 3
 a5315 · family=house · status=cured
 
 landing.hand named its branch hand/<who>-<YYYYmmdd-HHMMSS>, to the second. test_landing_queue steps 11 and 12 each make a hand landing by codex; on a fast run they fell in the same second, the second `git branch` failed ('a branch named hand/codex-... already exists'), and the landing room refused every branch (a5245 met it 15 Oct; ran it in the worktree and it failed the same way, with landing.py exactly as main has it). The same can happen live when one builder hand-lands twice quickly. Fixed (landing.py, a5245, commit 876c2b6): a taken name gets -2, -3 ... after it, and its temporary index file is named to match. Ran: test_landing_queue all passed; health.py frontier-try all green. Source edit, not world: the missing word was none at the world level; this is the house's own landing code.
+
+### A button could not ask the program its page is painted in
+
+a5370 · family=lens · status=cured
+
+worker-a5300, 15 Oct (a5300). The missing word: `on click host <verb> [words]`. Every home base button (bring a window forward, Spotify) needed a new js_api and an injected click script in research/window-lab/hud.py, found by a class name. Source edit: scene.py _w_on admits it (the painter's own act, like press), verbs.py leaves it out of a lens's desk steps, lens.js calls window.pywebview.api.host; the verbs are a closed table in research/window-lab/host_verbs.py, published as witnessed:host. Still source: each new native power is one entry in that table; the hud.py hook waits on Claude (patch on a5300).
