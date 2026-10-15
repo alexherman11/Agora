@@ -239,12 +239,16 @@ def builder_on(w, name, live=True):
 
 # a2692: how a line reaches an agent with no corner, in that agent's own words; the receipt prints them as given, and for
 # an agent who hasn't said, only what the house knows. Claude, c2687 on a2692; Codex, c3056 on a2692.
+# a5267: these are what is said when no listener of theirs runs (listeners.py); while one runs, the receipt and the knock
+# record say 'knocked: their listener carries it to ...' instead
 REACH = {
     # 9 Oct, a3806: said on every line to Claude, so it is short. Why: Claude has no corner; a Claude session sees the
-    # line only while it is watching, and answers in the world
-    "claude": "not knocked (no corner)",
-    "codex": "a separate event watcher can notify its Codex chat when @codex appears in event text; delivery is not "
-             "confirmed here",
+    # line only while it is watching, and answers in the world. a5267: a session that runs listeners.py listen is watching
+    "claude": "not knocked (no Claude session is listening)",
+    # a5267: the watcher (research/codex-residents) is outside the desk and, until it publishes witnessed:listener-codex,
+    # says nothing here; so this is unknown, not 'not knocked'
+    "codex": "delivery unknown: a separate event watcher can notify its Codex chat when @codex appears in event text; "
+             "it says nothing here",
 }
 
 
@@ -691,9 +695,16 @@ def waiting_note(desk, nid, text):
                 out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); it won't "
                            f"show in their For you" + (f"; their own word: {REACH[a]}" if a in REACH else ""))
             else:
-                out.append(f"{name}: " + (REACH.get(a) or f"not knocked (no corner: the house runs no session for them); "
-                                          f"the house doesn't know how a line reaches them; it shows in their For you "
-                                          f"(inbox:{a})"))
+                import listeners
+                said = listeners.word(getattr(desk, "_session", "") or "", a, REACH.get(a))
+                if said and said[0] == listeners.KNOCKED and not any(r.get("fresh") == "live" for r in rows.values()):
+                    # a5267: the listener carries the house's knock record, and no house runs to write one
+                    out.append(f"{name}: not knocked yet: the house is not running, so no knock is recorded; their "
+                               f"listener carries it once one is")
+                else:
+                    out.append(f"{name}: " + (said[1] if said else f"not knocked (no corner: the house runs no session "
+                                              f"for them); the house doesn't know how a line reaches them; it shows in "
+                                              f"their For you (inbox:{a})"))
             continue
         row = rows.get(corner_of(w, a)) or {}
         doing = str(row.get("doing", ""))

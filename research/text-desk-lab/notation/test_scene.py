@@ -960,6 +960,23 @@ def test_a_texts_keys_and_a_buttons_press():
     refused('root : column\n  w : text "x"\n    on click press Ctrl+Q', "on click press <Ctrl+B|Ctrl+I|Ctrl+K>")
 
 
+def test_a_button_asks_the_host():
+    """a5300: `on click host <verb> [words]` asks the program the page is painted in (the home base); like `press` it is
+    the painter's own act, so it is never a desk line, and its words keep their $fields for the build to fill."""
+    import verbs
+    src = ('root : column\n  n : text "Next"\n    on click host media.next\n  t : text "Go"\n    on click host bring $w.name\n'
+           '  d : text "Done"\n    on click do prop $item done=yes')
+    _root, parts = scene.parse(src)
+    acts = {k["name"]: k["on"] for k in scene._walk(parts["root"])}
+    assert acts["n"] == [{"on": "click", "line": "host media.next"}], acts["n"]
+    assert acts["t"] == [{"on": "click", "line": "host bring $w.name"}], acts["t"]
+    assert acts["d"][0]["line"] == "do prop $item done=yes"
+    steps = verbs._lens_steps(src)
+    assert not any(l.startswith(("host", "do host")) for l in steps) and any("done=yes" in l for l in steps), steps
+    refused('root : column\n  w : text "x"\n    on click host', "on click host <verb> [words]")
+    refused('root : column\n  w : text "x"\n    on click host Media!', "on click host <verb> [words]")
+
+
 def test_count_word_and_true_size():
     """a1101: `count <selection>` is a size without drawing; $count on a repeat is its size before the clamp."""
     import deskd, lens_ir

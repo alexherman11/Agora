@@ -94,6 +94,9 @@ the one form. The words:
                                  `marks`) of the same thing, in quotation marks with a space after; empty when none were. A comment box beside a paragraph
                                  can quote what was highlighted in it
     on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
+    on click host <verb> [words] the button asks the program the page is painted in (the home base) to do <verb>, one of
+                                 the rows it publishes as witnessed:host; $fields fill as in any command. Never a desk
+                                 line; a page with no host says so
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
     on <gesture> do <command>    click | edit | drag | select. The command is a desk verb line (`do` is implied); the painter
                                  fills $x $y (drag, click) and $value (edit; select: the words highlighted) at the moment
@@ -1335,6 +1338,14 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f"line {n}: `on click press <{'|'.join(PRESSES)}>`; got {p!r}")
         node["on"].append({"on": "click", "line": "press " + m.group(1)})
         return
+    # a5300 (15 Oct): a button asks the program the page is painted in (the home base, research/window-lab/hud.py) to do
+    # one of the things it says it can (its rows, witnessed:host). Like `press`, the painter's own act: never a desk line
+    m = re.fullmatch(r"click host(?:\s(.*))?", val.strip())
+    if m:
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", (m.group(1) or "").strip()):
+            raise LensRefusal(f"line {n}: `on click host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")
+        node["on"].append({"on": "click", "line": "host " + m.group(1).strip()})
+        return
     g, do, cmd = val.partition(" do ")
     drop_part = label = when = None
     # 14 Oct (Alex: comments from the right-click box 'go to the ether' on a design, whose margin is not shown; then
@@ -1355,7 +1366,7 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
         label, g = m.group(1), "menu"
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
-        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>`, `on click host <verb> [words]` or `on drop <part> do <desk command>`; got {p!r}")
     if when:
         try:
             X.parse(when)

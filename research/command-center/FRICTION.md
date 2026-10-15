@@ -253,7 +253,7 @@ a5214 · family=code · status=open
 Claude, 15 Oct, building the home base (a3874) and its chat. Two source edits, both landing by hand through the queue.
 1. A row source can only be named in scene.py. The home base wants the windows open on Alex's screen, which a program outside the desk sees (hud.py), and the only way for a lens to read them was a new entry in scene.SOURCES, as `windows` was for the window manager yesterday. Missing word: a source a program declares by writing it. Cured in part with `witnessed:<name>`: any living program's rows beside the house, every field it wrote, read through a frame. Still missing: declaring a source from the world itself (a feed, a mailbox), which the information streams design will need.
 2. A style could not say where a part stands across its parent's flow, so a chat could not put Alex's own lines at the right. Missing word: `align start|center|end|stretch`.
-Friction met on the way, not cured: a lens that names a source the running desk does not know made `do rewrite` answer 502 instead of a refusal (Codex is already on this: lens_ir and test_lens_row_refusal in the live checkout); an empty prop is none, so `only when $draft.reply_to != ""` can't tell, and the cure is `($draft.reply_to or "") != ""`, which nobody would guess.
+Friction met on the way, not cured: a lens that names a source the running desk does not know made `do rewrite` answer 502 instead of a refusal (cured by Codex, f90d49a: an invalid row query is a lens refusal, and the write still succeeds); an empty prop is none, so `only when $draft.reply_to != ""` can't tell, and the cure is `($draft.reply_to or "") != ""`, which nobody would guess.
 
 ### Source edit (a5267): no world word says how a session the house does not run is reached
 

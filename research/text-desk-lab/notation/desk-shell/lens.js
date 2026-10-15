@@ -69,6 +69,18 @@
     return r;
   }
 
+  // a5300: a host verb goes to the program that holds this page (the home base gives it window.pywebview.api.host), which
+  // answers "ok ..." or "ERR ..."; a refusal shows as the desk's do. A page in a plain browser has no host and says so.
+  async function host(words) {
+    const sp = words.indexOf(" "), verb = sp < 0 ? words : words.slice(0, sp), rest = sp < 0 ? "" : words.slice(sp + 1);
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || typeof api.host !== "function") return V.notify(`'${verb}' asks the home base, and this page is not in it (open the home base: Ctrl+Alt+J)`);
+    let r;
+    try { r = await api.host(verb, rest); } catch (e) { return V.notify(`the home base did not answer ${verb}: ${e.message || e}`); }
+    if (typeof r === "string" && r.startsWith("ERR")) V.notify(r);
+    return r;
+  }
+
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more, attachment) {
     const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
@@ -186,6 +198,8 @@
         if (a.line.startsWith("press ")) { t.focus(); return TEXT.press(t, a.line.slice(6)); }
         TEXT.wait(TEXT.tool(t, a.line));
       });
+      // a5300: `on click host <verb> [words]` asks the program the page is painted in (the home base's bridge), never the desk
+      else if (a.on === "click" && a.line.startsWith("host ")) { el.dataset.host = a.line.slice(5); el.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); host(a.line.slice(5)); }); }
       else if (a.on === "click") el.addEventListener("click", e => {     // a click knows where it landed: $x $y in this part's own space
         if (e.target !== el && a.line.includes("$x")) return;
         const r = el.getBoundingClientRect();
