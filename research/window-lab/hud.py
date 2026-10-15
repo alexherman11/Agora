@@ -1,0 +1,456 @@
+"""hud.py: the home base above the windows (a3874), JEFF's place on Alex's screen. 15 Oct 2026, a first prototype.
+
+    python hud.py [--lens home-base] [--as alex] [--world frontier] [--show]     run it (one instance)
+    python hud.py --stop                                                          end the running one
+
+Ctrl+Alt+J shows it over everything, or hides it; Esc hides it. Shown, it covers the main monitor's work area (the
+taskbar stays) with the painter (lens.html through the door) showing one lens, painted over a frosted copy of what was
+on the screen the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl+Alt+J.
+
+What it is made of, from the research of 10 to 12 Oct (a3909):
+  - a native Agora window: a frameless window of our own holding the browser engine that ships with Windows (WebView2,
+    through pywebview), not Edge in app mode, so the window is ours to place, show, hide and draw into;
+  - an overlay summoned by a key: an ordinary topmost window;
+  - live copies of other programs' windows: Windows draws a live picture of any window into a window we own (DWM
+    thumbnails). The lens says where: each part whose key names a desktop window (a repeat over witnessed:desktop,
+    keyed by the window's handle) gets that window's picture drawn over it, fitted, and a click on it brings that
+    window forward and hides the home base.
+  - what it sees of the desktop it says as rows beside the house (witnessed.py, source `witnessed:desktop`): one row
+    per program window, with name (its handle), title, program and front (yes for the window that was in front).
+
+Tried and dropped (ran 15 Oct): a see-through page over the system's acrylic or mica backdrop. With WebView2 inside
+WinForms the backdrop never showed through (three ways: DWM backdrop types 3 and 2 with the frame extended, and the
+older accent blur); the window drew solid. So the frost is a still picture taken as the home base opens.
+"""
+import argparse
+import base64
+import ctypes
+import io
+import json
+import os
+import sys
+import threading
+import time
+import urllib.parse
+import urllib.request
+from ctypes import wintypes as wt
+from pathlib import Path
+
+ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))      # per monitor v2: pixels are pixels
+
+HERE = Path(__file__).resolve().parent
+STATE = HERE / "state"
+PIDFILE = STATE / "hud.pid"
+NOTATION = HERE.parents[0] / "text-desk-lab" / "notation"
+sys.path.insert(0, str(NOTATION))
+import witnessed  # noqa: E402
+import media  # noqa: E402  (a5245: the music controller)
+
+user32, dwmapi, kernel32 = ctypes.windll.user32, ctypes.windll.dwmapi, ctypes.windll.kernel32
+MOD_ALT, MOD_CONTROL, MOD_NOREPEAT = 0x1, 0x2, 0x4000
+WM_HOTKEY, WM_QUIT, WM_APP = 0x0312, 0x0012, 0x8000
+VK_ESCAPE, VK_J = 0x1B, 0x4A
+HK_TOGGLE, HK_ESC = 1, 2
+GWL_EXSTYLE, WS_EX_TOOLWINDOW, WS_EX_APPWINDOW = -20, 0x80, 0x40000
+DWMWA_CLOAKED = 14
+GA_ROOTOWNER = 3
+WNDENUMPROC = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+
+
+def _sig(fn, res, *args):
+    fn.restype, fn.argtypes = res, list(args)
+
+
+_sig(user32.EnumWindows, wt.BOOL, WNDENUMPROC, wt.LPARAM)
+_sig(user32.IsWindowVisible, wt.BOOL, wt.HWND)
+_sig(user32.IsIconic, wt.BOOL, wt.HWND)
+_sig(user32.IsWindow, wt.BOOL, wt.HWND)
+_sig(user32.GetWindowTextW, ctypes.c_int, wt.HWND, wt.LPWSTR, ctypes.c_int)
+_sig(user32.GetWindowTextLengthW, ctypes.c_int, wt.HWND)
+_sig(user32.GetWindowLongW, ctypes.c_long, wt.HWND, ctypes.c_int)
+_sig(user32.GetAncestor, wt.HWND, wt.HWND, wt.UINT)
+_sig(user32.GetLastActivePopup, wt.HWND, wt.HWND)
+_sig(user32.GetForegroundWindow, wt.HWND)
+_sig(user32.SetForegroundWindow, wt.BOOL, wt.HWND)
+_sig(user32.ShowWindow, wt.BOOL, wt.HWND, ctypes.c_int)
+_sig(user32.GetWindowThreadProcessId, wt.DWORD, wt.HWND, ctypes.POINTER(wt.DWORD))
+_sig(user32.RegisterHotKey, wt.BOOL, wt.HWND, ctypes.c_int, wt.UINT, wt.UINT)
+_sig(user32.UnregisterHotKey, wt.BOOL, wt.HWND, ctypes.c_int)
+_sig(user32.GetMessageW, ctypes.c_int, ctypes.POINTER(wt.MSG), wt.HWND, wt.UINT, wt.UINT)
+_sig(user32.PostThreadMessageW, wt.BOOL, wt.DWORD, wt.UINT, wt.WPARAM, wt.LPARAM)
+_sig(user32.SetWindowPos, wt.BOOL, wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT)
+_sig(user32.MonitorFromPoint, wt.HMONITOR, wt.POINT, wt.DWORD)
+_sig(user32.GetMonitorInfoW, wt.BOOL, wt.HMONITOR, ctypes.c_void_p)
+_sig(user32.ClientToScreen, wt.BOOL, wt.HWND, ctypes.POINTER(wt.POINT))
+_sig(dwmapi.DwmGetWindowAttribute, ctypes.c_long, wt.HWND, wt.DWORD, ctypes.c_void_p, wt.DWORD)
+_sig(dwmapi.DwmRegisterThumbnail, ctypes.c_long, wt.HWND, wt.HWND, ctypes.POINTER(ctypes.c_void_p))
+_sig(dwmapi.DwmUnregisterThumbnail, ctypes.c_long, ctypes.c_void_p)
+_sig(dwmapi.DwmQueryThumbnailSourceSize, ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(wt.SIZE))
+_sig(dwmapi.DwmUpdateThumbnailProperties, ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p)
+_sig(kernel32.OpenProcess, wt.HANDLE, wt.DWORD, wt.BOOL, wt.DWORD)
+_sig(kernel32.CloseHandle, wt.BOOL, wt.HANDLE)
+_sig(kernel32.QueryFullProcessImageNameW, wt.BOOL, wt.HANDLE, wt.DWORD, wt.LPWSTR, ctypes.POINTER(wt.DWORD))
+_sig(kernel32.GetCurrentThreadId, wt.DWORD)
+
+
+class MONITORINFO(ctypes.Structure):
+    _fields_ = [("cbSize", wt.DWORD), ("rcMonitor", wt.RECT), ("rcWork", wt.RECT), ("dwFlags", wt.DWORD)]
+
+
+class THUMB(ctypes.Structure):
+    _fields_ = [("dwFlags", wt.DWORD), ("rcDestination", wt.RECT), ("rcSource", wt.RECT), ("opacity", ctypes.c_ubyte),
+                ("fVisible", wt.BOOL), ("fSourceClientAreaOnly", wt.BOOL)]
+
+
+TNP_RECTDESTINATION, TNP_OPACITY, TNP_VISIBLE, TNP_SOURCECLIENTAREAONLY = 0x1, 0x4, 0x8, 0x10
+
+
+def work_area():
+    m = user32.MonitorFromPoint(wt.POINT(0, 0), 1)
+    mi = MONITORINFO()
+    mi.cbSize = ctypes.sizeof(mi)
+    user32.GetMonitorInfoW(m, ctypes.byref(mi))
+    r = mi.rcWork
+    return r.left, r.top, r.right - r.left, r.bottom - r.top
+
+
+def title_of(h):
+    n = user32.GetWindowTextLengthW(h)
+    buf = ctypes.create_unicode_buffer(n + 1)
+    user32.GetWindowTextW(h, buf, n + 1)
+    return buf.value
+
+
+def program_of(h):
+    pid = wt.DWORD()
+    user32.GetWindowThreadProcessId(h, ctypes.byref(pid))
+    hp = kernel32.OpenProcess(0x1000, False, pid.value)
+    if not hp:
+        return "", pid.value
+    try:
+        buf, size = ctypes.create_unicode_buffer(520), wt.DWORD(520)
+        ok = kernel32.QueryFullProcessImageNameW(hp, 0, buf, ctypes.byref(size))
+        return (Path(buf.value).stem if ok else ""), pid.value
+    finally:
+        kernel32.CloseHandle(hp)
+
+
+def cloaked(h):
+    v = wt.DWORD()
+    dwmapi.DwmGetWindowAttribute(h, DWMWA_CLOAKED, ctypes.byref(v), ctypes.sizeof(v))
+    return v.value != 0
+
+
+def alt_tab_windows(skip_pid):
+    """The windows Alt+Tab would offer, front first: visible, uncloaked, titled, not tool windows, their own root."""
+    out = []
+
+    def each(h, _):
+        if not user32.IsWindowVisible(h) or cloaked(h):
+            return True
+        ex = user32.GetWindowLongW(h, GWL_EXSTYLE)
+        if ex & WS_EX_TOOLWINDOW and not ex & WS_EX_APPWINDOW:
+            return True
+        if user32.GetAncestor(h, GA_ROOTOWNER) != h and not ex & WS_EX_APPWINDOW:
+            return True
+        t = title_of(h)
+        if not t or t in ("Program Manager", "Windows Input Experience"):
+            return True
+        prog, pid = program_of(h)
+        if pid == skip_pid:
+            return True
+        out.append({"name": str(h), "title": t, "program": prog, "minimized": "yes" if user32.IsIconic(h) else "no"})
+        return True
+
+    user32.EnumWindows(WNDENUMPROC(each), 0)
+    return out
+
+
+# a click on a part that shows a window's picture (a role named thumb, keyed by the window's handle) brings it forward
+CLICKS = """(() => { if (window.__hudClicks) return; window.__hudClicks = 1;
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-key]'); if (!el) return;
+    const t = el.closest('[class*="thumb"]') || (el.className.indexOf('thumb') >= 0 ? el : null); if (!t) return;
+    const m = /(?:^|[^0-9])(\\d{5,})(?:$|[^0-9])/.exec(t.dataset.key); if (!m) return;
+    e.preventDefault(); e.stopPropagation(); window.pywebview.api.bring(m[1]);
+  }, true); })()"""
+
+
+class Hud:
+    def __init__(self, a):
+        self.a = a
+        self.door = "http://127.0.0.1:8794"
+        self.window = None
+        self.hwnd = None
+        self.shown = False
+        self.front = None             # the window that was in front when the home base opened
+        self.thumbs = {}              # source hwnd -> (thumbnail id, last rect)
+        self.keys_tid = None
+        self.lock = threading.Lock()
+
+    # -- the page
+    def url(self):
+        q = {"session": self.a.world, "as": self.a.who, "lens": self.a.lens, "inspect": "0"}
+        return f"{self.door}/lens.html?{urllib.parse.urlencode(q)}"
+
+    def frost(self):
+        """A still, blurred and darkened copy of the work area as it is now, as a data address for the page."""
+        from PIL import ImageGrab, ImageFilter, ImageEnhance
+        x, y, w, h = work_area()
+        im = ImageGrab.grab(bbox=(x, y, x + w, y + h)).convert("RGB")
+        im = im.resize((max(1, w // 6), max(1, h // 6)))
+        im = im.filter(ImageFilter.GaussianBlur(6))
+        im = ImageEnhance.Brightness(ImageEnhance.Color(im).enhance(0.8)).enhance(0.42)
+        b = io.BytesIO()
+        im.save(b, "JPEG", quality=80)
+        return "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode()
+
+    def dress(self, frost):
+        css = ("html{background:#0d100f url(%s) center/cover no-repeat fixed!important}"
+               "body,#paint{background:transparent!important}") % frost
+        self.window.evaluate_js(CLICKS)
+        self.window.evaluate_js(media.CLICKS)
+        self.window.evaluate_js("(() => { let s = document.getElementById('hud-frost');"
+                                " if (!s) { s = document.createElement('style'); s.id = 'hud-frost'; document.head.append(s); }"
+                                " s.textContent = %s; })()" % json.dumps(css))
+
+    # -- the desktop as rows
+    def say_desktop(self):
+        rows = alt_tab_windows(os.getpid())
+        for r in rows:
+            r["front"] = "yes" if self.front and r["name"] == str(self.front) else "no"
+        witnessed.write(self.a.world, "desktop", rows, by="hud")
+        witnessed.write(self.a.world, "media", media.rows(), by="hud")
+        try:
+            urllib.request.urlopen(urllib.request.Request(self.door + "/door/witnessed", data=b"{}", method="POST"),
+                                   timeout=2).read()
+        except OSError:
+            pass
+        return rows
+
+    # -- live pictures of windows, where the lens put their parts
+    def slots(self):
+        js = ("(() => { const out = []; const r0 = window.devicePixelRatio || 1;"
+              " for (const el of document.querySelectorAll('[data-key]')) {"
+              "  const m = /(?:^|[^0-9])(\\d{5,})(?:$|[^0-9])/.exec(el.dataset.key); if (!m) continue;"
+              "  if (el.closest('[data-folded=\"1\"]') || el.hidden) continue;"
+              "  const b = el.getBoundingClientRect(); if (b.width < 24 || b.height < 24) continue;"
+              "  out.push({key: el.dataset.key, h: m[1], x: b.left * r0, y: b.top * r0, w: b.width * r0, hh: b.height * r0,"
+              "   slot: el.className.indexOf('thumb') >= 0});"
+              " } return out; })()")
+        try:
+            return self.window.evaluate_js(js) or []
+        except Exception:
+            return []
+
+    def place_thumbs(self):
+        if not self.shown:
+            return
+        want = {}
+        for s in self.slots():
+            if s["slot"]:
+                want[int(s["h"])] = s
+        with self.lock:
+            for h in list(self.thumbs):
+                if h not in want or not user32.IsWindow(h):
+                    dwmapi.DwmUnregisterThumbnail(self.thumbs.pop(h)[0])
+            for h, s in want.items():
+                if not user32.IsWindow(h):
+                    continue
+                if h not in self.thumbs:
+                    t = ctypes.c_void_p()
+                    if dwmapi.DwmRegisterThumbnail(self.hwnd, h, ctypes.byref(t)) != 0:
+                        continue
+                    self.thumbs[h] = (t, None)
+                t, last = self.thumbs[h]
+                size = wt.SIZE()
+                dwmapi.DwmQueryThumbnailSourceSize(t, ctypes.byref(size))
+                sw, sh = max(1, size.cx), max(1, size.cy)
+                k = min(s["w"] / sw, s["hh"] / sh)
+                w, hh = int(sw * k), int(sh * k)
+                x, y = int(s["x"] + (s["w"] - w) / 2), int(s["y"] + (s["hh"] - hh) / 2)
+                rect = (x, y, x + w, y + hh)
+                if rect == last:
+                    continue
+                p = THUMB(TNP_RECTDESTINATION | TNP_OPACITY | TNP_VISIBLE | TNP_SOURCECLIENTAREAONLY,
+                          wt.RECT(*rect), wt.RECT(), 255, True, False)
+                dwmapi.DwmUpdateThumbnailProperties(t, ctypes.byref(p))
+                self.thumbs[h] = (t, rect)
+
+    def drop_thumbs(self):
+        with self.lock:
+            for t, _ in self.thumbs.values():
+                dwmapi.DwmUnregisterThumbnail(t)
+            self.thumbs.clear()
+
+    # -- show and hide
+    def show(self):
+        if self.shown:
+            return
+        fg = user32.GetForegroundWindow()
+        self.front = fg if fg and fg != self.hwnd else None
+        self.dress(self.frost())
+        self.say_desktop()
+        x, y, w, h = work_area()
+        user32.SetWindowPos(self.hwnd, wt.HWND(-1), x, y, w, h, 0x40)         # topmost, shown
+        self.window.show()
+        user32.SetForegroundWindow(self.hwnd)
+        self.shown = True
+        if self.keys_tid:
+            user32.PostThreadMessageW(self.keys_tid, WM_APP + 1, 1, 0)        # take Esc while shown
+        self.window.evaluate_js("window.__hud && window.__hud.shown && window.__hud.shown()")
+
+    def hide(self, to=None):
+        if not self.shown:
+            return
+        self.shown = False
+        self.drop_thumbs()
+        self.window.hide()
+        if self.keys_tid:
+            user32.PostThreadMessageW(self.keys_tid, WM_APP + 1, 0, 0)
+        target = to or self.front
+        if target and user32.IsWindow(target):
+            if user32.IsIconic(target):
+                user32.ShowWindow(target, 9)
+            user32.SetForegroundWindow(target)
+
+    def toggle(self):
+        self.hide() if self.shown else self.show()
+
+    # -- what the page asks of the host (pywebview's js_api)
+    def media(self, action):
+        """A music button was pressed: press it, then say the new song soon after (a5245)."""
+        did = media.press(action)
+        threading.Timer(0.8, self.say_desktop).start()
+        return did
+
+    def bring(self, name):
+        """A tile was clicked: that window comes forward and the home base gets out of the way."""
+        try:
+            h = int(name)
+        except (TypeError, ValueError):
+            return False
+        self.hide(to=h)
+        return True
+
+    # -- keys
+    def keys(self):
+        self.keys_tid = kernel32.GetCurrentThreadId()
+        if not user32.RegisterHotKey(None, HK_TOGGLE, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_J):
+            print("hud: Ctrl+Alt+J is taken by another program; only --show and --stop work", flush=True)
+        msg = wt.MSG()
+        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            if msg.message == WM_HOTKEY and msg.wParam == HK_TOGGLE:
+                self.toggle()
+            elif msg.message == WM_HOTKEY and msg.wParam == HK_ESC:
+                self.hide()
+            elif msg.message == WM_APP + 1:
+                if msg.wParam:
+                    user32.RegisterHotKey(None, HK_ESC, MOD_NOREPEAT, VK_ESCAPE)
+                else:
+                    user32.UnregisterHotKey(None, HK_ESC)
+        user32.UnregisterHotKey(None, HK_TOGGLE)
+
+    def tend(self):
+        """While shown: the desktop's rows every two seconds, the pictures placed every quarter second."""
+        n = 0
+        while True:
+            time.sleep(0.25)
+            if not self.shown:
+                continue
+            n += 1
+            try:
+                if n % 8 == 0:
+                    self.say_desktop()
+                self.place_thumbs()
+            except Exception as e:
+                print("hud: tend:", e, flush=True)
+
+    def started(self):
+        for _ in range(200):                     # a window made hidden has its form a moment after the loop starts
+            if self.window.native is not None:
+                break
+            time.sleep(0.05)
+        self.hwnd = wt.HWND(self.window.native.Handle.ToInt64())
+        # out of Alt+Tab and the taskbar: the home base is reached by its key
+        ex = user32.GetWindowLongW(self.hwnd, GWL_EXSTYLE)
+        ctypes.windll.user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
+        threading.Thread(target=self.keys, daemon=True).start()
+        threading.Thread(target=self.tend, daemon=True).start()
+        if self.a.show:
+            time.sleep(1.5)
+            self.show()
+
+    def closed(self):
+        witnessed.clear(self.a.world, "desktop")
+        witnessed.clear(self.a.world, "media")
+        if self.keys_tid:
+            user32.PostThreadMessageW(self.keys_tid, WM_QUIT, 0, 0)
+        PIDFILE.unlink(missing_ok=True)
+
+    def run(self):
+        import webview
+        x, y, w, h = work_area()
+        self.window = webview.create_window("Agora home base", self.url(), js_api=Api(self), x=x, y=y, width=w,
+                                            height=h, frameless=True, on_top=True, hidden=True, easy_drag=False,
+                                            background_color="#0D100F", text_select=True)
+        self.window.events.closed += self.closed
+        webview.start(self.started, gui="edgechromium", private_mode=False,
+                      storage_path=str(STATE / "hud-webview"))
+
+
+class Api:
+    def __init__(self, hud):
+        self._hud = hud
+
+    def bring(self, name):
+        return self._hud.bring(name)
+
+    def media(self, action):
+        return self._hud.media(action)
+
+    def hide(self):
+        self._hud.hide()
+        return True
+
+
+def alive(pid):
+    h = kernel32.OpenProcess(0x1000, False, pid)
+    if not h:
+        return False
+    code = wt.DWORD()
+    ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+    kernel32.CloseHandle(h)
+    return code.value == 259
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--lens", default="home-base")
+    ap.add_argument("--as", dest="who", default="alex")
+    ap.add_argument("--world", default="frontier")
+    ap.add_argument("--show", action="store_true", help="open shown, not waiting for the key")
+    ap.add_argument("--stop", action="store_true", help="end the running home base")
+    a = ap.parse_args()
+    STATE.mkdir(parents=True, exist_ok=True)
+    old = int(PIDFILE.read_text()) if PIDFILE.exists() and PIDFILE.read_text().strip().isdigit() else 0
+    if a.stop:
+        if old and alive(old):
+            os.system(f"taskkill /PID {old} /T /F >NUL 2>&1")
+            print("hud: stopped", old)
+        else:
+            print("hud: not running")
+        PIDFILE.unlink(missing_ok=True)
+        witnessed.clear(a.world, "desktop")
+        witnessed.clear(a.world, "media")
+        return
+    if old and alive(old):
+        print("hud: already running as", old)
+        sys.exit(76)
+    PIDFILE.write_text(str(os.getpid()))
+    print("hud: running; Ctrl+Alt+J shows or hides it, Esc hides it, `python hud.py --stop` ends it", flush=True)
+    Hud(a).run()
+
+
+if __name__ == "__main__":
+    main()
