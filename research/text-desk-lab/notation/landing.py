@@ -23,6 +23,13 @@ main. Several branches given at once are merged and judged together; when they f
 and each half judged, so the one that broke is found and the others land.
 
 One landing at a time (house-state/landing.lock); the house's own landings (workshop.land) come through here too.
+
+15 Oct (a5288), so that many can land at once: a landing asked is written into a queue (house-state/landing-queue.json),
+and whoever holds the lock judges everything waiting there as one batch, then answers each asker. Health runs its
+checks side by side, those nearest the change first, and stops at the first failure main did not already have, so a
+broken branch is refused in seconds; main moves only to a commit a whole health passed. When a batch fails, each of its
+branches alone runs just the checks that failed: the ones that break them are refused with their own failure, and the
+rest are judged again together (halves only when none breaks it alone).
 """
 import json
 import os
@@ -65,12 +72,27 @@ def _lock(wait=20 * 60):
     so a second landing broke in after 60 s and both used the one landing room at once: a5062 was judged again and again
     on 14 Oct, a landing's record was lost, and a judgement could have run on a tree the other had just reset. Now only
     a holder whose process has gone gives the lock up; a living one is waited for, however long it takes."""
+    end = time.time() + wait
+    while True:
+        lock = _try_lock()
+        if lock:
+            return lock
+        if time.time() > end:
+            try:
+                pid = (STATE / "landing.lock").read_text().strip()
+            except OSError:
+                pid = ""
+            raise SystemExit(f"a landing (pid {pid or '?'}) has held landing.lock for over {wait // 60} minutes; still waiting is a choice for a person")
+        time.sleep(0.2)
+
+
+def _try_lock():
+    """The landing lock if it is free, or held by a process that has died (its landing died with it); else None."""
     sys.path.insert(0, str(HERE))
     import explore
     STATE.mkdir(parents=True, exist_ok=True)
     lock = STATE / "landing.lock"
-    end = time.time() + wait
-    while True:
+    for _ in range(3):
         try:
             fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except (FileExistsError, PermissionError):
@@ -79,15 +101,13 @@ def _lock(wait=20 * 60):
             except OSError:
                 pid = ""
             if pid.isdigit() and not explore._alive(pid):
-                lock.unlink(missing_ok=True)          # its landing died with it
+                lock.unlink(missing_ok=True)
                 continue
-            if time.time() > end:
-                raise SystemExit(f"a landing (pid {pid or '?'}) has held {lock.name} for over {wait // 60} minutes; still waiting is a choice for a person")
-            time.sleep(0.2)
-            continue
+            return None
         os.write(fd, str(os.getpid()).encode())
         os.close(fd)
         return lock
+    return None
 
 
 def _unlock(lock):
@@ -159,9 +179,18 @@ def copy_world(world, into):
         explore.release_lock(lock)
 
 
-def health(world, cwd):
-    """health.py in the room, on the room's code and the copied world. -> its JSON, or a failure saying why not."""
-    r = subprocess.run([sys.executable, "health.py", world, "--json"], cwd=cwd, capture_output=True, text=True,
+def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
+    """health.py in the room, on the room's code and the copied world. -> its JSON, or a failure saying why not.
+    a5288: `changed` (the files the landing changes) starts the checks nearest them first; `fail_fast` stops at the
+    first failure of a check not in `excuse`; `only` runs just those checks. Run without them, it is all of health."""
+    args = [sys.executable, "health.py", world, "--json"]
+    if changed:
+        args += ["--changed", ",".join(changed)]
+    if only:
+        args += ["--only", ",".join(only)]
+    if fail_fast:
+        args += ["--fail-fast"] + (["--excuse", ",".join(excuse)] if excuse else [])
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=1200, env={**os.environ, "DESKD": "off"})
     lines = (r.stdout or "").strip().splitlines()
     try:
@@ -172,21 +201,27 @@ def health(world, cwd):
     return data
 
 
-def judged(world, sha, kept):
-    """Health of commit `sha` (the room is at it), from what is kept or by running it."""
+def judged(world, sha, kept, **how):
+    """Health of commit `sha` (the room is at it), from what is kept or by running it. Only a whole run is kept: one
+    stopped at a failure, or run for some checks only (`how`, health's options), judges this landing and no other."""
     if sha in kept.get("health", {}):
         return kept["health"][sha]
     copy_world(world, ROOM / NOTATION)
-    h = health(world, ROOM / NOTATION)
-    kept.setdefault("health", {})[sha] = {k: h.get(k) for k in ("ok", "lenses_ok", "failed", "text", "seconds")}
-    while len(kept["health"]) > 40:
-        kept["health"].pop(next(iter(kept["health"])))
+    h = health(world, ROOM / NOTATION, **how)
+    if not h.get("partial"):
+        kept.setdefault("health", {})[sha] = {k: h.get(k) for k in ("ok", "lenses_ok", "failed", "failed_checks", "text",
+                                                                    "seconds")}
+        while len(kept["health"]) > 40:
+            kept["health"].pop(next(iter(kept["health"])))
     return h
 
 
 def faults(before, after):
     """What the landing broke: a check failing that did not fail on main, or a lens that compiled and no longer does
-    (a lens or help note broken before the landing is the world's, not the landing's; workshop's rule since a1595)."""
+    (a lens or help note broken before the landing is the world's, not the landing's; workshop's rule since a1595).
+    A partial run (stopped, or some checks only) says nothing of the lenses unless it compiled them."""
+    if after.get("partial") and "lenses" not in (after.get("ran") or []):
+        after = {**after, "lenses_ok": before.get("lenses_ok") or []}
     lost = sorted(set(before.get("lenses_ok") or []) - set(after.get("lenses_ok") or []))
     had = set(before.get("failed") or [])
     out = [f for f in after.get("failed") or [] if f not in had]
@@ -352,20 +387,125 @@ def reapply(theirs, base):
     return conflicts
 
 
-def land(branches, world="frontier", who="?", why=None, _depth=0):
-    """Judge `branches` together on main and land them if they pass. -> {"landed": [...], "refused": [(branch, why)],
-    "head": short sha or None, "parked": [...], "text": health's lines}. Takes the landing lock unless called inside."""
-    branches = [b for b in dict.fromkeys(branches) if b]
-    lock = _lock() if _depth == 0 else None
+# --------------------------------------------------------------------------------------------------------------- queue
+# 15 Oct (a5288; a5261 point 2: "ten landings would take about 25 min"): each landing took the lock and ran health
+# alone, so landings asked at once waited in line for one judgement each. Now a landing that asks is written into the
+# queue (house-state/landing-queue.json); whoever holds the lock takes everything waiting there for the same world and
+# judges it as one batch (several branches at once, as land() always could), then writes each asker's answer. A landing
+# asked while a batch is judged goes into the next one. Every commit main moves to has passed a whole health, as before.
+
+def _queue(change):
+    """Read the queue, let `change` alter it, write it back, all under the queue's own short lock. -> what change says."""
+    sys.path.insert(0, str(HERE))
+    import explore
+    STATE.mkdir(parents=True, exist_ok=True)
+    path, lock = STATE / "landing-queue.json", STATE / "landing-queue.lock"
+    explore.take_lock(lock, tries=6000, pause=0.01)
     try:
-        return _land(branches, world, who, why or {}, _depth)
+        try:
+            q = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            q = {}
+        q.setdefault("waiting", [])
+        q.setdefault("done", {})
+        out = change(q)
+        tmp = STATE / "landing-queue.json.tmp"
+        tmp.write_text(json.dumps(q, indent=1), encoding="utf-8")
+        os.replace(tmp, path)
+        return out
     finally:
+        explore.release_lock(lock)
+
+
+def _serve():
+    """Holding the landing lock: judge everything waiting for one world as one batch, and answer each asker. Entries
+    leave the queue only with their answer, so a server that dies leaves them for the next."""
+    def take(q):
+        if not q["waiting"]:
+            return []
+        world = q["waiting"][0]["world"]
+        batch = [e for e in q["waiting"] if e["world"] == world]
+        for e in batch:
+            e["taken"] = os.getpid()
+        return batch
+    batch = _queue(take)
+    if not batch:
+        return
+    branches = list(dict.fromkeys(b for e in batch for b in e["branches"]))
+    why = {b: w for e in batch for b, w in (e.get("why") or {}).items()}
+    who = ", ".join(dict.fromkeys(e["who"] for e in batch))
+    try:
+        r = _land(branches, batch[0]["world"], who, why, 0)
+    except Exception as e:          # said to every asker, never lost
+        r = {"landed": [], "refused": [(b, f"the landing failed: {type(e).__name__}: {e}") for b in branches],
+             "head": None, "heads": {}, "parked": [], "text": "", "texts": {}}
+    answers = {}
+    for e in batch:
+        mine = e["branches"]
+        landed = [b for b in r["landed"] if b in mine]
+        answers[e["id"]] = {
+            "landed": landed, "refused": [list(x) for x in r["refused"] if x[0] in mine],
+            "head": next((r["heads"][b][:7] for b in reversed(mine) if b in r.get("heads", {})), None) if landed else None,
+            "heads": {b: r["heads"][b][:7] for b in landed if b in r.get("heads", {})},
+            "parked": r["parked"] if landed else [], "main_failing": r.get("main_failing") or [],
+            "text": next((r["texts"][b] for b in mine if b in r.get("texts", {})), r["text"]),
+            "batch": branches}
+
+    def answer(q):
+        q["waiting"] = [e for e in q["waiting"] if e["id"] not in answers]
+        q["done"].update(answers)
+        while len(q["done"]) > 100:          # an asker that died never reads its answer
+            q["done"].pop(next(iter(q["done"])))
+    _queue(answer)
+
+
+def _as_tuples(r):
+    r["refused"] = [tuple(x) for x in r["refused"]]
+    return r
+
+
+def land(branches, world="frontier", who="?", why=None, _depth=0, wait=20 * 60):
+    """Judge `branches` together on main and land them if they pass. -> {"landed": [...], "refused": [(branch, why)],
+    "head": short sha or None (the commit that brought this landing's last branch), "heads": {branch: its commit},
+    "parked": [...], "text": health's lines, "batch": every branch judged with these}. Through the queue: it waits for
+    its answer, and serves the queue itself whenever the landing lock is free."""
+    branches = [b for b in dict.fromkeys(branches) if b]
+    if _depth:
+        return _land(branches, world, who, why or {}, _depth)
+    if not branches:
+        return {"landed": [], "refused": [], "head": None, "heads": {}, "parked": [], "text": ""}
+    import threading
+    me = {"id": f"{os.getpid()}-{threading.get_ident()}-{time.time_ns()}", "branches": branches, "world": world,
+          "who": who, "why": {b: (why or {}).get(b) for b in branches if (why or {}).get(b)}, "at": time.time()}
+    _queue(lambda q: q["waiting"].append(me))
+    end = time.time() + wait
+    while True:
+        r = _queue(lambda q: q["done"].pop(me["id"], None))
+        if r is not None:
+            return _as_tuples(r)
+        lock = _try_lock()
         if lock:
-            _unlock(lock)
+            try:
+                _serve()
+            finally:
+                _unlock(lock)
+            continue
+        if time.time() > end:
+            def withdraw(q):
+                e = next((e for e in q["waiting"] if e["id"] == me["id"]), None)
+                if e and not e.get("taken"):
+                    q["waiting"].remove(e)
+                    return True
+                return False
+            if _queue(withdraw):
+                raise SystemExit(f"the landing lock was held for over {wait // 60} minutes and this landing was never "
+                                 "taken; still waiting is a choice for a person")
+            end = time.time() + wait            # taken into a batch being judged: its answer is coming
+        time.sleep(0.2)
 
 
 def _land(branches, world, who, why, depth):
-    out = {"landed": [], "refused": [], "head": None, "parked": [], "text": ""}
+    out = {"landed": [], "refused": [], "head": None, "heads": {}, "parked": [], "text": "", "texts": {}}
     if not branches:
         return out
     kept = _kept()
@@ -388,35 +528,82 @@ def _land(branches, world, who, why, depth):
         if not todo:
             return out
         room_at(base)
-        merged, refused = merge_in(todo, why)
+        heads = {}
+        merged, refused = merge_in(todo, why, heads)
         out["refused"] += [(b, f"does not merge into main: {w}") for b, w in refused]
         if not merged:
             _keep(kept)
             return out
         sha = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
-        after = judged(world, sha, kept)
+        changed = [p for p in git("diff", "--name-only", base, sha, cwd=ROOM).stdout.split("\n") if p]
+        # a5288: the checks nearest what changed start first, and the run stops at the first failure main did not
+        # already have (main's own health is kept: it is the last landing's), so a broken branch costs seconds, not
+        # a whole health. A run that is not stopped is the whole of health, which is what lets main move
+        known = kept.get("health", {}).get(base)
+        after = judged(world, sha, kept, changed=changed, fail_fast=True,
+                       excuse=(known or {}).get("failed_checks") or ())
         # 14 Oct (Codex e9993: a5062 judged again and again from 16:42 while main moved by hand under it): main alone is
         # judged only when the landing fails, to tell what it broke from what was already broken. A landing that passes
         # costs one run of health, so it is less often overtaken
         before = {"ok": True, "failed": []}
         if not after.get("ok", True) or after.get("failed"):
-            room_at(base)
-            before = judged(world, base, kept)
+            if known is None:
+                room_at(base)
+                before = judged(world, base, kept)
+            else:
+                before = known
+            if after.get("stopped") and not faults(before, after):
+                # it stopped at a failure main has too (main's health was not kept when this began): judge it whole
+                room_at(sha)
+                after = judged(world, sha, kept, changed=changed)
         _keep(kept)
         bad = faults(before, after)
         if bad:
             if len(merged) == 1:
                 out["refused"].append((merged[0], "judged and not landed: " + "; ".join(bad)[:1500]))
-                out["text"] = after.get("text", "")
+                out["text"] = out["texts"][merged[0]] = after.get("text", "")
                 return out
-            # together they broke something: judge each half alone, so the one that broke is found
-            half = len(merged) // 2
-            for part in (merged[:half], merged[half:]):
-                r = _land(part, world, who, why, depth + 1)
+            # a5288: together they broke something. Each branch alone runs just the checks that broke (seconds each);
+            # those that break them alone are named with their own failure, and the rest are judged again as one
+            new = sorted(set(after.get("failed_checks") or []) - set(before.get("failed_checks") or []))
+            if after.get("failed_checks") is not None and any(b.startswith("lens ") for b in bad):
+                new.append("lenses")
+            culprits = {}
+            for b in merged:
+                room_at(base)
+                one, _ = merge_in([b], why)
+                if not one:
+                    continue
+                bsha = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
+                alone = judged(world, bsha, kept, only=new) if new else judged(world, bsha, kept)
+                fb = faults(before, alone)
+                if fb:
+                    culprits[b] = (fb, alone.get("text", ""))
+            _keep(kept)
+            if culprits:
+                for b, (fb, text) in culprits.items():
+                    out["refused"].append((b, "judged and not landed: " + "; ".join(fb)[:1500]))
+                    out["texts"][b] = text
+                rest = [b for b in merged if b not in culprits]
+                r = _land(rest, world, who, why, depth + 1) if rest else None
+            else:
+                # none breaks it alone: two of them together do, or the failure comes and goes. Halves, as before
+                half = len(merged) // 2
+                r = None
+                for part in (merged[:half], merged[half:]):
+                    rr = _land(part, world, who, why, depth + 1)
+                    r = rr if r is None else {**rr, **{k: r[k] + rr[k] for k in ("landed", "refused", "parked")},
+                                              "heads": {**r["heads"], **rr["heads"]}, "texts": {**r["texts"], **rr["texts"]},
+                                              "head": rr["head"] or r["head"], "text": rr["text"] or r["text"],
+                                              "main_failing": rr.get("main_failing") or r.get("main_failing") or []}
+            if r:
                 for k in ("landed", "refused", "parked"):
                     out[k] += r[k]
+                out["heads"].update(r["heads"])
+                out["texts"].update(r["texts"])
                 out["head"] = r["head"] or out["head"]
                 out["text"] = r["text"] or out["text"]
+                out["main_failing"] = r.get("main_failing") or []
             return out
         moved, pk, whynot = advance(sha, base, f"parked by the landing of {', '.join(merged)} (asked by {who})")
         parked = None
@@ -426,6 +613,7 @@ def _land(branches, world, who, why, depth):
         if moved:
             out["landed"] += merged
             out["head"] = sha[:7]
+            out["heads"].update({b: heads[b][:7] for b in merged})
             out["text"] = after.get("text", "")
             out["main_failing"] = [f for f in after.get("failed") or [] if f in set(before.get("failed") or [])]
             kept.setdefault("landed", []).append({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "head": sha[:7],
@@ -447,6 +635,13 @@ def status():
     lines = [f"live checkout {LIVE}, main at {git('rev-parse', '--short', 'HEAD', cwd=LIVE).stdout.strip()}; landing room {ROOM}"]
     for x in kept.get("landed", [])[-10:]:
         lines.append(f"  {x['at']} landed {x['head']}: {', '.join(x['branches'])} (by {x['by']})" + (f"; parked {x['parked']['branch']}" if x.get("parked") else ""))
+    try:
+        q = json.loads((STATE / "landing-queue.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        q = {}
+    for e in q.get("waiting") or []:
+        lines.append(f"  {'being judged' if e.get('taken') else 'waiting'}: {', '.join(e['branches'])} (by {e['who']}, "
+                     f"asked {time.strftime('%H:%M:%S', time.localtime(e['at']))})")
     dirty = dirty_in_live()
     lines.append(f"uncommitted in the live checkout: {len(dirty)} path(s)" + (": " + ", ".join(dirty[:8]) if dirty else ""))
     return "\n".join(lines)
@@ -478,8 +673,10 @@ def main(argv):
               f"with a copy of the live world, and landed by fast-forward." for b in branches}
     t0 = time.time()
     r = land(branches, world=opt("--world", "frontier"), who=who, why=why)
+    if len(r.get("batch") or []) > 1:
+        print(f"judged in one batch with {', '.join(b for b in r['batch'] if b not in branches)}")
     for b in r["landed"]:
-        print(f"landed {b} as {r['head']}")
+        print(f"landed {b} as {(r.get('heads') or {}).get(b) or r['head']}")
         if b.startswith("hand/"):
             git("branch", "-D", b, cwd=LIVE)          # main holds it now; a hand branch that did not land is kept
     for b, w in r["refused"]:
