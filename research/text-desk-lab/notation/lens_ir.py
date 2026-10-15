@@ -13,6 +13,7 @@ import moo
 import scene as S
 import expr as X
 from desk import aspects_of, aspects_meet, event_aspects
+from world import Refusal
 
 ABSENT = None          # printed (no x); a third value, distinct from "" and from false
 
@@ -67,7 +68,13 @@ class Accessor:
         return (list(named), None) if named is not None else (None, list(ids))
 
     def rows(self, src):
-        rs = S.rows(self.desk, src)
+        try:
+            rs = S.rows(self.desk, src)
+        except Refusal as exc:
+            # Authored row queries use the native selector's refusal type. At the
+            # compiler boundary they belong to lens diagnostics and fallback,
+            # including checks run after an otherwise successful native write.
+            raise S.LensRefusal(f"row source {src!r}: {exc}") from exc
         self.R.append(("rows", src, len(rs) if rs is not None else None))
         if self.rec:
             self._said("rows", (src,), None if rs is None else [dict(r) for r in rs])
