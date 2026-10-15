@@ -267,7 +267,7 @@ a5372 · family=code · status=open
 
 worker-a5300, 15 Oct, in frontier-try with explore.py: `do replace` that made a lens line `of in:f5204 kind:note as h` raised world.Refusal "no such id 'f5204 kind:note'" out of desk_knife._visual_notes -> lens_ir.check -> Accessor.select -> _parse_selection, a traceback instead of the usual '~ ! lens does not compile' line (the comma form `in:f5204,kind:note` works). Ran once; not fixed (not my commission). The cure is likely lens_ir.check catching Refusal as it catches LensRefusal.
 
-## curing (27)
+## curing (28)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -488,6 +488,12 @@ workshop.land said a landing's wait once per SET of uncommitted files in the mai
 a5104 · family=conversation · status=curing
 
 Missing reusable capabilities encountered building task a5076: per-message default_to overridden by explicit header, atomic unknown-recipient refusal, sayings involving:<person> with original reply targets across chats/comments, bounded detached native context snapshots, composer lines bounds, and scroll-end continuity on window resize. Source edits are coordinated with Sable/Claude. Candidate checks in frontier@conversation-check; final evidence pending.
+
+### A fold's handle could only sit on its own line, above its summary
+
+a5473 · family=lens · status=curing
+
+Found by worker-a5359, 15 Oct, building the home base's board (a5359, Alex c5367: a card must open in place on a press on its title and be one line closed). The missing word: a fold whose handle stands beside its peek and whose peek is the press. Every fold's handle was drawn on its own line above the part, so a card with a one-line peek was two lines closed, and a press on its title did nothing (a clamped title opened only itself). Tried in the world first: a float (not in place), afloat on the handle (clipped, and presses missed it), one clamped text holding the whole card (a lens text can't hold a line break; test_backslash_n_in_a_lens_is_data). Source edit: `fold ... inline` (scene.py, lens.js, lens.html; test_fold_inline), opt-in so the folds that peek today keep their handle above. Still open beside it: a3399, a fold's label cannot compute ($( ) stays literal in it).
 
 ## cured (60)
 
