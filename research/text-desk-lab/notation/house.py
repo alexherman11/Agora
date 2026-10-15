@@ -903,6 +903,12 @@ class House:
     def knock_word(self, w, actor, how):
         """a3150: what happened to a resident a line reached, as the house sees them at this moment."""
         import rooms
+        if how == "an agent, not knocked":
+            # a5267: an agent the house does not run is knocked when a listener of theirs runs (listeners.py), which
+            # hears this record and carries it; with none, their own word (rooms.REACH) or the house's
+            import listeners
+            said = listeners.word(self.world, actor, rooms.REACH.get(str(actor).lower()))
+            return said[1] if said else how
         if how not in ("call", "book"):
             return how
         rid = rooms.corner_of(w, actor)
