@@ -39,6 +39,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+import shared                             # noqa: E402  (a5296: at import, before a test stubs the workers' Popen)
 REPO = HERE.parents[2]                    # the checkout the house runs from: landings merge here
 NOTATION = HERE.relative_to(REPO).as_posix()
 TREES = REPO / ".worktrees"
@@ -71,7 +72,9 @@ Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). 
 Never: touch {notation}/sessions/ (the worlds) or any .env file; push; delete what you did not make; edit
 src/agora3/prompts/jeff.md.
 
-Running things: the house has copied the live world into your worktree as {notation}/sessions/{world}-try.pickle.
+Running things: the house has copied the live world into your worktree as {notation}/sessions/{world}-try.pickle,
+and copies it again after every landing, so keep nothing there you need. health.py prints the event its world was at:
+name that event with any number you report from a world.
 Run one command per call, from your worktree root, with no cd and no chaining (; && |): the permission check approves
 single commands only. `python` is the lab's interpreter, and the lab's scripts find their own files, e.g.
   python {notation}/explore.py {world}-try --as {actor}      (it reads desk lines from stdin; DESKD is off)
@@ -281,6 +284,8 @@ class Workshop:
                 # branches from, the code that landed.
                 if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     continue
+                if self.uncommitted(w, cid, s):    # a5296: said at once, slot or no slot; held while a named file is new
+                    continue
                 # Sable c3142, 30 Sep: nine asked, none started from 18:25 to 19:50, because three idle workers (two
                 # waiting on someone, one reported) held all three slots. Only a worker at work holds one now; a waiting
                 # one keeps its process, and when it is answered the house may briefly run one over the number.
@@ -330,6 +335,54 @@ class Workshop:
                 wk.send("\n".join(heard))
             elif state == "working" and wk.state.get("turns", 0) > 0:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
+
+    def uncommitted(self, w, cid, s):
+        """a5296 (a5261 point 3): an asked card that names a file uncommitted in the main checkout, or one a card says it
+        is in, hears so at once (shared.check), once for what was found (prop uncommitted= keeps it). -> True to hold it:
+        a named file is new and never committed, and the card does not say uncommitted=ok."""
+        said = str((s.get("props") or {}).get("uncommitted") or "")
+        if said == "ok":
+            return False
+        try:
+            c = shared.check(s, REPO, w)
+        except Exception:                # git could not be read: the card starts as it did before a5296
+            return False
+        if c["key"] and c["key"] != said:
+            self.house.act("house", f"look {cid} :1; do prop {cid} uncommitted={json.dumps(c['key'], ensure_ascii=False)}")
+            self.say(cid, c["text"])
+        return bool(c["hold"])
+
+    def refresh_copies(self, live=None):
+        """a5296 (a5261 point 5: a worker's copy went stale in what the world builds, its lenses and styles): after a
+        landing, every other worker's -try world is copied again from the live one, under the live world's lock and its
+        own (a command of its worker mid-run finishes first). `live`: the world file (a test's). -> {cid: why not} for
+        those it could not refresh."""
+        import door
+        import explore
+        live, out = Path(live or HERE / "sessions" / f"{self.house.world}.pickle"), {}
+        for cid, wk in list(self.workers.items()):
+            to = Path(wk.tree) / NOTATION / "sessions" / f"{self.house.world}-try.pickle"
+            if not to.exists() or not live.exists():     # a worker with no copy is not given one here (begin does)
+                continue
+            tmp = to.with_name(to.name + ".fresh")
+            why = door.copy_locked(live, tmp)
+            if why:
+                out[cid] = why
+                continue
+            lock = to.with_suffix(".lock")
+            try:
+                explore.take_lock(lock, tries=600, pause=0.05)
+            except (Exception, SystemExit) as e:      # its worker holds it past 30 s (take_lock exits): next landing
+                tmp.unlink(missing_ok=True)
+                out[cid] = f"its copy's lock: {e}"
+                continue
+            try:
+                os.replace(tmp, to)
+            except OSError as e:
+                out[cid] = str(e)
+            finally:
+                explore.release_lock(lock)
+        return out
 
     # ---- the pool ----------------------------------------------------------------------------------------------
     @staticmethod
@@ -474,6 +527,11 @@ class Workshop:
         self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor, **chosen)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
+        try:                              # a5296: what the house found about the files it names, said to the card at ask
+            found = shared.check(s, REPO, w)["worker"]
+            first += f"\n\n{found}" if found else ""
+        except Exception:
+            pass
         if returning:      # 1 Oct (a1566): it remembered edits that the old worktree took with it
             first = (f"(You are back on this commission in a NEW worktree, {tree}, on your branch {branch}. Anything you "
                      "committed is there; uncommitted edits from before were not kept unless the house committed them for "
@@ -642,6 +700,7 @@ class Workshop:
                      + failing + parked + self.export_docs(cid))
             self.compare_lived(self.house.load())     # a3165: a promise reported as of a commit ends here, or stays open
             self.finish(cid, wk, keep_branch=False)
+            self.refresh_copies()                     # a5296: the others try things on the world as it is now
             if any(Path(p).name in HOUSE_FILES for p in changed):     # the rest reaches everyone without a restart
                 self.restart_wanted = True
             return

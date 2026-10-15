@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_builder_asks: a builder's comment wakes its asker only when it asks; the landing wakes them too (a5007).
 
     python test_builder_asks.py

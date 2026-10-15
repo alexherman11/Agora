@@ -5,10 +5,9 @@
 Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
   - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
-  - the rooms tests pass (test_room_verbs, test_room_look, test_room_reads, test_blanks, test_prop_fields,
-    test_house_words, test_house_cols, test_persons, test_persons_stored, test_lines, test_help_notes, test_promises,
-    test_lived, test_rules, test_lanes, test_bound_words, test_calls, test_sayings, test_due_any), each on a small world it builds itself (roomworld.py), so a failure is
-    the code's and not today's world's
+  - the rooms tests pass: every test_*.py with the line `# health: room test` among its first ten (a5296; there is no
+    list to add to), each on a small world it builds itself (roomworld.py), so a failure is the code's and not today's
+    world's
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - test_visit.py passes (a3204): `visit` and `home` through a real door, a version killed, one line written home
   - calm.style and every style note in <world> read by the one style reader (style.py; 8 Oct: the painter is handed
@@ -20,8 +19,9 @@ Checks, from this checkout:
     verb has a note, each names the arguments the code takes and shows none it doesn't. Each problem is a failed entry
     beginning "help note: "; the house excuses one that was there before the landing
 
-Prints one line per check, each ending in the seconds it took, then a total line; with --json, a last line
-{"ok": bool, "lenses_ok": [...], "failed": [...], "seconds": {check: s, ..., "total": s}}.
+Prints first the event <world> was at (a5296: every number after is taken there), then one line per check, each ending
+in the seconds it took, then a total line; with --json, a last line
+{"ok": bool, "world_at": "e<n> (when), n events", "lenses_ok": [...], "failed": [...], "seconds": {check: s, ..., "total": s}}.
 It reads the world under the desk's lock and never writes it.
 """
 import json
@@ -33,48 +33,25 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-ROOM_TESTS = (
-    # one a line (14 Oct): every builder adds here, and one long line made every two branches conflict
-    "test_room_verbs.py",
-    "test_room_look.py",
-    "test_room_reads.py",
-    "test_blanks.py",
-    "test_prop_fields.py",
-    "test_house_words.py",
-    "test_house_cols.py",
-    "test_persons.py",
-    "test_persons_stored.py",
-    "test_lines.py",
-    "test_kinds.py",
-    "test_help_notes.py",
-    "test_promises.py",
-    "test_lived.py",
-    "test_rules.py",
-    "test_lanes.py",
-    "test_bound_words.py",
-    "test_rule_bound.py",
-    "test_calls.py",
-    "test_sayings.py",
-    "test_due_any.py",
-    "test_kept.py",
-    "test_queries.py",
-    "test_table.py",
-    "test_house_verbs.py",
-    "test_nearest.py",
-    "test_reach.py",
-    "test_wake_fold.py",
-    "test_settled.py",
-    "test_comment_reply.py",
-    "test_design_talk.py",
-    "test_landing_wait.py",
-    "test_worker_pool.py",
-    "test_landing_queue.py",
-    "test_witnessed.py",
-    "test_bench_talk.py",
-    "test_builder_asks.py",
-    "test_line_waits.py",
-    "test_captures.py",
-)
+ROOM_MARK = "# health: room test"
+
+
+def room_tests(folder=HERE):
+    """a5296 (a5261 point 4: ROOM_TESTS, one list every builder added to, conflicted three times on 14 Oct): a rooms test
+    says so itself, with ROOM_MARK as a line among its first ten, so adding one is a new file and never a shared line."""
+    out = []
+    for p in sorted(folder.glob("test_*.py")):
+        try:
+            with p.open(encoding="utf-8") as f:
+                head = [next(f, "") for _ in range(10)]
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(l.startswith(ROOM_MARK) for l in head):
+            out.append(p.name)
+    return tuple(out)
+
+
+ROOM_TESTS = room_tests()
 HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
 
 
@@ -88,9 +65,18 @@ def check_help(world):
     return helpnotes.check(desk), len(helpnotes.entries(desk.world))
 
 
+def world_at(world):
+    """a5296 (a5261 point 5: a worker's numbers were from a copy nobody could date): the event <world> was at, which
+    every number below is taken at. -> 'e10330 (2026-10-15T09:12:03), 10330 events', or why it could not be read."""
+    import export_docs
+    w = export_docs.load(world).world
+    last = w.events[-1] if w.events else {}
+    return f"{last.get('id', 'no event')} ({last.get('at', last.get('day', '?'))}), {len(w.events)} events"
+
+
 def check_python():
     bad = []
-    for p in sorted(HERE.glob("*.py")) + sorted((HERE / "suite").glob("*.py")):
+    for p in sorted(HERE.glob("*.py")) + sorted((HERE / "suite").glob("*.py")) + sorted((HERE / "sources").glob("*.py")):
         try:
             compile(p.read_text(encoding="utf-8"), str(p), "exec")      # parse only: nothing is written
         except (SyntaxError, ValueError) as e:
@@ -165,6 +151,11 @@ def main():
         seconds[check] = round(time.perf_counter() - t0, 1)
         return f" ({seconds[check]:.1f}s)"
 
+    try:
+        at = world_at(world)
+    except Exception as e:           # a world not on disk (a test's): the checks that need it say so themselves
+        at = f"could not be read ({type(e).__name__}: {str(e)[:120]})"
+    print(f"world: {world} at {at}")
     t0 = time.perf_counter()
     bad = check_python()
     print(f"python: {'ok' if not bad else 'FAILED'}{took('python', t0)}" + "".join(f"\n  {b}" for b in bad))
@@ -274,7 +265,7 @@ def main():
     total = round(time.perf_counter() - start, 1)
     print(f"total: {total:.1f}s")
     if "--json" in sys.argv:
-        print(json.dumps({"ok": not failed, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": failed,
+        print(json.dumps({"ok": not failed, "world_at": at, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": failed,
                           "seconds": {**seconds, "total": total}}))
     sys.exit(1 if failed else 0)
 

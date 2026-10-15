@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_persons (a1568, design a1016): a person is a thing with one id for a life, and names are labels on it.
 
     python test_persons.py

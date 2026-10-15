@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_wake_fold: a wake does not print again a note its conversation already holds (9 Oct 2026, a3806).
 
 On a small world it builds itself (roomworld.build), with the house's fold_reads called as wake() calls it:

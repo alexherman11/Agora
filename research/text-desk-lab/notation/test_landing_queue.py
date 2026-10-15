@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_landing_queue: code reaches main only judged, and uncommitted edits never stop it (landing.py, Alex 14 Oct:
 "main should only be good working code ... uncommitted changes not blocking new code arriving ... minimal clobbering").
 

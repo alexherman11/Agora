@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_landing_wait: a commission's landing never waits on anyone's uncommitted edits, and what it comes to is said
 once (landing.py, Alex 14 Oct: "uncommitted changes not blocking new code arriving"; before: a4644, Pike c4717).
 
