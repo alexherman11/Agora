@@ -16,14 +16,16 @@ NEW = '''                current = self.house.load()
                 task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
                 props = task.get("props") or {}
                 provider = props.get("worker_provider", "claude")
-                model = props.get("worker_model") or model
+                # a5284: a codex card that names no model runs the adapter's own (codex_worker.MODEL), never the
+                # house's Claude model
+                model = props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL)
                 bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
                 if bound != provider:
                     raise ValueError(f"{self.cid}: saved worker conversation belongs to {bound}, not {provider}; preserved")
                 if provider == "codex":
                     adapter = HERE.parents[1] / "codex-residents" / "codex_worker.py"
                     instructions = self.dir / "worker-prompt.txt"
-                    instructions.write_text(prompt + "\\n\\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\\n", encoding="utf-8")
+                    instructions.write_text(prompt + "\\n\\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\\n" + CODEX_LIMITS, encoding="utf-8")
                     cmd = [str(PY), str(adapter), "--model", model,
                            "--reasoning", props.get("worker_reasoning", "medium"),
                            "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
