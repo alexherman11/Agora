@@ -1,7 +1,7 @@
 {
   "sdk": "0.147.0",
-  "binary": "C:\\Users\\Alex\\AppData\\Local\\OpenAI\\Codex\\bin\\c6fe824d725f02d7\\codex.exe",
-  "version": "codex-cli 0.159.2",
-  "binary_sha256": "cbafb6422bca005b94c12d105b1a16a0474219e24ea4893f85846409c464f5a1",
+  "binary": "C:\\Users\\Alex\\AppData\\Local\\OpenAI\\Codex\\bin\\9614f1d9b40d9c4f\\codex.exe",
+  "version": "codex-cli 0.162.0-alpha.17.2",
+  "binary_sha256": "e98c516f1c8935789aabe9122ee7e05ec4c3efd1ba6acf179242e031c495b99e",
   "catalog_sha256": "5ba3eb18012daa3f74fc273fd664df15a0473302a687dd35d0b748da5af4d9fc"
 }
