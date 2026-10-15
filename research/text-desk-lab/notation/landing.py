@@ -123,8 +123,9 @@ def room_at(base):
     return ROOM / NOTATION
 
 
-def merge_in(branches, why):
-    """Merge each branch into the room, in order. -> (merged branches, [(branch, why it does not merge)])."""
+def merge_in(branches, why, heads=None):
+    """Merge each branch into the room, in order. -> (merged branches, [(branch, why it does not merge)]). `heads`, when
+    given, gets each merged branch's own merge commit (its first parent is main with the branches before it)."""
     merged, refused = [], []
     for b in branches:
         r = git("merge", "--no-ff", b, "-m", (why.get(b) if isinstance(why, dict) else None) or f"land {b}", cwd=ROOM)
@@ -133,6 +134,8 @@ def merge_in(branches, why):
             refused.append((b, (r.stdout + r.stderr).strip()[-400:] or "it does not merge"))
         else:
             merged.append(b)
+            if heads is not None:
+                heads[b] = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
     return merged, refused
 
 
@@ -206,12 +209,34 @@ def dirty_in_live():
     return out
 
 
+def _index_file(kind):
+    """A git index of its own for one park or hand, named so that no other one shares it (another process, or
+    another thread of the house, in the same second)."""
+    import threading
+    return STATE / f"{kind}-{os.getpid()}-{threading.get_ident()}-{time.time_ns()}.index"
+
+
+def new_branch(stem, commit):
+    """Branch `stem` at `commit`, or stem-2, stem-3 ... when that name is taken. 15 Oct (a5245's landing failed on
+    'hand/codex-20261015-133134 already exists'): the names were the second only, so two hand landings by one actor in
+    one second collided, as test_landing_queue's cases 11 and 12 do on a fast machine. git refuses a name that exists
+    (it locks the ref to make it), so two makers at once can never both get one name: the second takes the next. -> name"""
+    for k in range(1, 1000):
+        name = stem if k == 1 else f"{stem}-{k}"
+        r = git("branch", name, commit, cwd=LIVE)
+        if not r.returncode:
+            return name
+        if "already exists" not in (r.stderr + r.stdout) and git("rev-parse", "--verify", "--quiet", f"refs/heads/{name}",
+                                                                   cwd=LIVE).returncode:
+            raise RuntimeError(f"git branch {name} {commit}: {(r.stderr or r.stdout).strip()[-400:]}")
+    raise RuntimeError(f"no free branch name like {stem}")
+
+
 def park(paths, why):
     """Keep someone's uncommitted edits to `paths` (in the live checkout) as a commit on a branch of their own, then put
     those files back as main has them. Nothing is lost; the landing goes ahead. -> the branch."""
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    branch = f"parked/{stamp}"
-    idx = STATE / f"park-{stamp}.index"
+    idx = _index_file("park")
     env = {"GIT_INDEX_FILE": str(idx)}
     try:
         git("read-tree", "HEAD", cwd=LIVE, env=env, check=True)
@@ -219,7 +244,7 @@ def park(paths, why):
         tree = git("write-tree", cwd=LIVE, env=env, check=True).stdout.strip()
         c = git("commit-tree", tree, "-p", "HEAD", "-m", f"parked: uncommitted edits in the live checkout, {stamp}\n\n{why}",
                 cwd=LIVE, check=True).stdout.strip()
-        git("branch", branch, c, cwd=LIVE, check=True)
+        branch = new_branch(f"parked/{stamp}", c)
     finally:
         idx.unlink(missing_ok=True)
     tracked = set(git("ls-files", "--", *paths, cwd=LIVE).stdout.splitlines())
@@ -260,8 +285,8 @@ def hand(paths, who="?", words=""):
         raise ValueError("no files named")
     STATE.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    branch = f"hand/{''.join(c if c.isalnum() or c in '-_' else '-' for c in who)}-{stamp}"
-    idx = STATE / f"hand-{stamp}.index"
+    stem = f"hand/{''.join(c if c.isalnum() or c in '-_' else '-' for c in who)}-{stamp}"
+    idx = _index_file("hand")
     env = {"GIT_INDEX_FILE": str(idx)}
     try:
         git("read-tree", "HEAD", cwd=LIVE, env=env, check=True)
@@ -271,7 +296,7 @@ def hand(paths, who="?", words=""):
             raise ValueError("those files are as main has them: nothing to land")
         msg = f"{words or 'by hand'}\n\nlanded by hand from the live checkout by {who}: {', '.join(rel)}"
         c = git("commit-tree", tree, "-p", "HEAD", "-m", msg, cwd=LIVE, check=True).stdout.strip()
-        git("branch", branch, c, cwd=LIVE, check=True)
+        branch = new_branch(stem, c)
     finally:
         idx.unlink(missing_ok=True)
     return branch
