@@ -477,8 +477,8 @@ def _lens_steps(text):
         for part in parts.values():
             for node in scene._walk(part):
                 for a in node["on"]:
-                    if a["line"].startswith("press "):
-                        continue          # a button's key press is the painter's own act (scene._w_on); no desk line
+                    if a["line"].startswith(("press ", "host ")):
+                        continue          # a key press or a host verb is the painter's own act (scene._w_on); no desk line
                     out += desk_mod.split_batch(a["line"])
         return out
     out = []
