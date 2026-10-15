@@ -59,13 +59,35 @@ STATE = LIVE / NOTATION / "house-state"
 BANNED = (f"{NOTATION}/sessions/",)                           # worlds are never landed; .env never committed
 
 
-def _lock():
+def _lock(wait=20 * 60):
+    """One landing at a time. 15 Oct: this took the sessions' lock (explore.take_lock), which removes any lock older
+    than a minute even when its holder is alive (a session's lock is held for a moment). A landing holds it for minutes,
+    so a second landing broke in after 60 s and both used the one landing room at once: a5062 was judged again and again
+    on 14 Oct, a landing's record was lost, and a judgement could have run on a tree the other had just reset. Now only
+    a holder whose process has gone gives the lock up; a living one is waited for, however long it takes."""
     sys.path.insert(0, str(HERE))
     import explore
     STATE.mkdir(parents=True, exist_ok=True)
     lock = STATE / "landing.lock"
-    explore.take_lock(lock, tries=20 * 60 * 10, pause=0.1)    # a landing ahead may take minutes: wait up to 20
-    return lock
+    end = time.time() + wait
+    while True:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except (FileExistsError, PermissionError):
+            try:
+                pid = lock.read_text().strip()
+            except OSError:
+                pid = ""
+            if pid.isdigit() and not explore._alive(pid):
+                lock.unlink(missing_ok=True)          # its landing died with it
+                continue
+            if time.time() > end:
+                raise SystemExit(f"a landing (pid {pid or '?'}) has held {lock.name} for over {wait // 60} minutes; still waiting is a choice for a person")
+            time.sleep(0.2)
+            continue
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return lock
 
 
 def _unlock(lock):
