@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_rule_bound (a1388, from Claude e3229 and Pike a1356): hitting the 3-round bound is said to the rules' authors.
 
     python test_rule_bound.py

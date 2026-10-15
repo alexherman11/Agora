@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_due_any (a3359): 'has a due date' is asked as due:any, and prop:due names the door instead of matching nothing.
 
     python test_due_any.py

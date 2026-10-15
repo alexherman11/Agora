@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_persons_stored (a1590, design a1016 rule 2): stored names become persons when saved.
 
     python test_persons_stored.py

@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_builders: standing builders (a5378, Alex 15 Oct: persistent compacting workers with shared memory; the workers
 can do everything Claude has been able to do).
 

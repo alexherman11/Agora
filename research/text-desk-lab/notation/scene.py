@@ -94,6 +94,9 @@ the one form. The words:
                                  `marks`) of the same thing, in quotation marks with a space after; empty when none were. A comment box beside a paragraph
                                  can quote what was highlighted in it
     on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
+    on click host <verb> [words] the button asks the program the page is painted in (the home base) to do <verb>, one of
+                                 the rows it publishes as witnessed:host; $fields fill as in any command. Never a desk
+                                 line; a page with no host says so
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
     on <gesture> do <command>    click | edit | drag | select. The command is a desk verb line (`do` is implied); the painter
                                  fills $x $y (drag, click) and $value (edit; select: the words highlighted) at the moment
@@ -119,7 +122,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
@@ -277,18 +280,31 @@ SOURCES = {
     "words": ("words [host=verb|command|lens|term|kind]", ("host", "word", "form", "slots", "doc")),
     "slots": ("slots [host=... word=...]", ("host", "word", "slot", "type", "needed", "doc")),
     "kinds": ("kinds", ("kind", "is", "shape", "things", "props", "declared")),
-    # 9 Oct (a3806): the lines the desk did not do, counted by shape, the most met first (verbs.record_reach): which
-    # refusal or missing word is worth curing shows itself, without anyone deciding whose fault each one was
-    "reaches": ("reaches", ("shape", "n", "who", "kind", "last", "line")),
-    # a5052 (14 Oct): the windows a host keeps on the screen (research/window-lab/wm.py), as it last said them, in its
-    # order: witnessed beside the house (witnessed.py), never in the world. name is the host's own for the window (a
-    # repeat keys each by it), kind agora or adopted, pinned/collapsed/focused yes or no, age the seconds since it said so
-    "windows": ("windows", ("name", "title", "lens", "kind", "pinned", "collapsed", "focused", "order", "age", "by")),
-    # 15 Oct (the home base, JEFF's HUD): rows any living program keeps beside the house under a name of its own, with the
-    # fields it wrote (read them through a frame, `of witnessed:desktop as w` and $w.title), and order, age and by. A
-    # program says what it sees without a source edit per program; `windows` is the first such source, kept by its name
-    "witnessed": ("witnessed:<name>", ("order", "age", "by")),
+    # reaches, windows and witnessed are files of their own in sources/ (a5296), read below
 }
+
+
+# a5296 (a5261 point 4: every new source was a line here and a branch in _rows_of, so two builders adding one conflicted):
+# a source may be one file in sources/, <name>.py, saying USAGE (as a refusal prints it), FIELDS, ARG ("none", "needed"
+# or "optional": whether `<name>:<arg>` takes one), OPEN (True: its rows may carry fields beyond FIELDS, printed after
+# them) and rows(desk, arg, session) -> [dict]. Adding a source is adding a file; nothing here changes.
+SOURCE_DIR = pathlib.Path(__file__).resolve().parent / "sources"
+SOURCE_FILES = {}        # name -> {"arg", "open", "rows"}
+
+
+def _load_sources(folder=SOURCE_DIR):
+    import importlib.util
+    for p in sorted(pathlib.Path(folder).glob("*.py")):
+        if p.stem.startswith("_") or p.stem in SOURCES:
+            continue             # a name the table above already has keeps it: a file never takes a source over
+        spec = importlib.util.spec_from_file_location(f"agora_source_{p.stem}", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        SOURCES[p.stem] = (mod.USAGE, tuple(mod.FIELDS))
+        SOURCE_FILES[p.stem] = {"arg": getattr(mod, "ARG", "none"), "open": bool(getattr(mod, "OPEN", False)), "rows": mod.rows}
+
+
+_load_sources()
 # a source's field names: read bare inside their own repeat ($who in `of messages:`); a text's $name that is one of them
 # is no prop of the thing, and no aspect for the fence. 8 Oct: they no longer take a name away from `let` or `as` in
 # every lens (`let shape` stopped compiling when a source gained a field shape): the nearer binding wins, as names.py says
@@ -768,7 +784,12 @@ def rows(desk, source, session=None):
 def _rows_of(desk, source, session=None):
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days", "witnessed")) != bool(arg)):
+    own = SOURCE_FILES.get(head)
+    if own:                  # a5296: a source that is a file of its own (sources/)
+        if own["arg"] != "optional" and (own["arg"] == "needed") != bool(arg.strip()):
+            return None
+        return own["rows"](desk, arg.strip(), session or getattr(desk, "_session", "") or "")
+    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name, days a span; house, turns and lines one or none; the rest none
     if head == "days":
         a, _, b = arg.partition("..")
@@ -791,21 +812,6 @@ def _rows_of(desk, source, session=None):
         return house_rows(desk, desk._resolve(arg) if arg else None)
     if head == "turns":
         return turn_rows(desk, desk._resolve(arg) if arg else None)
-    if head == "reaches":
-        import verbs
-        return verbs.reach_rows(desk)
-    if head == "windows":
-        import witnessed
-        doc = witnessed.read(session or getattr(desk, "_session", "") or "", "windows")
-        return [] if doc is None else [{**{f: "" for f in SOURCES["windows"][1]}, **{k: v for k, v in r.items() if k in SOURCES["windows"][1]},
-                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
-                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict) and r.get("name")]
-    if head == "witnessed":
-        import witnessed
-        doc = witnessed.read(session or getattr(desk, "_session", "") or "", arg.strip())
-        return [] if doc is None else [{**{k: v if isinstance(v, (str, int, float)) else __import__("json").dumps(v) for k, v in r.items()},
-                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
-                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict)]
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)
@@ -883,7 +889,8 @@ def rows_text(desk, source):
     if rs is None:
         raise LensRefusal("rows <source> [k=v k<v ...]. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
     fields = SOURCES[source_head(source)][1]
-    if source_head(source) in ("lines", "witnessed"):     # 14 Oct: and the fields the lines (15 Oct: or a program) gave them
+    if source_head(source) == "lines" or (SOURCE_FILES.get(source_head(source)) or {}).get("open"):
+        # 14 Oct: and the fields the lines (15 Oct: or a program, a source file saying OPEN) gave them
         fields = fields + tuple(sorted({k for r in rs for k in r} - set(fields)))
     lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
     for r in rs:
@@ -963,10 +970,16 @@ def _w_fold(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `fold ... handle <role>`: the role the handle wears; got {p!r}')
         if env["roles"] is not None and handle not in env["roles"]:
             raise LensRefusal(f"line {n}: no role {handle!r} for the fold's handle in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
-    if any(x not in ("open", "float") for x in mods) or len(set(mods)) != len(mods):
-        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [handle <role>] [group <name>]`; got {p!r}')
+    # a5359 (Alex c5367: a board card opens in place on a press on its title, and stays one line closed): `inline` draws
+    # the handle beside the part's peek, on one line, and a press anywhere on the peek opens and closes it. Opt-in, so
+    # the folds that peek today (a document's comments) keep their handle above.
+    if any(x not in ("open", "float", "inline") for x in mods) or len(set(mods)) != len(mods):
+        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [inline] [handle <role>] [group <name>]`; got {p!r}')
+    if "inline" in mods and "float" in mods:
+        raise LensRefusal(f"line {n}: `fold ... inline` opens in place beside its peek, `float` opens over the page; a fold is one or the other; got {p!r}")
     node["fold"] = m.group(1).strip('"') if m.group(1) else True
     node["fold_open"], node["fold_float"], node["fold_handle"], node["fold_group"] = "open" in mods, "float" in mods, handle, group
+    node["fold_inline"] = "inline" in mods
 
 
 def _w_measure(node, p, val, n, env):
@@ -1329,6 +1342,14 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f"line {n}: `on click press <{'|'.join(PRESSES)}>`; got {p!r}")
         node["on"].append({"on": "click", "line": "press " + m.group(1)})
         return
+    # a5300 (15 Oct): a button asks the program the page is painted in (the home base, research/window-lab/hud.py) to do
+    # one of the things it says it can (its rows, witnessed:host). Like `press`, the painter's own act: never a desk line
+    m = re.fullmatch(r"click host(?:\s(.*))?", val.strip())
+    if m:
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", (m.group(1) or "").strip()):
+            raise LensRefusal(f"line {n}: `on click host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")
+        node["on"].append({"on": "click", "line": "host " + m.group(1).strip()})
+        return
     g, do, cmd = val.partition(" do ")
     drop_part = label = when = None
     # 14 Oct (Alex: comments from the right-click box 'go to the ether' on a design, whose margin is not shown; then
@@ -1349,7 +1370,7 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
         label, g = m.group(1), "menu"
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
-        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>`, `on click host <verb> [words]` or `on drop <part> do <desk command>`; got {p!r}")
     if when:
         try:
             X.parse(when)
@@ -1372,7 +1393,7 @@ WORDS = {
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end", _w_scroll),
-    "fold": ('fold ["<handle label>"] [open] [float] [handle <role>] [group <name>]', _w_fold),
+    "fold": ('fold ["<handle label>"] [open] [float] [inline] [handle <role>] [group <name>]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
@@ -2072,7 +2093,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append(f"{wd} {n[wd]}")
         if n.get("fold"):
             bits.append(("unfolded" if n.get("fold_open") else "folded") + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else "")
-                        + (" float" if n.get("fold_float") else "") + (f" handle {n['fold_handle']}" if n.get("fold_handle") else "")
+                        + (" float" if n.get("fold_float") else "") + (" inline" if n.get("fold_inline") else "")
+                        + (f" handle {n['fold_handle']}" if n.get("fold_handle") else "")
                         + (f" group {n['fold_group']}" if n.get("fold_group") else ""))
         if n.get("wrap") == "verbatim":
             bits.append("verbatim")
@@ -2260,6 +2282,10 @@ def emit(node):
             paint["fold"] = {"folded": not node.get("fold_open"), "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
             if node.get("fold_float"):
                 paint["fold"]["float"] = True
+            if node.get("fold_inline"):              # a5359: beside its peek; with no label of its own, the arrow alone
+                paint["fold"]["inline"] = True
+                if not isinstance(node["fold"], str):
+                    paint["fold"]["label"] = ""
             if node.get("fold_handle"):
                 paint["fold"]["handle"] = node["fold_handle"]
             if node.get("fold_group"):

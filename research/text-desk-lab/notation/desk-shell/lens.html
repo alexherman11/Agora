@@ -75,6 +75,15 @@
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
   .l-float > [data-peek] { position: static; width: auto; max-height: none; }   /* a peek stays beside the handle, in the page */
+  /* fold ... inline (a5359): the handle and the peek share the first line; what the fold hides opens below them, easing in */
+  [data-fold-inline] { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .5em; align-items: baseline; }
+  [data-fold-inline] > button { grid-column: 1; }
+  [data-fold-inline] > [data-key] { grid-column: 1 / -1; }
+  [data-fold-inline] > [data-key][data-peek] { grid-column: 2; }
+  [data-fold-inline] > [data-peek] { cursor: pointer; }
+  [data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: l-unfold 180ms ease-out; }
+  @keyframes l-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { [data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: none; } }
   [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */
   [data-hint]:empty::before { content: attr(data-hint); color: var(--t-hush); }
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }

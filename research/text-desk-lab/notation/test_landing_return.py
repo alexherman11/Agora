@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_landing_return: a landing that does not land is never a dead end (a5292). It goes back to its worker with the
 failure, started again if its process is gone; if the worker cannot come back, the card is the asker's, with the
 failure and the branch named. The keeper's revert names the landing it reverts, never HEAD (a4919).

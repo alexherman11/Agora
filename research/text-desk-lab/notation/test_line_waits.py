@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_line_waits (a5068): an agent's chat line or thread reply sent on an old view waits.
 
     python test_line_waits.py [world]      on roomworld (built in memory); with a world (frontier-try), its copy,

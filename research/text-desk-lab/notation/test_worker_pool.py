@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_worker_pool: the house's worker pool (a5284, Alex 15 Oct: two Claude workers and two Astra workers) and slots
 that count only workers running a model (a5261 point 1: a ready or landing card held one, and runs none).
 

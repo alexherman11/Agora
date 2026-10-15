@@ -26,9 +26,19 @@ and the Study without assigning a fixed specialty.
 
 `codex_resident.py` uses Python `openai-codex==0.147.0`, managed ChatGPT sign-in,
 and exactly `gpt-6-astra` at medium reasoning. `runtime-lock.json` pins the
-current Codex executable (0.159.2) and model catalog by SHA-256. Missing or
+current Codex executable and model catalog by SHA-256. Missing or
 changed binaries/catalogs are refused, rather than silently changing the model
 or runtime. A future update needs a new inventory check before repinning.
+
+Pinned 1 Oct: 0.159.2 (`bin/c6fe824d725f02d7`). **Repinned 15 Oct (a5352)** after
+Codex updated itself and removed that binary: `codex-cli 0.162.0-alpha.17.2`,
+`bin/9614f1d9b40d9c4f`, sha `e98c516f…`, in both locks; catalogs unchanged. Ran on
+it first, mock inference only: `probe_runtime.py` (also with a PNG crop) and
+`probe_worker.py` for Sol and for Astra all printed PASS. The tool lists and
+instruction-free resident request match the 1 Oct inventory. (The resident request
+also lost an empty `additional_tools` item.) The catalog hashes are of the
+CRLF files as checked out in `C:/Projects/Agora4`; a checkout with LF endings
+fails the pin with the same "changed or missing" message.
 
 The custom system and developer instructions are empty. There are no model
 tools. The host sends the world's existing door welcome and wake text as user

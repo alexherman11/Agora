@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_queries (8 Oct 2026, step 3 of the grammar unification): one term table for every selection.
 
     python test_queries.py

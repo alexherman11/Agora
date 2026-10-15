@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_rules (a1027): rules become quiet notes; scripts retire into verbs.
 
     python test_rules.py
