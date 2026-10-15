@@ -114,6 +114,16 @@ def work_area():
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 
+def whole_monitor(area):
+    """The whole monitor that holds a work area, the taskbar's strip included (a5394)."""
+    x, y, w, h = area
+    mi = MONITORINFO()
+    mi.cbSize = ctypes.sizeof(mi)
+    user32.GetMonitorInfoW(user32.MonitorFromPoint(wt.POINT(x + w // 2, y + h // 2), 2), ctypes.byref(mi))
+    r = mi.rcMonitor
+    return r.left, r.top, r.right - r.left, r.bottom - r.top
+
+
 def title_of(h):
     n = user32.GetWindowTextLengthW(h)
     buf = ctypes.create_unicode_buffer(n + 1)
@@ -187,6 +197,13 @@ class Hud:
         self.thumbs = {}              # source hwnd -> (thumbnail id, last rect)
         self.keys_tid = None
         self.lock = threading.Lock()
+        self.settings = {"hide_taskbar": "yes"}
+
+    def area(self):
+        """Where it shows: the work area, or the whole monitor when hide_taskbar=yes (a5394). It covers the taskbar and
+        never hides the taskbar's own window, so a home base that is put away, stopped or killed has nothing to restore."""
+        a = work_area()
+        return whole_monitor(a) if self.settings.get("hide_taskbar") == "yes" else a
 
     # -- the page
     def url(self):
@@ -196,7 +213,7 @@ class Hud:
     def frost(self):
         """A still, blurred and darkened copy of the work area as it is now, as a data address for the page."""
         from PIL import ImageGrab, ImageFilter, ImageEnhance
-        x, y, w, h = work_area()
+        x, y, w, h = self.area()
         im = ImageGrab.grab(bbox=(x, y, x + w, y + h)).convert("RGB")
         im = im.resize((max(1, w // 6), max(1, h // 6)))
         im = im.filter(ImageFilter.GaussianBlur(6))
@@ -291,7 +308,7 @@ class Hud:
         self.front = fg if fg and fg != self.hwnd else None
         self.dress(self.frost())
         self.say_desktop()
-        x, y, w, h = work_area()
+        x, y, w, h = self.area()
         user32.SetWindowPos(self.hwnd, wt.HWND(-1), x, y, w, h, 0x40)         # topmost, shown
         self.window.show()
         user32.SetForegroundWindow(self.hwnd)
