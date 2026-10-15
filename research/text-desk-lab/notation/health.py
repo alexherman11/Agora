@@ -68,6 +68,7 @@ ROOM_TESTS = (
     "test_design_talk.py",
     "test_landing_wait.py",
     "test_worker_pool.py",
+    "test_builders.py",
     "test_landing_queue.py",
     "test_landing_return.py",
     "test_witnessed.py",

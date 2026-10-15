@@ -1238,7 +1238,8 @@ class House:
                                      "said": r.state.get("said", [])}
         out["workers"] = {cid: {"actor": wk.actor, "asked_by": wk.asked_by, "alive": wk.alive(),
                                 "doing": "working" if wk.busy else ("waiting" if wk.alive() else "stopped"),
-                                "turns": wk.state.get("turns", 0), "branch": wk.branch}
+                                "turns": wk.state.get("turns", 0), "branch": wk.branch,
+                                "builder": getattr(wk, "builder", None)}
                           for cid, wk in self.workshop.workers.items()}
         (self.dir / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 
