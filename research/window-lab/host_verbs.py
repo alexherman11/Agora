@@ -8,6 +8,7 @@ A lens asks with `on click host <verb> [words]` (scene.py). The painter sends th
 here. So a new button is lens lines only, and a new power is one entry in VERBS below, never a new js_api in hud.py.
 
 The table is closed on purpose: named verbs, no program to run, no shell line, no keys pressed but the media keys.
+`window <lens>` (a5500) opens only the desk's own painter on a lens, as lens_window.py does; never another program.
 
 Settings are props on the lens note the home base paints (home-base, a5208), read through the door each time it opens:
     hotkey=Ctrl+Alt+J      the key that shows or hides it (Ctrl, Alt, Shift, Win + a letter, digit, F1-F24 or Space)
@@ -69,9 +70,22 @@ def _media(action):
     return press
 
 
+def _window(hud, words):
+    # a5500: a dock icon opens an Agora app as its own window: one lens, painted as the home base's own person in its
+    # world, as lens_window.py does (Edge in app mode). A lens name only: no program, path or address
+    lens = words.strip().strip('"')
+    if not re.fullmatch(r"[a-z][a-z0-9-]*", lens):
+        raise Refused(f"window takes a lens's name (lower case, words joined by -); got {words!r}")
+    import lens_window
+    p = lens_window.open_window(lens, hud.a.who, hud.a.world)
+    hud.hide()
+    return f"opened {lens} as a window (process {p.pid})"
+
+
 VERBS = {
     "bring": ("bring that window forward and put the home base away", "window", _bring),
     "hide": ("put the home base away", "", _hide),
+    "window": ("open a lens as its own window (an Agora app) and put the home base away", "lens", _window),
     "media.play": ("play or pause (Spotify, else the media key)", "", _media("play")),
     "media.next": ("the next song", "", _media("next")),
     "media.prev": ("the song before, or this one from its start", "", _media("prev")),

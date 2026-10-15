@@ -25,6 +25,8 @@ A look's keys (the painter's table maps each to its medium):
     align start|center|end|stretch   where the part stands across its parent's flow (15 Oct)
     afloat  shy  pulse  wave     flags: takes no room; unseen until near; the motions (pulse: the part breathes;
                                  wave, 14 Oct: each character rises in turn, as typing dots do)
+    touch                        flag (a5500, 15 Oct): the part answers the pointer: it rises and brightens under it,
+                                 and sinks while pressed (a dock's icons). Brightens only, for reduced motion
 """
 import hashlib
 import pathlib
@@ -337,7 +339,7 @@ def read_prop(p, T, fonts):
         if re.search(r"\btracked\b", p):
             face["tracked"] = True
         return {"text": face}
-    if p in ("afloat", "shy", "pulse", "wave"):
+    if p in ("afloat", "shy", "pulse", "wave", "touch"):
         return {p: True}
     if (m := re.match(r"^align\s+(start|center|end|stretch)$", p)):
         return {"align": m.group(1)}      # 15 Oct: where the part stands across its parent's flow (a chat's own lines at the end)

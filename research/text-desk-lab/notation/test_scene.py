@@ -1240,6 +1240,8 @@ def test_style_read_once():
     assert dark["theme"] == "dark" and dark["tokens"]["paper"]["value"] == "#131517" and dark["roles"]["card"]["look"]["on"] == "#191C1F"
     sheet = style.looks("token gap = 8\nrole sheet : height 60em, width 30em, height gap x40, afloat, shy, pulse")["roles"]["sheet"]["look"]
     assert sheet == {"height_em": 60.0, "width_em": 30.0, "height": 320, "afloat": True, "shy": True, "pulse": True}
+    icon = style.looks("token gap = 8\nrole icon : corner gap, touch")["roles"]["icon"]       # a5500: answers the pointer
+    assert icon["look"] == {"corner": 8, "touch": True} and not icon["unread"]
     fonts = style.looks("font pixel = Silkscreen, monospace\ntoken text.pixel = pixel 13/1.3\nrole t : text.pixel up")
     assert fonts["roles"]["t"]["look"]["text"] == {"family": "'Silkscreen', monospace", "size": 15, "leading": 1.3} and fonts["fonts"]["pixel"]["face"] == "Silkscreen"
     out = style.for_painter({"name": "x", "text": "role x on paper"}, None)
