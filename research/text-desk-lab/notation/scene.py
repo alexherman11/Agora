@@ -122,7 +122,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
@@ -966,10 +966,16 @@ def _w_fold(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `fold ... handle <role>`: the role the handle wears; got {p!r}')
         if env["roles"] is not None and handle not in env["roles"]:
             raise LensRefusal(f"line {n}: no role {handle!r} for the fold's handle in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
-    if any(x not in ("open", "float") for x in mods) or len(set(mods)) != len(mods):
-        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [handle <role>] [group <name>]`; got {p!r}')
+    # a5359 (Alex c5367: a board card opens in place on a press on its title, and stays one line closed): `inline` draws
+    # the handle beside the part's peek, on one line, and a press anywhere on the peek opens and closes it. Opt-in, so
+    # the folds that peek today (a document's comments) keep their handle above.
+    if any(x not in ("open", "float", "inline") for x in mods) or len(set(mods)) != len(mods):
+        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [inline] [handle <role>] [group <name>]`; got {p!r}')
+    if "inline" in mods and "float" in mods:
+        raise LensRefusal(f"line {n}: `fold ... inline` opens in place beside its peek, `float` opens over the page; a fold is one or the other; got {p!r}")
     node["fold"] = m.group(1).strip('"') if m.group(1) else True
     node["fold_open"], node["fold_float"], node["fold_handle"], node["fold_group"] = "open" in mods, "float" in mods, handle, group
+    node["fold_inline"] = "inline" in mods
 
 
 def _w_measure(node, p, val, n, env):
@@ -1383,7 +1389,7 @@ WORDS = {
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end", _w_scroll),
-    "fold": ('fold ["<handle label>"] [open] [float] [handle <role>] [group <name>]', _w_fold),
+    "fold": ('fold ["<handle label>"] [open] [float] [inline] [handle <role>] [group <name>]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
@@ -2083,7 +2089,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append(f"{wd} {n[wd]}")
         if n.get("fold"):
             bits.append(("unfolded" if n.get("fold_open") else "folded") + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else "")
-                        + (" float" if n.get("fold_float") else "") + (f" handle {n['fold_handle']}" if n.get("fold_handle") else "")
+                        + (" float" if n.get("fold_float") else "") + (" inline" if n.get("fold_inline") else "")
+                        + (f" handle {n['fold_handle']}" if n.get("fold_handle") else "")
                         + (f" group {n['fold_group']}" if n.get("fold_group") else ""))
         if n.get("wrap") == "verbatim":
             bits.append("verbatim")
@@ -2271,6 +2278,10 @@ def emit(node):
             paint["fold"] = {"folded": not node.get("fold_open"), "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
             if node.get("fold_float"):
                 paint["fold"]["float"] = True
+            if node.get("fold_inline"):              # a5359: beside its peek; with no label of its own, the arrow alone
+                paint["fold"]["inline"] = True
+                if not isinstance(node["fold"], str):
+                    paint["fold"]["label"] = ""
             if node.get("fold_handle"):
                 paint["fold"]["handle"] = node["fold_handle"]
             if node.get("fold_group"):
