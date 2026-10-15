@@ -261,7 +261,12 @@ def hand(paths, who="?", words=""):
     STATE.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     branch = f"hand/{''.join(c if c.isalnum() or c in '-_' else '-' for c in who)}-{stamp}"
-    idx = STATE / f"hand-{stamp}.index"
+    # a5245, 15 Oct: two hand landings by one builder in the same second asked for the same name, and the second failed
+    k, base = 1, branch
+    while git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", cwd=LIVE).returncode == 0:
+        k += 1
+        branch = f"{base}-{k}"
+    idx = STATE / f"hand-{stamp}-{k}.index"
     env = {"GIT_INDEX_FILE": str(idx)}
     try:
         git("read-tree", "HEAD", cwd=LIVE, env=env, check=True)
