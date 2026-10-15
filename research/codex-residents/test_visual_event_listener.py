@@ -85,6 +85,42 @@ def test_saved_reply_address_reaches_codex_without_mention():
     assert list(state["pending"]) == ["e1"]
 
 
+def test_house_knock_record_makes_its_line_pending_once():
+    """a5267: the house's knock record saying codex was knocked pends the line it names (its cause), once; a record
+    that says codex was not knocked (not a member) pends nothing."""
+    state = {"since": 0, "pending": {}, "handled": {"e7": "done"}}
+    events = [
+        {"id": "e5", "verb": "append", "by": "alex", "args": {"append": "a line with to=codex stored", "to": "codex"}},
+        {"id": "e6", "verb": "knock", "by": "house", "cause": "e5", "args": {"codex": "knocked: their listener ..."}},
+        {"id": "e8", "verb": "knock", "by": "house", "cause": "e7", "args": {"codex": "knocked: their listener ..."}},
+        {"id": "e9", "verb": "knock", "by": "house", "cause": "e4", "args": {"codex": "not a member, not knocked"}},
+    ]
+    ingest(state, {"total": 4, "events": events})
+    assert list(state["pending"]) == ["e5"]
+    ingest(state, {"total": 5, "events": [dict(events[1], id="e10")]})
+    assert list(state["pending"]) == ["e5"]
+
+
+def test_publish_writes_the_row_only_when_it_changes(tmp_path, monkeypatch):
+    """a5267: the witnessed row listener-codex says what was handed to the chat; unchanged, it is not rewritten."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "text-desk-lab/notation"))
+    import witnessed
+
+    monkeypatch.setattr(witnessed, "ROOT", witnessed.ROOT)          # put back after: publish points it at WORLD's
+    monkeypatch.setattr(listener, "WORLD", tmp_path / "sessions" / "t.pickle")
+    monkeypatch.setattr(listener, "_published", [None])
+    listener.publish({"notified": ["e10", "e9"]})
+    assert witnessed.ROOT == tmp_path / "house-state"
+    doc = witnessed.read("t", "listener-codex")
+    assert doc["rows"][0]["delivered"] == "e9 e10" and doc["rows"][0]["carries"] == "its Codex app chat"
+    stamp = witnessed.stamp("t")
+    time.sleep(0.02)
+    listener.publish({"notified": ["e10", "e9"]})
+    assert witnessed.stamp("t") == stamp
+    listener.unpublish()
+    assert witnessed.read("t", "listener-codex") is None
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows notification API")
 def test_real_change_notification_and_rearm(tmp_path):
     changes = Changes([tmp_path])

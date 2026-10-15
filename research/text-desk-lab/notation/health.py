@@ -75,6 +75,7 @@ ROOM_TESTS = (
     "test_builder_asks.py",
     "test_line_waits.py",
     "test_captures.py",
+    "test_agent_reach.py",
 )
 HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
 
