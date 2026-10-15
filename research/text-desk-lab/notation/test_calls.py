@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_calls (a2733): a note or comment edit calls only what it added, by the same header rule as a chat line (a2715).
 
     python test_calls.py

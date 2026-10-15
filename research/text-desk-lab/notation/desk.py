@@ -1767,11 +1767,19 @@ class Desk:
     def _knock_lines(self, eid):
         """a3150: what the house recorded about whom the line made by event `eid` knocked: one line, or none."""
         import rooms
+        import listeners
         k = rooms.knock_of(self.world, eid)
         if k is None:
             return []
+        session = getattr(self, "_session", "") or ""
+
+        def told(a, v):
+            # a5267: a listener that carried the call says so in its witnessed row, while it runs; not in the world
+            if not str(v).startswith(listeners.KNOCKED):
+                return ""
+            return "; it says delivered" if listeners.delivered(session, a, eid) else ""
         return [f"  knock ({k['id']}, the house's record): " + "; ".join(
-            f"{self.world.display_name(a)}: {v}" for a, v in (k.get("args") or {}).items() if a != "line")]
+            f"{self.world.display_name(a)}: {v}{told(a, v)}" for a, v in (k.get("args") or {}).items() if a != "line")]
 
     def _fmt_args(self, args):
         def one(k, v):

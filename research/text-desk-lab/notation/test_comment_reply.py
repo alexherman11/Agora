@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_comment_reply (13 Oct): a reply under a comment that stays open.
 
     python test_comment_reply.py

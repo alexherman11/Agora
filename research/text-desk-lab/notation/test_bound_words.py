@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_bound_words (a1156, from a1147): stored lines bind their words when saved; nothing takes over a word later.
 
     python test_bound_words.py

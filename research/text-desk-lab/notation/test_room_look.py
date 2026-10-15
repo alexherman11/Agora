@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_room_look (a948, rooms step 2c): look tells the truth: a room by name, the date, who's really here, and a
 create's receipt that teaches $new.
 

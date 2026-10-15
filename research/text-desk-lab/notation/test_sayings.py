@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_sayings (a3319, lines phase 2): one showing lists chat lines and comments as they are, and For you asks it.
 
     python test_sayings.py

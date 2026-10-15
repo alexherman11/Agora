@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_promises (a1587, design a1576 with Revisions 2 and 3): promises and requests are things with honest ends.
 
     python test_promises.py

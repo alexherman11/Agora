@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_lines (a1581, lines as things phase 1): each chat line is a thing with its own id, and who it addresses is
 the writer's stored word.
 

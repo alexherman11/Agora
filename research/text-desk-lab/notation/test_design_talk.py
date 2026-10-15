@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_design_talk (13 Oct): a conversation about a design, where a message may point at a passage.
 
     python test_design_talk.py

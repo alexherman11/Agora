@@ -229,9 +229,16 @@ def _f_date(args):
     return Value("date", d) if d else none(f"date wants a date, a date-time or a freshness value; got {fmt(args[0])!r}")
 
 
+def _f_words_of(args):
+    """15 Oct (a5398): what someone typed, as one `?` term. A selection splits on spaces and commas and has no quoting,
+    so a find box holding `home base` could not reach `?home+base`: `let q = words-of($v.find)`, then `of ?$q`."""
+    words = [w for w in re.split(r"[\s,+]+", fmt(args[0], reach=False)) if w]
+    return Value("text", "+".join(words)) if words else none("words-of: no words")
+
+
 FUNCS = {"weekday": (("date",), _f_weekday), "week-of": (("date",), _f_week_of), "day-n": (("date", "n"), _f_day_n),
          "days-from": (("start", "end"), _f_days_from), "day-or-time": (("when", "today"), _f_day_or_time),
-         "time": (("when",), _f_time), "date": (("when",), _f_date)}
+         "time": (("when",), _f_time), "date": (("when",), _f_date), "words-of": (("text",), _f_words_of)}
 
 
 def call(name, args):

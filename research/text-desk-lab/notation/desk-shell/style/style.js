@@ -48,6 +48,7 @@ const Style = (() => {
     pulse: () => ({ animation: "r-pulse 2.5s ease-in-out infinite" }),
     align: v => ({ "align-self": { start: "flex-start", end: "flex-end", center: "center", stretch: "stretch" }[v] }),   // 15 Oct
     wave: () => ({ "white-space": "pre" }),     // 14 Oct: its characters are spans the painter makes (lens.js wave)
+    touch: () => ({ cursor: "pointer", transition: "transform 120ms ease-out, filter 120ms ease-out" }),   // a5500: and the rules in install
   };
   for (const side of ["top", "right", "bottom", "left"]) {
     TABLE["border_" + side] = v => ({ ["border-" + side]: `1px solid ${v}` });
@@ -94,6 +95,9 @@ const Style = (() => {
       if (r.look.afloat) afloat.push(c);
       if (r.look.shy)      // shy: seen when the pointer or the caret is in the part holding it (or the one above), or when it has focus
         out += [":hover > ", ":hover > * > ", ":focus-within > ", ":focus-within > * > "].map(a => a + c).join(",") + `,${c}:focus{opacity:1}\n`;
+      if (r.look.touch)    // a5500: the part answers the pointer, brighter under it, darker while pressed; it moves only below
+        out += `${c}:hover{filter:brightness(1.3)}${c}:active{filter:brightness(.85)}`
+          + `@media (prefers-reduced-motion: no-preference){${c}:hover{transform:translateY(-3px)}${c}:active{transform:translateY(0) scale(.94)}}\n`;
     }
     // a1140: the language's one motion, only for a viewer who has not asked for reduced motion; every pulse in one phase
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";

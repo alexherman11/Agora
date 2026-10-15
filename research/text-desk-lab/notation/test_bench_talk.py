@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_bench_talk: what is said to a builder in its owner's workbench reaches it as its next turn (a5001, Pike 14 Oct).
 
     python test_bench_talk.py

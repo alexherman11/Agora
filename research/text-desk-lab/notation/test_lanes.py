@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_lanes (a1081, for Alex's a1069 and Pike's design a1078): lanes sorted `by priority, rank`, the verb
 `put <card> above=<card>`, and a drop on a card answered by the card. (`put` was named `place` until Pike's c1202:
 one word, one meaning; `place` still makes a new appearance, and `put` with a move's arguments still moves.)
