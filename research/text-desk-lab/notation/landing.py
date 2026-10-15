@@ -320,6 +320,9 @@ def hand(paths, who="?", words=""):
         raise ValueError("no files named")
     STATE.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
+    # a5245, 15 Oct (876c2b6): two hand landings by one builder in the same second asked for the same name, and the
+    # second failed. It looked for a free name first; a5288: two at once could both see one free, so the name is now
+    # taken by making it (new_branch), and the index is named by process and thread
     stem = f"hand/{''.join(c if c.isalnum() or c in '-_' else '-' for c in who)}-{stamp}"
     idx = _index_file("hand")
     env = {"GIT_INDEX_FILE": str(idx)}
