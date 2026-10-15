@@ -849,6 +849,16 @@ def test_day_or_time():
     assert f("soon", "2026-09-25") == "none"
 
 
+def test_words_of():
+    """a5398: what someone typed in a find box, as one ? term (a selection splits on spaces and commas)."""
+    import expr as X
+    f = lambda a: X.fmt(X.call("words-of", [X.typed(a)]))      # noqa: E731
+    assert f("home base") == "home+base"
+    assert f("  kanban,  board ") == "kanban+board"
+    assert f("lowdown") == "lowdown"
+    assert f("   ") == "none"
+
+
 def test_functions_days_and_the_tree_reader():
     """9 Oct (step 5 of the grammar unification): derive is a let that calls a function; a function's arguments are
     expressions; days:<a>..<b> is a row source with terms over its fields; `over` a let of kind rows still repeats;

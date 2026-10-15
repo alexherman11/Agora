@@ -58,7 +58,12 @@ class Accessor:
             if named is not None:
                 hit = (tuple(named), None)
             else:
-                sel = self.desk._parse_selection(q)
+                try:
+                    sel = self.desk._parse_selection(q)
+                except Refusal as exc:
+                    # 15 Oct (a5398), as rows above: `count(kind:task,in:$item)` on a note asks in: of a note, and the
+                    # native refusal escaped the compiler, so the write that triggered the lens check crashed.
+                    raise S.LensRefusal(f"selection {q!r}: {exc}") from exc
                 hit = (None, tuple(sel[0]) if sel else ())
             self._sel[q] = hit
         named, ids = hit
