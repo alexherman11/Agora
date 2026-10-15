@@ -5,6 +5,7 @@ Alex's standing trust is the grant: nothing waits for approval. The house (this 
 pass) takes it through:
 
     asked -> working -> (waiting <-> working) -> ready -> landing -> landed | reverted | failed
+    reverted -> (its worker, told the failure) working | ready | waiting, or failed (handed to the asker)
     anyone can set commission=cancelled; the worker stops and its worktree goes
 
 **The worker** is one `claude -p` process with real tools, confined to its own git worktree (.worktrees/<id>, branch
@@ -26,6 +27,10 @@ only good working code, landed fast, never blocked by uncommitted edits), the sa
   4. in frontier, Current Implementation is exported from its Handbook binder (the worker keeps that true), and
      FRICTION.md from Rough spots, each committed if it changed;
   5. the result goes back as a comment and the worktree is removed.
+A landing that does not land (refused here, or reverted later by keeper.py, which names the landing it reverts) goes
+back to its worker with the failure, started again on its own conversation if its process is gone; a worker that
+cannot come back (no worktree and no conversation, stopped twice, or refused three times in a row) hands the card to
+the asker: commission=failed, the failure and the branch named (a5292).
 Under keeper.py the new code takes effect at once: keeper restarts deskd when HEAD moves, and the house asks to be
 restarted once no resident is mid-turn.
 """
@@ -47,6 +52,7 @@ PY = Path(sys.executable)
 # call) and deskd restarts on every commit; only these, which the house process itself runs, need the house to restart
 HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py", "landing.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
+REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
 PROTOCOL = """You are a worker in Agora's house: a disposable builder for one commission, then gone.
 
@@ -246,9 +252,50 @@ class Workshop:
                        + (f" also={q(short_files(c['also']))}" if c["also"] else "")
             self.house.act("house", f"look {st['aid']} :1; landed {st['aid']} lived={lived} {said}")
 
+    def keeper_reverts(self, w):
+        """a5292: keeper.py reverts a landing the house keeps dying after, by its hash, and records it in REVERTS. A
+        card still landed at a reverted hash is returned: its branch is put back at the landing's tip (finish deleted
+        it), its worker is told the keeper's failure, and the card says it (commission=reverted). The next pass brings
+        the worker back on its branch (resume), or hands the card to the asker. -> whether any card was returned."""
+        try:
+            entries = [json.loads(l) for l in REVERTS.read_text(encoding="utf-8").splitlines() if l.strip()]
+        except (OSError, ValueError):
+            return False
+        cs, done = self.commissions(w), False
+        for e in entries:
+            cid, landed = e.get("cid"), str(e.get("hash") or "")
+            s, state = cs.get(cid, (None, ""))
+            at = str((s or {}).get("props", {}).get("landed") or "")
+            if e.get("world", self.house.world) != self.house.world or state != "landed" or not at or not landed \
+                    or not (landed.startswith(at) or at.startswith(landed)):
+                continue
+            wk = self.workers.get(cid) or Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))
+            tip = e.get("tip") or git("rev-parse", "--verify", "--quiet", f"{landed}^2").stdout.strip()
+            if tip and git("rev-parse", "--verify", "--quiet", wk.branch).returncode:
+                git("branch", wk.branch, tip)
+            card = (f"the keeper reverted this landing ({landed[:7]}) as {str(e.get('revert') or '?')[:7]}: {e.get('why')}. "
+                    f"The branch {wk.branch} is back at {tip[:7] or '?'}, as it landed; its worker is told.")
+            wk.state["returns"] = wk.state.get("returns", 0) + 1
+            wk.state["failure"] = {
+                "card": card, "at": time.time(), "told": False, "cursor": len(w.events),
+                "text": f"~ house: your landing {landed[:7]} was reverted by the keeper as {str(e.get('revert'))[:7]}: "
+                        f"{e.get('why')}. Main no longer has it. Your branch {wk.branch} is back at {tip[:7]}, as it landed. "
+                        f"What the house printed before it died:\n{str(e.get('tail') or '(nothing recorded)')[-1500:]}\n"
+                        f"(all of it: {HERE.as_posix()}/house-state/house.out). Fix it on your branch, then set the "
+                        "commission ready again."}
+            wk.save()
+            self.set_state(cid, "reverted")
+            self.say(cid, card)
+            if wk.alive():
+                self.tell_failure(wk)
+            done = True
+        return done
+
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self, w, cfg):
         self.compare_lived(w)
+        if self.keeper_reverts(w):
+            w = self.house.load()
         cs = self.commissions(w)
         for cid, (s, state) in cs.items():
             wk = self.workers.get(cid)
@@ -279,7 +326,10 @@ class Workshop:
                 if running < int(cfg.get("workers", "1")):
                     self.begin(w, cid, s, cfg)
                 continue
-            if not wk and state in ("working", "waiting", "ready", "landing") and (TREES / cid).exists():
+            # a5292: a reverted card is underway too (a4869's worker was told of its revert, the house restarted mid-turn,
+            # and nothing resumed it: two comments to it went unheard and Claude finished it by hand)
+            if not wk and state in ("working", "waiting", "ready", "landing", "reverted") \
+                    and ((TREES / cid).exists() or state == "reverted"):
                 wk = self.resume(w, cid, s, cfg)      # the house restarted under it: carry on in its own session
             if not wk:
                 continue
@@ -313,8 +363,9 @@ class Workshop:
                 if state == "waiting":
                     self.set_state(cid, "working")
                 wk.send("\n".join(heard))
-            elif state == "working" and wk.state.get("turns", 0) > 0:
+            elif state in ("working", "reverted") and wk.state.get("turns", 0) > 0:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
+                self.unfinished(w, cid, wk)
 
     def heard(self, w, cid, s, wk):
         """Comments on its commission by anyone but itself and the house, and calls of it anywhere: a chat line's stored
@@ -412,6 +463,12 @@ class Workshop:
                      "committed is there; uncommitted edits from before were not kept unless the house committed them for "
                      "you (look for 'kept by the house' in git log). Check git log and git status before redoing anything.)"
                      "\n\n" + first)
+        wk.state["returns"] = 0          # asked again: whoever asked chose to try again
+        if wk.state.get("failure"):      # a5292: its last landing failed, and nobody has set it ready since
+            wk.state["failure"]["told"] = False
+            wk.state["failure"]["cursor"] = len(w.events)
+            self.tell_failure(wk, first + "\n\nYour branch's last landing did not land, and that is why you are back:\n")
+            return
         wk.send(first)
 
     def resume(self, w, cid, s, cfg):
@@ -421,6 +478,19 @@ class Workshop:
         is left for a person to re-ask (commission=asked)."""
         props = s.get("props") or {}
         if not self.real_tree(TREES / cid):
+            if props.get("commission") == "reverted":
+                # a5292: a reverted card's worker comes back on its branch, with its conversation and the failure
+                # (begin says it); with neither, it is the asker's
+                wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))
+                why = ("its branch is gone" if git("rev-parse", "--verify", "--quiet", wk.branch).returncode
+                       else None if wk.state.get("session") else "it has no saved conversation to come back to")
+                if why:
+                    self.hand_back(cid, wk, why)
+                    return None
+                self.set_state(cid, "asked")
+                self.say(cid, "its worker comes back in a fresh worktree on its branch, with the failure, when a slot is "
+                              "free.", to="nobody")
+                return None
             # a1161: never resume into a folder that isn't its worktree; ask again, and begin makes it anew on the kept branch
             self.set_state(cid, "asked")
             self.say(cid, "its worktree was gone when the house restarted, so it is asked again: the next worker starts in "
@@ -428,23 +498,42 @@ class Workshop:
             return None
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))     # a1590: the name, never p2919
         if not wk.state.get("session"):
+            if props.get("commission") == "reverted":
+                self.hand_back(cid, wk, "it has no saved conversation to come back to")
             return None
         if wk.state.get("retry_at", 0) > time.time():
             return None                          # stopped by a usage limit: it resumes after the reset (failed)
         wk.state.pop("retry_at", None)
         self.workers[cid] = wk
-        pending = wk.state.pop("pending", None) or {}
-        cut = pending.get("carry")
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
         wk.state.pop("unanswered", None), wk.state.pop("unanswered_why", None)     # said here, not by a resident's wake
-        wk.log("resume", {"session": wk.state["session"], "cut": bool(cut)})
+        wk.log("resume", {"session": wk.state["session"], "cut": bool((wk.state.get("pending") or {}).get("carry"))})
+        self.carry_on(wk, "the house restarted while you were working")
+        return wk
+
+    def carry_on(self, wk, why):
+        """A worker started again on its own conversation (a restart of the house, or of its process) is told what it
+        was last told and did not finish, or, if it never heard it, the failure of its landing (a5292). Without this a
+        process started again by failed() sat idle and the card stalled."""
+        pending = wk.state.pop("pending", None) or {}
+        cut = pending.get("carry")
         if cut and pending.get("delivered"):
             # 1 Oct: the message is already in this conversation (claude keeps it even when the turn is cut)
-            wk.send("(the house restarted while you were working; your session is resumed. My last message to you is "
-                    "above, unanswered: carry on from there, checking what your last commands did first.)")
+            wk.send(f"({why}; your session is resumed. My last message to you is above, unanswered: carry on from "
+                    "there, checking what your last commands did first.)")
         elif cut:
-            wk.send("(the house restarted while you were working; your session is resumed. What you were last told:)\n\n" + cut)
-        return wk
+            wk.send(f"({why}; your session is resumed. What you were last told:)\n\n" + cut)
+        elif (wk.state.get("failure") or {}).get("told") is False:
+            self.tell_failure(wk)
+
+    def tell_failure(self, wk, before=""):
+        """Send the worker its landing's failure; it counts as told once the message is in its conversation."""
+        f = wk.state["failure"]
+        wk.send(before + f["text"])
+        if (wk.state.get("pending") or {}).get("delivered"):
+            f["told"] = True
+            wk.save()
+        return f["told"]
 
     def failed(self, cid, wk, why):
         detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
@@ -466,15 +555,90 @@ class Workshop:
         wk.state["failures"] = wk.state.get("failures", 0) + 1
         wk.save()
         if wk.state["failures"] >= 2:
-            self.set_state(cid, "failed")
-            self.say(cid, f"the worker stopped twice ({detail}); its branch {wk.branch} is kept, with any uncommitted work "
-                          "committed to it. Set commission=asked to try again.")
-            self.finish(cid, wk, keep_branch=True)
+            self.hand_back(cid, wk, f"the worker stopped twice ({detail})")
         else:
             wk.stop()
             wk.log("restart", {"why": detail})
-            wk.start(self.house.settings(self.house.load()).get("worker_model") or self.house.settings(self.house.load())["model"],
-                     self.house.world, None)
+            wk.start(self.model(), self.house.world, None)
+            self.carry_on(wk, f"your process stopped ({detail[:120]}) and the house started it again")
+
+    def model(self):
+        cfg = self.house.settings(self.house.load())
+        return cfg.get("worker_model") or cfg["model"]
+
+    # ---- a landing that did not land (a5292) ------------------------------------------------------------------
+    # a4869, 14 Oct: reverted, its worker silent after the house restarted, two comments to it unheard, finished by
+    # hand. Alex wants more workers at once, so a failure must reach someone who can mend it without a person noticing:
+    # its worker, brought back if need be, or, if it cannot come back, the asker, with the failure and the branch.
+    RETURNS = 3            # refusals in a row before it is the asker's: a worker that cannot fix it is not run forever
+
+    def returned(self, cid, s, wk, state, card, told):
+        """A refused landing goes back to its worker: the failure is kept in its state (so a restart, a resume or a
+        re-ask still tells it), the card says it, and the worker hears it, started again on its own conversation if its
+        process is gone. If it cannot come back, the card is handed to the asker (hand_back)."""
+        returns = wk.state.get("returns", 0) + 1
+        wk.state["returns"] = returns
+        wk.state["failure"] = {"text": told, "card": card, "at": time.time(), "told": False,
+                               "cursor": len(self.house.load().events)}
+        wk.save()
+        if returns >= self.RETURNS:
+            return self.hand_back(cid, wk, f"its landing was refused {returns} times in a row")
+        why = self.cannot_come_back(wk)
+        if why:
+            return self.hand_back(cid, wk, why)
+        self.set_state(cid, state)
+        self.say(cid, card)
+        if not wk.alive():
+            wk.log("returned", {"why": "its process was gone when its landing was refused"})
+            try:
+                wk.start(self.model(), self.house.world, s)
+            except Exception as e:
+                return self.hand_back(cid, wk, f"it could not be started again: {type(e).__name__}: {e}")
+            self.workers[cid] = wk
+            return self.tell_failure(wk, "(your process had stopped; the house started it again on your session.)\n\n")
+        return self.tell_failure(wk)
+
+    def cannot_come_back(self, wk):
+        """Why this worker cannot be told, or None. A process that is gone can be started again on its saved
+        conversation, in its worktree; without either it is gone."""
+        if wk.alive():
+            return None
+        if not self.real_tree(wk.tree):
+            return "its worktree is gone"
+        if not wk.state.get("session"):
+            return "its process is gone and it has no saved conversation to come back to"
+        return None
+
+    def hand_back(self, cid, wk, why):
+        """The worker cannot mend it: the card is the asker's (commission=failed; the house's comment wakes them), with
+        the failure, why the worker is not on it, and the branch at its commit, kept with any uncommitted work."""
+        self.finish(cid, wk, keep_branch=True)
+        sha = git("rev-parse", "--short", "--verify", "--quiet", wk.branch).stdout.strip()
+        failure = (wk.state.get("failure") or {}).get("card")
+        self.set_state(cid, "failed")
+        self.say(cid, f"handed back to {wk.asked_by}: {why}, so the worker is not on it."
+                      + (f" What failed: {failure[:1200]}" if failure else "")
+                      + (f" The branch {wk.branch} is kept at {sha}, with any uncommitted work committed to it."
+                         if sha else f" Its branch {wk.branch} is gone.")
+                      + " Set commission=asked to start its worker on the branch again (it is told the failure), "
+                        "land the branch by hand, or cancel it.")
+        wk.state["returns"] = 0
+        wk.save()
+
+    def unfinished(self, w, cid, wk):
+        """After a failure, a turn that ended with no ready and no question: the asker is told once, with its last
+        words, so a worker that gave up quietly is not a stall nobody sees."""
+        f = wk.state.get("failure") or {}
+        if not f.get("told") or f.get("quiet_said"):
+            return
+        f["quiet_said"] = True
+        wk.save()
+        for e in w.events[f.get("cursor", 0):]:
+            if e.get("by") == wk.actor and e["verb"] == "comment" and (e.get("args") or {}).get("mark") == "ask":
+                return
+        last = ((wk.state.get("said") or [{}])[-1].get("text") or "").strip().splitlines()
+        self.say(cid, f"its worker was told the failure, and its turn ended without setting ready or asking anything. "
+                      f"It waits on you." + (f" Its last words: {last[-1][:300]}" if last else ""))
 
     def finish(self, cid, wk, keep_branch):
         wk.stop()
@@ -528,7 +692,9 @@ class Workshop:
         # on a parked/ branch and put back on top. (Until 14 Oct: a4644, Pike c4717, facd14a; their reasons were the
         # main checkout's, and it is no longer where a landing happens.)
         import landing
-        if wk.state.pop("held", None) is not None:
+        held = wk.state.pop("held", None)
+        failure = wk.state.pop("failure", None)       # a5292: set ready again, so the last failure is answered
+        if held is not None or failure is not None:
             wk.save()
         self.set_state(cid, "landing")
         title = re.sub(r"\s+", " ", s["title"])[:80]
@@ -570,22 +736,17 @@ class Workshop:
         why = r["refused"][0][1] if r["refused"] else "it did not land, and landing.py said nothing about why"
         if why.startswith("judged and not landed"):
             # the word stays 'reverted' (residents' rules and promises read it); nothing was reverted: main never had it
-            self.set_state(cid, "reverted")
-            self.say(cid, why[:1500] + f". Main never had it. The branch {wk.branch} is kept; fix it and set ready again.")
-            wk.send("~ house: your branch failed the checks in the landing room and did not land:\n" + why
-                    + "\nFix it on your branch and set the commission ready again.")
-            return
+            return self.returned(cid, s, wk, "reverted",
+                                 why[:1500] + f". Main never had it. The branch {wk.branch} is kept; fix it and set ready again.",
+                                 "~ house: your branch failed the checks in the landing room and did not land:\n" + why
+                                 + "\nFix it on your branch and set the commission ready again.")
         if why.startswith("does not merge"):
             why = "the branch " + why
-            self.set_state(cid, "working")
-            self.say(cid, why + ". Merge main into your branch (git merge main), then set ready again.")
-            wk.send(f"~ house: {why}. Merge main into your branch (git merge main) and set ready again.")
-            return
+            return self.returned(cid, s, wk, "working", why + ". Merge main into your branch (git merge main), then set ready again.",
+                                 f"~ house: {why}. Merge main into your branch (git merge main) and set ready again.")
         if why.startswith("the branch touches"):
             why += ". Take those out of the branch and set ready again"
-        self.set_state(cid, "working")
-        self.say(cid, why)
-        wk.send(f"~ house: {why}")
+        self.returned(cid, s, wk, "working", why, f"~ house: {why}")
 
 
 class Worker:

@@ -10,13 +10,17 @@ It is meant to change rarely. It:
   - restarts the house at once when it exits 75 (it asked, after a landing changed Python); restarts it with a
     pause when it dies otherwise;
   - if the house dies 3 times within 5 minutes of a landing (a commit whose subject begins "land "), reverts that
-    landing and says so in its log: the one part of live building that does not depend on the code it protects;
+    landing and says so in its log: the one part of live building that does not depend on the code it protects. It
+    reverts the landing by its hash, never HEAD (a4919), in a commit that names it, and records it in
+    house-state/reverts.jsonl with the house's last output, so the house returns the commission to its worker (a5292);
   - for frontier, runs docs_sync.py --watch, so an edit to a design document in the vault or the repo reaches the
     other copy and the Handbook within a minute; starts it again, at most once a minute, if it dies. The watch is
     told the keeper's pid and ends when the keeper does, however that happens, and it refuses to be a second one.
 Log: house-state/keeper.log.
 """
+import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -38,6 +42,47 @@ def log(msg):
 
 def git(*args):
     return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True).stdout.strip()
+
+
+def last_landing():
+    """The newest landing on main's own line: a commit whose subject begins "land ", not yet reverted. a5292 (a4919):
+    HEAD is not the landing. After one, the house commits its docs export on top, and anyone may commit meanwhile, so
+    `git revert HEAD` reverted Codex's commit once. -> {hash, at, subject, parents} or None."""
+    out = git("log", "--first-parent", "-n", "30", "--format=%H%x09%ct%x09%P%x09%s")
+    reverted = set(re.findall(r"[0-9a-f]{40}", git("log", "--first-parent", "-n", "30", "--format=%b"))) if out else set()
+    for line in out.splitlines():
+        h, at, parents, subject = (line.split("\t", 3) + ["", "", "", ""])[:4]
+        if subject.startswith("land ") and h not in reverted:
+            return {"hash": h, "at": int(at or 0), "subject": subject, "parents": parents.split()}
+    return None
+
+
+def revert(landing, why, world):
+    """Revert that landing by its hash, in a commit that names it, and record it in house-state/reverts.jsonl, where
+    the house reads it and returns the commission to its worker (workshop.keeper_reverts)."""
+    h, subject = landing["hash"], landing["subject"]
+    log(f"{why}: reverting {h[:7]} '{subject[:80]}' (HEAD is {git('rev-parse', '--short', 'HEAD')})")
+    merge = len(landing["parents"]) > 1
+    # git's own message names it ('Revert "land ..."', 'This reverts commit <hash>'); --no-commit would let a commit
+    # of ours sweep in whatever someone has staged in the main checkout
+    r = subprocess.run(["git", "revert", "--no-edit", *(["-m", "1"] if merge else []), h],
+                       cwd=REPO, capture_output=True, text=True)
+    if r.returncode:
+        subprocess.run(["git", "revert", "--abort"], cwd=REPO, capture_output=True, text=True)
+    log("revert: " + ((r.stdout + r.stderr).strip()[-300:] or "ok"))
+    if r.returncode:
+        return None
+    try:
+        tail = (HERE / "house-state" / "house.out").read_text(encoding="utf-8", errors="replace")[-1500:]
+    except OSError:
+        tail = ""
+    cid = subject[5:].split(":", 1)[0].strip()
+    entry = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "world": world, "hash": h, "subject": subject,
+             "cid": cid, "tip": landing["parents"][1] if merge else "", "revert": git("rev-parse", "HEAD"),
+             "why": why, "tail": tail}
+    with (HERE / "house-state" / "reverts.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return entry
 
 
 def start(args, env=None, name=""):
@@ -100,13 +145,11 @@ def main():
                 backoff_until, house = time.time() + 60, None
                 continue
             deaths = [t for t in deaths if time.time() - t < 300] + [time.time()]
-            subject = git("log", "-1", "--format=%s")
-            landed_at = int(git("log", "-1", "--format=%ct") or 0)
-            since = [t for t in deaths if t >= landed_at]       # only deaths after the landing count against it
-            if len(since) >= 3 and subject.startswith("land ") and time.time() - landed_at < 900:
-                log(f"the house died {len(since)} times since '{subject[:80]}'; reverting that landing")
-                r = subprocess.run(["git", "revert", "-m", "1", "--no-edit", "HEAD"], cwd=REPO, capture_output=True, text=True)
-                log("revert: " + ((r.stdout + r.stderr).strip()[-300:] or "ok"))
+            landing = last_landing()
+            since = [t for t in deaths if landing and t >= landing["at"]]   # only deaths after the landing count against it
+            if landing and len(since) >= 3 and time.time() - landing["at"] < 900:
+                revert(landing, f"the house died {len(since)} times in the {int(time.time() - landing['at'])} s after it landed",
+                       world)
                 deaths = []
                 house = start(["house.py", world], env, name="house")
             else:
