@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 
 def main():
     a = sys.argv[1:]
-    py = getattr(sys, "_base_executable", sys.executable)
+    py = sys.executable  # retain the environment that supplies pywebview
     subprocess.run([py, str(HERE / "hud.py"), "--stop"], cwd=HERE)
     env = dict(os.environ)
     env.pop("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", None)
