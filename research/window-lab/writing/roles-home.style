@@ -1,0 +1,48 @@
+# a5949: the Writing room in the home base (writing, doc-page, design-review): design-review's page, in this style's glass
+token card = #17221E
+token hush = ink at 50%
+token ghost = ink at 12%
+token mark = #E89A5B
+role sheet : between gap
+role toolbar : between gap, pad bottom gap, border bottom rim
+role railhead : text.mono down tracked, accent
+role rail : between gap /2, pad right gap
+role tree : between gap /4, space above gap /2
+role qcard : pad gap /2, pad left gap, corner gap
+role qcard.on : on wash, edge accent, pad gap /2, pad left gap, corner gap
+role qtitle : text down, ink
+role viewtab : text.mono down, soft, pad gap /2
+role viewtab.on : text.mono down, accent, pad gap /2, border bottom accent
+role leaf : pad left gap x2, pad right gap x2
+role aside : text down, soft, pad left gap, between gap, border left rim
+role block : space below gap /2
+role in1 : pad left gap x3
+role in2 : pad left gap x6
+role in3 : pad left gap x9
+role bullet : accent, pad right gap /2
+role box : text up, soft, pad right gap /2
+role box.on : text up, accent, pad right gap /2
+role figure : on wash, corner gap, pad gap x2
+role h1 : text up 3 strong, ink, space above gap x2
+role h2 : text up 2 medium, ink, space above gap x3, pad top gap, border top rim
+role h3 : text medium, accent, space above gap x2
+role quote : text up, ink, pad left gap x2, border left accent
+role ticked : text medium, accent
+role item : text, ink
+role pip : text down, warm, pad left gap
+role note : on raised, edge rim, corner gap, pad gap, between gap /2
+role notewaiting : on warmwash, edge warm, corner gap, pad gap, between gap /2
+role remark : text down, ink
+role unread : text down, warm
+role replybox : text down, ink, on wash, corner gap, pad gap /2
+role resolve : text.mono down 2, soft
+role talkpane : on glass, edge rim, corner gap x2, pad gap x2, between gap
+role askcard : on warmwash, edge warm, corner gap, pad gap
+role msg : text down, ink, pad top gap /2, pad bottom gap /2, border bottom rim
+role msg.ask : text down, ink, on warmwash, edge warm, corner gap, pad gap
+role msg.folded : text down, soft
+role msgbody : text down, ink
+role folded : text down, soft
+role typing : text.mono down, soft
+role pending : on glassdeep, edge accent, corner gap x1.5, pad gap, between gap /2, space above gap
+role light : on warmwash

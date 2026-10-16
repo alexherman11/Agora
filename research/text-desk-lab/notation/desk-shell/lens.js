@@ -558,6 +558,7 @@
     const a = n.acts.find(x => x.on === "edit");
     const md = Markdown.create({
       text: a ? V.words(n.key, p.text, n.fence) : p.text, links: p.wikilinks, titles: p.titles, hint: p.hint, editable: !!a,
+      light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
       typed: s => V.typed(n.key, s, { key: n.key, fence: el._n.fence }),
       save: s => mdSave(el, s),
       follow: async id => {
@@ -589,6 +590,7 @@
     el._n = n;
     const l = JSON.stringify(p.wikilinks || {});
     if (l !== el._mdLinks) { el._mdLinks = l; el._md.links(p.wikilinks); }
+    el._md.lights(p.light);                                     // a5949: a new comment's words light at once
   }
 
   // a text's keys (Alex, 7 Oct: 'Enter should create a new line, tab should indent'). A lens gives a text `on key
@@ -770,7 +772,9 @@
     let k = at && at.closest && paint.contains(at) ? at.closest("[data-key]") : null;
     while (k && !(k._n && k._n.acts.some(a => a.on === "select"))) k = k.parentElement && k.parentElement.closest("[data-key]");
     if (!k) return;
-    const words = sel.isCollapsed ? "" : String(sel).replace(/\s+/g, " ").trim(), sig = words && k._n.key + " " + words;
+    // a5949: in a document (markdown) the words are its source's own, marks and all, so the desk finds them again
+    const md = at.closest(".md-part"), own = md && md._md && md._md.picked && md._md.picked();
+    const words = sel.isCollapsed ? "" : (own || String(sel)).replace(/\s+/g, " ").trim(), sig = words && k._n.key + " " + words;
     if (sig === selSent) return;
     selSent = sig;
     send(k._n, k._n.acts.find(a => a.on === "select").line.replace(/\$value\b/g, () => TEXT.esc(words)));
@@ -1086,7 +1090,8 @@
   async function refresh(force) {
     const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
     const keys = encodeURIComponent("Enter,Tab,Shift+Tab,Backspace,Delete");
-    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}&view=painter&keys=${keys}${have}`)).json();
+    const on = q.get("on") ? `&on=${encodeURIComponent(q.get("on"))}` : "";   // a5949 (Sable's a4270): the thing the lens stands on
+    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}${on}&view=painter&keys=${keys}${have}`)).json();
     if (r.same) return;                          // deskd: nothing changed since the build this page has
     return paintAnswer(r, force);
   }

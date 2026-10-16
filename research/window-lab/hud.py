@@ -3,10 +3,12 @@
     python hud.py [--lens home-base] [--as alex] [--world frontier] [--show]     run it (one instance)
     python hud.py --stop                                                          end the running one
 
-Ctrl+Alt+J shows it over everything, or hides it; Esc hides it. Shown, it covers the main monitor, taskbar too (or only
+A bare tap of the Windows key (a5980, winkey.py), or Ctrl+Alt+J, shows it over everything, or hides it; Esc hides
+it. Win chords (Win+D, Win+Shift+S ...) are Windows' as before; Start opens from Ctrl+Esc or the host verb `start`.
+winkey=off on the lens note (within 15 s) or --winkey off gives the Win key back. Shown, it covers the main monitor, taskbar too (or only
 its work area when the lens note says hide_taskbar=no; settings and host verbs in host_verbs.py, a5300) with the
 painter (lens.html through the door) showing one lens, painted over a frosted copy of what was on the screen
-the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl+Alt+J.
+the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl+Alt+J and a bare Win tap.
 
 a5834: while it runs, so does the control screen (capture/capture.py, its child): hold Ctrl+Alt and drag over
 anything, the home base too, and the capture goes on the person's own chat draft, unsent. capture=off on the lens
@@ -52,10 +54,12 @@ sys.path.insert(0, str(NOTATION))
 import witnessed  # noqa: E402
 import host_verbs  # noqa: E402  (a5300: what the home base can be asked, and its settings)
 import media  # noqa: E402  (a5245: the music controller)
+import winkey  # noqa: E402  (a5980: a bare tap of the Windows key)
 
 user32, dwmapi, kernel32 = ctypes.windll.user32, ctypes.windll.dwmapi, ctypes.windll.kernel32
 MOD_ALT, MOD_CONTROL, MOD_NOREPEAT = 0x1, 0x2, 0x4000
 WM_HOTKEY, WM_QUIT, WM_APP = 0x0312, 0x0012, 0x8000
+WM_SYSCOMMAND, SC_TASKLIST = 0x0112, 0xF130
 VK_ESCAPE, VK_J = 0x1B, 0x4A
 HK_TOGGLE, HK_ESC = 1, 2
 GWL_EXSTYLE, WS_EX_TOOLWINDOW, WS_EX_APPWINDOW = -20, 0x80, 0x40000
@@ -85,6 +89,7 @@ _sig(user32.RegisterHotKey, wt.BOOL, wt.HWND, ctypes.c_int, wt.UINT, wt.UINT)
 _sig(user32.UnregisterHotKey, wt.BOOL, wt.HWND, ctypes.c_int)
 _sig(user32.GetMessageW, ctypes.c_int, ctypes.POINTER(wt.MSG), wt.HWND, wt.UINT, wt.UINT)
 _sig(user32.PostThreadMessageW, wt.BOOL, wt.DWORD, wt.UINT, wt.WPARAM, wt.LPARAM)
+_sig(user32.PostMessageW, wt.BOOL, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
 _sig(user32.SetWindowPos, wt.BOOL, wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT)
 _sig(user32.MonitorFromPoint, wt.HMONITOR, wt.POINT, wt.DWORD)
 _sig(user32.GetMonitorInfoW, wt.BOOL, wt.HMONITOR, ctypes.c_void_p)
@@ -236,6 +241,7 @@ class Hud:
         self.front = None             # the window that was in front when the home base opened
         self.thumbs = {}              # source hwnd -> (thumbnail id, last rect)
         self.keys_tid = None
+        self.winkey = None            # a5980: the Win-key hook, while it is in
         self.lock = threading.Lock()
         self.settings = dict(host_verbs.DEFAULTS)
 
@@ -424,6 +430,8 @@ class Hud:
                 self.toggle()
             elif msg.message == WM_HOTKEY and msg.wParam == HK_ESC:
                 self.hide()
+            elif msg.message == WM_APP + 2:                                       # a5980: a bare Win tap
+                self.toggle()
             elif msg.message == WM_APP + 1:
                 if msg.wParam:
                     if not user32.RegisterHotKey(None, HK_ESC, MOD_NOREPEAT, VK_ESCAPE):
@@ -431,6 +439,55 @@ class Hud:
                 else:
                     user32.UnregisterHotKey(None, HK_ESC)
         user32.UnregisterHotKey(None, HK_TOGGLE)
+
+    # a5980: a bare tap of the Windows key. The hook lives on its own thread (winkey.Hook) and posts the toggle to the
+    # keys thread, so a slow show never holds up a key on the machine. This guard puts the hook in and takes it out:
+    # out while winkey=off (the lens note, read every 15 s; --winkey off) and while a full-screen program is in front,
+    # so no Python of ours sits in a game's input path. --stop, a crash or a kill take it out with the process.
+    def winkey_tap(self):
+        if self.keys_tid:
+            user32.PostThreadMessageW(self.keys_tid, WM_APP + 2, 0, 0)
+
+    def guard_winkey(self):
+        me, n, said, slow = os.getpid(), 0, None, (0, 0)
+        while True:
+            if self.winkey and self.winkey.on:
+                if n % 60 == 59:
+                    self.winkey.reseat()                  # Windows drops a slow hook without a word: put it back
+                got = (self.winkey.slow, self.winkey.dropped)
+                if got != slow:
+                    print(f"hud: the Win-key hook was slow {got[0]} time(s) (slowest "
+                          f"{self.winkey.slowest * 1000:.0f} ms); {got[1]} time(s) Windows had dropped it", flush=True)
+                    slow = got
+            if n % 15 == 14:
+                s = host_verbs.settings(self.door, self.a.world, self.a.lens)
+                if s.get("read"):                         # a door that did not answer keeps what we had
+                    self.settings = s
+            n += 1
+            off = "--winkey off" if self.a.winkey == "off" else \
+                "winkey=off on the lens note" if self.settings.get("winkey") == "off" else \
+                "a full-screen program is in front" if winkey.fullscreen_in_front(me) else ""
+            try:
+                if not off and not (self.winkey and self.winkey.on):
+                    self.winkey = winkey.Hook(self.winkey_tap, may=lambda: winkey.why_not(me),
+                                              log=lambda t: print("hud:", t, flush=True))
+                    off = "" if self.winkey.start() else "the hook did not go in"
+                elif off and self.winkey:
+                    self.winkey.stop()
+                    self.winkey = None
+            except Exception as e:
+                off = f"{type(e).__name__}: {e}"
+            now = off or "on"
+            if now != said:
+                what = "shows and hides the home base" if now == "on" else "is Windows' own: " + now
+                print("hud: the Win key " + what, flush=True)
+                said = now
+            time.sleep(1)
+
+    def open_start(self):
+        """The host verb `start` (a5980): Windows' Start menu, asked for as a window menu does; no key is pressed."""
+        if self.hwnd:
+            user32.PostMessageW(self.hwnd, WM_SYSCOMMAND, SC_TASKLIST, 0)
 
     def tend(self):
         """While shown: the desktop's rows every two seconds, the pictures placed every quarter second."""
@@ -458,12 +515,15 @@ class Hud:
         ctypes.windll.user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
         threading.Thread(target=self.keys, daemon=True).start()
         threading.Thread(target=self.tend, daemon=True).start()
+        threading.Thread(target=self.guard_winkey, daemon=True).start()
         self.tend_capture()
         if self.a.show:
             time.sleep(1.5)
             self.show()
 
     def closed(self):
+        if self.winkey:
+            self.winkey.stop()
         self.stop_capture()
         witnessed.clear(self.a.world, "desktop")
         witnessed.clear(self.a.world, "media")
@@ -522,6 +582,8 @@ def main():
     ap.add_argument("--show", action="store_true", help="open shown, not waiting for the key")
     ap.add_argument("--stop", action="store_true", help="end the running home base (and its control screen)")
     ap.add_argument("--door", default="http://127.0.0.1:8794", help="the desk's door (a copy's, for a test)")
+    ap.add_argument("--winkey", choices=("on", "off"), default="on",
+                    help="off: the Win key stays Windows' whatever the lens note says (a5980)")
     a = ap.parse_args()
     STATE.mkdir(parents=True, exist_ok=True)
     old = int(PIDFILE.read_text()) if PIDFILE.exists() and PIDFILE.read_text().strip().isdigit() else 0
@@ -541,7 +603,8 @@ def main():
         print("hud: already running as", old)
         sys.exit(76)
     PIDFILE.write_text(str(os.getpid()))
-    print("hud: running; Ctrl+Alt+J shows or hides it, Esc hides it, `python hud.py --stop` ends it", flush=True)
+    print("hud: running; a bare Win tap or Ctrl+Alt+J shows or hides it, Esc hides it, `python hud.py --stop` ends it",
+          flush=True)
     Hud(a).run()
 
 

@@ -37,9 +37,12 @@ class Home:
 
 h = Home()
 names = [r["name"] for r in H.rows()]
-check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "window", "media.play", "media.next", "media.prev"]
+check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "start", "window", "media.play", "media.next", "media.prev"]
       and all(r["about"] for r in H.rows()), H.rows())
 check("hide hides", H.call(h, "hide") == "ok hidden" and h.did[-1] == ("hide",), h.did)
+# a5980: start puts the home base away, then asks for the Start menu (stood in for: nothing reaches the screen)
+h.open_start = lambda: h.did.append(("start",))
+check("start hides, then opens Start", H.call(h, "start") == "ok opened the Start menu" and h.did[-2:] == [("hide",), ("start",)], h.did)
 check("bring takes the window's handle, as the build filled it", H.call(h, "bring", "1312") == "ok brought 1312 forward"
       and h.did[-1] == ("bring", 1312), h.did)
 check("bring takes it quoted too", H.call(h, "bring", '"77"').startswith("ok") and h.did[-1] == ("bring", 77), h.did)
@@ -91,7 +94,8 @@ check("a monitor that is not there is the main one", H.work_area("9") == a, H.wo
 
 # settings through a door that is not there: the defaults, nothing unread
 s = H.settings("http://127.0.0.1:9", "nowhere", "home-base")
-check("no door: the defaults", s == {**H.DEFAULTS, "unread": []}, s)
+check("no door: the defaults, and it says the door did not answer", s == {**H.DEFAULTS, "unread": [], "read": False}, s)
+check("winkey is on unless the note says off", H.DEFAULTS["winkey"] == "on")
 
 print("host verbs:", "all passed" if not bad else f"{len(bad)} failed")
 sys.exit(1 if bad else 0)
