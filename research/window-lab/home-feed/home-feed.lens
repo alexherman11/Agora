@@ -1,0 +1,109 @@
+# home-feed (a5988, Alex 16 Oct: 'clicking on At work should allow me a view into their live conversation feed, all
+# their thoughts and actions taken'): what the agent of a thing is doing, live. Stood on a card (its worker=) or a
+# resident's corner (its actor=): At work (home-work) opens the one pressed in the viewer with with=home-feed, and the
+# house writes its feed while a viewer stands this lens on it: witnessed:feed-<id> (feeds.py), the last 500 lines,
+# secrets redacted; the newest 150 are drawn. Hidden reasoning is not readable: a thought is 'thought for N s' unless
+# its words were written. The viewer's note keeps what this view chose: feed_show= (thoughts, actions or errors; none
+# is all) and feed_held= (the newest line when Pause was pressed: the tail stands still there until Follow).
+feed : column
+  share 1
+  let card = $item
+  of prop:role=home-view,prop:actor=$me as v
+  each watch
+watch : column
+  share 1
+  role viewer
+  heads : column
+    of witnessed:feed-$card kind=head as h
+    each top
+  none : text "No feed yet: the house writes one while it is open here. If this stays, no house is running for this world."
+    role meta
+    only when count(witnessed:feed-$card kind=head) = 0
+  follow : column
+    share 1
+    scroll end
+    only when ($v.feed_held or 0) = 0 and ($v.feed_show or "") = ""
+    of witnessed:feed-$card kind!=head as e
+    clamp last 150
+    each line
+  followone : column
+    share 1
+    scroll end
+    only when ($v.feed_held or 0) = 0 and ($v.feed_show or "") != ""
+    of witnessed:feed-$card kind!=head group=$v.feed_show as e
+    clamp last 150
+    each line
+  held : column
+    share 1
+    scroll end
+    only when ($v.feed_held or 0) > 0 and ($v.feed_show or "") = ""
+    of witnessed:feed-$card kind!=head n<=$v.feed_held as e
+    clamp last 150
+    each line
+  heldone : column
+    share 1
+    scroll end
+    only when ($v.feed_held or 0) > 0 and ($v.feed_show or "") != ""
+    of witnessed:feed-$card kind!=head group=$v.feed_show n<=$v.feed_held as e
+    clamp last 150
+    each line
+top : column
+  role busy
+  title : row
+    who : text "$h.who"
+      role who
+    state : text "$h.state"
+      role chip
+      role chip.on when $h.state = "working"
+    since : text "at work since $h.since, $h.for"
+      role meta
+      only when ($h.since or "") != ""
+    room : text ""
+      share 1
+    kept : text "$h.events lines, $h.from to $h.newest"
+      role meta
+      only when ($h.from or "") != ""
+  tools : row
+    role pins
+    all : text "All"
+      role chip
+      role chip.on when ($v.feed_show or "") = ""
+      on click when ($v.feed_show or "") != "" do prop $v feed_show=""
+    thoughts : text "Thoughts"
+      role chip
+      role chip.on when $v.feed_show = "thoughts"
+      on click when ($v.feed_show or "") != "thoughts" do prop $v feed_show=thoughts
+    actions : text "Actions"
+      role chip
+      role chip.on when $v.feed_show = "actions"
+      on click when ($v.feed_show or "") != "actions" do prop $v feed_show=actions
+    errors : text "Errors"
+      role chip
+      role chip.on when $v.feed_show = "errors"
+      on click when ($v.feed_show or "") != "errors" do prop $v feed_show=errors
+    room : text ""
+      share 1
+    pause : text "Pause"
+      role chip
+      only when ($v.feed_held or 0) = 0
+      on click when ($v.feed_held or 0) = 0 do prop $v feed_held=$h.last
+    heldat : text "held at line $v.feed_held of $h.last"
+      role meta
+      only when ($v.feed_held or 0) > 0
+    go : text "Follow"
+      role chip.on
+      only when ($v.feed_held or 0) > 0
+      on click when ($v.feed_held or 0) > 0 do prop $v remove=feed_held
+line : row
+  role wfline
+  at : text "$e.at"
+    role wftime
+  kind : text "$e.kind"
+    role wfkind
+    role wfkind.thoughts when $e.group = "thoughts"
+    role wfkind.errors when $e.group = "errors"
+    role wfkind.life when $e.group = "life"
+  words : text "$e.text"
+    role wfwords
+    role wfwords.errors when $e.group = "errors"
+    share 1
