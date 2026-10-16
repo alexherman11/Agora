@@ -16,6 +16,12 @@ The whole step, in order, once the code it needs (share $(...), scroll none and 
 strip.desk, dock.desk and chat.desk replace exact passages as they stood on 15 Oct: a refusal there means someone has
 changed that lens since, so read it and adjust the line, never force it. home-base.lens goes last: until then the home
 base is the old frame and nothing a person sees changes.
+
+a5994 (16 Oct), the tiling made to work, once its painter words (`on drop <part> at <side>`, `on double`) are on main:
+    style-a5994.desk  drop-panel.verb  home-panels.lens  home-tiling.lens
+A .verb file is a verb note (its name the word) in Home base, living in the room around it (on=f5189). home-tiling.lens
+replaces the whole lens: first compare it with the world's (read a5692) and carry over anything changed there since
+16 Oct 15:20 (the widgets row a5530 placed is already in it). film.py films it on a copy.
 """
 import json
 import pathlib
@@ -78,6 +84,22 @@ def put_lens(w, path):
     print(name + ": " + " ".join(l.strip() for l in out.splitlines() if l.startswith(("ok ", "ERR", "~", "stopped"))))
 
 
+def put_verb(w, path):
+    """a5994: a .verb file's name is the verb's word and its text the verb's lines: a note of that title tagged verb in
+    Home base (f5204), rewritten (read first), else made. It lives in the room holding Home base (on=f5189, JEFF's
+    corner), where the home base's lenses look up their words: on=f5204 would be a verb on that one thing."""
+    name, text = path.stem, path.read_text(encoding="utf-8").rstrip("\n")
+    found = w.do(f"find title:{name},tag:verb,in:f5204")
+    hit = [l.split()[0] for l in found.splitlines() if f'"{name}"' in l and l.strip().startswith("a")]
+    if hit:
+        w.do(f"read {hit[0]}")
+        out = w.do(f"do rewrite {hit[0]} text={q(text)}")
+    else:
+        w.do("look f5204")
+        out = w.do(f"do create f5204 kind=note title={name} tags=verb on=f5189 text={q(text)}")
+    print(name + ": " + " ".join(l.strip() for l in out.splitlines() if l.startswith(("ok ", "ERR", "~", "stopped"))))
+
+
 def main():
     args = sys.argv[1:]
     who = args[args.index("--as") + 1] if "--as" in args else "worker-a5496"
@@ -87,8 +109,8 @@ def main():
     w = Try(who) if args[0] == "try" else Live(who)
     for f in args[1:]:
         p = pathlib.Path(f)
-        if p.suffix == ".lens":
-            put_lens(w, p)
+        if p.suffix in (".lens", ".verb"):
+            (put_lens if p.suffix == ".lens" else put_verb)(w, p)
             continue
         for line in p.read_text(encoding="utf-8").splitlines():
             if line.strip() and not line.startswith("#"):

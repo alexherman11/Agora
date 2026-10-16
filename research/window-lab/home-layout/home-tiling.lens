@@ -1,12 +1,16 @@
-# home-tiling: the home base's panels, laid out by each person (a5496). Alex, 15 Oct: 'I don't want the interface to
-# scroll. I should be able to drag around the different sections, or intuitively collapse them with a menu from the
-# bottom'; and later: pinned things stay (the chat, right), the rest come and go around it, and they slide.
-# Where each panel is, is the viewer's own world data: a surface (role=home-layout, actor=$me) holding column surfaces,
-# each holding panel notes (role=home-panel): lens= what it shows, lesser= its one-line view, shelf=yes put away. On the
-# layout: big= the panel widened, bigcol= its column. Drag a panel by its title onto another to put it above that one,
-# or onto a column's empty foot to put it last there. ⤢ widens one: its column takes the room and the others in that
-# column fold to their title and one line. – puts it on the shelf (home-panels, in the dock). Nothing scrolls: a panel
-# takes what it needs, and when a column is full they give way, cut and faded at the foot.
+# home-tiling: the home base's panels, laid out by each person (a5496; made to work by a5994). Alex, 16 Oct: 'I need
+# things to be draggable around this screen. It should snap to various sizes as I move it around, pushing other things
+# out of the way ... Double-clicking a window should make it fill the screen or the dominant space ... while leaving
+# the chat here.' Where each panel is, is the viewer's own world data: a surface (role=home-layout, actor=$me) holding
+# column surfaces (span=1|2|3, its share of the width), each holding panel notes (role=home-panel): lens= what it shows,
+# lesser= its one-line view, shelf=yes put away. On the layout: full= the panel that fills the space, pin=left|right
+# the chat's side (right when unsaid).
+# Drag a panel by its title. Over another panel, the landing box shows where it goes: near its left or right edge, a
+# new column there; near its top or bottom, above or below it; its middle, the two trade places. Over a column's empty
+# foot, it goes last there and takes that room. A column left empty goes, and the others take its width. Each drop is
+# one use of the verb drop-panel (Home base). ⇔ widens a column: a third, a half, two thirds of the room. A
+# double-click on a title fills the room with that panel (the others become a rail of titles; the chat stays); again,
+# or ⤡, gives it back. – shelves it (home-panels, in the dock). Nothing scrolls, nothing moves by itself.
 stage : column
   share 1
   role stage
@@ -20,67 +24,85 @@ desk : column
   role stage
   top : row
     role top
-    clock : row
-      role clock
-      of witnessed:clock as k
-      each clockface
-    day : text "$today"
-      role clocktime
-      only when count(witnessed:clock) = 0
+    widgets : row
+      lens home-widgets
     brand : text "AGORA"
       role brand
     gap : column
       share 1
-    how : text "drag a title to move a panel · ⤢ widens · – shelves it in the dock"
+    how : text "drag a title anywhere · double-click a title to fill the room · ⇔ widens · – shelves it"
       role hint
+    side : text "chat ⇆"
+      role tool
+      let at = ($lay.pin or "right")
+      on click when ($lay.pin or "right") = "right" do prop $lay pin=left
+      on click when ($lay.pin or "right") = "left" do prop $lay pin=right
     keys : text "Ctrl+Alt+J or Esc closes"
       role meta
   body : row
     share 1
     role body
     scroll none
+    chatleft : column
+      share 7
+      role pinned
+      scroll none
+      only when ($lay.pin or "right") = "left"
+      lens home-viewer
     tiling : row
       share 13
       role tiling
       scroll none
+      only when ($lay.full or "") = ""
       of kind:surface,in:$lay.item as col
       each column
-    pinned : column
+    filled : row
+      share 13
+      role tiling
+      scroll none
+      only when ($lay.full or "") != ""
+      rail : column
+        role rail
+        scroll none
+        of kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no as r
+        each railitem
+      room : column
+        share 1
+        role tilecol
+        scroll none
+        of kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no as p
+        each fullpanel
+    chatright : column
       share 7
       role pinned
       scroll none
+      only when ($lay.pin or "right") != "left"
       lens home-viewer
-clockface : row
-  role clock
-  time : text "$k.time"
-    role clocktime
-  day : text "$k.day"
-    role clockday
 column : column
-  let wide = 3 when $item = ($lay.bigcol or "")
-  let wide = 1 otherwise
-  share $wide
+  let span = ($col.span or 1)
+  share $span
   role tilecol
   scroll none
+  only when count(kind:note,in:$col.item,prop:role=home-panel,prop:shelf=no) > 0
   of kind:note,in:$col.item,prop:role=home-panel,prop:shelf=no as p
   each panel
   foot : column
-    let room = 0 when $item = ($lay.bigcol or "")
-    let room = 1 otherwise
-    share $room
+    share 1
     role tilefoot
-    on drop grip do move $carried into=$col
+    on drop grip do drop-panel end $carried $col $col $lay
 panel : column
   role pane
-  role pane.big when $item = ($lay.big or "")
   scroll none
-  let w = 1 when $item = ($lay.big or "")
-  let w = 0 otherwise
-  share $w
-  on drop grip do move $carried before=$p
+  on drop grip at left do drop-panel left $carried $p $col $lay
+  on drop grip at right do drop-panel right $carried $p $col $lay
+  on drop grip at top do drop-panel top $carried $p $col $lay
+  on drop grip at bottom do drop-panel bottom $carried $p $col $lay
+  on drop grip do drop-panel swap $carried $p $col $lay
   grip : row
     role panehead
     carry
+    let was = ($lay.full or "")
+    on double when ($lay.full or "") = "" do prop $lay full=$p
     title : text "$title"
       role panetitle
     sum : column
@@ -91,23 +113,54 @@ panel : column
     gap : column
       share 1
       only when ($p.lesser or "") = ""
-    wide : text "⤢"
+    wider : text "⇔"
       role tool
-      let was = ($lay.bigcol or "")
-      only when $item != ($lay.big or "")
-      on click do prop $lay big=$p bigcol=$col
-    narrow : text "⤡"
-      role tool
-      let was = ($lay.bigcol or "")
-      only when $item = ($lay.big or "")
-      on click do prop $lay big="" bigcol=""
+      let next = 2 when ($col.span or 1) = 1
+      let next = 3 when ($col.span or 1) = 2
+      let next = 1 otherwise
+      on click do prop $col span=$next
     away : text "–"
       role tool
-      let was = ($lay.bigcol or "")
       let out = ($shelf or "")
-      on click when $item = ($lay.big or "") do prop $p shelf=yes; do prop $lay big="" bigcol=""
-      on click when $item != ($lay.big or "") do prop $p shelf=yes
+      on click do prop $p shelf=yes
   body : column
     role panebody
-    only when $item = ($lay.big or "") or ($lay.bigcol or "") != $col.item
+    lens $p.lens
+railitem : column
+  role railitem
+  role railitem.on when $item = ($lay.full or "")
+  let was = ($lay.full or "")
+  on click when $item != ($lay.full or "") do prop $lay full=$r
+  name : text "$title"
+    role chipname
+    clamp 1
+  sum : column
+    role chipsum
+    only when ($r.lesser or "") != ""
+    lens $r.lesser
+fullpanel : column
+  share 1
+  role pane.big
+  scroll none
+  only when $item = ($lay.full or "")
+  grip : row
+    role panehead
+    let was = ($lay.full or "")
+    on double when ($lay.full or "") != "" do prop $lay full=""
+    title : text "$title"
+      role panetitle
+    gap : column
+      share 1
+    back : text "⤡"
+      role tool
+      let was = ($lay.full or "")
+      on click when ($lay.full or "") != "" do prop $lay full=""
+    away : text "–"
+      role tool
+      let out = ($shelf or "")
+      on click do prop $p shelf=yes; do prop $lay full=""
+  body : column
+    role panebody
+    share 1
+    scroll none
     lens $p.lens
