@@ -73,13 +73,18 @@ class Accessor:
         return (list(named), None) if named is not None else (None, list(ids))
 
     def rows(self, src):
-        try:
-            rs = S.rows(self.desk, src)
-        except Refusal as exc:
-            # Authored row queries use the native selector's refusal type. At the
-            # compiler boundary they belong to lens diagnostics and fallback,
-            # including checks run after an otherwise successful native write.
-            raise S.LensRefusal(f"row source {src!r}: {exc}") from exc
+        # a6010: answered once per build, as select is (the world holds still while a lens is built): the home base asked
+        # one chat's lines four times, ~70 ms each. Each asker gets its own copies of the rows
+        if ("rows", src) not in self._sel:
+            try:
+                self._sel[("rows", src)] = S.rows(self.desk, src)
+            except Refusal as exc:
+                # Authored row queries use the native selector's refusal type. At the
+                # compiler boundary they belong to lens diagnostics and fallback,
+                # including checks run after an otherwise successful native write.
+                raise S.LensRefusal(f"row source {src!r}: {exc}") from exc
+        rs = self._sel[("rows", src)]
+        rs = None if rs is None else [dict(r) for r in rs]
         self.R.append(("rows", src, len(rs) if rs is not None else None))
         if self.rec:
             self._said("rows", (src,), None if rs is None else [dict(r) for r in rs])
