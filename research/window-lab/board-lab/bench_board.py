@@ -29,7 +29,10 @@ def main(argv):
     world = argv[0]
     opt = lambda k, d: argv[argv.index(k) + 1] if k in argv else d      # noqa: E731
     who, lens, n = opt("--as", "alex"), opt("--lens", "home-base"), int(opt("--presses", "4"))
-    line0 = opt("--line", "")
+    lines = [l.strip() for l in opt("--line", "").split("||")]       # several: press i uses line i (the last again)
+    if "--verify" in argv:           # every build made twice, kept and whole, and any difference counted (lens_ir)
+        import os
+        os.environ["LENS_REUSE_VERIFY"] = "1"
     tmp = Path(tempfile.mkdtemp(prefix="bench-board-"))
     shutil.copyfile(NOTATION / "sessions" / f"{world}.pickle", tmp / "bench.pickle")
     deskd.SESSIONS, deskd.STATIC = tmp, NOTATION / "desk-shell"
@@ -47,10 +50,19 @@ def main(argv):
     real_scene_for = scene.scene_for
 
     def scene_for(*a, **k):
-        if prof[0] is None or "--profile-do" in argv:
+        if prof[0] is None or "--profile-do" in argv or "--profile-get" in argv:
             return real_scene_for(*a, **k)
         return prof[0].runcall(real_scene_for, *a, **k)
     scene.scene_for = scene_for
+    real_rows, spent = scene.rows, {}
+
+    def rows(desk, source, *a, **k):         # where the row sources' time goes, by source, in the last build
+        t = time.perf_counter()
+        try:
+            return real_rows(desk, source, *a, **k)
+        finally:
+            spent[source] = spent.get(source, 0) + (time.perf_counter() - t) * 1000
+    scene.rows = rows
     real_post = deskd.Handler._post
 
     def post(self):
@@ -58,6 +70,13 @@ def main(argv):
             return real_post(self)
         return prof[0].runcall(real_post, self)
     deskd.Handler._post = post
+    real_get = deskd.Handler._get
+
+    def get(self):                   # --profile-get: the whole scene request (build, painter view, hash, encode)
+        if prof[0] is None or "--profile-get" not in argv:
+            return real_get(self)
+        return prof[0].runcall(real_get, self)
+    deskd.Handler._get = get
 
     def call(path, body=None):
         t = time.perf_counter()
@@ -75,6 +94,7 @@ def main(argv):
         if i == n - 1 and "--profile-do" in argv:
             import cProfile
             prof[0] = cProfile.Profile()
+        line0 = lines[min(i, len(lines) - 1)]
         if line0:
             a, ms1, _ = call("/api/do", {"session": "bench", "as": who, "line": line0.replace("{i}", str(i)),
                                          "observed": {"at": r.get("events_total")}, "gesture": f"bench-{time.time()}-{i}"})
@@ -87,8 +107,14 @@ def main(argv):
         elif i == n - 1 and "--profile" in argv:
             import cProfile
             prof[0] = cProfile.Profile()
+        spent.clear()
         r, ms2, kb = call(q)
+        if "--rows" in argv:
+            print("   rows: " + ", ".join(f"{s[:40]} {v:.0f}" for s, v in sorted(spent.items(), key=lambda kv: -kv[1])[:6]))
         print(f"press {i + 1}: do {ms1:.0f} ms, scene {ms2:.0f} ms {kb} KB   [{said}]")
+    import lens_ir
+    print(f"instances kept {lens_ir._STATS['kept']}, made {lens_ir._STATS['made']}, builds {lens_ir._STATS['builds']}, "
+          f"differed from a whole build {lens_ir._STATS['differed']} (LENS_REUSE_VERIFY=1 checks every build)")
     if prof[0] is not None:
         import pstats
         pstats.Stats(prof[0]).sort_stats("cumulative").print_stats(int(opt("--profile", "25")))
