@@ -1,0 +1,10 @@
+# a5988: an agent's live feed in the viewer (home-feed), and the At work row being watched (home-work)
+role busy.on : between gap, pad top gap /2, on wash, corner gap
+role wfline : between gap, pad gap /4
+role wftime : text.mono, soft
+role wfkind : text down 2 medium tracked, accent, width gap x8
+role wfkind.thoughts : text down 2 medium tracked, jeff, width gap x8
+role wfkind.errors : text down 2 medium tracked, warm, width gap x8
+role wfkind.life : text down 2 medium tracked, soft, width gap x8
+role wfwords : text down, ink
+role wfwords.errors : text down, warm

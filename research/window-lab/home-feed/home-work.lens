@@ -1,0 +1,56 @@
+# home-work: who of the house is at work now, one panel of the home base (a5208). Split out of home-base by a5496.
+# a5988 (Alex, 16 Oct: 'clicking on At work should allow me a view into their live conversation feed'): residents at
+# work and the workers of the cards at work (commission=working); pressing one opens its card (or the resident's corner)
+# in the viewer with its feed (the viewer's note, role=home-view, is given viewing=<id> with=home-feed; a5949's viewer
+# stands any lens on the thing open).
+work : column
+  mine : column
+    of prop:role=home-view,prop:actor=$me as v
+    each at
+  plain : column
+    only when count(prop:role=home-view,prop:actor=$me) = 0
+    busy : column
+      of house doing=working as h
+      each still
+at : column
+  busy : column
+    of house doing=working as h
+    each busy
+  workers : column
+    of prop:commission=working as c
+    each worker
+  quiet : text "Everyone is resting."
+    role meta
+    only when count(house doing=working) = 0 and count(prop:commission=working) = 0
+busy : row
+  role busy
+  role busy.on when $v.viewing = $h.corner and $v.with = "home-feed"
+  on click do prop $v viewing=$h.corner back="$v.viewing" find="" with=home-feed
+  dot : text "•"
+    role live
+  who : text "$h.resident"
+    role who
+    share 1
+  what : text "working"
+    role meta
+worker : row
+  role busy
+  role busy.on when $v.viewing = $c and $v.with = "home-feed"
+  on click do prop $v viewing=$c back="$v.viewing" find="" with=home-feed
+  dot : text "•"
+    role live
+  who : text "$c.worker"
+    role who
+  what : text "$c.title"
+    role meta
+    clamp 1
+    share 1
+still : row
+  role busy
+  dot : text "•"
+    role live
+  who : text "$h.resident"
+    role who
+    share 1
+  what : text "working"
+    role meta
