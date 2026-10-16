@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (43)
+## open (45)
 
 ### F2. Scripts cannot say who is running them
 
@@ -290,6 +290,18 @@ Source edit by worker-a5820, 16 Oct, for Alex's ask (a5820: 'nice clean markdown
 a5999 · family=lens-words · status=open
 
 Alex, 16 Oct: 'can we get that video to be hyperlinked in chat and open in a native window here? I don't want to have to open a different application.' JEFF's line held the demo film's path; the chat drew it as words, since nothing in a lens could draw a file from the PC, and the desk had no way to serve one. Source edits (a5941): scene.py (the word `media [player]`, the gesture `on pop`, `on pop host`), media_links.py (the folders the desk may show and the one judge of a path), deskd.py and door.py (GET /media/ with ranges, refused to other sites), desk-shell/media.js and lens.js/lens.html (the poster, inline play, the player, Pop out; a page with no home base opens `host window <lens>` as a window of its own browser). The world-level words that were missing: `media` on a text, and `on pop`. Still open: the folders are a list in source (media_links.FOLDERS), not world data; a path with spaces is not found; a poster is the film's frame at 0.1 s, not a chosen one.
+
+### Gesture words a lens lacked: a drop by side with its landing shown, and a double-click (a5994)
+
+a6072 · family=lens-words · status=open
+
+Source edits by worker-a5994, 16 Oct, for Alex's 'I need things to be draggable around this screen. It should snap to various sizes as I move it around, pushing other things out of the way ... Double-clicking a window should make it fill the screen'. Missing world-level words, now in the language: (1) `on drop <part> at left|right|top|bottom do ...`: a receiver could say only one thing a drop meant, and the painter showed nothing of where it would land (home-style had no tool.on, so a5496's drag lit nothing, and Alex could not tell a drag was working). Now an act per side, and the painter draws the landing box. (2) `on double do ...`: there was no double-click gesture. Also in the painter: the carry ghost takes the ground of the part around it. screen.py gained `double` and a `hold` that continues a carry. Everything else is world: the verb drop-panel (a branching verb by `when` guards), home-tiling, home-panels, style roles. Files: scene.py, lens_ir.py, desk-shell/lens.js, lens.html, screen.py, test_scene.py.
+
+### Source edit (a5988): what an agent is doing could reach a lens only through house code (feeds.py)
+
+a6077 · family=missing-word · status=open
+
+worker-a5988, 16 Oct. Alex asked to click At work and watch an agent's live feed. The words of a stream are in house-state transcripts, which only the house reads, so making them a lens's rows needed source: feeds.py (Reader turns Claude stream-json and Codex items into rows; redact; Feed tails by offset; Feeds.step writes witnessed:feed-<id> while a viewer stands home-feed on a card or corner) and a guarded call in house.step. The world half (home-feed, home-work) is lenses only. THE MISSING WORDS: (1) a world way to ask the house to observe something on demand: the watched set is read from props (with=home-feed viewing=<id>, or watching=<id>), and the lens name home-feed is a constant in feeds.py, so another lens that wants a feed must use watching= or edit source; a watch= word on a lens note would let any lens declare what it needs observed. (2) a per-source change signal: witnessed.stamp covers every witnessed file, so one feed write repaints every open painter's whole scene (measured on a copy at a 0.5 s write cadence: 47 whole scenes in 23 s); feeds are throttled to one write per 2 s per feed to keep that bounded. (3) redaction is code, not a world rule: what counts as a secret is regexes in feeds.redact.
 
 ## curing (35)
 
