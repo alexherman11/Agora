@@ -1242,6 +1242,13 @@ def test_style_read_once():
     assert sheet == {"height_em": 60.0, "width_em": 30.0, "height": 320, "afloat": True, "shy": True, "pulse": True}
     icon = style.looks("token gap = 8\nrole icon : corner gap, touch")["roles"]["icon"]       # a5500: answers the pointer
     assert icon["look"] == {"corner": 8, "touch": True} and not icon["unread"]
+    # a5504: a lane's rail, a live card's glow, a card that glides; lift takes the `shadow` token's colour when there is one
+    board = style.looks("token gap = 8\ntoken ink = #E9EEEA\ntoken shadow = #000000\ntoken accent = #8DCDB4\n"
+                        "role card : rail accent, glow accent, lift gap /2, glide\nrole plain : lift gap")["roles"]
+    assert board["card"]["look"] == {"rail": "#8DCDB4", "glow": "#8DCDB4", "lift": 4, "lift_ink": "#000000", "lift_shadow": True, "glide": True}
+    assert not board["card"]["unread"]
+    assert style.looks("token gap = 8\ntoken ink = #E9EEEA\nrole plain : lift gap")["roles"]["plain"]["look"] == {"lift": 8, "lift_ink": "#E9EEEA"}
+    assert style.looks("role x : rail nothing")["roles"]["x"]["unread"]            # a rail names a colour token
     fonts = style.looks("font pixel = Silkscreen, monospace\ntoken text.pixel = pixel 13/1.3\nrole t : text.pixel up")
     assert fonts["roles"]["t"]["look"]["text"] == {"family": "'Silkscreen', monospace", "size": 15, "leading": 1.3} and fonts["fonts"]["pixel"]["face"] == "Silkscreen"
     out = style.for_painter({"name": "x", "text": "role x on paper"}, None)
