@@ -22,7 +22,7 @@ with no id at all, since words and roles repeat (Sable c5099); windows [{title, 
 words Windows' own text recognition read in it) or None; timing_ms.
 
 Written by the capture tool (research/window-lab/capture/capture.py, through make); read by whoever answers for the
-person (the chat's send side, load_capture / sent_copy). Discard deletes at once; a sent capture is deleted by `sent`
+person (the chat's send side, load_capture / sent_copy; the draft's chip, preview and thumb). Discard deletes at once; a sent capture is deleted by `sent`
 once the send is durable, so a retry finds it still there.
 """
 import base64
@@ -157,6 +157,35 @@ def preview(session, actor, cid):
     if not e.get("refs"):
         out.append("  native=none: no Agora page lay under it")
     return "\n".join(out)
+
+
+_thumbs = {}         # (session, actor, cid) -> data address; a capture's pixels are written once, so it never goes stale
+THUMB_MAX = 320      # pixels a side: the draft's chip shows it at about 96 CSS px, sharp at 200% too
+
+
+def thumb(session, actor, cid):
+    """a5834: a small picture of the capture's pixels as a data address (data:image/png;base64,...), for its own
+    person's draft only (the `captures` row source, field thumb); "" when it has no pixels or cannot be read."""
+    key = (session, str(actor).lower(), cid)
+    if not _thumbs.get(key):             # only a picture is kept: a read that failed is tried again next time
+        out = ""
+        try:
+            p = _image(session, actor, cid, load_capture(session, actor, cid))
+            if p:
+                import io
+                from PIL import Image
+                with Image.open(p) as im:
+                    im = im.convert("RGB")
+                    im.thumbnail((THUMB_MAX, THUMB_MAX))
+                    b = io.BytesIO()
+                    im.save(b, "PNG", optimize=True)
+                out = "data:image/png;base64," + base64.b64encode(b.getvalue()).decode("ascii")
+        except (CaptureError, OSError, ImportError, ValueError):
+            out = ""
+        if len(_thumbs) > 64:
+            _thumbs.clear()
+        _thumbs[key] = out
+    return _thumbs[key]
 
 
 def sent_copy(session, actor, cid):

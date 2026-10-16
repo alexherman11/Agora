@@ -16,6 +16,9 @@ Settings are props on the lens note the home base paints (home-base, a5208), rea
     monitor=main           main, or 1, 2 ... in the order Windows lists its monitors
     hide_taskbar=yes       no leaves the taskbar showing; yes covers it while the home base is shown (hud.py covers the
                            whole monitor, never hides the taskbar's own window, so a killed home base leaves it whole)
+    capture=on             a5834: the control screen (capture/capture.py: hold Ctrl+Alt and drag) runs while the home
+                           base runs, putting each capture on the person's own chat draft; off stops it at the next
+                           Ctrl+Alt+J (and keeps it off from the next start)
 A prop that is missing or does not read keeps its default, and settings() says which ones did not.
 
 What hud.py adds to use this (a5300's hook, put into hud.py by a5394):
@@ -37,7 +40,7 @@ import threading
 import urllib.request
 from ctypes import wintypes as wt
 
-DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes"}
+DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes", "capture": "on"}
 
 
 # -- the verbs: name -> (what it does, what words it takes, how). Each `how` gets the home base and the words, and
@@ -149,7 +152,10 @@ def settings(door, world, lens, who="hud"):
         r = json.loads(urllib.request.urlopen(urllib.request.Request(door + "/api/do", data=body, method="POST"),
                                               timeout=3).read())
         text = r.get("text") or ""
-        props = parse_props(text.splitlines()[0]) if text and not text.startswith("ERR") else {}
+        # a5834: the thing's own line, not the first: a '!! since your last look' line often comes before it, and
+        # every setting then read as its default
+        head = next((ln for ln in text.splitlines() if re.match(r"a\d+ ", ln)), "")
+        props = parse_props(head) if text and not text.startswith("ERR") else {}
     except (OSError, ValueError):
         props = {}
     for k in DEFAULTS:
@@ -157,7 +163,7 @@ def settings(door, world, lens, who="hud"):
         if not v:
             continue
         ok = (k == "hotkey" and hotkey(v)) or (k == "monitor" and (v == "main" or v.isdigit())) or \
-             (k == "hide_taskbar" and v in ("yes", "no"))
+             (k == "hide_taskbar" and v in ("yes", "no")) or (k == "capture" and v in ("on", "off"))
         (out.__setitem__(k, v) if ok else bad.append(f"{k}={v}"))
     out["unread"] = bad
     return out
