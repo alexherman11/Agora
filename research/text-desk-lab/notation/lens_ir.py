@@ -650,6 +650,14 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 lt = em["light"]
                 out["light"] = (S._fill_text(lt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in lt
                                 else S._fill(lt, fill_ctx, track))
+            if em.get("markdown") and "[[" in (out["text"] or ""):     # a5820: what each [[wikilink]] names, read now
+                out["wikilinks"] = S.wikilinks_of(w, out["text"], acc.thing)
+            if isinstance(em.get("markdown"), str) and any(a["on"] == "edit" for a in node["acts"]):
+                # `markdown links <selection>`: what typing [[ offers, read as one membership read (at most 500)
+                named, ids = acc.select(S._fill(em["markdown"], fill_ctx, track))
+                ids = [i for i, _ in named] if named is not None else ids
+                out["titles"] = [{"id": i, "title": c.get("title") or "", "kind": c.get("kind") or ""}
+                                 for i in ids[:500] for c in [S._ctx_for(w, i)] if c.get("title")]
             if em["props"]:
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:

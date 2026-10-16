@@ -122,14 +122,15 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end")    # end (a5530): a `live until` count reached zero
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+# end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
 # the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
 # kept is the lens's word (a prop on the viewer's own desk, a line, a thing), so it is world data anyone can read.
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace", "Delete")      # boundary deletion is authored in either direction
-PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
+PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K", "Ctrl+E", "Ctrl+S")   # the keys a button may press in the text the caret is in (E, S: a `markdown` text's source and save, a5820)      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index", "run", "in", "before", "after")
@@ -1045,7 +1046,19 @@ def _w_picture(node, p, val, n, env):
     node["picture"] = True
 
 
-LIVE = ("clock", "date", "until", "until ring")
+def _w_markdown(node, p, val, n, env):
+    # a5820 (Alex, 16 Oct: 'nice clean markdown formatting ... kinda like obsidian but better'): the words are a whole
+    # Markdown document (headings, lists, tasks, quotes, code, tables, links, [[wikilinks]], ![[embeds]]). The painter
+    # draws it; edited, the line the caret is on shows its marks and the rest stays drawn. The text is the source, so
+    # every printer, reader and quoting edit sees plain Markdown. The scene resolves each [[target]] to a thing's id.
+    # `markdown links <selection>`: what typing [[ offers (titles and ids), e.g. markdown links prop:role=doc
+    v = (val or "").strip()
+    if v and not v.startswith("links "):
+        raise LensRefusal(f"line {n}: `markdown` or `markdown links <selection>` (what typing [[ offers); got {p!r}")
+    node["markdown"] = v[6:].strip() if v else True
+
+
+LIVE =("clock", "date", "until", "until ring")
 
 
 def _w_live(node, p, val, n, env):
@@ -1089,6 +1102,50 @@ def marks_of(text):
         at = m.end()
     if at < len(text):
         out.append({"text": text[at:]})
+    return out
+
+
+_WIKI = re.compile(r"(!?)\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]*))?\]\]")
+
+
+def _titles(w):
+    """Every placed thing by its title, lower case -> appearance ids, a document (role=doc) first, then oldest first."""
+    out = {}
+    for nid, n in w.nodes.items():
+        s = w.subjects.get(n.get("subject")) or {}
+        title = (s.get("title") if s else n.get("title")) or n.get("title") or ""
+        props = s.get("props") or n.get("props") or {}
+        if not title or props.get("status") == "trashed":
+            continue
+        out.setdefault(title.strip().lower(), []).append((props.get("role") != "doc", int(nid[1:]) if nid[1:].isdigit() else 0, nid))
+    return {k: [x[2] for x in sorted(v)] for k, v in out.items()}
+
+
+def wikilinks_of(w, text, thing=None):
+    """a5820: each [[target]] or ![[target]] of a Markdown text -> {target: {id, title, kind, status, owner, inside,
+    excerpt}}. A target is an id (a4865, the form the editor writes, which a rename never breaks) or a title, matched
+    whole and in any case, a document first; `[[x#part]]` and `[[x|words]]` resolve x. A target that names nothing
+    has no id, and the painter draws it as a link to nothing. `thing` reads one thing (the scene records the read)."""
+    out = {}
+    for m in _WIKI.finditer(text or ""):
+        t = m.group(2).split("#")[0].strip()
+        if not t or t in out:
+            continue
+        if _ID.match(t) and (t in w.nodes or t in w.subjects):
+            nid = t
+        else:
+            hits = _once(w, ("titles",), lambda: _titles(w)).get(t.lower()) or []
+            nid = hits[0] if hits else None
+        if not nid:
+            out[t] = {"id": "", "title": t}
+            continue
+        c = thing(nid) if thing else _ctx_for(w, nid)
+        p = c.get("_props") or {}
+        body = " ".join((c.get("text") or "").split())
+        out[t] = {"id": c.get("item") or nid, "title": c.get("title") or t, "kind": c.get("kind") or "",
+                  **{k: str(p[k]) for k in ("status", "owner", "commission", "role") if p.get(k)},
+                  **({"excerpt": body[:280] + ("…" if len(body) > 280 else "")} if body else {}),
+                  **({"inside": len(w.children(nid))} if nid in w.nodes and w.nodes[nid].get("type") == "surface" else {})}
     return out
 
 
@@ -1426,6 +1483,7 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
     "picture": ("picture", _w_picture),
+    "markdown": ("markdown [links <selection>]", _w_markdown),
     "live": ("live clock|date|until [ring]", _w_live),
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
@@ -1529,7 +1587,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "light": None, "live": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "markdown": False, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1568,6 +1626,10 @@ def parse(src, roles=None, style=None):
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
             raise LensRefusal(f"line {k['line']}: `picture` draws a text that is a drawing (SVG): this part " + ("prints no text" if k["text"] is None else "is edited, and a drawing is edited as its source, in a part without `picture`"))
+        if k["markdown"] and (k["text"] is None or k["picture"] or k["live"]):
+            raise LensRefusal(f"line {k['line']}: `markdown` draws a text that is a Markdown document: this part " + ("prints no text" if k["text"] is None else "is also a picture or a live count"))
+        if any(a["on"] == "link" for a in k["on"]) and not k["markdown"]:
+            raise LensRefusal(f"line {k['line']}: `on link` is sent when a [[wikilink]] in a `markdown` text is followed; this part has no `markdown`")
         if k["layout"] == "grid" and not k["tracks"]:
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
@@ -2138,7 +2200,10 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append("live " + n["live"])
         if n.get("light"):
             bits.append("light " + str(len([x for x in str(n["light"]).split(chr(10)) if x.strip()])))
-        if n.get("plain"):
+        if n.get("markdown"):
+            wl = n.get("wikilinks") or {}
+            bits.append("markdown" + (f" · links {sum(1 for v in wl.values() if v.get('id'))} of {len(wl)}" if wl else ""))
+        elif n.get("plain"):
             bits.append("plain")
         elif n.get("text") and runs_of(n["text"], n.get("marks")):
             rs = runs_of(n["text"], n.get("marks"))
@@ -2336,7 +2401,13 @@ def emit(node):
             paint["light"] = [x.strip() for x in str(node["light"]).split(chr(10)) if x.strip()]
             if node.get("image_regions"):
                 paint["regions"] = node["image_regions"]
-        if not node.get("plain") and not node.get("picture") and not node.get("live") and node.get("text"):
+        if node.get("markdown"):              # a5820: the painter reads the Markdown itself; the scene says what [[x]] are
+            paint["markdown"] = True
+            if node.get("wikilinks"):
+                paint["wikilinks"] = node["wikilinks"]
+            if node.get("titles") is not None:
+                paint["titles"] = node["titles"]
+        elif not node.get("plain") and not node.get("picture") and not node.get("live") and node.get("text"):
             rs = runs_of(node["text"], node.get("marks"))
             if node.get("marks"):
                 paint["marks"] = True

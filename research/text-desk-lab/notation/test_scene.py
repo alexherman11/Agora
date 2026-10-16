@@ -1416,18 +1416,6 @@ def test_live_words_now_and_newest_first():
         tmp.unlink(missing_ok=True)
 
 
-if __name__ == "__main__":
-    import os
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from
-    n = 0
-    for name, fn in list(globals().items()):
-        if name.startswith("test_"):
-            fn()
-            n += 1
-            print("ok", name)
-    print(f"{n} passed")
-
-
 def test_picture_is_a_text_drawn():
     """13 Oct: `picture` marks a text as a drawing (SVG). It is painted as one, printed as its source, never edited as one."""
     svg = "<svg viewBox='0 0 10 10'><rect width='5' height='5'/></svg>"
@@ -1446,3 +1434,47 @@ def test_picture_is_a_text_drawn():
             assert "picture" in scene.to_text(sc, "w", "jeff", 0)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def test_markdown_is_a_document_and_its_wikilinks_name_things():
+    """a5820: `markdown` paints a text as a Markdown document; the painter reads it, the scene names each [[target]]:
+    an id stays that thing (a rename keeps it), a title is matched whole in any case, and what names nothing says so."""
+    refused("x : column, markdown", "prints no text")
+    refused('x : text "a", on link do prop $item open=$value', "has no `markdown`")
+    import deskd, lens_ir
+    tmp = _scratch("_test_markdown")
+    try:
+        with deskd.Session("_test_markdown", "jeff") as desk:
+            w = desk.world
+            some = next(i for i, n in w.nodes.items() if n.get("type") != "surface" and (w.subjects.get(n.get("subject")) or {}).get("title"))
+            title = w.subjects[w.nodes[some]["subject"]]["title"]
+            md = f"# Head\\n- see [[{some}|that]] and ![[{some}]]\\n- [[nothing called this]]"
+            src = chr(10).join(["w : column", f'  doc : text "{md}", markdown, on link do prop $item open=$value',
+                                '  flat : text "**x** [[y]]"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            doc, flat = scene.painter_view(sc)["kids"]
+            p = doc["paint"]
+            assert p["markdown"] is True and "runs" not in p
+            assert p["wikilinks"][some]["id"] == some and p["wikilinks"][some]["title"] == title
+            assert p["wikilinks"]["nothing called this"]["id"] == ""
+            assert any(a["on"] == "link" for a in doc["acts"])
+            assert "markdown" not in flat["paint"] and "wikilinks" not in flat["paint"]
+            assert "markdown · links 1 of 2" in scene.to_text(sc, "w", "jeff", 0)
+            by_title = scene.wikilinks_of(w, f"[[{title.upper()}]]")[title.upper()]
+            assert by_title["id"] and by_title["title"].lower() == title.lower()
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+# a5820: this block stood above test_picture_is_a_text_drawn (13 Oct), so that test was never run; it stays last
+if __name__ == "__main__":
+    import os
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from
+    n = 0
+    for name, fn in list(globals().items()):
+        if name.startswith("test_"):
+            fn()
+            n += 1
+            print("ok", name)
+    print(f"{n} passed")
