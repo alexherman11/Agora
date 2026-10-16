@@ -8,6 +8,7 @@ A lens asks with `on click host <verb> [words]` (scene.py). The painter sends th
 here. So a new button is lens lines only, and a new power is one entry in VERBS below, never a new js_api in hud.py.
 
 The table is closed on purpose: named verbs, no program to run, no shell line, no keys pressed but the media keys.
+`notify <words>` (a5824) shows a toast through notify.py; its words are shown, never run.
 `window <lens>` (a5500) opens only the desk's own painter on a lens, as lens_window.py does; never another program.
 
 Settings are props on the lens note the home base paints (home-base, a5208), read through the door each time it opens:
@@ -83,8 +84,23 @@ def _window(hud, words):
     return f"opened {lens} as a window (process {p.pid})"
 
 
+def _notify(hud, words):
+    # a5824: a Windows toast, title Agora, silent unless the words begin with ! (notify.py says how and its limits).
+    # This one leaves no record in the world; the house verb `notify` does (a line in Notifications sent)
+    import notify
+    text, sound = notify.words_of(words)
+    if not text:
+        raise Refused("notify takes the words to show")
+    try:
+        got = notify.show(text, sound=sound, by=getattr(getattr(hud, "a", None), "who", ""))
+    except RuntimeError as e:
+        raise Refused(f"Windows did not take the toast: {e}")
+    return f"notified: {text[:80]}" + (" (with sound)" if sound else "") + ("" if got == "shown" else f" ({got})")
+
+
 VERBS = {
     "bring": ("bring that window forward and put the home base away", "window", _bring),
+    "notify": ("show a Windows notification, title Agora (silent; words beginning ! ring)", "words", _notify),
     "hide": ("put the home base away", "", _hide),
     "window": ("open a lens as its own window (an Agora app) and put the home base away", "lens", _window),
     "media.play": ("play or pause (Spotify, else the media key)", "", _media("play")),
