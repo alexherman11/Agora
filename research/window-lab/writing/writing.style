@@ -28,8 +28,9 @@ token ramp     = 1.2
 token text     = sans 15/1.5
 token text.read = read 17/1.72
 
+role desk      : on paper, ink, text
 role app       : on paper, ink, text
-role side      : on side, ink, text down, pad gap x2, pad top gap x2, width gap x34, border right ghost
+role side      : on side, ink, text down, pad gap x2, pad top gap x2, width gap x34, align stretch, border right ghost
 role sidetop   : space below gap x2, between gap
 role brand     : text up strong, ink
 role newdoc    : text down medium, accent, pad gap /2, pad left gap, pad right gap, corner gap /2, edge ghost, touch
@@ -43,7 +44,7 @@ role doc.on    : text down medium, ink, on wash, pad gap /2, pad left gap, corne
 role hit       : pad gap /2, corner gap /2, space below gap /4, touch
 role main      : on paper, ink, text, pad gap x4, pad top gap x3
 role welcome   : pad gap x6, space above gap x6, between gap x2
-role page      : ink, text.read, pad bottom gap x12
+role page      : ink, text.read, width gap x96, pad bottom gap x12
 role crumbs    : text down, hush, between gap x2, space below gap x3
 role key       : text down, hush, pad left gap, pad right gap, corner gap /2, edge ghost, touch
 role title     : text up 6 strong, ink, space below gap
@@ -51,7 +52,7 @@ role chips     : between gap, space below gap x3
 role chip      : text down, soft, on wash, pad left gap, pad right gap, corner gap
 role prose     : text.read, quiet
 role figure    : on card, pad gap x2, corner gap, space above gap, space below gap
-role aside     : on side, ink, text down, pad gap x3, pad top gap x5, width gap x38, border left ghost
+role aside     : on side, ink, text down, pad gap x3, pad top gap x5, width gap x38, align stretch, border left ghost
 role panel     : between gap x4
 role panelhead : text down tracked, hush, space below gap
 role outline   : text down, soft, pad gap /4, pad left gap

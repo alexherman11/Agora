@@ -55,6 +55,7 @@
   .md-doc a.md-a,.md-doc .md-wl{color:var(--t-accent,#0F6B57);text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--t-accent,#0F6B57) 35%,transparent);text-underline-offset:.18em;cursor:pointer}
   .md-doc .md-wl:hover,.md-doc a.md-a:hover{text-decoration-color:currentColor}
   .md-doc .md-wl.md-missing{color:var(--t-hush,#889);text-decoration-style:dashed}
+  .md-doc .md-widget .md-syn{display:none}
   .md-doc .md-widget{position:relative;margin:.4em 0 .6em;cursor:text}
   .md-doc table.md-table{border-collapse:collapse;width:auto;min-width:50%;font-size:.95em}
   .md-doc .md-table th,.md-doc .md-table td{border:1px solid var(--t-ghost,#dde);padding:.35em .8em;text-align:left;vertical-align:top}
@@ -411,7 +412,7 @@
       popAt = r.a - m[1].length - 2;
       const q = m[1].toLowerCase().trim();
       popHits = opts.titles.filter(t => !q || t.title.toLowerCase().includes(q) || t.id === q)
-        .sort((x, y) => (y.title.toLowerCase().startsWith(q) - x.title.toLowerCase().startsWith(q))).slice(0, 8);
+        .sort((x, y) => (y.title.toLowerCase().startsWith(q) - x.title.toLowerCase().startsWith(q)) || x.title.length - y.title.length).slice(0, 8);
       popPick = Math.min(popPick, Math.max(0, popHits.length - 1));
       if (!pop) { pop = document.createElement("div"); pop.className = "md-pop"; pop.setAttribute("role", "listbox"); document.body.append(pop);
         pop.addEventListener("mousedown", e => { e.preventDefault(); const d = e.target.closest("[data-i]"); if (d) choose(+d.dataset.i); }); }

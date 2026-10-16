@@ -3,6 +3,8 @@ on a copy and applied to the live world after the code it needs (the `markdown` 
 
     python research/window-lab/writing/apply.py lines <out.desk>     the lines (explore.py <world> --as <you> < out.desk)
     python research/window-lab/writing/apply.py update <out.desk>    lines that rewrite the style and lens where they are
+    python research/window-lab/writing/apply.py try <out.desk>       lines, then the first page (welcome.md) opened: a copy to look at
+    python research/window-lab/writing/apply.py door-demo [--as <name>]   the first page alone, live, once `door` has run
     python research/window-lab/writing/apply.py door [--as <name>]   all of it, to the live door, line by line, stopping at a refusal
 
 What the lines make, in the Writing room (f3402), all world data anyone may change afterwards:
@@ -35,10 +37,17 @@ def lines(who="alex"):
             f"do create {ROOM} kind=note title=writing-style tags=style text={q(text('writing.style'))}",
             f"do create {ROOM} kind=note title=writing tags=lens style=writing-style text={q(text('writing.lens'))}",
             f'do create {ROOM} kind=surface title="Notes (Writing)" layout=column',
-            'do prop "Notes (Writing)" role=notes',
+            'do prop "Notes (Writing)" role=writing-notes',
             f"do create {ROOM} kind=note title=\"{who.capitalize()}'s writing (what the Writing app has open)\" role=writer actor={who}",
             "look a5573",
             "do prop a5573 window=writing remove=opens"]
+
+
+def demo(who="alex"):
+    """A first page (welcome.md) in Notes (Writing), opened in the writer's window: for a copy, or for Alex's first look."""
+    return [f'do create "Notes (Writing)" kind=note title="Writing in Agora" role=doc by=worker-a5820 text={q(text("welcome.md"))}',
+            f"look \"{who.capitalize()}'s writing (what the Writing app has open)\"",
+            f"do prop \"{who.capitalize()}'s writing (what the Writing app has open)\" open=$new"]
 
 
 def update():
@@ -56,11 +65,11 @@ def door(line, who):
 def main(argv):
     opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d       # noqa: E731
     who = opt("--as", "worker-a5820")
-    if not argv or argv[0] not in ("lines", "update", "door"):
+    if not argv or argv[0] not in ("lines", "update", "try", "door", "door-demo"):
         print(__doc__)
         return 0
-    out = update() if argv[0] == "update" else lines()
-    if argv[0] in ("lines", "update"):
+    out = {"update": update, "try": lambda: lines() + demo(), "door-demo": demo}.get(argv[0], lines)()
+    if argv[0] in ("lines", "update", "try"):
         pathlib.Path(argv[1]).write_text("\n".join(out) + "\n", encoding="utf-8")
         print(f"wrote {len(out)} lines to {argv[1]}")
         return 0

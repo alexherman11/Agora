@@ -14,7 +14,7 @@ writing : column
   none : text "Writing needs a note of yours: role=writer actor=<you> in the Writing room."
     role meta
     only when count(prop:role=writer,prop:actor=$me) = 0
-app : row
+app : grid fit 1fr fit
   share 1
   side : column
     role side
@@ -24,19 +24,19 @@ app : row
       name : text "Writing"
         role brand
         share 1
-      new : text "+ New"
-        role newdoc
-        on click do create "Notes (Writing)" kind=note title="Untitled" role=doc by=$me; do prop $w open=$new back="$w.open" find=""
+      new : row
+        of prop:role=writing-notes as nb
+        each newbtn
     box : text "$w.find"
       role find
       hint "Search titles and words"
       lines 1..1
       commit enter only
-      on edit do prop $w find="$value"
+      on edit do read $w; do prop $w find="$value"
     clear : text "Clear search"
       role sidelink
       only when ($w.find or "") != ""
-      on click do prop $w find=""
+      on click do read $w; do prop $w find=""
     found : column
       only when ($w.find or "") != ""
       let q = words-of($w.find)
@@ -100,14 +100,17 @@ app : row
     only when ($w.open or "") != ""
     of $w.open as d
     each panel
+newbtn : text "+ New"
+  role newdoc
+  on click do read $w; do create $nb kind=note title="Untitled" role=doc by=$me; do prop $w open=$new back="$w.open" find=""
 row : text "$title"
   role doc
   role doc.on when $item = $w.open
   clamp 1
-  on click do prop $w open=$item back="$w.open" find=""
+  on click do read $w; do prop $w open=$item back="$w.open" find=""
 hit : column
   role hit
-  on click do prop $w open=$f back="$w.open" find=""
+  on click do read $w; do prop $w open=$f back="$w.open" find=""
   t : text "$title"
     role doc
     clamp 1
@@ -121,7 +124,7 @@ page : column
     back : text "← Back"
       role sidelink
       only when ($w.back or "") != "" and $w.back != $item
-      on click do prop $w open="$w.back" back="$w.open"
+      on click do read $w; do prop $w open="$w.back" back="$w.open"
     where : text "$kind · $item"
       role meta
       share 1
@@ -134,6 +137,11 @@ page : column
       on click press Ctrl+E
   title : text "$title"
     role title
+    only when $kind != "surface"
+    on edit do retitle $item title="$value"
+  name : text "$title"
+    role title
+    only when $kind = "surface"
     on edit do rename $item title="$value"
   chips : row
     role chips
@@ -155,12 +163,12 @@ page : column
     markdown links prop:role=doc
     hint "Start writing…"
     on edit do rewrite $item text="$value"
-    on link do prop $w open=$value back="$w.open"
+    on link do read $w; do prop $w open=$value back="$w.open"
   shown : text "$text"
     role prose
     only when $kind != "note" and $kind != "surface"
     markdown
-    on link do prop $w open=$value back="$w.open"
+    on link do read $w; do prop $w open=$value back="$w.open"
   blocks : column
     only when $kind = "surface"
     of in:$item as b
@@ -179,7 +187,7 @@ block : column
     role prose
     only when $block != "figure" and $kind = "note"
     markdown
-    on link do prop $w open=$value back="$w.open"
+    on link do read $w; do prop $w open=$value back="$w.open"
   figure : text "$text"
     role figure
     picture
@@ -187,15 +195,15 @@ block : column
 panel : column
   role panel
   outline : column
-    only when count(sections:$item) > 0
+    only when count(sections:$item) > 1
     head : text "Outline"
       role panelhead
     list : column
       of sections:$item
       each heading
   mentions : column
-    let others = count(?$item) - 1
-    head : text "Mentioned in  $(others)"
+    let mcount = count(?$item)
+    head : text "Mentioned in  $(mcount)"
       role panelhead
     list : column
       of ?$item as m
@@ -203,7 +211,7 @@ panel : column
       each mention
     quiet : text "Nothing else mentions this yet. Link to it with [[ in another document."
       role meta
-      only when count(?$item) <= 1
+      only when count(?$item) = 0
   props : column
     head : text "Properties"
       role panelhead
@@ -225,10 +233,11 @@ panel : column
 heading : text "$heading"
   role outline
   clamp 1
+  only when $heading !has "(before the first heading)"
 mention : column
   role mention
   only when $item != $d.item
-  on click do prop $w open=$m back="$w.open" find=""
+  on click do read $w; do prop $w open=$m back="$w.open" find=""
   t : text "$title"
     role mentiontitle
     clamp 2
