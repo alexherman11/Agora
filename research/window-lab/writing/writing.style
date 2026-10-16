@@ -1,0 +1,84 @@
+# writing-style: the style of the Writing app (lens writing, a5820). Calm and dark, as the home base is: one face for
+# reading and for the tools, one accent, lines kept to a readable measure, nothing that is not words or a way to them.
+# Markdown inside a document is drawn by the painter (markdown.js) from these tokens: accent, ink, soft, hush, faint,
+# ghost, wash, card, mark. `?theme=light` on the page gives the paper version.
+
+font sans = Inter, system-ui, Segoe UI, sans-serif
+font read = Inter, system-ui, Segoe UI, sans-serif
+
+token paper    = #1A1B1F
+token side     = #141518
+token card     = #222429
+token ink      = #E3E4E8
+token accent   = #6FD3B2
+token mark     = #E8A15B
+token soft     = ink at 70%
+token quiet    = ink at 86%
+token hush     = ink at 52%
+token faint    = ink at 30%
+token ghost    = ink at 13%
+token wash     = #2A2D33
+token focus    = #222429
+token scrollbar = ink at 22%
+token scrollbar_w = 6
+token shadow   = #000000
+
+token gap      = 8
+token ramp     = 1.2
+token text     = sans 15/1.5
+token text.read = read 17/1.72
+
+role desk      : on paper, ink, text
+role app       : on paper, ink, text
+role side      : on side, ink, text down, pad gap x2, pad top gap x2, width gap x34, align stretch, border right ghost
+role sidetop   : space below gap x2, between gap
+role brand     : text up strong, ink
+role newdoc    : text down medium, accent, pad gap /2, pad left gap, pad right gap, corner gap /2, edge ghost, touch
+role find      : text down, ink, on card, pad gap, corner gap /2, edge ghost, space below gap x2
+role sidelink  : text down, hush, space below gap, touch
+role section   : space below gap x2
+role subsection : pad left gap, space above gap /2
+role sidehead  : text down tracked, hush, space below gap /2
+role doc       : text down, soft, pad gap /2, pad left gap, corner gap /2, touch
+role doc.on    : text down medium, ink, on wash, pad gap /2, pad left gap, corner gap /2
+role hit       : pad gap /2, corner gap /2, space below gap /4, touch
+role main      : on paper, ink, text, pad gap x4, pad top gap x3
+role welcome   : pad gap x6, space above gap x6, between gap x2
+role page      : ink, text.read, width gap x96, pad bottom gap x12
+role crumbs    : text down, hush, between gap x2, space below gap x3
+role key       : text down, hush, pad left gap, pad right gap, corner gap /2, edge ghost, touch
+role title     : text up 6 strong, ink, space below gap
+role chips     : between gap, space below gap x3
+role chip      : text down, soft, on wash, pad left gap, pad right gap, corner gap
+role prose     : text.read, quiet
+role figure    : on card, pad gap x2, corner gap, space above gap, space below gap
+role aside     : on side, ink, text down, pad gap x3, pad top gap x5, width gap x38, align stretch, border left ghost
+role panel     : between gap x4
+role panelhead : text down tracked, hush, space below gap
+role outline   : text down, soft, pad gap /4, pad left gap
+role mention   : pad gap, corner gap /2, on card, space below gap /2, touch
+role mentiontitle : text down, ink
+role prop      : text down, soft, pad gap /4
+role meta      : text down, hush
+
+# what the painter draws itself, in this app's look
+role tool      : text down, hush, pad gap /2
+role fold      : text down tracked, hush
+role mark      : mark
+role cut       : text down, hush
+role light     : on mark at 22%
+role button    : text down medium, accent, pad gap /2, corner gap /2, edge ghost
+role popup     : on card, edge ghost, corner gap /2, lift gap, pad gap /2
+role menu.item : text down, ink, pad gap /2, pad left gap, pad right gap
+role menu.ask  : text down, ink, pad gap
+
+theme light of writing-style
+  token paper  = #FBFBFA
+  token side   = #F3F3F1
+  token card   = #FFFFFF
+  token ink    = #1F2328
+  token accent = #0F7B63
+  token mark   = #B4571C
+  token wash   = #EDEFEC
+  token focus  = #FFFFFF
+  token shadow = #1F2328

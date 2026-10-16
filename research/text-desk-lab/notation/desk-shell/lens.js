@@ -103,7 +103,7 @@
     // line was sent was reused still showing it, and its next blur sent it again. Once no draft holds them, they go.
     const k = kept.get(n.key), p = k && k.el._n.paint;
     if (k && k.el._composer) k.el._composer.sync();
-    else if (p && p.text != null && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
+    else if (p && p.text != null && !p.markdown && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
       if (p.runs) runs(k.el, p.runs); else k.el.textContent = p.text; V.mark(k.el, n.key);
     }
     return r;
@@ -130,7 +130,15 @@
   let kept = new Map(), next = new Map();
   function make(n) {
     const old = kept.get(n.key), p = n.paint || {};
-    if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
+    if (old && V.hold === n.key) {                                        // the part in a person's hands is not repainted under them
+      if (old.el._md && p.markdown) mdFresh(old.el, n, p);                 // a5820: but its [[links]] and embeds stay live
+      next.set(n.key, old); return old.el;
+    }
+    // a5820: a document being written stays the same element when the world's words are what it holds (its own save
+    // came back), so the caret and the person's place are kept
+    if (old && old.el._md && p.markdown && old.el._md.src() === p.text && !V.drafts.has(n.key)) {
+      mdFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el;
+    }
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
     if (old && old.el._composer && old.el._composer.config === JSON.stringify([p, n.acts])) {
       old.el._n = n; old.sig = sig; old.el._composer.sync(); next.set(n.key, old); return old.el;
@@ -144,7 +152,8 @@
     if (role) el.className = Style.roleClass(role);
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
-    if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
+    if (p.text != null && p.markdown) markdown(el, n, p);
+    else if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
     // `wave` (14 Oct): a role that waves draws each character as its own span, each a beat after the one before
     else if (p.text != null && role && ((Style.style || {}).roles || {})[role] && Style.style.roles[role].look.wave)
       el.replaceChildren(...[...p.text].map((ch, i) => Object.assign(document.createElement("span"), { className: "t-wave", textContent: ch, style: `--i:${i}` })));
@@ -195,6 +204,7 @@
       if (onText) { el.dataset.tool = "1"; el.addEventListener("mousedown", e => e.preventDefault()); }
       if (onText) el.addEventListener("click", () => {
         const t = TEXT.last && TEXT.last.isConnected ? TEXT.last : null;
+        if (!t && /^press Ctrl\+[ES]$/.test(a.line)) return TEXT.press(el, a.line.slice(6));   // a5820: the page's document
         if (!t) return V.show("put the caret in a text first: this button acts on the text being written");
         if (a.line.startsWith("press ")) { t.focus(); return TEXT.press(t, a.line.slice(6)); }
         TEXT.wait(TEXT.tool(t, a.line));
@@ -210,7 +220,7 @@
         send(el._n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)))
           .finally(() => { delete el.dataset.pressed; });
       });
-      if (a.on === "edit") edits(el, n, a);
+      if (a.on === "edit" && !p.markdown) edits(el, n, a);
       if (a.on === "drag" && p.box) drags(el, n, a);
       if (a.on === "carry") carries(el, n);
       if (a.on === "drop") { el.dataset.drop = a.part; el._drop = a; }
@@ -519,6 +529,48 @@
     });
   }
 
+  // a5820: a text that says `markdown` is a document, drawn and written by markdown.js. Its `on edit` is sent with the
+  // whole Markdown text on leaving it, Ctrl+S or Ctrl+Enter, or before a [[link]] is followed (whole-text saves, as a
+  // document's words are saved today; the small edits of a4865 wait on Alex's choice). `on link` is sent with $value
+  // the id of the thing a [[wikilink]] or ![[embed]] names. Without `on edit` it is drawn only.
+  function markdown(el, n, p) {
+    if (!window.Markdown) { el.textContent = p.text; return; }
+    const a = n.acts.find(x => x.on === "edit");
+    const md = Markdown.create({
+      text: a ? V.words(n.key, p.text, n.fence) : p.text, links: p.wikilinks, titles: p.titles, hint: p.hint, editable: !!a,
+      typed: s => V.typed(n.key, s, { key: n.key, fence: el._n.fence }),
+      save: s => mdSave(el, s),
+      follow: async id => {
+        const link = el._n.acts.find(x => x.on === "link");
+        if (!link) return V.show("this document's links open nowhere here (its lens has no `on link`)");
+        if (a && V.drafts.has(el._n.key)) await mdSave(el, md.src());
+        send(el._n, link.line.replace(/\$value\b/g, () => TEXT.esc(id)));
+      },
+      notify: t => V.show(t),
+    });
+    el._md = md; el._mdLinks = JSON.stringify(p.wikilinks || {}); el.classList.add("md-part"); el.append(md.el);
+    if (!a) return;
+    md.el.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
+    md.el.addEventListener("blur", () => {
+      if (V.repainting) return;
+      if (!document.hasFocus()) return;                       // the window losing focus is not the person putting it down
+      if (V.drafts.has(el._n.key)) mdSave(el, md.src()); else V.hold = null;
+    });
+  }
+  async function mdSave(el, s) {
+    const n = el._n, key = n.key, a = n.acts.find(x => x.on === "edit");
+    if (!a) return;
+    if (s === (n.paint.text || "")) { V.drop(key); if (document.activeElement !== el._md.el) V.hold = null; return; }
+    const seen = V.editOrigin(key, n); if (!seen) { V.hold = null; return; }
+    await send(seen, a.line.replace("$value", () => TEXT.esc(s)).replace("$selected", () => ""), s);
+    if (document.activeElement === el._md.el) V.hold = key;   // still writing: the next scene does not take it away
+  }
+  function mdFresh(el, n, p) {
+    el._n = n;
+    const l = JSON.stringify(p.wikilinks || {});
+    if (l !== el._mdLinks) { el._mdLinks = l; el._md.links(p.wikilinks); }
+  }
+
   // a text's keys (Alex, 7 Oct: 'Enter should create a new line, tab should indent'). A lens gives a text `on key
   // Enter|Tab|Shift+Tab|Backspace do ...`; the command may name $head and $tail, the words either side of the caret.
   // The words typed and not yet sent go with it (the command is told them), so nothing is sent twice. Afterwards the
@@ -594,7 +646,11 @@
         }
       });
     },
-    press(el, key) { if (el._toSource) MARKS.key(el, { key: key.split("+").pop().toLowerCase(), preventDefault() {} }, el._toSource); },
+    press(el, key) {
+      // a5820: Source (Ctrl+E) and Save (Ctrl+S) belong to the document on the page, wherever the caret was last
+      const md = el._md ? el : /Ctrl\+[ES]$/.test(key) && [...paint.querySelectorAll(".md-part")].find(m => m._md);
+      if (md) return md._md.press(key);
+      if (el._toSource) MARKS.key(el, { key: key.split("+").pop().toLowerCase(), preventDefault() {} }, el._toSource); },
     key(el, e) {
       if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
       const name = (e.shiftKey ? "Shift+" : "") + e.key, a = el._n.acts.find(x => x.on === "key" && x.label === name);
