@@ -225,7 +225,12 @@
   // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
   function frames(el, n, p) {
     if (p.gap != null) el.style.gap = typeof p.gap === "number" ? p.gap + "px" : p.gap[0] === "/" ? `calc(var(--t-gap) / ${p.gap.slice(1)})` : `calc(${p.gap.slice(1)} * var(--t-gap))`;   // F10: steps of the style's gap
-    if (p.scroll && p.scroll !== "none") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    if (p.scroll && p.scroll !== "none" && p.scroll !== "none end") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    // a5496 (Alex, 15 Oct: 'I don't want the interface to scroll'): `scroll none` never scrolls; what does not fit is
+    // cut, and a cut part fades at its foot (lens.html), so the eye knows there is more (settle marks data-cut).
+    // `scroll none end` is cut at its head instead, its end always in view: a chat's newest lines
+    if (p.scroll === "none" || p.scroll === "none end") { el.style.overflow = "hidden"; el.dataset.scroll = "none"; }
+    if (p.scroll === "none end") el.dataset.atEnd = "1";
     if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
     if (!n.acts.some(a => a.on === "fold")) return;
     // Alex, 29 Sep: a floating fold is a menu. Its open contents are drawn over the page below the handle, it opens for
@@ -399,7 +404,7 @@
     recover.type = "button"; recover.textContent = "Use current version"; recover.className = Style.roleClass("button");
     post.className = Style.roleClass("button"); discard.className = Style.roleClass("tool"); status.className = Style.roleClass("meta");
     actions.append(post, discard, recover, status); el.append(input, actions);
-    let busy = false, picked = TEXT.selected(n);
+    let busy = false, picked = TEXT.selected(n), why = "";
     const sync = () => {
       // Reused elements must observe the refreshed value too. Otherwise a refused draft
       // never gets `shown`, and the next keystroke loses its origin while keeping its text.
@@ -420,7 +425,7 @@
       const unknown = !!d && !d.seen && !d.shown;
       post.disabled = busy || !input.value.trim() || unknown; discard.disabled = busy;
       recover.hidden = !unknown; recover.disabled = busy;
-      status.textContent = busy ? "Sending…" : unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "";
+      status.textContent = busy ? "Sending…" : why || (unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "");
       status.setAttribute("aria-live", "polite");
       V.mark(el, n.key);
       // An empty composer has no saved current text to compare with a refused draft.
@@ -431,11 +436,27 @@
     input.value = V.words(n.key, n.paint.text || "", n.fence);
     input.addEventListener("focus", () => { if (!openComposers.has(n.key) && !V.drafts.has(n.key)) picked = TEXT.selected(el._n); openComposers.add(n.key); V.hold = n.key; sync(); });
     input.addEventListener("blur", () => { if (!V.repainting) { V.hold = null; sync(); } });
-    input.addEventListener("input", () => { V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
+    input.addEventListener("input", () => { why = ""; V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
+    // a5588 (a5581: a click in the box's middle missed its one-row textarea, and the keys went nowhere): the whole
+    // composer is its hit area, so a press on its padding, the actions row or the status gives the words the caret
+    el.addEventListener("mousedown", e => {
+      if (e.button !== 0 || e.target === input || e.target.closest("button, a, input, select")) return;
+      e.preventDefault(); input.focus();
+    });
+    // Enter that cannot send says why on the page, instead of pressing a disabled Send
+    const trySend = () => {
+      if (busy) return;
+      const d = V.drafts.get(n.key);
+      why = !input.value.trim() ? "Nothing to send — write something first"
+        : d && !d.seen && !d.shown ? "Not sent — this draft was typed against a version not shown here: Use current version, or Discard"
+        : "";
+      if (why) return sync();
+      post.click();
+    };
     post.onclick = async () => {
       if (busy || !input.value.trim()) return;
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
-      const raw = input.value; busy = true; sync();
+      const raw = input.value; busy = true; why = ""; sync();
       await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
       busy = false;
       if (!V.drafts.has(n.key)) { input.value = ""; openComposers.delete(n.key); }
@@ -446,7 +467,7 @@
       if (V.useCurrent(n.key, { key: n.key, fence: el._n.fence, text: el._n.paint.text || "" })) { sync(); input.focus(); }
     };
     input.addEventListener("keydown", e => {
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); post.click(); }
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); trySend(); }
       if (e.key === "Escape") { e.preventDefault(); input.blur(); }
     });
     sync();
@@ -971,7 +992,13 @@
       }
     }
     for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
+    for (const el of paint.querySelectorAll('[data-scroll="none"]')) {
+      // a hair is not more. Cut at the head (none end), the overflow is above the box, where scrollHeight does not count it
+      const head = el.dataset.atEnd && el.firstElementChild ? el.getBoundingClientRect().top - el.firstElementChild.getBoundingClientRect().top : 0;
+      el.dataset.cut = el.scrollHeight > el.clientHeight + 8 || head > 8 ? "1" : "";
+    }
   }
+
   // which floating part is in hand: the one pressed, else the one beside what was pressed (the smallest part around
   // the press that holds exactly one), else none
   paint.addEventListener("pointerdown", e => {

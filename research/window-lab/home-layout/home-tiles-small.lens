@@ -1,0 +1,3 @@
+# home-tiles-small: what is open on the screen, in one line (a5496), for its panel title and the shelf.
+n : text "$(count(witnessed:desktop)) windows"
+  role summary
