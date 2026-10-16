@@ -105,6 +105,31 @@
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
+  /* `media` (a5941, media.js): films and pictures under the words, or one filling its part (`media player`). Sizes
+     follow the part (%, em); the look (colour, edge, the buttons) is the roles media, tool and meta. The one exception
+     to "no colour here": a film's letterbox is black and its play disc white on dark, as every video's is, so the
+     button reads over any picture whatever the style */
+  .t-media { display: flex; flex-direction: column; gap: .5em; margin-top: .5em; white-space: normal; user-select: none; }
+  .media-item { margin: 0; max-width: 32em; display: flex; flex-direction: column; overflow: hidden; }
+  .media-stage { position: relative; display: grid; place-items: center; background: #000; }
+  .media-stage > video, .media-stage > img { display: block; width: 100%; height: auto; max-height: 24em; object-fit: contain; }
+  .media-item .media-stage > video:not([controls]), .media-item .media-stage > img { cursor: pointer; }
+  .media-play { position: absolute; inset: 0; margin: auto !important; width: 3.2em; height: 3.2em; border-radius: 50% !important;
+    display: grid !important; place-items: center; text-align: center !important; color: #fff !important; background: rgba(0,0,0,.55) !important; }
+  .media-play[hidden] { display: none !important; }
+  .media-play svg { width: 1.6em; height: 1.6em; margin-left: .15em; }
+  .media-bar { display: flex; align-items: center; gap: .75em; padding: .35em .6em; min-width: 0; }
+  .media-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .media-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .media-button { white-space: nowrap; }
+  .media-button svg { width: 1.2em; height: 1.2em; display: block; }
+  .media-player { margin: 0; height: 100%; min-height: 0; display: flex; flex-direction: column; outline: none; }
+  .media-player > .media-stage { flex: 1; min-height: 0; }
+  .media-player > .media-stage > video, .media-player > .media-stage > img { width: 100%; height: 100%; max-height: none; }
+  .media-player[data-full] { position: fixed; inset: 0; z-index: 30; }
+  .media-seek { flex: 3; min-width: 6em; accent-color: var(--t-accent, currentColor); }
+  .media-speeds { display: flex; gap: .25em; }
+  .media-speeds > [data-on] { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
   /* `live` (a5530): the painter's clock and counts; `until ring` a ring that empties, the time left inside it */
   .t-live { font-variant-numeric: tabular-nums; }
   .t-ring { position: relative; display: grid; place-items: center; aspect-ratio: 1; width: 100%; max-width: 9em; margin-inline: auto; white-space: nowrap; }
@@ -139,6 +164,7 @@
 <script src="door.js"></script>
 <script src="image-comments.js"></script>
 <script src="markdown.js"></script>
+<script src="media.js"></script>
 <script src="lens.js"></script>
 <script src="term.js"></script>
 </body>

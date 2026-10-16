@@ -540,7 +540,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         _house()
-        if self.path.startswith("/api/") and self._foreign():
+        if (self.path.startswith("/api/") or self.path.startswith("/media/")) and self._foreign():
             return self._json({"error": "deskd answers only its own pages"}, 403)
         try:
             return self._get()
@@ -661,6 +661,11 @@ class Handler(SimpleHTTPRequestHandler):
             if st is not None:
                 _EVENTS[name] = (st.st_mtime_ns, st.st_size, total)
             return self._json({"events": evs, "total": total})
+        if u.path.startswith("/media/"):
+            # a5941: a film or picture a `media` text names, from the folders the desk may show (media_links.FOLDERS)
+            # and nowhere else; ranges, so a film seeks. Loads no session
+            import media_links
+            return media_links.serve(self, u.path)
         return super().do_GET()
 
     def _post(self):

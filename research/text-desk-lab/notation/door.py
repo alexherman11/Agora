@@ -946,7 +946,7 @@ class Handler(BaseHTTPRequestHandler):
         self._pass("POST", body)
 
     def _pass(self, method, body):
-        if self.path.startswith("/api/") and self._foreign() or (method == "POST" and self._foreign()):
+        if (self.path.startswith("/api/") or self.path.startswith("/media/")) and self._foreign() or (method == "POST" and self._foreign()):
             return self._json({"error": "deskd answers only its own pages"}, 403)
         headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP}
         if body is not None:
