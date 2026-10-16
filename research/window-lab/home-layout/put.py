@@ -9,6 +9,13 @@ A .lens file's name is the lens title and its text is the lens: a note of that t
 rewritten (read first), else made, tagged lens, style=home-style. A .desk file is desk lines, one a line, run in order;
 a line that begins with # is skipped. try: the worktree's frontier-try, loaded and saved here (never a world a
 server holds). live: through the keeper's door (127.0.0.1:8794), a real act in the real world.
+
+The whole step, in order, once the code it needs (share $(...), scroll none and none end) is on main:
+    style.desk  waiting-on-me-small.lens home-board-small.lens home-work-small.lens home-tiles-small.lens
+    home-panels.lens home-tiling.lens  layout-alex.desk  strip.desk dock.desk chat.desk  home-base.lens
+strip.desk, dock.desk and chat.desk replace exact passages as they stood on 15 Oct: a refusal there means someone has
+changed that lens since, so read it and adjust the line, never force it. home-base.lens goes last: until then the home
+base is the old frame and nothing a person sees changes.
 """
 import json
 import pathlib

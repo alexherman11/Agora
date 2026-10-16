@@ -5,7 +5,8 @@ do replace a5540 old="  role panel\n  head : text \"The lowdown\"\n    role head
 read a5544
 do replace a5544 old="  role panel\n  head : text \"At work\"\n    role heading\n" new=""
 read a5548
-do replace a5548 old="  role panel\n  head : text \"The board\"\n    role heading\n" new=""
+do replace a5548 old="tasks : column\n  role panel\n" new="tasks : column\n"
+do replace a5548 old="  head : row\n    role bdhead\n    title : text \"The board\"\n      role heading\n      share 1\n" new="  head : row\n    role bdhead\n"
 read a5546
 do replace a5546 old="  role side\n  head : text \"On your screen\"\n    role heading\n" new=""
 read a5439
