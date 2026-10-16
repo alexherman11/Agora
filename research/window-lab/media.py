@@ -15,19 +15,12 @@ rows() is what the home base keeps as `witnessed:media`: one row, {name: "media"
 artist, line}, or no row when no player is found. press(action) is what a click on a part keyed media-play,
 media-next or media-prev does.
 
-The lens (home-base a5208, style home-style a5206) has a panel "music" with parts prev, play and next (role mediakey)
-and a repeat over witnessed:media (each nowplaying: title, artist, "Paused"). What hud.py adds to use this (a5245; not
-in hud.py yet, since hud.py was not in git when this was written):
-    import media                                                    # beside import witnessed
-    self.window.evaluate_js(media.CLICKS)                           # in Hud.dress, beside CLICKS
-    witnessed.write(self.a.world, "media", media.rows(), by="hud")  # in Hud.say_desktop, beside the desktop's rows
-    def media(self, action):                                        # on Hud: press, then say the new song soon after
-        did = media.press(action)
-        threading.Timer(0.8, self.say_desktop).start()
-        return did
-    def media(self, action):                                        # on Api
-        return self._hud.media(action)
-    witnessed.clear(..., "media")                                   # in Hud.closed and in --stop, beside "desktop"
+The panel is the lens home-music (a5592, in Home base f5204, placed at the top of home-base's right column; its source
+and a put script in home-music/ here): parts prev, play and next (role mediakey) that ask `on click host media.prev`
+and so on (host_verbs.py, a5300), and a repeat over witnessed:media (each nowplaying: title, artist, "Paused").
+hud.py writes witnessed:media in Hud.say_desktop and clears it in Hud.closed and --stop. CLICKS below is how the
+buttons asked before host verbs (a5245); hud.py no longer injects it (a5592), and Hud.media / Api.media stay only for
+a home base still running older code.
 """
 import ctypes
 import sys

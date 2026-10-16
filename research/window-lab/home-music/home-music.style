@@ -1,0 +1,4 @@
+# a5592: the music panel (home-music)
+role musictop : between gap
+role mediakey : text up 2, ink, on wash, corner gap x3, pad gap /2, pad left gap, pad right gap, touch
+role nowplaying : between gap /4

@@ -228,7 +228,6 @@ class Hud:
         css = ("html{background:#0d100f url(%s) center/cover no-repeat fixed!important}"
                "body,#paint{background:transparent!important}") % frost
         self.window.evaluate_js(CLICKS)
-        self.window.evaluate_js(media.CLICKS)
         self.window.evaluate_js("(() => { let s = document.getElementById('hud-frost');"
                                 " if (!s) { s = document.createElement('style'); s.id = 'hud-frost'; document.head.append(s); }"
                                 " s.textContent = %s; })()" % json.dumps(css))

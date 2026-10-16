@@ -1,0 +1,36 @@
+# home-music: a small music controller, one panel of the home base (a5208), placed at the top of its right column. hud.py says witnessed:media (media.py, a5245: Spotify's window title, no sign-in, so a paused Spotify shows no song); the buttons ask the home base with host verbs (a5300). a5592.
+music : column
+  role panel
+  top : row
+    role musictop
+    head : text "Music"
+      role heading
+      share 1
+    prev : text "⏮"
+      role mediakey
+      on click host media.prev
+    play : text "⏯"
+      role mediakey
+      on click host media.play
+    next : text "⏭"
+      role mediakey
+      on click host media.next
+  playing : column
+    of witnessed:media as m
+    each nowplaying
+  none : text "Spotify is not open; the buttons press the media keys."
+    role meta
+    only when count(witnessed:media) = 0
+nowplaying : column
+  role nowplaying
+  title : text "$m.title"
+    role who
+    clamp 1
+    only when $m.playing = "yes"
+  artist : text "$m.artist"
+    role meta
+    clamp 1
+    only when $m.playing = "yes"
+  paused : text "Paused"
+    role meta
+    only when $m.playing = "no"
