@@ -544,13 +544,13 @@ a5760 · family=authority · status=curing
 
 Source edit (a5750, worker-a5750, 16 Oct): workshop.py and desk_mcp.py. The world had no word for who may let a builder run what: a worker's tools were one list in Worker.start, the same for every card, so Alex's 'talking with JEFF is the same authority as me' had no way through (a5723 could not read powercfg). Now a card's extra_tools=, set by a plain do prop signed jeff or alex, adds exact commands for that card's worker only, and the card says what was granted. Found on the way: the desk tool took as= from the caller, so a worker could sign as jeff; a worker's tool is now pinned (DESK_PIN). The missing world-level word: a grant, a thing in the world that says who may do what and was given by whom, which the house reads instead of code holding the list. Still a guardrail: a worker keeps python.
 
-### A saying must retain one message identity and its real writer
+### Home base: a capture's picture and the control screen's life needed source (a5834)
 
-a5853 · family=attribution · status=curing
+a5892 · family=host · status=curing
 
-Read: world.py explicitly aliases JEFF comment/reply/resolve authors to Alex; scene.py splits structured multiline chat messages into rows sharing the same event key except in involving mode. Fix new comment authors and keep each structured message whole in every sayings view. Preserve historic signatures and event log.
+Missing world words: (1) a row source field for a private capture's pixels: jeff-chat could show only a label, so `thumb` was added to the captures source (scene.py, captures.thumb). (2) A host that keeps a helper process alive: the home base had no word for 'run this tool while I run', so hud.py starts capture.py itself, switched by the capture= prop on a5208. (3) host_verbs.settings read examine's first line, which was often '!! since your last look', so every home-base setting silently read as its default; now the note's own line. A host verb or prop that names a helper (run=capture) would make (2) world-level.
 
-## cured (62)
+## cured (63)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1080,3 +1080,9 @@ a5394, 15 Oct. The world could say hide_taskbar on the home-base lens note (a530
 a5809 · family=missing-word · status=cured
 
 The restart helper discarded the pinned interpreter in favor of _base_executable; the resulting HUD failed to import webview. The missing operational guarantee is restart in the same dependency environment. Preserve sys.executable; verified manual pinned restart starts HUD PID51388.
+
+### A saying must retain one message identity and its real writer
+
+a5853 · family=attribution · status=cured
+
+Read: world.py explicitly aliases JEFF comment/reply/resolve authors to Alex; scene.py splits structured multiline chat messages into rows sharing the same event key except in involving mode. Fix new comment authors and keep each structured message whole in every sayings view. Preserve historic signatures and event log.
