@@ -11,6 +11,7 @@ edit to the lab takes effect on the next call instead of breaking a long-lived i
 
 Environment:
     DESK_AS       default actor when a call names none (one server per agent can pin its identity here)
+    DESK_PIN      set: a call may name no actor but DESK_AS (a5750: a worker's desk tool)
     DESK_SESSION  default session (frontier)
     DESKD         passed through to explore.py (off = skip the server)
 
@@ -92,6 +93,9 @@ def split_lines(text):
 def run_desk(args):
     line = str(args.get("line") or "").strip()
     who = str(args.get("as") or os.environ.get("DESK_AS") or "").strip().lower()
+    pinned = os.environ.get("DESK_PIN") and str(os.environ.get("DESK_AS") or "").strip().lower()
+    if pinned and who != pinned:     # a5750: a worker signs only as itself (only jeff or alex may grant it extra_tools)
+        return f"ERR this desk tool signs only as {pinned}", True
     session = str(args.get("session") or os.environ.get("DESK_SESSION") or "frontier").strip()
     window = str(args.get("window") or "").strip()
     if not line:

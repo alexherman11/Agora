@@ -1121,6 +1121,36 @@ class Workshop:
         self.returned(cid, s, wk, "working", why, f"~ house: {why}")
 
 
+GRANTERS = {"jeff", "alex"}     # a5750: who may grant a card's worker extra commands
+UNSAFE = re.compile(r"[*;|&$`<>\n\r]")
+
+
+def extra_tools(w, s):
+    """a5750 (Alex, 15 Oct: talking with JEFF is the same authority as talking to Alex): the card's extra_tools=
+    "cmd | cmd" gives its worker each exact command, in PowerShell and Bash, and nothing else. It counts only if the
+    last act that set it was signed jeff or alex, by hand (a `do prop`: no rule, verb or selection), and not undone. A command may hold no wildcard
+    and no ; | & $ ` < > (Claude Code splits a compound command and checks each part, so it could never match).
+    -> (tools for --allowedTools, the commands, the event that granted them, why not or "")."""
+    value = str(((s or {}).get("props") or {}).get("extra_tools") or "").strip()
+    if not value:
+        return [], [], None, ""
+    apps = set(w.appearances_of(s["id"])) | {s["id"]}
+    ev = next((e for e in reversed(w.events) if not e.get("undone") and e["verb"] == "prop"
+               and (e["target"] in apps or s["id"] in (e.get("changed") or []))
+               and "extra_tools" in (e.get("args") or {})), None)
+    if ev is None:
+        return [], [], None, "no act on the card set extra_tools"
+    if str(ev.get("by") or "").lower() not in GRANTERS or ev.get("via", "prop") != "prop":     # by hand: `do prop`
+        return [], [], ev["id"], f"extra_tools was set by {ev.get('by')}{' via ' + ev['via'] if ev.get('via') else ''}; only jeff or alex may grant"
+    if str(ev["args"]["extra_tools"]).strip() != value:
+        return [], [], ev["id"], "extra_tools differs from what jeff or alex set"
+    cmds = [c.strip() for c in value.split("|") if c.strip()]
+    bad = [c for c in cmds if UNSAFE.search(c) or "(" in c or ")" in c or len(c) > 200]
+    if bad or len(cmds) > 16:
+        return [], [], ev["id"], f"not exact commands: {'; '.join(bad) or f'{len(cmds)} of them, 16 at most'}"
+    return [f"{shell}({c})" for c in cmds for shell in ("PowerShell", "Bash")], cmds, ev["id"], ""
+
+
 class Worker:
     """A worker's process, stream and transcript: the resident's machinery (house.Resident), launched with tools."""
 
@@ -1138,7 +1168,8 @@ class Worker:
                 mcp = self.dir / "mcp.json"
                 mcp.write_text(json.dumps({"mcpServers": {"desk": {
                     "command": str(PY), "args": [str(HERE / "desk_mcp.py")],
-                    "env": {"DESK_AS": self.actor, "DESK_SESSION": world, "DESKD": os.environ.get("DESKD", "off")}}}}),
+                    "env": {"DESK_AS": self.actor, "DESK_PIN": "1", "DESK_SESSION": world,
+                            "DESKD": os.environ.get("DESKD", "off")}}}}),
                     encoding="utf-8")
                 who = (WHO_BUILDER.format(builder=self.builder, actor=self.actor, task=self.cid) if self.builder
                        else WHO_WORKER)
@@ -1166,6 +1197,16 @@ class Worker:
                 # a5284: a codex card that names no model runs the adapter's own (codex_worker.MODEL), never the
                 # house's Claude model
                 model = props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL)
+                extra, cmds, ev, why = extra_tools(current, task) if task else ([], [], None, "")
+                if provider != "claude" and cmds:
+                    extra, why = [], f"extra_tools is for claude workers; this one is {provider}"
+                said = f"granted {self.actor} these extra commands ({ev}): {' | '.join(cmds)}" if extra else \
+                    (f"extra_tools not granted ({ev or 'no act'}): {why}" if why else "")
+                if said and said != self.state.get("extra_said"):     # said on the card once per grant, waking no one
+                    self.house.act("house", f"look {self.cid} :1; do comment {self.cid} "
+                                            f"line={json.dumps(said, ensure_ascii=False)} to=nobody")
+                    self.state["extra_said"] = said
+                tools = tools + extra
                 if self.builder:
                     # a5378: the conversation is the builder's, moved to where claude will look for it from this worktree
                     b = Builder(self.house, self.builder)
