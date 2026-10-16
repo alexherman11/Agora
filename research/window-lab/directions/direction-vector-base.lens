@@ -1,0 +1,67 @@
+# direction-vector-base (a5534): the home base as a flight deck, a copy of home-base (a5208) wearing direction-vector.
+# The bar is a telemetry strip: three readouts (waiting on Alex, commissions in flight, the house at work). Narrow
+# instrument columns either side of a wide centre. A panel Alex keeps (pinned) has a lit rule above it; a loose one, a faint one.
+home : column
+  share 1
+  role home
+  let waits = count(tag:ready-for-review) + count(prop:design=waiting)
+  let flying = count(prop:commission=working) + count(prop:commission=waiting)
+  let crew = count(house doing=working)
+  bar : row
+    role bar
+    hello : column
+      share 1
+      mark : text "AGORA"
+        role brand
+      name : text "HOME BASE // ALEX"
+        role readlabel
+    r1 : column
+      n : text "$(waits)"
+        role readout
+      l : text "WAITING ON YOU"
+        role readlabel
+    r2 : column
+      n : text "$(flying)"
+        role readout
+      l : text "IN FLIGHT"
+        role readlabel
+    r3 : column
+      n : text "$(crew)"
+        role readout
+      l : text "CREW AT WORK"
+        role readlabel
+    r4 : column
+      n : text "$today"
+        role readout
+      l : text "CTRL+ALT+J · ESC"
+        role readlabel
+  body : grid 4 11 4
+    share 1
+    role body
+    left : column
+      role side
+      scroll scroll
+      waiting : column
+        role pinned
+        lens waiting-on-me
+      tasks : column
+        role loose
+        lens home-board
+    middle : column
+      share 1
+      role pinned
+      lens home-viewer
+    right : column
+      role side
+      scroll scroll
+      work : column
+        role loose
+        lens home-work
+      screen : column
+        role loose
+        lens home-tiles
+      lowdown : column
+        role loose
+        lens home-lowdown
+  dock : row
+    lens home-dock

@@ -1,0 +1,78 @@
+# direction-halo-base (a5534): the home base as one stage and an orbit, a copy of home-base (a5208) wearing direction-halo.
+# The day in large type, three soft readouts (the house's one breathes while anyone works). The middle is the stage,
+# pinned, in a glowing tray. Everything else orbits at the right as an accordion: opening one panel folds the others,
+# and the panel slides open (the painter's unfold, the one slide it has).
+home : column
+  share 1
+  role home
+  let waits = count(tag:ready-for-review) + count(prop:design=waiting)
+  let flying = count(prop:commission=working) + count(prop:commission=waiting)
+  let crew = count(house doing=working)
+  bar : row
+    role bar
+    hello : column
+      share 1
+      mark : text "AGORA · HOME BASE"
+        role brand
+      day : text "$(weekday($today)) $today"
+        role place
+    r1 : row
+      role readpill
+      n : text "$(waits)"
+        role readout
+      l : text "waiting on you"
+        role readlabel
+    r2 : row
+      role readpill
+      n : text "$(flying)"
+        role readout
+      l : text "in flight"
+        role readlabel
+    r3 : row
+      role readpill
+      role readpill.alive when crew > 0
+      n : text "$(crew)"
+        role readout
+      l : text "at work"
+        role readlabel
+  body : grid 13 6
+    share 1
+    role body
+    stage : column
+      share 1
+      role pinned
+      lens home-viewer
+    orbit : column
+      role side
+      waiting : column
+        role loose
+        share 1
+        scroll scroll
+        fold "01   WAITING" open group orbit handle orbit
+        lens waiting-on-me
+      board : column
+        role loose
+        share 1
+        scroll scroll
+        fold "02   BOARD" group orbit handle orbit
+        lens home-board
+      work : column
+        role loose
+        share 1
+        scroll scroll
+        fold "03   AT WORK" group orbit handle orbit
+        lens home-work
+      screen : column
+        role loose
+        share 1
+        scroll scroll
+        fold "04   ON SCREEN" group orbit handle orbit
+        lens home-tiles
+      lowdown : column
+        role loose
+        share 1
+        scroll scroll
+        fold "05   LOWDOWN" group orbit handle orbit
+        lens home-lowdown
+  dock : row
+    lens home-dock
