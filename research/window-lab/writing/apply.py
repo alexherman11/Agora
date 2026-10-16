@@ -6,15 +6,21 @@ on a copy and applied to the live world after the code it needs (the `markdown` 
     python research/window-lab/writing/apply.py try <out.desk>       lines, then the first page (welcome.md) opened: a copy to look at
     python research/window-lab/writing/apply.py door-demo [--as <name>]   the first page alone, live, once `door` has run
     python research/window-lab/writing/apply.py door [--as <name>]   all of it, to the live door, line by line, stopping at a refusal
+    python research/window-lab/writing/apply.py stage [--as <name>]  live, BEFORE the code lands: all of it and the first
+                       page, but the lens without its `lens` tag (not compiled) and the dock icon as it was
+    python research/window-lab/writing/apply.py finish [--as <name>] live, AFTER the landing; or type its desk lines:
+                       read "writing" / do tag "writing" add=lens / look a5573 / do prop a5573 window=writing remove=opens
 
 What the lines make, in the Writing room (f3402), all world data anyone may change afterwards:
-  - the style `writing` and the lens `writing` (style=writing);
+  - the style `writing-style` and the lens `writing` (style=writing-style);
+  - a first page, "Writing in Agora" (welcome.md), opened in the writer's window;
   - a surface "Notes (Writing)" where + New puts a new one-text document (a note, role=doc: a4865);
   - a writer's note for alex (role=writer actor=alex), what his Writing window has open;
   - the dock's Writing room icon (a5573) opens the Writing app as its own window: opens= becomes window=writing.
 Applying twice makes everything twice: it is for a world that has none of it yet."""
 import json
 import pathlib
+import re
 import sys
 import urllib.request
 
@@ -31,16 +37,23 @@ def text(name):
     return (HERE / name).read_text(encoding="utf-8").rstrip("\n")
 
 
-def lines(who="alex"):
-    # one command a line: the door reads each request whole (a5659, 15 Oct)
-    return [f"look {ROOM}",
+def lines(who="alex", staged=False):
+    # one command a line: the door reads each request whole (a5659, 15 Oct). Staged (before the code lands): the lens
+    # is made without its `lens` tag, so the live world never holds a lens its running code refuses, and the dock
+    # icon is left as it is; FINISH adds both after the landing
+    tags = "" if staged else "tags=lens "
+    out = [f"look {ROOM}",
             f"do create {ROOM} kind=note title=writing-style tags=style text={q(text('writing.style'))}",
-            f"do create {ROOM} kind=note title=writing tags=lens style=writing-style text={q(text('writing.lens'))}",
+            f"do create {ROOM} kind=note title=writing {tags}style=writing-style text={q(text('writing.lens'))}",
             f'do create {ROOM} kind=surface title="Notes (Writing)" layout=column',
             'do prop "Notes (Writing)" role=writing-notes',
             f"do create {ROOM} kind=note title=\"{who.capitalize()}'s writing (what the Writing app has open)\" role=writer actor={who}",
             "look a5573",
             "do prop a5573 window=writing remove=opens"]
+    return out[:-2] if staged else out
+
+
+FINISH = ['read "writing"', 'do tag "writing" add=lens', "look a5573", "do prop a5573 window=writing remove=opens"]
 
 
 def demo(who="alex"):
@@ -65,16 +78,22 @@ def door(line, who):
 def main(argv):
     opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d       # noqa: E731
     who = opt("--as", "worker-a5820")
-    if not argv or argv[0] not in ("lines", "update", "try", "door", "door-demo"):
+    if not argv or argv[0] not in ("lines", "update", "try", "door", "door-demo", "stage", "finish"):
         print(__doc__)
         return 0
-    out = {"update": update, "try": lambda: lines() + demo(), "door-demo": demo}.get(argv[0], lines)()
+    out = {"update": update, "try": lambda: lines() + demo(), "door-demo": demo,
+           "stage": lambda: lines(staged=True) + demo(), "finish": lambda: FINISH}.get(argv[0], lines)()
     if argv[0] in ("lines", "update", "try"):
         pathlib.Path(argv[1]).write_text("\n".join(out) + "\n", encoding="utf-8")
         print(f"wrote {len(out)} lines to {argv[1]}")
         return 0
+    made = None
     for line in out:
+        if made and line.endswith("=$new"):          # $new does not carry between door requests (a5659): the id made
+            line = line[:-len("$new")] + made
         said = door(line, who)
+        m = re.search(r"→ created ([as]\d+)", said)
+        made = m.group(1) if m else made
         print(said[:400])
         if said.startswith("ERR") or "refused" in said[:200]:
             print("stopped: the line above was refused")
