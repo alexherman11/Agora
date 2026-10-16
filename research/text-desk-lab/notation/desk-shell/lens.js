@@ -174,6 +174,7 @@
         }
       }
     }
+    if (p.live && p.text != null) live(el, n, p);
     if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
     if (p.kind === "frame") frames(el, n, p);
     // a weight, as a track is; in a row, a share also fills the row's height (lens.html: .l-row > [data-share]). 1 Oct:
@@ -705,6 +706,61 @@
     if (a.closest("[contenteditable]") && !(e.ctrlKey || e.metaKey)) return;     // in a text being written, a click places the caret
     e.preventDefault(); window.open(a.dataset.href, "_blank", "noopener");
   });
+
+  // `live` (a5530, Alex: a clock top left, a pomodoro ring that visibly counts down): words this page keeps live from its
+  // own clock, once a second, with no scene built. clock and date draw now; `until` reads the words as a moment
+  // ("2026-10-15 17:05:12 of 1500") or as seconds left that stand still ("1453 of 1500") and draws the time left, `ring`
+  // inside a ring that empties. At zero, a count this page watched move chimes softly, and the part's `on end` is sent
+  // once (also when the page opens on a moment already past, so a timer that ended while no one looked is told).
+  const LIVE = new Set(), ENDED = new Set();
+  let liveTimer = 0, audio = null;
+  addEventListener("pointerdown", () => { try { audio = audio || new AudioContext(); audio.resume(); } catch (e) { /* no sound here */ } }, true);
+  function live(el, n, p) {
+    el.classList.add("t-live"); el._live = { kind: p.live, src: p.text, was: null };
+    LIVE.add(el); tick(el, false);
+    liveTimer = liveTimer || setInterval(() => {
+      for (const e of LIVE) if (e.isConnected) tick(e, true); else LIVE.delete(e);
+      if (!LIVE.size) { clearInterval(liveTimer); liveTimer = 0; }
+    }, 1000);
+  }
+  const clockOf = s => { const t = Math.max(0, Math.round(s)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, x = String(t % 60).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${x}` : `${m}:${x}`; };
+  function tick(el, watching) {
+    const L = el._live, now = new Date();
+    if (L.kind === "clock") { el.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); return; }
+    if (L.kind === "date") { el.textContent = now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }); return; }
+    const m = /^\s*(?:(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?|(-?\d+(?:\.\d+)?))(?:\s+of\s+(\d+(?:\.\d+)?))?\s*$/.exec(L.src);
+    if (!m) { el.textContent = L.src; return; }
+    const moving = m[7] == null, whole = m[8] ? +m[8] : 0;
+    const left = moving ? Math.max(0, Math.ceil((new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) - now) / 1000)) : Math.max(0, +m[7]);
+    if (L.kind === "until ring") {
+      if (!L.arc) {
+        el.classList.add("t-ring");
+        el.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="45" pathLength="1"/><circle class="ring-arc" cx="50" cy="50" r="45" pathLength="1"/></svg><span class="ring-time"></span>';
+        L.arc = el.querySelector(".ring-arc"); L.time = el.querySelector(".ring-time");
+      }
+      L.arc.style.strokeDashoffset = String(1 - (whole ? Math.min(1, left / whole) : 1));
+      L.time.textContent = clockOf(left);
+    } else el.textContent = clockOf(left);
+    el.toggleAttribute("data-ended", left === 0);
+    if (moving && left === 0 && !ENDED.has(el.dataset.key + "|" + L.src)) {
+      ENDED.add(el.dataset.key + "|" + L.src);
+      if (watching && L.was > 0) chime();
+      for (const a of el._n.acts.filter(a => a.on === "end")) send(el._n, a.line);
+    }
+    L.was = left;
+  }
+  function chime() {      // two soft notes, the second higher, each fading over a second
+    try {
+      audio = audio || new AudioContext(); const t = audio.currentTime;
+      for (const [f, at] of [[660, 0], [880, 0.3]]) {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t + at); g.gain.linearRampToValueAtTime(0.07, t + at + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 1.4);
+        o.connect(g).connect(audio.destination); o.start(t + at); o.stop(t + at + 1.5);
+      }
+    } catch (e) { /* a page with no sound still shows the end */ }
+  }
 
   // runs inside one text leaf: plain words as text, a code run in its role (a block run keeps its lines, verbatim)
   // `picture` (13 Oct): the part's text is a drawing written as SVG. Only shapes and words are drawn: an element or

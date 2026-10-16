@@ -122,8 +122,8 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end")    # end (a5530): a `live until` count reached zero
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
 # the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
@@ -1045,6 +1045,20 @@ def _w_picture(node, p, val, n, env):
     node["picture"] = True
 
 
+LIVE = ("clock", "date", "until", "until ring")
+
+
+def _w_live(node, p, val, n, env):
+    # a5530 (Alex: a clock top left and a pomodoro timer whose ring visibly counts down): words the painter keeps live
+    # from its own clock, redrawn each second with no scene built. `clock` the time, `date` the day; `until` reads the
+    # words as a moment (2026-10-15 17:05:12, or a number of seconds left when the count stands still) with `of <secs>`
+    # for the whole, and draws the time left, `ring` with a ring that empties. At zero it sends the part's `on end`.
+    # The words stay what the printers print, so a reader of the scene sees the moment, not a picture of it
+    if (val or "").strip() not in LIVE:
+        raise LensRefusal(f"line {n}: `live <{'|'.join(LIVE)}>`; got {p!r}")
+    node["live"] = val.strip()
+
+
 def _w_peek(node, p, val, n, env):
     if val and (not val.isdigit() or int(val) < 1):
         raise LensRefusal(f"line {n}: peek [positive line count]")
@@ -1165,9 +1179,10 @@ def _w_of(node, p, val, n, env):
 
 def _w_by(node, p, val, n, env):
     # a1069/a1078: a repeat in the order of props, numbers ascending, a missing value last, ties in the order the things
-    # were made. `by priority, rank`: the parts after the comma are more props (parse joins them), not words
-    if not re.fullmatch(r"[\w.-]+( [\w.-]+)*", val or ""):
-        raise LensRefusal(f"line {n}: `by <prop>[, <prop>]` on a repeat; got {p!r}")
+    # were made. `by priority, rank`: the parts after the comma are more props (parse joins them), not words.
+    # a5530: `by -at` puts the largest first (newest first); a missing value stays last
+    if not re.fullmatch(r"-?\w[\w.-]*( -?\w[\w.-]*)*", val or ""):
+        raise LensRefusal(f"line {n}: `by [-]<prop>[, [-]<prop>]` on a repeat (-: the largest first); got {p!r}")
     node["by"] = (node["by"] or []) + val.split()
 
 
@@ -1378,7 +1393,7 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
         label, g = m.group(1), "menu"
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
-        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>`, `on click host <verb> [words]` or `on drop <part> do <desk command>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on end do <desk command>` (a `live until` at zero), `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>`, `on click host <verb> [words]` or `on drop <part> do <desk command>`; got {p!r}")
     if when:
         try:
             X.parse(when)
@@ -1411,6 +1426,7 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
     "picture": ("picture", _w_picture),
+    "live": ("live clock|date|until [ring]", _w_live),
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
@@ -1420,7 +1436,7 @@ WORDS = {
     "the": ("the <selection> [as <frame>]", _w_the),
     "of": ("of <selection | row source> [as <frame>]", _w_of),
     "over": ("over $<list> [as <frame>]", _w_over),
-    "by": ("by <prop>[, <prop>]", _w_by),
+    "by": ("by [-]<prop>[, [-]<prop>]", _w_by),
     "run": ("run <prop>", _w_run),
     "count": ("count <selection>", _w_count),
     "as": ("as <frame>", _w_as),
@@ -1513,7 +1529,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "light": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1547,7 +1563,7 @@ def parse(src, roles=None, style=None):
         for wd in ("gap", "scroll", "fold", "measure"):
             if k[wd] not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
-        for wd in ("wrap", "lines", "hint", "commit", "light"):
+        for wd in ("wrap", "lines", "hint", "commit", "light", "live"):
             if k.get(wd) is not None and k["text"] is None:
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
@@ -1560,6 +1576,10 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `on key` is for a text being written: this part has no `on edit`")
         if any(a["on"] == "open" for a in k["on"]) and not k["fold"]:
             raise LensRefusal(f"line {k['line']}: `on open` needs a fold handle")
+        if any(a["on"] == "end" for a in k["on"]) and not (k.get("live") or "").startswith("until"):
+            raise LensRefusal(f"line {k['line']}: `on end` is sent when a count reaches zero: this part needs `live until`")
+        if k.get("live") and any(a["on"] == "edit" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: `live` words are the painter's, redrawn each second; edit them in a part without `live`")
         if type(k["peek"]) is int and k["text"] is None:
             raise LensRefusal(f"line {k['line']}: `peek <lines>` needs text")
         if k["each"] and k["each"] not in parts:
@@ -2114,6 +2134,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append("peek" + (f" {n['peek']}" if type(n["peek"]) is int else ""))
         if n.get("picture"):
             bits.append("picture")
+        if n.get("live"):
+            bits.append("live " + n["live"])
         if n.get("light"):
             bits.append("light " + str(len([x for x in str(n["light"]).split(chr(10)) if x.strip()])))
         if n.get("plain"):
@@ -2308,11 +2330,13 @@ def emit(node):
             paint["hint"] = node["hint"]
         if node.get("picture"):
             paint["picture"] = True
+        if node.get("live"):
+            paint["live"] = node["live"]
         if node.get("light") and str(node["light"]).strip():
             paint["light"] = [x.strip() for x in str(node["light"]).split(chr(10)) if x.strip()]
             if node.get("image_regions"):
                 paint["regions"] = node["image_regions"]
-        if not node.get("plain") and not node.get("picture") and node.get("text"):
+        if not node.get("plain") and not node.get("picture") and not node.get("live") and node.get("text"):
             rs = runs_of(node["text"], node.get("marks"))
             if node.get("marks"):
                 paint["marks"] = True

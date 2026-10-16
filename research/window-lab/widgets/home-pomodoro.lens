@@ -1,0 +1,90 @@
+# home-pomodoro: a focus timer (a5530). Its state is world facts on Alex's timer note (role=pomodoro actor=$me), so it
+# survives closing the home base and anyone can read it: mode focus|break, focus= and rest= in minutes, state
+# idle|running|paused|done, started= (the moment it last started, $now at the press), left= (seconds left then) and
+# paused= (the moment of the pause). Each press stores only values that stand still while the timer is in that state,
+# so the lens computes the rest when it is drawn: the end is started + left, and a pause leaves left - (paused -
+# started). The ring is the painter's (`live until ring`), counting to the end on its own clock; at zero it chimes
+# softly and the part's `on end` marks the note done. While a focus runs, the notices widget holds its news.
+# A widget: tag widget, slot=bar, order=3.
+pomo : row
+  role pomo
+  of prop:role=pomodoro,prop:actor=$me as t
+  each timer
+  none : text "no timer note (role=pomodoro actor=you) in the Home base room"
+    role hint
+    only when count(prop:role=pomodoro,prop:actor=$me) = 0
+timer : row
+  role pomotimer
+  let whole = $t.focus * 60 when $t.mode = "focus"
+  let whole = $t.rest * 60 otherwise
+  let ends = $t.started + $t.left * 1m / 60
+  let held = $t.left - ($t.paused - $t.started) / 1m * 60
+  let label = "focus done" when $t.state = "done" and $t.mode = "focus"
+  let label = "break over" when $t.state = "done"
+  let label = "focus" when $t.mode = "focus"
+  let label = "break" otherwise
+  running : text "$(ends) of $(whole)"
+    live until ring
+    role pomoring
+    only when $t.state = "running"
+    on end do prop $t state=done
+  paused : text "$(held) of $(whole)"
+    live until ring
+    role pomoring.still
+    only when $t.state = "paused"
+  idle : text "$(whole) of $(whole)"
+    live until ring
+    role pomoring.still
+    only when ($t.state or "idle") = "idle"
+  done : text "0 of $(whole)"
+    live until ring
+    role pomoring.done
+    only when $t.state = "done"
+  side : column
+    role pomoside
+    mode : text "$(label)"
+      role pomomode
+      role pomomode.on when $t.state = "running" or $t.state = "done"
+    acts : row
+      role pomoacts
+      start : text "Start"
+        role pomobtn
+        only when ($t.state or "idle") = "idle"
+        let seen = ($t.started or "") + ($t.left or "")
+        on click do prop $t state=running started=$now left=$(whole)
+      pause : text "Pause"
+        role pomobtn
+        only when $t.state = "running"
+        let seen = $t.paused or ""
+        on click do prop $t state=paused paused=$now
+      resume : text "Resume"
+        role pomobtn
+        only when $t.state = "paused"
+        let seen = ($t.started or "") + ($t.left or "")
+        on click do prop $t state=running started=$now left=$(held)
+      rest : text "Break"
+        role pomobtn
+        only when $t.state = "done" and $t.mode = "focus"
+        let seen = ($t.started or "") + ($t.left or "")
+        on click do prop $t mode=break state=running started=$now left=$($t.rest * 60)
+      back : text "Focus"
+        role pomobtn
+        only when $t.state = "done" and $t.mode = "break"
+        let seen = ($t.started or "") + ($t.left or "")
+        on click do prop $t mode=focus state=running started=$now left=$($t.focus * 60)
+      more : text "+5"
+        role pomochip
+        only when $t.state = "running"
+        on click do prop $t left=$($t.left + 300)
+      tobreak : text "break"
+        role pomochip
+        only when ($t.state or "idle") = "idle" and $t.mode = "focus"
+        on click do prop $t mode=break
+      tofocus : text "focus"
+        role pomochip
+        only when ($t.state or "idle") = "idle" and $t.mode = "break"
+        on click do prop $t mode=focus
+      reset : text "Reset"
+        role pomochip
+        only when ($t.state or "idle") != "idle"
+        on click do prop $t state=idle

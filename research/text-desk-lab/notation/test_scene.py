@@ -1364,6 +1364,58 @@ def test_share_follows_data_and_scroll_none():
         tmp.unlink(missing_ok=True)
 
 
+def test_live_words_now_and_newest_first():
+    """a5530 (Alex: a clock top left, a pomodoro whose ring counts down and whose state is a world fact, notifications
+    newest first). `live clock|date|until [ring]` is a text the painter keeps live; `on end` needs `live until`; $now is
+    the moment a line runs (a lens leaves it for the press); a time keeps its seconds; `by -<prop>` is the largest
+    first; two ids of one letter compare by number (e9 < e10)."""
+    import datetime, re as _re
+    import deskd, expr as X, lens_ir, moo
+    refused('x : text "a", live sometimes', "live <clock|date|until|until ring>")
+    refused('x : column, live clock', "is a text word")
+    refused('x : text "a", on end do prop $item state=done', "needs `live until`")
+    refused('x : text "a", live clock, on end do prop $item state=done', "needs `live until`")
+    refused('x : text "a", live until, on edit do prop $item a="$value"', "edit them in a part without `live`")
+    assert X.fmt(X.typed("2026-10-15T17:04:58")) == "2026-10-15 17:04:58" and X.fmt(X.typed("2026-10-15 17:04")) == "2026-10-15 17:04"
+    lt = lambda a, b: X._cmp("<", X.typed(a), X.typed(b)).v      # noqa: E731
+    assert lt("e9", "e10") and not lt("b9", "a10") and lt("e10688", "e10791")     # one letter by number; else as words
+    assert [k for k in moo.sort_by(["e9", "e10", None, "e100"], ["-x"], lambda v, k: v)] == ["e100", "e10", "e9", None]
+    timer = chr(10).join([
+        "pomo : column, of prop:role=pomodoro as t, each timer",
+        "timer : column",
+        "  let ends = $t.started + $t.left * 1m / 60",
+        '  ring : text "$(ends) of 1500", live until ring, on end do prop $t state=done',
+        '  start : text "Start", on click do prop $t state=running started=$now left=1500',
+        "notes : column, of prop:role=notice as nt, each n",
+        "  by -came",
+        'n : text "$nt.title"'])
+    tmp = _scratch("_test_live")
+    try:
+        with deskd.Session("_test_live", "jeff") as desk:
+            say = lambda line: (lambda r: r.get("text") or r.get("error"))(desk.dispatch("desk", {"line": line}))   # noqa: E731
+            say("look")
+            say("do create f01 kind=note title=timer role=pomodoro started=2026-10-15T17:04:58 left=90")
+            for t, came in (("older", "2026-10-15T09:00:05"), ("newest", "2026-10-15T09:00:09"), ("middle", "2026-10-15T09:00:07")):
+                say(f"do create f01 kind=note title={t} role=notice came={came}")
+            sc = lens_ir.evaluate(desk, timer)
+            scene.emit(sc)
+            pv = scene.painter_view(sc)
+            ring, start = pv["kids"][0]["kids"]
+            assert ring["paint"]["text"] == "2026-10-15 17:06:28 of 1500" and ring["paint"]["live"] == "until ring", ring["paint"]
+            assert "runs" not in ring["paint"] and [a["on"] for a in ring["acts"]] == ["end"], ring
+            assert start["acts"][0]["line"].endswith("started=$now left=1500"), start["acts"]      # left for the press
+            assert "live until ring" in scene.to_text(sc, "t", "jeff", 0)
+            order = [k["text"] for k in lens_ir.evaluate(desk, "notes : column, of prop:role=notice as nt, each n\n  by -came\nn : text \"$nt.title\"")["kids"]]
+            assert order == ["newest", "middle", "older"], order
+            before = datetime.datetime.now().replace(microsecond=0)
+            say('read "timer"')
+            r = say('do prop "timer" state=running started=$now')
+            got = _re.search(r"started=(\S+)", r).group(1)
+            assert before <= datetime.datetime.fromisoformat(got) <= datetime.datetime.now(), (got, r)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     import os
     os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from

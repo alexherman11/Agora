@@ -120,8 +120,8 @@ def fmt(val, reach=True):
         s = str(int(val.v)) if float(val.v).is_integer() else f"{val.v:.4g}" if abs(val.v) < 1e6 else str(val.v)
     elif val.kind == "date":
         s = val.v.isoformat()
-    elif val.kind == "time":
-        s = val.v.strftime("%Y-%m-%d %H:%M")
+    elif val.kind == "time":       # a5530: a time that has seconds ($now, a moment counted to) keeps them
+        s = val.v.strftime("%Y-%m-%d %H:%M" + (":%S" if val.v.second else ""))
     elif val.kind == "duration":
         mins = val.v.total_seconds() / 60
         neg = mins < 0
@@ -497,6 +497,9 @@ def names_in(text):
 _COMPARABLE = {"number", "date", "time", "duration", "text"}
 
 
+_ID = re.compile(r"([a-z]+)(\d+)")
+
+
 def _cmp(op, a, b):
     if op in ("has", "!has"):
         hit = fmt(b, reach=False).lower() in fmt(a, reach=False).lower()
@@ -509,6 +512,11 @@ def _cmp(op, a, b):
     if a.kind not in _COMPARABLE and op not in ("=", "!="):
         return none(f"cannot order {a.kind}s")
     x, y = a.v, b.v
+    if a.kind == "text" and op not in ("=", "!="):
+        # a5530: two ids of one letter compare by their number (e9 < e10, as the events were made), not as letters
+        mx, my = _ID.fullmatch(x), _ID.fullmatch(y)
+        if mx and my and mx.group(1) == my.group(1):
+            x, y = int(mx.group(2)), int(my.group(2))
     return Value("bool", {"=": x == y, "!=": x != y, "<": x < y, ">": x > y, "<=": x <= y, ">=": x >= y}[op])
 
 
