@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (41)
+## open (42)
 
 ### F2. Scripts cannot say who is running them
 
@@ -278,6 +278,12 @@ Source edits by worker-a5530, 15 Oct, for Alex's 'a notification bar ... a pomod
 a5868 · family=missing · status=open
 
 a5824 (16 Oct, worker-a5824). Alex wants a Windows toast when work finishes, sent by any card or rule. The world part is a verb note (notify, a5864: a line in Notifications sent, a5861), but nothing in the world can make something happen on Alex's PC, so a source edit was needed: house.py's House.toasts watches that one chat and calls research/window-lab/notify.py. The missing world-level word: a way for a world act to ask a host for an effect (as a lens's `host <verb>` asks the home base, a5300), say `do host notify <words>`, answered by whichever host process holds the verb and recorded as an event with its answer. With it, the house would not need to know about toasts, and the next host effect (open a file, start a timer on the PC) would be one entry in a table, not another watcher.
+
+### Words a document lacked: a Markdown text drawn and written in place, and following a link (a5820)
+
+a5907 · family=lens-words · status=open
+
+Source edit by worker-a5820, 16 Oct, for Alex's ask (a5820: 'nice clean markdown formatting ... kinda like obsidian but better'). WANTED: a document that is one Markdown text (a4865) drawn as a document (headings, lists, tasks, quotes, code, tables, links, [[wikilinks]], ![[embeds]]) and written in place with the marks shown only on the line being written; a link that opens the other document. DONE IN THE WORLD: the Writing app itself (lens writing, style writing-style, Alex's writer note, the dock icon), research/window-lab/writing/apply.py. DONE IN SOURCE: scene.py the lens word markdown [links <selection>] and the gesture on link ($value the id), scene.wikilinks_of (a title or id named in [[ ]] resolved to a thing, read in lens_ir), press Ctrl+E / Ctrl+S; desk-shell/markdown.js (the reader, the drawing and the live-preview editor), lens.js wiring. WHY NO WORLD EDIT COULD DO IT: the painter draws a text as runs of a closed grammar, and an editable text is a plain contenteditable; a lens cannot say how a text is drawn line by line, nor resolve a name inside a text to a thing. THE SMALLEST SEAM THAT WOULD HAVE MADE IT A WORLD EDIT: (1) a world note that declares a text grammar (line kinds by pattern, each with its role and which characters are marks to hide), read by one generic painter routine; markdown.js would then be one such note; (2) a selection over the words inside a text (things named in it), so a lens could list and resolve links itself.
 
 ## curing (34)
 
