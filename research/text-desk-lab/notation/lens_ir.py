@@ -889,11 +889,26 @@ def is_thing(w, i):
     return isinstance(i, str) and (i in w.nodes or i in w.subjects)
 
 
+def may_read(desk, on):
+    """a5949 (Sable, on a5949; Juniper in f4358: an address is not believed): THE one place that asks whether this
+    viewer may have a lens stood on this thing, for all three doors (a typed `scene <lens> on`, an address's on=, a lens
+    placed on a thing), since every one of them comes through compile_lens. Today everyone here may read everything, so
+    it only asks that the id names a thing; strangers (Juniper's room) will add their refusal here. -> None or why not."""
+    if not is_thing(desk.world, on):
+        return f"on={on}: no thing has that id"
+    return None
+
+
 def stood_refusal(desk, acc, s, on):
-    """a5949 (Sable's a4270, 'each lens must say what it can stand on and refuse the rest in words'): a lens note's
-    stands_on=<selection> names what it can be stood on. -> the words of a refusal, or None when it may stand there."""
+    """a5949 (Sable's a4270, 'each lens must say what it can stand on and refuse the rest in words'): may_read, then a
+    lens note's stands_on=<selection>, what it can be stood on. -> the words of a refusal, or None when it may stand."""
+    if not on:
+        return None
+    no = may_read(desk, on)
+    if no:
+        return f"{no}, so lens {s['title']} cannot be stood on it"
     sel = (s.get("props") or {}).get("stands_on")
-    if not sel or not on:
+    if not sel:
         return None
     w = desk.world
     mine = {on} | ({w.nodes[on].get("subject")} if on in w.nodes else set(w.appearances_of(on) if on in w.subjects else []))
@@ -1051,8 +1066,6 @@ def scene_for(desk, name, part=None, words=None, on=None):
     nodes it showed whole, each for itself. With `on` (a5949) the lens is stood on that thing: an address is not
     believed (Juniper, a4270), so an id that names no thing is refused here, where the scene is built."""
     s = S.find_lens(desk, name)
-    if on is not None and not is_thing(desk.world, on):
-        raise S.LensRefusal(f"on={on}: no thing has that id, so lens {s['title']} cannot be stood on it")
     closure = []
     acc = Accessor(desk)
     import promises
