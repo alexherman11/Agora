@@ -71,7 +71,10 @@ def put_lens(w, path):
         w.do(f"read {hit[0]}")
         out = w.do(f"do rewrite {hit[0]} text={q(text)}")
     else:
-        out = w.do(f"look f5204; do create f5204 kind=note title={name} style=home-style text={q(text)}; do tag $new add=lens")
+        # one command per request, tagged in the create itself: the door reads a request whole (a `;` does not split it),
+        # and `$new` does not carry from one request to the next (a5659, 15 Oct)
+        w.do("look f5204")
+        out = w.do(f"do create f5204 kind=note title={name} tags=lens style=home-style text={q(text)}")
     print(name + ": " + " ".join(l.strip() for l in out.splitlines() if l.startswith(("ok ", "ERR", "~", "stopped"))))
 
 

@@ -105,8 +105,10 @@ def place(into):
 
 
 def lines(cleared="e10780", into="base"):
-    out = [f"do create {ROOM} kind=surface title=\"Alex's notices\" layout=column as=nb; set notices = $nb; "
-           f"do prop $notices role=notices actor=alex skip=a5080 cleared={cleared}",
+    # one command a line: the door reads each request whole, so a `;` there does not split it (a5659, 15 Oct)
+    out = [f"look {ROOM}",
+           f"do create {ROOM} kind=surface title=\"Alex's notices\" layout=column",
+           f"do prop \"Alex's notices\" role=notices actor=alex skip=a5080 cleared={cleared}",
            f"do create {ROOM} kind=note title=\"Alex's timer\" role=pomodoro actor=alex mode=focus focus=25 rest=5 state=idle",
            f"do create {ROOM} kind=note title=\"Alex's now\" role=now actor=alex"]
     for sel, topic in RULES:
@@ -129,7 +131,7 @@ def door(line, who):
 def main(argv):
     opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d       # noqa: E731
     who, into = opt("--as", "worker-a5530"), opt("--into")
-    if argv[:1] == ["door"] and not into:          # the live world says which frame it has
+    if argv[:1] in (["door"], ["door-place"]) and not into:          # the live world says which frame it has
         into = "tiling" if "nothing matches" not in door("find title:home-tiling,tag:lens", who) else "base"
     kw = {"into": into or "base", **({"cleared": opt("--cleared")} if opt("--cleared") else {})}
     out = {"lines": lambda: lines(**kw), "update": update, "place": lambda: place(kw["into"]),
