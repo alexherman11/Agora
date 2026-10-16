@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (39)
+## open (40)
 
 ### F2. Scripts cannot say who is running them
 
@@ -266,6 +266,12 @@ a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; n
 a5619 · family=lens-words · status=open
 
 Source edits by worker-a5496, 15 Oct, for Alex's 'I don't want the interface to scroll ... drag around the different sections ... collapse them' and his dynamic tiling (c5528). Missing world-level words, now in the language: (1) share could not follow data, so widening one panel could not push the others: share $(expr) / share $name, filled per part (scene._w_share, lens_ir after the lets; 0 or none = own size). (2) Nothing meant never scroll: scroll none was accepted and drew as plain overflow. Now scroll none clips, fades at the foot when cut, may shrink below its words, and a row of it never wraps (lens.html; a wrapping flex row's line grows to its tallest child and pushed a column of panels off the screen); scroll none end is cut at the head, the end in view (JEFF's chat). (3) No time of day for a lens: hud.py publishes witnessed:clock (time, day). Left open: earlier chat lines are out of reach in the HUD once the feed never scrolls (a page or an Earlier fold would need the draft to hold an offset and a repeat to skip by it); recency of glances is not kept (Sable c5552: it belongs beside the world, as painters' reports are); Sable's (5), showing the new arrangement on the press before the desk answers, is not done. Aside: in test_scene.py, test_picture_is_a_text_drawn sits below the __main__ block, so running the file never runs it.
+
+### Words a timer and a notification bar lacked: a clock the painter keeps, the moment of a press, newest first (a5530)
+
+a5648 · family=lens-words · status=open
+
+Source edits by worker-a5530, 15 Oct, for Alex's 'a notification bar ... a pomodoro timer' and 'move the time ... to top left'. Missing world-level words, now in the language: (1) nothing on a page could tick: a scene is built only when the world changes, so a clock or a countdown needed a scene a second or a host. Now `live clock|date|until [ring]` on a text: the painter redraws those words from its own clock (lens.js, lens.html). (2) nothing said a count had ended: `on end do <command>`, sent once per moment by the painter at zero (scene.py GESTURES). (3) a press could not say when it happened, so a timer could not be a world fact: the blank `$now` (names.py, blanks.py, desk_knife.py RULE_BLANKS), left unfilled by a lens so the desk fills it when the line arrives; expr times keep their seconds. (4) a repeat could not show newest first: `by -<prop>` (moo.sort_by, lens_ir, deskd), and ids compare and order by their number (e9 before e10; expr._cmp, moo.order_value), so `eid>e10780` means what it says. (5) a fold's label could not count: `fold "$(total)"` now computes (lens_ir). The widgets themselves are world data (research/window-lab/widgets/apply.py). Found while building: a selection as `create`'s target groups what it matches into a new surface (it moved Alex's notices into one) rather than creating in each; rules name the surface by title instead. Not cured: the frame name `x` is refused as a gesture name's shadow, which a reader meets with no hint of why `as x` is special.
 
 ## curing (32)
 
