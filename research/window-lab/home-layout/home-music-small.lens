@@ -1,0 +1,11 @@
+# home-music-small: what Spotify plays, in one line (a5592), for the music panel's title and the shelf.
+music : column
+  playing : column
+    of witnessed:media as m
+    each musicline
+  none : text "Spotify is not open"
+    role summary
+    only when count(witnessed:media) = 0
+musicline : text "$m.line"
+  role summary
+  clamp 1
