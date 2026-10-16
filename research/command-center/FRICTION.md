@@ -291,7 +291,7 @@ a5999 · family=lens-words · status=open
 
 Alex, 16 Oct: 'can we get that video to be hyperlinked in chat and open in a native window here? I don't want to have to open a different application.' JEFF's line held the demo film's path; the chat drew it as words, since nothing in a lens could draw a file from the PC, and the desk had no way to serve one. Source edits (a5941): scene.py (the word `media [player]`, the gesture `on pop`, `on pop host`), media_links.py (the folders the desk may show and the one judge of a path), deskd.py and door.py (GET /media/ with ranges, refused to other sites), desk-shell/media.js and lens.js/lens.html (the poster, inline play, the player, Pop out; a page with no home base opens `host window <lens>` as a window of its own browser). The world-level words that were missing: `media` on a text, and `on pop`. Still open: the folders are a list in source (media_links.FOLDERS), not world data; a path with spaces is not found; a poster is the film's frame at 0.1 s, not a chosen one.
 
-## curing (34)
+## curing (35)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -561,6 +561,12 @@ Source edit (a5750, worker-a5750, 16 Oct): workshop.py and desk_mcp.py. The worl
 a5892 · family=host · status=curing
 
 Missing world words: (1) a row source field for a private capture's pixels: jeff-chat could show only a label, so `thumb` was added to the captures source (scene.py, captures.thumb). (2) A host that keeps a helper process alive: the home base had no word for 'run this tool while I run', so hud.py starts capture.py itself, switched by the capture= prop on a5208. (3) host_verbs.settings read examine's first line, which was often '!! since your last look', so every home-base setting silently read as its default; now the note's own line. A host verb or prop that names a helper (run=capture) would make (2) world-level.
+
+### Home base: a bare Windows key tap, and opening Start, needed source (a5980)
+
+a6028 · family=host · status=curing
+
+Missing world words: (1) a host key that is not a hotkey: the home base's key is the hotkey= prop, read by RegisterHotKey, which binds a key plus modifiers and cannot bind a bare Win tap. So hud.py runs winkey.py (a low-level keyboard hook on its own thread), switched by a new winkey= prop on a5208. A world word for 'how the host is summoned' (summon=tap:Win | hotkey:Ctrl+Alt+J, any number of them) would make the next one a prop, but each kind of summoning still needs its own catcher in source. (2) a host verb to open the Start menu (start): the verb table is closed on purpose, so a new power is source by design. (3) host_verbs.settings now says read=False when the door did not answer, so a setting polled every 15 s keeps what it had instead of falling back to the default.
 
 ## cured (63)
 
