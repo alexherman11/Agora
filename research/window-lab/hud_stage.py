@@ -49,7 +49,8 @@ def main():
     world = a[0]
     session = f"{world}-screen-{os.getpid()}"
     base = LAB / "house-state" / session
-    witnessed.write(session, "desktop", [{"name": str(1000 + i), "title": t, "program": p, "front": "yes" if i == 0 else "no"}
+    # names as long as a real window handle's, so hud.py's SLOTS finds their tiles as it would (a5736)
+    witnessed.write(session, "desktop", [{"name": str(1000000 + i), "title": t, "program": p, "front": "yes" if i == 0 else "no"}
                                          for i, (t, p) in enumerate(WINDOWS)], by="hud_stage")
     if busy:
         # two residents, and three builders at work on commissions that are working in the copy (their cards breathe)

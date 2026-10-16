@@ -8,7 +8,8 @@ and read back what it measured. The screenshot is a PNG a model can open with it
 
 --term keeps the desk terminal beside the lens (it is hidden by default here); --page shell opens the windowed
 desktop (index.html: dock, windows, apps) instead of the painter. --reduced-motion looks as someone whose system asks
-for reduced motion (prefers-reduced-motion: reduce).
+for reduced motion (prefers-reduced-motion: reduce). --scale 1.5 paints as a display scaled 150% does (--size stays
+in CSS pixels: Alex's 3840x2160 at 150% is --size 2560x1440 --scale 1.5; a5736).
 
 By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served on a free port as the
 keeper serves the real one, by a door (door.py) with a deskd behind it, from a copy of THIS directory's desk-shell/
@@ -56,7 +57,8 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
                                  scroll, focus, whether a menu or float is open, the status line
     stream                       the world events the page's stream from the door delivered: their ids, any gap or
                                  duplicate among them, and how far behind the world the last one is
-    js <expression>              the value of a JavaScript expression in the page (awaited), as JSON
+    js <expression>              the value of a JavaScript expression in the page (awaited), as JSON; js @f.js reads it
+                                 from a file (one expression, e.g. research/window-lab/scroll_cost.js)
 --bare serves the copy from a deskd alone, without the door (as before a1505); `land` then restarts it as the keeper did.
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
@@ -78,6 +80,7 @@ import websockets
 
 HERE = Path(__file__).resolve().parent
 PY = sys.executable
+SCALE = 1.0          # --scale: the display's scale, as devicePixelRatio (a5736)
 BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe", "/usr/bin/google-chrome", "/usr/bin/chromium"]
@@ -255,7 +258,7 @@ async def run(url, steps, size, shots, restart=None, still=False):
         async with websockets.connect(ws_url, max_size=64 * 1024 * 1024) as ws:
             p = Page(ws)
             await p.call("Page.enable")
-            await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=1, mobile=False)
+            await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=SCALE, mobile=False)
             if still:
                 await p.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
             await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
@@ -423,7 +426,10 @@ async def run(url, steps, size, shots, restart=None, still=False):
                 elif s == "stream":
                     print(await p.js(STREAM_READ))
                 elif s == "js":
-                    print(json.dumps(await p.js(arg()), ensure_ascii=False, default=str)[:2000])
+                    src = arg()
+                    if src.startswith("@"):       # js @file.js: the expression is the file's text (a5736)
+                        src = Path(src[1:]).read_text(encoding="utf-8")
+                    print(json.dumps(await p.js(src), ensure_ascii=False, default=str)[:2000])
                     i += 1
                 else:
                     raise RuntimeError(f"unknown step {s!r}; see python screen.py --help")
@@ -459,6 +465,9 @@ def main():
             lens, k = a[k + 1], k + 2
         elif a[k] == "--size":
             size, k = tuple(int(x) for x in a[k + 1].lower().split("x")), k + 2
+        elif a[k] == "--scale":
+            global SCALE
+            SCALE, k = float(a[k + 1]), k + 2
         elif a[k] == "--live":
             live, k = True, k + 1
         elif a[k] == "--bare":

@@ -104,7 +104,7 @@ class THUMB(ctypes.Structure):
                 ("fVisible", wt.BOOL), ("fSourceClientAreaOnly", wt.BOOL)]
 
 
-TNP_RECTDESTINATION, TNP_OPACITY, TNP_VISIBLE, TNP_SOURCECLIENTAREAONLY = 0x1, 0x4, 0x8, 0x10
+TNP_RECTDESTINATION, TNP_RECTSOURCE, TNP_OPACITY, TNP_VISIBLE, TNP_SOURCECLIENTAREAONLY = 0x1, 0x2, 0x4, 0x8, 0x10
 
 
 def work_area():
@@ -187,6 +187,38 @@ CLICKS = """(() => { if (window.__hudClicks) return; window.__hudClicks = 1;
     e.preventDefault(); e.stopPropagation(); window.pywebview.api.bring(m[1]);
   }, true); })()"""
 
+# where the parts keyed by a window's handle are, in real pixels, and the box that shows of each
+SLOTS = ("(() => { const out = []; const r0 = window.devicePixelRatio || 1;"
+         " for (const el of document.querySelectorAll('[data-key]')) {"
+         "  const m = /(?:^|[^0-9])(\\d{5,})(?:$|[^0-9])/.exec(el.dataset.key); if (!m) continue;"
+         "  if (el.closest('[data-folded=\"1\"]') || el.hidden) continue;"
+         "  const b = el.getBoundingClientRect(); if (b.width < 24 || b.height < 24) continue;"
+         # a5736: what of it shows, inside every box that clips it and the window (a DWM picture paints over
+         # everything, so a tile cut at a panel's foot drew its whole window over the dock below)
+         "  let l = 0, t = 0, r = innerWidth, d = innerHeight;"
+         "  for (let p = el.parentElement; p; p = p.parentElement) { const s = getComputedStyle(p);"
+         "   if (s.overflowX === 'visible' && s.overflowY === 'visible') continue; const c = p.getBoundingClientRect();"
+         "   l = Math.max(l, c.left); t = Math.max(t, c.top); r = Math.min(r, c.right); d = Math.min(d, c.bottom); }"
+         "  out.push({key: el.dataset.key, h: m[1], x: b.left * r0, y: b.top * r0, w: b.width * r0, hh: b.height * r0,"
+         "   clip: [l * r0, t * r0, r * r0, d * r0], slot: el.className.indexOf('thumb') >= 0});"
+         " } return out; })()")
+
+
+def fit(s, sw, sh):
+    """-> (where on the page, which part of the window) for a slot from SLOTS and a window of sw x sh, or None.
+    The window's picture is fitted into the slot; a5736: only what the slot's clipping boxes show of it is drawn,
+    cropped from the source to match, and nothing when less than 40% of it shows (a sliver of a window reads as a
+    glitch)."""
+    sw, sh = max(1, sw), max(1, sh)
+    k = min(s["w"] / sw, s["hh"] / sh)
+    w, hh = int(sw * k), int(sh * k)
+    x, y = int(s["x"] + (s["w"] - w) / 2), int(s["y"] + (s["hh"] - hh) / 2)
+    cl, ct, cr, cb = s.get("clip") or (x, y, x + w, y + hh)
+    vx, vy, vr, vb = max(x, int(cl)), max(y, int(ct)), min(x + w, int(cr)), min(y + hh, int(cb))
+    if vr <= vx or vb <= vy or (vr - vx) * (vb - vy) < 0.4 * w * hh:
+        return None
+    return (vx, vy, vr, vb), (int((vx - x) / k), int((vy - y) / k), int((vr - x) / k), int((vb - y) / k))
+
 
 class Hud:
     def __init__(self, a):
@@ -253,16 +285,8 @@ class Hud:
 
     # -- live pictures of windows, where the lens put their parts
     def slots(self):
-        js = ("(() => { const out = []; const r0 = window.devicePixelRatio || 1;"
-              " for (const el of document.querySelectorAll('[data-key]')) {"
-              "  const m = /(?:^|[^0-9])(\\d{5,})(?:$|[^0-9])/.exec(el.dataset.key); if (!m) continue;"
-              "  if (el.closest('[data-folded=\"1\"]') || el.hidden) continue;"
-              "  const b = el.getBoundingClientRect(); if (b.width < 24 || b.height < 24) continue;"
-              "  out.push({key: el.dataset.key, h: m[1], x: b.left * r0, y: b.top * r0, w: b.width * r0, hh: b.height * r0,"
-              "   slot: el.className.indexOf('thumb') >= 0});"
-              " } return out; })()")
         try:
-            return self.window.evaluate_js(js) or []
+            return self.window.evaluate_js(SLOTS) or []
         except Exception:
             return []
 
@@ -284,21 +308,20 @@ class Hud:
                     t = ctypes.c_void_p()
                     if dwmapi.DwmRegisterThumbnail(self.hwnd, h, ctypes.byref(t)) != 0:
                         continue
-                    self.thumbs[h] = (t, None)
+                    self.thumbs[h] = (t, "new")
                 t, last = self.thumbs[h]
                 size = wt.SIZE()
                 dwmapi.DwmQueryThumbnailSourceSize(t, ctypes.byref(size))
-                sw, sh = max(1, size.cx), max(1, size.cy)
-                k = min(s["w"] / sw, s["hh"] / sh)
-                w, hh = int(sw * k), int(sh * k)
-                x, y = int(s["x"] + (s["w"] - w) / 2), int(s["y"] + (s["hh"] - hh) / 2)
-                rect = (x, y, x + w, y + hh)
-                if rect == last:
+                got = fit(s, size.cx, size.cy)
+                if got == last:
                     continue
-                p = THUMB(TNP_RECTDESTINATION | TNP_OPACITY | TNP_VISIBLE | TNP_SOURCECLIENTAREAONLY,
-                          wt.RECT(*rect), wt.RECT(), 255, True, False)
+                if got:
+                    p = THUMB(TNP_RECTDESTINATION | TNP_RECTSOURCE | TNP_OPACITY | TNP_VISIBLE | TNP_SOURCECLIENTAREAONLY,
+                              wt.RECT(*got[0]), wt.RECT(*got[1]), 255, True, False)
+                else:
+                    p = THUMB(TNP_VISIBLE, wt.RECT(), wt.RECT(), 255, False, False)
                 dwmapi.DwmUpdateThumbnailProperties(t, ctypes.byref(p))
-                self.thumbs[h] = (t, rect)
+                self.thumbs[h] = (t, got)
 
     def drop_thumbs(self):
         with self.lock:
