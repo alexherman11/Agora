@@ -16,8 +16,8 @@ How (hud.py runs it; nothing here runs on import):
   - The Start menu opens when Windows sees Win down then Win up with nothing between. On a bare tap the hook holds
     back the real Win-up and sends three keys in its place: a key that means nothing (vk 0xFF, 'no mapping'), its
     release, then the Win-up. Windows sees a chord, so Start stays shut, and the Win key is released (never left
-    down). The order matters: keys sent from inside the hook arrive after the event being hooked, so a mask sent
-    while letting the real Win-up through would come too late. When Windows refuses the three keys, the real Win-up
+    down). The order matters: keys sent from inside the hook arrive after the event being hooked (as I understand
+    Windows' input queue; not measured), so a mask sent while letting the real Win-up through would come too late. When Windows refuses the three keys, the real Win-up
     goes on untouched (Start opens; the home base does not toggle). AutoHotkey calls this its menu mask key.
   - A mouse click or wheel during the press makes it a chord too: a low-level mouse hook goes in when a Win press
     begins and comes out when it ends, so outside a Win press no code of ours is in the mouse's path.
