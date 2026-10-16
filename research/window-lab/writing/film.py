@@ -8,6 +8,8 @@ The story: BEFORE, the dock's Writing room as it opened (a board of old editor c
 raw Markdown; AFTER, the Writing app: a page drawn as Markdown, a new page written live (marks shown on the line being
 written, drawn when the caret leaves), a task ticked, a table, a [[link]] chosen from the documents, a live embed,
 the source one key away (Ctrl+E), the link followed and the page found in the other document's live 'Mentioned in'.
+The part keys name the ids apply.py try made in frontier-try on 16 Oct (writer a5903, first page a5905, Notes f5901, the
+new page a5907); after a recopy, run apply.py try again and change those ids to the ones its receipt prints.
 """
 import json
 import pathlib
