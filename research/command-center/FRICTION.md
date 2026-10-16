@@ -261,7 +261,7 @@ a5341 · family=missing-word · status=open
 
 a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; new listeners.py; the Codex listener) so that @claude and @codex are knocked when a listener of theirs runs. The missing world-level word: a thing that says 'this agent is reachable, through this, and here is what it handed on', as a corner says it for a resident. Today it is a witnessed row (listener-<name>), which is right for liveness (it dies with the process) but cannot be written from the desk, and what it delivered is not kept in the world. If a world word appeared for it (a reach= prop on a person/agent record, or a kind for a door to an outside session), the receipt's words would move into the world.
 
-## curing (31)
+## curing (32)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -514,7 +514,13 @@ worker-a5500, 15 Oct, building the home base's dock (lens home-dock, Alex's dock
 2. The home base could not open an Agora app as its own window. Missing word: a host verb. Cured as one entry in research/window-lab/host_verbs.py, `window <lens>`, through lens_window.open_window (split out of its main). Live only once Claude's hud.py hook (a5300 c5383) is in; until then the dock carries no window icon on Alex's screen.
 3. Lived with: `on click host` takes no `when`, and its verb can't be a $field (the verb is checked when the lens compiles), so a dock icon can't say 'ask the host whatever my note says'. Each kind of act is its own part with `only when` (view, chat, window), the glyph and label written three times. Also: an escaped double quote inside a lens text is drawn with its backslash.
 
-## cured (60)
+### A style could not say a lane's colour bar, a breathing halo, or a card that travels when it changes lane
+
+a5609 · family=lens · status=curing
+
+Found by worker-a5504, 15 Oct, restyling the home base's board (a5504; Alex: 'the board looks boring af', and smooth movement when a card changes lane). The missing words, all in a style: (1) a lane's colour as a bar down a card (edge is a 1px border all round; border left is 1px too); (2) a part that is alive breathing a halo, softer than pulse, which only fades opacity; (3) a card that changed lane travelling to its new place: its key path names its lane, so the painter made a new element and the card jumped; (4) on a dark style, lift drew its shadow in the light ink, a glow under every card. Weighed in the world first, by reading the words, not by painting them (imagined): border left is 1px, too thin to read as a lane; pulse on the card fades its words too; the old card's dot alone is too small to carry a lane; no word moves a part between paints. Source edit, opt-in, nothing else changes: style.py and style.js read rail <colour>, glow <colour> and glide, and lift takes a shadow token's colour when there is one; lens.js glides a part wearing glide from where its thing was painted (FLIP, by the scene node's item), and fades in one newly shown; still under reduced motion. test_scene test_style_read_once. Beside it, also found: a waiting-on-me press was refused as 'you have not seen a5441's prop:full' because the act replaced a prop the pressed part never read, and the painter's status line showed only the refusal's first line ('since your last look'), so Alex saw nothing happen. Cured in the world (each act reads what it replaces in its own when); the status line showing only the header is still open.
+
+## cured (61)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1032,3 +1038,9 @@ landing.hand named its branch hand/<who>-<YYYYmmdd-HHMMSS>, to the second. test_
 a5370 · family=lens · status=cured
 
 worker-a5300, 15 Oct (a5300). The missing word: `on click host <verb> [words]`. Every home base button (bring a window forward, Spotify) needed a new js_api and an injected click script in research/window-lab/hud.py, found by a class name. Source edit: scene.py _w_on admits it (the painter's own act, like press), verbs.py leaves it out of a lens's desk steps, lens.js calls window.pywebview.api.host; the verbs are a closed table in research/window-lab/host_verbs.py, published as witnessed:host. Still source: each new native power is one entry in that table; the hud.py hook waits on Claude (patch on a5300).
+
+### Home base: a setting on the lens note (hide_taskbar) had no host behind it
+
+a5606 · family=host · status=cured
+
+a5394, 15 Oct. The world could say hide_taskbar on the home-base lens note (a5300 read it), but nothing in the host acted on it, and hud.py had none of a5300's hook. Source edit: research/window-lab/hud.py (hook steps 1-9 of c5383; Hud.area and whole_monitor cover the whole monitor when hide_taskbar=yes), host_verbs.py (default yes). The missing world word: a host setting is only real once the host does it; each new setting still needs host code. Cover rather than hide, so nothing needs restoring.
