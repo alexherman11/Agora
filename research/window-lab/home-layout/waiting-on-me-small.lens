@@ -1,0 +1,3 @@
+# waiting-on-me-small: Waiting on you in one line (a5496), beside its panel's title and on its chip in the dock.
+n : text "$(count(tag:ready-for-review) + count(prop:design=waiting)) to look at"
+  role summary

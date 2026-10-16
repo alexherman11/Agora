@@ -89,7 +89,17 @@
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }
   .boxed { position: absolute; box-sizing: border-box; overflow: hidden; margin: 0; }
   .clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
-  [data-clamped][data-cut="1"], [data-clamped][data-opened="1"] { cursor: pointer; }   /* a cut text opens on a press, and closes */
+  [data-clamped][data-cut="1"], [data-clamped][data-opened="1"] { cursor: pointer; }
+  /* `scroll none` (a5496): never scrolls; a part cut at its foot fades there, so the eye knows there is more */
+  /* and it keeps inside its parent: it may shrink below its words, and a row of it is one line (a wrapping row's line
+     grows as tall as its tallest child, which pushed a column of panels off the screen) */
+  [data-scroll="none"] { min-height: 0; min-width: 0; }
+  .l-row[data-scroll="none"] { flex-wrap: nowrap; }
+  [data-scroll="none"][data-cut="1"] { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); }
+  /* `scroll none end`: the end in view, cut (and faded) at the head; what overflows a flex-end column's start is unreachable */
+  .l-column[data-at-end="1"] { justify-content: flex-end; }
+  .l-column[data-at-end="1"] > [data-key] { flex-shrink: 0; }
+  [data-at-end="1"][data-cut="1"] { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to top, #000 calc(100% - 3em), transparent); }   /* a cut text opens on a press, and closes */
   :where(mark[data-light]) { background: none; color: inherit; }   /* `light`: a passage's look is its role's */
   [data-key] { white-space: pre-line; }
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }

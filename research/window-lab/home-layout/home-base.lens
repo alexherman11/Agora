@@ -1,0 +1,13 @@
+# home-base: the home base above the windows (a3874), JEFF's place on Alex's screen. research/window-lab/hud.py paints
+# it over everything when Alex presses Ctrl+Alt+J. a5496: the panels are laid out by each person (home-tiling): the
+# viewer pinned right, the rest in columns he arranges, the time at the top left; the dock along the foot (home-dock,
+# a5500) holds the apps and, at its right end, the shelf of panels (home-panels). Every panel is its own lens:
+# waiting-on-me, home-lowdown, home-work, home-board, home-tiles, each with a one-line view (<name>-small).
+home : column
+  share 1
+  role home
+  tiles : column
+    share 1
+    lens home-tiling
+  dock : row
+    lens home-dock
