@@ -105,7 +105,10 @@ the one form. The words:
                                  the rows it publishes as witnessed:host; $fields fill as in any command. Never a desk
                                  line; a page with no host says so
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
-    on <gesture> do <command>    click | edit | drag | select. The command is a desk verb line (`do` is implied); the painter
+    on drop <part> at <side> do  side left|right|top|bottom: the act for a drop near that edge (the outer third) of the
+                                 receiver; the plain `on drop` is the middle. The painter draws the landing box (that
+                                 half of the receiver, or all of it) while the thing is in the air (a5994)
+    on <gesture> do <command>    click | edit | drag | select | double (a double-click). The command is a desk verb line (`do` is implied); the painter
                                  fills $x $y (drag, click) and $value (edit; select: the words highlighted) at the moment
                                  of the gesture. A gesture carries the item revision and the lens revision it was painted
                                  under; stale is refused.
@@ -132,7 +135,9 @@ LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: gr
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop")
+# double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop", "double")
+DROP_SIDES = ("left", "right", "top", "bottom")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
 # the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
@@ -1478,8 +1483,17 @@ def _w_on(node, p, val, n, env):
         label, g = g[4:].strip(), "key"
         if label not in KEYS:
             raise LensRefusal(f"line {n}: `on key <{'|'.join(KEYS)}> do <desk command>` on a text that has `on edit`; got {p!r}")
+    side = None
     if g.startswith("drop "):
         drop_part, g = g[5:].strip(), "drop"
+        # a5994 (Alex: a panel dragged anywhere snaps, and the place is shown before he lets go): `on drop <part> at
+        # left|right|top|bottom` is the act for a drop near that edge of the receiver; the painter picks the side by
+        # where the pointer is and draws the landing box (that half of the receiver) while the thing is in the air
+        m = re.fullmatch(r"(\S+)\s+at\s+(\S+)", drop_part)
+        if m:
+            drop_part, side = m.group(1), m.group(2)
+            if side not in DROP_SIDES:
+                raise LensRefusal(f"line {n}: `on drop <part> at <{'|'.join(DROP_SIDES)}> do <desk command>`; got {p!r}")
     if g.startswith("menu "):
         m = re.fullmatch(r'"([^"]+)"', g[5:].strip())
         if not m:
@@ -1499,7 +1513,8 @@ def _w_on(node, p, val, n, env):
     # unless it begins with one of the desk's own reading or session commands.
     if cmd.split(" ")[0] not in ACT_COMMANDS:
         cmd = "do " + cmd
-    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {}),
+    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"side": side} if side else {}),
+                       **({"label": label} if label else {}),
                        **({"when": when.strip()} if when else {})})
 
 
@@ -2300,7 +2315,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
         for a in n["acts"]:
             if a["on"] == "fold":
                 continue                    # the line already says folded; the fold act is the viewer's, with no line
-            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f' "{a["label"]}"' if a.get("label") else "")
+            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f" at {a['side']}" if a.get("side") else "")
+                        + (f' "{a["label"]}"' if a.get("label") else "")
                         + (f": {a['line']}" if a.get("line") else ""))
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):

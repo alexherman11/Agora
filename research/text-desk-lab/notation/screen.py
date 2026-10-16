@@ -26,13 +26,15 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     facts [key-prefix] [depth]   per painted part (to depth levels below the prefix, default 2): size, whether it
                                  scrolls or is cut, folded, hidden, off screen, a leaf's words; the window; the status line
     click <part|x,y>             left click at the part's centre (a fold handle: click <part>/handle)
+    double <part|x,y>            a double-click there (`on double`)
     right <part|x,y>             right click; then `menu` lists the menu that opened
     menu                         the entries of the open right-click menu
     choose <label>               click the entry of the open menu with that label
     type <text>                  click into nothing first; types into what has focus (click the part first)
     key <Enter|Escape|Tab|ArrowDown|...>   a held key goes first: key Ctrl+b, key Shift+Enter
     drag <part> <part|x,y>       press on the first, move, release on the second
-    hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there
+    hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there.
+                                 A hold while holding moves on from where the hand is (`hold - 400,900`), to film a carry
     scroll <part> <dy>           scroll a part by dy pixels
     wait <ms>
     answer <text>                the next prompt() or confirm() the page opens is answered with text, as a person
@@ -197,7 +199,7 @@ class Page:
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
+STEPS = ("shot", "facts", "click", "double", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
          "css", "blur", "events", "resend", "desk", "restart", "stop", "start",
          "land", "page", "js", "stream")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
@@ -308,6 +310,15 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await p.press(x, y, "left" if s == "click" else "right")
                     await asyncio.sleep(0.8)
                     print(f"{s} at {round(x)},{round(y)}")
+                elif s == "double":                         # a5994: a double-click, as the hand makes one (two presses, the second counted 2)
+                    x, y = await p.where(arg())
+                    i += 1
+                    await p.mouse("mouseMoved", x, y, "none", 0)
+                    for n in (1, 2):
+                        await p.mouse("mousePressed", x, y, "left", 1, n)
+                        await p.mouse("mouseReleased", x, y, "left", 0, n)
+                    await asyncio.sleep(0.8)
+                    print(f"double-clicked at {round(x)},{round(y)}")
                 elif s == "menu":
                     print("menu: " + (await p.js("(() => { const m = document.getElementById('menu-pop'); return m ? [...m.querySelectorAll('button')].map(b => b.textContent).join(' | ') : '(no menu open)'; })()")))
                 elif s == "choose":
@@ -351,11 +362,15 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await asyncio.sleep(1.5)
                     print(f"dragged {round(x0)},{round(y0)} -> {round(x1)},{round(y1)}")
                 elif s == "hold":                           # a1140: a drag stopped in the air, to look at it mid-carry
-                    x0, y0 = await p.where(arg())
+                    # a5994: a hold while already holding carries on from where the hand is (its first word is not read),
+                    # so shots between holds film a panel travelling
+                    held = getattr(p, "held", None)
+                    x0, y0 = held or await p.where(arg())
                     x1, y1 = await p.where(steps[i + 1])
                     i += 2
-                    await p.mouse("mouseMoved", x0, y0, "none", 0)
-                    await p.mouse("mousePressed", x0, y0, "left", 1)
+                    if not held:
+                        await p.mouse("mouseMoved", x0, y0, "none", 0)
+                        await p.mouse("mousePressed", x0, y0, "left", 1)
                     for t in range(1, 11):
                         await p.mouse("mouseMoved", x0 + (x1 - x0) * t / 10, y0 + (y1 - y0) * t / 10, "left", 1)
                         await asyncio.sleep(0.03)

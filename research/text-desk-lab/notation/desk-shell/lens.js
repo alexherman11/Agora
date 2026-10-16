@@ -237,7 +237,13 @@
       if (a.on === "edit" && !p.markdown) edits(el, n, a);
       if (a.on === "drag" && p.box) drags(el, n, a);
       if (a.on === "carry") carries(el, n);
-      if (a.on === "drop") { el.dataset.drop = a.part; el._drop = a; }
+      if (a.on === "drop") { el.dataset.drop = a.part; (el._drops = el._drops || []).push(a); }
+      if (a.on === "click") el._clicks = true;
+      // a5994: `on double` is a double-click on the part; one on a button inside it is that button's (two presses)
+      if (a.on === "double") el.addEventListener("dblclick", e => {
+        for (let t = e.target; t && t !== el; t = t.parentElement) if (t._clicks || t._drops || t.isContentEditable || /^(BUTTON|INPUT|TEXTAREA|A)$/.test(t.tagName)) return;
+        e.preventDefault(); getSelection().removeAllRanges(); send(el._n, a.line);
+      });
       if (a.on === "menu") el.dataset.menu = "1";                 // its entries are read from el._n when the menu opens
     }
     for (const k of n.kids) el.appendChild(make(k));
@@ -946,17 +952,43 @@
   // what that means, and both are fenced. Pointer: press, move, release over a receiver. Keys: Space takes it, Tab
   // reaches the receivers that accept it, Enter puts it down, Escape cancels. Nothing is sent onto the receiver it came from.
   let carrying = null; const receivers = part => [...paint.querySelectorAll(`[data-drop="${CSS.escape(part)}"]`)];
-  const over = r => { const c = Style.roleClass("tool.on"); if (carrying.over) carrying.over.classList.remove(c); carrying.over = r; if (r) r.classList.add(c); };
+  // a5994: a receiver may say an act per side (`on drop <part> at left`); the one taken is the side whose edge the
+  // pointer is within a third of (nearest first), else the plain act, else the nearest side. On the receiver it came
+  // from, only a left or right act (a panel set beside its own column); its middle would put it where it is.
+  function landing(r, m) {
+    const own = r.contains(carrying.el);
+    const acts = (r._drops || []).filter(a => a.part === carrying.n.part && (!own || a.side === "left" || a.side === "right"));
+    if (!acts.length) return null;
+    const b = r.getBoundingClientRect(), fx = m ? (m.clientX - b.left) / b.width : .5, fy = m ? (m.clientY - b.top) / b.height : .5;
+    const d = { left: fx, right: 1 - fx, top: fy, bottom: 1 - fy };
+    const sided = acts.filter(a => a.side).sort((x, y) => d[x.side] - d[y.side]);
+    const a = sided.find(x => d[x.side] < 1 / 3) || acts.find(x => !x.side) || sided[0];
+    const half = { left: [0, 0, .5, 1], right: [.5, 0, .5, 1], top: [0, 0, 1, .5], bottom: [0, .5, 1, .5] }[a.side] || [0, 0, 1, 1];
+    return { act: a, box: [b.left + half[0] * b.width, b.top + half[1] * b.height, half[2] * b.width, half[3] * b.height] };
+  }
+  const over = (r, m) => {
+    const c = Style.roleClass("tool.on"), l = r ? landing(r, m) : null;
+    if (r && !l) r = null;
+    if (carrying.over && carrying.over !== r) carrying.over.classList.remove(c);
+    carrying.over = r; carrying.act = l && l.act; if (r) r.classList.add(c);
+    // the landing box: where it will go, before the hand lets go
+    if (!l) { if (carrying.box) carrying.box.hidden = true; return; }
+    if (!carrying.box) { carrying.box = document.createElement("div"); carrying.box.className = "landing-box " + Style.roleClass("landing"); document.body.appendChild(carrying.box); }
+    const [x, y, w, h] = l.box;
+    Object.assign(carrying.box.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" }); carrying.box.hidden = false;
+  };
   // a receiver is judged on what it meant at pick-up (pike-3), though the view keeps repainting while a card is in the air
   function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: new Map(rs.map(r => [r.dataset.key, r._n.fence])) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
-  function put(r) {
+  function put(r, m) {
     const c = carrying; if (!c) return;
+    const l = r ? landing(r, m) : null;
     over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = ""; c.el.style.animation = "";
+    if (c.box) c.box.remove();
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
-    if (!r || r.contains(c.el)) { V.hold = null; c.el.focus(); return; }
+    if (!l) { V.hold = null; c.el.focus(); return; }
     const f = c.seen.get(r.dataset.key) || r._n.fence || {};
-    send({ key: r._n.key, fence: f }, r._drop.line, undefined, { carried: c.n.fence, receiver: f });
+    send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
@@ -964,6 +996,15 @@
     g.querySelectorAll("[data-key]").forEach(x => x.removeAttribute("data-key")); g.removeAttribute("data-key");
     Object.assign(g.style, { position: "fixed", left: b.left + "px", top: b.top + "px", width: b.width + "px", margin: 0,
       pointerEvents: "none", zIndex: 30, opacity: .92, animation: "none", boxShadow: "0 6px 18px rgba(0,0,0,.25)" });
+    // a5994: a part with no ground of its own (a panel's title row) is carried on the ground it sits on, or its words
+    // tangle with what it passes over
+    const clear = c => !c || c === "transparent" || /rgba\(.*,\s*0\)$/.test(c);
+    if (clear(getComputedStyle(el).backgroundColor)) {
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const s = getComputedStyle(a);
+        if (!clear(s.backgroundColor)) { Object.assign(g.style, { background: s.backgroundColor, borderRadius: s.borderRadius, padding: "6px 10px", boxSizing: "border-box", backdropFilter: "blur(8px)" }); break; }
+      }
+    }
     document.body.appendChild(g); return g;
   }
   function carries(el, n) {
@@ -984,7 +1025,7 @@
           take(el); c = carrying; c.ghost = ghost(el); el.style.opacity = ".35"; el.style.animation = "none";   // a1140: the dim wins over a pulse
           document.body.style.userSelect = "none"; getSelection().removeAllRanges();
         }
-        c.ghost.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px)`; over(at(m));
+        c.ghost.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px)`; over(at(m), m);
       };
       const up = m => {
         if (m.pointerId !== pid) return;
@@ -995,7 +1036,7 @@
         const eat = k => { k.stopPropagation(); k.preventDefault(); };
         window.addEventListener("click", eat, { capture: true, once: true });
         setTimeout(() => window.removeEventListener("click", eat, { capture: true }), 0);
-        put(m.type === "pointercancel" ? null : at(m));
+        put(m.type === "pointercancel" ? null : at(m), m);
       };
       document.addEventListener("pointermove", move); document.addEventListener("pointerup", up);
       document.addEventListener("pointercancel", up);

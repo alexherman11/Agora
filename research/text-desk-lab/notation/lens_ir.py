@@ -695,7 +695,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         def offered(a):                  # 14 Oct: `on menu "<label>" when <test>`: the entry is there only where it holds
             return not a.get("when") or X.holds(X.run(a["when"], xenv())[0]) is True
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
-            {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "label") if a.get(k)}}
+            {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "side", "label") if a.get(k)}}
             for a in node["acts"] if offered(a)]
         if node["carry"]:
             if not ctx.get("item"):

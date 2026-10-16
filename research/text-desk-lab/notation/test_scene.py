@@ -266,6 +266,28 @@ def test_carry_and_drop_shape():
         tmp.unlink(missing_ok=True)
 
 
+def test_drop_sides_and_double():
+    """a5994 (Alex: a panel dragged anywhere snaps, shown before release; a double-click fills the room): `on drop <part>
+    at left|right|top|bottom` is one receiver's act for a drop near that edge, beside its plain `on drop`; `on double`
+    is a double-click. Both reach the painter with their lines filled, and the text printer says the side."""
+    refused("root : column, of kind:note, each c, on drop c at middle do move $carried into=$item\nc : text a, carry", "at <left|right|top|bottom>")
+    _, parts = scene.parse("root : column, of kind:note, each c, on drop c at left do move $carried before=$item, on drop c do swap $carried $item\n"
+                           "c : text a, carry, on double do prop $item big=yes")
+    assert parts["root"]["on"][0] == {"on": "drop", "line": "do move $carried before=$item", "part": "c", "side": "left"}, parts["root"]["on"]
+    assert parts["root"]["on"][1] == {"on": "drop", "line": "do swap $carried $item", "part": "c"}
+    assert parts["c"]["on"] == [{"on": "double", "line": "do prop $item big=yes"}]
+    import deskd, lens_ir
+    tmp = _scratch("_test_drop_sides")
+    try:
+        with deskd.Session("_test_drop_sides", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:note, each c, on drop c at top do move $carried into=f01, on drop c do move $carried into=f01",
+                                                      'c : text "$title", carry']))
+            assert sc["acts"][0] == {"on": "drop", "line": "do move $carried into=f01", "part": "c", "side": "top"} and "side" not in sc["acts"][1]
+            assert "· drop c at top: do move $carried into=f01" in scene.to_text(sc, "t", "jeff", 0)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_role_when_follows_state():
     """a1105: `role <name> when <selection | value test>`; the first that holds wins, else the plain role, and the
     scene prints the role it chose and why. Both evaluators agree."""
