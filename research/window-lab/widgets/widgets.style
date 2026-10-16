@@ -2,9 +2,9 @@
 role widgets : between gap x3, align center
 role widget : align center
 role widget.wide : align center
-role clock : between gap
-role clocktime : text up 3 medium, ink
-role clockdate : text down, soft
+role wclock : between gap
+role wtime : text up 3 medium, ink
+role wdate : text down, soft
 role nowbar : between gap
 role nowline : between gap, on wash, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap x1.5
 role nowlabel : text down 2 medium tracked, accent
