@@ -638,6 +638,58 @@ class House:
         return [f"~ house: {len(lines)} line{'s' if len(lines) != 1 else ''} after > that nothing answered, {where}: "
                 + " | ".join(desk_one_line(l, 60) for l in lines)]
 
+    def toasts(self, w):
+        """a5824: each new line of the Notifications sent chat (role=notifications; the house verb `notify` writes
+        them) becomes a Windows toast on Alex's PC (research/window-lab/notify.py), once, in a thread so a pass never
+        waits on PowerShell. Only for the world frontier under the keeper and with a real model: a copy of the world, a
+        test house or a fake one never reaches his screen. Toasted line ids are kept in house-state/<world>/toasts.json;
+        what was shown or refused is logged there and printed."""
+        if self.world != "frontier" or self.fake or not os.environ.get("HOUSE_KEEPER") \
+                or os.environ.get("AGORA_TOASTS", "").lower() == "off":
+            return
+        try:
+            lab = str(HERE.parents[1] / "window-lab")
+            if lab not in sys.path:
+                sys.path.append(lab)
+            import notify
+            path = self.dir / "toasts.json"
+            try:
+                st = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                st = {"done": [], "log": []}
+            done = set(st["done"])
+            new = notify.pending(w, done, time.strftime("%Y-%m-%dT%H:%M:%S"))
+            if not new:
+                return
+            for mid, who, words, sound in new:
+                st["done"] = (st["done"] + [mid])[-500:]
+
+                def send(mid=mid, who=who, words=words, sound=sound):
+                    try:
+                        got = notify.show(words, sound=sound, by=who)
+                    except Exception as e:
+                        got = f"not shown: {type(e).__name__}: {e}"
+                    print(f"house: toast {mid} from {who}: {got}", flush=True)
+                    with self._toast_lock:
+                        try:
+                            s2 = json.loads(path.read_text(encoding="utf-8"))
+                        except (OSError, ValueError):
+                            s2 = {"done": [], "log": []}
+                        s2["log"] = (s2.get("log", []) + [{"line": mid, "by": who, "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                                            "got": got}])[-200:]
+                        path.write_text(json.dumps(s2, indent=1), encoding="utf-8")
+                threading.Thread(target=send, daemon=True).start()
+            with self._toast_lock:
+                try:
+                    st["log"] = json.loads(path.read_text(encoding="utf-8")).get("log", [])
+                except (OSError, ValueError):
+                    pass
+                path.write_text(json.dumps(st, indent=1), encoding="utf-8")
+        except Exception as e:        # a toast must never stop a pass
+            print(f"house: toasts failed: {type(e).__name__}: {e}", flush=True)
+
+    _toast_lock = threading.Lock()
+
     def note(self, w, title):
         for s in w.subjects.values():
             if s["title"] == title and w.appearances_of(s["id"]):
@@ -946,6 +998,7 @@ class House:
             # a3150: who each new line knocks is recorded before anyone is served, so 'in a turn' is as the line found
             # them; while a restart waits no one is knocked, so the house that follows records it (as it does the news)
             w = self.record_knocks(w, corners)
+        self.toasts(w)
         for rid, corner in corners.items():
             r = self.residents.setdefault(rid, Resident(self, rid))
             props = corner.get("props") or {}
