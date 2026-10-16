@@ -273,7 +273,7 @@ a5648 · family=lens-words · status=open
 
 Source edits by worker-a5530, 15 Oct, for Alex's 'a notification bar ... a pomodoro timer' and 'move the time ... to top left'. Missing world-level words, now in the language: (1) nothing on a page could tick: a scene is built only when the world changes, so a clock or a countdown needed a scene a second or a host. Now `live clock|date|until [ring]` on a text: the painter redraws those words from its own clock (lens.js, lens.html). (2) nothing said a count had ended: `on end do <command>`, sent once per moment by the painter at zero (scene.py GESTURES). (3) a press could not say when it happened, so a timer could not be a world fact: the blank `$now` (names.py, blanks.py, desk_knife.py RULE_BLANKS), left unfilled by a lens so the desk fills it when the line arrives; expr times keep their seconds. (4) a repeat could not show newest first: `by -<prop>` (moo.sort_by, lens_ir, deskd), and ids compare and order by their number (e9 before e10; expr._cmp, moo.order_value), so `eid>e10780` means what it says. (5) a fold's label could not count: `fold "$(total)"` now computes (lens_ir). The widgets themselves are world data (research/window-lab/widgets/apply.py). Found while building: a selection as `create`'s target groups what it matches into a new surface (it moved Alex's notices into one) rather than creating in each; rules name the surface by title instead. Not cured: the frame name `x` is refused as a gesture name's shadow, which a reader meets with no hint of why `as x` is special.
 
-## curing (32)
+## curing (33)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -531,6 +531,12 @@ worker-a5500, 15 Oct, building the home base's dock (lens home-dock, Alex's dock
 a5609 · family=lens · status=curing
 
 Found by worker-a5504, 15 Oct, restyling the home base's board (a5504; Alex: 'the board looks boring af', and smooth movement when a card changes lane). The missing words, all in a style: (1) a lane's colour as a bar down a card (edge is a 1px border all round; border left is 1px too); (2) a part that is alive breathing a halo, softer than pulse, which only fades opacity; (3) a card that changed lane travelling to its new place: its key path names its lane, so the painter made a new element and the card jumped; (4) on a dark style, lift drew its shadow in the light ink, a glow under every card. Weighed in the world first, by reading the words, not by painting them (imagined): border left is 1px, too thin to read as a lane; pulse on the card fades its words too; the old card's dot alone is too small to carry a lane; no word moves a part between paints. Source edit, opt-in, nothing else changes: style.py and style.js read rail <colour>, glow <colour> and glide, and lift takes a shadow token's colour when there is one; lens.js glides a part wearing glide from where its thing was painted (FLIP, by the scene node's item), and fades in one newly shown; still under reduced motion. test_scene test_style_read_once. Beside it, also found: a waiting-on-me press was refused as 'you have not seen a5441's prop:full' because the act replaced a prop the pressed part never read, and the painter's status line showed only the refusal's first line ('since your last look'), so Alex saw nothing happen. Cured in the world (each act reads what it replaces in its own when); the status line showing only the header is still open.
+
+### A worker could not be granted one command, and could sign as anyone
+
+a5760 · family=authority · status=curing
+
+Source edit (a5750, worker-a5750, 16 Oct): workshop.py and desk_mcp.py. The world had no word for who may let a builder run what: a worker's tools were one list in Worker.start, the same for every card, so Alex's 'talking with JEFF is the same authority as me' had no way through (a5723 could not read powercfg). Now a card's extra_tools=, set by a plain do prop signed jeff or alex, adds exact commands for that card's worker only, and the card says what was granted. Found on the way: the desk tool took as= from the caller, so a worker could sign as jeff; a worker's tool is now pinned (DESK_PIN). The missing world-level word: a grant, a thing in the world that says who may do what and was given by whom, which the house reads instead of code holding the list. Still a guardrail: a worker keeps python.
 
 ## cured (61)
 
