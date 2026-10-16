@@ -308,6 +308,43 @@
     return base + n;
   }
   function lineStart(el, st) { const l = +(el.dataset.l ?? el.dataset.from ?? 0); return st[l] ?? 0; }
+
+  // ---- lit passages (a5949: `light` on a document, the words its comments quote) -------------------------------------
+  // A passage is found in the source as expr.find_words finds it on the desk (white space however it falls, the case as
+  // written), so the page lights what the desk judges is still there; each text node it covers is wrapped in a <mark>.
+  function spaced(s) {
+    let out = "", gap = false; const at = [];
+    for (let i = 0; i < s.length; i++) {
+      if (/\s/.test(s[i])) { gap = out.length > 0; continue; }
+      if (gap) { out += " "; at.push(i - 1); gap = false; }
+      out += s[i]; at.push(i);
+    }
+    return [out, at];
+  }
+  function findWords(text, words) {
+    const [t, at] = spaced(text), w = spaced(words)[0];
+    const i = w ? t.indexOf(w) : -1;
+    return i < 0 ? null : [at[i], at[i + w.length - 1] + 1];
+  }
+  function lightUp(root, src, passages, cls) {
+    const st = starts(src);
+    for (const want of passages || []) {
+      const hit = findWords(src, want.replace(/^[“"]|[”"]$/g, "")); if (!hit) continue;
+      const [a, b] = hit, nodes = [];
+      for (const line of root.children) {
+        if (line.dataset.l == null) continue;                  // a table or an embed is drawn, not lit
+        const l = +line.dataset.l, ls = st[l], le = l + 1 < st.length ? st[l + 1] : src.length + 1;
+        if (le <= a || ls >= b) continue;
+        let n = 0;
+        for (const t of textNodes(line)) { nodes.push([t, ls + n]); n += t.data.length; }
+      }
+      for (const [t, o] of nodes.reverse()) {
+        const s = Math.max(a, o) - o, e = Math.min(b, o + t.data.length) - o; if (e <= s) continue;
+        const mid = s > 0 ? t.splitText(s) : t; if (e - s < mid.data.length) mid.splitText(e - s);
+        const m = document.createElement("mark"); m.className = cls || ""; m.dataset.light = want; mid.replaceWith(m); m.append(mid);
+      }
+    }
+  }
   function pointAt(root, src, at) {
     const st = starts(src); let l = 0; while (l + 1 < st.length && st[l + 1] <= at) l++;
     const el = root.querySelector(`:scope > [data-l="${l}"]`);
@@ -327,6 +364,7 @@
   function create(opts) {
     const root = document.createElement("div"); root.className = "md-doc";
     let src = opts.text || "", ctx = { links: opts.links || {} }, raw = false, active = new Set(), undo = [], redo = [], lastPush = 0, composing = false;
+    let lit = opts.light || [];
     if (opts.hint) root.dataset.hint = opts.hint;
     const ed = !!opts.editable;
     if (ed) { root.contentEditable = "true"; root.spellcheck = true; root.setAttribute("role", "textbox"); root.setAttribute("aria-multiline", "true"); }
@@ -344,8 +382,13 @@
       active = ed && document.activeElement === root && a != null ? linesOf(a, b) : new Set();
       // a fence opens as one: the caret on either end line shows both
       draw(root, src, ctx, active, raw);
+      if (!raw) lightUp(root, src, lit, opts.lightClass);
       if (a != null && document.activeElement === root) place(a, b);
     }
+    // a5949: the words highlighted here, as the source says them (marks and all), so a comment quotes the text's own
+    // words and the desk can find them again; null when nothing here is highlighted
+    const picked = () => { const r = sel(); return r && r.b > r.a ? src.slice(r.a, r.b) : null; };
+    const setLights = l => { const want = JSON.stringify(l || []); if (want === JSON.stringify(lit)) return; lit = l || []; const r = ed && document.activeElement === root ? sel() : null; paint(r ? r.a : null, r ? r.b : null); };
     function change(a, b, text, how) {
       const now = Date.now();
       if (how !== "type" || now - lastPush > 900) { undo.push({ src, a, b }); if (undo.length > 300) undo.shift(); }
@@ -444,7 +487,7 @@
       const w = e.target.closest(".md-widget");
       if (w && ed) { root.focus(); const at = starts(src)[+w.dataset.from] || 0; paint(at, at); }
     });
-    if (!ed) { paint(null); return { el: root, set(t, l) { src = t || ""; ctx = { links: l || {} }; paint(null); }, src: () => src }; }
+    if (!ed) { paint(null); return { el: root, set(t, l) { src = t || ""; ctx = { links: l || {} }; paint(null); }, src: () => src, picked, lights: setLights }; }
 
     root.addEventListener("beforeinput", e => {
       if (composing || e.inputType === "insertCompositionText") return;
@@ -537,7 +580,7 @@
         if (!focused) return;
         if (k === "b") return wrap(r, "**", "**"); if (k === "i") return wrap(r, "*", "*");
         if (k === "k") { const words = src.slice(r.a, r.b) || "link"; undo.push({ src, a: r.a, b: r.b }); src = src.slice(0, r.a) + `[${words}](https://)` + src.slice(r.b); const at = r.a + words.length + 3; paint(at, at + 8); opts.typed && opts.typed(src); } },
-      raw: () => raw,
+      raw: () => raw, picked, lights: setLights,
     };
   }
 

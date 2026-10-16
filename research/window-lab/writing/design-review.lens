@@ -1,0 +1,15 @@
+# design-review: a design, for Alex to answer (a4039, 13 Oct). Since a5949 it is two lenses that already exist: stood on
+# a document (in the home base's viewer, or scene design-review on <id>) it is that document's page, doc-page (its
+# words, your call, the margin of comments and its Talk); opened on its own it is the Writing room, writing, whose rail
+# holds the designs waiting for you. Residents read the one they review with doc-read and doc-answers, as before.
+review : column
+  share 1
+  role page
+  stood : column
+    share 1
+    only when ($item or "") != ""
+    lens doc-page
+  app : column
+    share 1
+    only when ($item or "") = ""
+    lens writing

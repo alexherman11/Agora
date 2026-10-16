@@ -349,7 +349,7 @@ def lower(root, parts):
 # Stage 5, evaluate. A transcription of scene.build's make(), with the world reached only through the accessor, the
 # fixed order within a part, host facts in Gamma, count as the true size, and one rule for guards.
 # ---------------------------------------------------------------------------------------------------------------------
-def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=()):
+def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=(), on=None):
     props = props or {}
     acc = acc or Accessor(desk)
     # F7: the lens's own style; 9 Oct (step 7): found from the lens's own room (acc.home, set by compile_lens)
@@ -370,7 +370,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     host = {f: acc.host(f) for f in ("me", "today", "session")}
     # a placed lens is keyed again under its placer after it is built (S._rekey, in place): nothing of it is kept
     off = _OFF[0] or os.environ.get("LENS_REUSE") == "off" or len(stack) > 1
-    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)))
+    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)), on)
     prev = {} if off else _REUSE.get(ck, {})
     nxt, used = {}, set()
 
@@ -846,9 +846,23 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         # --- placed lens
         if node["place"]:
             inner = S._fill(node["place"], ctx)
-            if inner.lower() in stack:
-                raise S.LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
-            sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb)
+            # a5949 (Sable's a4270): the placed lens starts on the thing this part stands on, when it stands on one
+            on = ctx.get("item") if is_thing(w, ctx.get("item")) else None
+            named = "$" in node["place"]       # a name from data: what it names is not this lens's fault
+            held = len(closure) if closure is not None else 0
+            try:
+                if inner.lower() in stack:
+                    raise S.LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
+                sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb, on=on)
+            except S.LensRefusal as e:
+                # a5949: a lens named from data (`lens $v.with`) that is missing, contains itself or does not compile is
+                # said in one line in its place, and its placer (the home base) is still drawn; a name written in the
+                # lens refuses the lens, as before
+                if not named:
+                    raise
+                if closure is not None:
+                    del closure[held:]
+                sub = cut_node("lens", f"lens {inner or '(no name)'} cannot be drawn here: {str(e).split('. ')[0]}")
             sub["key"] = f"{key}/lens:{inner}"
             S._rekey(sub, sub["key"])
             out["kids"].append(sub)
@@ -858,7 +872,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("size", ctx.get("count", ""))), f"{key}/{kid['part']}", em["layout"], chain, cb))
         return out
 
-    sc = make(irs[root], {}, root, cb=cb)
+    # a5949 (Sable's a4270): a lens stood on a thing starts on it, its fields and $item, as an instance of a repeat does
+    root_ctx = {k: v for k, v in acc.thing(on).items() if k != "_frames"} if on else {}
+    sc = make(irs[root], root_ctx, root, cb=cb)
     sc["R"] = list(acc.R)
     if not off:
         _REUSE.pop(ck, None)
@@ -868,8 +884,38 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     return sc
 
 
-def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
-    """One lens to a scene through the staged pipeline, recording the definition used; fallback as scene._compile does."""
+def is_thing(w, i):
+    """a5949: whether an id names a thing (an appearance or a subject) a lens can be stood on."""
+    return isinstance(i, str) and (i in w.nodes or i in w.subjects)
+
+
+def stood_refusal(desk, acc, s, on):
+    """a5949 (Sable's a4270, 'each lens must say what it can stand on and refuse the rest in words'): a lens note's
+    stands_on=<selection> names what it can be stood on. -> the words of a refusal, or None when it may stand there."""
+    sel = (s.get("props") or {}).get("stands_on")
+    if not sel or not on:
+        return None
+    w = desk.world
+    mine = {on} | ({w.nodes[on].get("subject")} if on in w.nodes else set(w.appearances_of(on) if on in w.subjects else []))
+    named, ids = acc.select(sel)
+    hits = {i for i, _ in named} if named is not None else set(ids)
+    hits |= {w.nodes[i].get("subject") for i in hits if i in w.nodes}
+    if mine & hits:
+        return None
+    subj = w.subjects.get(w.nodes[on].get("subject")) if on in w.nodes else w.subjects.get(on)
+    return f"lens {s['title']} stands on {sel}; {(subj or {}).get('title', on)} ({on}) is not one"
+
+
+def cut_node(part, text):
+    """a5949: one line said in place of a lens that cannot be drawn here (stood on what it does not stand on, or placed
+    by a name from data that is missing, contains itself or does not compile), so its placer is still drawn."""
+    return {"part": part, "key": part, "role": "cut", "layout": None, "item": None, "box": None, "text": text,
+            "clamp": None, "acts": [], "kids": []}
+
+
+def compile_lens(desk, s, stack, count, closure, acc=None, cb=(), on=None):
+    """One lens to a scene through the staged pipeline, recording the definition used; fallback as scene._compile does.
+    `on` (a5949): the thing the lens is stood on, where its root starts; a lens note's stands_on= may refuse it."""
     good = getattr(desk, "_lens_good", None)
     if good is None:
         good = desk._lens_good = {}
@@ -887,12 +933,15 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
     prev_home = getattr(acc, "home", None)
     acc.home = S.room_of_thing(desk.world, s)      # 9 Oct (step 7): this lens's own lookups (its style, the lenses it places) stand in its room
     try:
+        no = stood_refusal(desk, acc, s, on)
+        if no:
+            return cut_node(stack[-1] if stack else s["title"], no)
         try:
             import persons
             import verbs
             b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
             with persons.reading(desk, (b or {}).get("persons")):
-                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
+                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb, on=on)
             stamp(sc)
             good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
             return sc
@@ -905,7 +954,7 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
                 raise
             del closure[mark:]
             entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e), refused_in=e.lens)
-            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc)
+            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, on=on)
             stamp(sc)
             sc["broken"] = f"lens {s['title']}: {e}"
             return sc
@@ -995,23 +1044,26 @@ def part_names(sc):
     return sorted(x for x in out if x)
 
 
-def scene_for(desk, name, part=None, words=None):
+def scene_for(desk, name, part=None, words=None, on=None):
     """-> (scene, text), as scene.scene_for, through the staged pipeline. With `part`, the text is only the parts that
     path names (find_parts) and what is inside them; scene["printed"] lists those nodes. With `words` (a4179:
     {"start": n, "whole": bool}) the text is the scene's words alone (scene.to_words), and scene["said"] lists the
-    nodes it showed whole, each for itself."""
+    nodes it showed whole, each for itself. With `on` (a5949) the lens is stood on that thing: an address is not
+    believed (Juniper, a4270), so an id that names no thing is refused here, where the scene is built."""
     s = S.find_lens(desk, name)
+    if on is not None and not is_thing(desk.world, on):
+        raise S.LensRefusal(f"on={on}: no thing has that id, so lens {s['title']} cannot be stood on it")
     closure = []
     acc = Accessor(desk)
     import promises
     with promises.held(desk.world), S.still(desk.world):     # a4838: the world holds still while a lens is built
-        sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc)
+        sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc, on=on)
         _STATS["builds"] += 1
         if os.environ.get("LENS_REUSE") != "off" and (os.environ.get("LENS_REUSE_VERIFY") == "1" or _STATS["builds"] % VERIFY_EVERY == 0):
             closure2 = []
             _OFF[0] = True
             try:
-                sc2 = compile_lens(desk, s, (s["title"].lower(),), [0], closure2, Accessor(desk))
+                sc2 = compile_lens(desk, s, (s["title"].lower(),), [0], closure2, Accessor(desk), on=on)
             finally:
                 _OFF[0] = False
             S.emit(sc)
@@ -1030,7 +1082,7 @@ def scene_for(desk, name, part=None, words=None):
     at = len(desk.world.events)
     fallen = [c for c in closure if c["status"] == "fallback"]
     sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
-                     frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **S._identity())
+                     frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **S._identity(), **({"on": on} if on else {}))
     name = (s.get("props") or {}).get("style")
     home = S.room_of_thing(desk.world, s)          # 9 Oct (step 7): the style nearest the lens's own room
     if name:                                  # F7: which style paints this lens, and which revision of it

@@ -168,7 +168,7 @@ def _scene_key(q):
         visits = None
     who = (q.get("as") or "alex").lower()
     import witnessed                             # a5052: rows a program keeps beside the house (`windows`) are read too
-    return (name, who, q.get("lens", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), _LOOKED.get((name, who), 0), house,
+    return (name, who, q.get("lens", ""), q.get("on", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), _LOOKED.get((name, who), 0), house,
             int(time.time() // 60), visits, q.get("keys"), witnessed.stamp(name))
 
 
@@ -576,7 +576,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(None, body=body)       # the bytes already built: no load, no build, no encode
             with Session(q.get("session", "desktop"), q.get("as"), read=True) as desk:
                 try:
-                    sc, text = scene.scene_for(desk, q.get("lens", ""))
+                    # a5949 (Sable's a4270): on=<id> in the address stands the lens on that thing
+                    sc, text = scene.scene_for(desk, q.get("lens", ""), on=q.get("on") or None)
                     if q.get("view") == "painter":      # Pike a494: key, paint, acts, fence, kids; the root keeps its def
                         sc = dict(scene.painter_view(sc), **{"def": sc.get("def")})
                         # A retained page may still run the previous painter while
