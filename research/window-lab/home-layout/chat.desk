@@ -1,0 +1,4 @@
+# JEFF's chat never scrolls either (a5496): its newest lines stay in view, the oldest fade out above
+read a5210
+do replace a5210 old="  feed : column\n    share 1\n    scroll end\n" new="  feed : column\n    share 1\n    scroll none end\n"
+do replace a5210 old="  everything : column\n    share 1\n    scroll end\n" new="  everything : column\n    share 1\n    scroll none end\n"

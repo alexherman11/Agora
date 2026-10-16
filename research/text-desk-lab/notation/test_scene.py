@@ -1331,6 +1331,30 @@ def test_let_if_and_arithmetic():
         tmp.unlink(missing_ok=True)
 
 
+def test_share_follows_data_and_scroll_none():
+    """a5496 (Alex, 15 Oct: panels that never scroll, and one widened pushes the others): `share $(expr)` or `share $name`
+    is a weight filled per part (above 0 a weight, else the part keeps its own size; never sent unfilled); `scroll none`
+    and `scroll none end` are read."""
+    src = chr(10).join(["ws : column, scroll none", "  a : column", "    let w = 3 when 1 = 1", "    let w = 1 otherwise",
+                        "    share $w", "  b : column, share $(2 - 2)", "  c : column, share $(1 + 1), scroll none end"])
+    refused("x : column, share big", "share $(<expr>)")
+    refused("x : column, scroll sideways", "none end")
+    import deskd, lens_ir
+    tmp = _scratch("_test_share_data")
+    try:
+        with deskd.Session("_test_share_data", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pv = scene.painter_view(sc)
+            a, b, c = pv["kids"]
+            assert pv["paint"]["scroll"] == "none"
+            assert a["paint"]["share"] == 3, a["paint"]
+            assert "share" not in b["paint"], b["paint"]          # 0: its own size, and no template reaches the painter
+            assert c["paint"]["share"] == 2 and c["paint"]["scroll"] == "none end"
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     import os
     os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from

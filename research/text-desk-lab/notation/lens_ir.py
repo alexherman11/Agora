@@ -520,6 +520,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         out = {"part": node["part"], "key": key, "role": em["role"], "layout": em["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": em["clamp"], "acts": [], "kids": []}
         out.update({k: em[k] for k in S.PAINT_WORDS if k in em})
+        if isinstance(out.get("share"), str):
+            del out["share"]                    # a5496: filled below, once the lets are known; never sent unfilled
         if isinstance(out.get("fold"), str) and "$" in out["fold"]:
             out["fold"] = S._fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
         if b and b["kind"] == "one":
@@ -652,6 +654,18 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:
                 out["missing"] = missing
+        if isinstance(em.get("share"), str):          # a5496: `share $(expr)`, a weight that follows data
+            sc_ctx = {**(ctx.get("_props") or {}), **ctx}
+            s = em["share"]
+            s = S._fill_text(s, sc_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in s else S._fill(s, sc_ctx, track)
+            try:
+                weight = float(s)
+            except (TypeError, ValueError):
+                weight = 0
+            if weight > 0:
+                out["share"] = int(weight) if weight == int(weight) else weight
+            else:
+                out.pop("share", None)
         if ctx.get("_state") and ctx["_state"] != "live":
             out["state"] = ctx["_state"]
         if em.get("picture") and ctx.get("item"):

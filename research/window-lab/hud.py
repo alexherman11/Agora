@@ -221,6 +221,10 @@ class Hud:
             r["front"] = "yes" if self.front and r["name"] == str(self.front) else "no"
         witnessed.write(self.a.world, "desktop", rows, by="hud")
         witnessed.write(self.a.world, "media", media.rows(), by="hud")
+        # a5496: the time, for the clock at the home base's top left (the taskbar's clock is hidden while it is open)
+        now = time.localtime()
+        witnessed.write(self.a.world, "clock", [{"time": time.strftime("%H:%M", now),
+                                                 "day": time.strftime("%A %d %B", now).replace(" 0", " ")}], by="hud")
         try:
             urllib.request.urlopen(urllib.request.Request(self.door + "/door/witnessed", data=b"{}", method="POST"),
                                    timeout=2).read()
@@ -384,6 +388,7 @@ class Hud:
     def closed(self):
         witnessed.clear(self.a.world, "desktop")
         witnessed.clear(self.a.world, "media")
+        witnessed.clear(self.a.world, "clock")
         if self.keys_tid:
             user32.PostThreadMessageW(self.keys_tid, WM_QUIT, 0, 0)
         PIDFILE.unlink(missing_ok=True)
@@ -443,6 +448,7 @@ def main():
         PIDFILE.unlink(missing_ok=True)
         witnessed.clear(a.world, "desktop")
         witnessed.clear(a.world, "media")
+        witnessed.clear(a.world, "clock")
         return
     if old and alive(old):
         print("hud: already running as", old)

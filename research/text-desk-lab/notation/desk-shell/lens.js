@@ -225,7 +225,12 @@
   // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
   function frames(el, n, p) {
     if (p.gap != null) el.style.gap = typeof p.gap === "number" ? p.gap + "px" : p.gap[0] === "/" ? `calc(var(--t-gap) / ${p.gap.slice(1)})` : `calc(${p.gap.slice(1)} * var(--t-gap))`;   // F10: steps of the style's gap
-    if (p.scroll && p.scroll !== "none") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    if (p.scroll && p.scroll !== "none" && p.scroll !== "none end") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    // a5496 (Alex, 15 Oct: 'I don't want the interface to scroll'): `scroll none` never scrolls; what does not fit is
+    // cut, and a cut part fades at its foot (lens.html), so the eye knows there is more (settle marks data-cut).
+    // `scroll none end` is cut at its head instead, its end always in view: a chat's newest lines
+    if (p.scroll === "none" || p.scroll === "none end") { el.style.overflow = "hidden"; el.dataset.scroll = "none"; }
+    if (p.scroll === "none end") el.dataset.atEnd = "1";
     if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
     if (!n.acts.some(a => a.on === "fold")) return;
     // Alex, 29 Sep: a floating fold is a menu. Its open contents are drawn over the page below the handle, it opens for
@@ -949,7 +954,13 @@
       }
     }
     for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
+    for (const el of paint.querySelectorAll('[data-scroll="none"]')) {
+      // a hair is not more. Cut at the head (none end), the overflow is above the box, where scrollHeight does not count it
+      const head = el.dataset.atEnd && el.firstElementChild ? el.getBoundingClientRect().top - el.firstElementChild.getBoundingClientRect().top : 0;
+      el.dataset.cut = el.scrollHeight > el.clientHeight + 8 || head > 8 ? "1" : "";
+    }
   }
+
   // which floating part is in hand: the one pressed, else the one beside what was pressed (the smallest part around
   // the press that holds exactly one), else none
   paint.addEventListener("pointerdown", e => {
