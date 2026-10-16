@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (40)
+## open (41)
 
 ### F2. Scripts cannot say who is running them
 
@@ -273,7 +273,13 @@ a5648 · family=lens-words · status=open
 
 Source edits by worker-a5530, 15 Oct, for Alex's 'a notification bar ... a pomodoro timer' and 'move the time ... to top left'. Missing world-level words, now in the language: (1) nothing on a page could tick: a scene is built only when the world changes, so a clock or a countdown needed a scene a second or a host. Now `live clock|date|until [ring]` on a text: the painter redraws those words from its own clock (lens.js, lens.html). (2) nothing said a count had ended: `on end do <command>`, sent once per moment by the painter at zero (scene.py GESTURES). (3) a press could not say when it happened, so a timer could not be a world fact: the blank `$now` (names.py, blanks.py, desk_knife.py RULE_BLANKS), left unfilled by a lens so the desk fills it when the line arrives; expr times keep their seconds. (4) a repeat could not show newest first: `by -<prop>` (moo.sort_by, lens_ir, deskd), and ids compare and order by their number (e9 before e10; expr._cmp, moo.order_value), so `eid>e10780` means what it says. (5) a fold's label could not count: `fold "$(total)"` now computes (lens_ir). The widgets themselves are world data (research/window-lab/widgets/apply.py). Found while building: a selection as `create`'s target groups what it matches into a new surface (it moved Alex's notices into one) rather than creating in each; rules name the surface by title instead. Not cured: the frame name `x` is refused as a gesture name's shadow, which a reader meets with no hint of why `as x` is special.
 
-## curing (33)
+### A world act cannot reach the PC: notify needed the house to watch a chat
+
+a5868 · family=missing · status=open
+
+a5824 (16 Oct, worker-a5824). Alex wants a Windows toast when work finishes, sent by any card or rule. The world part is a verb note (notify, a5864: a line in Notifications sent, a5861), but nothing in the world can make something happen on Alex's PC, so a source edit was needed: house.py's House.toasts watches that one chat and calls research/window-lab/notify.py. The missing world-level word: a way for a world act to ask a host for an effect (as a lens's `host <verb>` asks the home base, a5300), say `do host notify <words>`, answered by whichever host process holds the verb and recorded as an event with its answer. With it, the house would not need to know about toasts, and the next host effect (open a file, start a timer on the PC) would be one entry in a table, not another watcher.
+
+## curing (34)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -538,7 +544,13 @@ a5760 · family=authority · status=curing
 
 Source edit (a5750, worker-a5750, 16 Oct): workshop.py and desk_mcp.py. The world had no word for who may let a builder run what: a worker's tools were one list in Worker.start, the same for every card, so Alex's 'talking with JEFF is the same authority as me' had no way through (a5723 could not read powercfg). Now a card's extra_tools=, set by a plain do prop signed jeff or alex, adds exact commands for that card's worker only, and the card says what was granted. Found on the way: the desk tool took as= from the caller, so a worker could sign as jeff; a worker's tool is now pinned (DESK_PIN). The missing world-level word: a grant, a thing in the world that says who may do what and was given by whom, which the house reads instead of code holding the list. Still a guardrail: a worker keeps python.
 
-## cured (61)
+### A saying must retain one message identity and its real writer
+
+a5853 · family=attribution · status=curing
+
+Read: world.py explicitly aliases JEFF comment/reply/resolve authors to Alex; scene.py splits structured multiline chat messages into rows sharing the same event key except in involving mode. Fix new comment authors and keep each structured message whole in every sayings view. Preserve historic signatures and event log.
+
+## cured (62)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1062,3 +1074,9 @@ worker-a5300, 15 Oct (a5300). The missing word: `on click host <verb> [words]`. 
 a5606 · family=host · status=cured
 
 a5394, 15 Oct. The world could say hide_taskbar on the home-base lens note (a5300 read it), but nothing in the host acted on it, and hud.py had none of a5300's hook. Source edit: research/window-lab/hud.py (hook steps 1-9 of c5383; Hud.area and whole_monitor cover the whole monitor when hide_taskbar=yes), host_verbs.py (default yes). The missing world word: a host setting is only real once the host does it; each new setting still needs host code. Cover rather than hide, so nothing needs restoring.
+
+### HUD restart must retain its installed Python environment
+
+a5809 · family=missing-word · status=cured
+
+The restart helper discarded the pinned interpreter in favor of _base_executable; the resulting HUD failed to import webview. The missing operational guarantee is restart in the same dependency environment. Preserve sys.executable; verified manual pinned restart starts HUD PID51388.
