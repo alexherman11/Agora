@@ -2564,11 +2564,27 @@ def split_words_arg(desk, arg):
     return " ".join(toks[: k - 1]), opts
 
 
-def scene_for(desk, name, part=None, words=None):
+def scene_for(desk, name, part=None, words=None, on=None):
     """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
     accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
     whose whole closure is current; a fallback frame is for reading. The old single-pass evaluator (build, _compile,
-    scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds."""
+    scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds.
+    `on` (a5949, Sable's a4270): the id of a thing the lens is stood on; its root starts on that thing."""
     import lens_ir
-    return lens_ir.scene_for(desk, name, part, words)
+    return lens_ir.scene_for(desk, name, part, words, on=on)
+
+
+def split_on_arg(desk, arg):
+    """a5949: `scene <lens> on <id> [<part path> | ok] [words]` -> (the line without `on <id>`, the id or None). A line
+    that names a lens whole is that lens, so a lens titled `notes on paper` is still itself."""
+    toks = arg.split()
+    if "on" not in toks[1:-1]:
+        return arg, None
+    try:
+        find_lens(desk, arg.strip())
+        return arg, None
+    except LensRefusal:
+        pass
+    i = max(k for k, t in enumerate(toks) if t == "on" and 0 < k < len(toks) - 1)
+    return " ".join(toks[:i] + toks[i + 2:]), toks[i + 1]

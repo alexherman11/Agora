@@ -1,0 +1,4 @@
+# a5949: the Writing room (writing, doc-page) in this style: its find box, the open document in the rail, a comment being written
+role find      : text down, ink, on card, edge faint, corner gap /2, pad gap /2, space below gap
+role qcard.on  : ink, text down, on wash, pad left gap /2, pad top gap /4, pad bottom gap /4, corner gap /2
+role pending   : on card, edge accent, corner gap /2, pad gap, between gap /2, space above gap
