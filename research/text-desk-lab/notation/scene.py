@@ -938,8 +938,10 @@ def _w_gap(node, p, val, n, env):
 
 
 def _w_scroll(node, p, val, n, env):
-    if val not in ("none", "scroll", "end"):
-        raise LensRefusal(f"line {n}: `scroll none|scroll|end` (end keeps the newest in view); got {p!r}")
+    # a5496 (Alex, 15 Oct: never scroll): `scroll none` never scrolls, cut at its foot; `scroll none end` never scrolls
+    # and keeps its end in view, cut at its head (a chat whose newest lines stay, the oldest fading out above)
+    if val not in ("none", "scroll", "end", "none end"):
+        raise LensRefusal(f"line {n}: `scroll none|scroll|end|none end` (end keeps the newest in view; none never scrolls: what does not fit is cut, and fades; none end is cut at its head instead); got {p!r}")
     node["scroll"] = val
 
 
@@ -1109,8 +1111,14 @@ def runs_of(text, marks=False):
 
 
 def _w_share(node, p, val, n, env):
+    # a5496 (Alex, 15 Oct: 'when one panel expands it pushes the others out'): the weight may follow data, `share
+    # $(expr)` or `share $name`, filled per instance as words are; a number above 0 is the weight, anything else
+    # (0, none) leaves the part its own size
+    if re.fullmatch(r"\$\(.+\)|\$[\w.]+", val):
+        node["share"] = val
+        return
     if not re.fullmatch(r"\d+(\.\d+)?", val) or float(val) <= 0:
-        raise LensRefusal(f"line {n}: `share <weight>` (this child's share of its column or row); got {p!r}")
+        raise LensRefusal(f"line {n}: `share <weight>` or `share $(<expr>)` (this child's share of its column or row); got {p!r}")
     node["share"] = float(val) if "." in val else int(val)
 
 
@@ -1407,13 +1415,13 @@ WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
-    "scroll": ("scroll none|scroll|end", _w_scroll),
+    "scroll": ("scroll none|scroll|end|none end", _w_scroll),
     "fold": ('fold ["<handle label>"] [open] [float] [inline] [handle <role>] [group <name>]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
     "commit": ("commit explicit|enter|ctrl-enter [only]", _w_commit),
-    "share": ("share <weight>", _w_share),
+    "share": ("share <weight> | share $(<expr>)", _w_share),
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),

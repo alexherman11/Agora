@@ -1242,6 +1242,13 @@ def test_style_read_once():
     assert sheet == {"height_em": 60.0, "width_em": 30.0, "height": 320, "afloat": True, "shy": True, "pulse": True}
     icon = style.looks("token gap = 8\nrole icon : corner gap, touch")["roles"]["icon"]       # a5500: answers the pointer
     assert icon["look"] == {"corner": 8, "touch": True} and not icon["unread"]
+    # a5504: a lane's rail, a live card's glow, a card that glides; lift takes the `shadow` token's colour when there is one
+    board = style.looks("token gap = 8\ntoken ink = #E9EEEA\ntoken shadow = #000000\ntoken accent = #8DCDB4\n"
+                        "role card : rail accent, glow accent, lift gap /2, glide\nrole plain : lift gap")["roles"]
+    assert board["card"]["look"] == {"rail": "#8DCDB4", "glow": "#8DCDB4", "lift": 4, "lift_ink": "#000000", "lift_shadow": True, "glide": True}
+    assert not board["card"]["unread"]
+    assert style.looks("token gap = 8\ntoken ink = #E9EEEA\nrole plain : lift gap")["roles"]["plain"]["look"] == {"lift": 8, "lift_ink": "#E9EEEA"}
+    assert style.looks("role x : rail nothing")["roles"]["x"]["unread"]            # a rail names a colour token
     fonts = style.looks("font pixel = Silkscreen, monospace\ntoken text.pixel = pixel 13/1.3\nrole t : text.pixel up")
     assert fonts["roles"]["t"]["look"]["text"] == {"family": "'Silkscreen', monospace", "size": 15, "leading": 1.3} and fonts["fonts"]["pixel"]["face"] == "Silkscreen"
     out = style.for_painter({"name": "x", "text": "role x on paper"}, None)
@@ -1329,6 +1336,30 @@ def test_let_if_and_arithmetic():
             # a guard that cannot tell is absence with the reason, never false
             sc2 = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:note, each c", 'c : text "$title", only when $beds * 2 > 5']))
             assert [k.get("why") for k in sc2["kids"]] == [None, "can't tell: no beds ($beds=none)"], [k.get("why") for k in sc2["kids"]]
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_share_follows_data_and_scroll_none():
+    """a5496 (Alex, 15 Oct: panels that never scroll, and one widened pushes the others): `share $(expr)` or `share $name`
+    is a weight filled per part (above 0 a weight, else the part keeps its own size; never sent unfilled); `scroll none`
+    and `scroll none end` are read."""
+    src = chr(10).join(["ws : column, scroll none", "  a : column", "    let w = 3 when 1 = 1", "    let w = 1 otherwise",
+                        "    share $w", "  b : column, share $(2 - 2)", "  c : column, share $(1 + 1), scroll none end"])
+    refused("x : column, share big", "share $(<expr>)")
+    refused("x : column, scroll sideways", "none end")
+    import deskd, lens_ir
+    tmp = _scratch("_test_share_data")
+    try:
+        with deskd.Session("_test_share_data", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pv = scene.painter_view(sc)
+            a, b, c = pv["kids"]
+            assert pv["paint"]["scroll"] == "none"
+            assert a["paint"]["share"] == 3, a["paint"]
+            assert "share" not in b["paint"], b["paint"]          # 0: its own size, and no template reaches the painter
+            assert c["paint"]["share"] == 2 and c["paint"]["scroll"] == "none end"
     finally:
         tmp.unlink(missing_ok=True)
 

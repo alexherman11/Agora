@@ -34,7 +34,11 @@ const Style = (() => {
     height_em: v => ({ "min-height": v + "em" }),
     width: v => ({ width: px(v) }),
     width_em: v => ({ "max-width": v + "em" }),
-    lift: (v, look) => ({ "box-shadow": `0 ${v}px ${v * 3}px rgba(${hexToRgb(look.lift_ink || "#000").join(",")},.10)` }),
+    // a5504: the shadow is a custom property, so a rail and a glow can be drawn beside it in one box-shadow
+    lift: (v, look) => ({ "--lift": `0 ${v}px ${v * 3}px rgba(${hexToRgb(look.lift_ink || "#000").join(",")},${look.lift_shadow ? ".45" : ".10"})` }),
+    rail: v => ({ "--rail": `inset 3px 0 0 ${v}` }),
+    glow: v => ({ "--glow": v, animation: "r-glow 2.8s ease-in-out infinite" }),
+    glide: () => ({}),
     text: t => {
       // no joined letters (13 Oct): a pixel face's "fi" drew as one glyph that read as an A ("Arst" for "first")
       const css = { "font-family": t.family, "line-height": t.leading, "font-size": px(t.size), "font-variant-ligatures": "none" };
@@ -57,11 +61,13 @@ const Style = (() => {
   function cssOf(look) {
     const css = {};
     for (const [k, v] of Object.entries(look || {})) if (TABLE[k]) Object.assign(css, TABLE[k](v, look));
+    if (look && (look.lift || look.rail || look.glow))      // the one box-shadow: the rail, then the shadow (r-glow adds the halo)
+      css["box-shadow"] = "var(--rail, 0 0 transparent), var(--lift, 0 0 transparent)";
     return css;
   }
 
   // ---- installation: tokens become custom properties, roles become classes ----
-  let current = null, tokens = null, sheet = null, pinned = false, afloat = [];
+  let current = null, tokens = null, sheet = null, pinned = false, afloat = [], glide = [];
   const loaded = new Set();
   function loadFonts(fonts) {
     Object.values(fonts || {}).forEach(({ face }) => {
@@ -87,12 +93,13 @@ const Style = (() => {
     if (tokens.gap) vars.push(`--radius:${tokens.gap.value}px`);
     if (tokens.text) { const f = Object.values(looks.roles).map(r => r.look.text).find(Boolean); if (f) vars.push(`--font:${f.family}`); }
     (looks.ramp || []).forEach(({ step, px }) => vars.push(`--t-size-${step}:${px}px`));   // the ramp, named: var(--t-size-0) is `text`
-    afloat = [];
+    afloat = []; glide = [];
     let out = ":root{" + vars.join(";") + "}\n";
     for (const [name, r] of Object.entries(looks.roles)) {
       const c = "." + cls(name);
       out += `${c}{${decl(cssOf(r.look))}}\n`;
       if (r.look.afloat) afloat.push(c);
+      if (r.look.glide) glide.push(c);
       if (r.look.shy)      // shy: seen when the pointer or the caret is in the part holding it (or the one above), or when it has focus
         out += [":hover > ", ":hover > * > ", ":focus-within > ", ":focus-within > * > "].map(a => a + c).join(",") + `,${c}:focus{opacity:1}\n`;
       if (r.look.touch)    // a5500: the part answers the pointer, brighter under it, darker while pressed; it moves only below
@@ -101,6 +108,11 @@ const Style = (() => {
     }
     // a1140: the language's one motion, only for a viewer who has not asked for reduced motion; every pulse in one phase
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";
+    // a5504: `glow`, a halo of the part's glow colour breathing beside its rail and shadow; a still ring for reduced motion
+    const base = "var(--rail, 0 0 transparent), var(--lift, 0 0 transparent)";
+    out += `@media (prefers-reduced-motion: no-preference){@keyframes r-glow{0%,100%{box-shadow:${base}, 0 0 0 1px color-mix(in srgb, var(--glow) 30%, transparent), 0 0 2px 0 color-mix(in srgb, var(--glow) 0%, transparent)}`
+      + `50%{box-shadow:${base}, 0 0 0 1px color-mix(in srgb, var(--glow) 70%, transparent), 0 0 18px 1px color-mix(in srgb, var(--glow) 32%, transparent)}}}\n`;
+    out += `@media (prefers-reduced-motion: reduce){${Object.entries(looks.roles).filter(([, r]) => r.look.glow).map(([n]) => "." + cls(n)).join(",") || ".r-none"}{box-shadow:${base}, 0 0 0 1px color-mix(in srgb, var(--glow) 60%, transparent)}}\n`;
     // 14 Oct (Alex: 'an animation on those three dots, ideally a cool animation'): `wave`, each character rising in
     // turn and brightening, then settling; still for a viewer who asked for reduced motion
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-wave{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-0.35em);opacity:1}}"
@@ -154,6 +166,7 @@ const Style = (() => {
     get theme() { return (current && current.theme) || ""; },
     get themes() { return (current && current.themes) || []; },
     get afloat() { return afloat; },      // the classes of parts that take no room (lens.js keeps them from lying on each other)
+    get glide() { return glide; },        // a5504: the classes of parts that travel to where their thing is painted next
     token: n => tokens && tokens[n] ? (tokens[n].value !== undefined ? tokens[n].value : tokens[n]) : null,
     varName: n => `var(--t-${n})`,
     roleClass: cls,

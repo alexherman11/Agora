@@ -226,7 +226,12 @@
   // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
   function frames(el, n, p) {
     if (p.gap != null) el.style.gap = typeof p.gap === "number" ? p.gap + "px" : p.gap[0] === "/" ? `calc(var(--t-gap) / ${p.gap.slice(1)})` : `calc(${p.gap.slice(1)} * var(--t-gap))`;   // F10: steps of the style's gap
-    if (p.scroll && p.scroll !== "none") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    if (p.scroll && p.scroll !== "none" && p.scroll !== "none end") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
+    // a5496 (Alex, 15 Oct: 'I don't want the interface to scroll'): `scroll none` never scrolls; what does not fit is
+    // cut, and a cut part fades at its foot (lens.html), so the eye knows there is more (settle marks data-cut).
+    // `scroll none end` is cut at its head instead, its end always in view: a chat's newest lines
+    if (p.scroll === "none" || p.scroll === "none end") { el.style.overflow = "hidden"; el.dataset.scroll = "none"; }
+    if (p.scroll === "none end") el.dataset.atEnd = "1";
     if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
     if (!n.acts.some(a => a.on === "fold")) return;
     // Alex, 29 Sep: a floating fold is a menu. Its open contents are drawn over the page below the handle, it opens for
@@ -966,8 +971,30 @@
     // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
     V.recoverLayout(r.scene);
+    const was = glideRects();
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
-    settle(); followEnds(); placeMenuDrafts(); V.show(r.text); report();
+    settle(); glideFrom(was); followEnds(); placeMenuDrafts(); V.show(r.text); report();
+  }
+  // a5504 (Alex: 'smooth movement when a card changes lane'): a part whose role says `glide` is known by its thing, not its
+  // key, so a card that moved lane (a new key, a new element) is seen as the same card. Before a paint each one's place
+  // is noted; after it, each travels from where its thing was (FLIP), and one that was not there before fades in.
+  // Nothing moves for a viewer who asked for reduced motion, nor on the first paint.
+  const thingOf = el => (el._n && el._n.fence && el._n.fence.item) || (el.dataset.key || "").split("/").pop();
+  function glideRects() {
+    const sel = (Style.glide || []).join(","); if (!sel) return null;
+    const m = new Map(); for (const el of paint.querySelectorAll(sel)) if (!el.hidden && el.offsetParent) m.set(thingOf(el), el.getBoundingClientRect());
+    return m;
+  }
+  function glideFrom(was) {
+    if (!was || !was.size || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const el of paint.querySelectorAll((Style.glide || []).join(","))) {
+      if (el.hidden || !el.offsetParent) continue;
+      const a = was.get(thingOf(el)), b = el.getBoundingClientRect();
+      if (!a) { el.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 360, easing: "ease-out" }); continue; }
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)`, zIndex: 2 }, { transform: "none", zIndex: 2 }], { duration: 520, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
   }
   // Alex, 7 Oct (c3674: comments must not push the paragraphs down): parts a style calls `afloat` take no room, so two
   // of them near each other would lie one on the other. After a paint each is slid down just far enough to clear the
@@ -1005,7 +1032,13 @@
       }
     }
     for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
+    for (const el of paint.querySelectorAll('[data-scroll="none"]')) {
+      // a hair is not more. Cut at the head (none end), the overflow is above the box, where scrollHeight does not count it
+      const head = el.dataset.atEnd && el.firstElementChild ? el.getBoundingClientRect().top - el.firstElementChild.getBoundingClientRect().top : 0;
+      el.dataset.cut = el.scrollHeight > el.clientHeight + 8 || head > 8 ? "1" : "";
+    }
   }
+
   // which floating part is in hand: the one pressed, else the one beside what was pressed (the smallest part around
   // the press that holds exactly one), else none
   paint.addEventListener("pointerdown", e => {

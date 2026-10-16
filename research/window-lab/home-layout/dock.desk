@@ -1,0 +1,3 @@
+# the shelf of panels at the dock's right end, where a5500 left room for it (home-dock a5564)
+read a5564
+do replace a5564 old="  right : column\n    share 1\n" new="  right : column\n    share 1\n    panels : row\n      lens home-panels\n"
