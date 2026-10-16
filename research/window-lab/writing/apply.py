@@ -42,7 +42,7 @@ HOME_ANCHOR = "role nx : text down, soft, pad left gap /2, pad right gap /2"
 REVIEW_ANCHOR = "role light     : on mark at 16%"
 TILING_OLD = "    pinned : column\n      share 7\n"
 TILING_NEW = ("    pinned : column\n"
-              "      let wide = 20 when count(prop:role=home-view,prop:actor=$me,prop:viewing,-prop:viewing=a5080) + count(prop:role=home-view,prop:actor=$me,prop:find) > 0\n"
+              "      let wide = 32 when count(prop:role=home-view,prop:actor=$me,prop:viewing,-prop:viewing=a5080) + count(prop:role=home-view,prop:actor=$me,prop:find) > 0\n"
               "      let wide = 7 otherwise\n"
               "      share $wide\n")
 DOCK = [("  view : column\n    only when ($d.opens or \"\") != \"\" and $d.opens != \"chat\"\n    role appicon\n    role appicon.on when $d.opens = $v.viewing\n    on click do prop $v viewing=$d.opens back=\"$v.viewing\" find=\"\"\n",

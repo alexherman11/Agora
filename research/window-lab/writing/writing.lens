@@ -58,13 +58,6 @@ app : column
           only when count(?$q,prop:role=doc) = 0
       tree : column
         only when ($w.find or "") = ""
-        recent : column
-          fold "Recent" open
-          role tree
-          docs : column
-            of prop:role=doc
-            clamp last 4
-            each qrow
         designs : column
           fold "Designs for me" open
           role tree
@@ -76,7 +69,7 @@ app : column
             of prop:role=doc,prop:design=answered
             each qrow
         notes : column
-          fold "Notes"
+          fold "Notes" open
           role tree
           docs : column
             of kind:note,prop:role=doc,-prop:design,-prop:collection

@@ -1,4 +1,8 @@
 # a5949: the Writing room in the home base (writing, doc-page, design-review): design-review's page, in this style's glass
+token card = #17221E
+token hush = ink at 50%
+token ghost = ink at 12%
+token mark = #E89A5B
 role sheet : between gap
 role toolbar : between gap, pad bottom gap, border bottom rim
 role railhead : text.mono down tracked, accent
@@ -9,7 +13,7 @@ role qcard.on : on wash, edge accent, pad gap /2, pad left gap, corner gap
 role qtitle : text down, ink
 role viewtab : text.mono down, soft, pad gap /2
 role viewtab.on : text.mono down, accent, pad gap /2, border bottom accent
-role leaf : on glassdeep, edge rim, corner gap x2, pad gap x3, pad left gap x4, pad right gap x4
+role leaf : pad left gap x2, pad right gap x2
 role aside : text down, soft, pad left gap, between gap, border left rim
 role block : space below gap /2
 role in1 : pad left gap x3
