@@ -230,7 +230,8 @@
     // a5496 (Alex, 15 Oct: 'I don't want the interface to scroll'): `scroll none` never scrolls; what does not fit is
     // cut, and a cut part fades at its foot (lens.html), so the eye knows there is more (settle marks data-cut).
     // `scroll none end` is cut at its head instead, its end always in view: a chat's newest lines
-    if (p.scroll === "none" || p.scroll === "none end") { el.style.overflow = "hidden"; el.dataset.scroll = "none"; }
+    // a5736: clip, not hidden: a hidden box still scrolls by a drag that selects text, the keys or scrollIntoView
+    if (p.scroll === "none" || p.scroll === "none end") { el.style.overflow = "clip"; el.dataset.scroll = "none"; }
     if (p.scroll === "none end") el.dataset.atEnd = "1";
     if (p.measure) { el.style.maxWidth = p.measure; el.style.marginInline = "auto"; }
     if (!n.acts.some(a => a.on === "fold")) return;
@@ -1095,7 +1096,8 @@
     (carried.floats || []).forEach(k => { const el = q(k), h = el && el.querySelector(":scope > button"); if (h && el.dataset.folded === "1") h.click(); });
     if (carried.places) V.place(carried.places);
     const f = carried.focus && q(carried.focus.key);
-    if (f) { f.focus(); const t = f.firstChild; if (t && t.nodeType === 3 && carried.focus.caret != null) getSelection().collapse(t, Math.min(carried.focus.caret, t.length)); }
+    if (f && f.matches(".explicit-composer")) { const t = f.querySelector("textarea"); if (t) t.focus(); }
+    else if (f) { f.focus(); const t = f.firstChild; if (t && t.nodeType === 3 && carried.focus.caret != null) getSelection().collapse(t, Math.min(carried.focus.caret, t.length)); }
   }
   await refresh().catch(() => {});
   startImageComments();
@@ -1119,7 +1121,9 @@
   let painter = null, leaving = false;
   function reloadKeeping() {
     const a = document.activeElement, s = getSelection();
-    const focus = a && a.dataset && a.dataset.key ? { key: a.dataset.key, caret: s.rangeCount && a.contains(s.focusNode) ? s.focusOffset : null } : null;
+    const c = a && a.closest && a.closest(".explicit-composer[data-key]");      // a5736: a composer's caret comes back too
+    const focus = c ? { key: c.dataset.key, caret: null }
+      : a && a.dataset && a.dataset.key ? { key: a.dataset.key, caret: s.rangeCount && a.contains(s.focusNode) ? s.focusOffset : null } : null;
     const floats = [...paint.querySelectorAll('.l-float:not([data-folded="1"])')].map(e => e.dataset.key);
     try { sessionStorage.setItem(carryKey, JSON.stringify({ answer: held, places: V.places(), focus, floats })); }
     catch (e) { try { sessionStorage.setItem(carryKey, JSON.stringify({ places: V.places(), focus, floats })); } catch (e2) {} }
@@ -1138,8 +1142,14 @@
     // the view (reloadKeeping), as soon as the person's hands are free: nothing carried, no part held, no composer with
     // the caret in it. While hands are busy the line says it is waiting, and the next tick asks again. (Until today the
     // line offered a click and the person chose when; Juniper's e3746 argued that reading has no safe pause.)
-    const a = document.activeElement, typing = a && (a.isContentEditable && paint.contains(a) || a.matches("input,textarea"));
-    if (carrying || V.hold || typing || imageCommentsBusy() || menuDrafts.size || openComposers.size) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
+    // a5736: an empty composer that only has the caret is free hands. The home base keeps its chat's composer focused,
+    // so it waited for ever and Alex's home base ran painter code three landings old (no `scroll none`: it scrolled)
+    const empty = k => { const c = k && paint.querySelector(`.explicit-composer[data-key="${CSS.escape(k)}"]`), t = c && c.querySelector("textarea");
+      return !!t && !t.value.trim() && !V.drafts.has(k); };
+    const a = document.activeElement, idle = a && a.matches(".explicit-composer textarea") && empty(a.closest(".explicit-composer").dataset.key);
+    const typing = a && !idle && (a.isContentEditable && paint.contains(a) || a.matches("input,textarea"));
+    const composing = [...openComposers].some(k => !empty(k)), holding = V.hold && !empty(V.hold);
+    if (carrying || holding || typing || imageCommentsBusy() || menuDrafts.size || composing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
     if (leaving) return; leaving = true;
     if (window.DoorLine) DoorLine.note("new screen code: loading it, keeping your view");
     setTimeout(reloadKeeping, 200);
