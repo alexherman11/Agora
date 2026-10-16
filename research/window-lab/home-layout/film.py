@@ -47,7 +47,7 @@ def main():
     subprocess.run([sys.executable, str(NOTATION / "screen.py"), "frontier-try", "--as", "alex", "--lens", "home-base",
                     "--size", "2560x1440", *steps], check=True)
     out.parent.mkdir(parents=True, exist_ok=True)
-    lst = ROOT / "screen-film.txt"
+    lst = out.with_suffix(".frames.txt")
     lst.write_text("".join(f"file '{f.as_posix()}'\nduration {s}\n" for f, s in frames) + f"file '{frames[-1][0].as_posix()}'\n", encoding="utf-8")
     subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-vf",
                     "scale=1920:-2,format=yuv420p", "-r", "25", str(out)], check=True)
