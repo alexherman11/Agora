@@ -458,11 +458,15 @@ def saying_rows(desk, terms=""):
             listed = set()
             for k in range(len(tl) - 1, -1, -1):
                 text, line, (at, eid) = tl[k]
-                if involving and line is not None:
+                # A stored message is one saying in every view. Splitting its paragraphs reused the
+                # same event key and treated a speaker-like phrase in its body as another writer.
+                if line is not None:
                     if line["id"] in listed:
                         continue
                     listed.add(line["id"])
                     text = line["text"]
+                    if line.get("edited") and not involving:
+                        text += f"  (edited, {line['id']})"
                 m = w.SPEAKER.match(text)
                 who = m.group(1).lower() if m else ""
                 if me and who == me:
