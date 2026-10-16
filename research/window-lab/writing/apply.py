@@ -5,6 +5,8 @@ world AFTER the code it needs has landed (a lens stood on a thing; section-of, w
 
     python research/window-lab/writing/apply.py lines <out.desk>     the lines (explore.py <world> --as <you> < out.desk)
     python research/window-lab/writing/apply.py update <out.desk>    lines that rewrite this commission's lenses in place
+    python research/window-lab/writing/apply.py backup [--as <name>]   first: each note it changes, as it stands, into before-a5949/
+    python research/window-lab/writing/apply.py check     every old= passage against those texts (each must stand once)
     python research/window-lab/writing/apply.py door [--as <name>] [--port 8794] [--world frontier]
                                          all of it through a door, line by line, stopping at the first refusal
 
@@ -80,9 +82,46 @@ def door(line, who, port, world):
     return json.loads(r.read()).get("text", "")
 
 
+TOUCHED = ("a5206", "a4200", "a5911", "a4039", "a5486", "a5692", "a5564", "a5573")
+BEFORE = HERE / "before-a5949"
+
+
+def body(said):
+    """The text of a note from `read <id> :3` as the door prints it: between the first --- line and the next."""
+    ls = said.splitlines()
+    i = ls.index("---")
+    j = ls.index("---", i + 1)
+    return "\n".join(ls[i + 1:j]), [x for x in ls[:i] if "appears at" in x]
+
+
+def backup(who, port, world):
+    """Each note this changes, as it stands now, kept beside this file so it can be put back by hand."""
+    BEFORE.mkdir(exist_ok=True)
+    for i in TOUCHED:
+        text, head = body(door(f"read {i} :3", who, port, world))
+        (BEFORE / f"{i}.txt").write_text(text + "\n", encoding="utf-8")
+        (BEFORE / f"{i}.head.txt").write_text("\n".join(head) + "\n", encoding="utf-8")
+        print(f"kept {i}: {len(text)} characters · {head[0][:140] if head else ''}")
+
+
+def check():
+    """Every old= passage of a replace, against the texts backup kept: each must stand there exactly once."""
+    bad = 0
+    for line in lines():
+        if not line.startswith("do replace "):
+            continue
+        i = line.split()[2]
+        old = line.split(" old=", 1)[1].split(" new=", 1)[0]
+        old = json.loads(old.replace("\\$", "$")) if old.startswith('"') else old
+        n = (BEFORE / f"{i}.txt").read_text(encoding="utf-8").count(old)
+        print(f"{i}: old= stands {n} time(s): {old[:70]!r}")
+        bad += n != 1
+    return bad
+
+
 def main(argv):
     opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d       # noqa: E731
-    if not argv or argv[0] not in ("lines", "update", "door"):
+    if not argv or argv[0] not in ("lines", "update", "door", "backup", "check"):
         print(__doc__)
         return 0
     out = update() if argv[0] == "update" else lines()
@@ -91,11 +130,17 @@ def main(argv):
         print(f"wrote {len(out)} lines to {argv[1]}")
         return 0
     who, port, world = opt("--as", "worker-a5949"), opt("--port", "8794"), opt("--world", "frontier")
+    if argv[0] == "backup":
+        backup(who, port, world)
+        return 0
+    if argv[0] == "check":
+        return 1 if check() else 0
     for line in out:
         said = door(line, who, port, world)
         print(said[:300])
-        if said.startswith("ERR") or "refused" in said[:200] or "MISS" in said[:20]:
-            print("stopped: the line above was refused")
+        bad = [x for x in said.splitlines() if x.startswith(("ERR", "MISS")) or x.startswith("~ ! lens")]
+        if bad and not (line.startswith("do rewrite a5911") and all("writing does not compile" in x for x in bad)):
+            print("stopped: the line above was refused or left a lens not compiling:", bad[:2])
             return 1
     return 0
 
