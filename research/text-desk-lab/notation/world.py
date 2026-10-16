@@ -1100,7 +1100,7 @@ class World:
                     raise Refusal(f"{rid} is not a comment on {sid}; read {sid} to see its comments")
                 if c["resolved"]:
                     raise Refusal(f"{rid} is resolved; a reply is given to an open comment (undo the resolve, or comment anew)")
-                me = "alex" if actor in ("jeff", "alex") else actor
+                me = actor
                 c["replies"].append({"by": me, "text": line, **({"mark": mark} if mark else {})})
                 s["rev"] += 1
                 for a in apps:
@@ -1119,7 +1119,7 @@ class World:
                 return {"ok": True, "event": ev["id"], "changed": [sid] + apps,
                         "note": f"reply added under {rid} by {me} on {sid}; it stays open" + (f"; to: {', '.join(ev['to'])}" if ev["to"] else "")
                         + (rooms.QUIET_NOTE if quiet and not ev["to"] else "")}
-            cid = self.add_comment(sid, "alex" if actor in ("jeff", "alex") else actor, line, actor, image)
+            cid = self.add_comment(sid, actor, line, actor, image)
             # a3319: whom the comment addresses is the writer's word, stored now, as a chat line's is (a1581): the
             # names of its header (written, a2733) that are someone, kept on its event as `to`. Beside args, not in
             # them: the house tells a resident every string an event's args hold. A comment from before this has no
@@ -1146,7 +1146,7 @@ class World:
                 raise Refusal(f"{cid} is already resolved")
             reply = str(args.get("line", "")).strip()
             if reply:
-                c["replies"].append({"by": "alex" if actor in ("jeff", "alex") else actor, "text": reply})
+                c["replies"].append({"by": actor, "text": reply})
             c["resolved"] = True
             s["rev"] += 1
             for a in apps:

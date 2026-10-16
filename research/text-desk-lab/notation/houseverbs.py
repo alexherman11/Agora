@@ -41,6 +41,13 @@ NOTES = (
              "# said back, are added for you ($reach), so there is nothing to copy. No family, no status, and no\n"
              "# deciding whose fault it was: someone sorts later (rows reaches counts what the desk refused).\n"
              "do append prop:role=wishes line=\"$* $reach\""),
+    # 16 Oct (a5824; Alex wants to be told when work finishes): the line is the record (who and when are its event), and
+    # the house turns each new one into a Windows toast on his PC (house.toasts, research/window-lab/notify.py)
+    ("notify", "# notify <words>: tell Alex, as a Windows notification on his PC (title Agora, silent; words that begin\n"
+               "# with ! ring). Each send is a line in the chat with prop role=notifications (Notifications sent): who,\n"
+               "# when and the words, so none is silent. The house shows it within seconds while it runs the live world;\n"
+               "# Focus Assist or Do not disturb hold the banner back (it waits in his notification centre)\n"
+               "do append prop:role=notifications line=\"$*\""),
 )
 
 
