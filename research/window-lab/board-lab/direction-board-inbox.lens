@@ -99,7 +99,6 @@ bands : column
     rows : column
       role nbrows
       of prop:commission=landed as c
-      clamp last 5
       each done
 # a thing waiting on Alex's look: a note, a demo, a report (tagged ready-for-review)
 review : column
@@ -131,6 +130,7 @@ review : column
       role nbtop
       when : text "waiting since $(day-or-time($changed.tags, $today))"
         role nbwhen
+        only when ($changed.tags or "") != ""
       demo : text "· a demo inside"
         role nbwhen
         only when ($c.demo or "") != ""
@@ -207,7 +207,6 @@ failure : column
       role nbwhen
     last : column
       of comments:$c.item as m
-      clamp last 2
       each note
     say : text ""
       role nbinput
@@ -249,31 +248,55 @@ moving : column
       share 1
     since : text "$(day-or-time($changed.commission, $today))"
       role nbwhen
+      only when ($changed.commission or "") != ""
   body : column
     role nbbody
-    who : text "$(($c.worker or $c.owner) or "nobody yet") · for $(($c.asked_by or "nobody")) · $c.commission since $(day-or-time($changed.commission, $today))"
+    steps : row
+      role nbsteps
+      q : text "queued"
+        role nbstep
+        role nbstep.on when $c.commission = "asked"
+        role nbstep.done when $c.commission != "asked"
+      w : text "working"
+        role nbstep
+        role nbstep.on when $c.commission = "working"
+        role nbstep.ask when $c.commission = "waiting"
+        role nbstep.done when $c.commission = "ready" or $c.commission = "landing"
+      r : text "ready"
+        role nbstep
+        role nbstep.on when $c.commission = "ready"
+        role nbstep.done when $c.commission = "landing"
+      l : text "landing"
+        role nbstep
+        role nbstep.on when $c.commission = "landing"
+      d : text "landed"
+        role nbstep
+    who : text "$(($c.worker or $c.owner) or "nobody yet") · asked by $(($c.asked_by or "nobody"))"
       role nbwhen
     now : text "at work this moment"
       role nbnow
       only when count(house doing=working resident=$c.worker) > 0
     last : column
       of comments:$c.item as m
-      clamp last 2
       each note
     acts : row
       role nbacts
       open : text "Open in the middle"
         role nbbtn
         on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+# the latest comment only (a clamp would print how many it cut, in the card)
 note : column
   role nbnote
+  only when $index = $count
   by : text "$m.by"
     role nbnoteby
   said : text "$m.text"
     role nbnotetext
     clamp 3
+# the last five landed (by $index, not a clamp, which would print what it cut)
 done : row
   role nbdone
+  only when $index > $count - 5
   on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
   title : text "$c.title"
     role nbdonetitle

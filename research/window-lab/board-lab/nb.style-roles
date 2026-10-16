@@ -44,3 +44,12 @@ role nbnoteby : text down 2 medium, soft
 role nbnotetext : text down, ink
 role nbdone : between gap, pad gap /4, pad left gap x1.5, pad right gap
 role nbdonetitle : text down, soft
+# direction-board-focus: the open first card, and the track of steps
+role nbfocus : on raised, rail warm, corner gap x1.5, pad gap x2, pad left gap x2.5, between gap
+role nbtitle.big : text up 2 medium, ink
+role nbwho : text down 2, soft
+role nbsteps : between gap /2
+role nbstep : text down 2, faint
+role nbstep.done : text down 2, soft
+role nbstep.on : text down 2 medium, night, on accent, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role nbstep.ask : text down 2 medium, night, on warm, corner gap x2, pad left gap /1.5, pad right gap /1.5
