@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (38)
+## open (39)
 
 ### F2. Scripts cannot say who is running them
 
@@ -260,6 +260,12 @@ Friction met on the way, not cured: a lens that names a source the running desk 
 a5341 · family=missing-word · status=open
 
 a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; new listeners.py; the Codex listener) so that @claude and @codex are knocked when a listener of theirs runs. The missing world-level word: a thing that says 'this agent is reachable, through this, and here is what it handed on', as a corner says it for a resident. Today it is a witnessed row (listener-<name>), which is right for liveness (it dies with the process) but cannot be written from the desk, and what it delivered is not kept in the world. If a world word appeared for it (a reach= prop on a person/agent record, or a kind for a door to an outside session), the receipt's words would move into the world.
+
+### Layout words a lens lacked: a weight that follows data, and never scrolling (a5496)
+
+a5619 · family=lens-words · status=open
+
+Source edits by worker-a5496, 15 Oct, for Alex's 'I don't want the interface to scroll ... drag around the different sections ... collapse them' and his dynamic tiling (c5528). Missing world-level words, now in the language: (1) share could not follow data, so widening one panel could not push the others: share $(expr) / share $name, filled per part (scene._w_share, lens_ir after the lets; 0 or none = own size). (2) Nothing meant never scroll: scroll none was accepted and drew as plain overflow. Now scroll none clips, fades at the foot when cut, may shrink below its words, and a row of it never wraps (lens.html; a wrapping flex row's line grows to its tallest child and pushed a column of panels off the screen); scroll none end is cut at the head, the end in view (JEFF's chat). (3) No time of day for a lens: hud.py publishes witnessed:clock (time, day). Left open: earlier chat lines are out of reach in the HUD once the feed never scrolls (a page or an Earlier fold would need the draft to hold an offset and a repeat to skip by it); recency of glances is not kept (Sable c5552: it belongs beside the world, as painters' reports are); Sable's (5), showing the new arrangement on the press before the desk answers, is not done. Aside: in test_scene.py, test_picture_is_a_text_drawn sits below the __main__ block, so running the file never runs it.
 
 ## curing (32)
 
