@@ -399,7 +399,7 @@
     recover.type = "button"; recover.textContent = "Use current version"; recover.className = Style.roleClass("button");
     post.className = Style.roleClass("button"); discard.className = Style.roleClass("tool"); status.className = Style.roleClass("meta");
     actions.append(post, discard, recover, status); el.append(input, actions);
-    let busy = false, picked = TEXT.selected(n);
+    let busy = false, picked = TEXT.selected(n), why = "";
     const sync = () => {
       // Reused elements must observe the refreshed value too. Otherwise a refused draft
       // never gets `shown`, and the next keystroke loses its origin while keeping its text.
@@ -420,7 +420,7 @@
       const unknown = !!d && !d.seen && !d.shown;
       post.disabled = busy || !input.value.trim() || unknown; discard.disabled = busy;
       recover.hidden = !unknown; recover.disabled = busy;
-      status.textContent = busy ? "Sending…" : unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "";
+      status.textContent = busy ? "Sending…" : why || (unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "");
       status.setAttribute("aria-live", "polite");
       V.mark(el, n.key);
       // An empty composer has no saved current text to compare with a refused draft.
@@ -431,11 +431,27 @@
     input.value = V.words(n.key, n.paint.text || "", n.fence);
     input.addEventListener("focus", () => { if (!openComposers.has(n.key) && !V.drafts.has(n.key)) picked = TEXT.selected(el._n); openComposers.add(n.key); V.hold = n.key; sync(); });
     input.addEventListener("blur", () => { if (!V.repainting) { V.hold = null; sync(); } });
-    input.addEventListener("input", () => { V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
+    input.addEventListener("input", () => { why = ""; V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
+    // a5588 (a5581: a click in the box's middle missed its one-row textarea, and the keys went nowhere): the whole
+    // composer is its hit area, so a press on its padding, the actions row or the status gives the words the caret
+    el.addEventListener("mousedown", e => {
+      if (e.button !== 0 || e.target === input || e.target.closest("button, a, input, select")) return;
+      e.preventDefault(); input.focus();
+    });
+    // Enter that cannot send says why on the page, instead of pressing a disabled Send
+    const trySend = () => {
+      if (busy) return;
+      const d = V.drafts.get(n.key);
+      why = !input.value.trim() ? "Nothing to send — write something first"
+        : d && !d.seen && !d.shown ? "Not sent — this draft was typed against a version not shown here: Use current version, or Discard"
+        : "";
+      if (why) return sync();
+      post.click();
+    };
     post.onclick = async () => {
       if (busy || !input.value.trim()) return;
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
-      const raw = input.value; busy = true; sync();
+      const raw = input.value; busy = true; why = ""; sync();
       await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
       busy = false;
       if (!V.drafts.has(n.key)) { input.value = ""; openComposers.delete(n.key); }
@@ -446,7 +462,7 @@
       if (V.useCurrent(n.key, { key: n.key, fence: el._n.fence, text: el._n.paint.text || "" })) { sync(); input.focus(); }
     };
     input.addEventListener("keydown", e => {
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); post.click(); }
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); trySend(); }
       if (e.key === "Escape") { e.preventDefault(); input.blur(); }
     });
     sync();
