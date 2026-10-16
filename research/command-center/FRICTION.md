@@ -303,7 +303,7 @@ a6077 · family=missing-word · status=open
 
 worker-a5988, 16 Oct. Alex asked to click At work and watch an agent's live feed. The words of a stream are in house-state transcripts, which only the house reads, so making them a lens's rows needed source: feeds.py (Reader turns Claude stream-json and Codex items into rows; redact; Feed tails by offset; Feeds.step writes witnessed:feed-<id> while a viewer stands home-feed on a card or corner) and a guarded call in house.step. The world half (home-feed, home-work) is lenses only. THE MISSING WORDS: (1) a world way to ask the house to observe something on demand: the watched set is read from props (with=home-feed viewing=<id>, or watching=<id>), and the lens name home-feed is a constant in feeds.py, so another lens that wants a feed must use watching= or edit source; a watch= word on a lens note would let any lens declare what it needs observed. (2) a per-source change signal: witnessed.stamp covers every witnessed file, so one feed write repaints every open painter's whole scene (measured on a copy at a 0.5 s write cadence: 47 whole scenes in 23 s); feeds are throttled to one write per 2 s per feed to keep that bounded. (3) redaction is code, not a world rule: what counts as a secret is regexes in feeds.redact.
 
-## curing (35)
+## curing (36)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -579,6 +579,12 @@ Missing world words: (1) a row source field for a private capture's pixels: jeff
 a6028 · family=host · status=curing
 
 Missing world words: (1) a host key that is not a hotkey: the home base's key is the hotkey= prop, read by RegisterHotKey, which binds a key plus modifiers and cannot bind a bare Win tap. So hud.py runs winkey.py (a low-level keyboard hook on its own thread), switched by a new winkey= prop on a5208. A world word for 'how the host is summoned' (summon=tap:Win | hotkey:Ctrl+Alt+J, any number of them) would make the next one a prop, but each kind of summoning still needs its own catcher in source. (2) a host verb to open the Start menu (start): the verb table is closed on purpose, so a new power is source by design. (3) host_verbs.settings now says read=False when the door did not answer, so a setting polled every 15 s keeps what it had instead of falling back to the default.
+
+### The home base was built whole at every change: a placed lens was never kept, and a press fetched two scenes (a6010)
+
+a6090 · family=code · status=curing
+
+worker-a6010, 16 Oct. ran (bench_board.py on a frontier-try copy with a log): any change rebuilt the whole home base, ~490 ms, because nothing inside a placed lens was kept (it was rekeyed in place after its build) and every panel of the home base is a placed lens; persons.reply_by scanned all ~11k events per reply, and touched() all events per $changed. The painter then fetched two whole scenes per press (its refresh and the stream's). Source changes, no new word: lens_ir builds a placed lens under its final keys and keeps it; row sources once per build; indexes for touched and find_lens; lens.js one scene request at a time and data-sending on a pressed part; screen.py --logged. After: ~160 ms a home-base build, 62-69 ms the board; 0 differences kept vs whole over 7 kinds of change. What is still missing in the world's words: a press that says what it will change, so the painter could draw the result before the desk answers (Snappy stage 3 for clicks, not only keys).
 
 ## cured (63)
 
