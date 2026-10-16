@@ -37,7 +37,7 @@ class Home:
 
 h = Home()
 names = [r["name"] for r in H.rows()]
-check("the rows are the verbs, each with what it does", names == ["bring", "hide", "window", "media.play", "media.next", "media.prev"]
+check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "window", "media.play", "media.next", "media.prev"]
       and all(r["about"] for r in H.rows()), H.rows())
 check("hide hides", H.call(h, "hide") == "ok hidden" and h.did[-1] == ("hide",), h.did)
 check("bring takes the window's handle, as the build filled it", H.call(h, "bring", "1312") == "ok brought 1312 forward"
@@ -58,6 +58,26 @@ check("window opens the lens as the home base's person in its world, and puts th
       and h.did[-1] == ("hide",), (r, opened, h.did))
 r = H.call(h, "window", "C:/Windows/notepad.exe")
 check("window takes a lens's name only, never a path or a program", r.startswith("ERR window takes") and len(opened) == 1, r)
+# a5824: notify <words> shows a toast (notify.show, stood in for here: nothing reaches the screen)
+import notify  # noqa: E402
+shown = []
+notify.show = lambda words, sound=False, by="": shown.append((words, sound, by)) or "shown"
+r = H.call(h, "notify", '"the writing area is done"')
+check("notify shows the words, outer quotes off, silent, from the home base's person",
+      r == "ok notified: the writing area is done" and shown[-1] == ("the writing area is done", False, "alex"), (r, shown))
+r = H.call(h, "notify", "! it broke")
+check("words that begin with ! ask for the sound", r.endswith("(with sound)") and shown[-1] == ("it broke", True, "alex"), (r, shown))
+r = H.call(h, "notify", "  ")
+check("notify with no words is refused and shows nothing", r.startswith("ERR notify takes") and len(shown) == 2, r)
+
+
+def no_toast(words, sound=False, by=""):
+    raise RuntimeError("Access is denied")
+
+
+notify.show = no_toast
+r = H.call(h, "notify", "x")
+check("a toast Windows did not take is said as a refusal", r == "ERR Windows did not take the toast: Access is denied", r)
 check("a verb that fails says so instead of raising", H.call(type("X", (), {"hide": lambda s: 1 / 0})(), "hide").startswith("ERR hide failed: ZeroDivisionError"))
 
 p = H.parse_props('a5208 note "home-base" · style=home-style hotkey=Ctrl+Shift+F9 monitor=2 note="a b" · 277w')

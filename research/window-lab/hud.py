@@ -8,6 +8,10 @@ its work area when the lens note says hide_taskbar=no; settings and host verbs i
 painter (lens.html through the door) showing one lens, painted over a frosted copy of what was on the screen
 the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl+Alt+J.
 
+a5834: while it runs, so does the control screen (capture/capture.py, its child): hold Ctrl+Alt and drag over
+anything, the home base too, and the capture goes on the person's own chat draft, unsent. capture=off on the lens
+note turns it off (at the next Ctrl+Alt+J); --stop ends both. Its output: state/capture.log.
+
 What it is made of, from the research of 10 to 12 Oct (a3909):
   - a native Agora window: a frameless window of our own holding the browser engine that ships with Windows (WebView2,
     through pywebview), not Edge in app mode, so the window is ours to place, show, hide and draw into;
@@ -29,6 +33,7 @@ import ctypes
 import io
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -223,7 +228,8 @@ def fit(s, sw, sh):
 class Hud:
     def __init__(self, a):
         self.a = a
-        self.door = "http://127.0.0.1:8794"
+        self.door = a.door.rstrip("/")
+        self.capture = None           # a5834: the control screen, our child while capture=on
         self.window = None
         self.hwnd = None
         self.shown = False
@@ -334,6 +340,7 @@ class Hud:
         if self.shown:
             return
         self.settings = host_verbs.settings(self.door, self.a.world, self.a.lens)     # a prop changed takes effect now
+        self.tend_capture()
         fg = user32.GetForegroundWindow()
         self.front = fg if fg and fg != self.hwnd else None
         self.dress(self.frost())
@@ -363,6 +370,31 @@ class Hud:
 
     def toggle(self):
         self.hide() if self.shown else self.show()
+
+    # -- the control screen (a5834): hold Ctrl+Alt and drag anywhere, the HUD too; the capture goes on the person's own
+    # chat draft (jeff-chat shows it as a chip with its picture, unsent). Our child, so it lives and ends with us:
+    # --stop ends the tree, and it ends itself when this process is gone (--parent). capture=off on the lens note
+    # stops it at the next show.
+    def tend_capture(self):
+        want = self.settings.get("capture", "on") == "on"
+        running = self.capture is not None and self.capture.poll() is None
+        if want and not running:
+            log = open(STATE / "capture.log", "a", encoding="utf-8")
+            log.write(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} started by the home base {os.getpid()}\n")
+            log.flush()
+            self.capture = subprocess.Popen(
+                [sys.executable, "-u", str(HERE / "capture" / "capture.py"), "--as", self.a.who, "--world", self.a.world,
+                 "--door", self.door, "--draft", "auto", "--parent", str(os.getpid())],
+                stdout=log, stderr=subprocess.STDOUT, creationflags=0x08000000)      # CREATE_NO_WINDOW
+            log.close()
+        elif not want and running:
+            self.stop_capture()
+
+    def stop_capture(self):
+        if self.capture is not None and self.capture.poll() is None:
+            # the venv's python is a launcher: the interpreter is its child, so the whole tree goes
+            subprocess.run(["taskkill", "/PID", str(self.capture.pid), "/T", "/F"], capture_output=True)
+        self.capture = None
 
     # -- what the page asks of the host (pywebview's js_api)
     def media(self, action):
@@ -426,11 +458,13 @@ class Hud:
         ctypes.windll.user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
         threading.Thread(target=self.keys, daemon=True).start()
         threading.Thread(target=self.tend, daemon=True).start()
+        self.tend_capture()
         if self.a.show:
             time.sleep(1.5)
             self.show()
 
     def closed(self):
+        self.stop_capture()
         witnessed.clear(self.a.world, "desktop")
         witnessed.clear(self.a.world, "media")
         witnessed.clear(self.a.world, "clock")
@@ -486,7 +520,8 @@ def main():
     ap.add_argument("--as", dest="who", default="alex")
     ap.add_argument("--world", default="frontier")
     ap.add_argument("--show", action="store_true", help="open shown, not waiting for the key")
-    ap.add_argument("--stop", action="store_true", help="end the running home base")
+    ap.add_argument("--stop", action="store_true", help="end the running home base (and its control screen)")
+    ap.add_argument("--door", default="http://127.0.0.1:8794", help="the desk's door (a copy's, for a test)")
     a = ap.parse_args()
     STATE.mkdir(parents=True, exist_ok=True)
     old = int(PIDFILE.read_text()) if PIDFILE.exists() and PIDFILE.read_text().strip().isdigit() else 0

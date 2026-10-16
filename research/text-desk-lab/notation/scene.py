@@ -245,7 +245,7 @@ def _cmd_value(v):
 # somewhere; here it gets named fields. `rows <source>` prints the same rows in the desk, so a lens never sees
 # anything the terminal cannot.
 SOURCES = {
-    "captures": ("captures [cap-<id> ...]", ("cid", "label", "summary", "remaining")),
+    "captures": ("captures [cap-<id> ...]", ("cid", "label", "summary", "remaining", "thumb")),
     "sections": ("sections:<id>", ("item", "heading", "words", "text", "index")),
     "comments": ("comments:<id>", ("item", "cid", "by", "text", "state", "replies", "image", "awaiting", "to", "eid", "unread", "unread_count", "reply_count", "latest", "opening_awaiting")),
     "replies": ("replies:<id>", ("item", "rid", "thread", "by", "text", "index", "awaiting", "to", "eid", "unread")),
@@ -459,11 +459,15 @@ def saying_rows(desk, terms=""):
             listed = set()
             for k in range(len(tl) - 1, -1, -1):
                 text, line, (at, eid) = tl[k]
-                if involving and line is not None:
+                # A stored message is one saying in every view. Splitting its paragraphs reused the
+                # same event key and treated a speaker-like phrase in its body as another writer.
+                if line is not None:
                     if line["id"] in listed:
                         continue
                     listed.add(line["id"])
                     text = line["text"]
+                    if line.get("edited") and not involving:
+                        text += f"  (edited, {line['id']})"
                 m = w.SPEAKER.match(text)
                 who = m.group(1).lower() if m else ""
                 if me and who == me:
@@ -754,21 +758,24 @@ def rows(desk, source, session=None):
         except ImportError:
             return [{"cid": cid, "label": "Attachment unavailable",
                      "summary": "Capture service unavailable; this attachment is kept.",
-                     "remaining": " ".join(other for other in ids if other != cid)}
+                     "remaining": " ".join(other for other in ids if other != cid), "thumb": ""}
                     for cid in ids]
         rows = []
         capture_session = session or getattr(desk, "_session", "")
         actor = str(desk.world.me).split("/")[0]
         for cid in ids:
+            thumb = ""
             try:
                 value = captures.load_capture(capture_session, actor, cid)
                 refs = value.get("refs") or []
                 label = f"{len(refs)} native item(s)" if refs else "Image selection"
                 summary = captures.preview(capture_session, actor, cid)
+                # a5834: the pixels, small, as a data address a `picture` text paints (the person's own scene only)
+                thumb = captures.thumb(capture_session, actor, cid) if hasattr(captures, "thumb") else ""
             except captures.CaptureError as exc:
                 label, summary = "Attachment unavailable", str(exc)
             rows.append({"cid": cid, "label": label, "summary": summary,
-                         "remaining": " ".join(other for other in ids if other != cid)})
+                         "remaining": " ".join(other for other in ids if other != cid), "thumb": thumb})
         return rows
     if source_head(src) == "sayings":
         own = [t for t in rest.split() if t.startswith(("for:", "involving:", "in:"))]
