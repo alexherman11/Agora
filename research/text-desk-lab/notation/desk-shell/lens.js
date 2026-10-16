@@ -74,6 +74,12 @@
   async function host(words) {
     const sp = words.indexOf(" "), verb = sp < 0 ? words : words.slice(0, sp), rest = sp < 0 ? "" : words.slice(sp + 1);
     const api = window.pywebview && window.pywebview.api;
+    // a5941: `window <lens>` from a page with no home base (an Agora window, a browser tab) opens the lens as a window
+    // of this page's own browser, as the home base's verb opens one in Edge: the same painter, person and world
+    if ((!api || typeof api.host !== "function") && verb === "window" && /^[a-z][a-z0-9-]*$/.test(rest.trim())) {
+      const u = `lens.html?${new URLSearchParams({ session, as: who, lens: rest.trim(), inspect: "0" })}`;
+      return window.open(u, "agora-" + rest.trim(), "popup,width=1280,height=760") ? "ok opened" : V.notify(`the browser did not open ${rest.trim()} as a window (a pop-up blocker?)`);
+    }
     if (!api || typeof api.host !== "function") return V.notify(`'${verb}' asks the home base, and this page is not in it (open the home base: Ctrl+Alt+J)`);
     let r;
     try { r = await api.host(verb, rest); } catch (e) { return V.notify(`the home base did not answer ${verb}: ${e.message || e}`); }
@@ -103,7 +109,7 @@
     // line was sent was reused still showing it, and its next blur sent it again. Once no draft holds them, they go.
     const k = kept.get(n.key), p = k && k.el._n.paint;
     if (k && k.el._composer) k.el._composer.sync();
-    else if (p && p.text != null && !p.markdown && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
+    else if (p && p.text != null && !p.markdown && !p.media && draft !== undefined && !V.drafts.has(n.key) && k.el.textContent !== (p.runs ? p.runs.map(x => x.text).join("") : p.text)) {
       if (p.runs) runs(k.el, p.runs); else k.el.textContent = p.text; V.mark(k.el, n.key);
     }
     return r;
@@ -184,6 +190,14 @@
       }
     }
     if (p.live && p.text != null) live(el, n, p);
+    // a5941: `media`: the films and pictures the words name, drawn by media.js; Pop out sends the part's `on pop` acts
+    // in order, desk lines and host verbs alike, with $value the path as written
+    if (p.media && window.Media) Media.draw(el, p.media, n.acts.some(a => a.on === "pop") ? async item => {
+      for (const a of el._n.acts.filter(a => a.on === "pop")) {
+        const line = a.line.replace(/\$value\b/g, () => TEXT.esc(item.path));
+        if (line.startsWith("host ")) await host(line.slice(5)); else await send(el._n, line);
+      }
+    } : null);
     if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
     if (p.kind === "frame") frames(el, n, p);
     // a weight, as a track is; in a row, a share also fills the row's height (lens.html: .l-row > [data-share]). 1 Oct:

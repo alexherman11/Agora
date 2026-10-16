@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (42)
+## open (43)
 
 ### F2. Scripts cannot say who is running them
 
@@ -284,6 +284,12 @@ a5824 (16 Oct, worker-a5824). Alex wants a Windows toast when work finishes, sen
 a5907 · family=lens-words · status=open
 
 Source edit by worker-a5820, 16 Oct, for Alex's ask (a5820: 'nice clean markdown formatting ... kinda like obsidian but better'). WANTED: a document that is one Markdown text (a4865) drawn as a document (headings, lists, tasks, quotes, code, tables, links, [[wikilinks]], ![[embeds]]) and written in place with the marks shown only on the line being written; a link that opens the other document. DONE IN THE WORLD: the Writing app itself (lens writing, style writing-style, Alex's writer note, the dock icon), research/window-lab/writing/apply.py. DONE IN SOURCE: scene.py the lens word markdown [links <selection>] and the gesture on link ($value the id), scene.wikilinks_of (a title or id named in [[ ]] resolved to a thing, read in lens_ir), press Ctrl+E / Ctrl+S; desk-shell/markdown.js (the reader, the drawing and the live-preview editor), lens.js wiring. WHY NO WORLD EDIT COULD DO IT: the painter draws a text as runs of a closed grammar, and an editable text is a plain contenteditable; a lens cannot say how a text is drawn line by line, nor resolve a name inside a text to a thing. THE SMALLEST SEAM THAT WOULD HAVE MADE IT A WORLD EDIT: (1) a world note that declares a text grammar (line kinds by pattern, each with its role and which characters are marks to hide), read by one generic painter routine; markdown.js would then be one such note; (2) a selection over the words inside a text (things named in it), so a lens could list and resolve links itself.
+
+### A path to a film in a chat line stayed words: no lens word drew a file, and no gesture said Pop out (a5941)
+
+a5999 · family=lens-words · status=open
+
+Alex, 16 Oct: 'can we get that video to be hyperlinked in chat and open in a native window here? I don't want to have to open a different application.' JEFF's line held the demo film's path; the chat drew it as words, since nothing in a lens could draw a file from the PC, and the desk had no way to serve one. Source edits (a5941): scene.py (the word `media [player]`, the gesture `on pop`, `on pop host`), media_links.py (the folders the desk may show and the one judge of a path), deskd.py and door.py (GET /media/ with ranges, refused to other sites), desk-shell/media.js and lens.js/lens.html (the poster, inline play, the player, Pop out; a page with no home base opens `host window <lens>` as a window of its own browser). The world-level words that were missing: `media` on a text, and `on pop`. Still open: the folders are a list in source (media_links.FOLDERS), not world data; a path with spaces is not found; a poster is the film's frame at 0.1 s, not a chosen one.
 
 ## curing (34)
 
