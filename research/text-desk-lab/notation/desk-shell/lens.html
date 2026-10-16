@@ -95,6 +95,17 @@
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
+  /* `live` (a5530): the painter's clock and counts; `until ring` a ring that empties, the time left inside it */
+  .t-live { font-variant-numeric: tabular-nums; }
+  .t-ring { position: relative; display: grid; place-items: center; aspect-ratio: 1; width: 100%; max-width: 9em; margin-inline: auto; white-space: nowrap; }
+  .t-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .t-ring circle { fill: none; stroke-width: 5; }
+  .t-ring .ring-track { stroke: currentColor; opacity: 0.13; }
+  .t-ring .ring-arc { stroke: var(--t-accent, currentColor); stroke-linecap: round; stroke-dasharray: 1 1; transition: stroke-dashoffset 1s linear; }
+  .t-ring[data-ended] .ring-arc { opacity: 0; }     /* a round cap would leave a dot at zero */
+  .t-live[data-ended] { animation: live-end 1.8s ease-in-out 3; }
+  @keyframes live-end { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .t-ring .ring-arc { transition: none; } .t-live[data-ended] { animation: none; } }
   [data-focus] [contenteditable]:focus { outline: 1px solid var(--t-focus); outline-offset: 2px; }
   [data-tool] { cursor: pointer; user-select: none; }
   [data-pressed] { opacity: 0.45; }   /* a press that is on its way to the desk */

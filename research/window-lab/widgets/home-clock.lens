@@ -1,0 +1,11 @@
+# home-clock: the time and the day, top left of the home base (a5530). A widget: tag widget, slot=bar, order=1.
+# `live clock` and `live date` are drawn by the painter from its own clock, once a second; the words here ($today) are
+# what a reader of the scene sees.
+clock : row
+  role clock
+  time : text "$today"
+    live clock
+    role clocktime
+  day : text "$today"
+    live date
+    role clockdate

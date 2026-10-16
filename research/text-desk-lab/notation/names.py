@@ -22,7 +22,7 @@ from world import Refusal
 
 FIELDS = ("title", "text", "kind", "due", "tags", "id", "item")
 PLACE = ("in", "before", "after", "text")
-HOST = ("me", "today", "session", "here", "house")
+HOST = ("me", "today", "now", "session", "here", "house")
 PART = re.compile(r"^\.([A-Za-z_][A-Za-z0-9_-]*)$")
 
 
@@ -178,6 +178,12 @@ def host_frame(desk, ctx=None, here=None):
             if not today:
                 raise Refusal("$today is unset; clock YYYY-MM-DD sets it (clock follow keeps it on the wall date)")
             return today
+        if name == "now":
+            # a5530 (Alex: a pomodoro timer whose state is a world fact): the wall clock to the second, when the line
+            # runs. Only lines that run have it (blanks); a lens is built earlier than its press, so a gesture's $now is
+            # left for the desk to fill when the press arrives
+            import datetime
+            return datetime.datetime.now().replace(microsecond=0).isoformat()
         if name == "session":
             return ctx.get("session") or getattr(desk, "_session", None) or ""
         if name == "here":
@@ -193,7 +199,7 @@ def host_frame(desk, ctx=None, here=None):
     def parts(name, attr):
         p = attr[1:]
         what = f"${name}{attr}"
-        if name in ("today", "session"):
+        if name in ("today", "now", "session"):
             raise Refusal(f"{what}: ${name} has no parts")
         if name == "me":
             import persons

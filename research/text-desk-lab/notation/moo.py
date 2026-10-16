@@ -152,14 +152,31 @@ def v_put(w, nid, a):
 RANK_STEP = 1000
 
 
+_IDLIKE = re.compile(r"([a-z]+)(\d{1,12})")
+
+
 def order_value(v):
-    """Numbers ascending, then words, then a missing value last."""
+    """Numbers ascending, then words, then a missing value last. A word that is letters then a number (an id: e9,
+    e10, a5530) orders by its number, so e9 comes before e10 (a5530)."""
     if v is None or v == "":
         return (2, 0, "")
     try:
         return (0, float(v), "")
     except (TypeError, ValueError):
-        return (1, 0, str(v).lower())
+        s = str(v).lower()
+        m = _IDLIKE.fullmatch(s)
+        return (1, 0, m.group(1) + m.group(2).zfill(12) if m else s)
+
+
+def sort_by(items, keys, get):
+    """`items` in the order of `keys`, each a field name, or `-name` for the largest first (a5530: newest first); a
+    missing value is last either way. `get(item, name)` reads a field. Stable, so ties keep the order they came in."""
+    out = list(items)
+    for k in reversed(list(keys)):
+        name, desc = (k[1:], True) if k.startswith("-") else (k, False)
+        have = [x for x in out if order_value(get(x, name))[0] != 2]
+        out = sorted(have, key=lambda x: order_value(get(x, name)), reverse=desc) + [x for x in out if order_value(get(x, name))[0] == 2]
+    return out
 
 
 def props_of(w, i):
@@ -172,7 +189,7 @@ def props_of(w, i):
 def order_by(w, ids, keys):
     """`ids` in the order of `keys` (props); a stable sort, so ties keep the order they came in: for a selection, the
     order the appearances were made."""
-    return sorted(ids, key=lambda i: tuple(order_value(props_of(w, i).get(k)) for k in keys))
+    return sort_by(ids, keys, lambda i, k: props_of(w, i).get(k))
 
 
 def _lane_group(w, status, priority, leave_out):

@@ -230,7 +230,7 @@ class DeskKnife(DeskMoo):
     _rule_authors = None    # {subject id: (events seen, author)}: who a rule acts as, read from the log once per change
     _rule_notes = None
     _in_rules = False
-    RULE_BLANKS = ("item", "here", "today", "me")
+    RULE_BLANKS = ("item", "here", "today", "now", "me")      # now (a5530): the moment the rule fires
     RULE_FORM = "when <selection> do <verb> [target] [k=v ...]   or   on <verb> [by=<actor>] do <verb> ..."
 
     def _prop_names(self):
@@ -310,7 +310,7 @@ class DeskKnife(DeskMoo):
                 return None, "$new: a rule has no earlier line; it acts on $item, the thing it fired on"
             if name.isdigit() or name in ("this", "*"):
                 return None, (f"${name}{attr} is a verb's word; a rule has none. A rule's blanks: $item $item.title $item.<prop> "
-                              f"$item.maker, $item's own words bare ($title, $status), $here $here.<prop> $today $me $house, or a "
+                              f"$item.maker, $item's own words bare ($title, $status), $here $here.<prop> $today $now $me $house, or a "
                               f"handle; a literal dollar sign is \\$")
             if name not in self.RULE_BLANKS and name != "house" and name not in (self.vars or {}) \
                     and name not in names.FIELDS and name not in self._prop_names():
@@ -318,7 +318,7 @@ class DeskKnife(DeskMoo):
                 # present: a word no thing in the world carries as a prop is refused; $item.<prop> says it on purpose
                 return None, (f"${name}{attr} is no blank in a rule, and no thing here has a prop {name}=. A rule's blanks: "
                               f"$item $item.title $item.<prop> $item.maker, $item's own words bare ($title, $status), $here "
-                              f"$here.<prop> $today $me $house, or a handle; for a prop the thing will have, write $item.{name}")
+                              f"$here.<prop> $today $now $me $house, or a handle; for a prop the thing will have, write $item.{name}")
             if attr and name in ("today", "me"):
                 return None, f"${name}{attr}: ${name} has no parts"
         try:

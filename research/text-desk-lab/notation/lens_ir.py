@@ -654,6 +654,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 out["missing"] = missing
         if ctx.get("_state") and ctx["_state"] != "live":
             out["state"] = ctx["_state"]
+        if isinstance(out.get("fold"), str) and "$(" in out["fold"]:      # a5530: a label computes as words do: fold "$(total)"
+            out["fold"] = S._fill_text(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track, lambda e: X.run(e, xenv()))[0]
         if em.get("picture") and ctx.get("item"):
             original = acc.thing(ctx["item"])
             if out.get("text") == original.get("text"):
@@ -742,7 +744,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 if b.get("by"):
                     out["by"] = b["by"]             # a1069: ordered here, in the scene, so both printers show one order
                 if rs is not None and b.get("by"):
-                    rs = sorted(rs, key=lambda r: tuple(moo.order_value(r.get(k)) for k in b["by"]))
+                    rs = moo.sort_by(rs, b["by"], lambda r, k: r.get(k))
                 if b.get("run"):
                     out["run"] = b["run"]
                 if rs is not None:
@@ -757,8 +759,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     named, ids = acc.select(sel_text)
                     if b.get("by"):
                         if named is not None:
-                            at = {i: k for k, (i, _st) in enumerate(named)}
-                            named = sorted(named, key=lambda x: (tuple(moo.order_value(moo.props_of(w, x[0]).get(k)) for k in b["by"]), at[x[0]]))
+                            named = moo.sort_by(named, b["by"], lambda x, k: moo.props_of(w, x[0]).get(k))
                         else:
                             ids = moo.order_by(w, list(ids), b["by"])
                     # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in

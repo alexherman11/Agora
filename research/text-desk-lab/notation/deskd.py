@@ -80,7 +80,7 @@ def same_answer(desk, q, answer, keep=None, by=None):
     if by:
         import moo
         w = desk.world
-        now = sorted(now, key=lambda x: tuple(moo.order_value(moo.props_of(w, x[0] if isinstance(x, list) else x).get(k)) for k in by))
+        now = moo.sort_by(now, by, lambda x, k: moo.props_of(w, x[0] if isinstance(x, list) else x).get(k))
     if keep:
         now = now[:keep]
     key = lambda xs: {tuple(x) if isinstance(x, list) else x for x in xs}
