@@ -9,7 +9,10 @@ and read back what it measured. The screenshot is a PNG a model can open with it
 --term keeps the desk terminal beside the lens (it is hidden by default here); --page shell opens the windowed
 desktop (index.html: dock, windows, apps) instead of the painter. --reduced-motion looks as someone whose system asks
 for reduced motion (prefers-reduced-motion: reduce). --scale 1.5 paints as a display scaled 150% does (--size stays
-in CSS pixels: Alex's 3840x2160 at 150% is --size 2560x1440 --scale 1.5; a5736).
+in CSS pixels: Alex's 3840x2160 at 150% is --size 2560x1440 --scale 1.5; a5736). --visible x,y opens a REAL window on
+the screen at x,y (an app window, no tabs or bar; --size its size in the screen's own scaling, --scale ignored), and the
+steps act in it where anyone at the screen sees them: for a demo filmed with research/window-lab/screen_tools.py record.
+It closes when the steps end (a5820).
 
 By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served on a free port as the
 keeper serves the real one, by a door (door.py) with a deskd behind it, from a copy of THIS directory's desk-shell/
@@ -81,6 +84,7 @@ import websockets
 HERE = Path(__file__).resolve().parent
 PY = sys.executable
 SCALE = 1.0          # --scale: the display's scale, as devicePixelRatio (a5736)
+VISIBLE = ""         # --visible x,y: a real window on the screen there, not headless (a5820)
 BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe", "/usr/bin/google-chrome", "/usr/bin/chromium"]
@@ -248,9 +252,15 @@ async def run(url, steps, size, shots, restart=None, still=False):
         raise SystemExit("screen: no Chrome or Edge found; looked in " + ", ".join(BROWSERS))
     prof = tempfile.mkdtemp(prefix="screen-profile-")
     port = free_port()
-    br = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
-                           "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--hide-scrollbars",
-                           f"--window-size={w},{h}", "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # a5820 (--visible x,y): a real window on the screen, an app window with no tabs or bar, at x,y and the size asked
+    # (in the screen's own scaling, not emulated), so the steps can be watched and filmed as a person would see them
+    # (13:5x 16 Oct: `--app=about:blank` came up as a whole browser with a tab bar and took the keyboard from the person
+    # at the screen; the app window is asked for with the page's own address. It still takes the focus as it opens:
+    # open one only when the person at the screen has said now is a good time)
+    head = [f"--window-position={VISIBLE}", f"--app={url}"] if VISIBLE else ["--headless=new", "--hide-scrollbars", "about:blank"]
+    br = subprocess.Popen([exe, f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
+                           "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+                           f"--window-size={w},{h}", *head], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         wait_http(f"http://127.0.0.1:{port}/json/version")
         tabs = json.loads(wait_http(f"http://127.0.0.1:{port}/json"))
@@ -258,7 +268,8 @@ async def run(url, steps, size, shots, restart=None, still=False):
         async with websockets.connect(ws_url, max_size=64 * 1024 * 1024) as ws:
             p = Page(ws)
             await p.call("Page.enable")
-            await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=SCALE, mobile=False)
+            if not VISIBLE:
+                await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=SCALE, mobile=False)
             if still:
                 await p.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
             await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
@@ -468,6 +479,9 @@ def main():
         elif a[k] == "--scale":
             global SCALE
             SCALE, k = float(a[k + 1]), k + 2
+        elif a[k] == "--visible":
+            global VISIBLE
+            VISIBLE, k = a[k + 1], k + 2
         elif a[k] == "--live":
             live, k = True, k + 1
         elif a[k] == "--bare":
