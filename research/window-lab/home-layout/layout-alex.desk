@@ -8,4 +8,5 @@ do create "Alex's left column" kind=note title="Waiting on you" role=home-panel 
 do create "Alex's left column" kind=note title="The lowdown" role=home-panel actor=alex lens=home-lowdown lesser= shelf=no
 do create "Alex's left column" kind=note title="At work" role=home-panel actor=alex lens=home-work lesser=home-work-small shelf=no
 do create "Alex's middle column" kind=note title="The board" role=home-panel actor=alex lens=home-board lesser=home-board-small shelf=no
+do create "Alex's middle column" kind=note title="Music" role=home-panel actor=alex lens=home-music lesser=home-music-small shelf=no
 do create "Alex's middle column" kind=note title="On your screen" role=home-panel actor=alex lens=home-tiles lesser=home-tiles-small shelf=no

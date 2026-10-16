@@ -12,3 +12,6 @@ do replace a5546 old="  role side\n  head : text \"On your screen\"\n    role he
 read a5439
 do replace a5439 old="waiting : column\n  role panel\n" new="waiting : column\n"
 do replace a5439 old="  top : row\n    role waithead\n    head : text \"Waiting on you\"\n      role heading\n      share 1\n    n : text \"$(now + later)\"\n      role count\n      only when now + later > 0\n" new=""
+# a5592: the music panel keeps its buttons at the right of its first row; only its box and title go
+read "home-music"
+do replace "home-music" old="  role panel\n  top : row\n    role musictop\n    head : text \"Music\"\n      role heading\n      share 1\n" new="  top : row\n    role musictop\n    head : column\n      share 1\n"
