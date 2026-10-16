@@ -1,0 +1,25 @@
+# media-player-style: the player window (lens media-player, a5941). Dark, so the film is what is seen; the controls
+# are quiet words under it. The painter draws the player (media.js) in the roles media, tool and meta.
+
+font sans = Inter, system-ui, Segoe UI, sans-serif
+
+token paper    = #0E0F12
+token card     = #17181C
+token ink      = #E3E4E8
+token accent   = #6FD3B2
+token hush     = ink at 55%
+token ghost    = ink at 13%
+token scrollbar = ink at 22%
+token scrollbar_w = 6
+
+token gap      = 8
+token ramp     = 1.2
+token text     = sans 15/1.5
+
+role desk      : on paper, ink, text
+role app       : on paper, ink, text
+role film      : on paper
+role media     : on paper, ink
+role meta      : text down, hush, pad gap
+role tool      : text down, ink, pad gap /2, pad left gap, pad right gap, corner gap /2, edge ghost
+role cut       : text down, hush

@@ -36,6 +36,13 @@ the one form. The words:
                                  [label](address). Read, they are drawn; edited, they are their source, and Ctrl+B,
                                  Ctrl+I, Ctrl+K put one around what is selected or take it off. Not inside code runs;
                                  marks do not nest. The printer says `marks strong 2, link 1`
+    media [player]               on words: a path in them to a film or picture the desk may show (media_links.py:
+                                 research/window-lab/demos or media/, mp4 webm m4v png jpg gif webp) is drawn under
+                                 the words, a film as a poster that plays where it is, with Pop out (`on pop`); any
+                                 other path stays words. `media player`: the first one fills the part, with play,
+                                 seek, speed and full window. The printer says `media 1 video` (and what was not shown)
+    on pop do <command>          on a `media` text: Pop out was pressed on one of its films or pictures, $value its path
+                                 as written; `on pop host <verb> [words]` asks the host too (both run, in order)
     clamp <N>                    on words: at most N lines (printed as ~, the painter clamps wrapped lines).
                                  on a repeat: at most N instances; both printers say how many are left
     of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas), over ids named
@@ -122,9 +129,10 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link")
+# pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
 # the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
@@ -1065,6 +1073,16 @@ def _w_markdown(node, p, val, n, env):
     node["markdown"] = v[6:].strip() if v else True
 
 
+def _w_media(node, p, val, n, env):
+    # a5941 (Alex, 16 Oct: 'can we get that video to be hyperlinked in chat and open in a native window here'): a path in
+    # the words to a film or picture the desk may show is drawn as one. The link stays words in the text; which paths
+    # are shown is media_links.py's, judged when the scene is built and again when the file is asked for
+    v = (val or "").strip()
+    if v not in ("", "player"):
+        raise LensRefusal(f"line {n}: `media` (each film or picture the words name, under them) or `media player` (the first, filling the part); got {p!r}")
+    node["media"] = v or "embed"
+
+
 LIVE =("clock", "date", "until", "until ring")
 
 
@@ -1089,6 +1107,16 @@ _RUNS = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.S)
 
 
 _MARKS = re.compile(r"BS*BS*BS*(?=BSS)(?P<both>[^*BSn]+?)(?<=BSS)BS*BS*BS*|BS*BS*(?=BSS)(.+?)(?<=BSS)BS*BS*|BS*(?=BSS)([^*BSn]+?)(?<=BSS)BS*|BS[([^BS]BSn]+)BS]BS(([^)BSsBSn]+)BS)".replace("BS", chr(92)))
+
+
+def media_of(text):
+    """a5941: the films and pictures a `media` text's words name (media_links.find): shown ones carry src. A fault in
+    judging a path (a name the file system refuses) leaves the words as words; it never stops the lens around them"""
+    import media_links
+    try:
+        return media_links.find(text)
+    except (OSError, ValueError) as e:
+        return [{"path": "", "refused": f"the paths in these words could not be judged ({type(e).__name__}: {e})"}]
 
 
 def marks_of(text):
@@ -1431,11 +1459,12 @@ def _w_on(node, p, val, n, env):
         return
     # a5300 (15 Oct): a button asks the program the page is painted in (the home base, research/window-lab/hud.py) to do
     # one of the things it says it can (its rows, witnessed:host). Like `press`, the painter's own act: never a desk line
-    m = re.fullmatch(r"click host(?:\s(.*))?", val.strip())
+    # a5941: `on pop host ...` too (Pop out on a `media` film asks for a window)
+    m = re.fullmatch(r"(click|pop) host(?:\s(.*))?", val.strip())
     if m:
-        if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", (m.group(1) or "").strip()):
-            raise LensRefusal(f"line {n}: `on click host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")
-        node["on"].append({"on": "click", "line": "host " + m.group(1).strip()})
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", (m.group(2) or "").strip()):
+            raise LensRefusal(f"line {n}: `on {m.group(1)} host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")
+        node["on"].append({"on": m.group(1), "line": "host " + m.group(2).strip()})
         return
     g, do, cmd = val.partition(" do ")
     drop_part = label = when = None
@@ -1491,6 +1520,7 @@ WORDS = {
     "marks": ("marks", _w_marks),
     "picture": ("picture", _w_picture),
     "markdown": ("markdown [links <selection>]", _w_markdown),
+    "media": ("media [player]", _w_media),
     "live": ("live clock|date|until [ring]", _w_live),
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
@@ -1594,7 +1624,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "markdown": False, "light": None, "live": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1635,6 +1665,10 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `picture` draws a text that is a drawing (SVG): this part " + ("prints no text" if k["text"] is None else "is edited, and a drawing is edited as its source, in a part without `picture`"))
         if k["markdown"] and (k["text"] is None or k["picture"] or k["live"]):
             raise LensRefusal(f"line {k['line']}: `markdown` draws a text that is a Markdown document: this part " + ("prints no text" if k["text"] is None else "is also a picture or a live count"))
+        if k["media"] and (k["text"] is None or k["picture"] or k["markdown"] or k["live"] or any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `media` draws the films and pictures a text's words name, under them: this part " + ("prints no text" if k["text"] is None else "is edited (the words are written in a part without `media`)" if any(a["on"] == "edit" for a in k["on"]) else "is also a picture, a Markdown document or a live count"))
+        if any(a["on"] == "pop" for a in k["on"]) and not k["media"]:
+            raise LensRefusal(f"line {k['line']}: `on pop` is sent when Pop out is pressed on a film or picture a `media` text draws; this part has no `media`")
         if any(a["on"] == "link" for a in k["on"]) and not k["markdown"]:
             raise LensRefusal(f"line {k['line']}: `on link` is sent when a [[wikilink]] in a `markdown` text is followed; this part has no `markdown`")
         if k["layout"] == "grid" and not k["tracks"]:
@@ -2220,6 +2254,12 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append("marks " + (", ".join(f"{k} {c}" for k in ("strong", "stress", "both", "link") for c in [sum(1 for r in rs if r.get("mark") == k)] if c) or "none"))
         elif n.get("marks"):
             bits.append("marks none")
+        if n.get("media"):
+            ms = media_of(n.get("text") or "")
+            kinds = [m["kind"] for m in ms if m.get("src")]
+            said = ", ".join(f"{kinds.count(k)} {k}" for k in ("video", "image") if k in kinds) or "none"
+            no = [m["refused"] for m in ms if not m.get("src")]
+            bits.append(("media player " if n["media"] == "player" else "media ") + said + (f" (not shown: {'; '.join(no)})" if no else ""))
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:
@@ -2420,6 +2460,10 @@ def emit(node):
                 paint["marks"] = True
             if rs:
                 paint["runs"] = rs            # the text stays the joined words; the fence and the printer do not change
+        if node.get("media") and node.get("text"):     # a5941: only what media_links shows; the rest stays words
+            shown = [m for m in media_of(node["text"]) if m.get("src")]
+            if shown:
+                paint["media"] = {"mode": node["media"], "items": shown}
         ons = {a.get("on") for a in (node.get("acts") or [])}
         if "edit" in ons:
             mx = (node.get("lines") or [1, 1])[1]
