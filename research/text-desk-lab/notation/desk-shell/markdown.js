@@ -151,7 +151,7 @@
     /(?<![\w])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w])/.source, // 13 stress
     /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/.source,          // 14 bare address
     /(?<![\w&#])(#[A-Za-z][\w/-]*)/.source,                      // 15 tag
-    /(?<![\w-])((?:worker-)?(?:[afsce]\d{2,}|m\d{2,}))(?![\w-])/.source,   // 16 a bare id (a6109): drawn as its name
+    /(?<![\w-])((?:worker-)?(?:[afscep]\d{2,}|m\d{2,}))(?![\w-])/.source,  // 16 a bare id (a6109): drawn as its name
   ].join("|"), "g");
 
   function syn(t) { const s = document.createElement("span"); s.className = "md-syn"; s.textContent = t; return s; }

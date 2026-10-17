@@ -7,7 +7,8 @@ code has landed (`on link` on any part; the `ids` word).
     python research/window-lab/names/apply.py check [--as <name>] [--port 8794] [--world frontier]
                                          every old= passage against the world's text now (each must stand once)
     python research/window-lab/names/apply.py door [--as <name>] [--port 8794] [--world frontier]
-                                         all of it through a door, line by line, stopping at the first refusal
+                                         all of it through a door, line by line, stopping at the first refusal;
+                                         it checks every passage first and keeps each note's live text in before-a6109/
 
 What the lines do, all world data anyone may change afterwards:
   - a house verb `view <id>` (view.verb): opens it in your viewer (role=home-view, actor=you), with Back;
@@ -22,6 +23,7 @@ names them, and the root's `on link` opens them.
 Every line that changes a lens says the words it replaces (do replace), so it is refused where someone changed them."""
 import json
 import pathlib
+import re
 import sys
 import urllib.request
 
@@ -72,6 +74,24 @@ def body(said):
     return "\n".join(ls[i + 1:ls.index("---", i + 1)])
 
 
+BEFORE = HERE / "before-a6109"
+
+
+def check(who, port, world, keep=False):
+    """Every old= passage against the world's text now; each must stand once. keep: save each note's text first."""
+    bad = 0
+    for note, old, _ in REPLACES:
+        said = door(f"read {note} :3", who, port, world)
+        now = body(said)
+        if keep:
+            BEFORE.mkdir(exist_ok=True)
+            (BEFORE / f"{note}.txt").write_text(now + "\n", encoding="utf-8")
+        n = now.count(old)
+        print(f"{note}: old= stands {n} time(s): {old[:70]!r}" + (f"  (kept in before-a6109/{note}.txt)" if keep else ""))
+        bad += n != 1
+    return bad
+
+
 def main(argv):
     opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d       # noqa: E731
     if not argv or argv[0] not in ("lines", "door", "check"):
@@ -84,12 +104,11 @@ def main(argv):
         return 0
     who, port, world = opt("--as", "worker-a6109"), opt("--port", "8794"), opt("--world", "frontier")
     if argv[0] == "check":
-        bad = 0
-        for note, old, _ in REPLACES:
-            n = body(door(f"read {note} :3", who, port, world)).count(old)
-            print(f"{note}: old= stands {n} time(s): {old[:70]!r}")
-            bad += n != 1
-        return 1 if bad else 0
+        return 1 if check(who, port, world) else 0
+    # door: first every passage, the live text of each note kept beside this file; nothing is sent unless all stand
+    if check(who, port, world, keep=True):
+        print("stopped before sending anything: a passage above no longer stands once")
+        return 1
     new = None
     for line in lines():
         if "$new" in line and new:             # the door does not carry $new between requests (builders' notebook)
@@ -98,6 +117,9 @@ def main(argv):
         print(said[:300])
         if "(\u0024new = " in said or "($new = " in said:
             new = said.split("($new = ", 1)[1].split(")", 1)[0]
+        made = re.search(r"→ created (a\d+)", said)       # a create's own receipt names what it made
+        if made:
+            new = made.group(1)
         if [x for x in said.splitlines() if x.startswith(("ERR", "MISS")) or x.startswith("~ ! lens")]:
             print("stopped: the line above was refused or left a lens not compiling")
             return 1
