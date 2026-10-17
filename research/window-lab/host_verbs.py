@@ -19,6 +19,8 @@ Settings are props on the lens note the home base paints (home-base, a5208), rea
     capture=on             a5834: the control screen (capture/capture.py: hold Ctrl+Alt and drag) runs while the home
                            base runs, putting each capture on the person's own chat draft; off stops it at the next
                            Ctrl+Alt+J (and keeps it off from the next start)
+    winkey=on              a5980: a bare tap of the Windows key shows or hides it (winkey.py); off gives the Win key
+                           back to Windows (Start opens from it again) within 15 seconds; the hotkey above stays
 A prop that is missing or does not read keeps its default, and settings() says which ones did not.
 
 What hud.py adds to use this (a5300's hook, put into hud.py by a5394):
@@ -40,7 +42,7 @@ import threading
 import urllib.request
 from ctypes import wintypes as wt
 
-DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes", "capture": "on"}
+DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes", "capture": "on", "winkey": "on"}
 
 
 # -- the verbs: name -> (what it does, what words it takes, how). Each `how` gets the home base and the words, and
@@ -101,10 +103,19 @@ def _notify(hud, words):
     return f"notified: {text[:80]}" + (" (with sound)" if sound else "") + ("" if got == "shown" else f" ({got})")
 
 
+def _start(hud, words):
+    # a5980: with the Win key taken by the home base, Start opens from here (and from Ctrl+Esc, Windows' own). No key is
+    # pressed: hud.open_start asks Windows for the Start menu as its window menu does (WM_SYSCOMMAND SC_TASKLIST)
+    hud.hide()
+    hud.open_start()
+    return "opened the Start menu"
+
+
 VERBS = {
     "bring": ("bring that window forward and put the home base away", "window", _bring),
     "notify": ("show a Windows notification, title Agora (silent; words beginning ! ring)", "words", _notify),
     "hide": ("put the home base away", "", _hide),
+    "start": ("put the home base away and open Windows' Start menu", "", _start),
     "window": ("open a lens as its own window (an Agora app) and put the home base away", "lens", _window),
     "media.play": ("play or pause (Spotify, else the media key)", "", _media("play")),
     "media.next": ("the next song", "", _media("next")),
@@ -156,16 +167,18 @@ def settings(door, world, lens, who="hud"):
         # every setting then read as its default
         head = next((ln for ln in text.splitlines() if re.match(r"a\d+ ", ln)), "")
         props = parse_props(head) if text and not text.startswith("ERR") else {}
+        read = bool(head)
     except (OSError, ValueError):
-        props = {}
+        props, read = {}, False
     for k in DEFAULTS:
         v = str(props.get(k, "")).strip()
         if not v:
             continue
         ok = (k == "hotkey" and hotkey(v)) or (k == "monitor" and (v == "main" or v.isdigit())) or \
-             (k == "hide_taskbar" and v in ("yes", "no")) or (k == "capture" and v in ("on", "off"))
+             (k == "hide_taskbar" and v in ("yes", "no")) or (k in ("capture", "winkey") and v in ("on", "off"))
         (out.__setitem__(k, v) if ok else bad.append(f"{k}={v}"))
     out["unread"] = bad
+    out["read"] = read            # a5980: False when the door did not answer, so a caller can keep what it had
     return out
 
 

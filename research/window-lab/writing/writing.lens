@@ -1,245 +1,136 @@
-# writing: the Writing app (a5820, Alex 16 Oct: 'clean, kinda like obsidian but better'). A quiet tree of documents on
-# the left, the open document in the middle as Markdown written in place, and on the right what only Agora knows about
-# it: its outline, every note, task and chat that mentions it (live), and its props. What is open is the person's own
-# note (role=writer, actor=$me): open= the thing, back= the one before, find= the words in the search box.
-# A one-text document (a note, role=doc) is written here. A paragraph document (a surface, role=doc) is drawn as
-# Markdown and read only: its comments and ticks hang on its paragraphs, and design-review is where they are answered.
+# writing: the Writing room as an app (a5949, Alex 16 Oct: 'I kinda liked the old style, I just wanted good feature
+# parity and for it to be more polished'). design-review's page (a4039): the rail of documents on the left, the open
+# document in the middle drawn by doc-page (its words, its margin of comments, its Talk beside it). What is open is the
+# person's own writer note (role=writer, actor=$me): open= the document, back= the one before, find= the search words.
+# A new document is one Markdown text (a note, role=doc: a4865); a paragraph document (a surface) keeps its comments on
+# its paragraphs. In the home base this opens on the left of JEFF's chat (home-viewer); Pop out gives it a window.
 writing : column
   share 1
-  role app
+  role page
   mine : column
     share 1
     of prop:role=writer,prop:actor=$me as w
     each app
-  none : text "Writing needs a note of yours: role=writer actor=<you> in the Writing room."
+  none : text "Writing needs a writer note of yours: a note in the Writing room with role=writer actor=<you>."
     role meta
     only when count(prop:role=writer,prop:actor=$me) = 0
-app : grid fit 1fr fit
+app : column
   share 1
-  side : column
-    role side
-    scroll scroll
-    top : row
-      role sidetop
-      name : text "Writing"
-        role brand
-        share 1
-      new : row
-        of prop:role=writing-notes as nb
-        each newbtn
-    box : text "$w.find"
-      role find
-      hint "Search titles and words"
-      lines 1..1
-      commit enter only
-      on edit do read $w; do prop $w find="$value"
-    clear : text "Clear search"
-      role sidelink
-      only when ($w.find or "") != ""
-      on click do read $w; do prop $w find=""
-    found : column
-      only when ($w.find or "") != ""
-      let q = words-of($w.find)
-      hits : column
-        of ?$q as f
-        clamp 40
-        each hit
-      nothing : text "Nothing holds those words."
-        role meta
-        only when count(?$q) = 0
-    tree : column
-      only when ($w.find or "") = ""
-      notes : column
-        fold "Notes" open handle sidehead
-        role section
-        list : column
-          of kind:note,prop:role=doc
-          each row
-      designs : column
-        fold "Designs" open handle sidehead
-        role section
-        list : column
-          of kind:surface,prop:role=doc,prop:design=waiting
-          each row
-        answered : column
-          fold "Answered" handle sidehead
-          role subsection
-          list : column
-            of kind:surface,prop:role=doc,prop:design,-prop:design=waiting
-            each row
-      docs : column
-        fold "Agora documentation" handle sidehead
-        role section
-        list : column
-          of in:f600,prop:source
-          each row
-      others : column
-        fold "Other documents" handle sidehead
-        role section
-        list : column
-          of kind:surface,prop:role=doc,-prop:design
-          each row
-  main : column
+  global : row
+    role toolbar
+    gap
+    brand : text "WRITING"
+      share 1
+      role railhead
+    back : text "← back"
+      role tool
+      only when ($w.back or "") != "" and ($w.back or "") != ($w.open or "")
+      on click do read $w; do prop $w open="$w.back" back="$w.open"
+    new : row
+      of prop:role=writing-notes as nb
+      each newbtn
+  workspace : row
     share 1
-    role main
-    scroll scroll
-    empty : column
-      role welcome
-      only when ($w.open or "") = ""
-      hi : text "Nothing open"
-        role title
-      say : text "Choose a document on the left, or start one with + New. Write in Markdown: it is drawn as you type, and Ctrl+E shows the source."
-        role meta
-    open : column
-      only when ($w.open or "") != ""
-      of $w.open as d
-      each page
-  aside : column
-    role aside
-    scroll scroll
-    only when ($w.open or "") != ""
-    of $w.open as d
-    each panel
-newbtn : text "+ New"
-  role newdoc
+    gap
+    queue : column
+      scroll scroll
+      share 1
+      role rail
+      box : text "$w.find"
+        role find
+        hint "Find a document"
+        lines 1..1
+        commit enter only
+        on edit do read $w; do prop $w find="$value"
+      clear : text "clear the search"
+        role tool
+        only when ($w.find or "") != ""
+        on click do read $w; do prop $w find=""
+      found : column
+        only when ($w.find or "") != ""
+        let q = words-of($w.find)
+        hits : column
+          of ?$q,prop:role=doc as f
+          clamp 40
+          each hit
+        nothing : text "No document holds those words."
+          role meta
+          only when count(?$q,prop:role=doc) = 0
+      tree : column
+        only when ($w.find or "") = ""
+        designs : column
+          fold "Designs for me" open
+          role tree
+          waiting : column
+            of prop:role=doc,prop:design=waiting
+            each qrow
+          answered : column
+            fold "Answered"
+            of prop:role=doc,prop:design=answered
+            each qrow
+        notes : column
+          fold "Notes" open
+          role tree
+          docs : column
+            of kind:note,prop:role=doc,-prop:design,-prop:collection
+            each qrow
+        documentation : column
+          fold "Agora documentation"
+          role tree
+          sources : column
+            of in:f600,prop:source
+            each qrow
+          docs : column
+            of prop:role=doc,prop:collection=documentation
+            each qrow
+        personal : column
+          fold "Personal writing"
+          role tree
+          docs : column
+            of prop:role=doc,prop:collection=personal
+            each qrow
+          empty : text "No documents here yet"
+            role meta
+            only when count(prop:role=doc,prop:collection=personal) = 0
+        loose : column
+          fold "Paragraph documents"
+          role tree
+          docs : column
+            of kind:surface,prop:role=doc,-prop:design,-prop:collection
+            each qrow
+    desk : column
+      share 4
+      empty : column
+        only when ($w.open or "") = ""
+        hi : text "Nothing open"
+          role title
+        say : text "Choose a document on the left, or start one with New document. It is one Markdown text, drawn as you write: Ctrl+E shows the source, [[ links another document. Select any words to comment on them; the comment goes to the document's Talk, beside it."
+          role meta
+      doc : column
+        share 1
+        only when ($w.open or "") != ""
+        one : column
+          share 1
+          of $w.open as d
+          each shown
+shown : column
+  share 1
+  lens doc-page
+newbtn : text "New document"
+  role button
   on click do read $w; do create $nb kind=note title="Untitled" role=doc by=$me; do prop $w open=$new back="$w.open" find=""
-row : text "$title"
-  role doc
-  role doc.on when $item = $w.open
-  clamp 1
-  on click do read $w; do prop $w open=$item back="$w.open" find=""
+qrow : column
+  role qcard
+  role qcard.on when $item = ($w.open or "")
+  qt : text "$title"
+    role qtitle
+    clamp 2
+    on click do read $w; do prop $w open=$item back="$w.open" find=""
 hit : column
-  role hit
+  role qcard
   on click do read $w; do prop $w open=$f back="$w.open" find=""
   t : text "$title"
-    role doc
-    clamp 1
-  k : text "$kind"
-    role meta
-page : column
-  role page
-  measure 74ch
-  crumbs : row
-    role crumbs
-    back : text "← Back"
-      role sidelink
-      only when ($w.back or "") != "" and $w.back != $item
-      on click do read $w; do prop $w open="$w.back" back="$w.open"
-    where : text "$kind · $item"
-      role meta
-      share 1
-    by : text "by $by"
-      role meta
-      only when ($by or "") != ""
-    raw : text "Source  Ctrl+E"
-      role key
-      only when $kind = "note"
-      on click press Ctrl+E
-  title : text "$title"
-    role title
-    only when $kind != "surface"
-    on edit do retitle $item title="$value"
-  name : text "$title"
-    role title
-    only when $kind = "surface"
-    on edit do rename $item title="$value"
-  chips : row
-    role chips
-    status : text "$status"
-      role chip
-      only when ($status or "") != ""
-    design : text "design: $design"
-      role chip
-      only when ($design or "") != ""
-    owner : text "owner $owner"
-      role chip
-      only when ($owner or "") != ""
-    tags : text "$tags"
-      role chip
-      only when ($tags or "") != ""
-  body : text "$text"
-    role prose
-    only when $kind = "note"
-    markdown links prop:role=doc
-    hint "Start writing…"
-    on edit do rewrite $item text="$value"
-    on link do read $w; do prop $w open=$value back="$w.open"
-  shown : text "$text"
-    role prose
-    only when $kind != "note" and $kind != "surface"
-    markdown
-    on link do read $w; do prop $w open=$value back="$w.open"
-  blocks : column
-    only when $kind = "surface"
-    of in:$item as b
-    each block
-block : column
-  let pre = "# " when $block = "h1"
-  let pre = "## " when $block = "h2"
-  let pre = "### " when $block = "h3"
-  let pre = "- " when $block = "bullet"
-  let pre = "1. " when $block = "number"
-  let pre = "- [x] " when $block = "check" and $checked = "yes"
-  let pre = "- [ ] " when $block = "check"
-  let pre = "> " when $block = "quote"
-  let pre = "" otherwise
-  words : text "$(pre)$text"
-    role prose
-    only when $block != "figure" and $kind = "note"
-    markdown
-    on link do read $w; do prop $w open=$value back="$w.open"
-  figure : text "$text"
-    role figure
-    picture
-    only when $block = "figure"
-panel : column
-  role panel
-  outline : column
-    only when count(sections:$item) > 1
-    head : text "Outline"
-      role panelhead
-    list : column
-      of sections:$item
-      each heading
-  mentions : column
-    let mcount = count(?$item)
-    head : text "Mentioned in  $(mcount)"
-      role panelhead
-    list : column
-      of ?$item as m
-      clamp 30
-      each mention
-    quiet : text "Nothing else mentions this yet. Link to it with [[ in another document."
-      role meta
-      only when count(?$item) = 0
-  props : column
-    head : text "Properties"
-      role panelhead
-    id : text "id  $item"
-      role prop
-    kind : text "kind  $kind"
-      role prop
-    role : text "role  $role"
-      role prop
-      only when ($role or "") != ""
-    by : text "by  $by"
-      role prop
-      only when ($by or "") != ""
-    collection : text "collection  $collection"
-      role prop
-      only when ($collection or "") != ""
-    in : text "in  $in"
-      role prop
-heading : text "$heading"
-  role outline
-  clamp 1
-  only when $heading !has "(before the first heading)"
-mention : column
-  role mention
-  only when $item != $d.item
-  on click do read $w; do prop $w open=$m back="$w.open" find=""
-  t : text "$title"
-    role mentiontitle
+    role qtitle
     clamp 2
   k : text "$kind"
     role meta

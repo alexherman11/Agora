@@ -1562,10 +1562,13 @@ class DeskKnife(DeskMoo):
             if not arg.strip():
                 raise Refusal("scene <lens name> [<part path> | ok | lines] [words]. A lens is a note tagged lens; help scene")
             try:
+                arg, on = scene.split_on_arg(self, arg)            # a5949: scene <lens> on <id>, the lens stood on a thing
+                if on:
+                    on = self._resolve(on)
                 arg, words = scene.split_words_arg(self, arg)      # a4179: scene <lens> [<part path>] words [:3 | from=<n>]
                 name, rest = scene.split_scene_arg(self, arg)
                 if words is not None:
-                    sc, text = scene.scene_for(self, name, rest, words)
+                    sc, text = scene.scene_for(self, name, rest, words, on=on)
                     for n in sc["said"]:                 # only a part whose words printed whole has been seen
                         self._scene_seen(n)
                     return text
@@ -1576,7 +1579,7 @@ class DeskKnife(DeskMoo):
                     s = scene.find_lens(self, name)
                     style = (s.get("props") or {}).get("style")
                     return scene.to_lines(s.get("text") or "", scene.style_roles(self, style), style)
-                sc, text = scene.scene_for(self, name, rest)
+                sc, text = scene.scene_for(self, name, rest, on=on)
             except scene.LensRefusal as e:
                 raise Refusal(str(e))
 

@@ -105,6 +105,10 @@
   :where(mark[data-light]) { background: none; color: inherit; }   /* `light`: a passage's look is its role's */
   [data-key] { white-space: pre-line; }
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
+  /* a5994: where a carried thing will land, drawn while it is in the air (the receiver's half on the side its act
+     names, or the whole receiver). Its look is the style's role `landing` when the style has one; this is the floor */
+  .landing-box { position: fixed; pointer-events: none; z-index: 29; box-sizing: border-box; border-radius: 10px;
+    border: 2px solid var(--t-accent, currentColor); background: color-mix(in srgb, var(--t-accent, #888) 16%, transparent); }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
   /* `media` (a5941, media.js): films and pictures under the words, or one filling its part (`media player`). Sizes

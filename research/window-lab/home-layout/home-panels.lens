@@ -12,10 +12,10 @@ chips : row
 chip : column
   role dockchip
   role dockchip.on when ($p.shelf or "") != "yes"
-  let was = ($lay.bigcol or "")
+  let was = ($lay.full or "")
   on click when ($p.shelf or "") = "yes" do prop $p shelf=no
-  on click when ($p.shelf or "") != "yes" and $item = ($lay.big or "") do prop $p shelf=yes; do prop $lay big="" bigcol=""
-  on click when ($p.shelf or "") != "yes" and $item != ($lay.big or "") do prop $p shelf=yes
+  on click when ($p.shelf or "") != "yes" and $item = ($lay.full or "") do prop $p shelf=yes; do prop $lay full=""
+  on click when ($p.shelf or "") != "yes" and $item != ($lay.full or "") do prop $p shelf=yes
   name : text "$title"
     role chipname
     clamp 1
