@@ -144,15 +144,12 @@
   let kept = new Map(), next = new Map();
   function make(n) {
     const old = kept.get(n.key), p = n.paint || {};
-    if (old && V.hold === n.key) {                                        // the part in a person's hands is not repainted under them
-      if (old.el._md && p.markdown) mdFresh(old.el, n, p);                 // a5820: but its [[links]] and embeds stay live
-      next.set(n.key, old); return old.el;
+    // a6067: a document is one element for as long as its key and its lens's words for it stand (rule 1): the desk's new
+    // words go INTO it (textedit.js fits them over what this window has not sent), never a new element under the caret
+    if (old && old.el._te && p.markdown && old.el._teConf === textConf(n, p)) {
+      textFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el;
     }
-    // a5820: a document being written stays the same element when the world's words are what it holds (its own save
-    // came back), so the caret and the person's place are kept
-    if (old && old.el._md && p.markdown && old.el._md.src() === p.text && !V.drafts.has(n.key)) {
-      mdFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el;
-    }
+    if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
     if (old && old.el._composer && old.el._composer.config === JSON.stringify([p, n.acts])) {
       old.el._n = n; old.sig = sig; old.el._composer.sync(); next.set(n.key, old); return old.el;
@@ -354,6 +351,9 @@
     menuDrafts.set(key, d); document.body.append(box); placeMenuDrafts();
     const drop = () => { box.remove(); menuDrafts.delete(key); };
     input.addEventListener("input", () => { V.typed(key, input.value, n); post.disabled = !input.value.trim(); });
+    // a6067: its keys, undo and composition are the continuous-text module's, as every typed text's are
+    if (window.TextEdit) TextEdit.attach(input, { text: "", hooks: { notify: t => V.notify(t),
+      changed: st => { if ((V.drafts.get(key) || {}).text !== st.text) { V.typed(key, st.text, n); post.disabled = !st.text.trim(); } } } });
     post.disabled = true;
     post.onclick = async () => {
       if (!input.value.trim() || post.disabled) return;
@@ -450,7 +450,7 @@
       // never gets `shown`, and the next keystroke loses its origin while keeping its text.
       const words = V.words(n.key, el._n.paint.text || "", el._n.fence);
       const d = V.drafts.get(n.key);
-      if (document.activeElement !== input) input.value = words;
+      if (document.activeElement !== input && input.value !== words) { input.value = words; if (te) te.reset(words); }
       const open = openComposers.has(n.key) || !!d;
       el.dataset.composing = String(open);
       const bounds = el._n.paint.lines;
@@ -474,6 +474,9 @@
     };
     el._composer = { config: JSON.stringify([n.paint, n.acts]), sync };
     input.value = V.words(n.key, n.paint.text || "", n.fence);
+    // a6067: the box's keys, undo and composition are the continuous-text module's (textedit.js), as a document's are;
+    // the draft rules here stay this composer's (Codex): what is unsent, its origin, Send, Discard, Use current version
+    let te = null;
     input.addEventListener("focus", () => { if (!openComposers.has(n.key) && !V.drafts.has(n.key)) picked = TEXT.selected(el._n); openComposers.add(n.key); V.hold = n.key; sync(); });
     input.addEventListener("blur", () => { if (!V.repainting) { V.hold = null; sync(); } });
     input.addEventListener("input", () => { why = ""; V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
@@ -487,7 +490,8 @@
     const trySend = () => {
       if (busy) return;
       const d = V.drafts.get(n.key);
-      why = !input.value.trim() ? "Nothing to send — write something first"
+      why = te && te.composing() ? "Not sent — the input method is still writing; finish it first"
+        : !input.value.trim() ? "Nothing to send — write something first"
         : d && !d.seen && !d.shown ? "Not sent — this draft was typed against a version not shown here: Use current version, or Discard"
         : "";
       if (why) return sync();
@@ -495,14 +499,15 @@
     };
     post.onclick = async () => {
       if (busy || !input.value.trim()) return;
+      if (te && te.composing()) { why = "Not sent — the input method is still writing; finish it first"; return sync(); }   // Codex, a6067 c6120
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
       const raw = input.value; busy = true; why = ""; sync();
       await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
       busy = false;
-      if (!V.drafts.has(n.key)) { input.value = ""; openComposers.delete(n.key); }
+      if (!V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
       sync();
     };
-    discard.onclick = () => { if (V.drop(n.key)) { input.value = n.paint.text || ""; openComposers.delete(n.key); sync(); } };
+    discard.onclick = () => { if (V.drop(n.key)) { input.value = n.paint.text || ""; if (te) te.reset(input.value); openComposers.delete(n.key); sync(); } };
     recover.onclick = () => {
       if (V.useCurrent(n.key, { key: n.key, fence: el._n.fence, text: el._n.paint.text || "" })) { sync(); input.focus(); }
     };
@@ -510,6 +515,16 @@
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); trySend(); }
       if (e.key === "Escape") { e.preventDefault(); input.blur(); }
     });
+    if (window.TextEdit) te = TextEdit.attach(input, { text: input.value, key: n.key, item: (n.fence || {}).item,
+      // an undo sets the box's words without an input event: the draft follows them
+      hooks: { notify: t => V.notify(t), changed: st => {
+        const d = V.drafts.get(n.key);
+        if ((d ? d.text : (el._n.paint.text || "")) === st.text) return;
+        why = "";
+        if (st.text === (el._n.paint.text || "")) V.drop(n.key); else V.typed(n.key, st.text, { key: n.key, fence: el._n.fence });
+        sync();
+      } } });
+    el._te = te;
     sync();
   }
   function edits(el, n, a) {
@@ -557,48 +572,97 @@
     });
   }
 
-  // a5820: a text that says `markdown` is a document, drawn and written by markdown.js. Its `on edit` is sent with the
-  // whole Markdown text on leaving it, Ctrl+S or Ctrl+Enter, or before a [[link]] is followed (whole-text saves, as a
-  // document's words are saved today; the small edits of a4865 wait on Alex's choice). `on link` is sent with $value
-  // the id of the thing a [[wikilink]] or ![[embed]] names. Without `on edit` it is drawn only.
+  // a5820, a6067: a text that says `markdown` is a document, written through textedit.js (the continuous-text module:
+  // caret, selection, composition, undo, keys) and drawn by markdown.js. Its `on edit` is the seam: sent as the person
+  // pauses (and on Ctrl+S, Ctrl+Enter, before a [[link]] is followed) with $value the whole Markdown text, fenced by the
+  // version the module fitted it to; the desk's new words are fitted over what this window has not sent (a4865's small
+  // edits wait on Alex's choice; they would replace this one function). `on link` is sent with $value the id a
+  // [[wikilink]] or ![[embed]] names; `on capture` with $value what a dropped capture carries. Without `on edit` it is
+  // drawn only.
+  const textConf = (n, p) => JSON.stringify([n.acts.map(a => [a.on, a.line]), p.hint || ""]);
+  // the thing whose words a text shows: the read of its `text` (a lens that reads $d.text under another thing's part,
+  // as doc-page does, is fenced on that part's thing, but its words are the document's subject), else the part's thing
+  const textOf = n => { const f = n.fence || {}, r = (f.reads || []).find(e => Array.isArray(e[2]) && e[2].includes("text")); return (r && r[0]) || f.item || null; };
+  // the module's keeper is the viewer's (Sable c5977: one keeper of a viewer's values): the unsent words, with the
+  // words and version they were typed on, are the person's draft; the caret is this window's
+  const textKeeper = (key, nOf) => ({
+    load: () => { const st = V.textState(key) || {}, d = V.drafts.get(key); return { text: d ? d.text : undefined, base: d ? d.base : undefined, sel: st.sel }; },
+    save: st => {
+      const dirty = st.text !== st.base || !!st.conflict;
+      V.textState(key, { sel: st.sel });
+      if (dirty) V.rebased(key, st.text, { key, fence: st.version || (nOf().fence || null) }, st.base);
+      else if (V.drafts.has(key) && !V.busy(key)) V.drop(key);
+    },
+  });
+  // another window of this person changed a draft: a document shows the same unsent words, a composer draws again
+  V.onDrafts(keys => {
+    for (const k of keys) {
+      const el = kept.get(k) && kept.get(k).el, d = V.drafts.get(k);
+      if (el && el._composer) el._composer.sync();
+      else if (el && el._te && el._teConf && d) el._te.adopt(d.text, d.base, d.seen && d.seen.fence);
+    }
+  });
+  async function sendEdit(el, out) {
+    const n = el._n, a = n.acts.find(x => x.on === "edit");
+    if (!a) return { ok: false, error: "this text has no `on edit`" };
+    const r = await send({ key: n.key, fence: out.version }, a.line.replace("$value", () => TEXT.esc(out.text)).replace("$selected", () => ""), out.text);
+    const t = r ? (r.error || r.text || "") : "the answer was lost";
+    const ok = !!r && !r.error && !/(^|\n)ERR\b/.test(t);
+    return { ok, error: ok ? null : t, event: ok ? (r.events || []).slice(-1)[0] : null };
+  }
   function markdown(el, n, p) {
-    if (!window.Markdown) { el.textContent = p.text; return; }
+    if (!window.TextEdit || !window.Markdown) { el.textContent = p.text; return; }
     const a = n.acts.find(x => x.on === "edit");
-    const md = Markdown.create({
-      text: a ? V.words(n.key, p.text, n.fence) : p.text, links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint, editable: !!a,
+    const te = TextEdit.create({
+      text: p.text, version: n.fence, editable: !!a, key: n.key, item: textOf(n),
+      links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint,
       light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
-      typed: s => V.typed(n.key, s, { key: n.key, fence: el._n.fence }),
-      save: s => mdSave(el, s),
-      follow: async id => {
-        const at = linkFor(el);                                   // a6109: its own `on link`, or the nearest above it
-        if (!at) return V.show("this document's links open nowhere here (no `on link` on it or above it)");
-        if (a && V.drafts.has(el._n.key)) await mdSave(el, md.src());
-        send(at._n, at._n.acts.find(x => x.on === "link").line.replace(/\$value\b/g, () => TEXT.esc(id)));
+      keep: a ? textKeeper(n.key, () => el._n) : null,
+      seam: a ? { send: out => sendEdit(el, out) } : null,
+      hooks: {
+        notify: t => V.notify(t),
+        follow: async id => {
+          const at = linkFor(el);                                   // a6109: its own `on link`, or the nearest above it
+          if (!at) return V.show("this document's links open nowhere here (no `on link` on it or above it)");
+          if (a) await te.flush();
+          send(at._n, at._n.acts.find(x => x.on === "link").line.replace(/\$value\b/g, () => TEXT.esc(id)));
+        },
+        // the world's undo of this window's sent edit; its answer says which undo this was, and a refusal says why
+        undoSent: async ev => {
+          const r = await send(el._n, `undo ${ev}`), t = r ? (r.error || r.text || "") : "the answer was lost";
+          V.notify(r && !r.error && !/(^|\n)ERR\b/.test(t) ? `undid ${ev}, your last sent edit, through the desk (the world's undo: it shows for everyone)`
+            : `the desk did not undo ${ev}: ${t.split("\n").find(l => l.trim()) || t}`);
+        },
+        // Pike (a6067 c6122): "Keep mine" set someone's landed change aside: said on the thing, so they learn it did not stand
+        overrode: (changes, ev) => {
+          const item = textOf(el._n); if (!item) return;
+          const what = changes.slice(0, 3).map(c => `“${c.was.slice(0, 80)}” → “${c.now.slice(0, 80)}”`).join("; ");
+          send(el._n, `do comment ${item} line="${TEXT.esc(`${who} kept their own words over a change that landed while they were typing (${ev || "their edit"}); set aside: ${what}`)}"`);
+        },
+        capture: (anchor, data) => {
+          const c = el._n.acts.find(x => x.on === "capture");
+          if (!c) return V.notify("this text takes no capture here (its lens has no `on capture`)");
+          send(el._n, c.line.replace(/\$value\b/g, () => TEXT.esc(data)).replace("$selected", () => TEXT.esc(anchor.quote || "")));
+        },
       },
-      notify: t => V.show(t),
     });
-    el._md = md; el._mdLinks = JSON.stringify([p.wikilinks || {}, p.things || {}]); el.classList.add("md-part"); el.append(md.el);
+    el._te = el._md = te; el._teConf = textConf(n, p); el._mdLinks = JSON.stringify([p.wikilinks || {}, p.things || {}]);
+    el.classList.add("md-part"); el.append(te.el);
     if (!a) return;
-    md.el.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
-    md.el.addEventListener("blur", () => {
-      if (V.repainting) return;
-      if (!document.hasFocus()) return;                       // the window losing focus is not the person putting it down
-      if (V.drafts.has(el._n.key)) mdSave(el, md.src()); else V.hold = null;
+    const root = te.el.querySelector(".md-doc");
+    root.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
+    root.addEventListener("blur", () => {
+      if (V.repainting || !document.hasFocus()) return;        // the window losing focus is not the person putting it down
+      te.flush(); V.hold = null;
     });
   }
-  async function mdSave(el, s) {
-    const n = el._n, key = n.key, a = n.acts.find(x => x.on === "edit");
-    if (!a) return;
-    if (s === (n.paint.text || "")) { V.drop(key); if (document.activeElement !== el._md.el) V.hold = null; return; }
-    const seen = V.editOrigin(key, n); if (!seen) { V.hold = null; return; }
-    await send(seen, a.line.replace("$value", () => TEXT.esc(s)).replace("$selected", () => ""), s);
-    if (document.activeElement === el._md.el) V.hold = key;   // still writing: the next scene does not take it away
-  }
-  function mdFresh(el, n, p) {
+  function textFresh(el, n, p) {
     el._n = n;
     const l = JSON.stringify([p.wikilinks || {}, p.things || {}]);
-    if (l !== el._mdLinks) { el._mdLinks = l; el._md.links(p.wikilinks, p.things); }
-    el._md.lights(p.light);                                     // a5949: a new comment's words light at once
+    if (l !== el._mdLinks) { el._mdLinks = l; el._te.links(p.wikilinks, p.things); }
+    el._te.lights(p.light);                                     // a5949: a new comment's words light at once
+    el._te.titles(p.titles);
+    el._te.receive(p.text, n.fence);                            // a6067: the desk's words, at this version
   }
 
   // a text's keys (Alex, 7 Oct: 'Enter should create a new line, tab should indent'). A lens gives a text `on key

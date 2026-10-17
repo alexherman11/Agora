@@ -7,11 +7,11 @@
 //
 // How it holds together: the source string is the only truth. Every source character is in the DOM as text, the marks
 // in spans (.md-syn) hidden on lines the caret is not on; what is only drawn (a checkbox, a table, an embed card) is
-// marked data-deco or data-src and is never read back as text. Every change (a key, a paste, a cut, undo) is made on
-// the string, through the range the browser says it would change (beforeinput's target range), and the document is
-// drawn again with the caret put back by its count of characters. So nothing the browser does to the DOM can drift
-// from what is saved. Keys: Ctrl+B bold, Ctrl+I italic, Ctrl+K link, Ctrl+E source, Ctrl+S save, Ctrl+Z / Ctrl+Y,
-// Tab / Shift+Tab indent a list, Enter continues a list, [[ offers the documents the lens names.
+// marked data-deco or data-src and is never read back as text.
+// a6067: this file is now the Markdown GRAMMAR and its DRAWING only: what each line is, how it is drawn, characters <->
+// DOM points, lit passages, and what Enter, Backspace, Tab, Ctrl+B/I/K and a task box mean as edits of the source. The
+// editing (caret, selection, composition, undo, keys, sending to the desk) is textedit.js's, the one module every
+// typed text uses; it draws a Markdown text through Markdown.draw.
 (() => {
   const CSS = `
   .md-doc{white-space:pre-wrap;overflow-wrap:anywhere;outline:none;tab-size:4;caret-color:var(--t-accent,#0F6B57)}
@@ -82,8 +82,10 @@
   .md-pop div[aria-selected=true]{background:var(--t-wash,#eef3f0)}
   .md-pop small{color:var(--t-hush,#889);margin-left:auto;font-size:.8em}
   .md-pop .md-none{color:var(--t-hush,#889);cursor:default}`;
-  const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
-  document.documentElement.style.setProperty("--md-mono", "'JetBrains Mono', 'Cascadia Code', Consolas, ui-monospace, monospace");
+  if (typeof document !== "undefined") {          // a6067: node tests read the grammar's edits without a page
+    const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
+    document.documentElement.style.setProperty("--md-mono", "'JetBrains Mono', 'Cascadia Code', Consolas, ui-monospace, monospace");
+  }
 
   const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -149,7 +151,7 @@
     /(?<![\w])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w])/.source, // 13 stress
     /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/.source,          // 14 bare address
     /(?<![\w&#])(#[A-Za-z][\w/-]*)/.source,                      // 15 tag
-    /(?<![\w-])((?:worker-)?(?:[afsce]\d{2,}|m\d{2,}))(?![\w-])/.source,   // 16 a bare id (a6109): drawn as its name
+    /(?<![\w-])((?:worker-)?(?:[afscep]\d{2,}|m\d{2,}))(?![\w-])/.source,  // 16 a bare id (a6109): drawn as its name
   ].join("|"), "g");
 
   function syn(t) { const s = document.createElement("span"); s.className = "md-syn"; s.textContent = t; return s; }
@@ -370,233 +372,56 @@
     return [el, 0];
   }
 
-  // ---- the editor --------------------------------------------------------------------------------------------------
-  // opts: { text, links, things {id: {name, title, open}}, titles [{id,title,kind}], hint, editable, typed(src), save(src) -> Promise, follow(id, title) }
-  function create(opts) {
-    const root = document.createElement("div"); root.className = "md-doc";
-    let src = opts.text || "", ctx = { links: opts.links || {}, things: opts.things || {} }, raw = false, active = new Set(), undo = [], redo = [], lastPush = 0, composing = false;
-    let lit = opts.light || [];
-    if (opts.hint) root.dataset.hint = opts.hint;
-    const ed = !!opts.editable;
-    if (ed) { root.contentEditable = "true"; root.spellcheck = true; root.setAttribute("role", "textbox"); root.setAttribute("aria-multiline", "true"); }
-    const sel = () => {
-      const s = getSelection(); if (!s.rangeCount || !root.contains(s.anchorNode)) return null;
-      const a = offsetOf(root, src, s.anchorNode, s.anchorOffset), f = offsetOf(root, src, s.focusNode, s.focusOffset);
-      return { a: Math.min(a, f), b: Math.max(a, f), back: f < a };
-    };
-    const linesOf = (a, b) => { const st = starts(src), set = new Set(); let l = 0; while (l + 1 < st.length && st[l + 1] <= a) l++; set.add(l); while (l + 1 < st.length && st[l + 1] <= b) set.add(++l); return set; };
-    const place = (a, b = a) => {
-      const s = getSelection(), [n1, o1] = pointAt(root, src, a), [n2, o2] = pointAt(root, src, b);
-      try { s.setBaseAndExtent(n1, o1, n2, o2); } catch (e) { /* a point that moved away */ }
-    };
-    function paint(a, b) {
-      active = ed && document.activeElement === root && a != null ? linesOf(a, b) : new Set();
-      // a fence opens as one: the caret on either end line shows both
-      draw(root, src, ctx, active, raw);
-      if (!raw) lightUp(root, src, lit, opts.lightClass);
-      if (a != null && document.activeElement === root) place(a, b);
-    }
-    // a5949: the words highlighted here, as the source says them (marks and all), so a comment quotes the text's own
-    // words and the desk can find them again; null when nothing here is highlighted
-    const picked = () => { const r = sel(); return r && r.b > r.a ? src.slice(r.a, r.b) : null; };
-    const setLights = l => { const want = JSON.stringify(l || []); if (want === JSON.stringify(lit)) return; lit = l || []; const r = ed && document.activeElement === root ? sel() : null; paint(r ? r.a : null, r ? r.b : null); };
-    function change(a, b, text, how) {
-      const now = Date.now();
-      if (how !== "type" || now - lastPush > 900) { undo.push({ src, a, b }); if (undo.length > 300) undo.shift(); }
-      lastPush = how === "type" ? now : 0; redo = [];
-      src = src.slice(0, a) + text + src.slice(b);
-      const c = a + text.length; paint(c, c); opts.typed && opts.typed(src);
-      complete();
-    }
-    function restore(from, to) {
-      const st = from.pop(); if (!st) return;
-      to.push({ src, a: st.a, b: st.b }); src = st.src; paint(st.a, st.b); opts.typed && opts.typed(src);
-    }
-    function lineAround(at) { const s = src.lastIndexOf("\n", at - 1) + 1, e = src.indexOf("\n", at); return [s, e < 0 ? src.length : e]; }
-
-    // Enter: a list goes on; an empty item ends it
-    function enter(r) {
-      const [ls] = lineAround(r.a), line = src.slice(ls, r.a);
-      let m, more = "";
-      if ((m = RX.task.exec(line))) more = m[1] + m[2] + " [ ] ";
-      else if ((m = RX.bullet.exec(line))) more = m[1] + m[2] + " ";
-      else if ((m = RX.num.exec(line))) more = m[1] + (+m[2] + 1) + m[3] + " ";
-      else if ((m = RX.quote.exec(line))) more = m[1] + "> ";
-      if (more && line.trim() === (m[0] || "").trim() && r.a === r.b) return change(ls, r.a, "", "enter");   // an empty item: the list ends
-      change(r.a, r.b, "\n" + more, "enter");
-    }
-    function indent(r, out) {
-      const st = starts(src), ls = linesOf(r.a, r.b);
-      let shift = 0, first = 0, s2 = src;
-      for (const l of [...ls].sort((x, y) => y - x)) {
-        const at = st[l], line = s2.slice(at, s2.indexOf("\n", at) < 0 ? undefined : s2.indexOf("\n", at));
-        if (out) { const k = line.startsWith("  ") ? 2 : line.startsWith("\t") ? 1 : line.startsWith(" ") ? 1 : 0; s2 = s2.slice(0, at) + s2.slice(at + k); shift -= k; if (l === Math.min(...ls)) first = -k; }
-        else { s2 = s2.slice(0, at) + "  " + s2.slice(at); shift += 2; if (l === Math.min(...ls)) first = 2; }
-      }
-      undo.push({ src, a: r.a, b: r.b }); redo = []; src = s2;
-      paint(Math.max(0, r.a + first), Math.max(0, r.b + shift)); opts.typed && opts.typed(src);
-    }
-    function wrap(r, w0, w1) {
-      const words = src.slice(r.a, r.b);
-      if (src.slice(r.a - w0.length, r.a) === w0 && src.slice(r.b, r.b + w1.length) === w1) {    // on already: take it off
-        undo.push({ src, a: r.a, b: r.b }); redo = [];
-        src = src.slice(0, r.a - w0.length) + words + src.slice(r.b + w1.length);
-        paint(r.a - w0.length, r.b - w0.length); opts.typed && opts.typed(src); return;
-      }
-      undo.push({ src, a: r.a, b: r.b }); redo = [];
-      src = src.slice(0, r.a) + w0 + words + w1 + src.slice(r.b);
-      paint(r.a + w0.length, r.b + w0.length); opts.typed && opts.typed(src);
-    }
-    function toggle(l) {
-      const st = starts(src), at = st[l], line = src.slice(at, src.indexOf("\n", at) < 0 ? undefined : src.indexOf("\n", at)), m = RX.task.exec(line);
-      if (!m) return;
-      const k = at + m[1].length + m[2].length + m[3].length + 1;
-      undo.push({ src, a: k, b: k }); redo = [];
-      src = src.slice(0, k) + (m[4] === " " ? "x" : " ") + src.slice(k + 1);
-      paint(null); opts.typed && opts.typed(src); opts.save && opts.save(src);
-    }
-
-    // [[ offers what the lens names (opts.titles); the choice is written [[id|title]], so a rename never breaks it
-    let pop = null, popAt = 0, popPick = 0, popHits = [];
-    function closePop() { if (pop) pop.remove(); pop = null; }
-    function complete() {
-      const r = sel(); if (!r || r.a !== r.b || !opts.titles) return closePop();
-      const [ls] = lineAround(r.a), m = /\[\[([^\[\]|\n]{0,60})$/.exec(src.slice(ls, r.a));
-      if (!m) return closePop();
-      popAt = r.a - m[1].length - 2;
-      const q = m[1].toLowerCase().trim();
-      popHits = opts.titles.filter(t => !q || t.title.toLowerCase().includes(q) || t.id === q)
-        .sort((x, y) => (y.title.toLowerCase().startsWith(q) - x.title.toLowerCase().startsWith(q)) || x.title.length - y.title.length).slice(0, 8);
-      popPick = Math.min(popPick, Math.max(0, popHits.length - 1));
-      if (!pop) { pop = document.createElement("div"); pop.className = "md-pop"; pop.setAttribute("role", "listbox"); document.body.append(pop);
-        pop.addEventListener("mousedown", e => { e.preventDefault(); const d = e.target.closest("[data-i]"); if (d) choose(+d.dataset.i); }); }
-      pop.replaceChildren(...(popHits.length ? popHits.map((t, i) => { const d = document.createElement("div"); d.dataset.i = i; d.setAttribute("role", "option"); d.setAttribute("aria-selected", String(i === popPick)); d.innerHTML = `<span>${esc(t.title)}</span><small>${esc(t.kind || "")} ${esc(t.id)}</small>`; return d; })
-        : [Object.assign(document.createElement("div"), { className: "md-none", textContent: q ? `no document called “${m[1]}”: keep typing for a link to a title` : "type a title" })]));
-      const rr = getSelection().getRangeAt(0).getBoundingClientRect();
-      pop.style.left = Math.min(rr.left, innerWidth - 360) + "px"; pop.style.top = (rr.bottom + 6) + "px";
-    }
-    function choose(i) {
-      const t = popHits[i]; if (!t) return;
-      const r = sel(), end = src.slice(r.a, r.a + 2) === "]]" ? r.a + 2 : r.a;
-      closePop(); change(popAt, end, `[[${t.id}|${t.title}]]`, "link");
-    }
-
-    function follow(target) {
-      const named = (ctx.things || {})[target];                  // a6109: a bare id, named by the scene
-      if (named && named.open) return opts.follow && opts.follow(named.open, named.name);
-      const hit = (ctx.links || {})[target];
-      if (!hit || !hit.id) return opts.notify && opts.notify(`nothing is called “${target}” yet`);
-      opts.follow && opts.follow(hit.id, hit.title);
-    }
-    root.addEventListener("click", e => {
-      const box = e.target.closest(".md-check");
-      if (box && ed) { e.preventDefault(); return toggle(+box.dataset.check); }
-      const wl = e.target.closest(".md-wl"), emb = e.target.closest(".md-embed[data-id]"), a = e.target.closest("a.md-a");
-      const line = (wl || a) && lineOf(root, wl || a), shown = !line || !line.classList.contains("md-active");
-      if (emb && (!ed || !e.altKey)) { e.preventDefault(); return follow(emb.closest(".md-widget").dataset.src.replace(/^\s*!\[\[|\]\]\s*$/g, "").split("|")[0].split("#")[0].trim()); }
-      // a link whose marks are hidden is followed; on the line being written a click places the caret (Ctrl+click follows)
-      if (wl && (shown || e.ctrlKey || e.metaKey)) { e.preventDefault(); return follow(wl.dataset.target); }
-      if (a && (shown || e.ctrlKey || e.metaKey) && /^https?:/.test(a.dataset.href || "")) { e.preventDefault(); window.open(a.dataset.href, "_blank", "noopener"); return; }
-      const w = e.target.closest(".md-widget");
-      if (w && ed) { root.focus(); const at = starts(src)[+w.dataset.from] || 0; paint(at, at); }
+  // ---- what a key means in Markdown (a6067) -------------------------------------------------------------------------
+  // The grammar's own edits, as plain data: each takes the source and a range and gives the edit to make, {a, b, s}
+  // (replace a..b by s) with where the selection goes after, or null when the key means nothing special here. The
+  // editing itself (caret, undo, sending) is textedit.js's: this file only knows what Markdown says.
+  function lineAround(src, at) { const s = src.lastIndexOf("\n", at - 1) + 1, e = src.indexOf("\n", at); return [s, e < 0 ? src.length : e]; }
+  // Enter: a list goes on; an empty item ends it
+  function enter(src, a, b) {
+    const [ls] = lineAround(src, a), line = src.slice(ls, a);
+    let m, more = "";
+    if ((m = RX.task.exec(line))) more = m[1] + m[2] + " [ ] ";
+    else if ((m = RX.bullet.exec(line))) more = m[1] + m[2] + " ";
+    else if ((m = RX.num.exec(line))) more = m[1] + (+m[2] + 1) + m[3] + " ";
+    else if ((m = RX.quote.exec(line))) more = m[1] + "> ";
+    if (more && line.trim() === (m[0] || "").trim() && a === b) return { a: ls, b: a, s: "", at: ls };   // an empty item: the list ends
+    return { a, b, s: "\n" + more, at: a + 1 + more.length };
+  }
+  // Backspace at the start of a list item or heading takes its mark off first, as Obsidian does
+  function unmark(src, at) {
+    const [ls, le] = lineAround(src, at), line = src.slice(ls, le);
+    const m = RX.task.exec(line) || RX.bullet.exec(line) || RX.num.exec(line) || RX.head.exec(line) || RX.quote.exec(line);
+    if (!m || at !== ls + m[0].length) return null;
+    const keep = m[1] && /^\s+$/.test(m[1]) ? m[1].slice(0, -Math.min(2, m[1].length)) : "";
+    return { a: ls, b: ls + m[0].length, s: keep, at: ls + keep.length };
+  }
+  // Tab / Shift+Tab: the lines of the range in or out by two spaces; one edit over the whole lines
+  function indent(src, a, b, out) {
+    const ls = lineAround(src, a)[0], le = lineAround(src, b)[1], lines = src.slice(ls, le).split("\n");
+    let first = 0, shift = 0;
+    const moved = lines.map((line, i) => {
+      if (!out) { if (i === 0) first = 2; shift += 2; return "  " + line; }
+      const k = line.startsWith("  ") ? 2 : line.startsWith("\t") || line.startsWith(" ") ? 1 : 0;
+      if (i === 0) first = -k; shift -= k; return line.slice(k);
     });
-    if (!ed) { paint(null); return { el: root, set(t, l, th) { src = t || ""; ctx = { links: l || {}, things: th || ctx.things }; paint(null); }, src: () => src, picked, lights: setLights,
-                                    links(l, th) { ctx = { links: l || {}, things: th || {} }; paint(null); } }; }
-
-    root.addEventListener("beforeinput", e => {
-      if (composing || e.inputType === "insertCompositionText") return;
-      const r0 = sel(); if (!r0) return;
-      const tr = e.getTargetRanges && e.getTargetRanges()[0];
-      const r = tr ? (() => { const a = offsetOf(root, src, tr.startContainer, tr.startOffset), b = offsetOf(root, src, tr.endContainer, tr.endOffset); return { a: Math.min(a, b), b: Math.max(a, b) }; })() : r0;
-      const t = e.inputType;
-      e.preventDefault();
-      if (t === "insertText" || t === "insertReplacementText" || t === "insertFromPaste" || t === "insertFromDrop" || t === "insertFromYank") {
-        const data = (e.data != null ? e.data : e.dataTransfer && e.dataTransfer.getData("text/plain")) || "";
-        return change(r.a, r.b, data.replace(/\r\n?/g, "\n"), t === "insertText" ? "type" : "paste");
-      }
-      if (t === "insertParagraph" || t === "insertLineBreak") return pop && popHits.length ? choose(popPick) : enter(r0);
-      if (t.startsWith("delete")) {
-        let { a, b } = r;
-        if (a === b) {                                      // no range given: one character
-          if (t.includes("Backward")) a = Math.max(0, a - 1); else b = Math.min(src.length, b + 1);
-        }
-        // Backspace at the start of a list item or heading takes its mark off first, as Obsidian does
-        if (t === "deleteContentBackward" && r0.a === r0.b) {
-          const [ls] = lineAround(r0.a), line = src.slice(ls, src.indexOf("\n", ls) < 0 ? undefined : src.indexOf("\n", ls));
-          const m = RX.task.exec(line) || RX.bullet.exec(line) || RX.num.exec(line) || RX.head.exec(line) || RX.quote.exec(line);
-          if (m && r0.a === ls + m[0].length) return change(ls, ls + m[0].length, m[1] && /^\s+$/.test(m[1]) ? m[1].slice(0, -Math.min(2, m[1].length)) : "", "del");
-        }
-        return change(a, b, "", t.includes("Backward") ? "del" : "fwd");
-      }
-      if (t === "historyUndo") return restore(undo, redo);
-      if (t === "historyRedo") return restore(redo, undo);
-      if (t === "formatBold") return wrap(r0, "**", "**");
-      if (t === "formatItalic") return wrap(r0, "*", "*");
-    });
-    root.addEventListener("compositionstart", () => { composing = true; });
-    root.addEventListener("compositionend", e => {      // an input method's words, read back from the line they went into
-      composing = false;
-      const r = sel(); if (!r) return;
-      const line = lineOf(root, getSelection().anchorNode); if (!line || line.dataset.l == null) return;
-      const l = +line.dataset.l, st = starts(src), end = src.indexOf("\n", st[l]);
-      const now = textNodes(line).map(t => t.data).join("");
-      undo.push({ src, a: r.a, b: r.b }); src = src.slice(0, st[l]) + now + src.slice(end < 0 ? src.length : end);
-      paint(r.a, r.a); opts.typed && opts.typed(src);
-    });
-    root.addEventListener("keydown", e => {
-      const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase(), r = sel();
-      if (pop) {
-        if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); popPick = (popPick + (e.key === "ArrowDown" ? 1 : popHits.length - 1)) % Math.max(1, popHits.length); return complete(); }
-        if (e.key === "Tab" && popHits.length) { e.preventDefault(); return choose(popPick); }
-        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); return closePop(); }
-      }
-      if (!r) return;
-      if (mod && k === "e") { e.preventDefault(); raw = !raw; return paint(r.a, r.b); }
-      if (mod && k === "s") { e.preventDefault(); return opts.save && opts.save(src); }
-      if (mod && e.key === "Enter") { e.preventDefault(); return opts.save && opts.save(src); }
-      if (mod && k === "b") { e.preventDefault(); return wrap(r, "**", "**"); }
-      if (mod && k === "i") { e.preventDefault(); return wrap(r, "*", "*"); }
-      if (mod && k === "k") { e.preventDefault(); const words = src.slice(r.a, r.b) || "link"; undo.push({ src, a: r.a, b: r.b }); src = src.slice(0, r.a) + `[${words}](https://)` + src.slice(r.b); const at = r.a + words.length + 3; paint(at, at + 8); opts.typed && opts.typed(src); return; }
-      if (mod && !e.shiftKey && k === "z") { e.preventDefault(); return restore(undo, redo); }
-      if (mod && (k === "y" || (e.shiftKey && k === "z"))) { e.preventDefault(); return restore(redo, undo); }
-      if (e.key === "Tab" && !mod) { e.preventDefault(); return indent(r, e.shiftKey); }
-      if (e.key === "Escape") { e.preventDefault(); root.blur(); }
-    });
-    root.addEventListener("copy", e => { const r = sel(); if (!r || r.a === r.b) return; e.preventDefault(); e.clipboardData.setData("text/plain", src.slice(r.a, r.b)); });
-    root.addEventListener("cut", e => { const r = sel(); if (!r || r.a === r.b) return; e.preventDefault(); e.clipboardData.setData("text/plain", src.slice(r.a, r.b)); change(r.a, r.b, "", "cut"); });
-    // the caret moving shows the marks of the lines it is on, and opens a table it enters
-    let was = "";
-    const moved = () => {
-      if (document.activeElement !== root || composing) return;
-      const r = sel(); if (!r) return;
-      const now = [...linesOf(r.a, r.b)].join(",");
-      if (now === was) return; was = now;
-      const next = linesOf(r.a, r.b), widgetTouched = [...root.children].some(c => c.dataset.from != null && [...next].some(l => l >= +c.dataset.from && l <= +c.dataset.to));
-      const leftWidget = [...active].some(l => { const w = read(src.split("\n")).lines[l]; return w && w.w != null; });
-      if (widgetTouched || leftWidget || raw) return paint(r.a, r.b);
-      for (const c of root.children) if (c.dataset.l != null) c.classList.toggle("md-active", next.has(+c.dataset.l));
-      active = next;
-      if (pop) complete();
-    };
-    document.addEventListener("selectionchange", moved);
-    root.addEventListener("focus", () => { was = ""; setTimeout(moved, 0); });
-    root.addEventListener("blur", () => { closePop(); was = ""; active = new Set(); for (const c of root.querySelectorAll(".md-line.md-active")) if (!raw) c.classList.remove("md-active"); if (read(src.split("\n")).widgets.length) paint(null); });
-    paint(null);
-    return {
-      el: root, src: () => src,
-      // the world's words arrive: kept when they are what is here; drawn again (the caret kept) when only links changed
-      set(t, l, th) { ctx = { links: l || {}, things: th || ctx.things }; const r = sel(); if (t != null) src = t; paint(r ? r.a : null, r ? r.b : null); },
-      links(l, th) { ctx = { links: l || {}, things: th || {} }; const r = sel(); paint(r ? r.a : null, r ? r.b : null); },
-      press(key) { const k = key.split("+").pop().toLowerCase(), r = sel() || { a: src.length, b: src.length };
-        const focused = document.activeElement === root;
-        if (k === "e") { raw = !raw; return paint(focused ? r.a : null, focused ? r.b : null); }
-        if (k === "s") return opts.save && opts.save(src);
-        if (!focused) return;
-        if (k === "b") return wrap(r, "**", "**"); if (k === "i") return wrap(r, "*", "*");
-        if (k === "k") { const words = src.slice(r.a, r.b) || "link"; undo.push({ src, a: r.a, b: r.b }); src = src.slice(0, r.a) + `[${words}](https://)` + src.slice(r.b); const at = r.a + words.length + 3; paint(at, at + 8); opts.typed && opts.typed(src); } },
-      raw: () => raw, picked, lights: setLights,
-    };
+    return { a: ls, b: le, s: moved.join("\n"), sel: [Math.max(ls, a + first), Math.max(ls, b + shift)] };
+  }
+  // Ctrl+B and the like: wrap the words, or take the marks off when they are already round them
+  function wrap(src, a, b, w0, w1) {
+    if (src.slice(a - w0.length, a) === w0 && src.slice(b, b + w1.length) === w1)
+      return { a: a - w0.length, b: b + w1.length, s: src.slice(a, b), sel: [a - w0.length, b - w0.length] };
+    return { a, b, s: w0 + src.slice(a, b) + w1, sel: [a + w0.length, b + w0.length] };
+  }
+  function link(src, a, b) { const words = src.slice(a, b) || "link"; const at = a + words.length + 3; return { a, b, s: `[${words}](https://)`, sel: [at, at + 8] }; }
+  // a task box pressed: [ ] <-> [x] on line l
+  function toggle(src, l) {
+    const st = starts(src), at = st[l], end = src.indexOf("\n", at), m = RX.task.exec(src.slice(at, end < 0 ? undefined : end));
+    if (!m) return null;
+    const k = at + m[1].length + m[2].length + m[3].length + 1;
+    return { a: k, b: k + 1, s: m[4] === " " ? "x" : " " };
   }
 
-  window.Markdown = { create, read };
+  globalThis.Markdown = { read, draw, inline, starts, textNodes, lineOf, offsetOf, pointAt, lightUp, findWords,
+    enter, unmark, indent, wrap, link, toggle, lineAround };
 })();

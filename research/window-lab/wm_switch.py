@@ -14,7 +14,12 @@ Never leaving a window displaced, whichever part dies:
     `wm.py --release-all` (a process of its own, reading only that file), then takes the row away.
   - the home base dies: wm.py sees its parent gone within a second or two and puts everything back itself.
   - both die at once (hud.py --stop ends the whole tree): hud.py --stop, and the next home base as it starts, call
-    release_left(), which runs --release-all when the state file holds windows and no host is alive.
+    release_left(), which runs --release-all when the state file was not released and its host is not running.
+What release-all ends (c6178, after Codex's c6176): only processes this host started and recorded with their creation
+time and executable, and only while both still match. Never a pid alone, never an Edge found by a profile folder, and
+the host's Edges use folders of their own (state/wm-edge/<run>), not lens_window.py's. A state file saved before
+Windows last started, or by a host from before that fix, is renamed aside (state/wm.stale-<when>.json) and nothing it
+names is touched.
 A window manager started some other way (by hand, before this) is left alone: start says so, and its own
 Ctrl+Alt+Backspace stops it.
 """
@@ -37,19 +42,6 @@ LENS = "design-review,command-center,doc-editor"      # wm.py's own default wind
 NO_WINDOW = 0x08000000
 
 
-def _alive(pid):
-    import ctypes
-    from ctypes import wintypes as wt
-    k32 = ctypes.windll.kernel32
-    h = k32.OpenProcess(0x1000, False, int(pid))
-    if not h:
-        return False
-    code = wt.DWORD()
-    k32.GetExitCodeProcess(h, ctypes.byref(code))
-    k32.CloseHandle(h)
-    return code.value == 259
-
-
 def _state():
     try:
         return json.loads(STATE.read_text(encoding="utf-8"))
@@ -58,23 +50,26 @@ def _state():
 
 
 def other_host():
-    """The pid of a wm.py host alive now, by its state file, or 0 (as wm.py's own run() asks it)."""
-    st = _state() or {}
-    pid = st.get("host_pid")
-    return pid if pid and st.get("windows") and _alive(pid) else 0
+    """The pid of a wm.py host running now, by its state file, or 0. The host is known by its identity (pid, creation
+    time, executable: wm.same), never by a pid alone, which Windows gives to new processes (c6176)."""
+    import wm
+    st = _state()
+    return st["host"]["pid"] if st and st.get("windows") and not wm.stale(st) and wm.host_alive(st) else 0
 
 
 def release_left(say=print):
-    """Put back what a window manager left when no host is alive to do it (wm.py --release-all). -> what it said."""
+    """Put back what a window manager left when no host is alive to do it: wm.py --release-all, which ends only
+    processes it can prove it started and retires a state file from before this boot untouched. -> what it said."""
+    import wm
     st = _state()
-    if not st or not st.get("windows"):
+    if not st or st.get("released"):
         return ""
-    if st.get("host_pid") and _alive(st["host_pid"]):
+    if not wm.stale(st) and wm.host_alive(st):
         return ""                                     # alive: it puts back its own
     try:
         r = subprocess.run([sys.executable, str(WM), "--release-all"], capture_output=True, text=True, timeout=120,
                            creationflags=NO_WINDOW)
-        out = (r.stdout.strip().splitlines() or ["(nothing said)"])[-1]
+        out = "; ".join(ln.split(" ", 1)[-1] for ln in r.stdout.strip().splitlines()) or "(nothing said)"
     except (OSError, subprocess.SubprocessError) as e:
         out = f"release-all failed: {e}"
     say("wm_switch:", out)

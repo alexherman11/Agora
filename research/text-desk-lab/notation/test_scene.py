@@ -1533,6 +1533,32 @@ def test_ids_in_words_are_drawn_as_the_names_of_what_they_name():
         tmp.unlink(missing_ok=True)
 
 
+def test_a_persons_name_is_a_link_where_it_stands_alone():
+    """a6109, c6186: a person is printed by name, so the name is the link, where a text is only that name or ends
+    'by|to|from <name>'; never in prose, never in a text that is a button, and a word nobody bears stays words."""
+    import deskd, lens_ir, persons
+    tmp = _scratch("_test_people")
+    try:
+        with deskd.Session("_test_people", "jeff") as desk:
+            w = desk.world
+            persons.begin(w, actor="jeff")
+            pid = persons.today(w, "jeff")
+            assert pid, "persons began"
+            src = chr(10).join(["w : column", '  alone : text "jeff"', '  by : text "asked by jeff"', '  prose : text "jeff wrote this and jeff left"',
+                                '  chip : text "jeff"', "    on click do prop $item to=jeff", '  nobody : text "by zzyzx"', f'  pid : text "said {pid}"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            alone, by, prose, chip, nobody, byid = scene.painter_view(sc)["kids"]
+            link = lambda k: [r for r in k["paint"].get("runs") or [] if r.get("mark") == "thing"]      # noqa: E731
+            assert [r["text"] for r in link(alone)] == ["jeff"] and link(alone)[0]["kind"] == "person"
+            assert link(alone)[0]["open"] == (persons.corner(w, pid) or pid)
+            assert [r["text"] for r in link(by)] == ["jeff"] and "".join(r["text"] for r in by["paint"]["runs"]) == "asked by jeff"
+            assert not link(prose) and not link(chip) and not link(nobody)
+            assert [r["kind"] for r in link(byid)] == ["person"], "a person's id is their name"
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 # a5820: this block stood above test_picture_is_a_text_drawn (13 Oct), so that test was never run; it stays last
 if __name__ == "__main__":
     import os
