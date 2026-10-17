@@ -1,0 +1,9 @@
+# home-house-small: The house in one line (a6057), beside its panel's title and on its chip in the dock.
+n : row
+  role lhsmall
+  lit : text "$(count(house doing=working)) at work"
+    role lhsmall.lit
+    only when count(house doing=working) > 0
+  rest : text "$(count(house doing!=working)) resting"
+    role summary
+    only when count(house doing!=working) > 0
