@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (48)
+## open (50)
 
 ### F2. Scripts cannot say who is running them
 
@@ -320,6 +320,18 @@ Source edit by worker-a6067, 16 Oct, for Alex (a6067: the document is one contin
 a6279 · family=lens-words · status=open
 
 worker-a6010, 17 Oct (HUD sprint round 3, the board). A press that changes the world painted only when the desk answered, 300-430 ms in the playtest (act ~100 ms, the home base's scene ~200 ms), so Looks good on a needs-you card was slow however fast the server got. Missing: a way for a lens's style to say what a press will look like at once. Added two style flags (style.py, style.js; no lens or scene word): a part whose look says `leaves` is hidden, its room kept, while a press on a part inside it whose look says `away` waits for its answer; a refusal draws it again beside the reason. Playtest: Looks good 333 -> 5-18 ms, Send back 314 -> 14 ms. Found on the way: taking the card out of the layout made the next card slide under the pointer, and a quick double-click approved two cards (headless, double.js), so the room is kept. Still missing: a press whose result is a move (Later: the card goes under a fold) shows only its leaving at once; where it went waits for the scene.
+
+### Source edit (a6265): how full an agent's context is, and Alex's limit, reach a lens only through house code; a popover from a line needed painter words
+
+a6321 · family=missing-word · status=open
+
+Two words the world lacked for At work's improvement pass (a6265, 17 Oct). (1) What the house observes of an agent's MODEL use: the house logs each agent's stream (Claude's assistant usage, result modelUsage.contextWindow, rate_limit_event; Codex's thread/tokenUsage/updated) into transcripts the world cannot read, so a new module, usage.py, run from house.py's pass beside feeds.py, writes witnessed:usage (context per cent per agent, the account's five-hour and seven-day use). The missing world word: a resident or lens can name a witnessed source but cannot ask the house to observe something new; every such source is house code (as a6077 said for feeds). (2) A popover from a line: `fold float inline` was refused as one or the other (scene.py), and an open float inside a `scroll none` panel was cut at the panel's edge and covered by the next column (lens.js placeFloat lifts it into the browser's top layer; lens.html stops a peek being lifted over it), and closed whenever its part was made again (lens.js keeps it open). The missing word was a lens word for 'over everything, anchored to this line'; float now means that inside a panel.
+
+### Words an icon lacked: what it is, shown on hover without moving anything, and a ground under the pointer that does not move (a6271)
+
+a6329 · family=lens-words · status=open
+
+Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
 ## curing (37)
 
