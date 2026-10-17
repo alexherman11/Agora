@@ -53,6 +53,7 @@ const Style = (() => {
     align: v => ({ "align-self": { start: "flex-start", end: "flex-end", center: "center", stretch: "stretch" }[v] }),   // 15 Oct
     wave: () => ({ "white-space": "pre" }),     // 14 Oct: its characters are spans the painter makes (lens.js wave)
     touch: () => ({ cursor: "pointer", transition: "transform 120ms ease-out, filter 120ms ease-out" }),   // a5500: and the rules in install
+    leaves: () => ({}), away: () => ({}),        // a6010: the one rule in install
   };
   for (const side of ["top", "right", "bottom", "left"]) {
     TABLE["border_" + side] = v => ({ ["border-" + side]: `1px solid ${v}` });
@@ -106,6 +107,14 @@ const Style = (() => {
         out += `${c}:hover{filter:brightness(1.3)}${c}:active{filter:brightness(.85)}`
           + `@media (prefers-reduced-motion: no-preference){${c}:hover{transform:translateY(-3px)}${c}:active{transform:translateY(0) scale(.94)}}\n`;
     }
+    // a6010 (Snappy Desk stage 3 for presses): a part whose look says `leaves` is not drawn while a press on a part inside
+    // it whose look says `away` is on its way (lens.js marks the pressed part data-sending until its answer is painted);
+    // a refusal takes the mark off, so it is drawn again beside the reason, and an answer's scene shows where it went.
+    // Its room stays until then: hidden, not taken out, so the next card does not slide under the pointer and take the
+    // second click of a double-click (seen headless: three quick presses landed at one spot on three cards)
+    const leaves = Object.entries(looks.roles).filter(([, r]) => r.look.leaves).map(([n]) => "." + cls(n));
+    const away = Object.entries(looks.roles).filter(([, r]) => r.look.away).map(([n]) => "." + cls(n));
+    if (leaves.length && away.length) out += `:is(${leaves.join(",")}):has(:is(${away.join(",")})[data-sending="1"]){visibility:hidden}\n`;
     // a1140: the language's one motion, only for a viewer who has not asked for reduced motion; every pulse in one phase
     out += "@media (prefers-reduced-motion: no-preference){@keyframes r-pulse{0%,100%{opacity:1}50%{opacity:.6}}}\n";
     // a5504: `glow`, a halo of the part's glow colour breathing beside its rail and shadow; a still ring for reduced motion
