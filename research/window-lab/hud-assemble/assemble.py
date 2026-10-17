@@ -243,7 +243,10 @@ def main(a):
         w = Live(who)
         liv = (d / "living.txt")
         if liv.exists():
-            r = subprocess.run([sys.executable, str(LIVING), "undo", liv.read_text(encoding="utf-8").strip(), "--as", who],
+            ld = pathlib.Path(liv.read_text(encoding="utf-8").strip())
+            if not ld.is_absolute():               # as committed: from the checkout's root, wherever that is now
+                ld = WL.parents[1] / ld
+            r = subprocess.run([sys.executable, str(LIVING), "undo", str(ld), "--as", who],
                                capture_output=True, text=True, encoding="utf-8")
             print(r.stdout[-3000:] + r.stderr[-1000:])
             if r.returncode:
@@ -286,7 +289,11 @@ def main(a):
         return 1
     code, out, living_dir = run_living("door" if a[0] == "door" else "try", who)
     if d and living_dir:
-        (d / "living.txt").write_text(living_dir + "\n", encoding="utf-8")
+        try:
+            said = pathlib.Path(living_dir).resolve().relative_to(WL.parents[1]).as_posix()
+        except ValueError:
+            said = living_dir
+        (d / "living.txt").write_text(said + "\n", encoding="utf-8")
     if code:
         print("stopped in B (lane 3's apply)" + (f"\nto put back what was done: assemble.py restore {d}" if d else ""))
         return 1
