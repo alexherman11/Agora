@@ -141,7 +141,7 @@ def main():
     check(f"release-all with the host dead{' and the desk stopped' if a.stop_door else ''}: the ordinary window is back "
           f"({round((time.perf_counter() - t0) * 1000)} ms)", moved != plain_was and wm.rect(plain_hwnd) == plain_was, (wm.rect(plain_hwnd), plain_was))
     check("release-all: every Agora window closed", not any(wm.user32.IsWindow(h) for h in agora), agora)
-    left = wm.profile_pids(wm.PROFILE) | wm.profile_pids(wm.UNSEEN)
+    left = wm.profile_pids(wm.EDGE_ROOT)
     check("release-all: none of the host's Edges still runs", not left, left)
     plain.kill()
     print("timings:", [l for l in wm.LOG.read_text(encoding="utf-8").splitlines() if "in place in" in l])

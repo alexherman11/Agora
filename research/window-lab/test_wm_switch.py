@@ -139,7 +139,7 @@ def arranged(n=3):
 
 
 def edges_left():
-    return wm.profile_pids(wm.PROFILE) | wm.profile_pids(wm.UNSEEN)
+    return wm.profile_pids(wm.EDGE_ROOT)            # every run's own folders (a6113): no other program's Edge
 
 
 def adopt(hwnds):
@@ -164,6 +164,10 @@ def all_back(standins, before, label, agora):
 def start_by_click(hud, label):
     check(f"{label}: the icon shows its start face", wait("face", lambda: hud.face() == "start", 20), hud.face())
     t0 = time.time()
+    if wm.LOG.exists():           # what the last release said: what it ended and what it left alone (c6178)
+        for ln in wm.LOG.read_text(encoding="utf-8").splitlines():
+            if "release-all" in ln:
+                print("     log:", ln[13:])
     wm.LOG.unlink(missing_ok=True)
     check(f"{label}: the icon was clicked", hud.click("wm"))
     st = wait("arranged", arranged, 60)
