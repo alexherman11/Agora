@@ -22,7 +22,8 @@
 //          hooks                  pick(q) [[ picker titles, follow(id), capture(anchor, data), undoSent(event),
 //                                 overrode(changes, event) after "Keep mine" was sent over someone's edit,
 //                                 notify(words), changed(st) after any change (the customer's own bookkeeping)
-//          links, titles, light, lightClass     Markdown only: [[link]] targets, picker titles, lit passages
+//          links, things, titles, light, lightClass     Markdown only: [[link]] targets, ids drawn as names (a6109),
+//                                 picker titles, lit passages
 //   editor: el, src(), receive(text, version), adopt(text, base, version) (another window's unsent words), flush(),
 //           anchor(), picked(), press(key), lights(l), links(l), titles(t), resolve("mine"|"theirs"), composing(),
 //           state(), doc
@@ -351,7 +352,7 @@
     const M = globalThis.Markdown;
     const root = document.createElement("div"); root.className = "md-doc";
     const wrapEl = document.createElement("div"); wrapEl.className = "te-wrap"; wrapEl.append(root);
-    let ctx = { links: opts.links || {} }, raw = false, active = new Set(), lit = opts.light || [];
+    let ctx = { links: opts.links || {}, things: opts.things || {} }, raw = false, active = new Set(), lit = opts.light || [];
     if (opts.hint) root.dataset.hint = opts.hint;
     const ed = !!opts.editable;
     if (ed) { root.contentEditable = "true"; root.spellcheck = true; root.setAttribute("role", "textbox"); root.setAttribute("aria-multiline", "true"); }
@@ -418,6 +419,8 @@
       closePop(); change({ a: popAt, b: end, s, at: popAt + s.length }, "link");
     }
     function follow(target) {
+      const named = (ctx.things || {})[target];                  // a6109: a bare id, named by the scene
+      if (named && named.open) return opts.hooks && opts.hooks.follow && opts.hooks.follow(named.open, named.name);
       const hit = (ctx.links || {})[target];
       if (!hit || !hit.id) return opts.hooks && opts.hooks.notify && opts.hooks.notify(`nothing is called “${target}” yet`);
       opts.hooks && opts.hooks.follow && opts.hooks.follow(hit.id, hit.title);
@@ -439,9 +442,9 @@
       receive: (t, v) => E.receive(t, v), flush: () => E.flush(), resolve: w => E.resolve(w), adopt: (t, b, v) => E.adopt(t, b, v),
       composing: () => E.composing(),
       titles(t) { opts.titles = t; },
-      links(l) { ctx = { links: l || {} }; const r = focused() ? sel() : null; paint(r ? r.a : null, r ? r.b : null); },
-      // compatibility with the painter's old document part: set(words, links) draws the words as the desk's
-      set(t, l) { if (l) ctx = { links: l }; if (t != null) E.receive(t, E.doc.version); else render(); },
+      links(l, th) { ctx = { links: l || {}, things: th || {} }; const r = focused() ? sel() : null; paint(r ? r.a : null, r ? r.b : null); },
+      // compatibility with the painter's old document part: set(words, links, things) draws the words as the desk's
+      set(t, l, th) { if (l) ctx = { links: l, things: th || ctx.things }; if (t != null) E.receive(t, E.doc.version); else render(); },
       press(key) {
         const k = key.split("+").pop().toLowerCase(), r = sel() || { a: E.doc.sel[0], b: E.doc.sel[1] };
         if (k === "e") { raw = !raw; return paint(focused() ? r.a : null, focused() ? r.b : null); }

@@ -37,7 +37,7 @@ class Home:
 
 h = Home()
 names = [r["name"] for r in H.rows()]
-check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "start", "window", "media.play", "media.next", "media.prev"]
+check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "start", "window", "wm.start", "wm.stop", "media.play", "media.next", "media.prev"]
       and all(r["about"] for r in H.rows()), H.rows())
 check("hide hides", H.call(h, "hide") == "ok hidden" and h.did[-1] == ("hide",), h.did)
 # a5980: start puts the home base away, then asks for the Start menu (stood in for: nothing reaches the screen)
@@ -72,6 +72,21 @@ r = H.call(h, "notify", "! it broke")
 check("words that begin with ! ask for the sound", r.endswith("(with sound)") and shown[-1] == ("it broke", True, "alex"), (r, shown))
 r = H.call(h, "notify", "  ")
 check("notify with no words is refused and shows nothing", r.startswith("ERR notify takes") and len(shown) == 2, r)
+# a6113: wm.start / wm.stop go to wm_switch.SWITCH (stood in for here: no window manager runs; test_wm_switch.py runs
+# the real one on the sandbox desktop)
+import wm_switch  # noqa: E402
+asked = []
+wm_switch.SWITCH = type("S", (), {"start": lambda s, hud, lenses: asked.append(("start", lenses)) or "started it",
+                                  "stop": lambda s, hud: asked.append(("stop",)) or "stopped it"})()
+r = H.call(h, "wm.start")
+check("wm.start starts it with wm.py's own windows, then puts the home base away",
+      r == "ok started it" and asked[-1] == ("start", "") and h.did[-1] == ("hide",), (r, asked, h.did))
+r = H.call(h, "wm.start", "doc-editor,command-center")
+check("wm.start takes lens names joined by commas", r.startswith("ok") and asked[-1] == ("start", "doc-editor,command-center"), r)
+r = H.call(h, "wm.start", "doc-editor; calc.exe")
+check("wm.start refuses anything but lens names, and starts nothing", r.startswith("ERR wm.start takes") and len(asked) == 2, r)
+r = H.call(h, "wm.stop")
+check("wm.stop stops it", r == "ok stopped it" and asked[-1] == ("stop",), r)
 
 
 def no_toast(words, sound=False, by=""):

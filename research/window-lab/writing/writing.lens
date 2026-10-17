@@ -16,6 +16,7 @@ writing : column
     only when count(prop:role=writer,prop:actor=$me) = 0
 app : column
   share 1
+  on link do read $w; do prop $w open=$value back="$w.open"
   global : row
     role toolbar
     gap

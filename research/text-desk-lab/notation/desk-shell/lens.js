@@ -90,6 +90,14 @@
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more, attachment) {
     const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
+    // a6010: the pressed part says at once that it was heard (data-sending, drawn by lens.html), until the answer is
+    // painted: a press that waits on the world is seen on the next frame, not ~300 ms later
+    const pressed = kept.get(n.key) && kept.get(n.key).el;
+    if (pressed) pressed.dataset.sending = "1";
+    try { return await sendNow(n, line, draft, more, attachment, token); }
+    finally { if (pressed) delete pressed.dataset.sending; }
+  }
+  async function sendNow(n, line, draft, more, attachment, token) {
     const observed = { ...(n.fence || {}), at: sceneAt, def, ...more }, gesture = attachment?.gesture || V.gesture(n.key, draft !== undefined);
     let r;
     try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture, image_context: attachment?.image }) })).json(); }
@@ -607,17 +615,17 @@
     const a = n.acts.find(x => x.on === "edit");
     const te = TextEdit.create({
       text: p.text, version: n.fence, editable: !!a, key: n.key, item: textOf(n),
-      links: p.wikilinks, titles: p.titles, hint: p.hint,
+      links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint,
       light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
       keep: a ? textKeeper(n.key, () => el._n) : null,
       seam: a ? { send: out => sendEdit(el, out) } : null,
       hooks: {
         notify: t => V.notify(t),
         follow: async id => {
-          const link = el._n.acts.find(x => x.on === "link");
-          if (!link) return V.show("this document's links open nowhere here (its lens has no `on link`)");
+          const at = linkFor(el);                                   // a6109: its own `on link`, or the nearest above it
+          if (!at) return V.show("this document's links open nowhere here (no `on link` on it or above it)");
           if (a) await te.flush();
-          send(el._n, link.line.replace(/\$value\b/g, () => TEXT.esc(id)));
+          send(at._n, at._n.acts.find(x => x.on === "link").line.replace(/\$value\b/g, () => TEXT.esc(id)));
         },
         // the world's undo of this window's sent edit; its answer says which undo this was, and a refusal says why
         undoSent: async ev => {
@@ -638,7 +646,7 @@
         },
       },
     });
-    el._te = el._md = te; el._teConf = textConf(n, p); el._mdLinks = JSON.stringify(p.wikilinks || {});
+    el._te = el._md = te; el._teConf = textConf(n, p); el._mdLinks = JSON.stringify([p.wikilinks || {}, p.things || {}]);
     el.classList.add("md-part"); el.append(te.el);
     if (!a) return;
     const root = te.el.querySelector(".md-doc");
@@ -650,8 +658,8 @@
   }
   function textFresh(el, n, p) {
     el._n = n;
-    const l = JSON.stringify(p.wikilinks || {});
-    if (l !== el._mdLinks) { el._mdLinks = l; el._te.links(p.wikilinks); }
+    const l = JSON.stringify([p.wikilinks || {}, p.things || {}]);
+    if (l !== el._mdLinks) { el._mdLinks = l; el._te.links(p.wikilinks, p.things); }
     el._te.lights(p.light);                                     // a5949: a new comment's words light at once
     el._te.titles(p.titles);
     el._te.receive(p.text, n.fence);                            // a6067: the desk's words, at this version
@@ -775,10 +783,12 @@
   // more arm in scene.marks_of. Read, a mark is drawn; edited, it is its source, as a code run is.
   const MARKS = {
     kinds: { strong: { tag: "strong", wrap: ["**", "**"], key: "b" }, stress: { tag: "em", wrap: ["*", "*"], key: "i" },
-             both: { tag: "strong", look: "t-mark-strong t-mark-stress" }, link: { tag: "a", wrap: ["[", "](https://)"], key: "k" } },
+             both: { tag: "strong", look: "t-mark-strong t-mark-stress" }, link: { tag: "a", wrap: ["[", "](https://)"], key: "k" },
+             thing: { tag: "a" } },          // a6109: an id in the words, drawn as the name of what it names (scene.things_of)
     draw(r) {
       const m = document.createElement(this.kinds[r.mark].tag); m.className = "t-mark " + (this.kinds[r.mark].look || "t-mark-" + r.mark); m.textContent = r.text;
       if (r.mark === "link") { m.dataset.href = r.href; m.title = r.href + "  (Ctrl+click opens it)"; }
+      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = r.title + (r.open ? "  (click opens it)" : ""); }
       return m;
     },
     // Ctrl+B and the like, in the source: wrap what is selected, or take the mark off when it is already there
@@ -845,6 +855,23 @@
   }
   document.addEventListener("pointerup", () => setTimeout(selectGesture, 0));
   document.addEventListener("keyup", e => { if (e.shiftKey || e.key === "Shift") selectGesture(); });
+  // a6109 (Alex: 'names of things ... should ALL be clickable'): a name drawn for an id opens what it names, by the
+  // nearest `on link` above it (the home base's root says where: its viewer), $value the id. With none above, the press
+  // is the part's own, as a press on its words always was. Caught before the parts' own clicks, so a name on a card
+  // opens the name, not the card. Words being highlighted are not a press.
+  function linkFor(el) {
+    let k = el.closest("[data-key]");
+    while (k && !(k._n && k._n.acts.some(a => a.on === "link"))) k = k.parentElement && k.parentElement.closest("[data-key]");
+    return k;
+  }
+  document.addEventListener("click", e => {
+    const a = e.target.closest && e.target.closest(".t-mark-thing");
+    if (!a || !paint.contains(a) || !a.dataset.thing || String(getSelection())) return;
+    if (a.closest("[contenteditable]") && !(e.ctrlKey || e.metaKey)) return;
+    const at = linkFor(a); if (!at) return;
+    e.preventDefault(); e.stopPropagation();
+    send(at._n, at._n.acts.find(x => x.on === "link").line.replace(/\$value\b/g, () => TEXT.esc(a.dataset.thing)));
+  }, true);
   document.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest(".t-mark-link");
     if (!a || !/^https?:/.test(a.dataset.href || "")) return;
@@ -1051,12 +1078,18 @@
     const c = carrying; if (!c) return;
     const l = r ? landing(r, m) : null;
     over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = ""; c.el.style.animation = "";
-    if (c.box) c.box.remove();
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
-    if (!l) { V.hold = null; c.el.focus(); return; }
+    if (!l) { if (c.box) c.box.remove(); V.hold = null; c.el.focus(); return; }
     const f = c.seen.get(r.dataset.key) || r._n.fence || {};
-    send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f });
+    // a5994 round 2 (lane 1's 'a press is seen on the next frame'): the landing box stays where the thing is going until
+    // the desk's answer is painted, then fades once (none for reduced motion), so the hand never sees it snap back
+    const box = c.box; if (box) { box.hidden = false; Object.assign(box.style, l.box.reduce((o, v, i) => (o[["left", "top", "width", "height"][i]] = v + "px", o), {})); }
+    Promise.resolve(send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f })).finally(() => {
+      if (!box) return;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return box.remove();
+      box.style.transition = "opacity 160ms ease-out"; box.style.opacity = "0"; setTimeout(() => box.remove(), 200);
+    });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
@@ -1151,7 +1184,18 @@
       for (const child of frame.children) if (!state.kids.has(child)) { state.kids.add(child); endSizes.observe(child); }
     }
   }
-  async function refresh(force) {
+  // a6010 (a press fetched two whole scenes at once, its own and the stream's, each a build on the server): one scene
+  // request at a time. An ask while one is out queues one more, which starts when it ends and so sees the world after
+  // it; asks while one is queued join that one (forced if any of them was).
+  let queued = null, chain = Promise.resolve();
+  function refresh(force) {
+    if (queued) { queued.force = queued.force || !!force; return queued.p; }
+    const q = { force: !!force };
+    q.p = chain.then(() => { queued = null; return fetchScene(q.force); });
+    queued = q; chain = q.p.catch(() => {});
+    return q.p;
+  }
+  async function fetchScene(force) {
     const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
     const keys = encodeURIComponent("Enter,Tab,Shift+Tab,Backspace,Delete");
     const on = q.get("on") ? `&on=${encodeURIComponent(q.get("on"))}` : "";   // a5949 (Sable's a4270): the thing the lens stands on

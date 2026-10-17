@@ -69,6 +69,8 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     js <expression>              the value of a JavaScript expression in the page (awaited), as JSON; js @f.js reads it
                                  from a file (one expression, e.g. research/window-lab/scroll_cost.js)
 --bare serves the copy from a deskd alone, without the door (as before a1505); `land` then restarts it as the keeper did.
+--logged gives the copy a log, as the live world has one (a snapshot plus the log since): time presses with it, or each
+write pickles the whole copy twice and a press looks ~250 ms slower than it is live (a6010).
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
 """
@@ -521,6 +523,7 @@ def main():
         return
     world, who, lens, size, live, steps = a[0], None, "command-center", (1500, 900), False, []
     page, term, still, bare = "lens", False, False, False
+    logged = False
     k = 1
     while k < len(a):
         if a[k] == "--reduced-motion":
@@ -555,6 +558,8 @@ def main():
             live, k = True, k + 1
         elif a[k] == "--bare":
             bare, k = True, k + 1
+        elif a[k] == "--logged":
+            logged, k = True, k + 1
         else:
             steps.append(a[k])
             k += 1
@@ -572,6 +577,12 @@ def main():
             session = f"{world}-screen-{os.getpid()}"
             copy = HERE / "sessions" / f"{session}.pickle"
             shutil.copy(src, copy)
+            if logged:
+                # a6010: as the live world, a snapshot plus a log (Snappy Desk), so a press is timed as it is there: a
+                # copy without one pickles the whole world twice at every write (~250 ms of each press)
+                import pickle
+                import store
+                store.genesis(pickle.loads(copy.read_bytes()), copy, why="screen --logged")
             port = free_port()
             # a1505: served as the keeper serves it, through a door (door.py) with its own deskd behind it, its news
             # kept in a temporary directory, and the painter from a copy of this checkout's desk-shell/ made now, so

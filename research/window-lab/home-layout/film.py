@@ -36,11 +36,13 @@ def main():
 
     steps = ["js", "document.body.style.background='#223'", "desk", "look a5674", "desk", "do prop a5674 shelf=no", "wait", "900"]
     steps += shot(2.0)
-    steps += ["hold", f"{T}/tiling/f5666/a5674/grip", "1000,500"] + shot(0.6)
-    steps += ["hold", "-", "700,750"] + shot(0.6)
-    steps += ["hold", "-", "400,900"] + shot(1.8)
+    # Alex's layout on 16 Oct evening: left column Waiting on you and At work, middle the board (shelved, brought
+    # out above) and Music; a document open beside the chat makes the panels' room narrow
+    steps += ["hold", f"{T}/tiling/f5666/a5674/grip", "560,500"] + shot(0.6)
+    steps += ["hold", "-", "380,800"] + shot(0.6)
+    steps += ["hold", "-", "190,1030"] + shot(1.8)
     steps += ["release", "wait", "800"] + shot(2.2)
-    steps += ["double", f"{T}/tiling/f5665/a5676/grip/title", "wait", "900"] + shot(2.4)
+    steps += ["double", f"{T}/tiling/f5666/a5676/grip/title", "wait", "900"] + shot(2.4)
     steps += ["double", f"{T}/filled/room/a5676/grip/title", "wait", "900"] + shot(1.8)
     steps += ["js", "location.reload()", "wait", "3500", "js", "document.body.style.background='#223'", "wait", "500"] + shot(2.2)
     steps += ["events", "6", "facts", T, "2", "js", NOSCROLL]

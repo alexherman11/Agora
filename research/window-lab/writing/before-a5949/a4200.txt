@@ -1,0 +1,119 @@
+# review: the style of the design-review window. The look of the design pages Alex liked on 13 Oct
+# (a pixel face for headings, a plain sans for reading, mono for small labels, green on pale paper), said in roles.
+# Claude, 13 Oct, at Alex's words: "I want it to look good you know?" Began as a copy of page (Juniper, 7 Oct).
+
+font display = Pixelify Sans, IBM Plex Mono, monospace
+font sans = IBM Plex Sans, system-ui, sans-serif
+font plex = IBM Plex Mono, ui-monospace, monospace
+
+token paper    = #EEF1EE
+token card     = #F8FAF8
+token sheet    = #F8FAF8
+token ink      = #17231F
+token accent   = #0F6B57
+token mark     = #B4571C
+token warn     = #A8323E
+token focus    = #F8FAF8
+token soft     = ink at 62%
+token quiet    = ink at 92%
+token hush     = ink at 50%
+token faint    = ink at 22%
+token ghost    = ink at 12%
+token wash     = accent at 10%
+token scrollbar = ink at 30%
+token scrollbar_w = 6
+
+token gap      = 8
+token ramp     = 1.2
+token text     = sans 16/1.6
+token text.display = display 17/1.15
+token text.mono = plex 13/1.5
+
+role desk      : on paper, ink, text
+role page      : on paper, ink, text, pad gap x3
+role rail      : pad right gap x2
+role railhead  : text.mono down tracked, soft, space below gap
+role qcard     : ink, text down, pad left gap /2, pad top gap /4, pad bottom gap /4
+role qtitle    : text down, ink
+role title     : text.display up 4, ink, space below gap /2
+role sheet     : on sheet, ink, text, pad gap x6
+role leaf      : on sheet, ink, text, pad left gap x6, pad right gap x4
+role aside     : text down, soft, pad left gap x2, pad right gap x2, border left ghost
+role block     : ink, text, space below gap
+role body      : text, quiet
+role h1        : text.display up 3, ink, space above gap x3, space below gap
+role h2        : text.display up 2, ink, space above gap x4, pad top gap x2, border top ink, space below gap /2
+role h3        : text strong, accent, space above gap x2
+role quote     : text up, ink, pad left gap x2, border left accent, space above gap x2, space below gap
+role figure    : on paper, ink, pad gap x2, corner gap /2, space above gap, space below gap
+role code      : text.mono, ink, on wash, pad gap
+role item      : text, quiet
+role ticked    : text medium, accent
+role bullet    : text, accent, pad right gap /2
+role box       : text up, soft, pad right gap /2
+role box.on    : text up, accent, pad right gap /2
+role rule      : text.mono down, faint
+role grip      : text down, soft, shy
+role in1       : pad left gap x3
+role in2       : pad left gap x6
+role in3       : pad left gap x9
+role mark      : text.mono down, mark, on mark at 10%, pad gap /2, corner gap /2, space below gap
+role meta      : text.mono down, soft
+role tag       : text.mono down, accent
+role tool      : text.mono down, soft, pad gap /2
+role toolbar   : pad top gap, pad bottom gap x1.5, between gap, space below gap x2, border bottom faint
+role button    : text down medium, accent, on card, edge accent, corner gap /2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role divider   : text.mono down, faint
+role whisper   : text down, soft, shy
+role hush      : afloat, shy
+# comments that stay in view beside their paragraph, taking no room in the page (Alex, 13 Oct)
+role beside    : afloat
+role note      : on card, text down, ink, pad gap, edge faint, corner gap /2, lift gap /2, space below gap
+role reply     : text down, quiet, pad left gap, border left accent, space above gap /2
+role remark    : text down, ink
+role replybox  : text down, ink, on paper, pad gap /2, corner gap /2, space above gap
+role resolve   : text.mono down, soft, space above gap /2
+role dot       : text, mark
+role cut       : text.mono down, soft
+role said      : on card, text down, quiet, pad gap, edge faint, corner gap /2
+role source    : text.mono down, quiet
+role menu.item : text down, ink, pad gap /2, pad left gap, pad right gap
+role menu.ask  : text down, ink, pad gap
+role popup     : on card, edge faint, corner gap /2, lift gap, pad gap /2
+
+# Explicit comment composition and source-bound image selections (Codex, 13 Oct).
+role author    : text down medium, accent, space below gap /2
+role message   : text down, ink, pad top gap, pad bottom gap, border top faint
+role region    : accent, edge accent
+role tree      : pad left gap, space below gap /2
+
+token unread = #2875BF
+role notewaiting : on unread at 8%, text down, ink, pad gap, edge unread, corner gap /2, lift gap /2, space below gap
+role messagewaiting : text down, ink, pad top gap, pad bottom gap, border top faint, on unread at 8%, border left unread, pad left gap
+role unread : text.mono down, unread
+
+role viewtab   : text.mono down, soft, pad gap /2
+role viewtab.on : text.mono down, accent, pad gap /2, border bottom accent
+role talkpane  : on card, ink, text, pad gap x2, border left faint, between gap
+role askcard   : on unread at 8%, text down, ink, pad gap, edge unread, corner gap /2
+role msg       : text down, ink, pad top gap /2, pad bottom gap /2
+role msg.ask   : text down, ink, pad gap, edge unread, corner gap /2
+role msg.folded : text down, soft
+role chip      : text down, quiet, on mark at 12%, pad left gap /2, pad right gap /2, corner gap /2
+role msgbody   : text down, ink
+role folded    : text down, soft
+role composer  : text down, ink, on paper, pad gap, edge faint, corner gap /2
+role typing    : text.mono down, soft
+role typing.dots : text up 2 strong, accent, wave, pad left gap /2
+role pip       : text down, mark, pad left gap
+role light     : on mark at 16%
+
+theme dark of review
+  token paper  = #101815
+  token card   = #17221E
+  token sheet  = #17221E
+  token ink    = #E4ECE7
+  token accent = #4FC3A4
+  token mark   = #E89A5B
+  token warn   = #E07A85
+  token focus  = #17221E

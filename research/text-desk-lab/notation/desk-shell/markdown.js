@@ -151,6 +151,7 @@
     /(?<![\w])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w])/.source, // 13 stress
     /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/.source,          // 14 bare address
     /(?<![\w&#])(#[A-Za-z][\w/-]*)/.source,                      // 15 tag
+    /(?<![\w-])((?:worker-)?(?:[afsce]\d{2,}|m\d{2,}))(?![\w-])/.source,   // 16 a bare id (a6109): drawn as its name
   ].join("|"), "g");
 
   function syn(t) { const s = document.createElement("span"); s.className = "md-syn"; s.textContent = t; return s; }
@@ -189,6 +190,16 @@
       else if (m[13] != null) put("em", "", m[13], "_", "_");
       else if (m[14] != null) { const a = document.createElement("a"); a.className = "md-a"; a.dataset.href = m[14]; a.textContent = m[14]; into.append(a); }
       else if (m[15] != null) { const t = document.createElement("span"); t.className = "md-tag"; t.textContent = m[15]; into.append(t); }
+      else if (m[16] != null) {
+        // a6109: an id the scene names (ctx.things) shows the name, the id kept as the hidden source; any other stays words
+        const hit = (ctx.things || {})[m[16]];
+        if (!hit) into.append(m[16]);
+        else {
+          const a = document.createElement("span"); a.className = "md-wl md-thing"; a.dataset.target = m[16]; a.title = hit.title;
+          a.append(syn(m[16])); const t = document.createElement("span"); t.dataset.deco = "1"; t.contentEditable = "false"; t.textContent = hit.name; a.append(t);
+          into.append(a);
+        }
+      }
       at = rx.lastIndex;
     }
     if (at < text.length) into.append(text.slice(at));

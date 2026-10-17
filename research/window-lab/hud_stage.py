@@ -7,6 +7,7 @@ is empty (the copy's world has no house-state), and witnessed:desktop has no row
     python research/window-lab/hud_stage.py [--busy] [--frost <name>] <screen.py arguments ...>
 
 --busy      the house says jeff and sable are working (house-state/<the copy>/house.json, as house.py beats it)
+--crew      instead, whom it says: corner=actor:doing,... (e.g. f5189=jeff:working,a6057=worker-a6057:working)
 --frost     the stand-in frost behind the page: dusk (default), none. A gradient, never a picture of anyone's screen.
 Always:     six stand-in windows as witnessed:desktop (generic titles), the first one in front.
 
@@ -41,6 +42,12 @@ def main():
     a = sys.argv[1:]
     busy = "--busy" in a
     a = [x for x in a if x != "--busy"]
+    crew = None
+    if "--crew" in a:     # a6057: whom the house says is where, corner=actor:doing,... (implies --busy)
+        i = a.index("--crew")
+        crew = {c: tuple(v.split(":", 1)) for c, v in (x.split("=", 1) for x in a[i + 1].split(","))}
+        busy = True
+        del a[i:i + 2]
     frost = "dusk"
     if "--frost" in a:
         i = a.index("--frost")
@@ -56,7 +63,7 @@ def main():
         # two residents, and three builders at work on commissions that are working in the copy (their cards breathe)
         doing = {"f5189": ("jeff", "working"), "f571": ("sable", "working"), "f576": ("pike", "resting"),
                  "a5496": ("worker-a5496", "working"), "a5530": ("worker-a5530", "working"),
-                 "a5534": ("worker-a5534", "working")}
+                 "a5534": ("worker-a5534", "working")} if crew is None else crew
         st = {"pid": os.getpid(), "beat": time.time() + 3600, "world": session,
               "residents": {c: {"actor": n, "alive": True, "doing": d, "turns": 3, "last_turn": time.time()}
                             for c, (n, d) in doing.items()}, "workers": {}}

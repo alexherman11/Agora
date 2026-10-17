@@ -14,6 +14,9 @@ a5834: while it runs, so does the control screen (capture/capture.py, its child)
 anything, the home base too, and the capture goes on the person's own chat draft, unsent. capture=off on the lens
 note turns it off (at the next Ctrl+Alt+J); --stop ends both. Its output: state/capture.log.
 
+a6113: the window manager (wm.py) is its child too, but only from the dock: the host verbs wm.start and wm.stop
+(wm_switch.py). Closing the home base stops it; --stop, and the next start, put back whatever a killed one left.
+
 What it is made of, from the research of 10 to 12 Oct (a3909):
   - a native Agora window: a frameless window of our own holding the browser engine that ships with Windows (WebView2,
     through pywebview), not Edge in app mode, so the window is ours to place, show, hide and draw into;
@@ -55,6 +58,7 @@ import witnessed  # noqa: E402
 import host_verbs  # noqa: E402  (a5300: what the home base can be asked, and its settings)
 import media  # noqa: E402  (a5245: the music controller)
 import winkey  # noqa: E402  (a5980: a bare tap of the Windows key)
+import wm_switch  # noqa: E402  (a6113: the window manager, started and stopped from the dock)
 
 user32, dwmapi, kernel32 = ctypes.windll.user32, ctypes.windll.dwmapi, ctypes.windll.kernel32
 MOD_ALT, MOD_CONTROL, MOD_NOREPEAT = 0x1, 0x2, 0x4000
@@ -513,6 +517,8 @@ class Hud:
         # out of Alt+Tab and the taskbar: the home base is reached by its key
         ex = user32.GetWindowLongW(self.hwnd, GWL_EXSTYLE)
         ctypes.windll.user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
+        # a6113: what it can be asked is so from its start, not only once it has been shown (the dock reads it)
+        witnessed.write(self.a.world, "host", host_verbs.rows(), by="hud")
         threading.Thread(target=self.keys, daemon=True).start()
         threading.Thread(target=self.tend, daemon=True).start()
         threading.Thread(target=self.guard_winkey, daemon=True).start()
@@ -525,6 +531,11 @@ class Hud:
         if self.winkey:
             self.winkey.stop()
         self.stop_capture()
+        try:
+            wm_switch.SWITCH.stop(self)               # a6113: the window manager it started puts everything back
+        except Exception as e:
+            print("hud: window manager stop:", e, flush=True)
+        witnessed.clear(self.a.world, "wm")
         witnessed.clear(self.a.world, "desktop")
         witnessed.clear(self.a.world, "media")
         witnessed.clear(self.a.world, "clock")
@@ -594,15 +605,19 @@ def main():
         else:
             print("hud: not running")
         PIDFILE.unlink(missing_ok=True)
+        wm_switch.release_left()                      # a6113: the tree went with /F, so its window manager could not
         witnessed.clear(a.world, "desktop")
         witnessed.clear(a.world, "media")
         witnessed.clear(a.world, "clock")
         witnessed.clear(a.world, "host")
+        witnessed.clear(a.world, "wm")
         return
     if old and alive(old):
         print("hud: already running as", old)
         sys.exit(76)
     PIDFILE.write_text(str(os.getpid()))
+    wm_switch.release_left()                          # a6113: a window manager a killed home base left, put back
+    witnessed.clear(a.world, "wm")
     print("hud: running; a bare Win tap or Ctrl+Alt+J shows or hides it, Esc hides it, `python hud.py --stop` ends it",
           flush=True)
     Hud(a).run()

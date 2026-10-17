@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (45)
+## open (47)
 
 ### F2. Scripts cannot say who is running them
 
@@ -303,7 +303,19 @@ a6077 · family=missing-word · status=open
 
 worker-a5988, 16 Oct. Alex asked to click At work and watch an agent's live feed. The words of a stream are in house-state transcripts, which only the house reads, so making them a lens's rows needed source: feeds.py (Reader turns Claude stream-json and Codex items into rows; redact; Feed tails by offset; Feeds.step writes witnessed:feed-<id> while a viewer stands home-feed on a card or corner) and a guarded call in house.step. The world half (home-feed, home-work) is lenses only. THE MISSING WORDS: (1) a world way to ask the house to observe something on demand: the watched set is read from props (with=home-feed viewing=<id>, or watching=<id>), and the lens name home-feed is a constant in feeds.py, so another lens that wants a feed must use watching= or edit source; a watch= word on a lens note would let any lens declare what it needs observed. (2) a per-source change signal: witnessed.stamp covers every witnessed file, so one feed write repaints every open painter's whole scene (measured on a copy at a 0.5 s write cadence: 47 whole scenes in 23 s); feeds are throttled to one write per 2 s per feed to keep that bounded. (3) redaction is code, not a world rule: what counts as a secret is regexes in feeds.redact.
 
-## curing (35)
+### An id in words could not be drawn as its name, and a link pressed inside a placed lens could not say where it opens (a6109)
+
+a6169 · family=lens-words · status=open
+
+Missing words, met by a6109 (Alex, 16 Oct: 'I should never see id names ... names of things ... should ALL be clickable'). (1) Words that print an id (a chat line 'in a5949', a title '(a5251)', a viewer head 'surface · f155') had no way to show the thing's name: a lens can print $x.title only for an id it holds in a frame, never for one inside free words, and agents write ids in their words on purpose. The general word became no word: every text that is only read draws an id that names something as its name (scene.things_of, lens.js .t-mark-thing); ids keeps them. (2) on link stood only on a markdown text and the press could go only to that text's own lens; a name in the Conversation or the board had nowhere to go. on link now stands on any part and the nearest above a pressed name is sent, so the home base's root says where (on link do view $value, a house verb). Source: scene.py, lens_ir.py, lens.js, lens.html, markdown.js.
+
+### Words a typed text lacked: one editor for every text, fitted over the desk's words, two undos, passages with names (a6067)
+
+a6191 · family=lens-words · status=open
+
+Source edit by worker-a6067, 16 Oct, for Alex (a6067: the document is one continuous text; one general module for every text a person types into), to Pike's boundary (c5974) and Sable's rules (c5977, and her split on c6106: words the person's, caret the window's). WANTED: one editing module for documents and the chat composer alike: caret, selection, composition, keys and the undo of unsent typing in the painter; edits sent against a version as the person pauses; the desk's new words (a resident's do replace) fitted over unsent typing, or refused loudly; the world's undo of a sent edit; a passage the control screen can name; a dropped capture that asks the world. DONE IN SOURCE: desk-shell/textedit.js (the module; markdown.js shrank to the grammar and drawing); viewer.js (drafts per person kept in step across windows, caret per window, rebased, onDrafts, textState); lens.js (the document and the composers are its customers; textOf names the document a text read); scene.py the gesture on capture; window-lab/capture/capture.py reads part:<key>::<line> as a passage. WHY NO WORLD EDIT COULD DO IT: typing happens below the desk's grain (a keystroke is not an event, by Pike's boundary), so caret, composition and fitting are painter work; and the seam to the desk has only one shape today, a whole value fenced by a revision. THE SMALLEST SEAM THAT WOULD MAKE MORE OF IT A WORLD EDIT: (1) an edit verb that takes a range at a version (at=, gone=, came=, version=) and that the desk maps through what it ordered since (a4865's choice is Alex's: our own ordering or a library), so fitting would move from the painter to the desk and every window would agree; (2) a text's source named in the paint contract (whose words a part shows), so the painter would not read it from the fence's reads; (3) keys as world data (a keymap note a lens names), so which press is a shortcut would not be source.
+
+## curing (36)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -579,6 +591,12 @@ Missing world words: (1) a row source field for a private capture's pixels: jeff
 a6028 · family=host · status=curing
 
 Missing world words: (1) a host key that is not a hotkey: the home base's key is the hotkey= prop, read by RegisterHotKey, which binds a key plus modifiers and cannot bind a bare Win tap. So hud.py runs winkey.py (a low-level keyboard hook on its own thread), switched by a new winkey= prop on a5208. A world word for 'how the host is summoned' (summon=tap:Win | hotkey:Ctrl+Alt+J, any number of them) would make the next one a prop, but each kind of summoning still needs its own catcher in source. (2) a host verb to open the Start menu (start): the verb table is closed on purpose, so a new power is source by design. (3) host_verbs.settings now says read=False when the door did not answer, so a setting polled every 15 s keeps what it had instead of falling back to the default.
+
+### The home base was built whole at every change: a placed lens was never kept, and a press fetched two scenes (a6010)
+
+a6090 · family=code · status=curing
+
+worker-a6010, 16 Oct. ran (bench_board.py on a frontier-try copy with a log): any change rebuilt the whole home base, ~490 ms, because nothing inside a placed lens was kept (it was rekeyed in place after its build) and every panel of the home base is a placed lens; persons.reply_by scanned all ~11k events per reply, and touched() all events per $changed. The painter then fetched two whole scenes per press (its refresh and the stream's). Source changes, no new word: lens_ir builds a placed lens under its final keys and keeps it; row sources once per build; indexes for touched and find_lens; lens.js one scene request at a time and data-sending on a pressed part; screen.py --logged. After: ~160 ms a home-base build, 62-69 ms the board; 0 differences kept vs whole over 7 kinds of change. What is still missing in the world's words: a press that says what it will change, so the painter could draw the result before the desk answers (Snappy stage 3 for clicks, not only keys).
 
 ## cured (63)
 

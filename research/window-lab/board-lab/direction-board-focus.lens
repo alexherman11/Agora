@@ -1,0 +1,169 @@
+# direction-board-focus (a6010, round 1, the second take): triage one thing at a time. The first thing waiting on Alex
+# stands open and large, its words and its answers in reach; the rest wait under it as single lines. Each moving card
+# shows where it is on one track, queued > working > ready > landing > landed, the step it is on lit.
+board : column
+  role nb
+  views : column
+    of prop:role=home-view,prop:actor=$me as hv
+    each bands
+bands : column
+  role nbbands
+  let nneed = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=failed,-prop:review=later)
+  let nmove = count(prop:commission=asked) + count(prop:commission=working) + count(prop:commission=waiting) + count(prop:commission=ready) + count(prop:commission=landing)
+  let nlanded = count(prop:commission=landed)
+  need : column
+    role nbband
+    head : row
+      role nbhead
+      name : text "YOUR TURN"
+        role nbname.need
+      n : text "$(nneed)"
+        role nbcount.need
+        only when nneed > 0
+      gap : text ""
+        share 1
+      none : text "nothing waits on you"
+        role nbquiet
+        only when nneed = 0
+    reviews : column
+      role nbcards
+      of tag:ready-for-review,-prop:review=later as c
+      each review
+    designs : column
+      role nbcards
+      of prop:design=waiting,-prop:review=later as c
+      each small
+    failed : column
+      role nbcards
+      of prop:commission=failed,-prop:review=later as c
+      each small
+  move : column
+    role nbband
+    head : row
+      role nbhead
+      name : text "IN MOTION"
+        role nbname
+      n : text "$(nmove)"
+        role nbcount
+    landing : column
+      role nbrows
+      of prop:commission=landing as c
+      each track
+    ready : column
+      role nbrows
+      of prop:commission=ready as c
+      each track
+    working : column
+      role nbrows
+      of prop:commission=working as c
+      each track
+    asking : column
+      role nbrows
+      of prop:commission=waiting as c
+      each track
+    queued : column
+      role nbrows
+      of prop:commission=asked as c
+      each track
+  landed : column
+    role nbband
+    fold "LANDED · $(nlanded)" handle nbfold
+    rows : column
+      role nbrows
+      of prop:commission=landed as c
+      clamp last 5
+      each small
+review : column
+  big : column
+    role nbfocus
+    only when $index = 1
+    kind : text "TO LOOK AT · waiting since $(day-or-time($changed.tags, $today))"
+      role nbkind.review
+    title : text "$c.title"
+      role nbtitle.big
+      clamp 3
+      on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+    gist : text "$c.text"
+      role nbgist
+      clamp 5
+      only when ($c.text or "") != ""
+    acts : row
+      role nbacts
+      ok : text "Looks good"
+        role nbgo
+        on click do tag $c remove=ready-for-review; do comment $c line="@jeff: looks good (from the board)"
+      later : text "Later"
+        role nbbtn
+        on click do prop $c review=later
+      open : text "Open in the middle"
+        role nbbtn
+        on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+    say : text ""
+      role nbinput
+      hint "Ask or answer; it goes on the card, to JEFF (Enter)"
+      lines 1..6
+      commit enter only
+      on edit do comment $c line="@jeff: $value"
+  line : row
+    role nbrow
+    only when $index > 1
+    on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+    kind : text "LOOK"
+      role nbkind.review
+    title : text "$c.title"
+      role nbrowtitle
+      clamp 1
+      share 1
+small : row
+  role nbrow
+  on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+  design : text "DESIGN"
+    role nbkind.design
+    only when $c.design = "waiting"
+  fail : text "STUCK"
+    role nbkind.fail
+    only when $c.commission = "failed"
+  title : text "$c.title"
+    role nbrowtitle
+    clamp 1
+    share 1
+  when : text "$(day-or-time($changed.commission, $today))"
+    role nbwhen
+    only when $c.commission = "landed"
+track : column
+  role nbrow
+  role nbrow.live when $c.commission = "working" and count(house doing=working resident=$c.worker) > 0
+  on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+  top : row
+    role nbtop
+    title : text "$c.title"
+      role nbrowtitle
+      clamp 1
+      share 1
+    who : text "$(($c.worker or $c.owner) or "")"
+      role nbwho
+  steps : row
+    role nbsteps
+    q : text "queued"
+      role nbstep
+      role nbstep.on when $c.commission = "asked"
+      role nbstep.done when $c.commission != "asked"
+    w : text "working"
+      role nbstep
+      role nbstep.on when $c.commission = "working"
+      role nbstep.ask when $c.commission = "waiting"
+      role nbstep.done when $c.commission = "ready" or $c.commission = "landing"
+    r : text "ready"
+      role nbstep
+      role nbstep.on when $c.commission = "ready"
+      role nbstep.done when $c.commission = "landing"
+    l : text "landing"
+      role nbstep
+      role nbstep.on when $c.commission = "landing"
+    d : text "landed"
+      role nbstep
+    asks : text "· asks JEFF"
+      role nbwhen
+      only when $c.commission = "waiting"
+    since : text "· since $(day-or-time($changed.commission, $today))"
+      role nbwhen

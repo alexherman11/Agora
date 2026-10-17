@@ -535,11 +535,12 @@ def open_edge(name, url, size="1500x900", tries=2):
     return st
 
 
-def run_hidden(name, argv, cdp=False):
-    """Any program on the sandbox desktop. --cdp gives a WebView2 in it a DevTools port (its environment variable)."""
+def run_hidden(name, argv, cdp=False, env=None):
+    """Any program on the sandbox desktop. --cdp gives a WebView2 in it a DevTools port (its environment variable);
+    env adds to its environment (a6113: AGORA_WM_KEYS=off, so a window manager there takes no global key)."""
     STATE.mkdir(parents=True, exist_ok=True)
     port = free_port() if cdp else None
-    env = {"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": f"--remote-debugging-port={port}"} if cdp else None
+    env = {**(env or {}), **({"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": f"--remote-debugging-port={port}"} if cdp else {})} or None
     argv = [sys.executable if a == "python" else a for a in argv]
     pid = start(name, argv, env)
     st = json.loads(state_file(name).read_text(encoding="utf-8")) if state_file(name).exists() else \

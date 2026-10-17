@@ -204,8 +204,8 @@ def reply_by(w, c, i):
     r = (c.get("replies") or [])[i]
     if not on(w):
         return r.get("by")
-    evs = [e for e in w.events if e["verb"] in ("resolve", "comment") and (e.get("args") or {}).get("id") == c.get("id")
-           and (e.get("args") or {}).get("line") and not e.get("undone")]
+    import rooms                # a6010: its index, kept until the events change; a scan of every event per reply was a
+    evs = rooms.reply_events(w).get(c.get("id")) or []      # third of a home-base build
     e = evs[i] if i < len(evs) else None
     if e and of_event(w, e) and norm(e.get("by")) == norm(r.get("by")):
         return label(w, e["who"])

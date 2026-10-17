@@ -18,6 +18,85 @@ from world import Refusal
 ABSENT = None          # printed (no x); a third value, distinct from "" and from false
 
 
+import weakref as _weakref
+_TOUCH = _weakref.WeakKeyDictionary()
+
+
+def _touch_index(w):
+    """name -> the indices of the events whose target or `changed` names it (a6010: a board of 60 cards asked
+    `$changed.commission` of each, and each ask walked back through all ~11k events, ~2 ms each). Events are only
+    appended (an undo is an event of its own and marks the one it undoes, which the reader still checks), so the
+    index is extended with the new ones; it is made again if the list was replaced or shrank."""
+    ev = w.events
+    hit = _TOUCH.get(w)
+    if hit is None or hit[0] is not ev or hit[1] > len(ev) or (hit[1] and ev[hit[1] - 1] is not hit[2]):
+        hit = [ev, 0, None, {}]
+        _TOUCH[w] = hit
+    idx = hit[3]
+    for i in range(hit[1], len(ev)):
+        e = ev[i]
+        for nm in {e["target"], *(e.get("changed") or [])}:
+            idx.setdefault(nm, []).append(i)
+    if len(ev) != hit[1]:
+        hit[1], hit[2] = len(ev), ev[-1]
+    return idx
+
+
+# a6010: a selection's answer kept across builds, dropped when an event since touched what it reads. The home base asks
+# ~35 selections (count(prop:commission=working) and the like), each a walk over every thing, and every press made
+# them all again. A selection is kept only when every term says what it reads (knife.ASPECTS, or a comparison of a
+# field or prop); `age`, `unanswered` and the promise and request terms (time or talk) are never kept. Events since the
+# last look are read by desk.event_aspects: one that may touch anything (None), a create (a new thing may match any
+# selection) or an undo empties the store; otherwise each kept selection whose aspects meet the event's goes. Every
+# selection reads place (a Trash's things are left out), so any move empties it too. The whole build that
+# LENS_REUSE_VERIFY compares against (_OFF) asks the world afresh, so a stale answer would show as a difference.
+_SELS = _weakref.WeakKeyDictionary()
+
+
+def _selection_aspects(q):
+    """-> the aspects selection `q`'s members are read by, or None when a term reads something no event names."""
+    import knife
+    out = {"place"}
+    for t in [x for x in re.split(r"[,\s]+", (q or "").strip()) if x]:
+        name, op, _v = knife.term_key(t)
+        if op in ("=", "!=", "<", ">", "<=", ">=", "has"):
+            if name == "age":
+                return None
+            out.add("kind" if name == "kind" else name if name in knife.FIELDS else f"prop:{name}")
+            continue
+        if name in ("age", "unanswered", "settled") or name not in knife.ASPECTS:     # settled reads a promise's end too
+            return None
+        out |= knife.ASPECTS[name] or {name}
+    return out
+
+
+def _kept_selections(w, desk):
+    """The store of kept selections for this world and viewer, brought up to its events (see above)."""
+    ev = w.events
+    key = (w.me, getattr(desk, "today", None) or getattr(w, "today", None))
+    hit = _SELS.get(w)
+    if hit is None or hit["ev"] is not ev or hit["n"] > len(ev) or (hit["n"] and ev[hit["n"] - 1] is not hit["last"]):
+        hit = _SELS[w] = {"ev": ev, "n": len(ev), "last": ev[-1] if ev else None, "by": {}}
+    if hit["n"] < len(ev):
+        touched, everything = set(), False
+        for e in ev[hit["n"]:]:
+            a = event_aspects(e)
+            if a is None or "contents" in a or e["verb"] in ("undo", "redo"):
+                everything = True
+                break
+            touched |= a
+        if everything:
+            hit["by"].clear()
+        else:
+            for store in hit["by"].values():
+                for q in [q for q, (_h, asp) in store.items() if asp & touched]:
+                    del store[q]
+        hit["n"], hit["last"] = len(ev), ev[-1]
+    return hit["by"].setdefault(key, {})
+
+
+# (a6010 tried keeping a chat's sayings the same way, ~50 ms of a home-base build, and took it out: who a line calls
+# is the house's rule in code (rooms.calls), which can change with no event, and test_sayings (v) caught it.)
 class Accessor:
     """The seam: six questions, each recorded in R (sable-8 section 1)."""
 
@@ -58,13 +137,19 @@ class Accessor:
             if named is not None:
                 hit = (tuple(named), None)
             else:
-                try:
-                    sel = self.desk._parse_selection(q)
-                except Refusal as exc:
-                    # 15 Oct (a5398), as rows above: `count(kind:task,in:$item)` on a note asks in: of a note, and the
-                    # native refusal escaped the compiler, so the write that triggered the lens check crashed.
-                    raise S.LensRefusal(f"selection {q!r}: {exc}") from exc
-                hit = (None, tuple(sel[0]) if sel else ())
+                kept = None if _OFF[0] else _kept_selections(self.w, self.desk)
+                hit = kept.get(q, (None,))[0] if kept is not None else None
+                if hit is None:
+                    try:
+                        sel = self.desk._parse_selection(q)
+                    except Refusal as exc:
+                        # 15 Oct (a5398), as rows above: `count(kind:task,in:$item)` on a note asks in: of a note, and
+                        # the native refusal escaped the compiler, so the write that triggered the lens check crashed.
+                        raise S.LensRefusal(f"selection {q!r}: {exc}") from exc
+                    hit = (None, tuple(sel[0]) if sel else ())
+                    asp = _selection_aspects(q) if kept is not None else None
+                    if asp is not None:
+                        kept[q] = (hit, asp)
             self._sel[q] = hit
         named, ids = hit
         self.R.append(("select", q, [i for i, _ in named] if named is not None else list(ids)))
@@ -73,13 +158,18 @@ class Accessor:
         return (list(named), None) if named is not None else (None, list(ids))
 
     def rows(self, src):
-        try:
-            rs = S.rows(self.desk, src)
-        except Refusal as exc:
-            # Authored row queries use the native selector's refusal type. At the
-            # compiler boundary they belong to lens diagnostics and fallback,
-            # including checks run after an otherwise successful native write.
-            raise S.LensRefusal(f"row source {src!r}: {exc}") from exc
+        # a6010: answered once per build, as select is (the world holds still while a lens is built): the home base asked
+        # one chat's lines four times, ~70 ms each. Each asker gets its own copies of the rows
+        if ("rows", src) not in self._sel:
+            try:
+                self._sel[("rows", src)] = S.rows(self.desk, src, memo=self._sel)
+            except Refusal as exc:
+                # Authored row queries use the native selector's refusal type. At the
+                # compiler boundary they belong to lens diagnostics and fallback,
+                # including checks run after an otherwise successful native write.
+                raise S.LensRefusal(f"row source {src!r}: {exc}") from exc
+        rs = self._sel[("rows", src)]
+        rs = None if rs is None else [dict(r) for r in rs]
         self.R.append(("rows", src, len(rs) if rs is not None else None))
         if self.rec:
             self._said("rows", (src,), None if rs is None else [dict(r) for r in rs])
@@ -99,10 +189,10 @@ class Accessor:
         n = w.nodes.get(r)
         names = {r} | ({n["subject"]} if n and n.get("subject") else set()) | set(w.appearances_of(r) if r in w.subjects else [])
         hit = None
-        for e in reversed(w.events):
+        idx = _touch_index(w)        # a6010: the events on these names only, not every event of the world each time
+        for i in sorted({i for nm in names for i in idx.get(nm, ())}, reverse=True):
+            e = w.events[i]
             if e.get("undone") or e["verb"] == "undo":
-                continue
-            if e["target"] not in names and not (names & set(e.get("changed") or [])):
                 continue
             if aspect and not aspects_meet({aspect}, event_aspects(e)):
                 continue
@@ -349,7 +439,9 @@ def lower(root, parts):
 # Stage 5, evaluate. A transcription of scene.build's make(), with the world reached only through the accessor, the
 # fixed order within a part, host facts in Gamma, count as the true size, and one rule for guards.
 # ---------------------------------------------------------------------------------------------------------------------
-def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=(), on=None):
+def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=(), on=None, prefix=None):
+    """prefix (a6010): a placed lens is built under its placer's key (`<part key>/lens:<name>`) from the start, so its
+    parts have their final keys and what is kept of them can be used again at the next build."""
     props = props or {}
     acc = acc or Accessor(desk)
     # F7: the lens's own style; 9 Oct (step 7): found from the lens's own room (acc.home, set by compile_lens)
@@ -368,9 +460,12 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     w = desk.world
     count = count if count is not None else [0]
     host = {f: acc.host(f) for f in ("me", "today", "session")}
-    # a placed lens is keyed again under its placer after it is built (S._rekey, in place): nothing of it is kept
-    off = _OFF[0] or os.environ.get("LENS_REUSE") == "off" or len(stack) > 1
-    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)), on)
+    # a6010: a placed lens was keyed again under its placer after it was built (S._rekey, in place), so nothing of it
+    # could be kept, and the home base (every panel a placed lens) was built whole at every change, ~500 ms. Built
+    # under its final keys now (prefix), it is kept as a root lens is, one store per place it stands (and thing it
+    # stands on, a5949)
+    off = _OFF[0] or os.environ.get("LENS_REUSE") == "off" or (len(stack) > 1 and prefix is None)
+    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)), on, prefix)
     prev = {} if off else _REUSE.get(ck, {})
     nxt, used = {}, set()
 
@@ -652,6 +747,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                                 else S._fill(lt, fill_ctx, track))
             if em.get("markdown") and "[[" in (out["text"] or ""):     # a5820: what each [[wikilink]] names, read now
                 out["wikilinks"] = S.wikilinks_of(w, out["text"], acc.thing)
+            # a6109: an id in words that are only read is drawn as the name of what it names. Not recorded as a read:
+            # a name is how the words look, never what a press on this part was fenced on
+            if out["text"] and not em.get("ids") and not em.get("plain") and not em.get("picture") and not em.get("live") \
+                    and (em.get("markdown") or not any(a["on"] == "edit" for a in node["acts"])):   # a document's drawn lines name too
+                named = S.things_of(w, out["text"])
+                if named:
+                    out["things"] = named
             if isinstance(em.get("markdown"), str) and any(a["on"] == "edit" for a in node["acts"]):
                 # `markdown links <selection>`: what typing [[ offers, read as one membership read (at most 500)
                 named, ids = acc.select(S._fill(em["markdown"], fill_ctx, track))
@@ -812,6 +914,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
                            "text": (f"{total - keep} earlier not shown (clamp last {keep}); " if b.get("last") else f"{total - keep} more not shown (clamp {keep}); ")
                            + f"find {sel_text} lists all {total}", "clamp": None, "acts": [], "kids": []}
+                    if S.things_of(w, sel_text):                  # a6109: in:f155 is drawn as the board's name
+                        cut["things"] = S.things_of(w, sel_text)
                     if b.get("last"):
                         out["kids"].insert(0, cut)
                     else:
@@ -853,7 +957,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             try:
                 if inner.lower() in stack:
                     raise S.LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
-                sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb, on=on)
+                sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb,
+                                   on=on, prefix=f"{key}/lens:{inner}")
             except S.LensRefusal as e:
                 # a5949: a lens named from data (`lens $v.with`) that is missing, contains itself or does not compile is
                 # said in one line in its place, and its placer (the home base) is still drawn; a name written in the
@@ -863,8 +968,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 if closure is not None:
                     del closure[held:]
                 sub = cut_node("lens", f"lens {inner or '(no name)'} cannot be drawn here: {str(e).split('. ')[0]}")
-            sub["key"] = f"{key}/lens:{inner}"
-            S._rekey(sub, sub["key"])
+            sub["key"] = f"{key}/lens:{inner}"      # a6010: its parts were built under this key already (prefix)
             out["kids"].append(sub)
             out["lens"] = inner
         # --- fixed kids
@@ -874,7 +978,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
 
     # a5949 (Sable's a4270): a lens stood on a thing starts on it, its fields and $item, as an instance of a repeat does
     root_ctx = {k: v for k, v in acc.thing(on).items() if k != "_frames"} if on else {}
-    sc = make(irs[root], root_ctx, root, cb=cb)
+    sc = make(irs[root], root_ctx, f"{prefix}/{root}" if prefix else root, cb=cb)
+    if prefix:
+        sc["key"] = prefix              # the placed lens's root stands at its placer's key; its parts under <prefix>/<root>
     sc["R"] = list(acc.R)
     if not off:
         _REUSE.pop(ck, None)
@@ -928,9 +1034,10 @@ def cut_node(part, text):
             "clamp": None, "acts": [], "kids": []}
 
 
-def compile_lens(desk, s, stack, count, closure, acc=None, cb=(), on=None):
+def compile_lens(desk, s, stack, count, closure, acc=None, cb=(), on=None, prefix=None):
     """One lens to a scene through the staged pipeline, recording the definition used; fallback as scene._compile does.
-    `on` (a5949): the thing the lens is stood on, where its root starts; a lens note's stands_on= may refuse it."""
+    `on` (a5949): the thing the lens is stood on, where its root starts; a lens note's stands_on= may refuse it.
+    `prefix` (a6010): the key a placed lens stands at, under which its parts are built (evaluate)."""
     good = getattr(desk, "_lens_good", None)
     if good is None:
         good = desk._lens_good = {}
@@ -956,7 +1063,7 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=(), on=None):
             import verbs
             b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
             with persons.reading(desk, (b or {}).get("persons")):
-                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb, on=on)
+                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb, on=on, prefix=prefix)
             stamp(sc)
             good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
             return sc
@@ -969,7 +1076,7 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=(), on=None):
                 raise
             del closure[mark:]
             entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e), refused_in=e.lens)
-            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, on=on)
+            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, on=on, prefix=prefix)
             stamp(sc)
             sc["broken"] = f"lens {s['title']}: {e}"
             return sc
