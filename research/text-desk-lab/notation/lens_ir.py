@@ -751,7 +751,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             # a name is how the words look, never what a press on this part was fenced on
             if out["text"] and not em.get("ids") and not em.get("plain") and not em.get("picture") and not em.get("live") \
                     and (em.get("markdown") or not any(a["on"] == "edit" for a in node["acts"])):   # a document's drawn lines name too
-                named = S.things_of(w, out["text"])
+                # a person's name only in a text that is no button and no document (c6186: the To chips stay chips)
+                named = S.things_of(w, out["text"], people=not node["acts"] and not em.get("markdown"))
                 if named:
                     out["things"] = named
             if isinstance(em.get("markdown"), str) and any(a["on"] == "edit" for a in node["acts"]):

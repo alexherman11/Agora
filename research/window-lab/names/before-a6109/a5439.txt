@@ -1,0 +1,137 @@
+# waiting-on-me: what waits on Alex's review, in the home base (a5390). Every thing tagged ready-for-review is listed,
+# and every design waiting on his word (design=waiting: a document can't take a tag; Sable, c5554), a dynamic list
+# with no records of its own; one marked Later (review=later on it) goes below the rest. A click on one opens it in
+# place (a5504): its words, and its demo when it names one (demo=<lens> on the thing paints that lens inside the card);
+# a second click folds it. Seen / Done takes the tag off (a design's state is Alex's to set in its own talk, so it has
+# none), Later marks it, Open fully shows the whole of it, Open here shows it in the middle (the viewer, a5398).
+# What is open is the viewer's own note (role=home-review, actor=$me): reviewing= the thing, full=yes when shown whole.
+# a5504: an act that replaces a prop of a note reads it in its own part (in a `when`, a let or its words). A press is
+# fenced on what its part read; full=no, never painted, refused every click as 'you have not seen a5441's prop:full'.
+waiting : column
+  let now = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later)
+  let later = count(tag:ready-for-review,prop:review=later) + count(prop:design=waiting,prop:review=later)
+  none : text "Nothing waits on you."
+    role meta
+    only when now + later = 0
+  mine : column
+    of prop:role=home-review,prop:actor=$me as rd
+    each desk
+  lost : text "No review note for you here (role=home-review, actor=you), so a click has nowhere to open."
+    role hint
+    only when count(prop:role=home-review,prop:actor=$me) = 0
+desk : column
+  role waitdesk
+  now : column
+    role waitlist
+    of tag:ready-for-review,-prop:review=later as w
+    each item
+  designs : column
+    role waitlist
+    of prop:design=waiting,-prop:review=later as w
+    each item
+  laterhead : text "LATER"
+    role lanename
+    only when later > 0
+  later : column
+    role waitlist
+    of tag:ready-for-review,prop:review=later as w
+    each item
+  laterdesigns : column
+    role waitlist
+    of prop:design=waiting,prop:review=later as w
+    each item
+item : column
+  role wait
+  role wait.on when $item = $rd.reviewing
+  let days = ($today - date($changed.tags)) / 1d
+  head : column
+    role waithit
+    on click when $item != ($rd.reviewing or "") and $rd.full = "yes" do prop $rd reviewing=$w full=no
+    on click when $item != ($rd.reviewing or "") and ($rd.full or "") != "yes" do prop $rd reviewing=$w
+    on click when $item = $rd.reviewing and $rd.full = "yes" do prop $rd reviewing="" full=no
+    on click when $item = $rd.reviewing and ($rd.full or "") != "yes" do prop $rd reviewing=""
+    title : text "$title"
+      role who
+      clamp 2
+    facts : row
+      role waitfacts
+      kind : text "$kind"
+        role tag
+        only when ($design or "") != "waiting"
+      design : text "design"
+        role tag.design
+        only when $design = "waiting"
+      by : text "by $by"
+        role meta
+        only when $design = "waiting" and ($by or "") != ""
+      demo : text "demo inside"
+        role tag.demo
+        only when ($demo or "") != ""
+      today : text "today, $(time($changed.tags))"
+        role meta
+        only when ($design or "") != "waiting" and days < 1
+      yday : text "yesterday"
+        role meta
+        only when ($design or "") != "waiting" and days = 1
+      ago : text "$(days) days ago"
+        role meta
+        only when ($design or "") != "waiting" and days > 1
+  open : column
+    role reviewbody
+    only when $item = $rd.reviewing
+    short : text "$text"
+      role prose
+      marks
+      clamp 5
+      only when ($rd.full or "") != "yes" and ($text or "") != ""
+    whole : text "$text"
+      role prose
+      marks
+      only when $rd.full = "yes" and ($text or "") != ""
+    adesign : text "A design waiting on your word. Open here reads it as its blocks; you answer in its own talk."
+      role meta
+      only when $design = "waiting"
+    show : column
+      role demo
+      only when ($demo or "") != ""
+      lens $w.demo
+    acts : row
+      role reviewacts
+      done : text "Seen / Done"
+        role button
+        only when ($design or "") != "waiting"
+        on click when ($review or "") = "later" and $rd.full = "yes" do tag $item remove=ready-for-review; do prop $item remove=review; do prop $rd reviewing="" full=no
+        on click when ($review or "") = "later" and ($rd.full or "") != "yes" do tag $item remove=ready-for-review; do prop $item remove=review; do prop $rd reviewing=""
+        on click when ($review or "") != "later" and $rd.full = "yes" do tag $item remove=ready-for-review; do prop $rd reviewing="" full=no
+        on click when ($review or "") != "later" and ($rd.full or "") != "yes" do tag $item remove=ready-for-review; do prop $rd reviewing=""
+      here : row
+        of prop:role=home-view,prop:actor=$me as hv
+        each openhere
+      later : text "Later"
+        role chip
+        only when ($review or "") != "later"
+        on click when $rd.full = "yes" do prop $item review=later; do prop $rd reviewing="" full=no
+        on click when ($rd.full or "") != "yes" do prop $item review=later; do prop $rd reviewing=""
+      back : text "Not later"
+        role chip
+        only when $review = "later"
+        on click do prop $item remove=review
+      more : text "Open fully"
+        role chip
+        only when ($rd.full or "") != "yes" and ($text or "") != ""
+        on click do prop $rd full=yes
+      less : text "Show less"
+        role chip
+        only when $rd.full = "yes"
+        on click do prop $rd full=no
+      gap : text ""
+        share 1
+      where : text "$item"
+        role hint
+# the viewer (a5398) opens the thing in the middle; Back there returns to what it showed before. `was` reads back=
+# so the press may replace it
+openhere : text "Open here"
+  role chip
+  let was = $hv.back
+  on click when ($hv.find or "") != "" do prop $hv viewing=$w back="$hv.viewing" find=""
+  on click when ($hv.find or "") = "" do prop $hv viewing=$w back="$hv.viewing"
