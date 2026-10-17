@@ -168,7 +168,7 @@ def _scene_key(q):
         visits = None
     who = (q.get("as") or "alex").lower()
     import witnessed                             # a5052: rows a program keeps beside the house (`windows`) are read too
-    return (name, who, q.get("lens", ""), q.get("on", ""), q.get("view"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), _LOOKED.get((name, who), 0), house,
+    return (name, who, q.get("lens", ""), q.get("on", ""), q.get("view"), q.get("text"), st.st_mtime_ns, st.st_size, _VERSION.get(name, 0), _LOOKED.get((name, who), 0), house,
             int(time.time() // 60), visits, q.get("keys"), witnessed.stamp(name))
 
 
@@ -296,7 +296,7 @@ def _snapshot(name, under_lock=False, looks=False):
     """Save the world this process holds in memory to its file, when something changed since the last save."""
     path, lock = SESSIONS / f"{name}.pickle", SESSIONS / f"{name}.lock"
     if not under_lock:
-        explore.take_lock(lock, tries=1200, pause=0.05)
+        _take(name, lock)
     try:
         t0 = time.time()
         held = _DESKS.get(str(path))
@@ -315,7 +315,7 @@ def _snapshot(name, under_lock=False, looks=False):
         return True
     finally:
         if not under_lock:
-            explore.release_lock(lock)
+            _give(name, lock)
 
 
 def _snapshotter():
@@ -334,7 +334,7 @@ def _snapshotter():
 def _release(name):
     """Asked by the deskd that comes next: save now, give the lease back, and never take it again."""
     lock = SESSIONS / f"{name}.lock"
-    explore.take_lock(lock, tries=1200, pause=0.05)
+    _take(name, lock)
     try:
         if LEASES.get(name):
             _snapshot(name, under_lock=True, looks=True)       # its people's seen marks too: the next one starts from them
@@ -348,7 +348,33 @@ def _release(name):
         _DESKS.pop(str(SESSIONS / f"{name}.pickle"), None)
         return True
     finally:
+        _give(name, lock)
+
+
+# a6153: the world's lock was a file alone, tried every 50 ms, so two requests of this one process (a press behind a
+# page's build, or behind the background save) waited in steps of 50 ms: live, Alex's requests waited a median 58 ms
+# and up to 1.3 s while the lock was held under 1% of the time. Threads of this process now queue on a lock of their
+# own first, woken the moment it is let go; the file lock is still taken after it, for any other process.
+_LOCKS, _LOCKS_GUARD = {}, __import__("threading").Lock()
+
+
+def _take(name, lock):
+    with _LOCKS_GUARD:
+        mine = _LOCKS.setdefault(name, __import__("threading").RLock())
+    if not mine.acquire(timeout=60):
+        raise SystemExit(f"could not take {lock.name} after 60s; a request of this server holds it")
+    try:
+        explore.take_lock(lock, tries=1200, pause=0.05)
+    except BaseException:
+        mine.release()
+        raise
+
+
+def _give(name, lock):
+    try:
         explore.release_lock(lock)
+    finally:
+        _LOCKS[name].release()
 
 
 def _trace(line):
@@ -384,13 +410,16 @@ class Session:
     def __enter__(self):
         self._t0 = time.perf_counter()
         hold = False if self.read else _hold(self.name)        # may ask the deskd before this one to let go (no lock held)
-        explore.take_lock(self.lock, tries=1200, pause=0.05)
+        _take(self.name, self.lock)
         self._t1 = time.perf_counter()
         try:
-            self.hold = _take_lease(self.name) if hold is None else hold
+            return self._enter_locked(hold)
         except BaseException:
-            explore.release_lock(self.lock)
+            _give(self.name, self.lock)          # a6153: never left held (the in-process lock has no stale-age escape)
             raise
+
+    def _enter_locked(self, hold):
+        self.hold = _take_lease(self.name) if hold is None else hold
         # 7 Oct: the desk this process last saved or loaded is kept in memory, and used again while the file is still
         # that one (same time and size: nobody else wrote it). Reading and unpickling 13 MB was 80 to 110 ms a request.
         # Always under the session's lock, as before; the file stays the truth, and any other writer's save is seen
@@ -500,7 +529,7 @@ class Session:
             _DESKS.pop(str(self.path), None)
             raise
         finally:
-            explore.release_lock(self.lock)
+            _give(self.name, self.lock)
             t2 = time.perf_counter()
             _trace(f"{time.strftime('%H:%M:%S')} {self.name} {self.actor} {getattr(_REQ, 'what', '?')} "
                    f"wait={(self._t1 - self._t0) * 1000:.0f} held={(t2 - self._t1) * 1000:.0f} "
@@ -577,7 +606,23 @@ class Handler(SimpleHTTPRequestHandler):
             with Session(q.get("session", "desktop"), q.get("as"), read=True) as desk:
                 try:
                     # a5949 (Sable's a4270): on=<id> in the address stands the lens on that thing
-                    sc, text = scene.scene_for(desk, q.get("lens", ""), on=q.get("on") or None)
+                    # a6153: text=0 from a painter that shows no scene text (lens.html with its inspector off)
+                    build = lambda: scene.scene_for(desk, q.get("lens", ""), on=q.get("on") or None, text=q.get("text") != "0")  # noqa: E731
+                    if os.environ.get("DESKD_PROFILE_SCENES"):
+                        # a6153: each build profiled into that folder (scene-<n>-<lens>.prof), to read where a real page's
+                        # builds go (research/window-lab/press-speed/read_profiles.py); off unless set
+                        import cProfile
+                        pr = cProfile.Profile()
+                        sc, text = pr.runcall(build)
+                        d = Path(os.environ["DESKD_PROFILE_SCENES"])
+                        d.mkdir(parents=True, exist_ok=True)
+                        pr.dump_stats(str(d / f"scene-{time.time_ns()}-{q.get('lens', '')}.prof"))
+                    else:
+                        import lens_ir
+                        k0, m0 = lens_ir._STATS["kept"], lens_ir._STATS["made"]
+                        sc, text = build()
+                        # a6153: the trace says how much of each build was kept from the last (views by change)
+                        _REQ.what += f" kept={lens_ir._STATS['kept'] - k0} made={lens_ir._STATS['made'] - m0}"
                     if q.get("view") == "painter":      # Pike a494: key, paint, acts, fence, kids; the root keeps its def
                         sc = dict(scene.painter_view(sc), **{"def": sc.get("def")})
                         # A retained page may still run the previous painter while
@@ -594,8 +639,11 @@ class Handler(SimpleHTTPRequestHandler):
             # names this build, so a painter compares a word, not 700 KB. a1505: by its content, so the same scene from
             # a deskd started after a landing has the same name, and the painter is told `same` in a few bytes
             import hashlib
-            out["gen"] = "g" + hashlib.sha1(json.dumps(out, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+            # a6153: encoded once (it was twice, sorted for the name and again to send, ~14 ms each for the home base's
+            # 1.4 MB): the name is of the bytes sent, which the same code builds in the same order
             body = json.dumps(out, ensure_ascii=False).encode("utf-8")
+            out["gen"] = "g" + hashlib.sha1(body).hexdigest()[:16]
+            body = body[:-1] + b', "gen": "' + out["gen"].encode() + b'"}'
             if key is not None and key == _scene_key(q):     # unchanged while it was built: keep it (a few, the newest)
                 _SCENES[key] = (out["gen"], body)
                 while len(_SCENES) > 16:

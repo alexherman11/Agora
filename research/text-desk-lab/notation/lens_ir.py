@@ -175,6 +175,15 @@ class Accessor:
             self._said("rows", (src,), None if rs is None else [dict(r) for r in rs])
         return rs
 
+    def props(self, i):
+        """a6153: a thing's props as `by` and `run` order a repeat by them (moo.props_of), as a read: a part holding a
+        sorted repeat is kept only while every key it sorted by reads the same."""
+        p = dict(moo.props_of(self.w, i))
+        self.R.append(("props", i, S._rev_of(self.w, i)))
+        if self.rec:
+            self._said("props", (i,), dict(p))
+        return p
+
     def define(self, name):
         s = S.find_lens(self.desk, name, getattr(self, "home", None))     # 9 Oct: nearest to the placing lens's room
         self.R.append(("define", name, s["id"], s["rev"]))
@@ -252,6 +261,10 @@ _REUSE = {}                 # (session, viewer, lens text, style, props) -> {ins
 _IR = {}                    # (lens text, style, roles) -> (IR parts, root, what each part reads)
 _OFF = [False]
 _STATS = {"kept": 0, "made": 0, "builds": 0, "differed": 0}
+REUSE_STORES = 400          # a6153: stores of kept instances (evaluate), the oldest let go first
+# a6153: why an instance was made rather than kept, counted by part and reason, while _WHY_ON[0] (bench_board --why)
+_WHY_ON = [os.environ.get("LENS_REUSE_WHY") == "1"]
+_WHY = __import__("collections").Counter()
 VERIFY_EVERY = 25
 _IDENT = re.compile(r"(?<![\w$.])([A-Za-z]\w*)")
 
@@ -309,8 +322,10 @@ def _static(node, irs, memo):
             (ffields.add((a, f)) if f else names.add(a))
     for t in exprs:
         idents.update(_IDENT.findall(t))
+    # a6153: a repeat ordered or run by its members' props (`by`, `run`) no longer stops what holds it from being kept:
+    # those props are read through the accessor now (Accessor.props), so the holder's questions include them
     keep = not node["place"] and em.get("at") != "item" and not em.get("spread") and not (
-        b and b["kind"] == "many" and (b.get("by") or b.get("run") or b.get("over")))
+        b and b["kind"] == "many" and b.get("over"))
     inner = list(node["kids"]) + ([irs[b["each"]]] if b and b["kind"] == "many" and b.get("each") in irs else [])
     for k in inner:
         n2, f2, i2, k2 = _static(k, irs, memo)
@@ -507,9 +522,18 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 nxt[key] = old
                 _STATS["kept"] += 1
                 return old["out"]
+            if _WHY_ON[0]:
+                bad = next((q for q in old["asks"] if not acc.same(*q)), None)
+                _WHY[f"{each['part']}: asked again, {bad[0]} {str(bad[1])[:80]}" if bad else f"{each['part']}: ?"] += 1
             del acc.R[mark:]
             for r, m in zip(acc.rec, marks):
                 del r[m:]
+        elif _WHY_ON[0]:
+            if old is None:
+                _WHY[f"{each['part']}: new"] += 1
+            else:
+                d = next((i for i, (a, b) in enumerate(zip(old["fp"], fp)) if a != b), None)
+                _WHY[f"{each['part']}: fingerprint {str(old['fp'][d])[:60] if d is not None else '?'} -> {str(fp[d])[:60] if d is not None else ''}"] += 1
         asks, nodes, inner = [], [], []
         acc.rec.append(asks)
         acc.nodes.append(nodes)
@@ -786,15 +810,24 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             if out.get("text") == original.get("text"):
                 out["image_regions"] = original.get("_image_regions", [])
         # --- acts
-        safe = {k: (S._cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
         out["id"] = ctx.get("id")
-        safe["_frames"] = {k: {kk: (S._cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
+        # a6153: the escaped context is made once, for a part that has a gesture: made for every part, it escaped each
+        # value of every frame above it (~620k escapes in 8 home-base builds, a fifth of each build)
+        safe_ = []
+
+        def safe():
+            if not safe_:
+                sf = {k: (S._cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
+                sf["_frames"] = {k: {kk: (S._cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
+                safe_.append(sf)
+            return safe_[0]
+
         def act_line(line):
             # Juniper and Pike, 7 Oct: `do split $item $(next) ...` reached the desk as the words '$(next)', and a
             # paragraph was made with block=$(next). A command computes $( ) as words do, when the part is built
             if "$(" not in line:
-                return S._fill(line, safe, track)
-            return S._fill_text(line, safe, track, lambda e: X.run(e, xenv()), esc=S._cmd_value)[0]
+                return S._fill(line, safe(), track)
+            return S._fill_text(line, safe(), track, lambda e: X.run(e, xenv()), esc=S._cmd_value)[0]
         def offered(a):                  # 14 Oct: `on menu "<label>" when <test>`: the entry is there only where it holds
             return not a.get("when") or X.holds(X.run(a["when"], xenv())[0]) is True
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
@@ -882,18 +915,22 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         out["kids"].append(instance(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
+                    # a6153: the keys a repeat is ordered and run by are read through the accessor (acc.props), so a
+                    # part holding it can be kept: it is used again only while each of them reads the same
+                    pr = {}
+                    props = lambda i: pr[i] if i in pr else pr.setdefault(i, acc.props(i))      # noqa: E731
                     if b.get("by"):
                         if named is not None:
-                            named = moo.sort_by(named, b["by"], lambda x, k: moo.props_of(w, x[0]).get(k))
+                            named = moo.sort_by(named, b["by"], lambda x, k: props(x[0]).get(k))
                         else:
-                            ids = moo.order_by(w, list(ids), b["by"])
+                            ids = moo.sort_by(list(ids), b["by"], lambda i, k: props(i).get(k))
                     # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in
                     shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]
                              + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []
                     if named is not None and not shown:
                         shown = [["select", sel_text, [list(x) for x in named]]]
                     order = [x[0] for x in named] if named is not None else list(ids)
-                    place = dict(zip(order, S.run_places([moo.props_of(w, i).get(b["run"]) for i in order]))) if b.get("run") else {}
+                    place = dict(zip(order, S.run_places([props(i).get(b["run"]) for i in order]))) if b.get("run") else {}
                     if named is not None:
                         total = len(named)
                         base = max(0, total - keep) if b.get("last") else 0      # $index: the place in the whole repeat
@@ -986,7 +1023,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     if not off:
         _REUSE.pop(ck, None)
         _REUSE[ck] = nxt
-        while len(_REUSE) > 24:
+        # a6153: one store per lens per place it stands, so one home base with the board out is ~30 stores; at 24 each
+        # build pushed out the stores the next one needed, and nothing was kept (kept 4, made 260). Together the stores
+        # of one page hold about one scene, so a few hundred cost little
+        while len(_REUSE) > REUSE_STORES:
             _REUSE.pop(next(iter(_REUSE)))
     return sc
 
@@ -1167,7 +1207,7 @@ def part_names(sc):
     return sorted(x for x in out if x)
 
 
-def scene_for(desk, name, part=None, words=None, on=None):
+def scene_for(desk, name, part=None, words=None, on=None, text=True):
     """-> (scene, text), as scene.scene_for, through the staged pipeline. With `part`, the text is only the parts that
     path names (find_parts) and what is inside them; scene["printed"] lists those nodes. With `words` (a4179:
     {"start": n, "whole": bool}) the text is the scene's words alone (scene.to_words), and scene["said"] lists the
@@ -1220,6 +1260,8 @@ def scene_for(desk, name, part=None, words=None, on=None):
         if not roots:
             raise S.LensRefusal(f"no part {part!r} in the scene of {s['title']}. Its parts: {' '.join(part_names(sc))}")
         sc["printed"] = roots
+    if not text and words is None:
+        return sc, ""          # a6153: a painter that shows no text is not sent one (deskd's text=0)
     if words is not None:
         text, sc["said"] = S.to_words(sc, s["title"], desk.world.me, at, roots=roots, part=part,
                                       start=words.get("start", 1), whole=words.get("whole", False))

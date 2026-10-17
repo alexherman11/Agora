@@ -285,13 +285,18 @@ class Hud:
         rows = alt_tab_windows(os.getpid())
         for r in rows:
             r["front"] = "yes" if self.front and r["name"] == str(self.front) else "no"
-        witnessed.write(self.a.world, "desktop", rows, by="hud")
-        witnessed.write(self.a.world, "host", host_verbs.rows(), by="hud")
-        witnessed.write(self.a.world, "media", media.rows(), by="hud")
+        # a6153: only what changed is written (the clock once a minute), and the pages are told only then: each rewrite
+        # had every open lens built again, every 2 s, and a press landed behind that build
+        wrote = [witnessed.write(self.a.world, "desktop", rows, by="hud", changed_only=True),
+                 witnessed.write(self.a.world, "host", host_verbs.rows(), by="hud", changed_only=True),
+                 witnessed.write(self.a.world, "media", media.rows(), by="hud", changed_only=True)]
         # a5496: the time, for the clock at the home base's top left (the taskbar's clock is hidden while it is open)
         now = time.localtime()
-        witnessed.write(self.a.world, "clock", [{"time": time.strftime("%H:%M", now),
-                                                 "day": time.strftime("%A %d %B", now).replace(" 0", " ")}], by="hud")
+        wrote.append(witnessed.write(self.a.world, "clock", [{"time": time.strftime("%H:%M", now),
+                                                              "day": time.strftime("%A %d %B", now).replace(" 0", " ")}],
+                                     by="hud", changed_only=True))
+        if not any(wrote):
+            return rows
         try:
             urllib.request.urlopen(urllib.request.Request(self.door + "/door/witnessed", data=b"{}", method="POST"),
                                    timeout=2).read()

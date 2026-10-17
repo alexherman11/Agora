@@ -215,10 +215,16 @@ def style_roles(desk, name, at=None):
     """The role names a lens may use under style `name`; None keeps the old behavior (calm.style, the file)."""
     if not name:
         return None
-    st = style_source(desk, name, at)
-    if st is None:
-        raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
-    return style_mod.role_names(st["text"])
+
+    def read():
+        st = style_source(desk, name, at)
+        if st is None:
+            raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
+        return style_mod.role_names(st["text"])
+    # a6153: once per build while the world holds still (still): the home base read its one style ~26 times a build,
+    # each a scan of every subject and a reading of the style's text. Each asker gets its own copy
+    got = _once(desk.world, ("style_roles", name, at), read)
+    return type(got)(got) if isinstance(got, (set, frozenset, list, dict, tuple)) else got
 
 
 def pulsing_roles(desk, name, at=None):
@@ -226,11 +232,19 @@ def pulsing_roles(desk, name, at=None):
     The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving. A style
     the painter refuses paints nothing, so nothing pulses."""
     st = style_source(desk, name or "calm", at) or {}
-    try:
-        roles = style_mod.parse(st.get("text") or "")["roles"]
-    except style_mod.StyleRefusal:
-        return set()
-    return {n for n, r in roles.items() if "pulse" in r["props"]}
+    text = st.get("text") or ""
+    if text not in _PULSING:          # a6153: a function of the style's text alone, read once per text (~7 ms a build)
+        try:
+            roles = style_mod.parse(text)["roles"]
+            _PULSING[text] = frozenset(n for n, r in roles.items() if "pulse" in r["props"])
+        except style_mod.StyleRefusal:
+            _PULSING[text] = frozenset()
+        while len(_PULSING) > 32:
+            _PULSING.pop(next(iter(_PULSING)))
+    return set(_PULSING[text])
+
+
+_PULSING = {}
 
 
 def mark_pulse(node, roles):
@@ -421,7 +435,13 @@ def source_head(source):
     return first.partition(":")[0]
 
 
-def saying_rows(desk, terms=""):
+SAYING_EARLY = ("item", "what", "eid", "source", "chat", "in")      # a6153: a saying's fields known before it is read
+LINE_ROW_KEYS = {"item", "what", "saying", "by", "name", "at", "in", "to", "said", "answered", "edited", "before", "state",
+                 "eid", "chat", "who", "open", "index", "line", "_t", "source", "thread", "reply_to", "mark", "context",
+                 "context_summary"}      # a line's row before its own fields: those are never one of its own fields
+
+
+def saying_rows(desk, terms="", early=None):
     """a3319 (lines phase 2; Pike c3323: unify the reading first): the SAYINGS of the desk, chat lines and comments
     as they are stored, two kinds read through one showing, oldest first like a chat. Nothing is migrated and no id
     is new: `saying` is a line's m<n> or a comment's c<n>, `what` says which. `by`, `at`, `in` (the chat, or the thing
@@ -472,10 +492,55 @@ def saying_rows(desk, terms=""):
             where[n["subject"]] = nid
     made, closed = persons.comment_events(w), None
     flip = {"yes": "no", "no": "yes", "withdrawn": "no"}
+    # a6153 (rows): early = (terms over SAYING_EARLY fields, binds), asked of each saying before it is read. Not with
+    # involving:, whose own filter runs after the rows are made
+    early = early if early and not involving else None
+    skipped_keys = set()
+    if early:
+        import knife
+        checks = [(t.startswith("-"), *knife.term_key(t)) for t in early[0]]
+        said_before = {}        # (term, value) -> held: knife.compares asked once per value
+        # an id against an id of the same letters (eid>e10993) is what knife.compares makes of it (expr._cmp: two texts,
+        # ordered by their numbers), done here without typing each saying's eid again (~10 us each, 2700 of them)
+        expr_id = X._ID
+        ids = {c: expr_id.fullmatch(c[3]) for c in checks if c[1] not in persons.PERSON_KEYS
+               and c[2] in ("=", "!=", "<", ">", "<=", ">=")}
+        ops = {"=": lambda a, b: a == b, "!=": lambda a, b: a != b, "<": lambda a, b: a < b, ">": lambda a, b: a > b,
+               "<=": lambda a, b: a <= b, ">=": lambda a, b: a >= b}
+
+        def early_ok(f):
+            for c in checks:
+                v = f.get(c[1])
+                mw = ids.get(c)
+                mv = expr_id.fullmatch(v) if mw is not None and isinstance(v, str) else None
+                if mv is not None and mv.group(1) == mw.group(1):
+                    hit = ops[c[2]](v, c[3]) if c[2] in ("=", "!=") else ops[c[2]](int(mv.group(2)), int(mw.group(2)))
+                    hit = hit != c[0]
+                else:
+                    hit = said_before.get((c, v))
+                    if hit is None:
+                        hit = said_before[(c, v)] = knife.compares(w, v, c[2], c[3], c[1], early[1]) != c[0]
+                if not hit:
+                    return False
+            return True
+        # the terms over a saying's thing (item, source, chat, in) are the same for every saying on it: judged once
+        per_thing = [c for c in checks if c[1] in ("item", "source", "chat", "in")]
+
+        def thing_ok(sid, s):
+            f = {"item": where[sid], "source": sid, "chat": s["title"], "in": s["title"]}
+            return all((said_before.get((c, f[c[1]])) if (c, f[c[1]]) in said_before else
+                        said_before.setdefault((c, f[c[1]]), knife.compares(w, f[c[1]], c[2], c[3], c[1], early[1]) != c[0]))
+                       for c in per_thing)
     out = []
     for sid, s in w.subjects.items():
         if sid not in where or (only and sid != only):
             continue
+        if early and per_thing and not thing_ok(sid, s):
+            # none of its sayings is kept, so none is read: only a line's own fields would still shape the rows
+            # (`extra`), so a thing with a line holding a field not met yet is read the long way, line by line
+            if not any({k2 for k2, v in line_fields(ln).items() if not k2.startswith("_") and isinstance(v, str)
+                        and k2 not in LINE_ROW_KEYS} - skipped_keys for ln in (s.get("lines") or [])):
+                continue
         if s["kind"] == "chat" and not (me and not rooms.is_member(w, s, me)):
             tl = text_lines(w, sid)
             mine_after = False              # walking back from the end: has a line of mine come after this one?
@@ -497,6 +562,15 @@ def saying_rows(desk, terms=""):
                     mine_after = True
                     continue
                 if me and not who:
+                    continue
+                if early and not early_ok({"item": where[sid], "what": "line", "eid": eid or f"{where[sid]}-{k + 1}",
+                                           "source": sid, "chat": s["title"], "in": s["title"]}):
+                    # a line's own fields shape every row (`extra`, below) when it would have been listed: asked only for
+                    # a line with a field not met yet (rare), so the rows are as they were, field for field
+                    own = {k2 for k2, v in line_fields(line).items() if not k2.startswith("_") and isinstance(v, str)
+                           and k2 not in LINE_ROW_KEYS} - skipped_keys if line else set()
+                    if own and (not me or rooms.shown(w, s, line["to"], me)):
+                        skipped_keys.update(own)
                     continue
                 said = text[m.end():] if m else text
                 # a1581: a line's address is its writer's stored word, never its words searched again; a chat from
@@ -541,6 +615,9 @@ def saying_rows(desk, terms=""):
         cs = s.get("comments") or []
         for i, c in enumerate(cs):
             e = made.get(c["id"])
+            if early and not early_ok({"item": where[sid], "what": "comment", "eid": e["id"] if e else c["id"],
+                                       "source": sid, "chat": s["title"], "in": s["title"]}):
+                continue
             writer = str(c.get("by") or "").split("/")[0].lower()
             to = (e or {}).get("to")
             if me and (rooms.same_person(w, writer, me) or to is None or not rooms.shown(w, s, to, me, comment=True)):
@@ -575,6 +652,9 @@ def saying_rows(desk, terms=""):
             replies = c.get("replies") or []
             events = rooms.reply_events(w).get(c["id"], [])
             for i, (reply, e) in enumerate(zip(replies, events), 1):
+                if early and not early_ok({"item": where[sid], "what": "reply", "eid": e["id"], "source": sid,
+                                           "chat": s["title"], "in": s["title"]}):
+                    continue
                 writer = str(reply.get("by") or "").split("/")[0].lower()
                 to = rooms.comment_to(e)
                 if e.get("args", {}).get("line") != reply.get("text"):
@@ -620,7 +700,7 @@ def saying_rows(desk, terms=""):
                 w, w.subjects[row["source"]], viewer)
 
         out = [row for row in out if included(row)]
-    extra = {key for row in out for key in row} - set(SOURCES["sayings"][1])
+    extra = ({key for row in out for key in row} | skipped_keys) - set(SOURCES["sayings"][1])
     for row in out:
         for key in extra:
             row.setdefault(key, "")
@@ -817,7 +897,13 @@ def rows(desk, source, session=None, memo=None):
     if source_head(src) == "sayings":
         own = [t for t in rest.split() if t.startswith(("for:", "involving:", "in:"))]
         terms = [t for t in rest.split() if t not in own]
-        rs = saying_rows(desk, " " + " ".join(own) if own else "")
+        # a6153: terms over the fields a saying has before its costly reading (who it is shown to, answered) are asked
+        # first, so a row they leave out is never read: the home base's `sayings for:alex ... eid>e<n>` read 512 rows
+        # to keep 1. The same terms filter the rows again below, so what is kept is the same
+        pre = [t for t in terms if knife.term_key(t)[0] in SAYING_EARLY and knife.term_key(t)[1] in
+               ("=", "!=", "<", ">", "<=", ">=", "has")]
+        rs = saying_rows(desk, " " + " ".join(own) if own else "",
+                         early=(pre, __import__("persons").active(desk)) if pre else None)
     else:
         terms = [t for t in re.split(r"[,\s]+", rest) if t]
         rs = _rows_of(desk, first, session)
@@ -2779,15 +2865,16 @@ def split_words_arg(desk, arg):
     return " ".join(toks[: k - 1]), opts
 
 
-def scene_for(desk, name, part=None, words=None, on=None):
+def scene_for(desk, name, part=None, words=None, on=None, text=True):
     """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
     accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
     whose whole closure is current; a fallback frame is for reading. The old single-pass evaluator (build, _compile,
     scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds.
-    `on` (a5949, Sable's a4270): the id of a thing the lens is stood on; its root starts on that thing."""
+    `on` (a5949, Sable's a4270): the id of a thing the lens is stood on; its root starts on that thing. text=False
+    (a6153): the scene alone, its text "" (a painter that shows no text: ~400 KB and ~25 ms of the home base's build)."""
     import lens_ir
-    return lens_ir.scene_for(desk, name, part, words, on=on)
+    return lens_ir.scene_for(desk, name, part, words, on=on, text=text)
 
 
 def split_on_arg(desk, arg):
