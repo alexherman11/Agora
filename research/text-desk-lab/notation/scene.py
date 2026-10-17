@@ -1223,7 +1223,11 @@ def wikilinks_of(w, text, thing=None):
 # tasks, workers etc. should ALL be clickable'): an id written in words (a5143, f155, s5948, c5957, e11454, m6012,
 # worker-a6010) is drawn as the name of what it names, a link; the words stay as written, so agents keep writing ids
 # and every printer and fence sees them. Only an id that names something is drawn so; any other stays words.
-_THING = re.compile(r"(?<![\w-])(worker-)?([afsce]\d{2,}|m\d{2,})(?![\w-])")
+_THING = re.compile(r"(?<![\w-])(worker-)?([afscep]\d{2,}|m\d{2,})(?![\w-])")
+# a6109, JEFF c6186: a person is printed by name, not id, so their name is the link: where a text is only a name, or
+# ends 'by|to|from <name>' (a card's owner, who is at work, a chat line's writer, 'by Juniper'). Never in prose, where
+# a name is also a word, and never in a text that is itself a button (the To chips)
+_PERSON_AT = re.compile(r"^\s*([A-Za-z][\w-]*)\s*$|\b(?:by|to|from)\s+([A-Za-z][\w-]*)\s*$")
 
 
 def _short(title, most=48):
@@ -1287,37 +1291,71 @@ def _thing_named(w, ref):
         apps = w.appearances_of(s["id"])
         return {"name": f"{_who_named(w, (e or {}).get('by'))}'s line in {_short(s.get('title'), 36)}", "title": f"{nid}: a line in “{s.get('title')}”",
                 "kind": "line", "open": apps[0] if apps else s["id"]}
+    if head == "p":
+        import persons
+        if not persons.is_person(w, nid):
+            return None
+        return _person(w, nid, persons.display(w, nid))
     return None
 
 
-def things_of(w, text):
+def _person(w, pid, shown):
+    """A person -> {name, title, kind, open}: open is their corner (a resident's room), else the person itself."""
+    import persons
+    corner = _once(w, ("person-corner", pid), lambda: persons.corner(w, pid))
+    return {"name": shown, "title": f"{persons.display(w, pid)} · person {pid}" + (f" · corner {corner}" if corner else ""),
+            "kind": "person", "open": corner or pid}
+
+
+def _person_word(w, word):
+    """A word that is a person's name today -> _person, or None (not a person, or a name the house keeps for itself)."""
+    import persons
+    if not persons.on(w) or persons.norm(word) in persons.NOT_PERSONS:
+        return None
+    pid = persons.today(w, word)
+    return _person(w, pid, word) if pid else None
+
+
+def things_of(w, text, people=False):
     """a6109: each id in words that names something -> {name, title, kind, open}; ids in code spans stay code. Read
-    while the world holds still (still); a press reads the world again, so a renamed thing is at worst named late."""
+    while the world holds still (still); a press reads the world again, so a renamed thing is at worst named late.
+    people: also a person's name where the text is only that name or ends 'by|to|from <name>' (kind person, word)."""
     out = {}
-    if not text or not _THING.search(text):
+    if not text:
         return out
-    plain = _RUNS.sub(lambda m: " " * len(m.group(0)), text)
-    for m in _THING.finditer(plain):
-        ref = m.group(0)
-        if ref in out:
-            continue
-        hit = _once(w, ("thing-named", ref), lambda: _thing_named(w, ref))
+    if _THING.search(text):
+        plain = _RUNS.sub(lambda m: " " * len(m.group(0)), text)
+        for m in _THING.finditer(plain):
+            ref = m.group(0)
+            if ref in out:
+                continue
+            hit = _once(w, ("thing-named", ref), lambda: _thing_named(w, ref))
+            if hit:
+                out[ref] = hit
+    m = _PERSON_AT.search(text) if people and "`" not in text else None
+    if m:
+        word = m.group(1) or m.group(2)
+        hit = word not in out and _once(w, ("person-word", word), lambda: _person_word(w, word))
         if hit:
-            out[ref] = hit
+            out[word] = {**hit, "word": True}
     return out
 
 
 def _named_runs(r, things):
-    """One plain run -> runs where each id `things` knows is its own run, mark=thing."""
+    """One plain run -> runs where each id `things` knows is its own run, mark=thing; a person's name (word) where
+    _PERSON_AT found it, at the run's end or as the whole run."""
     out, at, t = [], 0, r["text"]
-    for m in _THING.finditer(t):
-        hit = things.get(m.group(0))
+    words = [k for k, v in things.items() if v.get("word")]
+    rx = re.compile(_THING.pattern + "".join(f"|(?<![\\w-]){re.escape(k)}\\s*$" for k in words)) if words else _THING
+    for m in rx.finditer(t):
+        ref = m.group(0).rstrip()                   # a name at the end may carry the words' trailing space
+        hit = things.get(ref)
         if not hit:
             continue
         if m.start() > at:
             out.append({**r, "text": t[at:m.start()]})
-        out.append({"text": hit["name"], "mark": "thing", "id": m.group(0), "open": hit["open"], "title": hit["title"], "kind": hit["kind"]})
-        at = m.end()
+        out.append({"text": hit["name"], "mark": "thing", "id": ref, "open": hit["open"], "title": hit["title"], "kind": hit["kind"]})
+        at = m.start() + len(ref)
     if not out:
         return [r]
     if at < len(t):

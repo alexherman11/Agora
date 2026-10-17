@@ -2,7 +2,7 @@
 // A word counts when it is drawn (it has a box, is not hidden, is not a hidden mark's source) and its box meets the
 // window. Run with screen.py: js @research/window-lab/names/ids_audit.js. -> {visible, inDom, ids: {id: "n first-part"}}
 (() => {
-  const rx = /(?<![\w-])(?:worker-|builder-)?(?:[afscem]\d{2,}|cap-\d+)(?![\w-])/g;
+  const rx = /(?<![\w-])(?:worker-|builder-)?(?:[afscemp]\d{2,}|cap-\d+)(?![\w-])/g;
   const W = innerWidth, H = innerHeight, seen = {}, dom = {};
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const shown = el => {
