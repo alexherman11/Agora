@@ -160,7 +160,11 @@ const Viewer = (session, who, lens, said, status) => {
     answered(key, err, draft, token) {
       if (token && pending.get(key) !== token) return;
       pending.delete(key);
-      const cur = drafts.get(key), newer = token && token.draft !== undefined && cur !== token.draft;
+      // a6067 (Sable c6206, Codex c6224): the words are newer when the draft now holds anything but the words that were
+      // sent (by their text, not by which object holds them); a send that began with no draft never clears words typed
+      // while it was out. Newer words are ALWAYS kept, whatever is said about them below
+      const cur = drafts.get(key), sent = draft !== undefined ? draft : token && token.draft ? token.draft.text : undefined;
+      const newer = !!cur && cur.text !== sent;
       if (!newer) v.hold = null;
       if (err) {
         shownNotice = "";
@@ -168,9 +172,10 @@ const Viewer = (session, who, lens, said, status) => {
         // pike-8 section 3: a refused draft is kept, and the world's current value will be drawn beside it (both sides);
         // a resend is fenced on the value shown, never on a fresher one the person has not seen
         if (draft !== undefined && !newer) drafts.set(key, { text: draft, why: err.split("\n").pop(), refused: true, shown: null, gesture: token && token.draft && token.draft.gesture });
-      } else if (newer && fromElsewhere.has(key)) notice = "sent; newer words kept (typed since, in another of your windows)";   // Sable c6206
-      else if (newer && !texts[key]) notice = "sent the earlier words; what you typed since is still unsent";   // a6067: a module text says so itself
-      else { notice = ""; drafts.delete(key); }
+      } else if (newer) {                                   // kept; only what is said differs
+        if (fromElsewhere.has(key)) notice = "sent; newer words kept (typed since, in another of your windows)";   // Sable c6206
+        else if (!texts[key]) notice = "sent the earlier words; what you typed since is still unsent";   // a module text says so itself
+      } else { notice = ""; drafts.delete(key); }
       v.show();
     },
     busy(key) { return pending.has(key); },      // a6067: is a send of this part's in flight
