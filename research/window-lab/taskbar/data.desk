@@ -25,11 +25,17 @@ look a5674
 do prop a5674 icon=lanes lights=you about="What needs you, what is moving, what landed."
 look a5676
 do prop a5676 icon=music about="What Spotify is playing, with its keys."
-look a5709
-do prop a5709 name=Clock icon=clock about="The time and the date, at the top left."
-look a5711
-do prop a5711 name=Now icon=now about="What you are on now, said in a line at the top."
-look a5713
-do prop a5713 name="Focus timer" icon=timer about="A focus timer, for working in rounds with breaks."
-look a5715
-do prop a5715 name=Notices icon=bell about="The latest notices for you, at the top."
+# the widgets by title: which exist depends on the round-3 assembly (lane 3 untags clock, Now and pomodoro and adds
+# the glance and the timer bar); apply.py skips a widget this world does not have
+look "home-clock"
+do prop "home-clock" name=Clock icon=clock about="The time and the date, at the top left."
+look "home-now"
+do prop "home-now" name=Now icon=now about="What you are on now, said in a line at the top."
+look "home-pomodoro"
+do prop "home-pomodoro" name="Focus timer" icon=timer about="A focus timer, for working in rounds with breaks."
+look "home-notices"
+do prop "home-notices" name=Notices icon=bell about="The latest notices for you, at the top."
+look "home-glance"
+do prop "home-glance" name=Glance icon=glance about="The time, and in one line what waits on you and who is at work."
+look "home-timer-bar"
+do prop "home-timer-bar" name="Focus timer" icon=timer about="Your focus timer, at the top while The house is put away."

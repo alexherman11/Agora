@@ -97,11 +97,22 @@ def step_icons(w):
 
 
 def step_data(w):
+    absent = False
     for line in (HERE / "data.desk").read_text(encoding="utf-8").splitlines():
-        if line.strip() and not line.startswith("#"):
+        if not line.strip() or line.startswith("#"):
+            continue
+        if line.startswith("look "):
             out = w.do(line)
-            if line.startswith("do ") and "nothing to change" not in out:      # a re-run: already said
-                print(f"  {line[:70]}: {said(out)}")
+            # a widget named by title may not be in this world (the round-3 assembly decides which are); an id must be
+            absent = line.startswith('look "') and not answer(out).startswith(("a", "f", "s"))
+            if absent:
+                print(f"  {line[5:]}: not in this world, skipped")
+            continue
+        if absent:
+            continue
+        out = w.do(line)
+        if "nothing to change" not in out:      # a re-run: already said
+            print(f"  {line[:70]}: {said(out)}")
 
 
 def step_lens(w, name):
@@ -126,17 +137,23 @@ def backup(w):
     keep.mkdir(exist_ok=True)
     (keep / "home-style.txt").write_text(text_of(w, STYLE) + "\n", encoding="utf-8")
     (keep / "home-dock.txt").write_text(text_of(w, DOCK) + "\n", encoding="utf-8")
-    props = {t: w.do(f"look {t}").splitlines()[0] for t in things()}
+    widgets = re.findall(r'^look ("[^"]+")$', (HERE / "data.desk").read_text(encoding="utf-8"), re.M)
+    props = {t: answer(w.do(f"look {t}")) for t in things() + widgets}
     (keep / "things.json").write_text(json.dumps(props, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"backup: {keep} (home-style, home-dock, {len(props)} things)")
     return props
+
+
+def answer(out):
+    """The first line of a reply that is its answer, not a '!! since your last look' or its indented list."""
+    return next((l for l in out.splitlines() if l.strip() and not l.startswith(("!!", " "))), "")
 
 
 def preflight(w):
     """True when every thing data.desk names is there and home-dock is a lens this was written against."""
     ok = True
     for t in things():
-        first = (w.do(f"look {t}").splitlines() or [""])[0]
+        first = answer(w.do(f"look {t}"))
         if not first.startswith(t) and f" {t} " not in first:
             print(f"preflight: {t} is not there ({first[:120]})")
             ok = False

@@ -6,7 +6,8 @@ Run apply.py try first (the bar in frontier-try; a landing recopies it). The sto
 the home base at rest with the bar along its foot; the pointer rests on three icons in turn (an app, a panel put away, a
 widget) and each says what it is; he presses the board's icon and the board comes back into its column; the pointer
 rests on it again and it says it is out. A drawn ring shows where the pointer is (headless Chrome draws none). Each frame
-is a screen.py shot, cropped to the lower part of the screen where the bar is, the whole screen first and last; ffmpeg
+is a screen.py shot; between the first and last (the whole screen) it is the middle of the screen's foot at its own
+pixels, where the bar and its tips are; ffmpeg
 holds each for its own time (the story's pace, not measured times). Writes <out>.mp4 and keeps the frames beside it.
 """
 import pathlib
@@ -37,7 +38,7 @@ def main():
         ("rest", None, False, 2.5),
         ("conversation", f"{BAR}/apps/f5565/a5571/view", False, 2.5),
         ("board-away", f"{BAR}/panels/f5664/a5674", False, 2.5),
-        ("timer", f"{BAR}/widgets/a5713", False, 2.5),
+        ("notices", f"{BAR}/widgets/a5715", False, 2.5),
         ("board-pressed", f"{BAR}/panels/f5664/a5674", True, 1.5),
         ("board-out", f"{BAR}/panels/f5664/a5674", False, 3.0),
     ]
@@ -54,11 +55,8 @@ def main():
     lst = []
     for i, (name, _, _, hold) in enumerate(beats):
         im = Image.open(frames / f"{name}.png").convert("RGB")
-        if 0 < i < len(beats) - 1:
-            im = im.crop((0, 1080, 3840, 2160)).resize((3840, 1080))
-            canvas = Image.new("RGB", (3840, 2160), (14, 18, 17))
-            canvas.paste(im, (0, 540))
-            im = canvas
+        if 0 < i < len(beats) - 1:          # the bar and its tips at the screen's own pixels: the middle of the foot
+            im = im.crop((960, 1080, 2880, 2160))
         p = frames / f"{i:02d}-{name}.png"
         im.resize((1920, 1080)).save(p)
         lst.append(f"file '{p.as_posix()}'\nduration {hold}")
