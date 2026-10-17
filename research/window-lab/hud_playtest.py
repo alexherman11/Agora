@@ -72,8 +72,9 @@ DUSK = ("html{background:radial-gradient(1200px 800px at 18% 22%,#2a3c4a 0%,tran
 # --break: a lens changed in the copy before the walk, to prove the step that should notice does (a6040's done check)
 BREAKS = {
     "card": ("home-board", "  fold inline handle cardopen\n", "", "a board card no longer opens on a press: `card` should fail"),
-    "later": ("waiting-on-me", 'do prop $item review=later; do prop $rd reviewing="" full=no',
-              'do prop $rd reviewing="" full=no', "Later no longer marks the item: `later` should fail"),
+    # the Later of an item not opened fully (the one a press meets): it closes the item but no longer marks it
+    "later": ("waiting-on-me", '!= "yes" do prop $item review=later; do prop $rd reviewing=""',
+              '!= "yes" do prop $rd reviewing=""', "Later no longer marks the item: `later` should fail"),
 }
 
 # In the page from its first line: the timer, the finders, and a stand-in for the home base's host (hud.py's js_api).
@@ -302,8 +303,10 @@ class Window:
                 await self.p.mouse("mousePressed", x, y, "left", 1, n)
                 await self.p.mouse("mouseReleased", x, y, "left", 0, n)
 
-    async def drag(self, x0, y0, x1, y1, steps=12):
-        if self.SB:
+    async def drag(self, x0, y0, x1, y1, steps=12, devtools=False):
+        """devtools: the drag as DevTools mouse events (Chromium's own input path) even in the sandbox: posted window
+        messages move pointers (a carry works) but select no text (ran 16 Oct, a control drag over the chat's words)."""
+        if self.SB and not devtools:
             SB = self.SB
             ox, oy, dpr = await self.origin()
             a, b = (ox + x0 * dpr, oy + y0 * dpr), (ox + x1 * dpr, oy + y1 * dpr)
@@ -357,6 +360,12 @@ class Window:
         return path
 
     async def close(self):
+        if getattr(self, "said", None):          # closed already: the same verdict again
+            return self.said
+        self.said = await self._close()
+        return self.said
+
+    async def _close(self):
         if self.ws:
             try:
                 await self.ws.close()
@@ -419,12 +428,18 @@ class Play:
         if not self.landed[card]:
             raise Skip(f"waits on {card} ({what}), not landed yet")
 
-    async def find(self, expr, what):
-        """The centre of the part a JS expression names (pt.* helpers); one that is not there is a failure."""
-        c = await self.w.js(f"(() => {{ const pt = window.__pt; return pt.center({expr}); }})()")
+    async def find(self, expr, what, reachable=True):
+        """The centre of the part a JS expression names (pt.* helpers); one that is not there is a failure, and so is
+        one a person cannot press: painted, but cut off by a panel that never scrolls or covered by something (the
+        element at its centre is not it). Ran 16 Oct: an item's demo pushed its Seen / Done below its panel's cut."""
+        c = await self.w.js(f"""(() => {{ const pt = window.__pt, e = {expr}; const c = pt.center(e); if (!c) return null;
+            const at = document.elementFromPoint(c[0], c[1]);
+            return {{ c, hit: !!at && (e.contains(at) || at.contains(e)), at: at ? ((at.dataset && at.dataset.key) || at.tagName).split('/').slice(-2).join('/') : 'nothing' }}; }})()""")
         if not c:
             raise AssertionError(f"could not find {what}")
-        return c
+        if reachable and not c["hit"]:
+            raise AssertionError(f"{what} is painted but cut off or covered: a press at its centre lands on {c['at']} (a person cannot press it)")
+        return c["c"]
 
     async def has(self, expr):
         return await self.w.js(f"(() => {{ const pt = window.__pt; return !!({expr}); }})()")
@@ -471,7 +486,7 @@ class Play:
             res["outcome"], res["note"] = "fail", str(e)
         except Exception as e:                       # the script's own trouble is a failure too, named
             res["outcome"], res["note"] = "fail", f"{type(e).__name__}: {e}"
-        if res["outcome"] != "skip":
+        if res["outcome"] != "skip" and res["note"] != "not in --only":
             try:
                 res["shot"] = str(await self.w.shot(self.out / f"{self.n:02d}-{sid}.png"))
             except Exception as e:
@@ -521,16 +536,21 @@ async def walk(play, only):
         return not only or sid in only
 
     async def skip_unwanted(sid, name):
-        await S(sid, name, lambda: (_ for _ in ()).throw(Skip("not in --only")))
+        async def no():
+            raise Skip("not in --only")
+        res = await S(sid, name, no)
+        res["outcome"] = "not played"
 
     steps = []
+    # every walk waits for the first paint, whichever steps it plays (`open` reports it)
+    opened = await w.js("""new Promise(res => { const t0 = performance.now(); const f = () => { const pt = window.__pt;
+        if (pt && pt.opened) return res({ ok: true, ms: Math.round(pt.opened), first_ms: null });
+        if (performance.now() - t0 > 15000) return res({ ok: false, want: 'the home base tiles and dock' , timeout: 15000});
+        setTimeout(f, 20); }; f(); })""")
+    await asyncio.sleep(1.2)                     # its first scenes settle (reports, fonts)
 
     async def s_open():
-        r = await w.js("""new Promise(res => { const t0 = performance.now(); const f = () => { const pt = window.__pt;
-            if (pt && pt.opened) return res({ ok: true, ms: Math.round(pt.opened), first_ms: null });
-            if (performance.now() - t0 > 15000) return res({ ok: false, want: 'the home base tiles and dock' , timeout: 15000});
-            setTimeout(f, 20); }; f(); })""")
-        await asyncio.sleep(1.2)                 # its first scenes settle (reports, fonts)
+        r = dict(opened)
         if r.get("ok"):
             r["note"] = "a cold load of the page (from navigation); the hotkey shows an already loaded page"
         return r
@@ -625,15 +645,22 @@ async def walk(play, only):
             raise AssertionError("no At-work rows (the copy's house is staged busy)")
         live = await play.has(f"pt.pressable({row})")
         try:
-            play.needs("a5988", "the At-work feed", ("home-work", "on click"))
+            play.needs("a5988", "the At-work feed", ("home-work", "home-feed"))
         except Skip as e:
             raise Skip(str(e) + ("" if live else "; a press on a row does nothing today (the row has no click)"))
-        before = await w.js("document.querySelectorAll('#paint [data-key]').length")
-        r = await play.timed(f"document.querySelectorAll('#paint [data-key]').length > {before + 3} && "
-                             "pt.parts('').some(e => /feed|thought|log/i.test(e.dataset.key) && !e.dataset.key.includes('jeff-chat'))",
-                             press(play, row, "an At-work row"))
+        who = await w.js(f"(() => {{ const pt = window.__pt, r = {row}; return r ? r.innerText.split('\\n')[0].trim() : ''; }})()")
+        r = await play.timed("!!pt.part('lens:home-feed')", press(play, row, "an At-work row"))
         if not r["ok"]:
-            r["want"] = "a press on an At-work row opened no feed (a loose check, until the step knows a5988's shape)"
+            r["want"] = f"a press on {who!r} in At work opened no feed"
+            return r
+        lines = await w.js("window.__pt.parts('lens:home-feed').filter(e => /\\/(follow|followone|held|heldone)\\/[^/]+$/.test(e.dataset.key)).length")
+        empty = await play.has("pt.leaf('No feed yet…', pt.part('lens:home-feed'))")
+        r["note"] = (f"{who}'s feed opened in the viewer; " + (f"{lines} lines" if lines else
+                     "it says 'No feed yet' (a copy has no house to write feeds: the lines themselves are not played here)" if empty else "no lines"))
+        # give the middle back to the chat, as Alex would before the next step
+        if await play.has(DOCK.format(json.dumps("JEFF"))):
+            await press(play, DOCK.format(json.dumps("JEFF")), "JEFF on the dock")()
+            await asyncio.sleep(1.5)
         return r
     steps.append(("atwork", "click an At-work row and watch its feed", s_atwork, (OK_MS, SLOW_MS)))
 
@@ -658,7 +685,13 @@ async def walk(play, only):
         side = await w.js("(() => { const pt = window.__pt, a = pt.rect(pt.part('lens:writing')), b = pt.rect(pt.part('lens:jeff-chat')); return a && b ? a[0] + a[2] <= b[0] + 2 : null; })()")
         if not side:
             raise AssertionError("Writing is not on the left of the chat")
-        return {"note": "Writing stands left of the chat"}
+        # how wide the page itself is: a page squeezed to a few words a line is there but not writable
+        width = await w.js("(() => { const pt = window.__pt, l = pt.part('lens:writing'), d = l && (l.querySelector('.md-doc') || l.querySelector('[contenteditable]'));"
+                           " return d ? Math.round(d.getBoundingClientRect().width) : null; })()")
+        note = f"Writing stands left of the chat; its page is {width} px wide"
+        if width is not None and width < 360:
+            raise AssertionError(note + ": squeezed to a few words a line")
+        return {"note": note}
     steps.append(("writedoc", "Writing on the left of the chat", s_writeleft, (OK_MS, SLOW_MS)))
 
     async def s_comment():
@@ -666,19 +699,52 @@ async def walk(play, only):
         doc = "pt.part('lens:writing') && (pt.part('lens:writing').querySelector('.md-doc') || pt.part('lens:writing').querySelector('[contenteditable]'))"
         if not await play.has(doc):
             raise AssertionError("no Writing document painted in the home base")
+        await asyncio.sleep(1.5)        # settled: a drag in the page's late repaints would test the repaint, not the drag
         # some words of the page's own, mid-paragraph: their place on the screen, to drag over them as a person would
         span = await w.js(f"""(() => {{ const pt = window.__pt, d = {doc}; const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT); let n;
-            while ((n = tw.nextNode())) {{ const m = /[A-Za-z]{{3,}}( [A-Za-z]{{2,}}){{3}}/.exec(n.data); if (!m) continue;
+            while ((n = tw.nextNode())) {{ const m = /[A-Za-z]{{3,}} [A-Za-z]{{3,}}/.exec(n.data); if (!m) continue;
               const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length); const b = r.getBoundingClientRect();
               if (b.width < 30 || b.height > 40 || !pt.vis(n.parentElement)) continue;
               return {{ words: m[0], x0: b.left + 1, x1: b.right - 1, y: b.top + b.height / 2 }}; }} return null; }})()""")
         if not span:
             raise AssertionError("no line of words in the Writing page to select")
         box = "pt.parts('lens:writing').find(e => /\\/pending\\/box$/.test(e.dataset.key))"
-        r1 = await play.timed(f"!!({box})", lambda: w.drag(span["x0"], span["y"], span["x1"], span["y"], steps=8))
-        how = "a drag over the words"
+        # posted window messages select no text in Chromium (ran 16 Oct, with a control over the chat's words), so the
+        # drag goes as DevTools mouse events: a mouse drag down Chromium's own input path, selection and all
+        r1 = await play.timed(f"!!({box})", lambda: w.drag(span["x0"], span["y"], span["x1"], span["y"], steps=8, devtools=True))
+        how = "a mouse drag over the words (DevTools mouse events)"
+        if not r1["ok"]:                      # a person's second try: click into the page first, then drag
+            first_sel = await w.js("String(getSelection())")
+            await w.click((span["x0"] + span["x1"]) / 2, span["y"])
+            await asyncio.sleep(0.8)
+            span2 = await w.js(f"""(() => {{ const pt = window.__pt, d = {doc}; const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT); let n;
+                while ((n = tw.nextNode())) {{ const i = n.data.indexOf({json.dumps(span['words'])}); if (i < 0) continue;
+                  const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + {len(span['words'])}); const b = r.getBoundingClientRect();
+                  return {{ x0: b.left + 1, x1: b.right - 1, y: b.top + b.height / 2 }}; }} return null; }})()""") or span
+            r1 = await play.timed(f"!!({box})", lambda: w.drag(span2["x0"], span2["y"], span2["x1"], span2["y"], steps=8, devtools=True))
+            if r1["ok"]:
+                how = (f"a mouse drag only after a click into the page (the first drag, on the page untouched, selected "
+                       f"{first_sel[:30]!r} and opened no Comment box)")
         if not r1["ok"]:                      # the drag selected nothing the page took up: say so, and select by script
-            how = "a scripted selection (a drag over the words opened no Comment box)"
+            sel = await w.js("String(getSelection())")
+            # a control: the same posted drag over plain words in the chat's feed. If it selects there, the Writing
+            # page is what refuses a drag (a person would meet that); if not, it is this script's input
+            ctl = await w.js("""(() => { const pt = window.__pt, c = pt.part('lens:jeff-chat'); if (!c) return null;
+                const tw = document.createTreeWalker(c, NodeFilter.SHOW_TEXT); let n;
+                while ((n = tw.nextNode())) { const m = /[A-Za-z]{3,} [A-Za-z]{3,} [A-Za-z]{3,}/.exec(n.data); if (!m || !pt.vis(n.parentElement)) continue;
+                  const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length); const b = r.getBoundingClientRect();
+                  if (b.height > 40 || b.width < 30) continue; return { x0: b.left + 1, x1: b.right - 1, y: b.top + b.height / 2 }; } return null; })()""")
+            got = None
+            if ctl:
+                await w.js("getSelection().removeAllRanges()")
+                await w.drag(ctl["x0"], ctl["y"], ctl["x1"], ctl["y"], steps=8, devtools=True)
+                await asyncio.sleep(0.4)
+                got = await w.js("String(getSelection())")
+                await w.js("getSelection().removeAllRanges()")
+            how = ("a scripted selection (a drag over the words opened no Comment box; the page's selection after it: "
+                   f"{sel[:40]!r}; the same drag over the chat's words selected {got[:40] if got is not None else 'nothing found to try'!r}"
+                   + (": so the Writing page refuses a drag-select" if got and not sel else
+                      ": so the drag is this script's limit, not the page's" if not got else "") + ")")
             r1 = await play.timed(f"!!({box})", lambda: w.js(
                 f"""(() => {{ const d = {doc.replace('pt.', 'window.__pt.')}; const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT); let n;
                 while ((n = tw.nextNode())) {{ const i = n.data.indexOf({json.dumps(span['words'])}); if (i >= 0) {{
@@ -944,6 +1010,11 @@ async def walk(play, only):
         return {"note": f"no key is sent: test_winkey.py drives the tap logic and the hook with made-up keys ({sum(x.startswith('ok') for x in lines)} ok)"}
     steps.append(("winkey", "the Windows key shows and hides it (test_winkey.py)", s_winkey, (OK_MS, SLOW_MS)))
 
+    # the board goes back before fill and widen: dragged out, a5994's tiling leaves one column, and ⇔ has nothing to
+    # take room from (ran 16 Oct: widen failed so, the tiling was right)
+    order = ["open", "lowdown", "board", "card", "later", "approve", "sendback", "atwork", "writing", "writedoc", "comment",
+             "chat", "send", "drag", "restore", "fill", "widen", "glance", "dock", "esc", "winkey"]
+    steps.sort(key=lambda s: order.index(s[0]) if s[0] in order else len(order))
     for sid, name, fn, budget in steps:
         if want(sid):
             await S(sid, name, fn, budget)
@@ -990,17 +1061,21 @@ def report_md(results, meta, previous):
     return "\n".join(L), verdict
 
 
-def write_live(md, verdict, results, meta, by):
-    """The report note in JEFF's corner, rewritten; a notice to Alex when a step that passed last time fails now."""
+def write_live(md, verdict, results, meta, by, base=LIVE, session="frontier"):
+    """The report note in JEFF's corner, rewritten; a notice to Alex when a step that passed last time fails now.
+    base/session: the live door by default; --report copy writes into the copy instead (a test of this path)."""
+    def door(b, s, who, line):                      # noqa: F811  (this report's world, whichever it is)
+        return globals()["door"](base, session, who, line)
     found = door(LIVE, "frontier", by, "find role=hud-playtest")
     import re
     m = re.search(r"\b(a\d+) note \"HUD playtest\"", found)
     passed_now = [r["id"] for r in results if r["outcome"] in ("pass", "slow")]
     failed_now = [r["id"] for r in results if r["outcome"] == "fail"]
-    props = f"verdict={q(verdict)} passed={q(','.join(passed_now))} failed={q(','.join(failed_now))} at={q('e' + str(meta['at']))} ran={q(meta['iso'])}"
+    props = f"verdict={q(verdict)} passed={q(','.join(passed_now))} failed={q(','.join(failed_now))} world_at={q('e' + str(meta['at']))} ran={q(meta['iso'])}"
     if not m:
+        door(LIVE, "frontier", by, "look \"JEFF's corner\"")          # the desk refuses a create in what you have not seen
         out = door(LIVE, "frontier", by, f"do create \"JEFF's corner\" kind=note title=\"HUD playtest\" role=hud-playtest text={q(md)}")
-        nid = re.search(r"\b(a\d+)\b", out)
+        nid = re.search(r"created (a\d+)", out) or re.search(r"\bok create\b.*?\b(a\d+)\b", out)
         nid = nid.group(1) if nid else None
         if not nid:
             return f"could not make the report note: {out[:300]}"
@@ -1018,6 +1093,7 @@ def write_live(md, verdict, results, meta, by):
     said = f"rewrote the report note {nid}" + ("" if "ERR" not in out1 + out2 else f" (refused: {(out1 + out2)[:300]})")
     if newly:
         names = ", ".join(r["name"] for r in results if r["id"] in newly)
+        door(LIVE, "frontier", by, "look \"Alex's notices\"")
         out = door(LIVE, "frontier", by, "do create \"Alex's notices\" kind=note title=\"HUD playtest failed\" role=notice to=alex "
                                          f"topic=playtest about={nid} came={q(meta['iso'])} text={q('Passed last time, failed now: ' + names + '. ' + verdict)}")
         said += f"; a 'HUD playtest failed' notice for Alex ({', '.join(newly)})" + ("" if "ERR" not in out else f" REFUSED: {out[:200]}")
@@ -1098,11 +1174,28 @@ async def amain(a):
             lens, old, new, why = BREAKS[b]
             c1 = copy.do(f"read {lens}", "hud-playtest")
             c2 = copy.do(f"do replace {lens} old={q(old)} new={q(new)}", "hud-playtest")
-            print(f"broke {lens} in the copy: {why}" + ("" if "ERR" not in c1 + c2 else f" (REFUSED: {(c1 + c2)[:300]})"), flush=True)
+            if "ok replace" not in c2:      # a break that did not take proves nothing: stop
+                sys.exit(f"--break {b}: the copy's {lens} did not take the change (its words have moved on?): {c2[:300]}")
+            print(f"broke {lens} in the copy: {why}", flush=True)
         await win.open(copy.url())
         play = Play(win, copy, out, a.assume)
         await walk(play, set(a.only) if a.only else None)
         errors = await win.js("window.__pt.errors")
+        guard = await win.close()
+        if a.report == "copy":
+            # the report path, tried in the copy: an earlier report that says every played step passed, then this
+            # run's over it, so each step failing now makes the notice; then what the copy's notices hold
+            played = [r["id"] for r in play.results if r["outcome"] in ("pass", "slow", "fail")]
+            seed = write_live("# HUD playtest, (seeded by --report copy)\n\n**Verdict: seeded.**", "seeded",
+                              [{"id": s, "outcome": "pass", "name": s} for s in played], {"at": at, "iso": "seed"}, a.by, copy.base, copy.session)
+            print(f"report copy: seeded an earlier report claiming {len(played)} steps passed ({seed})")
+            when = datetime.datetime.now()
+            meta0 = {"when": when.strftime("%d %b %H:%M").lstrip("0"), "iso": when.isoformat(timespec="seconds"), "world": world,
+                     "at": at, "window": "", "code": git_code(), "guard": guard[1], "out": str(out)}
+            md0, verdict0 = report_md(play.results, meta0, [])
+            print("report copy: " + write_live(md0, verdict0, play.results, meta0, a.by, copy.base, copy.session))
+            print("report copy, the copy's notices now:\n" + copy.do("find prop:role=notice,prop:topic=playtest", a.by)[:800])
+            print("report copy, the copy's report note:\n" + copy.do("find role=hud-playtest", a.by)[:600])
     finally:
         guard = await win.close()
         copy.close()
@@ -1132,7 +1225,7 @@ def main():
     ap = argparse.ArgumentParser(description="the home base played as Alex plays it, timed (see the top of this file)")
     ap.add_argument("--world")
     ap.add_argument("--headless", action="store_true")
-    ap.add_argument("--report", choices=["live", "none"], default=None)
+    ap.add_argument("--report", choices=["live", "none", "copy"], default=None)
     ap.add_argument("--by", default="hud-playtest")
     ap.add_argument("--only", type=lambda s: s.split(","), default=None)
     ap.add_argument("--assume", type=lambda s: s.split(","), default=[])
