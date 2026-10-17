@@ -1,8 +1,10 @@
 # a5994: the looks the working tiling adds to home-style (a5206): the rail of titles beside a panel that fills the room,
-# and the landing box the painter draws while a panel is in the air (lens.html has a floor look if a style has none)
+# and the landing box the painter draws while a panel is in the air (lens.html has a floor look if a style has none).
+# Round 2 of the HUD sprint, after lane 3 (LAMPLIT): colour says whose move it is, so the hand's own marks (where a
+# panel will land, which one fills the room) are white, never the mint that means an agent is at work.
 read a5206
-do append a5206 line="# a5994: the tiling's rail (a panel fills the room, the rest are titles) and the landing box of a drag"
+do append a5206 line="# a5994: the tiling's rail (a panel fills the room, the rest are titles) and the landing box of a drag; white, the hand's own colour"
 do append a5206 line="role rail : between gap, width 15em"
 do append a5206 line="role railitem : soft, on glass, edge rim, corner gap x1.5, pad gap, between gap /4"
-do append a5206 line="role railitem.on : ink, on glassdeep, edge accent, corner gap x1.5, pad gap, between gap /4"
-do append a5206 line="role landing : on accentwash, edge accent, corner gap x2"
+do append a5206 line="role railitem.on : ink, on glassdeep, edge ink, corner gap x1.5, pad gap, between gap /4"
+do append a5206 line="role landing : on wash, edge ink, corner gap x2"

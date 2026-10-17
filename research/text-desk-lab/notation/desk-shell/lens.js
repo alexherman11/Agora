@@ -995,12 +995,18 @@
     const c = carrying; if (!c) return;
     const l = r ? landing(r, m) : null;
     over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = ""; c.el.style.animation = "";
-    if (c.box) c.box.remove();
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
-    if (!l) { V.hold = null; c.el.focus(); return; }
+    if (!l) { if (c.box) c.box.remove(); V.hold = null; c.el.focus(); return; }
     const f = c.seen.get(r.dataset.key) || r._n.fence || {};
-    send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f });
+    // a5994 round 2 (lane 1's 'a press is seen on the next frame'): the landing box stays where the thing is going until
+    // the desk's answer is painted, then fades once (none for reduced motion), so the hand never sees it snap back
+    const box = c.box; if (box) { box.hidden = false; Object.assign(box.style, l.box.reduce((o, v, i) => (o[["left", "top", "width", "height"][i]] = v + "px", o), {})); }
+    Promise.resolve(send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f })).finally(() => {
+      if (!box) return;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return box.remove();
+      box.style.transition = "opacity 160ms ease-out"; box.style.opacity = "0"; setTimeout(() => box.remove(), 200);
+    });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
