@@ -1,0 +1,17 @@
+# a6249: the Scripts lens (scripts, rocket-settings), appended to home-style
+role scpage : between gap, pad gap
+role schead : text up 3 medium, ink
+role scintro : text down, soft
+role sclist : between gap
+role sccard : on wash, edge rim, corner gap, pad gap, between gap /2
+role sctitle : text up 1 medium, ink
+role scdoes : text, ink
+role scmeta : text down, soft
+role scwarn : text down, warm
+role scpanel : between gap /4
+role scsettings : between gap /4
+role scsetting : between gap, align start
+role sclabel : text, ink
+role scnumber : text medium, ink, edge rim, corner gap /2, pad left gap /2, pad right gap /2, width 4em
+role scwords : between gap /4
+role sccode : text.mono down, ink, on glassdeep, corner gap /2, pad gap /2
