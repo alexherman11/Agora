@@ -90,6 +90,14 @@
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more, attachment) {
     const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
+    // a6010: the pressed part says at once that it was heard (data-sending, drawn by lens.html), until the answer is
+    // painted: a press that waits on the world is seen on the next frame, not ~300 ms later
+    const pressed = kept.get(n.key) && kept.get(n.key).el;
+    if (pressed) pressed.dataset.sending = "1";
+    try { return await sendNow(n, line, draft, more, attachment, token); }
+    finally { if (pressed) delete pressed.dataset.sending; }
+  }
+  async function sendNow(n, line, draft, more, attachment, token) {
     const observed = { ...(n.fence || {}), at: sceneAt, def, ...more }, gesture = attachment?.gesture || V.gesture(n.key, draft !== undefined);
     let r;
     try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture, image_context: attachment?.image }) })).json(); }
@@ -1006,12 +1014,18 @@
     const c = carrying; if (!c) return;
     const l = r ? landing(r, m) : null;
     over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = ""; c.el.style.animation = "";
-    if (c.box) c.box.remove();
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
-    if (!l) { V.hold = null; c.el.focus(); return; }
+    if (!l) { if (c.box) c.box.remove(); V.hold = null; c.el.focus(); return; }
     const f = c.seen.get(r.dataset.key) || r._n.fence || {};
-    send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f });
+    // a5994 round 2 (lane 1's 'a press is seen on the next frame'): the landing box stays where the thing is going until
+    // the desk's answer is painted, then fades once (none for reduced motion), so the hand never sees it snap back
+    const box = c.box; if (box) { box.hidden = false; Object.assign(box.style, l.box.reduce((o, v, i) => (o[["left", "top", "width", "height"][i]] = v + "px", o), {})); }
+    Promise.resolve(send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f })).finally(() => {
+      if (!box) return;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return box.remove();
+      box.style.transition = "opacity 160ms ease-out"; box.style.opacity = "0"; setTimeout(() => box.remove(), 200);
+    });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
@@ -1106,7 +1120,18 @@
       for (const child of frame.children) if (!state.kids.has(child)) { state.kids.add(child); endSizes.observe(child); }
     }
   }
-  async function refresh(force) {
+  // a6010 (a press fetched two whole scenes at once, its own and the stream's, each a build on the server): one scene
+  // request at a time. An ask while one is out queues one more, which starts when it ends and so sees the world after
+  // it; asks while one is queued join that one (forced if any of them was).
+  let queued = null, chain = Promise.resolve();
+  function refresh(force) {
+    if (queued) { queued.force = queued.force || !!force; return queued.p; }
+    const q = { force: !!force };
+    q.p = chain.then(() => { queued = null; return fetchScene(q.force); });
+    queued = q; chain = q.p.catch(() => {});
+    return q.p;
+  }
+  async function fetchScene(force) {
     const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
     const keys = encodeURIComponent("Enter,Tab,Shift+Tab,Backspace,Delete");
     const on = q.get("on") ? `&on=${encodeURIComponent(q.get("on"))}` : "";   // a5949 (Sable's a4270): the thing the lens stands on

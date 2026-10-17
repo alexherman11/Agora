@@ -1,0 +1,179 @@
+# ===== LAMPLIT (a6057, lane 3: the living system). Everything above is home-style as it stood when this was built;
+# everything below overrides it (a style's later line of one name wins), so the direction wears every role the HUD has
+# and never misses one added later (build.py reads home-style afresh).
+# The rule: the house at night, seen from outside. Only what is alive gives light, and colour says whose move it is.
+#   amber (lamp)  your move: it waits on you            mint (lit)  an agent is acting this moment
+#   lilac (jeff)  JEFF's move, and JEFF himself          grey        the machine's, or nobody's: queued, ready, past
+# Controls and selection are white, never a colour, so no colour is ever spent on chrome. Numbers and times are in a
+# mono, so they line up and do not jitter. Nothing moves.
+font sans = Geist, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif
+font mono = Geist Mono, Cascadia Code, ui-monospace, monospace
+token night = #06080B
+token paper = #0A0D11
+token ink = #E7EBF0
+token glass = #0A0D11CC
+token glassdeep = #0B0E13EE
+token rim = ink at 8%
+token soft = ink at 58%
+token faint = ink at 32%
+token ghost = ink at 12%
+token wash = #E7EBF00D
+token raised = #E7EBF009
+token raisedhi = #E7EBF012
+token mine = #E7EBF014
+token focus = ink at 35%
+# the three lights
+token lamp = #FFB547
+token lampwash = #FFB54719
+token lit = #63E2C0
+token litwash = #63E2C014
+token jeff = #B9A8FF
+token jeffwash = #B9A8FF1A
+token jeffwash2 = #B9A8FF1A
+# accent was mint everywhere; here it is white: a chosen thing, a button, a focus. Life has its own colour.
+token accent = #E7EBF0
+token accentwash = #E7EBF014
+token warm = #FFB547
+token warmwash = #FFB54719
+# the machine's lanes (ready, landing) are grey: nobody has to act
+token sky = #8E97A4
+token skywash = #8E97A41A
+token teal = #8E97A4
+token tealwash = #8E97A41A
+token mark = #FFB547
+token text = sans 15/1.5
+token text.mono = mono 12/1.5
+token text.big = mono 40/1
+token text.num = mono 26/1
+token text.label = mono 11/1.4
+# --- the glance (direction-living-glance)
+role widgets : between gap x4, align center
+role lgband : between gap x5, align center
+role lgclock : between gap /4
+role lgtime : text.big, ink
+role lgday : text.label tracked, soft
+role lgsentence : between gap x3, align center, pad left gap x4, border left rim
+role lgstat : between gap, align center
+role lgnum : text.num, soft
+role lgnum.you : text.num medium, lamp
+role lgnum.lit : text.num medium, lit
+role lgword : text down, faint
+role lgword.you : text down medium, lamp
+role lgword.lit : text down, lit
+role lgcalm : text down, faint
+# --- The house (direction-living-house, -small)
+role lhouse : between gap x1.5
+role lhlist : between gap
+role lhme : between gap x1.5,pad gap, pad left gap x1.5, on wash, corner gap, rail lamp
+role lhname.you : text medium, lamp, width 4em
+role lhdoing : text, ink
+role lhbeing : on raised, rail lit,corner gap, pad gap, pad left gap x1.5, between gap /2
+role lhbeing.asks : on jeffwash, rail jeff, corner gap, pad gap, pad left gap x1.5, between gap /2
+role lhbeing.you : on lampwash, rail lamp, corner gap, pad gap, pad left gap x1.5, between gap /2
+role lhcol : between gap /2
+role lhhead : between gap x1.5
+role lhwhat : text medium, ink
+role lhwho : text.label, lit
+role lhname : text medium, ink
+role lhname.jeff : text medium, jeff
+role lhline : between gap
+role lhstate.asks : text.label medium, jeff
+role lhstate.you : text.label medium, lamp
+role lhsince : text.label, faint
+role lhword : text down, soft
+role lhrest : between gap,pad top gap, border top rim
+role lhrestlabel : text.label tracked, faint
+role lhrestnames : between gap x1.5
+role lhrestname : text down, faint
+role lhcalm : text down, faint
+role lhsmall : between gap
+role lhsmall.lit : text down medium, lit
+# --- the notices (direction-living-notices; home-notices' roles, recoloured by whose move it is)
+role nbar : between gap
+role nbell : between gap, align center, on glass, edge rim, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap /2, width 36em
+role nquiet : text down, faint
+role nheld : text down, soft
+role nline : between gap, align center
+role ndot : text down 2, faint
+role ndot.you : text down 2, lamp
+role nlabel : text down medium, soft
+role nlabel.you : text down medium, lamp
+role ntitle : text down, ink
+role ncounts : between gap /2
+role ncount : text.label medium, soft, on wash, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role ncount.you : text.label medium, night, on lamp, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role nmore : text down 2, soft, pad left gap /2, pad right gap /2
+role nhead : text.label tracked, faint, space above gap /2
+role nhead.you : text.label tracked, lamp, space above gap /2
+role nitem : on wash, corner gap, pad gap /2, pad left gap, between gap /2
+role nitem.you : on lampwash, corner gap, pad gap /2, pad left gap, between gap /2, rail lamp
+role nat : text.label, faint
+# --- the frame: panes are dark glass with a hairline; their titles are quiet labels, so the contents lead
+role brand : text.label tracked, faint
+role pane : on glass, edge rim, corner gap x2, pad gap x2, between gap x1.5
+role pane.big : on glassdeep, edge rim, corner gap x2, pad gap x2, between gap x1.5
+role panehead : between gap
+role panetitle : text.label medium tracked, soft
+role panesum : text down, soft
+role summary : text down, soft
+role hint : text down 2, faint
+role meta : text down, soft
+role tool : text down, faint, pad gap /2
+# --- the board (lane 1's lens, worn in this light): a card is lit only while its worker is at work; one that asks
+# JEFF is lilac, one that asks you is amber (the lens says asks; the colour is JEFF's, the asker of most); the rest grey
+role bdlivecount : text.label medium, lit
+role bddot : text down, faint
+role bddot.asked : text down, faint
+role bddot.working : text down, lit
+role bddot.ready : text down, soft
+role bddot.landing : text down, soft
+role bdlanename : text.label medium tracked, soft
+role bdcount : text.label medium, faint, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.asked : text.label medium, soft, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.working : text.label medium, lit, on litwash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.ready : text.label medium, soft, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.landing : text.label medium, soft, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcard : on raised, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.asked : on raised, rail ghost, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.working : on raised, rail faint, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.live : on raisedhi, rail lit, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.asking : on jeffwash, rail jeff, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.ready : on raised, rail soft, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.landing : on raisedhi, rail soft, edge rim, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.landed : corner gap, pad gap /4, pad left gap x1.5, pad right gap
+role bdtitle.landed : text down, faint
+role bdwho : text.label, faint
+role bdstate : text.label medium, lit
+role bdstate.asking : text.label medium, jeff
+# --- what waits on you is the amber list
+role count : text.label medium, night, on lamp, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role wait : on lampwash, rail lamp, corner gap, pad gap, pad left gap x1.5, between gap /4
+role wait.on : on lampwash, rail lamp, edge lamp, corner gap, pad gap, pad left gap x1.5, between gap /4
+role tag : text.label tracked, faint
+role tag.demo : text.label medium tracked, lamp
+role tag.design : text.label medium tracked, jeff
+# --- the old At work and the chat: life is mint, JEFF lilac, you plain
+role live : lit
+role busy : between gap, pad top gap /2
+role thinking : text down, jeff
+role dots : jeff
+role face : on jeffwash, jeff, text up 2 strong, corner gap x3, pad gap, pad left gap x2, pad right gap x2
+role bubble : on wash, corner gap x1.5, pad gap x1.5
+role bubble.mine : on mine, corner gap x1.5, pad gap x1.5
+role bubble.jeff : on jeffwash, corner gap x1.5, pad gap x1.5
+role author : text down medium, soft
+role chip.on : text down medium, night, on ink, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role button : on ink, night, text down medium, pad gap, pad left gap x2, pad right gap x2, corner gap x2
+# --- the timer: running is alive (mint); idle is grey; done is your move (amber)
+role pomoring : text.label medium, lit, width gap x7
+role pomoring.still : text.label medium, faint, width gap x7
+role pomoring.done : text.label medium, lamp, width gap x7
+role pomomode : text.label tracked, faint
+role pomomode.on : text.label medium tracked, lit
+role pomobtn : text down 2 medium, night, on ink, corner gap x2, pad gap /4, pad left gap, pad right gap
+role pomochip : text down 2, soft, edge rim, corner gap x2, pad gap /4, pad left gap, pad right gap
+# --- the dock: white for what is open
+role appicon.on : on mine, edge ink, corner gap x1.5, pad gap, width gap x11, between gap /4
+role dockchip.on : ink, on wash, edge ink, corner gap, pad gap /2, pad left gap, pad right gap
+role railitem.on : ink, on glassdeep, edge ink, corner gap x1.5, pad gap, between gap /4
+role landing : on wash, edge ink, corner gap x2

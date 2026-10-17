@@ -90,6 +90,8 @@
   .boxed { position: absolute; box-sizing: border-box; overflow: hidden; margin: 0; }
   .clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
   [data-clamped][data-cut="1"], [data-clamped][data-opened="1"] { cursor: pointer; }
+  /* a6010: a pressed part whose answer is on its way: dimmed at once, a state and not a motion, until it is painted */
+  [data-sending="1"] { opacity: .5; cursor: progress; }
   /* `scroll none` (a5496): never scrolls; a part cut at its foot fades there, so the eye knows there is more */
   /* and it keeps inside its parent: it may shrink below its words, and a row of it is one line (a wrapping row's line
      grows as tall as its tallest child, which pushed a column of panels off the screen) */
@@ -106,7 +108,7 @@
   /* a5994: where a carried thing will land, drawn while it is in the air (the receiver's half on the side its act
      names, or the whole receiver). Its look is the style's role `landing` when the style has one; this is the floor */
   .landing-box { position: fixed; pointer-events: none; z-index: 29; box-sizing: border-box; border-radius: 10px;
-    border: 2px solid var(--t-accent, currentColor); background: color-mix(in srgb, var(--t-accent, #888) 16%, transparent); }
+    border: 2px solid var(--t-ink, currentColor); background: color-mix(in srgb, var(--t-ink, #888) 10%, transparent); }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
   /* `media` (a5941, media.js): films and pictures under the words, or one filling its part (`media player`). Sizes
