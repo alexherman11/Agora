@@ -29,8 +29,9 @@ ABOUT = ("Alex's own scripts, each a note the house keeps in step with its file 
          "is written and the note says so. The house never runs a script from here. To bring another one in: a note "
          "here with role=script, file=<its path>, does=<one plain sentence>, runs=<how it is started>; the house fills "
          "in its words. Open the lens scripts-page to see them as Alex does.")
-DOES = ("Lets Rocket League run for a set time each day, warns you 7 minutes before the end, lets a match you are "
-        "in finish, then closes the game until tomorrow.")
+DOES = ("Lets Rocket League run for a set time each day, warns you 7 minutes before the end with a small note over "
+        "the game that never takes it away from you, lets a match you are in finish, then closes the game until "
+        "tomorrow.")
 RUNS = ("Windows starts it quietly in the background and one copy watches all day. A new version starts working the "
         "next time you sign in; after that a changed setting counts within seconds.")
 WHY_NOT = "Never run from here: it closes a game."

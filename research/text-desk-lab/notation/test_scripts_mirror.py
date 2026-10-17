@@ -255,6 +255,14 @@ if shutil.which("powershell.exe"):
     want = {"Monday": 30, "Tuesday": 30, "Wednesday": 30, "Thursday": 30, "Friday": 30, "Saturday": 60, "Sunday": 60}
     got = {m.group(1): int(m.group(2)) for m in re.finditer(r"(\w+day)\s+limit (\d+) min", out)}
     check("dry run, no settings file: 30 on weekdays, 60 on Saturday and Sunday", got == want, got)
+    warns = re.findall(r"after (\d+) min: '7 minutes of Rocket League left", out)
+    check("dry run: each day says when its 7-minute notice comes (23 on weekdays, 53 at the weekend)",
+          warns == ["23"] * 5 + ["53"] * 2, warns)
+    check("dry run: each day says what the notices at the end say, and the wait for a match stays",
+          out.count("closes when this match ends.' (waits up to 10 min for it)") == 7
+          and out.count("not in a match: 'Rocket League time is up for today.") == 7, out[-600:])
+    check("the notice is an overlay that takes no focus, not a message box",
+          "WS_EX_NOACTIVATE" in new_text and ".Popup(" not in new_text)
     settings_file.write_text(json.dumps({"weekday_minutes": 45, "weekend_minutes": 90}), encoding="utf-8")
     out = dry("-Clock", "2026-10-17", "-SettingsFile", str(settings_file))
     print(out.rstrip())
