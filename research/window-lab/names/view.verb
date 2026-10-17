@@ -1,0 +1,4 @@
+# view <id>: open it in your home base's viewer (the middle, beside JEFF's chat), with Back to what was open before (a6109).
+# Every name the home base draws for an id presses this, through `on link do view $value` on the home base's root.
+# Pressing what is already open does nothing. JEFF may use it only when Alex asked to be shown something.
+do prop prop:role=home-view,prop:actor=$me back=$(max($viewing of prop:role=home-view,prop:actor=$me)) viewing=$1 find="" with="" when count(prop:role=home-view,prop:actor=$me,prop:viewing=$1) = 0
