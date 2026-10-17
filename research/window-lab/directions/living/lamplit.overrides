@@ -9,8 +9,9 @@
 # raisedhi, mine, rim (and their *wash forms: warmwash, jeffwash, accentwash); never a hex. A lens that adds roles
 # appends them to home-style, one desk line each. research/window-lab/directions/living/apply.py lint lists any role
 # that breaks this and any role a lens in the Home base room uses that home-style lacks.
-# How this text is made: apply.py reads the live home-style, adds lane 1's board roles (nb*) and a5988's feed roles
-# (wf*) where it lacks them, then these lines, and keeps the last definition of each name: one flat style.
+# How this text is made: apply.py reads the live home-style, adds a5988's feed roles (wf*) where it lacks them, then
+# these lines, and keeps each name once (where it first stood, in its last words): one flat style. Lane 1's board roles
+# (nb*) are its own marked block, written by its apply and never overridden here.
 font sans = Geist, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif
 font mono = Geist Mono, Cascadia Code, ui-monospace, monospace
 token night = #06080B

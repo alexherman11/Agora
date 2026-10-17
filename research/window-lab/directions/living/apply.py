@@ -22,9 +22,13 @@ assembles the three in one pass.
     python research/window-lab/directions/living/apply.py undo <saved dir> [--as <who>]     undo.desk through the door
 
 What it does, in order (a style's roles before the lenses that use them, so nothing is ever uncompiled):
-  1. home-style (a5206) is rewritten as ONE flat style: the live text as read at that moment, then lane 1's nb* roles
-     and a5988's wf* roles that it lacks (board-lab/nb.style-roles, home-feed/feed.style), then lamplit.overrides; the
-     last definition of each name is kept, so it is a superset of what it replaces.
+  1. home-style (a5206) is rewritten as ONE flat style: the live text as read at that moment, then a5988's wf* roles
+     it lacks (home-feed/feed.style), then lamplit.overrides; each name stands where it first stood with the words of
+     its last definition, so it is a superset of what it replaces. Lane 1's marked nb* block is kept as it stands
+     (this lane never writes nb* roles). Run twice, it gives the same text.
+ORDER, when the three lanes go live together (agreed on the table a6049): lane 2's tiling and a5988's feed half first,
+then lane 1's board apply, then this one (it reads home-style as they left it). This lane needs lane 2's tiling for a
+glance number to fill the room (full=) and a5988's home-feed lens for a press in The house to show a feed.
   2. lenses, each a note in Home base (f5204), style=home-style: home-glance (widget, order 1), home-timer-bar (widget,
      order 3), home-timer, home-house, home-house-small; home-notices (a5530's widget) is rewritten with this lane's.
   3. widgets: home-clock, home-now and home-pomodoro lose their `widget` tag (the glance holds the time; Now and the
@@ -48,7 +52,9 @@ WL = HERE.parents[1]
 LAB = WL.parent / "text-desk-lab" / "notation"
 ROOM = "f5204"
 DOOR = "http://127.0.0.1:8794/api/do"
-BORROWED = [WL / "board-lab" / "nb.style-roles", WL / "home-feed" / "feed.style"]
+# a5988's feed roles where home-style lacks them (lane 1's nb* roles are NOT borrowed: lane 1's own apply writes them
+# as one marked block, agreed on the table a6049, c6262, so two copies never stand)
+BORROWED = [WL / "home-feed" / "feed.style"]
 # (title, tags, props): the lenses this lane puts in Home base
 LENSES = [("home-timer", "lens", ""),
           ("home-timer-bar", "lens,widget", "slot=bar order=3 size=s"),
@@ -263,9 +269,14 @@ def plan(w, chat=False):
         report.append("panel: The house is already Alex's (lens=home-house)")
     else:
         report.append("panel: Alex has no At work panel (lens=home-work); The house is not placed (make a panel note)")
-    # 5. glance tags
+    # 5. glance tags (agreed, a6049 c6262): lane 1's apply tags The board glance-you and glance-board; Waiting on you is
+    # tagged glance-you here only while no panel answers 'you' yet, and the assembler takes it off when the board lands
+    claimed = set(re.findall(r"^\s+(a\d+) note ", w.do(f"find {PANEL},tag:glance-you"), re.M))
     for lens, tag in (("waiting-on-me", "glance-you"), ("home-house", "glance-work"), ("home-work", "glance-work"),
                       ("home-board", "glance-board"), ("direction-board-inbox", "glance-board")):
+        if tag == "glance-you" and claimed:
+            report.append(f"glance-you: already answered by {' '.join(sorted(claimed))}; Waiting on you left untagged")
+            continue
         f = w.do(f"find {PANEL},prop:lens={lens}")
         for pid in re.findall(r"^\s+(a\d+) note ", f, re.M):
             lines += [f"read {pid}", f"do tag {pid} add={tag}"]

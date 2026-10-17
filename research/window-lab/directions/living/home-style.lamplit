@@ -311,67 +311,23 @@ role folded : text down, soft
 role typing : text.mono down, soft
 role pending : on glassdeep, edge ink, corner gap x1.5, pad gap, between gap /2, space above gap
 role light : on warmwash
-# from board-lab/nb.style-roles (roles home-style did not have yet)
-role nb : between gap x2
-role nbbands : between gap x3
-role nbband : between gap /2
-role nbhead : between gap, pad bottom gap /2, pad left gap /2
-role nbname : text down 2 medium tracked, soft
-role nbname.need : text down 2 medium tracked, warm
-role nbname.link : text down 2 medium, ink
-role nbcount : text down 2 medium, soft
-role nbcount.need : text down 2 medium, night, on warm, corner gap x2, pad left gap /1.5, pad right gap /1.5
-role nbquiet : text down 2, soft
-role nblive : text down 2, accent
-role nbcards : between gap /2
-role nblater : between gap /2, space above gap /2
-role nbjeff : between gap /4, space above gap /2
-role nbfold : text down 2 medium tracked, soft, pad gap /4
-role nbfold.jeff : text down 2 medium tracked, jeff, pad gap /4
-role nbchev : text down 2, faint
-role nbneed : on raised, rail warm, corner gap, pad gap /1.5, pad left gap x1.5, pad right gap
-role nbneed.fail : on raised, rail warm, corner gap, pad gap /1.5, pad left gap x1.5, pad right gap
-role nbline : between gap, align center
-role nbbody : between gap, pad top gap /2, pad bottom gap /2
-role nbtop : between gap
-role nbkind : text down 2, soft
-role nbkind.review : text down 2 medium tracked, warm
-role nbkind.design : text down 2 medium tracked, warm
-role nbkind.fail : text down 2 medium tracked, warm
-role nbwhen : text down 2, soft
-role nbtitle : text medium, ink
-role nbgist : text down, soft
-role nbacts : between gap
-role nbgo : text down 2 medium, night, on ink, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
-role nbbtn : text down 2, ink, edge rim, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
-role nbinput : text down, ink, on wash, corner gap, pad gap
-role nbrows : between gap /4
-role nbrow : corner gap, pad gap /2, pad left gap x1.5, pad right gap
-role nbrow.live : corner gap, pad gap /2, pad left gap x1.5, pad right gap
-role nbrowtitle : text down, ink
-role nbstage : text down 2, soft
-role nbstage.live : text down 2 medium, accent
-role nbstage.jeff : text down 2 medium, jeff
-role nbstage.queued : text down 2, soft
-role nbstage.working : text down 2, soft
-role nbstage.asks : text down 2 medium, jeff
-role nbstage.ready : text down 2, soft
-role nbstage.landing : text down 2, soft
-role nbnow : text down 2, accent
-role nbnote : between gap /4, pad left gap, border left rim
-role nbnoteby : text down 2 medium, soft
-role nbnotetext : text down, ink
-role nbdone : between gap, pad gap /4, pad left gap x1.5, pad right gap
-role nbdonetitle : text down, soft
-role nbfocus : on raised, rail warm, corner gap x1.5, pad gap x2, pad left gap x2.5, between gap
-role nbtitle.big : text up 2 medium, ink
-role nbwho : text down 2, soft
-role nbsteps : between gap /2
-role nbstep : text down 2, faint
-role nbstep.done : text down 2, soft
-role nbstep.on : text down 2 medium, night, on ink, corner gap x2, pad left gap /1.5, pad right gap /1.5
-role nbstep.jeff : text down 2 medium, night, on jeff, corner gap x2, pad left gap /1.5, pad right gap /1.5
-role nbstep.ask : text down 2 medium, night, on jeff, corner gap x2, pad left gap /1.5, pad right gap /1.5
+# a6249: the Scripts lens (scripts, rocket-settings), appended to home-style
+role scpage : between gap, pad gap
+role schead : text up 3 medium, ink
+role scintro : text down, soft
+role sclist : between gap
+role sccard : on wash, edge rim, corner gap, pad gap, between gap /2
+role sctitle : text up 1 medium, ink
+role scdoes : text, ink
+role scmeta : text down, soft
+role scwarn : text down, warm
+role scpanel : between gap /4
+role scsettings : between gap /4
+role scsetting : between gap, align start
+role sclabel : text, ink
+role scnumber : text medium, ink, edge rim, corner gap /2, pad left gap /2, pad right gap /2, width 4em
+role scwords : between gap /4
+role sccode : text.mono down, ink, on glassdeep, corner gap /2, pad gap /2
 # from home-feed/feed.style (roles home-style did not have yet)
 role busy.on : between gap, pad top gap /2, on wash, edge ink, corner gap
 role wfline : between gap, pad gap /4
@@ -393,8 +349,9 @@ role wfwords.errors : text down medium, ink
 # raisedhi, mine, rim (and their *wash forms: warmwash, jeffwash, accentwash); never a hex. A lens that adds roles
 # appends them to home-style, one desk line each. research/window-lab/directions/living/apply.py lint lists any role
 # that breaks this and any role a lens in the Home base room uses that home-style lacks.
-# How this text is made: apply.py reads the live home-style, adds lane 1's board roles (nb*) and a5988's feed roles
-# (wf*) where it lacks them, then these lines, and keeps the last definition of each name: one flat style.
+# How this text is made: apply.py reads the live home-style, adds a5988's feed roles (wf*) where it lacks them, then
+# these lines, and keeps each name once (where it first stood, in its last words): one flat style. Lane 1's board roles
+# (nb*) are its own marked block, written by its apply and never overridden here.
 # the four lights
 # home-style's other colour tokens, folded into the rule: the machine's lanes are grey; a mark in a document is warm
 token text.big = mono 30/1
