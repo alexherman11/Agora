@@ -753,10 +753,24 @@ def house_rows(desk, corner=None):
     return out
 
 
-def rows(desk, source, session=None):
+def rows(desk, source, session=None, memo=None):
     """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection). 8 Oct (step 3):
     the source may be followed by terms over its fields, read by the one comparison (`house doing=awake`,
-    `messages:a12 who=alex`, `sayings for:claude answered=no`; knife.filter_rows)."""
+    `messages:a12 who=alex`, `sayings for:claude answered=no`; knife.filter_rows). memo (a6010): a dict kept for one
+    lens build, while the world holds still: a source's rows are made once and each set of terms filters them (a board
+    asked `house doing=working resident=<its worker>` once per card). Its keys are ("base", <source>)."""
+    if memo is not None:
+        import knife
+        src = source.strip()
+        first, _, rest = src.partition(" ")
+        if source_head(src) not in ("captures", "sayings"):
+            if ("base", first) not in memo:
+                memo[("base", first)] = _rows_of(desk, first, session)
+            rs = memo[("base", first)]
+            terms = [t for t in re.split(r"[,\s]+", rest) if t]
+            if rs is None or not terms:
+                return None if rs is None else list(rs)
+            return knife.filter_rows(desk.world, rs, terms, __import__("persons").active(desk), SOURCES[source_head(src)][0])
     import knife
     src = source.strip()
     first, _, rest = src.partition(" ")
@@ -2386,6 +2400,10 @@ def to_words(scene, name, who, at, roots=None, part=None, start=1, whole=False):
     return "\n".join(out), [n for n, a, b, ok in spans if ok and a >= lo and b <= hi]
 
 
+import weakref as _weakref
+_LENSES = _weakref.WeakKeyDictionary()
+
+
 def find_lens(desk, name, at=None):
     """A lens by title, regardless of case, nearest first (verbs.nearest; 9 Oct, step 7): the room `at` (a placing
     lens's own, else where the line stands), the rooms around it, the house, then unplaced (a removed lens leaves its
@@ -2393,7 +2411,17 @@ def find_lens(desk, name, at=None):
     import kinds
     import verbs
     w = desk.world
-    hits = [s for s in w.subjects.values() if kinds.is_lens(s) and s["title"].lower() == name.lower()]
+    # a6010: the lenses by title, made once per change of the world (the home base asked ~20 times a build, each a walk
+    # over every subject); every change to a title or a tag is an event, so the events' count keys it
+    key = (getattr(w, "_eseq", 0), len(w.events), len(w.subjects))
+    hit = _LENSES.get(w)
+    if hit is None or hit[0] != key:
+        by = {}
+        for s in w.subjects.values():
+            if kinds.is_lens(s):
+                by.setdefault(s["title"].lower(), []).append(s)
+        hit = _LENSES[w] = (key, by)
+    hits = list(hit[1].get(name.lower(), ()))
     try:
         s = verbs.nearest(desk, hits, name, "lenses", at)
     except Refusal as e:
