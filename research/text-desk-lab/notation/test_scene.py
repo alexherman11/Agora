@@ -1462,7 +1462,6 @@ def test_markdown_is_a_document_and_its_wikilinks_name_things():
     """a5820: `markdown` paints a text as a Markdown document; the painter reads it, the scene names each [[target]]:
     an id stays that thing (a rename keeps it), a title is matched whole in any case, and what names nothing says so."""
     refused("x : column, markdown", "prints no text")
-    refused('x : text "a", on link do prop $item open=$value', "has no `markdown`")
     import deskd, lens_ir
     tmp = _scratch("_test_markdown")
     try:
@@ -1485,6 +1484,51 @@ def test_markdown_is_a_document_and_its_wikilinks_name_things():
             assert "markdown · links 1 of 2" in scene.to_text(sc, "w", "jeff", 0)
             by_title = scene.wikilinks_of(w, f"[[{title.upper()}]]")[title.upper()]
             assert by_title["id"] and by_title["title"].lower() == title.lower()
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_ids_in_words_are_drawn_as_the_names_of_what_they_name():
+    """a6109 (Alex, 16 Oct: 'I should never see id names'): an id in words that are only read is drawn as its thing's
+    name, a link carrying the id; an id-looking word that names nothing, an id in code, a text that says `ids` and a
+    text being written keep their words. The printer and the fence keep the words as written."""
+    refused("x : column, ids", "prints no text")
+    import deskd, lens_ir
+    tmp = _scratch("_test_names")
+    try:
+        with deskd.Session("_test_names", "jeff") as desk:
+            w = desk.world
+            some = next(i for i, n in w.nodes.items() if i.startswith("a") and n.get("type") != "surface" and (w.subjects.get(n.get("subject")) or {}).get("title"))
+            title = w.subjects[w.nodes[some]["subject"]]["title"]
+            sid = w.nodes[some]["subject"]
+            room = next(i for i, n in w.nodes.items() if n.get("type") == "surface" and n.get("title"))
+            cs = next(((s, c) for s in w.subjects.values() for c in s.get("comments") or [] if s.get("title") and w.appearances_of(s["id"])), None)
+            ev = {"id": "e99999", "verb": "comment", "target": some, "args": {}, "undo": None, "note": "", "by": "pike", "at": "2026-10-16T12:00:00"}
+            w.events.append(ev)                              # the probe world's own events are e1..e9, too short to be ids
+            ghost = "a" + str(10 ** 9)                      # id-shaped, names nothing
+            words = f"see {some}, {sid} in {room}; {ghost} and a12x and xa{some[1:]} and `{some}` and {ev['id']}" + (f" and {cs[1]['id']}" if cs else "")
+            src = chr(10).join(["w : column, on link do prop $item open=$value", f'  t : text "{words}"', f'  raw : text "{words}", ids',
+                                f'  ed : text "{words}", on edit do rewrite $item text="$value"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            t, raw, ed = scene.painter_view(sc)["kids"]
+            rs = t["paint"]["runs"]
+            named = {r["id"]: r for r in rs if r.get("mark") == "thing"}
+            assert t["paint"]["text"] == words, "the words stay as written"
+            assert named[some]["text"] == scene._short(title) and named[some]["open"] == some and some in named[some]["title"]
+            assert named[sid]["open"] == some, "a subject id opens where it appears"
+            assert named[room]["text"] and named[room]["kind"] == "surface"
+            assert ghost not in named and ghost in "".join(r["text"] for r in rs), "an id that names nothing stays as words"
+            assert "a12x" in "".join(r["text"] for r in rs) and f"xa{some[1:]}" in "".join(r["text"] for r in rs)
+            assert any(r.get("role") == "code" and r["text"] == some for r in rs), "an id in code stays code"
+            assert named[ev["id"]]["kind"] == "event" and named[ev["id"]]["text"].endswith(scene._short(scene._ctx_for(w, ev["target"])["title"], 36))
+            if cs:
+                assert named[cs[1]["id"]]["text"].startswith("comment by ") and named[cs[1]["id"]]["open"] == w.appearances_of(cs[0]["id"])[0]
+            assert not any(r.get("mark") == "thing" for p in (raw["paint"], ed["paint"]) for r in p.get("runs") or [])
+            assert words in scene.to_text(sc, "w", "jeff", 0), "the printer prints the words"
+            assert any(a["on"] == "link" for a in scene.painter_view(sc)["acts"]), "`on link` may stand on any part"
+            worker = scene.things_of(w, "worker-" + some)["worker-" + some]
+            assert worker["name"].startswith("worker on ") and worker["open"] == some
     finally:
         tmp.unlink(missing_ok=True)
 

@@ -557,19 +557,19 @@
     if (!window.Markdown) { el.textContent = p.text; return; }
     const a = n.acts.find(x => x.on === "edit");
     const md = Markdown.create({
-      text: a ? V.words(n.key, p.text, n.fence) : p.text, links: p.wikilinks, titles: p.titles, hint: p.hint, editable: !!a,
+      text: a ? V.words(n.key, p.text, n.fence) : p.text, links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint, editable: !!a,
       light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
       typed: s => V.typed(n.key, s, { key: n.key, fence: el._n.fence }),
       save: s => mdSave(el, s),
       follow: async id => {
-        const link = el._n.acts.find(x => x.on === "link");
-        if (!link) return V.show("this document's links open nowhere here (its lens has no `on link`)");
+        const at = linkFor(el);                                   // a6109: its own `on link`, or the nearest above it
+        if (!at) return V.show("this document's links open nowhere here (no `on link` on it or above it)");
         if (a && V.drafts.has(el._n.key)) await mdSave(el, md.src());
-        send(el._n, link.line.replace(/\$value\b/g, () => TEXT.esc(id)));
+        send(at._n, at._n.acts.find(x => x.on === "link").line.replace(/\$value\b/g, () => TEXT.esc(id)));
       },
       notify: t => V.show(t),
     });
-    el._md = md; el._mdLinks = JSON.stringify(p.wikilinks || {}); el.classList.add("md-part"); el.append(md.el);
+    el._md = md; el._mdLinks = JSON.stringify([p.wikilinks || {}, p.things || {}]); el.classList.add("md-part"); el.append(md.el);
     if (!a) return;
     md.el.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
     md.el.addEventListener("blur", () => {
@@ -588,8 +588,8 @@
   }
   function mdFresh(el, n, p) {
     el._n = n;
-    const l = JSON.stringify(p.wikilinks || {});
-    if (l !== el._mdLinks) { el._mdLinks = l; el._md.links(p.wikilinks); }
+    const l = JSON.stringify([p.wikilinks || {}, p.things || {}]);
+    if (l !== el._mdLinks) { el._mdLinks = l; el._md.links(p.wikilinks, p.things); }
     el._md.lights(p.light);                                     // a5949: a new comment's words light at once
   }
 
@@ -711,10 +711,12 @@
   // more arm in scene.marks_of. Read, a mark is drawn; edited, it is its source, as a code run is.
   const MARKS = {
     kinds: { strong: { tag: "strong", wrap: ["**", "**"], key: "b" }, stress: { tag: "em", wrap: ["*", "*"], key: "i" },
-             both: { tag: "strong", look: "t-mark-strong t-mark-stress" }, link: { tag: "a", wrap: ["[", "](https://)"], key: "k" } },
+             both: { tag: "strong", look: "t-mark-strong t-mark-stress" }, link: { tag: "a", wrap: ["[", "](https://)"], key: "k" },
+             thing: { tag: "a" } },          // a6109: an id in the words, drawn as the name of what it names (scene.things_of)
     draw(r) {
       const m = document.createElement(this.kinds[r.mark].tag); m.className = "t-mark " + (this.kinds[r.mark].look || "t-mark-" + r.mark); m.textContent = r.text;
       if (r.mark === "link") { m.dataset.href = r.href; m.title = r.href + "  (Ctrl+click opens it)"; }
+      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = r.title + (r.open ? "  (click opens it)" : ""); }
       return m;
     },
     // Ctrl+B and the like, in the source: wrap what is selected, or take the mark off when it is already there
@@ -781,6 +783,23 @@
   }
   document.addEventListener("pointerup", () => setTimeout(selectGesture, 0));
   document.addEventListener("keyup", e => { if (e.shiftKey || e.key === "Shift") selectGesture(); });
+  // a6109 (Alex: 'names of things ... should ALL be clickable'): a name drawn for an id opens what it names, by the
+  // nearest `on link` above it (the home base's root says where: its viewer), $value the id. With none above, the press
+  // is the part's own, as a press on its words always was. Caught before the parts' own clicks, so a name on a card
+  // opens the name, not the card. Words being highlighted are not a press.
+  function linkFor(el) {
+    let k = el.closest("[data-key]");
+    while (k && !(k._n && k._n.acts.some(a => a.on === "link"))) k = k.parentElement && k.parentElement.closest("[data-key]");
+    return k;
+  }
+  document.addEventListener("click", e => {
+    const a = e.target.closest && e.target.closest(".t-mark-thing");
+    if (!a || !paint.contains(a) || !a.dataset.thing || String(getSelection())) return;
+    if (a.closest("[contenteditable]") && !(e.ctrlKey || e.metaKey)) return;
+    const at = linkFor(a); if (!at) return;
+    e.preventDefault(); e.stopPropagation();
+    send(at._n, at._n.acts.find(x => x.on === "link").line.replace(/\$value\b/g, () => TEXT.esc(a.dataset.thing)));
+  }, true);
   document.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest(".t-mark-link");
     if (!a || !/^https?:/.test(a.dataset.href || "")) return;

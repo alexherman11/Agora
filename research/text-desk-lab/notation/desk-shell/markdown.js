@@ -149,6 +149,7 @@
     /(?<![\w])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w])/.source, // 13 stress
     /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/.source,          // 14 bare address
     /(?<![\w&#])(#[A-Za-z][\w/-]*)/.source,                      // 15 tag
+    /(?<![\w-])((?:worker-)?(?:[afsce]\d{2,}|m\d{2,}))(?![\w-])/.source,   // 16 a bare id (a6109): drawn as its name
   ].join("|"), "g");
 
   function syn(t) { const s = document.createElement("span"); s.className = "md-syn"; s.textContent = t; return s; }
@@ -187,6 +188,16 @@
       else if (m[13] != null) put("em", "", m[13], "_", "_");
       else if (m[14] != null) { const a = document.createElement("a"); a.className = "md-a"; a.dataset.href = m[14]; a.textContent = m[14]; into.append(a); }
       else if (m[15] != null) { const t = document.createElement("span"); t.className = "md-tag"; t.textContent = m[15]; into.append(t); }
+      else if (m[16] != null) {
+        // a6109: an id the scene names (ctx.things) shows the name, the id kept as the hidden source; any other stays words
+        const hit = (ctx.things || {})[m[16]];
+        if (!hit) into.append(m[16]);
+        else {
+          const a = document.createElement("span"); a.className = "md-wl md-thing"; a.dataset.target = m[16]; a.title = hit.title;
+          a.append(syn(m[16])); const t = document.createElement("span"); t.dataset.deco = "1"; t.contentEditable = "false"; t.textContent = hit.name; a.append(t);
+          into.append(a);
+        }
+      }
       at = rx.lastIndex;
     }
     if (at < text.length) into.append(text.slice(at));
@@ -360,10 +371,10 @@
   }
 
   // ---- the editor --------------------------------------------------------------------------------------------------
-  // opts: { text, links, titles [{id,title,kind}], hint, editable, typed(src), save(src) -> Promise, follow(id, title) }
+  // opts: { text, links, things {id: {name, title, open}}, titles [{id,title,kind}], hint, editable, typed(src), save(src) -> Promise, follow(id, title) }
   function create(opts) {
     const root = document.createElement("div"); root.className = "md-doc";
-    let src = opts.text || "", ctx = { links: opts.links || {} }, raw = false, active = new Set(), undo = [], redo = [], lastPush = 0, composing = false;
+    let src = opts.text || "", ctx = { links: opts.links || {}, things: opts.things || {} }, raw = false, active = new Set(), undo = [], redo = [], lastPush = 0, composing = false;
     let lit = opts.light || [];
     if (opts.hint) root.dataset.hint = opts.hint;
     const ed = !!opts.editable;
@@ -471,6 +482,8 @@
     }
 
     function follow(target) {
+      const named = (ctx.things || {})[target];                  // a6109: a bare id, named by the scene
+      if (named && named.open) return opts.follow && opts.follow(named.open, named.name);
       const hit = (ctx.links || {})[target];
       if (!hit || !hit.id) return opts.notify && opts.notify(`nothing is called “${target}” yet`);
       opts.follow && opts.follow(hit.id, hit.title);
@@ -487,7 +500,8 @@
       const w = e.target.closest(".md-widget");
       if (w && ed) { root.focus(); const at = starts(src)[+w.dataset.from] || 0; paint(at, at); }
     });
-    if (!ed) { paint(null); return { el: root, set(t, l) { src = t || ""; ctx = { links: l || {} }; paint(null); }, src: () => src, picked, lights: setLights }; }
+    if (!ed) { paint(null); return { el: root, set(t, l, th) { src = t || ""; ctx = { links: l || {}, things: th || ctx.things }; paint(null); }, src: () => src, picked, lights: setLights,
+                                    links(l, th) { ctx = { links: l || {}, things: th || {} }; paint(null); } }; }
 
     root.addEventListener("beforeinput", e => {
       if (composing || e.inputType === "insertCompositionText") return;
@@ -571,8 +585,8 @@
     return {
       el: root, src: () => src,
       // the world's words arrive: kept when they are what is here; drawn again (the caret kept) when only links changed
-      set(t, l) { ctx = { links: l || {} }; const r = sel(); if (t != null) src = t; paint(r ? r.a : null, r ? r.b : null); },
-      links(l) { ctx = { links: l || {} }; const r = sel(); paint(r ? r.a : null, r ? r.b : null); },
+      set(t, l, th) { ctx = { links: l || {}, things: th || ctx.things }; const r = sel(); if (t != null) src = t; paint(r ? r.a : null, r ? r.b : null); },
+      links(l, th) { ctx = { links: l || {}, things: th || {} }; const r = sel(); paint(r ? r.a : null, r ? r.b : null); },
       press(key) { const k = key.split("+").pop().toLowerCase(), r = sel() || { a: src.length, b: src.length };
         const focused = document.activeElement === root;
         if (k === "e") { raw = !raw; return paint(focused ? r.a : null, focused ? r.b : null); }
