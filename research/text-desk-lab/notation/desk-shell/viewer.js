@@ -24,13 +24,14 @@ const Viewer = (session, who, lens, said, status) => {
   if (!wid) { wid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem(widKey, wid); } catch {} }
   const winStore = `lens-window:${session}:${who}:${lens}:${wid}`;          // in sessionStorage: it lives as the window does
   let texts; try { texts = JSON.parse(sessionStorage.getItem(winStore)) || {}; } catch { texts = {}; }
-  const typedAt = new Map(), onDrafts = [];
+  const typedAt = new Map(), onDrafts = [], fromElsewhere = new Set();   // fields whose words last came from another window
   // codex team (pike-8 section 2): a saved draft with no record of what it was typed against is never sent against
   // today's paint. It stays, marked; the person copies it, drops it (Escape) and starts from the current text.
   const unknownOrigin = "origin unknown: this kept draft has no record of what it was typed against; copy it if you need it, then Escape and start from the current text";
   for (const d of drafts.values()) if (!d.seen && !d.shown) d.why = unknownOrigin;
   let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed` : "";
   let text = "", told = "", unheardIn = null, kept = null;
+  let published = new Map([...drafts].map(([k, d]) => [k, JSON.stringify(d)]));   // the drafts as last agreed with the store
   let shownNotice = "", noticeTimer;
   const foldStore = `lens-folds:${session}:${who}:${lens}`;
   let folds; try { folds = JSON.parse(localStorage.getItem(foldStore)) || {}; } catch { folds = {}; }
@@ -76,8 +77,48 @@ const Viewer = (session, who, lens, said, status) => {
         status.textContent = summary; status.title = notice; status.hidden = !notice;
         if (notice) noticeTimer = setTimeout(() => { status.hidden = true; }, 4500);
       }
-      const want = JSON.stringify([...drafts]);
+      v.publish();
+    },
+    // a6067 (Codex c6203, Sable c6206): the store is shared by the person's windows, so a window writes only what IT
+    // changed, into what the store holds now, never its whole map over another window's newer words. A draft it
+    // cleared is removed only if the store still holds the very words it knew (the equality the desk keeps for text);
+    // newer words from another window are kept, taken back here, and said. What other windows changed is taken in.
+    publish() {
+      let S; try { S = new Map(JSON.parse(localStorage.getItem(store)) || []); } catch { S = new Map(); }
+      const J = x => x === undefined ? undefined : JSON.stringify(x), mineKeys = new Set(), keptBack = [], theirs = [], together = [];
+      for (const k of new Set([...drafts.keys(), ...published.keys()])) {
+        const mine = J(drafts.get(k)), was = published.get(k);
+        if (mine === was) continue;                              // not changed in this window
+        mineKeys.add(k);
+        const there = J(S.get(k));
+        if (mine !== undefined) S.set(k, drafts.get(k));
+        else if (there === was) S.delete(k);                     // cleared here: the store still holds what was cleared
+        else if (there !== undefined) { drafts.set(k, S.get(k)); keptBack.push(k); }   // newer words elsewhere: kept
+      }
+      // what another window changed that this one had not heard (a key with a send in flight here too: its answer
+      // then sees newer words than it sent, and keeps them)
+      for (const k of new Set([...S.keys(), ...drafts.keys()])) {
+        if (mineKeys.has(k) || J(S.get(k)) === J(drafts.get(k))) continue;
+        // this window has its own unsent words here too (typed here, not taken from another window, no send of them in
+        // flight): both windows are typing in this field. Each keeps its own words, never the last keystroke over the
+        // other's, and says so (Sable, Codex). A field with a send in flight takes the other's words, so its answer
+        // sees them as newer than what it sent and keeps them
+        if (drafts.has(k) && typedAt.has(k) && !fromElsewhere.has(k) && !pending.has(k)) {
+          if (S.has(k)) together.push(k); else S.set(k, drafts.get(k));   // the other window sent ITS words: ours go back in
+          continue;
+        }
+        if (S.has(k)) drafts.set(k, S.get(k)); else drafts.delete(k);
+        theirs.push(k); fromElsewhere.add(k);
+      }
+      published = new Map([...S].map(([k, d]) => [k, J(d)]));
+      for (const k of together) published.set(k, J(drafts.get(k)));     // kept as ours: a later clear here leaves theirs
+      const want = JSON.stringify([...S]);
       if (want !== kept) { kept = want; try { localStorage.setItem(store, want); } catch {} }   // (an unchanged store tells no other window)
+      if (keptBack.length) notice = "sent; newer words kept (typed since, in another of your windows)";
+      if (together.length) notice = "you are typing in this field in another of your windows too: each window keeps what it typed; check both before sending";
+      if (keptBack.length || together.length) said.textContent = notice + "\n\n" + text;
+      const changed = [...keptBack, ...theirs];
+      if (changed.length) for (const f of onDrafts) f(changed);
     },
     window: wid,
     // a6067: a typed text's window state (textedit.js): caret and selection, this window's only (Sable)
@@ -92,7 +133,7 @@ const Viewer = (session, who, lens, said, status) => {
     rebased(key, words, origin, base) {
       const d = drafts.get(key);
       if (d && !d.refused && d.text === words && d.base === base && JSON.stringify(d.seen) === JSON.stringify(origin)) return;
-      typedAt.set(key, Date.now());
+      typedAt.set(key, Date.now()); fromElsewhere.delete(key);
       drafts.set(key, { text: words, why: "typed here, not sent", seen: origin, base, gesture: d && d.text === words ? d.gesture : undefined });
       if (d && d.refused) notice = "";
       v.show();
@@ -127,7 +168,8 @@ const Viewer = (session, who, lens, said, status) => {
         // pike-8 section 3: a refused draft is kept, and the world's current value will be drawn beside it (both sides);
         // a resend is fenced on the value shown, never on a fresher one the person has not seen
         if (draft !== undefined && !newer) drafts.set(key, { text: draft, why: err.split("\n").pop(), refused: true, shown: null, gesture: token && token.draft && token.draft.gesture });
-      } else if (newer && !texts[key]) notice = "sent the earlier words; what you typed since is still unsent";   // a6067: a module text says so itself
+      } else if (newer && fromElsewhere.has(key)) notice = "sent; newer words kept (typed since, in another of your windows)";   // Sable c6206
+      else if (newer && !texts[key]) notice = "sent the earlier words; what you typed since is still unsent";   // a6067: a module text says so itself
       else { notice = ""; drafts.delete(key); }
       v.show();
     },
@@ -140,7 +182,7 @@ const Viewer = (session, who, lens, said, status) => {
     typed(key, words, fence) {
       const d = drafts.get(key), seen = d ? (d.shown || d.seen) : fence;
       if (d && d.refused && seen) notice = "draft kept; edited against the version shown";
-      typedAt.set(key, Date.now());
+      typedAt.set(key, Date.now()); fromElsewhere.delete(key);
       drafts.set(key, { text: words, why: seen ? "typed here, not sent" : unknownOrigin, seen }); v.show();
     },
     // the fence a draft is sent on: what it was typed against, or the value shown beside a refused draft; null means
@@ -307,19 +349,13 @@ const Viewer = (session, who, lens, said, status) => {
       } finally { v.repainting = false; }
     },
   };
-  // a6067 (Sable): another window of this person changed a draft: the same words here, drawn again by whoever shows
-  // them; a draft with a send in flight here is this window's until answered. Typed in both at once: said in both.
+  // a6067 (Sable): another window of this person changed a draft: the same words here (publish takes them in), drawn
+  // again by whoever shows them. Typed in both at once: said in both.
   if (typeof addEventListener === "function") addEventListener("storage", e => {
     if (e.key !== store || e.newValue === kept) return;
-    let next; try { next = new Map(JSON.parse(e.newValue) || []); } catch { return; }
-    kept = e.newValue;
-    const changed = [...new Set([...drafts.keys(), ...next.keys()])].filter(k => !pending.has(k) && JSON.stringify(drafts.get(k)) !== JSON.stringify(next.get(k)));
-    if (!changed.length) return;
-    const together = changed.filter(k => Date.now() - (typedAt.get(k) || 0) < 4000);
-    for (const k of changed) { if (next.has(k)) drafts.set(k, next.get(k)); else drafts.delete(k); }
-    if (together.length) notice = "you are typing in this field in another of your windows too: both show what was typed last; check it before sending";
-    v.show();
-    for (const f of onDrafts) f(changed);
+    const was = notice;
+    v.publish();
+    if (notice !== was) v.show();
   });
   return v;
 };
