@@ -1264,6 +1264,11 @@ def test_style_read_once():
     assert sheet == {"height_em": 60.0, "width_em": 30.0, "height": 320, "afloat": True, "shy": True, "pulse": True}
     icon = style.looks("token gap = 8\nrole icon : corner gap, touch")["roles"]["icon"]       # a5500: answers the pointer
     assert icon["look"] == {"corner": 8, "touch": True} and not icon["unread"]
+    # a6010: a card that leaves its list while a press on its Looks good waits for the desk (style.js draws the pair as one
+    # :has rule over the pressed part's data-sending); both flags are read, none is left unread
+    pair = style.looks("token gap = 8\nrole card : corner gap, leaves\nrole ok : away")["roles"]
+    assert pair["card"]["look"] == {"corner": 8, "leaves": True} and pair["ok"]["look"] == {"away": True}
+    assert not pair["card"]["unread"] and not pair["ok"]["unread"]
     # a5504: a lane's rail, a live card's glow, a card that glides; lift takes the `shadow` token's colour when there is one
     board = style.looks("token gap = 8\ntoken ink = #E9EEEA\ntoken shadow = #000000\ntoken accent = #8DCDB4\n"
                         "role card : rail accent, glow accent, lift gap /2, glide\nrole plain : lift gap")["roles"]

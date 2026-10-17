@@ -616,7 +616,38 @@ async def walk(play, only):
 
     WAIT_ITEMS = "window.__pt.parts('lens:waiting-on-me').filter(e => /\\/now\\/[a-z]\\d+\\/head$/.test(e.dataset.key) || /\\/designs\\/[a-z]\\d+\\/head$/.test(e.dataset.key))"
 
+    # a6010 (round 3 of the HUD sprint): the board's NEEDS YOU answers what waits on Alex, one press on the line's own
+    # button (no opening first). Played there when the board has such a line, else in Waiting on you, as before.
+    BOARD_NEED = "window.__pt.parts('lens:home-board').filter(e => /\\/need\\/reviews\\/[a-z]\\d+\\/line$/.test(e.dataset.key))"
+    ON_BOARD = {"Seen / Done": "Looks good", "Later": "Later", "Send back": "Send back"}
+
+    async def on_board(button, label):
+        try:
+            await open_panel(play, "The board", "home-board")
+        except AssertionError:
+            return None                          # no board in this layout: Waiting on you answers
+        # a press before this one may still be on its way (its card hidden at once, `leaves`): when its answer is
+        # painted the list closes up, so aim only once nothing is in flight, as a person aims at a settled screen
+        await w.js("new Promise(r => { const t0 = performance.now(); const f = () => !document.querySelector('[data-sending=\"1\"]') || performance.now() - t0 > 3000 ? r(true) : setTimeout(f, 20); f(); })")
+        heads = await w.js(f"{BOARD_NEED}.map(e => e.dataset.key)")
+        if not heads:
+            return None
+        head = heads[0]
+        item, hk, word = head.split("/")[-2], json.dumps(head), ON_BOARD[button]
+        gone = f"!pt.parts('lens:home-board').some(e => /\\/need\\/reviews\\/{item}\\/line$/.test(e.dataset.key))"
+        later = f"pt.all('lens:home-board').some(e => /\\/need\\/later\\/a\\/{item}$/.test(e.dataset.key))"
+        pred = gone + (f" && {later}" if button == "Later" else "")
+        r = await play.timed(pred, press(play, f"pt.pressable(pt.leaf({json.dumps(word)}, pt.key({hk})))", f"'{word}' on the board"))
+        if not r["ok"]:
+            r["want"] = f"'{word}' did not take {item} off NEEDS YOU" + (" and under Later" if button == "Later" else "")
+            return r
+        r["note"] = f"{item}: on the board's NEEDS YOU line, one press: {label} in {r['ms']} ms"
+        return r
+
     async def answer(button, want_gone_from_now, label):
+        r = await on_board(button, label)
+        if r is not None:
+            return r
         r0 = await open_panel(play, "Waiting on you", "waiting-on-me")
         heads = await w.js(f"{WAIT_ITEMS}.map(e => e.dataset.key)")
         heads = [h for h in heads if "/now/" in h]
@@ -643,6 +674,9 @@ async def walk(play, only):
     steps.append(("approve", "answer a waiting item: Seen / Done, and see it leave", lambda: answer("Seen / Done", True, "left the list"), (OK_MS, SLOW_MS)))
 
     async def s_sendback():
+        r = await on_board("Send back", "sent back")
+        if r is not None:
+            return r
         await open_panel(play, "Waiting on you", "waiting-on-me")
         lens = c.do("read waiting-on-me", "hud-playtest")
         if "send back" not in lens.lower():
