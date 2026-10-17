@@ -1,0 +1,88 @@
+# house-at-work: who is at work, one line each, in the order of whose move it is (a6265, Alex 17 Oct: 'more detailed
+# visualization into who is working ... per person task, status, context usage. Clickable to see a preview of their
+# messages ... Minimal and easy to hide'). Built on a6057's The house (direction-living-house): the same light (amber
+# your move, lilac a resident's, mint acting this moment) and the same press (a5988's feed in the middle), with what the
+# house now observes of each agent, witnessed:usage (usage.py): how full its context is, and whether it has gone quiet
+# or is held by the limit. It reads usage rows, not house rows, so workers are here as well as residents.
+# First You (a6057's row: your Now when set, and home-timer; LAMPLIT's bar timer hides while this panel shows). Then
+# the order: asks you, asks a resident, held or quiet, acting, the rest; resting residents are one faint line of names.
+# Each line is house-at-work-row stood on the person's card (a worker) or corner (a resident); a press on it opens a
+# small popover of their latest words and actions, and from there the full feed.
+# The header (house-at-work-small, beside the panel's title) folds the whole panel: folded=yes on Alex's own panel note.
+house : column
+  role athouse
+  only when ($folded or "") != "yes"
+  you : column
+    of prop:role=now,prop:actor=$me as nw
+    each me
+  yours : column
+    role athouse
+    of witnessed:usage kind=agent as u
+    each g1
+  asks : column
+    role athouse
+    of witnessed:usage kind=agent as u
+    each g2
+  trouble : column
+    role athouse
+    of witnessed:usage kind=agent as u
+    each g3
+  lit : column
+    role athouse
+    of witnessed:usage kind=agent doing=working as u
+    each g4
+  other : column
+    role athouse
+    of witnessed:usage kind=agent doing!=working doing!=resting as u
+    each g5
+  rest : row
+    role atrest
+    only when count(witnessed:usage kind=agent doing=resting) > 0
+    label : text "resting"
+      role atrestlabel
+    names : row
+      role atrestnames
+      share 1
+      of witnessed:usage kind=agent doing=resting as r
+      each restname
+  none : text "No house is running here, so nobody's work or numbers can be read."
+    role atcalm
+    only when count(witnessed:usage kind=agent) = 0
+me : row
+  role lhme
+  name : text "You"
+    role lhname.you
+  doing : text "$nw.doing"
+    role lhdoing
+    share 1
+    clamp 1
+    only when ($nw.doing or "") != ""
+  gap : column
+    share 1
+    only when ($nw.doing or "") = ""
+  timer : row
+    lens home-timer
+g1 : column
+  the $u.corner as c
+  only when ($c.commission or "") = "waiting" and ($c.asked_by or "") = $me
+  lens house-at-work-row
+g2 : column
+  the $u.corner as c
+  only when ($c.commission or "") = "waiting" and ($c.asked_by or "") != $me
+  lens house-at-work-row
+g3 : column
+  the $u.corner as c
+  only when ($c.commission or "") != "waiting" and $u.doing != "resting" and (($u.held or "") != "" or ($u.quiet or "") != "")
+  lens house-at-work-row
+g4 : column
+  the $u.corner as c
+  only when ($c.commission or "") != "waiting" and ($u.held or "") = "" and ($u.quiet or "") = ""
+  lens house-at-work-row
+g5 : column
+  the $u.corner as c
+  only when ($c.commission or "") != "waiting" and ($u.held or "") = "" and ($u.quiet or "") = ""
+  lens house-at-work-row
+restname : text "$(shown)"
+  let shown = "JEFF" when $r.actor = "jeff"
+  let shown = $r.actor otherwise
+  role atrestname

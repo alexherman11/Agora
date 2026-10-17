@@ -535,10 +535,12 @@ def test_fold_group():
 def test_fold_inline():
     """a5359 (Alex c5367): `fold ... inline` draws the handle beside the part's peek and a press on the peek opens it.
     The painter is told `inline`; with no label of its own the handle is the arrow alone (the label is ""); both
-    printers say it; it can't also float; a fold without it is as before (its label falls back to the part's name)."""
+    printers say it; since a6265 it may also float (a press on the peek opens a popover over the page: At work's line);
+    a fold without it is as before (its label falls back to the part's name)."""
     src = chr(10).join(["ws : column", "  card : column, fold inline", '    line : text "the title", peek', '    more : text "x"',
                         '  old : column, fold', '    u : text "y"'])
-    refused('x : column, fold inline float', "one or the other")
+    _, both = scene.parse(chr(10).join(["x : column, fold float inline", '  line : text "a", peek', '  pop : text "b"']))
+    assert both["x"]["fold_inline"] and both["x"]["fold_float"], both["x"]
     refused('x : column, fold sideways', "[inline]")
     root, parts = scene.parse(src)
     assert [k.get("fold_inline") for k in parts["ws"]["kids"]] == [True, False]
