@@ -109,6 +109,14 @@
      names, or the whole receiver). Its look is the style's role `landing` when the style has one; this is the floor */
   .landing-box { position: fixed; pointer-events: none; z-index: 29; box-sizing: border-box; border-radius: 10px;
     border: 2px solid var(--t-ink, currentColor); background: color-mix(in srgb, var(--t-ink, #888) 10%, transparent); }
+  /* a6271: `tip`, a part's name and what it does, over the page beside it (lens.js). Its look is the style's role `tip`
+     when the style has one; this is the floor. Never pressed, never moved: it shows and hides, nothing more */
+  .lens-tip { position: fixed; z-index: 40; pointer-events: none; display: none; max-width: 22em; box-sizing: border-box;
+    padding: 6px 10px; border-radius: 8px; white-space: normal; background: var(--t-paper, #222); color: var(--t-ink, #eee);
+    border: 1px solid color-mix(in srgb, var(--t-ink, #888) 18%, transparent); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  .lens-tip[data-shown] { display: block; }
+  .lens-tip-name { font-weight: 600; }
+  .lens-tip-about { opacity: .72; margin-top: 2px; }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
   /* `media` (a5941, media.js): films and pictures under the words, or one filling its part (`media player`). Sizes

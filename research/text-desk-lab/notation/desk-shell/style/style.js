@@ -39,6 +39,7 @@ const Style = (() => {
     rail: v => ({ "--rail": `inset 3px 0 0 ${v}` }),
     glow: v => ({ "--glow": v, animation: "r-glow 2.8s ease-in-out infinite" }),
     glide: () => ({}),
+    hover: () => ({}),          // a6271: a ground only under the pointer: the rule in install
     text: t => {
       // no joined letters (13 Oct): a pixel face's "fi" drew as one glyph that read as an A ("Arst" for "first")
       const css = { "font-family": t.family, "line-height": t.leading, "font-size": px(t.size), "font-variant-ligatures": "none" };
@@ -102,6 +103,7 @@ const Style = (() => {
       if (r.look.glide) glide.push(c);
       if (r.look.shy)      // shy: seen when the pointer or the caret is in the part holding it (or the one above), or when it has focus
         out += [":hover > ", ":hover > * > ", ":focus-within > ", ":focus-within > * > "].map(a => a + c).join(",") + `,${c}:focus{opacity:1}\n`;
+      if (r.look.hover) out += `${c}:hover{background:${r.look.hover}}\n`;   // a6271: under the pointer, still
       if (r.look.touch)    // a5500: the part answers the pointer, brighter under it, darker while pressed; it moves only below
         out += `${c}:hover{filter:brightness(1.3)}${c}:active{filter:brightness(.85)}`
           + `@media (prefers-reduced-motion: no-preference){${c}:hover{transform:translateY(-3px)}${c}:active{transform:translateY(0) scale(.94)}}\n`;

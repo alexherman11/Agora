@@ -32,6 +32,7 @@ A look's keys (the painter's table maps each to its medium):
                                  lane), it travels there from where it was; a thing newly shown fades in
     touch                        flag (a5500, 15 Oct): the part answers the pointer: it rises and brightens under it,
                                  and sinks while pressed (a dock's icons). Brightens only, for reduced motion
+    hover <colour>               the ground while the pointer is over the part, and nothing moves (a6271: the bar's icons)
 """
 import hashlib
 import pathlib
@@ -330,6 +331,8 @@ def read_prop(p, T, fonts):
         return need_col(m.group(1), "glow")         # a5504: the part breathes a halo of this colour (alive, working)
     if p == "glide":
         return {"glide": True}                      # a5504: the part moves from where its thing was painted before
+    if (m := re.match(r"^hover\s+(.+)$", p)):
+        return need_col(m.group(1), "hover")        # a6271: a ground under the pointer, and nothing moves
     if re.match(r"^text\b", p):
         tok = p.split()[0] if p.startswith("text.") else "text"
         t = T.get(tok)

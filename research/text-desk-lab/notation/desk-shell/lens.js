@@ -214,6 +214,7 @@
     if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
+    if (p.tip && p.tip[0]) { el._tip = p.tip; el.dataset.tip = p.tip[0]; el.setAttribute("aria-label", p.tip.join(": ")); }   // a6271
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
     if (Number.isInteger(p.peek)) { el.dataset.peekLines = p.peek; el.style.setProperty("--peek-lines", p.peek); }
     for (const a of n.acts) {
@@ -1282,6 +1283,44 @@
       el.dataset.cut = el.scrollHeight > el.clientHeight + 8 || head > 8 ? "1" : "";
     }
   }
+
+  // `tip` (a6271; Alex, 17 Oct: icons with 'no text. If I hover them it should say what they are'): a part's name and one
+  // sentence, in one float laid over the page beside it while the pointer rests on it or it has focus, so it never moves
+  // the layout: above the part in the lower half of the window, below it in the upper. It waits a moment before showing,
+  // as a desktop's tooltips do, and shows at once when one was just showing (running the pointer along a bar). It wears
+  // the style's role `tip` when the style has one. Known by key, so a repaint under the pointer keeps it.
+  const TIP = { el: null, key: null, timer: 0, last: 0 };
+  function tipShow(key) {
+    TIP.timer = 0;
+    const el = [...paint.querySelectorAll("[data-tip]")].find(e => e.dataset.key === key && e.getClientRects().length);
+    if (!el) return tipHide();
+    const t = TIP.el && TIP.el.isConnected ? TIP.el : (TIP.el = document.body.appendChild(document.createElement("div")));
+    t.className = "lens-tip " + Style.roleClass("tip"); t.id = "lens-tip"; t.setAttribute("role", "tooltip");
+    const line = (cls, words) => Object.assign(document.createElement("div"), { className: cls, textContent: words });
+    t.replaceChildren(line("lens-tip-name", el._tip[0]), ...(el._tip[1] ? [line("lens-tip-about", el._tip[1])] : []));
+    t.dataset.shown = "1"; TIP.key = key;
+    const r = el.getBoundingClientRect(), w = t.offsetWidth, h = t.offsetHeight, gap = 8;
+    const y = r.top > innerHeight / 2 ? r.top - h - gap : r.bottom + gap;
+    t.style.left = Math.max(gap, Math.min(innerWidth - w - gap, r.left + r.width / 2 - w / 2)) + "px";
+    t.style.top = Math.max(gap, Math.min(innerHeight - h - gap, y)) + "px";
+  }
+  function tipHide() {
+    clearTimeout(TIP.timer); TIP.timer = 0;
+    if (TIP.el && TIP.el.dataset.shown) { delete TIP.el.dataset.shown; TIP.last = Date.now(); }
+    TIP.key = null;
+  }
+  function tipWant(el) {
+    const key = el.dataset.key;
+    if (key === TIP.key && (TIP.timer || (TIP.el && TIP.el.dataset.shown))) return;     // still on the same part
+    const soon = !!(TIP.el && TIP.el.dataset.shown) || Date.now() - TIP.last < 600;
+    tipHide(); TIP.key = key; TIP.timer = setTimeout(() => tipShow(key), soon ? 0 : 400);
+  }
+  const tipOf = e => e.target instanceof Element ? e.target.closest("[data-tip]") : null;
+  paint.addEventListener("pointerover", e => { const el = tipOf(e); if (el && paint.contains(el)) tipWant(el); else if (TIP.key || TIP.timer) tipHide(); });
+  paint.addEventListener("pointerleave", tipHide);
+  paint.addEventListener("pointerdown", tipHide, true);
+  paint.addEventListener("focusin", e => { const el = tipOf(e); if (el && e.target.matches(":focus-visible")) tipShow(el.dataset.key); });
+  paint.addEventListener("focusout", tipHide);
 
   // which floating part is in hand: the one pressed, else the one beside what was pressed (the smallest part around
   // the press that holds exactly one), else none

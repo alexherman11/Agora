@@ -142,7 +142,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
 # double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
@@ -1160,6 +1160,16 @@ def _w_hint(node, p, val, n, env):
     node["hint"] = m.group(1)
 
 
+def _w_tip(node, p, val, n, env):
+    # a6271 (Alex, 17 Oct: 'They should have good icons, no text. If I hover them it should say what they are'): what a
+    # part is, shown beside it while the pointer rests on it (or it has focus), over the page: it never moves the layout.
+    # A name, then one plain sentence of what it does; each a template filled as text is (`tip "$title" "$about"`)
+    parts = re.findall(r'"([^"]*)"', val)
+    if not parts or len(parts) > 2 or not parts[0] or re.sub(r'"[^"]*"', "", val).strip():
+        raise LensRefusal(f'line {n}: `tip "<name>" ["<one sentence of what it does>"]`; got {p!r}')
+    node["tip"] = parts
+
+
 def _w_plain(node, p, val, n, env):
     node["plain"] = True          # Juniper a559: no runs; backticks print as the characters they are
 
@@ -1794,6 +1804,7 @@ WORDS = {
     "commit": ("commit explicit|enter|ctrl-enter [only]", _w_commit),
     "share": ("share <weight> | share $(<expr>)", _w_share),
     "hint": ('hint "..."', _w_hint),
+    "tip": ('tip "<name>" ["<what it does>"]', _w_tip),
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
     "ids": ("ids", _w_ids),
@@ -1903,7 +1914,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "ids": False, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "tip": None, "plain": False, "peek": False, "marks": False, "ids": False, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -2517,6 +2528,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append(f"lines {n['lines'][0]}..{n['lines'][1] if n['lines'][1] is not None else ''}")
         if n.get("hint"):
             bits.append(f'hint "{n["hint"]}"')
+        if n.get("tip"):                  # a6271: an icon has no words of its own; its tip is what it says it is
+            bits.append("tip " + " ".join(f'"{t}"' for t in n["tip"]))
         if n.get("peek"):
             bits.append("peek" + (f" {n['peek']}" if type(n["peek"]) is int else ""))
         if n.get("picture"):
@@ -2777,6 +2790,8 @@ def emit(node):
         paint["share"] = node["share"]
     if node.get("peek") and not paint.get("absent"):
         paint["peek"] = node["peek"]
+    if node.get("tip") and not paint.get("absent"):        # a6271: on a frame or a text alike
+        paint["tip"] = [t for t in node["tip"] if t]
     node["paint"] = paint
     acts = list(node.get("acts") or [])
     if node.get("fold") and not any(a.get("on") == "fold" for a in acts):
