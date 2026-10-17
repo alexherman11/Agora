@@ -129,7 +129,6 @@ sheet : column
               light "$(spots)" "$(held)"
               on select do read $w; do prop $w quoting=$d.item quote_in=$d.item quote="$value"
               on edit do read $d.item; do rewrite $d.item text="$value"
-              on link do read $w; do prop $w open=$value back="$w.open"
           margin : column
             share 1
             role aside

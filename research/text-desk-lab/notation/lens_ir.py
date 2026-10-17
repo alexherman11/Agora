@@ -747,6 +747,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                                 else S._fill(lt, fill_ctx, track))
             if em.get("markdown") and "[[" in (out["text"] or ""):     # a5820: what each [[wikilink]] names, read now
                 out["wikilinks"] = S.wikilinks_of(w, out["text"], acc.thing)
+            # a6109: an id in words that are only read is drawn as the name of what it names. Not recorded as a read:
+            # a name is how the words look, never what a press on this part was fenced on
+            if out["text"] and not em.get("ids") and not em.get("plain") and not em.get("picture") and not em.get("live") \
+                    and (em.get("markdown") or not any(a["on"] == "edit" for a in node["acts"])):   # a document's drawn lines name too
+                named = S.things_of(w, out["text"])
+                if named:
+                    out["things"] = named
             if isinstance(em.get("markdown"), str) and any(a["on"] == "edit" for a in node["acts"]):
                 # `markdown links <selection>`: what typing [[ offers, read as one membership read (at most 500)
                 named, ids = acc.select(S._fill(em["markdown"], fill_ctx, track))
@@ -907,6 +914,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
                            "text": (f"{total - keep} earlier not shown (clamp last {keep}); " if b.get("last") else f"{total - keep} more not shown (clamp {keep}); ")
                            + f"find {sel_text} lists all {total}", "clamp": None, "acts": [], "kids": []}
+                    if S.things_of(w, sel_text):                  # a6109: in:f155 is drawn as the board's name
+                        cut["things"] = S.things_of(w, sel_text)
                     if b.get("last"):
                         out["kids"].insert(0, cut)
                     else:

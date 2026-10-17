@@ -36,7 +36,17 @@ the one form. The words:
                                  [label](address). Read, they are drawn; edited, they are their source, and Ctrl+B,
                                  Ctrl+I, Ctrl+K put one around what is selected or take it off. Not inside code runs;
                                  marks do not nest. The printer says `marks strong 2, link 1`
-    media [player]               on words: a path in them to a film or picture the desk may show (media_links.py:
+    (names)                      every text that is only read (no `on edit`, `plain`, `picture` or `live`), and a
+                                 `markdown` text, draws an id in its words (a5143, f155, s9, c5957, e11454, m6012,
+                                 worker-a6010) as the NAME of what it names, a quiet link with the id on hover: a
+                                 thing its title, a comment 'comment by X on <title>', an event 'X's <verb> on
+                                 <title>', a chat line 'X's line in <chat>', a worker 'worker on <card>'. An id that
+                                 names nothing, or in a code run, stays as written. The words and printers keep ids.
+    ids                          on words: keep this text's ids as written (a Properties line, a command to copy)
+    on link do <command>         a name or [[wikilink]] pressed in this part or anywhere inside it (placed lenses too):
+                                 the nearest `on link` above it is sent, $value the id it opens. None above: the
+                                 press goes to the part it is in, as a press on its words would
+    media [player]              on words: a path in them to a film or picture the desk may show (media_links.py:
                                  research/window-lab/demos or media/, mp4 webm m4v png jpg gif webp) is drawn under
                                  the words, a film as a poster that plays where it is, with Pop out (`on pop`); any
                                  other path stays words. `media player`: the first one fills the part, with play,
@@ -132,7 +142,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
 # double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
@@ -1074,6 +1084,12 @@ def _w_marks(node, p, val, n, env):
     node["marks"] = True
 
 
+def _w_ids(node, p, val, n, env):
+    # a6109: an id in words is drawn as the name of what it names (things_of), in every text that is only read. `ids`
+    # keeps this text's ids as written: a Properties line, a command to copy, a text about ids themselves
+    node["ids"] = True
+
+
 def _w_picture(node, p, val, n, env):
     # 13 Oct (Alex: the design-review window needs diagrams): the words are a drawing, written as SVG, and the painter
     # draws it. The text stays the drawing's source, so a reader of the print can read and write one as any other text.
@@ -1203,9 +1219,116 @@ def wikilinks_of(w, text, thing=None):
     return out
 
 
-def runs_of(text, marks=False):
+# a6109 (Alex, 16 Oct: 'I should never see id names, only actual names of things ... and names of things like notes,
+# tasks, workers etc. should ALL be clickable'): an id written in words (a5143, f155, s5948, c5957, e11454, m6012,
+# worker-a6010) is drawn as the name of what it names, a link; the words stay as written, so agents keep writing ids
+# and every printer and fence sees them. Only an id that names something is drawn so; any other stays words.
+_THING = re.compile(r"(?<![\w-])(worker-)?([afsce]\d{2,}|m\d{2,})(?![\w-])")
+
+
+def _short(title, most=48):
+    t = " ".join((title or "").split())
+    if len(t) <= most:
+        return t
+    cut = t[:most].rsplit(" ", 1)[0].rstrip(" ,;:·-—(")
+    return (cut or t[:most]) + "…"
+
+
+def _who_named(w, by):
+    """A writer as a person reads them: a name with its capital; a worker as the card it works on."""
+    m = re.fullmatch(r"worker-(a\d+)", by or "")
+    if m:
+        c = _ctx_for(w, m.group(1))
+        return f"the worker on {_short(c.get('title'), 32)}" if c.get("title") else by
+    return (by or "someone")[:1].upper() + (by or "someone")[1:]
+
+
+def _thing_named(w, ref):
+    """One id -> {name, title, kind, open} or None when it names nothing. `open` is what a press shows: the thing
+    itself, a comment's thing, an event's target, a chat line's chat."""
+    worker = ref.startswith("worker-")
+    nid = ref[7:] if worker else ref
+    head = nid[0]
+    if worker:
+        c = _ctx_for(w, nid)
+        if not c.get("item") or not c.get("title"):
+            return None
+        return {"name": f"worker on {_short(c['title'], 40)}", "title": f"{ref}: the worker on “{c['title']}”", "kind": "worker", "open": c["item"]}
+    if head in "afs":
+        if nid not in w.nodes and nid not in w.subjects:
+            return None
+        c = _ctx_for(w, nid)
+        if not c.get("title"):
+            return None
+        return {"name": _short(c["title"]), "title": f"{c['title']} · {c.get('kind') or ''} {nid}".strip(), "kind": c.get("kind") or "", "open": c.get("item") or nid}
+    if head == "c":
+        s, cm = _once(w, ("comment-index",), lambda: {c["id"]: (s, c) for s in w.subjects.values() for c in s.get("comments") or []}).get(nid, (None, None))
+        if not s:
+            return None
+        apps = w.appearances_of(s["id"])
+        on = _short(s.get("title"), 36)
+        return {"name": f"comment by {_who_named(w, cm.get('by'))} on {on}", "title": f"{nid}: a comment by {cm.get('by')} on “{s.get('title')}”",
+                "kind": "comment", "open": apps[0] if apps else s["id"]}
+    if head == "e":
+        e = w.event_by_id(nid)
+        if not e:
+            return None
+        t = e.get("target") if isinstance(e.get("target"), str) else ""
+        c = _ctx_for(w, t) if t and (t in w.nodes or t in w.subjects) else {}
+        on = f" on {_short(c['title'], 36)}" if c.get("title") else ""
+        return {"name": f"{_who_named(w, e.get('by'))}'s {e.get('verb') or 'act'}{on}", "title": f"{nid}: {e.get('by')} {e.get('verb')} {t} at {e.get('at', '')}".strip(),
+                "kind": "event", "open": c.get("item") or ""}
+    if head == "m":
+        s = _once(w, ("line-index",), lambda: {l["id"]: s for s in w.subjects.values() if s.get("kind") == "chat" for l in s.get("lines") or []}).get(nid)
+        if not s:
+            return None
+        l = next(x for x in s["lines"] if x["id"] == nid)
+        e = w.event_by_id(l.get("ev"))
+        apps = w.appearances_of(s["id"])
+        return {"name": f"{_who_named(w, (e or {}).get('by'))}'s line in {_short(s.get('title'), 36)}", "title": f"{nid}: a line in “{s.get('title')}”",
+                "kind": "line", "open": apps[0] if apps else s["id"]}
+    return None
+
+
+def things_of(w, text):
+    """a6109: each id in words that names something -> {name, title, kind, open}; ids in code spans stay code. Read
+    while the world holds still (still); a press reads the world again, so a renamed thing is at worst named late."""
+    out = {}
+    if not text or not _THING.search(text):
+        return out
+    plain = _RUNS.sub(lambda m: " " * len(m.group(0)), text)
+    for m in _THING.finditer(plain):
+        ref = m.group(0)
+        if ref in out:
+            continue
+        hit = _once(w, ("thing-named", ref), lambda: _thing_named(w, ref))
+        if hit:
+            out[ref] = hit
+    return out
+
+
+def _named_runs(r, things):
+    """One plain run -> runs where each id `things` knows is its own run, mark=thing."""
+    out, at, t = [], 0, r["text"]
+    for m in _THING.finditer(t):
+        hit = things.get(m.group(0))
+        if not hit:
+            continue
+        if m.start() > at:
+            out.append({**r, "text": t[at:m.start()]})
+        out.append({"text": hit["name"], "mark": "thing", "id": m.group(0), "open": hit["open"], "title": hit["title"], "kind": hit["kind"]})
+        at = m.end()
+    if not out:
+        return [r]
+    if at < len(t):
+        out.append({**r, "text": t[at:]})
+    return out
+
+
+def runs_of(text, marks=False, things=None):
     """Juniper a559: code spans and fences become runs at print, from this closed grammar, with no world effect; the
-    words stay the part's source, so the printer's text and the fence are unchanged. -> [{text, role?, block?}] or None."""
+    words stay the part's source, so the printer's text and the fence are unchanged. -> [{text, role?, block?}] or None.
+    a6109: `things` (things_of) draws each id it knows as a run of its own, mark=thing, outside code."""
     out, at = [], 0
     for m in _RUNS.finditer(text or ""):
         if m.start() > at:
@@ -1216,6 +1339,8 @@ def runs_of(text, marks=False):
         out.append({"text": text[at:]})
     if marks:                              # marks are looked for in the plain stretches only: code keeps its stars
         out = [r2 for r in out for r2 in ([r] if r.get("role") else marks_of(r["text"]))]
+    if things:                             # a link keeps its own words; strong and stressed words may hold a name
+        out = [r2 for r in out for r2 in ([r] if r.get("role") or r.get("mark") == "link" else _named_runs(r, things))]
     if not any(r.get("role") or r.get("mark") for r in out):
         return None
     return out
@@ -1547,6 +1672,7 @@ WORDS = {
     "hint": ('hint "..."', _w_hint),
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
+    "ids": ("ids", _w_ids),
     "picture": ("picture", _w_picture),
     "markdown": ("markdown [links <selection>]", _w_markdown),
     "media": ("media [player]", _w_media),
@@ -1653,7 +1779,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "ids": False, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1698,8 +1824,10 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `media` draws the films and pictures a text's words name, under them: this part " + ("prints no text" if k["text"] is None else "is edited (the words are written in a part without `media`)" if any(a["on"] == "edit" for a in k["on"]) else "is also a picture, a Markdown document or a live count"))
         if any(a["on"] == "pop" for a in k["on"]) and not k["media"]:
             raise LensRefusal(f"line {k['line']}: `on pop` is sent when Pop out is pressed on a film or picture a `media` text draws; this part has no `media`")
-        if any(a["on"] == "link" for a in k["on"]) and not k["markdown"]:
-            raise LensRefusal(f"line {k['line']}: `on link` is sent when a [[wikilink]] in a `markdown` text is followed; this part has no `markdown`")
+        # a6109: `on link` is no longer the Markdown text's alone: a name or a [[wikilink]] pressed in this part or any
+        # part inside it (inside a placed lens too) sends the nearest `on link` above it, $value the id it opens
+        if k["ids"] and k["text"] is None:
+            raise LensRefusal(f"line {k['line']}: `ids` keeps the ids in a text's words as written: this part prints no text")
         if k["layout"] == "grid" and not k["tracks"]:
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
@@ -2498,8 +2626,10 @@ def emit(node):
                 paint["wikilinks"] = node["wikilinks"]
             if node.get("titles") is not None:
                 paint["titles"] = node["titles"]
+            if node.get("things"):                # a6109: the bare ids in its words, drawn as names
+                paint["things"] = node["things"]
         elif not node.get("plain") and not node.get("picture") and not node.get("live") and node.get("text"):
-            rs = runs_of(node["text"], node.get("marks"))
+            rs = runs_of(node["text"], node.get("marks"), node.get("things"))
             if node.get("marks"):
                 paint["marks"] = True
             if rs:

@@ -5,6 +5,10 @@
     python wm.py --release-all      put back every window the host moved, close the windows it opened, stop its page;
                                     reads only state/wm.json, so it works with the desk stopped (and with the host gone)
 
+Alex never runs these: the home base does (a6113). Its dock icon asks `host wm.start` and `host wm.stop` (wm_switch.py),
+which runs this as its child with --parent <the home base's pid>: when that process is gone the host puts everything
+back and ends. --keys off (or AGORA_WM_KEYS=off in its environment) takes no global key: tests on the sandbox use it.
+
 What it does. The host opens Agora windows the way lens_window.py does (Edge in app mode on lens.html, its own profile)
 and keeps each one's window handle. It does not decide where they go. It paints a LAYOUT LENS, a note in the world
 (wm-strip by default), in an unseen page: Edge with no window (headless), sized to the monitor's work area at the
@@ -389,6 +393,7 @@ class Host:
         self.report_seen, self.applied, self.focus = None, None, None
         self.pending = None          # (what was asked, when): a key, a lens edit, a start; cleared when windows move
         self.timings = []
+        self.parent_checked = 0
 
     # -- the state file
     def save(self):
@@ -429,7 +434,8 @@ class Host:
         # --pictures: Edge composites without the GPU, so PrintWindow can draw each window alone (it draws a GPU-composited
         # Edge blank; ran 14 Oct). Only tests ask for it: a picture then holds the host's windows and nothing else
         extra = ["--disable-gpu-compositing"] if self.a.pictures else []
-        p = self.edge(PROFILE, *extra, f"--app={self.url(lens)}", f"--window-size={w // 3},{h // 2}", f"--window-position={x + 40},{y + 40}")
+        # a6113: InPrivate, no sync: a fresh Edge profile signs itself into Alex's Microsoft account and syncs (a5932)
+        p = self.edge(PROFILE, *extra, "--inprivate", "--disable-sync", f"--app={self.url(lens)}", f"--window-size={w // 3},{h // 2}", f"--window-position={x + 40},{y + 40}")
         deadline = time.time() + 15
         while time.time() < deadline:
             time.sleep(0.15)
@@ -638,7 +644,8 @@ class Host:
 
     # -- the loop
     def tick(self):
-        gone = [w for w in self.windows if not user32.IsWindow(w["hwnd"])]
+        """One look round; -> True when the host should put everything back and stop (its home base is gone)."""
+        gone =[w for w in self.windows if not user32.IsWindow(w["hwnd"])]
         for w in gone:
             self.windows.remove(w)
             if w.get("lesser_hwnd") and user32.IsWindow(w["lesser_hwnd"]):
@@ -658,9 +665,15 @@ class Host:
         rep = self.read_report()
         if rep is not None:
             self.apply(rep)
+        if self.a.parent and time.time() - self.parent_checked > 1:
+            self.parent_checked = time.time()
+            if not alive(self.a.parent):
+                log("the home base that started us is gone (pid", self.a.parent, "); putting everything back")
+                return True
         if time.time() - self.unseen_at > 30 and not any(alive(p) for p in self.unseen_pids):
             log("the unseen page stopped; starting it again")         # at most once in 30 s
             self.start_unseen()
+        return False
 
     def run(self):
         st = load_state()
@@ -679,8 +692,11 @@ class Host:
                 user32.PostMessageW(h, WM_CLOSE, 0, 0)
         self.say_rows("start")
         self.start_unseen()
-        ok = [k for k in self.KEYS if user32.RegisterHotKey(None, k, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, self.KEYS[k][0])]
-        if len(ok) < len(self.KEYS):
+        ok = [k for k in self.KEYS if self.a.keys == "on"
+              and user32.RegisterHotKey(None, k, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, self.KEYS[k][0])]
+        if self.a.keys != "on":
+            log("--keys off: no global key taken")
+        elif len(ok) < len(self.KEYS):
             log("keys taken by another program:", [k for k in self.KEYS if k not in ok])
         user32.SetTimer(None, 0, 30, None)
         msg = wt.MSG()
@@ -691,9 +707,8 @@ class Host:
                         break
                     self.on_key(msg.wParam)
                 elif msg.message == WM_TIMER:
-                    if self.asked():
+                    if self.asked() or self.tick():
                         break
-                    self.tick()
                 if self.a.seconds and time.time() - self.started > self.a.seconds:
                     break
         finally:
@@ -720,6 +735,9 @@ def main():
     ap.add_argument("--monitor", type=int, default=None, help="which monitor, counting from 0 (default: the primary)")
     ap.add_argument("--pictures", action="store_true", help="draw windows so `snap` can picture each alone (tests)")
     ap.add_argument("--seconds", type=float, default=0, help="stop after this long, putting everything back (tests)")
+    ap.add_argument("--parent", type=int, default=None, help="the home base's pid (wm_switch.py): put back and stop when it is gone")
+    ap.add_argument("--keys", choices=("on", "off"), default=os.environ.get("AGORA_WM_KEYS", "on"),
+                    help="off: take no global key (a test on the sandbox desktop)")
     ap.add_argument("--release-all", action="store_true")
     a = ap.parse_args()
     if a.release_all:

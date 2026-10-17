@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (45)
+## open (46)
 
 ### F2. Scripts cannot say who is running them
 
@@ -302,6 +302,12 @@ Source edits by worker-a5994, 16 Oct, for Alex's 'I need things to be draggable 
 a6077 · family=missing-word · status=open
 
 worker-a5988, 16 Oct. Alex asked to click At work and watch an agent's live feed. The words of a stream are in house-state transcripts, which only the house reads, so making them a lens's rows needed source: feeds.py (Reader turns Claude stream-json and Codex items into rows; redact; Feed tails by offset; Feeds.step writes witnessed:feed-<id> while a viewer stands home-feed on a card or corner) and a guarded call in house.step. The world half (home-feed, home-work) is lenses only. THE MISSING WORDS: (1) a world way to ask the house to observe something on demand: the watched set is read from props (with=home-feed viewing=<id>, or watching=<id>), and the lens name home-feed is a constant in feeds.py, so another lens that wants a feed must use watching= or edit source; a watch= word on a lens note would let any lens declare what it needs observed. (2) a per-source change signal: witnessed.stamp covers every witnessed file, so one feed write repaints every open painter's whole scene (measured on a copy at a 0.5 s write cadence: 47 whole scenes in 23 s); feeds are throttled to one write per 2 s per feed to keep that bounded. (3) redaction is code, not a world rule: what counts as a secret is regexes in feeds.redact.
+
+### An id in words could not be drawn as its name, and a link pressed inside a placed lens could not say where it opens (a6109)
+
+a6169 · family=lens-words · status=open
+
+Missing words, met by a6109 (Alex, 16 Oct: 'I should never see id names ... names of things ... should ALL be clickable'). (1) Words that print an id (a chat line 'in a5949', a title '(a5251)', a viewer head 'surface · f155') had no way to show the thing's name: a lens can print $x.title only for an id it holds in a frame, never for one inside free words, and agents write ids in their words on purpose. The general word became no word: every text that is only read draws an id that names something as its name (scene.things_of, lens.js .t-mark-thing); ids keeps them. (2) on link stood only on a markdown text and the press could go only to that text's own lens; a name in the Conversation or the board had nowhere to go. on link now stands on any part and the nearest above a pressed name is sent, so the home base's root says where (on link do view $value, a house verb). Source: scene.py, lens_ir.py, lens.js, lens.html, markdown.js.
 
 ## curing (36)
 

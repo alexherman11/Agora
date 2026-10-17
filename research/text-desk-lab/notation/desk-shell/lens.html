@@ -108,7 +108,7 @@
   /* a5994: where a carried thing will land, drawn while it is in the air (the receiver's half on the side its act
      names, or the whole receiver). Its look is the style's role `landing` when the style has one; this is the floor */
   .landing-box { position: fixed; pointer-events: none; z-index: 29; box-sizing: border-box; border-radius: 10px;
-    border: 2px solid var(--t-accent, currentColor); background: color-mix(in srgb, var(--t-accent, #888) 16%, transparent); }
+    border: 2px solid var(--t-ink, currentColor); background: color-mix(in srgb, var(--t-ink, #888) 10%, transparent); }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
   /* `media` (a5941, media.js): films and pictures under the words, or one filling its part (`media player`). Sizes
@@ -153,6 +153,10 @@
   /* marks in a text (a3486): weight and slant are the reader's own signs, so they are not roles of a style */
   .t-mark-strong { font-weight: 700; } .t-mark-stress { font-style: italic; }
   .t-mark-link { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; color: inherit; }
+  /* a6109: an id drawn as its thing's name: quiet, the words' own colour, a faint underline that firms on hover */
+  .t-mark-thing { color: inherit; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
+  .t-mark-thing[data-thing]:not([data-thing=""]) { cursor: pointer; }
+  .t-mark-thing:hover { text-decoration-style: solid; text-decoration-color: currentColor; }
   /* scrollbars from the style (Alex, 30 Sep: skinny square bars that fit the theme). A style with a `scrollbar` token
      (the thumb's colour) and `scrollbar_w` (its width) draws them; without one the browser's own stay. */
   [data-bars] ::-webkit-scrollbar { width: var(--t-scrollbar_w); height: var(--t-scrollbar_w); background: transparent; }
