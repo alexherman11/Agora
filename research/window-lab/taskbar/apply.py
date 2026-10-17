@@ -101,10 +101,10 @@ def step_data(w):
     for line in (HERE / "data.desk").read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.startswith("#"):
             continue
-        if line.startswith("look "):
+        if line.startswith("read "):      # read, not look: a prop act just after someone's tag is refused stale otherwise
             out = w.do(line)
             # a widget named by title may not be in this world (the round-3 assembly decides which are); an id must be
-            absent = line.startswith('look "') and not answer(out).startswith(("a", "f", "s"))
+            absent = line.startswith('read "') and not answer(out).startswith(("a", "f", "s"))
             if absent:
                 print(f"  {line[5:]}: not in this world, skipped")
             continue
@@ -116,7 +116,12 @@ def step_data(w):
 
 
 def step_lens(w, name):
-    put.put_lens(w, HERE / f"{name}.lens")
+    path = HERE / f"{name}.lens"
+    hit = re.findall(r"^\s*(a\d+) note", w.do(f"find title:{name},tag:lens,in:{HOME}"), re.M)
+    if hit and text_of(w, hit[0]) == path.read_text(encoding="utf-8").rstrip("\n"):
+        print(f"{name}: stands as written")
+        return
+    put.put_lens(w, path)
 
 
 def run_all(w):
@@ -128,7 +133,7 @@ def run_all(w):
 
 
 def things():
-    return sorted(set(re.findall(r"^look (a\d+)$", (HERE / "data.desk").read_text(encoding="utf-8"), re.M)))
+    return sorted(set(re.findall(r"^read (a\d+)$", (HERE / "data.desk").read_text(encoding="utf-8"), re.M)))
 
 
 def backup(w):
@@ -137,7 +142,7 @@ def backup(w):
     keep.mkdir(exist_ok=True)
     (keep / "home-style.txt").write_text(text_of(w, STYLE) + "\n", encoding="utf-8")
     (keep / "home-dock.txt").write_text(text_of(w, DOCK) + "\n", encoding="utf-8")
-    widgets = re.findall(r'^look ("[^"]+")$', (HERE / "data.desk").read_text(encoding="utf-8"), re.M)
+    widgets = re.findall(r'^read ("[^"]+")$', (HERE / "data.desk").read_text(encoding="utf-8"), re.M)
     props = {t: answer(w.do(f"look {t}")) for t in things() + widgets}
     (keep / "things.json").write_text(json.dumps(props, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"backup: {keep} (home-style, home-dock, {len(props)} things)")
