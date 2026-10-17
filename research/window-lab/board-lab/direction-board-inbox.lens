@@ -1,8 +1,11 @@
-# direction-board-inbox (a6010, round 1, lane 'the calm command center'): the board as an inbox. Three bands, top to
-# bottom: what needs Alex, what is moving, what landed. Every card is ONE line until pressed: what it is, who has it,
-# how far along, and (on a card that needs him) its answers, right on the line. A press opens it in place, at once
-# (the viewer's own fold, no round trip): the worker's latest words, a reply box, Open in the middle (the home base's
-# viewer, role=home-view actor=$me). Opening one closes the others (fold group). Landed is one line with a count.
+# direction-board-inbox (a6010; round 2 of the HUD sprint, lane 1, the calm command center). The board as an inbox:
+# NEEDS YOU, IN MOTION, LANDED, one line per card. A line says what it is (brief= when the card has one, else its
+# title), how far along (a word at the right edge) and, on a line that needs Alex, its answer: one press, never typing.
+# Round 2 borrows LAMPLIT's colour rule (lane 3, a6057): colour says whose move it is. Amber is Alex's (only NEEDS YOU),
+# lilac a resident's (what waits on JEFF, a stuck card's asker), mint an agent acting this moment (a working card whose
+# worker is at work now); the rest is grey, and buttons are white. A press anywhere else on a line opens it in place at
+# once (the viewer's own fold): its track, who has it (names, never ids), its worker's latest word, a reply box (never
+# needed), Open in the middle. What waits on JEFF folds into one lilac line; Landed is one line with a count.
 board : column
   role nb
   views : column
@@ -13,9 +16,10 @@ board : column
     only when count(prop:role=home-view,prop:actor=$me) = 0
 bands : column
   role nbbands
-  let nneed = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=failed,-prop:review=later)
-  let nlater = count(tag:ready-for-review,prop:review=later) + count(prop:design=waiting,prop:review=later) + count(prop:commission=failed,prop:review=later)
-  let nmove = count(prop:commission=asked) + count(prop:commission=working) + count(prop:commission=waiting) + count(prop:commission=ready) + count(prop:commission=landing)
+  let nneed = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=failed,prop:asked_by=alex,-prop:review=later)
+  let nlater = count(tag:ready-for-review,prop:review=later) + count(prop:design=waiting,prop:review=later) + count(prop:commission=failed,prop:asked_by=alex,prop:review=later)
+  let nmove = count(prop:commission=asked) + count(prop:commission=working) + count(prop:commission=ready) + count(prop:commission=landing)
+  let njeff = count(prop:commission=waiting) + count(prop:commission=failed,prop:asked_by!=alex)
   let nlanded = count(prop:commission=landed)
   let busy = count(house doing=working)
   need : column
@@ -42,7 +46,7 @@ bands : column
       each design
     failed : column
       role nbcards
-      of prop:commission=failed,-prop:review=later as c
+      of prop:commission=failed,prop:asked_by=alex,-prop:review=later as c
       each failure
     later : column
       role nblater
@@ -58,7 +62,7 @@ bands : column
         each design
       f : column
         role nbcards
-        of prop:commission=failed,prop:review=later as c
+        of prop:commission=failed,prop:asked_by=alex,prop:review=later as c
         each failure
   move : column
     role nbband
@@ -81,10 +85,6 @@ bands : column
       role nbrows
       of prop:commission=ready as c
       each moving
-    asking : column
-      role nbrows
-      of prop:commission=waiting as c
-      each moving
     working : column
       role nbrows
       of prop:commission=working as c
@@ -93,6 +93,18 @@ bands : column
       role nbrows
       of prop:commission=asked as c
       each moving
+    jeff : column
+      role nbjeff
+      only when njeff > 0
+      fold "WAITING ON JEFF · $(njeff)" handle nbfold.jeff
+      asking : column
+        role nbrows
+        of prop:commission=waiting as c
+        each moving
+      stuck : column
+        role nbrows
+        of prop:commission=failed,prop:asked_by!=alex as c
+        each moving
   landed : column
     role nbband
     fold "LANDED · $(nlanded)" handle nbfold
@@ -107,9 +119,7 @@ review : column
   line : row
     peek
     role nbline
-    kind : text "LOOK"
-      role nbkind.review
-    title : text "$c.title"
+    what : text "$(($c.brief or $c.title))"
       role nbtitle
       clamp 1
       share 1
@@ -128,43 +138,45 @@ review : column
     role nbbody
     facts : row
       role nbtop
-      when : text "waiting since $(day-or-time($changed.tags, $today))"
+      kind : text "to look at"
         role nbwhen
-        only when ($changed.tags or "") != ""
       demo : text "· a demo inside"
         role nbwhen
         only when ($c.demo or "") != ""
+      when : text "· waiting since $(day-or-time($changed.tags, $today))"
+        role nbwhen
+        only when ($changed.tags or "") != ""
     gist : text "$c.text"
       role nbgist
       clamp 4
       only when ($c.text or "") != ""
-    say : text ""
-      role nbinput
-      hint "Ask or answer; it goes on the card, to JEFF (Enter)"
-      lines 1..6
-      commit enter only
-      on edit do comment $c line="@jeff: $value"
     acts : row
       role nbacts
       open : text "Open in the middle"
         role nbbtn
         on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
-# a design waiting on Alex's word: he answers in its own talk, so the board opens it or puts it off
+    say : text ""
+      role nbinput
+      hint "Or say something to JEFF about it (Enter); never needed"
+      lines 1..6
+      commit enter only
+      on edit do comment $c line="@jeff: $value"
+# a design waiting on Alex's word: Build it is his word in one press (design=answered verdict=build, and a line in its
+# own talk, which reaches its author); Later puts it off; Read it opens it in the middle
 design : column
   role nbneed
   fold inline group open handle nbchev
   line : row
     peek
     role nbline
-    kind : text "DESIGN"
-      role nbkind.design
-    title : text "$c.title"
+    what : text "$(($c.brief or $c.title))"
       role nbtitle
       clamp 1
       share 1
-    read : text "Read it"
+    build : text "Build it"
       role nbgo
-      on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+      on click when $c.design = "waiting" and ($c.talk or "") != "" do prop $c design=answered verdict=build; do append $c.talk line="Build it. (from the board)"
+      on click when $c.design = "waiting" and ($c.talk or "") = "" do prop $c design=answered verdict=build; do comment $c line="@jeff: build it (from the board)"
     later : text "Later"
       role nbbtn
       only when ($c.review or "") != "later"
@@ -175,77 +187,75 @@ design : column
       on click do prop $c remove=review
   body : column
     role nbbody
-    by : text "by $c.by · you answer in its own talk"
+    by : text "a design by $(($c.by or "someone")), waiting on your word"
       role nbwhen
-# a commission the house gave back: it did not land and its worker could not mend it
+    acts : row
+      role nbacts
+      read : text "Read it in the middle"
+        role nbbtn
+        on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+# a commission Alex asked for that did not land and its worker could not mend: Try again starts its worker once more
 failure : column
-  role nbneed.fail
+  role nbneed
   fold inline group open handle nbchev
   line : row
     peek
     role nbline
-    kind : text "STUCK"
-      role nbkind.fail
-    title : text "$c.title"
+    what : text "$(($c.brief or $c.title))"
       role nbtitle
       clamp 1
       share 1
     again : text "Try again"
       role nbgo
-      on click do prop $c commission=asked
+      on click when $c.commission = "failed" do prop $c commission=asked
     later : text "Later"
       role nbbtn
       only when ($c.review or "") != "later"
       on click do prop $c review=later
-    back : text "Now"
-      role nbbtn
-      only when $c.review = "later"
-      on click do prop $c remove=review
   body : column
     role nbbody
-    who : text "did not land · asked by $(($c.asked_by or "nobody")) · $(($c.worker or "no worker"))"
+    who : text "did not land; its worker could not mend it"
       role nbwhen
     last : column
       of comments:$c.item as m
       each note
-    say : text ""
-      role nbinput
-      hint "A note for JEFF about this one (Enter)"
-      lines 1..6
-      commit enter only
-      on edit do comment $c line="@jeff: $value"
     acts : row
       role nbacts
       open : text "Open in the middle"
         role nbbtn
         on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
-# one commission on its way: what, who, how far; pressed, the worker's own latest words
+# one commission on its way: what, then at the right edge how far and since when; pressed, who has it and their word
 moving : column
   role nbrow
-  role nbrow.live when $c.commission = "working" and count(house doing=working resident=$c.worker) > 0
   fold inline group open handle nbchev
   line : row
     peek
     role nbline
-    queued : text "QUEUED"
-      role nbstage.queued
-      only when $c.commission = "asked"
-    working : text "WORKING"
-      role nbstage.working
-      only when $c.commission = "working"
-    asks : text "ASKS JEFF"
-      role nbstage.asks
-      only when $c.commission = "waiting"
-    ready : text "READY"
-      role nbstage.ready
-      only when $c.commission = "ready"
-    landing : text "LANDING"
-      role nbstage.landing
-      only when $c.commission = "landing"
-    title : text "$c.title"
+    what : text "$(($c.brief or $c.title))"
       role nbrowtitle
       clamp 1
       share 1
+    queued : text "queued"
+      role nbstage
+      only when $c.commission = "asked"
+    live : text "working"
+      role nbstage.live
+      only when $c.commission = "working" and count(house doing=working resident=$c.worker) > 0
+    idle : text "working"
+      role nbstage
+      only when $c.commission = "working" and count(house doing=working resident=$c.worker) = 0
+    asks : text "asks JEFF"
+      role nbstage.jeff
+      only when $c.commission = "waiting"
+    stuck : text "stuck"
+      role nbstage.jeff
+      only when $c.commission = "failed"
+    ready : text "ready to land"
+      role nbstage
+      only when $c.commission = "ready"
+    landing : text "landing"
+      role nbstage
+      only when $c.commission = "landing"
     since : text "$(day-or-time($changed.commission, $today))"
       role nbwhen
       only when ($changed.commission or "") != ""
@@ -255,27 +265,45 @@ moving : column
       role nbsteps
       q : text "queued"
         role nbstep
-        role nbstep.on when $c.commission = "asked"
         role nbstep.done when $c.commission != "asked"
+        role nbstep.on when $c.commission = "asked"
       w : text "working"
         role nbstep
-        role nbstep.on when $c.commission = "working"
-        role nbstep.ask when $c.commission = "waiting"
         role nbstep.done when $c.commission = "ready" or $c.commission = "landing"
+        role nbstep.on when $c.commission = "working"
+        role nbstep.jeff when $c.commission = "waiting" or $c.commission = "failed"
       r : text "ready"
         role nbstep
-        role nbstep.on when $c.commission = "ready"
         role nbstep.done when $c.commission = "landing"
+        role nbstep.on when $c.commission = "ready"
       l : text "landing"
         role nbstep
         role nbstep.on when $c.commission = "landing"
       d : text "landed"
         role nbstep
-    who : text "$(($c.worker or $c.owner) or "nobody yet") · asked by $(($c.asked_by or "nobody"))"
-      role nbwhen
-    now : text "at work this moment"
-      role nbnow
-      only when count(house doing=working resident=$c.worker) > 0
+    who : row
+      role nbtop
+      codex : text "a Codex builder"
+        role nbname.link
+        only when $c.worker_provider = "codex"
+        on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+      claude : text "a Claude builder"
+        role nbname.link
+        only when ($c.worker_provider or "") != "codex" and ($c.worker or "") != ""
+        on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+      owner : text "$c.owner"
+        role nbname.link
+        only when ($c.worker or "") = "" and ($c.owner or "") != ""
+        on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
+      now : text "at work this moment"
+        role nbnow
+        only when count(house doing=working resident=$c.worker) > 0
+      jeff : text "· asked by JEFF"
+        role nbwhen
+        only when $c.asked_by = "jeff"
+      for : text "· asked by $(($c.asked_by or "nobody"))"
+        role nbwhen
+        only when $c.asked_by != "jeff"
     last : column
       of comments:$c.item as m
       each note
@@ -288,7 +316,7 @@ moving : column
 note : column
   role nbnote
   only when $index = $count
-  by : text "$m.by"
+  by : text "latest, from $m.by"
     role nbnoteby
   said : text "$m.text"
     role nbnotetext
@@ -298,9 +326,10 @@ done : row
   role nbdone
   only when $index > $count - 5
   on click do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""
-  title : text "$c.title"
+  what : text "$(($c.brief or $c.title))"
     role nbdonetitle
     clamp 1
     share 1
   when : text "$(day-or-time($changed.commission, $today))"
     role nbwhen
+    only when ($changed.commission or "") != ""
