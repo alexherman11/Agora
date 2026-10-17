@@ -1,0 +1,62 @@
+# direction-living-glance: the two-second glance at the top left of the home base (a6057, lane 3, LAMPLIT). The time,
+# then one sentence of the state of everything, in numbers: what waits on you (amber, the only warm colour on the
+# screen), who is at work this moment (mint: something alive), then the machine's queue in grey. A count of nothing is
+# left out, so the sentence is as short as the day is quiet; when nothing waits on you it says so, faint.
+# A widget: tag widget, slot=bar, order=1 (it takes the clock's place: home-clock is untagged where this is worn).
+glance : row
+  role lgband
+  let you = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=waiting,prop:asked_by=$me)
+  let busy = count(house doing=working)
+  let queued = count(prop:commission=asked)
+  let ready = count(prop:commission=ready)
+  let landing = count(prop:commission=landing)
+  let youword = "waits on you" when you = 1
+  let youword = "wait on you" otherwise
+  clock : column
+    role lgclock
+    time : text "$today"
+      live clock
+      role lgtime
+    day : text "$today"
+      live date
+      role lgday
+  sentence : row
+    role lgsentence
+    you : row
+      role lgstat
+      only when you > 0
+      n : text "$(you)"
+        role lgnum.you
+      w : text "$(youword)"
+        role lgword.you
+    calm : text "nothing waits on you"
+      role lgcalm
+      only when you = 0
+    busy : row
+      role lgstat
+      only when busy > 0
+      n : text "$(busy)"
+        role lgnum.lit
+      w : text "at work"
+        role lgword.lit
+    queued : row
+      role lgstat
+      only when queued > 0
+      n : text "$(queued)"
+        role lgnum
+      w : text "queued"
+        role lgword
+    ready : row
+      role lgstat
+      only when ready > 0
+      n : text "$(ready)"
+        role lgnum
+      w : text "ready to land"
+        role lgword
+    landing : row
+      role lgstat
+      only when landing > 0
+      n : text "$(landing)"
+        role lgnum
+      w : text "landing"
+        role lgword

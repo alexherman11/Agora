@@ -1,0 +1,101 @@
+# direction-living-house: The house, who is here and what each is on right now (a6057, lane 3, LAMPLIT). It takes At
+# work's place as a panel (the panel note's lens=). One grammar for everyone, you included: a name, what they are on,
+# since when, and their latest word. You first: your Now line (JEFF and the residents read it) and your timer. Then each
+# one at work, lit: a worker is shown by WHAT it is on (its card's title), with its name small; its latest word is its
+# own latest comment on that card. A resident by name, its own Now (its corner's focus=, what it holds), and the last
+# thing it said. Who is resting is one
+# faint line of names. The rail says whose move it is: mint, at work; lilac, it asks JEFF; amber, it asks you.
+house : column
+  role lhouse
+  you : column
+    of prop:role=now,prop:actor=$me as nw
+    each me
+  lit : column
+    role lhlist
+    of house doing=working as h
+    each being
+  rest : row
+    role lhrest
+    only when count(house doing!=working) > 0
+    label : text "resting"
+      role lhrestlabel
+    names : row
+      role lhrestnames
+      share 1
+      of house doing!=working as r
+      each restname
+  empty : text "No house is running here: no one is at work, and no one rests."
+    role lhcalm
+    only when count(house) = 0
+me : row
+  role lhme
+  name : text "You"
+    role lhname.you
+  doing : text "$nw.doing"
+    role lhdoing
+    share 1
+    hint "what are you on?"
+    on edit do prop $nw doing="$value"
+  timer : row
+    lens home-pomodoro
+being : column
+  the $h.corner as c
+  role lhbeing
+  role lhbeing.asks when $c.commission = "waiting" and ($c.asked_by or "") != $me
+  role lhbeing.you when $c.commission = "waiting" and ($c.asked_by or "") = $me
+  work : column
+    role lhcol
+    only when ($c.commission or "") != ""
+    head : row
+      role lhhead
+      what : text "$c.title"
+        role lhwhat
+        share 1
+        clamp 1
+      who : text "$h.resident"
+        role lhwho
+    word : row
+      role lhline
+      state : text "asks $c.asked_by"
+        role lhstate.asks
+        role lhstate.you when ($c.asked_by or "") = $me
+        only when $c.commission = "waiting"
+      since : text "since $(time($changed.commission))"
+        role lhsince
+      said : row
+        share 1
+        of comments:$c.item by=$h.resident as m
+        each lastword
+  dweller : column
+    role lhcol
+    only when ($c.commission or "") = ""
+    head : row
+      role lhhead
+      name : text "$h.resident"
+        role lhname
+        role lhname.jeff when $h.resident = "jeff"
+      gap : column
+        share 1
+      since : text "last spoke $h.since"
+        role lhsince
+        only when ($h.since or "") != ""
+    focus : text "$c.focus"
+      role lhwhat
+      clamp 1
+      only when ($c.focus or "") != ""
+    word : row
+      role lhline
+      said : row
+        share 1
+        of turns:$h.corner as t
+        each lastturn
+lastword : text "$m.text"
+  role lhword
+  only when $index = $count
+  clamp 1
+lastturn : text "$t.said"
+  role lhword
+  only when $index = $count
+  clamp 1
+restname : text "$r.resident"
+  role lhrestname
