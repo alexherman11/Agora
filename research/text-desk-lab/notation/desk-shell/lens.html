@@ -56,6 +56,10 @@
   :where(#paint button, #menu-pop button, #door button) { appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }   /* a folded part gives up its share: its siblings take the room */
   /* fold ... float: a menu, its open contents drawn over the page below the handle */
   .l-float { position: relative; }
+  .l-float:not([data-folded="1"]) { z-index: 12; }   /* a6265: an open one lies over its later siblings too (rows of At work) */
+  /* a6265: a float lifted into the top layer (lens.js placeFloat) keeps its role's look, not the browser's popover box */
+  .l-float > [popover] { inset: auto; margin: 0; border: 0; color: inherit; font: inherit; }
+  :where(.l-float > [popover]) { background: transparent; padding: 0; }
   /* a part's own menu (on menu "<label>" do ...), at the pointer */
   #menu-pop textarea, .menu-draft textarea { font: inherit; color: inherit; background: transparent; border: 0; resize: vertical; width: 36ch; max-width: 80vw; box-sizing: border-box; }
   .menu-draft { position: fixed; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box; }
@@ -74,7 +78,7 @@
   #menu-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 12ch; box-sizing: border-box; }
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
-  .l-float > [data-peek] { position: static; width: auto; max-height: none; }   /* a peek stays beside the handle, in the page */
+  .l-float > [data-peek] { position: static; width: auto; max-height: none; z-index: auto; }   /* a peek stays beside the handle, in the page (a6265: and is not lifted over an open float above it) */
   /* fold ... inline (a5359): the handle and the peek share the first line; what the fold hides opens below them, easing in */
   [data-fold-inline] { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .5em; align-items: baseline; }
   [data-fold-inline] > button { grid-column: 1; }
@@ -84,6 +88,8 @@
   [data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: l-unfold 180ms ease-out; }
   @keyframes l-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { [data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: none; } }
+  /* fold ... float inline (a6265): a press on the line opens a popover over the page; it appears, it does not ease in */
+  .l-float[data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: none; }
   [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */
   [data-hint]:empty::before { content: attr(data-hint); color: var(--t-hush); }
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }

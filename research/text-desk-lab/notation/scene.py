@@ -1108,8 +1108,8 @@ def _w_fold(node, p, val, n, env):
     # the folds that peek today (a document's comments) keep their handle above.
     if any(x not in ("open", "float", "inline") for x in mods) or len(set(mods)) != len(mods):
         raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [inline] [handle <role>] [group <name>]`; got {p!r}')
-    if "inline" in mods and "float" in mods:
-        raise LensRefusal(f"line {n}: `fold ... inline` opens in place beside its peek, `float` opens over the page; a fold is one or the other; got {p!r}")
+    # a6265 (a popover from a line of At work): `float inline` is both: the handle beside the peek, a press anywhere on the
+    # peek opens it, and what it hides is drawn over the page (was refused as one or the other)
     node["fold"] = m.group(1).strip('"') if m.group(1) else True
     node["fold_open"], node["fold_float"], node["fold_handle"], node["fold_group"] = "open" in mods, "float" in mods, handle, group
     node["fold_inline"] = "inline" in mods

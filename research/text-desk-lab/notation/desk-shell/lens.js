@@ -301,7 +301,7 @@
     if (group) el.dataset.foldGroup = group;
     const opened = () => { for (const a of el._n.acts.filter(a => a.on === "open")) send(el._n, a.line); };
     h.addEventListener("click", () => {
-      if (float) { const f = el.dataset.folded !== "1"; set(f); settle(); if (!f) opened(); return; }
+      if (float) { const f = el.dataset.folded !== "1"; set(f); placeFloat(el); settle(); if (!f) opened(); return; }
       const f = !V.folded(n.key, dflt); V.fold(n.key, f); set(f);
       // `fold ... group <name>` (Alex, 30 Sep): opening one folds its open siblings in the same group, an accordion
       if (!f && group && el.parentElement)
@@ -309,9 +309,33 @@
       settle();
       if (!f) opened();
     });
-    el.prepend(h); set(float ? dflt : V.folded(n.key, dflt));
+    // a6265: a float open when its part is made again (its words or acts changed: a popover's feed lines arriving, the
+    // press that opened it recorded) stays open; it still closes only by Escape, a press outside, or its handle
+    const prev = float && kept.get(n.key);
+    const stay = !!(prev && prev.el !== el && prev.el.classList.contains("l-float") && prev.el.dataset.folded === "");
+    el.prepend(h); set(float ? (stay ? false : dflt) : V.folded(n.key, dflt));
   }
-  const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) m._close(); });
+  // a6265: an open float inside a part that never scrolls (`scroll none` clips) was cut at that part's edge and lay under
+  // the next column (a popover from a line of At work, in a narrow column): it is lifted into the page's top layer (a
+  // manual popover, which no clip or later sibling covers), under its line, or above it when the page has no room below.
+  // Closed, it goes back to the page's flow (lens.html's .l-float).
+  function placeFloat(el) {
+    if (!el.parentElement || !el.parentElement.closest('[data-scroll="none"]')) return;
+    const r = el.getBoundingClientRect();
+    for (const c of el.querySelectorAll(":scope > [data-key]:not([data-peek])")) {
+      if (el.dataset.folded === "1") {
+        if (c.popover && c.matches(":popover-open")) c.hidePopover();
+        c.style.position = c.style.left = c.style.top = ""; continue;
+      }
+      if (c.showPopover && !c.popover) c.popover = "manual";
+      if (c.popover && !c.matches(":popover-open")) try { c.showPopover(); } catch (e) {}
+      c.style.position = "fixed";
+      const w = c.offsetWidth, h = c.offsetHeight;
+      c.style.left = Math.max(0, Math.min(r.left, innerWidth - w)) + "px";
+      c.style.top = (r.bottom + h > innerHeight && r.top - h >= 0 ? r.top - h : r.bottom) + "px";
+    }
+  }
+  const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) { m._close(); placeFloat(m); } });
   document.addEventListener("pointerdown", e => closeFloats(e.target));
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
 
@@ -1276,6 +1300,7 @@
         if (it.el.dataset.key === inHand) it.el.dataset.inhand = "1"; else delete it.el.dataset.inhand;
       }
     }
+    for (const el of paint.querySelectorAll('.l-float:not([data-folded="1"])')) placeFloat(el);    // a6265: kept under its line
     for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
     for (const el of paint.querySelectorAll('[data-scroll="none"]')) {
       // a hair is not more. Cut at the head (none end), the overflow is above the box, where scrollHeight does not count it
