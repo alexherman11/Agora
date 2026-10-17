@@ -303,7 +303,8 @@ def _static(node, irs, memo):
     if got is not None:
         return got
     em, b = node["emit"], node["bind"]
-    words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"]]
+    words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
+             *(em.get("tip") or ())]
     exprs = [c for _, c in em["role_when"]]
     if node["guard"]:
         exprs.append(node["guard"]["src"])
@@ -641,6 +642,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         out.update({k: em[k] for k in S.PAINT_WORDS if k in em})
         if isinstance(out.get("share"), str):
             del out["share"]                    # a5496: filled below, once the lets are known; never sent unfilled
+        out.pop("tip", None)                    # a6271: the same, for a tip's words
         if isinstance(out.get("fold"), str) and "$" in out["fold"]:
             out["fold"] = S._fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
         if b and b["kind"] == "one":
@@ -789,6 +791,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:
                 out["missing"] = missing
+        if em.get("tip"):                             # a6271: a tip's name and sentence are words, filled as text is
+            tc = {**(ctx.get("_props") or {}), **ctx}
+            out["tip"] = [S._fill_text(t, tc, track, lambda e: X.run(e, xenv()))[0] if "$(" in t else S._fill(t, tc, track)
+                          for t in em["tip"]]
         if isinstance(em.get("share"), str):          # a5496: `share $(expr)`, a weight that follows data
             sc_ctx = {**(ctx.get("_props") or {}), **ctx}
             s = em["share"]

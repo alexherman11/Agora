@@ -1,0 +1,18 @@
+# a6271: the bar's roles, appended to home-style as one marked block (apply.py replaces the block on a re-run, so no
+# two copies stand). Tokens only, by meaning (the round-3 rule): ink controls, warm Alex's move, accent an agent acting.
+# a6271 bar roles: begin (the one bar at the foot, home-dock and home-icon; tip is the painter's hover words)
+role tbfoot : pad top gap
+role tbbar : on glassdeep, edge rim, corner gap, pad left gap, pad right gap, between gap /2
+role tbgroup : between gap /4, align center
+role tbsep : border left rim, height gap x3, space above gap /2, align center
+role tbitem : ink, corner gap /2, pad gap /2, pad left gap, pad right gap, between gap /4, hover wash
+role tbitem.on : ink, corner gap /2, pad gap /2, pad left gap, pad right gap, between gap /4, hover raisedhi
+role tbitem.you : warm, corner gap /2, pad gap /2, pad left gap, pad right gap, between gap /4, hover wash
+role tbitem.work : accent, corner gap /2, pad gap /2, pad left gap, pad right gap, between gap /4, hover wash
+role tbicon : align center, width gap x3
+role tbpic : width gap x3
+role tbglyph : text up, align center
+role tbpip : align center, width gap x1.5, height gap /4
+role tbpip.on : on soft, align center, width gap x1.5, height gap /4, corner gap /4
+role tip : on glassdeep, edge rim, corner gap, pad gap /2, pad left gap x1.5, pad right gap x1.5, text down, ink, lift gap
+# a6271 bar roles: end

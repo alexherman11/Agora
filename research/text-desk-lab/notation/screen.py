@@ -30,6 +30,7 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     facts [key-prefix] [depth]   per painted part (to depth levels below the prefix, default 2): size, whether it
                                  scrolls or is cut, folded, hidden, off screen, a leaf's words; the window; the status line
     click <part|x,y>             left click at the part's centre (a fold handle: click <part>/handle)
+    hover <part|x,y>             the pointer rests there, pressing nothing (a `tip` shows; :hover looks apply)
     double <part|x,y>            a double-click there (`on double`)
     right <part|x,y>             right click; then `menu` lists the menu that opened
     menu                         the entries of the open right-click menu
@@ -210,7 +211,7 @@ class Page:
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "window", "facts", "click", "double", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
+STEPS = ("shot", "window", "facts", "click", "hover", "double", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
          "css", "blur", "events", "resend", "desk", "restart", "stop", "start",
          "land", "page", "js", "stream")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
@@ -280,6 +281,10 @@ async def run(url, steps, size, shots, restart=None, still=False):
         # asked (13:5x 16 Oct: `--app=about:blank` came up as a whole browser with a tab bar and took the keyboard from
         # the person at the screen). It takes the focus as it opens: only for a demo he asked for (Alex, 16 Oct)
         head = [f"--window-position={VISIBLE}", f"--app={url}"] if VISIBLE else ["--headless=new", "--hide-scrollbars", "about:blank"]
+        # a6271: headless at --scale, the browser's own scale, not an emulated one: a screenshot re-reads where the pointer
+        # is in the window's pixels, and with an emulated 1.5 a `hover` at 1556,1375 landed on 1037,916 (its tip gone)
+        if not VISIBLE and SCALE != 1:
+            head.insert(0, f"--force-device-scale-factor={SCALE}")
         br = subprocess.Popen([exe, f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
                                "--no-first-run", "--no-default-browser-check", "--disable-extensions",
                                f"--window-size={w},{h}", *head], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -293,8 +298,8 @@ async def run(url, steps, size, shots, restart=None, still=False):
                 SB.join(sandbox)
                 p.win = SB.main_window(sandbox)
             await p.call("Page.enable")
-            if not VISIBLE:
-                await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=SCALE, mobile=False)
+            if not VISIBLE:          # a6271: at --scale the size only (0 keeps the browser's own scale, set above)
+                await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=SCALE if SCALE == 1 else 0, mobile=False)
             if still:
                 await p.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
             await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
@@ -343,6 +348,12 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await p.press(x, y, "left" if s == "click" else "right")
                     await asyncio.sleep(0.8)
                     print(f"{s} at {round(x)},{round(y)}")
+                elif s == "hover":                          # a6271: the pointer rests on a part (`tip`, :hover), pressing nothing
+                    x, y = await p.where(arg())
+                    i += 1
+                    await p.mouse("mouseMoved", x, y, "none", 0)
+                    await asyncio.sleep(0.8)
+                    print(f"hover at {round(x)},{round(y)}")
                 elif s == "double":                         # a5994: a double-click, as the hand makes one (two presses, the second counted 2)
                     x, y = await p.where(arg())
                     i += 1

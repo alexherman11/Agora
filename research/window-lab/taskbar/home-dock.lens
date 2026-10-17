@@ -1,0 +1,150 @@
+# home-dock: the one bar along the foot of the home base (a6271; Alex, 17 Oct: 'one unified bar that is lower and more
+# discreet, like the Windows bar. They should have good icons, no text. If I hover them it should say what they are').
+# Low, centred as Windows 11 has it, three groups, each read from the world and never listed here:
+#   apps     the notes in the person's dock (role=dock actor=$me, in its order): opens=<id> shows it in the middle,
+#            opens=chat gives JEFF's chat back, window=<lens> opens a lens as a window (the host's verb), switch=wm starts
+#            the window manager and, lit while it runs, puts the windows back. Right-click: take off, move left or right
+#   panels   the panels of the person's layout (home-tiling): lit while out; a press puts one away or brings it back
+#   widgets  the top bar's widgets (tag widget, slot=bar shown, slot=off hidden): lit while shown; a press hides or shows
+# Every item is an icon (icon=<name>, a note in Icons, drawn by home-icon; glyph= when it has none) and a tip: its name
+# and its about= sentence, shown while the pointer rests on it. The colour says whose move it is: lights=you is amber
+# while anything waits on the person, lights=work mint while an agent is at work, else white. A lit item has a mark
+# under it. Add an app with one line:
+#   do create <the dock> kind=note title="Label" icon=<name> about="What it does, in one sentence." opens=<id>
+foot : row
+  share 1
+  role tbfoot
+  let you = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=waiting,prop:asked_by=$me) + count(prop:commission=failed,-prop:review=later)
+  let busy = count(house doing=working)
+  left : column
+    share 1
+  bar : row
+    role tbbar
+    of prop:role=home-view,prop:actor=$me as v
+    each groups
+  none : text "No dock yet: make a row surface in the Home base room and give it role=dock actor=<you>"
+    role hint
+    only when count(kind:surface,prop:role=dock,prop:actor=$me) = 0
+  right : column
+    share 1
+groups : row
+  role tbgroup
+  apps : row
+    role tbgroup
+    of kind:surface,prop:role=dock,prop:actor=$me as k
+    each dock
+  sep1 : column
+    role tbsep
+    only when count(prop:role=home-layout,prop:actor=$me) > 0
+  panels : row
+    role tbgroup
+    of prop:role=home-layout,prop:actor=$me as lay
+    each layout
+  sep2 : column
+    role tbsep
+    only when count(tag:widget,prop:slot=bar) + count(tag:widget,prop:slot=off) > 0
+  widgets : row
+    role tbgroup
+    of tag:widget as w
+    by order
+    each widget
+dock : row
+  role tbgroup
+  of in:$k.item,kind:note as d
+  each app
+layout : row
+  role tbgroup
+  of kind:note,in:$lay.item,prop:role=home-panel as p
+  each panel
+# an app: one part for each way it opens, so its press is the one obvious thing
+app : row
+  role tbgroup
+  on menu "Take off the bar" do remove $d.item
+  on menu "Move left" when ($d.before or "") != "" do move $d.item before=$d.before
+  on menu "Move right" when ($d.after or "") != "" do move $d.item after=$d.after
+  view : column
+    only when ($d.opens or "") != "" and $d.opens != "chat" and (($d.switch or "") != "wm" or count(witnessed:host name=wm.start) = 0)
+    role tbitem.you when ($d.lights or "") = "you" and you > 0
+    role tbitem.work when ($d.lights or "") = "work" and busy > 0
+    role tbitem.on when $d.opens = $v.viewing
+    role tbitem
+    tip "$d.title" "$d.about"
+    on click do prop $v viewing=$d.opens back="$v.viewing" find="" with=""
+    icon : column
+      lens home-icon
+    pip : column
+      role tbpip.on when $d.opens = $v.viewing
+      role tbpip
+  chat : column
+    only when $d.opens = "chat"
+    role tbitem.you when ($d.lights or "") = "you" and you > 0
+    role tbitem.work when ($d.lights or "") = "work" and busy > 0
+    role tbitem.on when ($v.viewing or "") = "" and ($v.find or "") = ""
+    role tbitem
+    tip "$d.title" "$d.about"
+    on click do prop $v viewing="" back="$v.viewing" find=""
+    icon : column
+      lens home-icon
+    pip : column
+      role tbpip.on when ($v.viewing or "") = "" and ($v.find or "") = ""
+      role tbpip
+  window : column
+    only when ($d.window or "") != "" and ($d.opens or "") = ""
+    role tbitem
+    tip "$d.title" "$d.about"
+    on click host window $d.window
+    icon : column
+      lens home-icon
+    pip : column
+      role tbpip
+  wm : column
+    only when ($d.switch or "") = "wm" and count(witnessed:host name=wm.start) > 0 and count(witnessed:wm) = 0
+    role tbitem
+    tip "$d.title" "$d.about"
+    on click host wm.start
+    icon : column
+      lens home-icon
+    pip : column
+      role tbpip
+  wmon : column
+    only when ($d.switch or "") = "wm" and count(witnessed:wm) > 0
+    role tbitem.on
+    tip "$d.title" "Running: press to put every window back."
+    on click host wm.stop
+    icon : column
+      lens home-icon
+    pip : column
+      role tbpip.on
+# a panel: out or put away (the shelf); putting away the panel that fills the room gives the room back
+panel : column
+  role tbitem.you when ($p.lights or "") = "you" and you > 0
+  role tbitem.work when ($p.lights or "") = "work" and busy > 0
+  role tbitem.on when ($p.shelf or "") != "yes"
+  role tbitem
+  let was = ($lay.full or "")
+  let act = "Out: press to put it away." when ($p.shelf or "") != "yes"
+  let act = "Put away: press to bring it back." otherwise
+  tip "$p.title" "$p.about $(act)"
+  on click when ($p.shelf or "") = "yes" do prop $p shelf=no
+  on click when ($p.shelf or "") != "yes" and $item = ($lay.full or "") do prop $p shelf=yes; do prop $lay full=""
+  on click when ($p.shelf or "") != "yes" and $item != ($lay.full or "") do prop $p shelf=yes
+  icon : column
+    lens home-icon
+  pip : column
+    role tbpip.on when ($p.shelf or "") != "yes"
+    role tbpip
+# a widget of the top bar: shown (slot=bar) or hidden (slot=off); a widget in another slot is not the bar's
+widget : column
+  only when ($w.slot or "") = "bar" or ($w.slot or "") = "off"
+  role tbitem.on when ($w.slot or "") = "bar"
+  role tbitem
+  let act = "Shown: press to hide it." when ($w.slot or "") = "bar"
+  let act = "Hidden: press to show it." otherwise
+  tip "$(($w.name or $w.title))" "$w.about $(act)"
+  on click when ($w.slot or "") = "bar" do prop $w slot=off
+  on click when ($w.slot or "") = "off" do prop $w slot=bar
+  icon : column
+    lens home-icon
+  pip : column
+    role tbpip.on when ($w.slot or "") = "bar"
+    role tbpip

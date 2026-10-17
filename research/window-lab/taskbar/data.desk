@@ -1,0 +1,41 @@
+# a6271: what the bar says of each thing on it, as props on the things themselves: icon= (a note in Icons), about= (one
+# plain sentence for the hover), lights= (you: amber while anything waits on Alex; work: mint while an agent is at work),
+# and name= for a widget, whose title is its lens's name. Alex's dock notes (f5565), his panels, the top bar's widgets.
+read a5567
+do prop a5567 icon=jeff about="Talk with JEFF: his chat takes the middle of the screen."
+read a5569
+do prop a5569 icon=board about="The whole board of epics, stories and tasks, in the middle."
+read a5571
+do prop a5571 icon=conversation about="Your conversation with JEFF and the agents, in the middle."
+read a5573
+do prop a5573 icon=writing about="Your documents, to read and write, in the middle."
+read a5575
+do prop a5575 icon=windows about="The window manager, which lays your windows out side by side."
+read a5577
+do prop a5577 icon=lowdown about="The lowdown: what happened in the house, in one page."
+read a5668
+do prop a5668 icon=inbox lights=you about="What waits on your look or your word."
+read a5670
+do prop a5670 icon=digest about="The day in a few lines."
+read a5672
+do prop a5672 icon=people lights=work about="Who is working on what right now."
+read a5678
+do prop a5678 icon=screen about="The windows open on your screen."
+read a5674
+do prop a5674 icon=lanes lights=you about="What needs you, what is moving, what landed."
+read a5676
+do prop a5676 icon=music about="What Spotify is playing, with its keys."
+# the widgets by title: which exist depends on the round-3 assembly (lane 3 untags clock, Now and pomodoro and adds
+# the glance and the timer bar); apply.py skips a widget this world does not have
+read "home-clock"
+do prop "home-clock" name=Clock icon=clock about="The time and the date, at the top left."
+read "home-now"
+do prop "home-now" name=Now icon=now about="What you are on now, said in a line at the top."
+read "home-pomodoro"
+do prop "home-pomodoro" name="Focus timer" icon=timer about="A focus timer, for working in rounds with breaks."
+read "home-notices"
+do prop "home-notices" name=Notices icon=bell about="The latest notices for you, at the top."
+read "home-glance"
+do prop "home-glance" name=Glance icon=glance about="The time, and in one line what waits on you and who is at work."
+read "home-timer-bar"
+do prop "home-timer-bar" name="Focus timer" icon=timer about="Your focus timer, at the top while The house is put away."
