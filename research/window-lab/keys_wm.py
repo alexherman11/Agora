@@ -126,7 +126,7 @@ def main():
     time.sleep(1)
     agora = [w[k] for w in kept["windows"] for k in ("hwnd", "lesser_hwnd") if w.get(k)]
     check("every Agora window closed", not any(user32.IsWindow(h) for h in agora), agora)
-    left = wm.profile_pids(wm.PROFILE) | wm.profile_pids(wm.UNSEEN)
+    left = wm.profile_pids(wm.EDGE_ROOT)
     check("none of the host's Edges still runs", not left, left)
     print("key timings:", [l.split(" ", 1)[1][:60] for l in wm.LOG.read_text(encoding="utf-8").splitlines() if "in place in" in l][-6:])
     print("all passed" if all(results) else f"{results.count(False)} FAILED")
