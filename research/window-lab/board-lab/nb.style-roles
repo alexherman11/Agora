@@ -1,55 +1,64 @@
-# a6010: the board as an inbox (direction-board-inbox). Lists, not tiles: every card one line until pressed, set
-# apart by a faint face; a card that needs Alex has a warm rail. Colour says the stage, in one small word; nothing moves.
+# a6010: the board as an inbox (direction-board-inbox). Round 2: LAMPLIT's rule (a6057), colour says whose move it is:
+# warm (amber) only on what waits on Alex, jeff (lilac) on a resident's move, accent (mint) only on an agent acting this
+# moment; everything else soft grey on the glass, and controls white. Lists, not tiles; nothing moves.
 role nb : between gap x2
 role nbbands : between gap x3
 role nbband : between gap /2
 role nbhead : between gap, pad bottom gap /2, pad left gap /2
 role nbname : text down 2 medium tracked, soft
 role nbname.need : text down 2 medium tracked, warm
+role nbname.link : text down 2 medium, ink
 role nbcount : text down 2 medium, soft
 role nbcount.need : text down 2 medium, night, on warm, corner gap x2, pad left gap /1.5, pad right gap /1.5
 role nbquiet : text down 2, soft
 role nblive : text down 2, accent
 role nbcards : between gap /2
 role nblater : between gap /2, space above gap /2
+role nbjeff : between gap /4, space above gap /2
 role nbfold : text down 2 medium tracked, soft, pad gap /4
+role nbfold.jeff : text down 2 medium tracked, jeff, pad gap /4
 role nbchev : text down 2, faint
 role nbneed : on raised, rail warm, corner gap, pad gap /1.5, pad left gap x1.5, pad right gap
-role nbneed.fail : on raised, rail jeff, corner gap, pad gap /1.5, pad left gap x1.5, pad right gap
+role nbneed.fail : on raised, rail warm, corner gap, pad gap /1.5, pad left gap x1.5, pad right gap
 role nbline : between gap, align center
 role nbbody : between gap, pad top gap /2, pad bottom gap /2
 role nbtop : between gap
-role nbkind.review : text down 2 medium tracked, warm, width 4.5em
-role nbkind.design : text down 2 medium tracked, jeff, width 4.5em
-role nbkind.fail : text down 2 medium tracked, jeff, width 4.5em
+role nbkind : text down 2, soft
+role nbkind.review : text down 2 medium tracked, warm
+role nbkind.design : text down 2 medium tracked, warm
+role nbkind.fail : text down 2 medium tracked, warm
 role nbwhen : text down 2, soft
 role nbtitle : text medium, ink
 role nbgist : text down, soft
 role nbacts : between gap
-role nbgo : text down 2 medium, night, on accent, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
+role nbgo : text down 2 medium, night, on ink, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
 role nbbtn : text down 2, ink, edge rim, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
 role nbinput : text down, ink, on wash, corner gap, pad gap
 role nbrows : between gap /4
 role nbrow : corner gap, pad gap /2, pad left gap x1.5, pad right gap
-role nbrow.live : on raised, edge accent, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role nbrow.live : corner gap, pad gap /2, pad left gap x1.5, pad right gap
 role nbrowtitle : text down, ink
-role nbstage.queued : text down 2 medium tracked, jeff, width 5.5em
-role nbstage.working : text down 2 medium tracked, accent, width 5.5em
-role nbstage.asks : text down 2 medium tracked, warm, width 5.5em
-role nbstage.ready : text down 2 medium tracked, sky, width 5.5em
-role nbstage.landing : text down 2 medium tracked, teal, width 5.5em
+role nbstage : text down 2, soft
+role nbstage.live : text down 2 medium, accent
+role nbstage.jeff : text down 2 medium, jeff
+role nbstage.queued : text down 2, soft
+role nbstage.working : text down 2, soft
+role nbstage.asks : text down 2 medium, jeff
+role nbstage.ready : text down 2, soft
+role nbstage.landing : text down 2, soft
 role nbnow : text down 2, accent
 role nbnote : between gap /4, pad left gap, border left rim
 role nbnoteby : text down 2 medium, soft
 role nbnotetext : text down, ink
 role nbdone : between gap, pad gap /4, pad left gap x1.5, pad right gap
 role nbdonetitle : text down, soft
-# direction-board-focus: the open first card, and the track of steps
+# the track of steps, and direction-board-focus (round 1, kept for the record)
 role nbfocus : on raised, rail warm, corner gap x1.5, pad gap x2, pad left gap x2.5, between gap
 role nbtitle.big : text up 2 medium, ink
 role nbwho : text down 2, soft
 role nbsteps : between gap /2
 role nbstep : text down 2, faint
 role nbstep.done : text down 2, soft
-role nbstep.on : text down 2 medium, night, on accent, corner gap x2, pad left gap /1.5, pad right gap /1.5
-role nbstep.ask : text down 2 medium, night, on warm, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role nbstep.on : text down 2 medium, night, on ink, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role nbstep.jeff : text down 2 medium, night, on jeff, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role nbstep.ask : text down 2 medium, night, on jeff, corner gap x2, pad left gap /1.5, pad right gap /1.5

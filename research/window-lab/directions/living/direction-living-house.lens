@@ -1,11 +1,22 @@
 # direction-living-house: The house, who is here and what each is on right now (a6057, lane 3, LAMPLIT). It takes At
-# work's place as a panel (the panel note's lens=). One grammar for everyone, you included: a name, what they are on,
-# since when, and their latest word. You first: your Now line (JEFF and the residents read it) and your timer. Then each
-# one at work, lit: a worker is shown by WHAT it is on (its card's title), with its name small; its latest word is its
-# own latest comment on that card. A resident by name, its own Now (its corner's focus=, what it holds), and the last
-# thing it said. Who is resting is one
-# faint line of names. The rail says whose move it is: mint, at work; lilac, it asks JEFF; amber, it asks you.
+# work's place as a panel (the panel note's lens=). One grammar for everyone, you included: who, what they are on, since
+# when, and their latest word. You first: your Now (only when you or JEFF set it: nothing here asks you to type) and a
+# small timer. Then each one at work: a worker is shown by WHAT it is on (its card's title) and by its maker (Claude,
+# Codex), never by an id; its latest word is its own latest comment on that card. A resident by name, its own Now (its
+# corner's focus=), and the last thing it said. Who is resting is one faint line of names. A press on anyone opens their
+# live feed in the middle (a5988's home-feed, as At work did); the one you are watching has a white edge. The rail says
+# whose move it is: mint, at work this moment; lilac, it asks a resident; amber, it asks you.
+# Round 2: one row a worker unless it says something (two lines, not three); since in lane 1's words (a time today,
+# else the day); the ring timer became a line (direction-living-timer); ids are gone; presses open feeds.
 house : column
+  role lhouse
+  mine : column
+    of prop:role=home-view,prop:actor=$me as v
+    each roster
+  plain : text "No viewer note for you here (role=home-view, actor=you): a press has nowhere to open a feed."
+    role hint
+    only when count(prop:role=home-view,prop:actor=$me) = 0
+roster : column
   role lhouse
   you : column
     of prop:role=now,prop:actor=$me as nw
@@ -34,68 +45,80 @@ me : row
   doing : text "$nw.doing"
     role lhdoing
     share 1
-    hint "what are you on?"
-    on edit do prop $nw doing="$value"
+    clamp 1
+    only when ($nw.doing or "") != ""
+  gap : column
+    share 1
+    only when ($nw.doing or "") = ""
   timer : row
-    lens home-pomodoro
+    lens direction-living-timer
 being : column
   the $h.corner as c
   role lhbeing
   role lhbeing.asks when $c.commission = "waiting" and ($c.asked_by or "") != $me
   role lhbeing.you when $c.commission = "waiting" and ($c.asked_by or "") = $me
+  role lhbeing.on when $v.viewing = $h.corner and $v.with = "home-feed"
+  let was = $v.viewing
+  on click do prop $v viewing=$h.corner back="$v.viewing" find="" with=home-feed
   work : column
     role lhcol
     only when ($c.commission or "") != ""
+    let maker = "Codex" when ($c.worker_provider or "") = "codex"
+    let maker = "Claude" otherwise
     head : row
       role lhhead
       what : text "$c.title"
         role lhwhat
         share 1
         clamp 1
-      who : text "$h.resident"
-        role lhwho
-    word : row
-      role lhline
-      state : text "asks $c.asked_by"
+      asks : text "asks $c.asked_by"
         role lhstate.asks
         role lhstate.you when ($c.asked_by or "") = $me
         only when $c.commission = "waiting"
-      since : text "since $(time($changed.commission))"
+      who : text "$(maker)"
+        role lhwho
+      since : text "$(day-or-time($changed.commission, $today))"
         role lhsince
-      said : row
-        share 1
-        of comments:$c.item by=$h.resident as m
-        each lastword
+        only when ($changed.commission or "") != ""
+    said : row
+      of comments:$c.item by=$h.resident as m
+      each lastword
   dweller : column
     role lhcol
     only when ($c.commission or "") = ""
+    let shown = "JEFF" when $h.resident = "jeff"
+    let shown = $h.resident otherwise
     head : row
       role lhhead
-      name : text "$h.resident"
+      name : text "$(shown)"
         role lhname
         role lhname.jeff when $h.resident = "jeff"
+      focus : text "$c.focus"
+        role lhfocus
+        share 1
+        clamp 1
+        only when ($c.focus or "") != ""
       gap : column
         share 1
-      since : text "last spoke $h.since"
+        only when ($c.focus or "") = ""
+      since : text "$h.since"
         role lhsince
         only when ($h.since or "") != ""
-    focus : text "$c.focus"
-      role lhwhat
-      clamp 1
-      only when ($c.focus or "") != ""
-    word : row
-      role lhline
-      said : row
-        share 1
-        of turns:$h.corner as t
-        each lastturn
+    said : row
+      of turns:$h.corner as t
+      each lastturn
 lastword : text "$m.text"
   role lhword
   only when $index = $count
   clamp 1
+  share 1
 lastturn : text "$t.said"
   role lhword
   only when $index = $count
   clamp 1
+  share 1
 restname : text "$r.resident"
   role lhrestname
+  role lhrestname.on when $v.viewing = $r.corner and $v.with = "home-feed"
+  let was = $v.viewing
+  on click do prop $v viewing=$r.corner back="$v.viewing" find="" with=home-feed
