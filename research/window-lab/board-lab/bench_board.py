@@ -63,6 +63,16 @@ def main(argv):
         finally:
             spent[source] = spent.get(source, 0) + (time.perf_counter() - t) * 1000
     scene.rows = rows
+    import knife                     # --sel (a6153): where the selections' time goes, by selection, in the last build
+    real_sel = knife.parse_selection
+
+    def parse_selection(w, token, *a, **k):
+        t = time.perf_counter()
+        try:
+            return real_sel(w, token, *a, **k)
+        finally:
+            spent["sel " + token] = spent.get("sel " + token, 0) + (time.perf_counter() - t) * 1000
+    knife.parse_selection = parse_selection
     real_post = deskd.Handler._post
 
     def post(self):
@@ -109,8 +119,9 @@ def main(argv):
             prof[0] = cProfile.Profile()
         spent.clear()
         r, ms2, kb = call(q)
-        if "--rows" in argv:
-            print("   rows: " + ", ".join(f"{s[:40]} {v:.0f}" for s, v in sorted(spent.items(), key=lambda kv: -kv[1])[:6]))
+        if "--rows" in argv or "--sel" in argv:
+            print(f"   rows and selections, {sum(spent.values()):.0f} ms in all: " + ", ".join(
+                f"{s[:60]} {v:.1f}" for s, v in sorted(spent.items(), key=lambda kv: -kv[1])[:int(opt("--sel", "8"))]))
         print(f"press {i + 1}: do {ms1:.0f} ms, scene {ms2:.0f} ms {kb} KB   [{said}]")
     import lens_ir
     print(f"instances kept {lens_ir._STATS['kept']}, made {lens_ir._STATS['made']}, builds {lens_ir._STATS['builds']}, "
