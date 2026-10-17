@@ -482,7 +482,8 @@
     const trySend = () => {
       if (busy) return;
       const d = V.drafts.get(n.key);
-      why = !input.value.trim() ? "Nothing to send — write something first"
+      why = te && te.composing() ? "Not sent — the input method is still writing; finish it first"
+        : !input.value.trim() ? "Nothing to send — write something first"
         : d && !d.seen && !d.shown ? "Not sent — this draft was typed against a version not shown here: Use current version, or Discard"
         : "";
       if (why) return sync();
@@ -490,6 +491,7 @@
     };
     post.onclick = async () => {
       if (busy || !input.value.trim()) return;
+      if (te && te.composing()) { why = "Not sent — the input method is still writing; finish it first"; return sync(); }   // Codex, a6067 c6120
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
       const raw = input.value; busy = true; why = ""; sync();
       await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
@@ -570,15 +572,27 @@
   // [[wikilink]] or ![[embed]] names; `on capture` with $value what a dropped capture carries. Without `on edit` it is
   // drawn only.
   const textConf = (n, p) => JSON.stringify([n.acts.map(a => [a.on, a.line]), p.hint || ""]);
-  // the module's keeper is the viewer's, this window's slot (Sable c5977: one keeper of a viewer's values)
+  // the thing whose words a text shows: the read of its `text` (a lens that reads $d.text under another thing's part,
+  // as doc-page does, is fenced on that part's thing, but its words are the document's subject), else the part's thing
+  const textOf = n => { const f = n.fence || {}, r = (f.reads || []).find(e => Array.isArray(e[2]) && e[2].includes("text")); return (r && r[0]) || f.item || null; };
+  // the module's keeper is the viewer's (Sable c5977: one keeper of a viewer's values): the unsent words, with the
+  // words and version they were typed on, are the person's draft; the caret is this window's
   const textKeeper = (key, nOf) => ({
-    load: () => { const st = V.textState(key) || {}, d = V.drafts.get(key); return { text: d ? d.text : undefined, base: st.base, sel: st.sel }; },
+    load: () => { const st = V.textState(key) || {}, d = V.drafts.get(key); return { text: d ? d.text : undefined, base: d ? d.base : undefined, sel: st.sel }; },
     save: st => {
       const dirty = st.text !== st.base || !!st.conflict;
-      V.textState(key, dirty ? { base: st.base, sel: st.sel } : { sel: st.sel });
-      if (dirty) V.rebased(key, st.text, { key, fence: st.version || (nOf().fence || null) });
+      V.textState(key, { sel: st.sel });
+      if (dirty) V.rebased(key, st.text, { key, fence: st.version || (nOf().fence || null) }, st.base);
       else if (V.drafts.has(key) && !V.busy(key)) V.drop(key);
     },
+  });
+  // another window of this person changed a draft: a document shows the same unsent words, a composer draws again
+  V.onDrafts(keys => {
+    for (const k of keys) {
+      const el = kept.get(k) && kept.get(k).el, d = V.drafts.get(k);
+      if (el && el._composer) el._composer.sync();
+      else if (el && el._te && el._teConf && d) el._te.adopt(d.text, d.base, d.seen && d.seen.fence);
+    }
   });
   async function sendEdit(el, out) {
     const n = el._n, a = n.acts.find(x => x.on === "edit");
@@ -592,7 +606,7 @@
     if (!window.TextEdit || !window.Markdown) { el.textContent = p.text; return; }
     const a = n.acts.find(x => x.on === "edit");
     const te = TextEdit.create({
-      text: p.text, version: n.fence, editable: !!a, key: n.key, item: (n.fence || {}).item,
+      text: p.text, version: n.fence, editable: !!a, key: n.key, item: textOf(n),
       links: p.wikilinks, titles: p.titles, hint: p.hint,
       light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
       keep: a ? textKeeper(n.key, () => el._n) : null,
@@ -605,7 +619,18 @@
           if (a) await te.flush();
           send(el._n, link.line.replace(/\$value\b/g, () => TEXT.esc(id)));
         },
-        undoSent: ev => send(el._n, `undo ${ev}`),                  // the world's undo of this window's sent edit
+        // the world's undo of this window's sent edit; its answer says which undo this was, and a refusal says why
+        undoSent: async ev => {
+          const r = await send(el._n, `undo ${ev}`), t = r ? (r.error || r.text || "") : "the answer was lost";
+          V.notify(r && !r.error && !/(^|\n)ERR\b/.test(t) ? `undid ${ev}, your last sent edit, through the desk (the world's undo: it shows for everyone)`
+            : `the desk did not undo ${ev}: ${t.split("\n").find(l => l.trim()) || t}`);
+        },
+        // Pike (a6067 c6122): "Keep mine" set someone's landed change aside: said on the thing, so they learn it did not stand
+        overrode: (changes, ev) => {
+          const item = textOf(el._n); if (!item) return;
+          const what = changes.slice(0, 3).map(c => `“${c.was.slice(0, 80)}” → “${c.now.slice(0, 80)}”`).join("; ");
+          send(el._n, `do comment ${item} line="${TEXT.esc(`${who} kept their own words over a change that landed while they were typing (${ev || "their edit"}); set aside: ${what}`)}"`);
+        },
         capture: (anchor, data) => {
           const c = el._n.acts.find(x => x.on === "capture");
           if (!c) return V.notify("this text takes no capture here (its lens has no `on capture`)");

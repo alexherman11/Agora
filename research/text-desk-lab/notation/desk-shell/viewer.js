@@ -8,44 +8,29 @@
 //   4. viewer marks are drawn in honesty roles, never silently   (mark: unsent, refused)
 const Viewer = (session, who, lens, said, status) => {
   // Juniper c347 (7): typed words outlive a closed tab. localStorage stands in for the viewer store: this browser only.
-  // a6067 (Sable c5977: caret and unsent words are the WINDOW's, not the person's; two of Alex's windows on one
-  // document must not overwrite each other): one slot per session, viewer, lens and WINDOW. The window's id lives in
-  // its sessionStorage (it survives a reload of that window); a new window takes over the newest slot whose window
-  // has not been heard from for 20 s (it was closed), or the one slot from before windows had their own, so a closed
-  // tab's words still come back. Not handled: a duplicated tab copies its sessionStorage, so the two share one slot.
-  const base = `lens-drafts:${session}:${who}:${lens}`;
-  // (a frame shares its page's sessionStorage, so the id is kept under the frame's own name: two named frames, or two
-  // named pop-outs, are two windows)
+  // One slot per session, viewer and lens (two windows of one viewer share it).
+  // a6067 (Sable, on a6067 c6106, sorting by whose a value is): the unsent WORDS of a field are the person's: one draft
+  // per field, the same in every window that shows it, kept in step while both are open (the `storage` event), and
+  // said in both when two windows type into one field at once. The caret, the selection and an input method's half-
+  // typed words are the WINDOW's: kept in a slot of the window's own (its id in sessionStorage, under the frame's name,
+  // so two named frames or pop-outs are two windows), never shared. Nothing precious lives in a window's slot, so a
+  // new window takes no one's over: it starts with no caret, and a slot whose window is gone is only a stale caret.
+  const store = `lens-drafts:${session}:${who}:${lens}`;
+  let drafts;
+  try { drafts = new Map(JSON.parse(localStorage.getItem(store)) || []); } catch { drafts = new Map(); }
   const widKey = "lens-window:" + (typeof window !== "undefined" && window.name || "");
-  let wid = null, adopt = null;
+  let wid = null;
   try { wid = sessionStorage.getItem(widKey); } catch {}
-  if (!wid) {
-    wid = Math.random().toString(36).slice(2, 10);
-    try { sessionStorage.setItem(widKey, wid); } catch {}
-    try {
-      const keys = [base];
-      if (typeof localStorage.length === "number" && localStorage.key) for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(base + ":w:")) keys.push(k); }
-      for (const k of keys) {
-        let v; try { v = JSON.parse(localStorage.getItem(k)); } catch { continue; }
-        if (!v) continue;
-        const alive = Array.isArray(v) ? 0 : v.alive || 0;        if (Date.now() - alive > 20000 && (!adopt || alive > adopt.alive)) adopt = { k, alive, v };
-      }
-    } catch {}
-  }
-  const store = `${base}:w:${wid}`;
-  const slot = v => Array.isArray(v) ? [v, {}] : [(v && v.drafts) || [], (v && v.texts) || {}];
-  let drafts, texts;
-  try {
-    const own = JSON.parse(localStorage.getItem(store) || "null");
-    [drafts, texts] = slot(own || (adopt && adopt.v)); drafts = new Map(drafts);
-    if (!own && adopt && localStorage.removeItem) localStorage.removeItem(adopt.k);
-  } catch { drafts = new Map(); texts = {}; }
+  if (!wid) { wid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem(widKey, wid); } catch {} }
+  const winStore = `lens-window:${session}:${who}:${lens}:${wid}`;          // in sessionStorage: it lives as the window does
+  let texts; try { texts = JSON.parse(sessionStorage.getItem(winStore)) || {}; } catch { texts = {}; }
+  const typedAt = new Map(), onDrafts = [];
   // codex team (pike-8 section 2): a saved draft with no record of what it was typed against is never sent against
   // today's paint. It stays, marked; the person copies it, drops it (Escape) and starts from the current text.
   const unknownOrigin = "origin unknown: this kept draft has no record of what it was typed against; copy it if you need it, then Escape and start from the current text";
   for (const d of drafts.values()) if (!d.seen && !d.shown) d.why = unknownOrigin;
   let notice = drafts.size ? `unsent: ${drafts.size} draft(s) kept from before, marked where they were typed` : "";
-  let text = "", told = "", unheardIn = null;
+  let text = "", told = "", unheardIn = null, kept = null;
   let shownNotice = "", noticeTimer;
   const foldStore = `lens-folds:${session}:${who}:${lens}`;
   let folds; try { folds = JSON.parse(localStorage.getItem(foldStore)) || {}; } catch { folds = {}; }
@@ -91,32 +76,29 @@ const Viewer = (session, who, lens, said, status) => {
         status.textContent = summary; status.title = notice; status.hidden = !notice;
         if (notice) noticeTimer = setTimeout(() => { status.hidden = true; }, 4500);
       }
-      v.keepSlot();
-    },
-    // this window's slot: its drafts, its texts' state (caret, selection, what each was typed on), and when it was last
-    // heard from (a slot not heard from for 20 s is a closed window's, for the next window to take over)
-    keepSlot() {
-      try {
-        if (drafts.size || Object.keys(texts).length) localStorage.setItem(store, JSON.stringify({ drafts: [...drafts], texts, alive: Date.now() }));
-        else if (localStorage.removeItem) localStorage.removeItem(store);     // an empty window leaves nothing behind
-      } catch {}
+      const want = JSON.stringify([...drafts]);
+      if (want !== kept) { kept = want; try { localStorage.setItem(store, want); } catch {} }   // (an unchanged store tells no other window)
     },
     window: wid,
-    // a6067: a typed text's own state (textedit.js): the words it was typed against (base), their version, the caret and
-    // selection, kept here so there is one keeper of a viewer's values (Sable c5977), not a second store
+    // a6067: a typed text's window state (textedit.js): caret and selection, this window's only (Sable)
     textState(key, st) {
       if (st === undefined) return texts[key] || null;
       if (st === null) delete texts[key]; else texts[key] = st;
-      v.keepSlot();
+      try { sessionStorage.setItem(winStore, JSON.stringify(texts)); } catch {}
     },
     // a6067: the module fitted unsent words over newer words of the desk's: they are now typed against that version
-    // (the fence they will be sent on), and a refusal they had is answered by the fitting
-    rebased(key, words, origin) {
+    // (the fence they will be sent on) and those words (base); a refusal they had is answered by the fitting. The
+    // words, their fence and their gesture id stay together (Codex, a6067 c6120)
+    rebased(key, words, origin, base) {
       const d = drafts.get(key);
-      drafts.set(key, { text: words, why: "typed here, not sent", seen: origin, gesture: d && d.text === words ? d.gesture : undefined });
+      if (d && !d.refused && d.text === words && d.base === base && JSON.stringify(d.seen) === JSON.stringify(origin)) return;
+      typedAt.set(key, Date.now());
+      drafts.set(key, { text: words, why: "typed here, not sent", seen: origin, base, gesture: d && d.text === words ? d.gesture : undefined });
       if (d && d.refused) notice = "";
       v.show();
     },
+    // a6067: told when another window of this person changed a draft (keys); a part showing it draws it again
+    onDrafts(f) { onDrafts.push(f); },
     // one send per key at a time; the token is the draft generation that was submitted
     beginSend(key) {
       if (pending.has(key)) return null;
@@ -158,6 +140,7 @@ const Viewer = (session, who, lens, said, status) => {
     typed(key, words, fence) {
       const d = drafts.get(key), seen = d ? (d.shown || d.seen) : fence;
       if (d && d.refused && seen) notice = "draft kept; edited against the version shown";
+      typedAt.set(key, Date.now());
       drafts.set(key, { text: words, why: seen ? "typed here, not sent" : unknownOrigin, seen }); v.show();
     },
     // the fence a draft is sent on: what it was typed against, or the value shown beside a refused draft; null means
@@ -324,6 +307,19 @@ const Viewer = (session, who, lens, said, status) => {
       } finally { v.repainting = false; }
     },
   };
-  if (typeof setInterval === "function") setInterval(() => v.keepSlot(), 5000);   // a6067: this window is still here
+  // a6067 (Sable): another window of this person changed a draft: the same words here, drawn again by whoever shows
+  // them; a draft with a send in flight here is this window's until answered. Typed in both at once: said in both.
+  if (typeof addEventListener === "function") addEventListener("storage", e => {
+    if (e.key !== store || e.newValue === kept) return;
+    let next; try { next = new Map(JSON.parse(e.newValue) || []); } catch { return; }
+    kept = e.newValue;
+    const changed = [...new Set([...drafts.keys(), ...next.keys()])].filter(k => !pending.has(k) && JSON.stringify(drafts.get(k)) !== JSON.stringify(next.get(k)));
+    if (!changed.length) return;
+    const together = changed.filter(k => Date.now() - (typedAt.get(k) || 0) < 4000);
+    for (const k of changed) { if (next.has(k)) drafts.set(k, next.get(k)); else drafts.delete(k); }
+    if (together.length) notice = "you are typing in this field in another of your windows too: both show what was typed last; check it before sending";
+    v.show();
+    for (const f of onDrafts) f(changed);
+  });
   return v;
 };

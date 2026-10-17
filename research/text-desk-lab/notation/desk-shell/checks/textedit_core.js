@@ -148,6 +148,23 @@ function Window(desk, name, gate) {
   check("each window kept its state in its own slot", A.slot.get("doc").sel[0] === 3 && B.slot.get("doc").sel[0] === desk.text.length);
 }
 
+// ---- 6b. the unsent words are the person's (Sable): one window's typing reaches the other, fitted over its own
+{
+  const desk = Desk("Top.\nBottom.\n");
+  const A = Window(desk, "A"), B = Window(desk, "B");
+  caretAt(A.inp, 0); type(A.inp, "A: ");
+  caretAt(B.inp, desk.text.length); type(B.inp, "B.\n");
+  B.te.adopt(A.te.doc.text, A.te.doc.base, A.te.doc.version);
+  check("another window's unsent words are fitted over this one's own (both kept)", B.inp.value === "A: Top.\nBottom.\nB.\n", B.inp.value);
+  check("and this window's caret stays in its own words", B.te.doc.sel[0] === B.inp.value.length, B.te.doc.sel);
+  A.te.adopt(B.te.doc.text, B.te.doc.base, B.te.doc.version);
+  check("back the other way, the edit both hold is one edit: the two windows agree", A.inp.value === B.inp.value, [A.inp.value, B.inp.value]);
+  const C = Window(desk, "C"), D = Window(desk, "D");
+  C.inp.selectionStart = 0; C.inp.selectionEnd = 3; type(C.inp, "Up"); D.inp.selectionStart = 0; D.inp.selectionEnd = 3; type(D.inp, "Peak");
+  const was = D.inp.value, took = D.te.adopt(C.te.doc.text, C.te.doc.base, C.te.doc.version);
+  check("typed in the same words in two windows at once: not taken over, and said", !took && D.inp.value === was && D.said.some(s => /two of your windows/.test(s)), D.said);
+}
+
 // ---- 7. an input method (IME): the composed words go in as one edit; the desk's words wait for it
 {
   const desk = Desk("Notes:\n");

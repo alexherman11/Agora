@@ -341,8 +341,11 @@ def scene_nodes(root):
         if item:
             text = p.get("text") if p.get("text") is not None else ("".join(r.get("text", "") for r in p["runs"]) if p.get("runs") else None)
             bind = f.get("bind") if isinstance(f.get("bind"), dict) else {}
+            # a6067: whose words a text shows (the read of its `text`: a lens may read a document's text under another part)
+            text_of = next((e[0] for e in (f.get("reads") or []) if isinstance(e, list) and len(e) > 2 and isinstance(e[2], list)
+                            and "text" in e[2]), None)
             here = {"key": n["key"], "item": item, "subject": bind.get("subject"), "role": p.get("role"), "rev": f.get("rev"),
-                    "text": text, "up": up}
+                    "text": text, "up": up, "text_of": text_of, "text_rev": next((e[1] for e in (f.get("reads") or []) if isinstance(e, list) and e and e[0] == text_of), None)}
             if f.get("item") == item:
                 fenced.setdefault(item, here)
             out.append(here)
@@ -400,6 +403,8 @@ def refs_from(parts, root, events_total, page, rect=None):
                                                "viewer": who, "_at": p["rect"][1::-1]})
             if line:
                 ref.setdefault("passage", []).append(p.get("words") or "")
+                if n.get("text_of"):                 # the document the words are, and its revision
+                    ref["passage_of"], ref["passage_rev"] = n["text_of"], n.get("text_rev")
             ref["words"].append(p.get("words") or ("" if line else n["text"]) or "")
             outer = n
             while outer["up"] and outer["up"]["item"] == n["item"]:       # the card, not its title: the item's own part

@@ -139,7 +139,9 @@ except scene.LensRefusal as e:
 sys.path.insert(0, str(HERE.parent.parent / "window-lab" / "capture"))
 try:
     import capture   # noqa: E402
-    root_node = {"key": "w", "paint": {}, "kids": [{"key": "w/a12/body", "fence": {"item": "a12", "rev": 7, "bind": {"subject": "s11"}},
+    # as doc-page: the part is fenced on the writer note a12, its words are the document s30's text (read at rev 4)
+    root_node = {"key": "w", "paint": {}, "kids": [{"key": "w/a12/body", "fence": {"item": "a12", "rev": 7, "bind": {"subject": "s11"},
+                                                                                   "reads": [["a12", 7, ["place"]], ["s30", 4, ["text"]]]},
                                                      "paint": {"text": "# Plan\nWe build it.\nThen we test it.\n", "role": "body"}, "kids": []}]}
     parts = [{"aid": "part:w/a12/body", "rect": [0, 0, 600, 400], "words": "Plan We build it. Then we test it."},
              {"aid": "part:w/a12/body::1", "rect": [0, 40, 600, 20], "words": "We build it."},
@@ -147,7 +149,7 @@ try:
     refs = capture.refs_from(parts, root_node, 99, ("frontier", "alex", "writing"), rect=[0, 38, 600, 44])
     r0 = refs[0] if refs else {}
     check("a passage is named: its document, its rev, and the words under the drag",
-          len(refs) == 1 and r0.get("item") == "a12" and r0.get("rev") == 7 and r0.get("passage") == "We build it.\nThen we test it.", refs)
+          len(refs) == 1 and r0.get("passage") == "We build it.\nThen we test it." and r0.get("passage_of") == "s30" and r0.get("passage_rev") == 4, refs)
 except ImportError as e:
     check("capture.py imports", False, e)
 

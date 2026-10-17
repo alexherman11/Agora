@@ -37,10 +37,23 @@
   const r2 = await pike('do replace ' + id + ' old="build it" new="ship it"');
   await until(() => !document.querySelector(".te-conflict").hidden);
   check("a conflict bar shows, his words kept", !document.querySelector(".te-conflict").hidden && mine().includes("make it"), [r2, mine()]);
+  const bt = document.querySelector(".te-conflict span").textContent;
+  check("the bar names the words in dispute: what was there, theirs, his", /“build”/.test(bt) && /theirs: “ship”/.test(bt) && /yours \(unsent\): “make”/.test(bt), bt);
   await sleep(1500);
   check("nothing of his is sent over Pike's while it stands", painted().includes("ship it") && !painted().includes("make"), painted());
   [...document.querySelectorAll(".te-conflict button")].find(b => b.textContent === "Take theirs").click();
   check("Take theirs: his words are the world's again", mine() === painted() && document.querySelector(".te-conflict").hidden, mine());
+  // and Keep mine: his words go over Pike's, and the thing says so, so Pike learns his words did not stand (Pike c6122)
+  const at2 = mine().indexOf("ship"); caret(at2, at2 + 4); write("launch");
+  await pike('do replace ' + id + ' old="ship it" new="send it"');
+  await until(() => !document.querySelector(".te-conflict").hidden);
+  [...document.querySelectorAll(".te-conflict button")].find(b => b.textContent === "Keep mine").click();
+  await until(() => painted().includes("launch it"));
+  await sleep(800);
+  const ex = await desk("pike", `examine ${id}`);
+  check("Keep mine: his words stand, and a comment on the document tells what was set aside",
+    painted().includes("launch it") && /kept their own words over a change/.test(ex.text || "") && /“ship” → “send”/.test(ex.text || ""), [painted(), (ex.text || "").slice(0, 600)]);
+  caret(mine().indexOf("launch"), mine().indexOf("launch") + 6); write("ship"); await until(() => painted().includes("ship it"));
 
   // 4. an input method: the composed words stay while it composes; the desk's words wait, then are fitted
   caret(mine().length); const el = md();
@@ -74,6 +87,8 @@
   check("with nothing unsent, Ctrl+Z asks the desk to undo his sent edit, and says which", /asked the desk to undo e\d+/.test(said()), said().slice(0, 200));
   await until(() => painted() !== before);
   check("the world's undo took the sent Q away", !painted().includes("€Q") && painted() === mine(), painted());
+  await until(() => /undid e\d+, your last sent edit, through the desk/.test(said()));
+  check("and its answer stays said (which undo it was)", /undid e\d+, your last sent edit, through the desk/.test(said()), said().slice(0, 200));
 
   // 6b. a change the browser makes with no beforeinput (execCommand: the painter's own key queue) is read back
   await until(() => painted() === mine());
@@ -86,7 +101,8 @@
   check("lines are named part:<key>::<line>", ids.length > 1 && ids.every(i => i.startsWith("part:" + part().dataset.key + "::")), ids.slice(0, 3));
   const sel0 = mine().indexOf("plan"); caret(sel0, sel0 + 4);
   const an = part()._te.anchor();
-  check("a selection's anchor: document, version, words, words either side", an.item === id && an.quote === "plan" && /The$/.test(an.before) && /^is/.test(an.after) && an.version && an.version.rev, an);
+  const textRead = part()._n.fence.reads.find(e => (e[2] || []).includes("text"))[0];      // the document's words: its subject
+  check("a selection's anchor: document, version, words, words either side", an.item === textRead && an.quote === "plan" && /The$/.test(an.before) && /^is/.test(an.after) && an.version && an.version.rev, an);
 
   // 8. two windows of one person on one document: their own carets and unsent words; both edits stand
   const fr = document.createElement("iframe"); fr.name = "second-window"; fr.style.cssText = "width:700px;height:500px";
@@ -110,7 +126,7 @@
   if (box) {
     box.focus(); write("Hello JEFF"); await sleep(50);
     const k = box.closest("[data-key]").dataset.key;
-    const draft = () => { for (const s of Object.keys(localStorage).filter(x => x.includes(":w:"))) { try { const v = JSON.parse(localStorage.getItem(s)); const d = (v.drafts || []).find(e => e[0] === k); if (d) return d[1].text; } catch (e) {} } return null; };
+    const draft = () => { try { const d = (JSON.parse(localStorage.getItem(`lens-drafts:${session}:${q.get("as")}:${q.get("lens")}`)) || []).find(e => e[0] === k); return d ? d[1].text : null; } catch (e) { return null; } };
     check("the composer's words are a kept draft (with what they were typed on)", draft() === "Hello JEFF", draft());
     box.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true }));
     check("Ctrl+Z in the composer is the module's undo, and the draft follows it", box.value === "" && !draft(), [box.value, draft()]);

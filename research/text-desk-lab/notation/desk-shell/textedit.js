@@ -14,14 +14,18 @@
 //   TextEdit.attach(textarea, opts) -> editor a plain box: the textarea stays the browser's (IME, AltGr, spelling)
 //   opts:  text, version          the desk's words and the version they are at (opaque: the painter gives its fence)
 //          editable, hint, key    key: the part's scene key, for ids the control screen reads (part:<key>::<line>)
-//          keep {load(), save(st)} the viewer's keeper, THIS WINDOW's slot (viewer.js): unsent text, base, caret
+//          keep {load(), save(st)} the viewer's keeper (viewer.js): the unsent words and what they were typed on are
+//                                 the PERSON's draft (one per field, the same in all their windows); the caret and
+//                                 selection are THIS WINDOW's (Sable, a6067)
 //          seam {send(out)}       out = {text, version, edits}; resolves {ok, event, error}. Without a seam the
-//                                 customer sends (a composer's Enter); the module still keeps undo, keys, composition
+//                                 customer sends (a composer's Enter: no autosave, no fitting, no desk undo there)
 //          hooks                  pick(q) [[ picker titles, follow(id), capture(anchor, data), undoSent(event),
+//                                 overrode(changes, event) after "Keep mine" was sent over someone's edit,
 //                                 notify(words), changed(st) after any change (the customer's own bookkeeping)
 //          links, titles, light, lightClass     Markdown only: [[link]] targets, picker titles, lit passages
-//   editor: el, src(), receive(text, version), flush(), anchor(), picked(), press(key), lights(l), links(l),
-//           resolve("mine"|"theirs"), state(), doc
+//   editor: el, src(), receive(text, version), adopt(text, base, version) (another window's unsent words), flush(),
+//           anchor(), picked(), press(key), lights(l), links(l), titles(t), resolve("mine"|"theirs"), composing(),
+//           state(), doc
 //
 // THE SEAM (Pike c5974; a4865 is Alex's choice and this file does not make it): 'send an edit against a version,
 // receive ordered edits'. The module sends {version, edits, text} as the person pauses and receives the desk's words
@@ -50,20 +54,18 @@
   // lines narrowed to the characters that differ, so two edits on two lines stay two edits
   function diff(x, y) {
     if (x === y) return [];
-    let p = 0; const n0 = Math.min(x.length, y.length);
-    while (p < n0 && x[p] === y[p]) p++;
-    let q = 0; while (q < n0 - p && x[x.length - 1 - q] === y[y.length - 1 - q]) q++;
-    // whole lines round the difference, so lines are compared as lines
-    p = x.lastIndexOf("\n", p - 1) + 1;
-    const xe = x.indexOf("\n", x.length - q), ye = y.indexOf("\n", y.length - q);
-    q = Math.min(xe < 0 ? 0 : x.length - xe, ye < 0 ? 0 : y.length - ye);
-    const xm = x.slice(p, x.length - q), ym = y.slice(p, y.length - q);
+    // the lines both share at the start and the end are set aside, whole lines, so lines are compared as lines
+    const X = lines(x), Y = lines(y);
+    let i = 0; while (i < X.length && i < Y.length && X[i] === Y[i]) i++;
+    let j = 0; while (j < X.length - i && j < Y.length - i && X[X.length - 1 - j] === Y[Y.length - 1 - j]) j++;
+    const p = X.slice(0, i).join("").length;
+    const xm = X.slice(i, X.length - j).join(""), ym = Y.slice(i, Y.length - j).join("");
     const narrow = (a0, sa, sb) => {
       let k = 0; while (k < sa.length && k < sb.length && sa[k] === sb[k]) k++;
       let r = 0; while (r < sa.length - k && r < sb.length - k && sa[sa.length - 1 - r] === sb[sb.length - 1 - r]) r++;
       return k === sa.length && k === sb.length ? null : { a: a0 + k, b: a0 + sa.length - r, s: sb.slice(k, sb.length - r) };
     };
-    const A = lines(xm), B = lines(ym), runs = myers(A, B);
+    const A = X.slice(i, X.length - j), B = Y.slice(i, Y.length - j), runs = myers(A, B);
     if (!runs) return [narrow(p, xm, ym)].filter(Boolean);
     const out = [];
     let ax = 0, ai = 0, by = 0, bi = 0;
@@ -118,9 +120,13 @@
   // fit the desk's new words over the person's: base is what both started from, next the desk's, local the person's.
   // -> {text, sel, theirs} with the selection carried, or {conflict, theirs, mine} when they touch the same words
   function fit(base, next, local, sel) {
-    const W = diff(base, next), L = diff(base, local);
+    let W = diff(base, next), L = diff(base, local);
+    // the same edit on both sides (another window of the person's already holding mine) is one edit, not a clash
+    const same = (u, v) => u.a === v.a && u.b === v.b && u.s === v.s;
+    const both = W.filter(w => L.some(l => same(w, l)));
+    if (both.length) { W = W.filter(w => !both.some(x => same(w, x))); }
     const hit = W.find(w => L.some(l => clash(w, l)));
-    if (hit) return { conflict: true, theirs: W, mine: L, at: hit };
+    if (hit) return { conflict: true, theirs: W, mine: L, at: hit, with: L.find(l => clash(hit, l)) };
     // the desk's edits in the person's text: shifted by the person's edits before them (one at the same point
     // inserting is after the desk's, so it does not shift it)
     const shift = pos => pos + L.filter(l => l.b <= pos && !(l.a === l.b && l.a === pos)).reduce((n, l) => n + l.s.length - (l.b - l.a), 0);
@@ -187,7 +193,14 @@
       if (text === this.base) { this.version = version; return { kind: "same" }; }
       if (text === this.text) { this.base = text; this.version = version; this.undo = []; this.redo = []; return { kind: "confirmed" }; }
       const r = fit(this.base, text, this.text, this.sel);
-      if (r.conflict) { this.conflict = { theirs: text, version, base: this.base }; return { kind: "conflict", theirs: r.theirs }; }
+      if (r.conflict) {
+        // what each side did to the words in dispute, in whole words, for the person to choose by
+        const b = this.base, wide = e => { let a = e.a, z = e.b; while (a > 0 && !/\s/.test(b[a - 1])) a--; while (z < b.length && !/\s/.test(b[z])) z++; return [a, z]; };
+        const [ta, tz] = wide(r.at), [ma, mz] = wide(r.with);
+        const seen = { was: b.slice(Math.min(ta, ma), Math.max(tz, mz)), theirs: b.slice(ta, r.at.a) + r.at.s + b.slice(r.at.b, tz), mine: b.slice(ma, r.with.a) + r.with.s + b.slice(r.with.b, mz) };
+        this.conflict = { theirs: text, version, base: this.base, seen };
+        return { kind: "conflict", theirs: r.theirs };
+      }
       // the person's own undo steps are fitted too; a step that touches the desk's words is dropped (said)
       const keepSteps = list => list.map(st => { const f = fit(this.base, text, st.text, st.sel); return f.conflict ? null : { text: f.text, sel: f.sel }; });
       const u = keepSteps(this.undo), dropped = u.filter(x => !x).length;
@@ -200,6 +213,16 @@
     resolve(which) {
       const c = this.conflict; if (!c) return false;
       this.conflict = null; this.held = null; this.base = c.theirs; this.version = c.version;
+      // Pike (a6067 c6122): keeping mine undoes what someone else's edit did; once sent, the world is told what was
+      // set aside (the customer's hooks.overrode), so a resident learns its words did not stand
+      if (which === "mine" && c.base != null) {          // said in whole words: "ship" -> "send", not "hip" -> "end"
+        let d = 0;
+        this.overrode = diff(c.base, c.theirs).map(e => {
+          let a = e.a, b = e.b; while (a > 0 && !/\s/.test(c.base[a - 1])) a--; while (b < c.base.length && !/\s/.test(c.base[b])) b++;
+          const grow = e.s.length - (e.b - e.a), out = { was: c.base.slice(a, b), now: c.theirs.slice(a + d, b + d + grow) };
+          d += grow; return out;
+        });
+      }
       if (which === "theirs") { this.text = c.theirs; this.undo = []; this.redo = []; const n = Math.min(this.sel[0], this.text.length); this.sel = [n, n]; }
       return true;
     }
@@ -248,6 +271,7 @@
       doc.began(out);
       let r; try { r = await opts.seam.send(out); } catch (err) { r = { ok: false, error: String(err && err.message || err) }; }
       doc.answered(!!(r && r.ok), r && r.event);
+      if (r && r.ok && doc.overrode) { const o = doc.overrode; doc.overrode = null; if (opts.hooks && opts.hooks.overrode) opts.hooks.overrode(o, r.event); }
       E.save();
       if (doc.outgoing()) E.changed();       // typed while it was out, or fitted over newer words: that goes next
       return r;
@@ -275,6 +299,23 @@
       composing = on;
       if (!on && queued) { const q = queued; queued = null; E.receive(q[0], q[1]); }
     };
+    // another window of this person changed these unsent words (the viewer's draft is the person's, Sable): the same
+    // words here, this window's caret carried over them; nothing is sent from here for it (the typing window sends)
+    // Typed in both windows at once: the other's edits are fitted over this window's (same words: kept apart and said)
+    E.adopt = (text, base, version) => {
+      if (composing || doc.conflict || text == null || text === doc.text) return false;
+      let f;
+      if (!doc.dirty || base == null || base !== doc.base) {
+        if (doc.dirty && base != null && base !== doc.base) { notify("typed in two of your windows at once, on words the desk has moved since: this window keeps its own; the desk will order them"); return false; }
+        f = { text, sel: fit(doc.text, text, doc.text, doc.sel).sel };
+      } else {
+        f = fit(doc.base, text, doc.text, doc.sel);
+        if (f.conflict) { notify("typed in two of your windows at once, in the same words: this window keeps its own; look at both before sending"); return false; }
+      }
+      doc.text = f.text; doc.sel = f.sel || doc.sel;
+      if (base != null) { doc.base = base; if (version != null) doc.version = version; }
+      render(); E.save(); return true;
+    };
     E.resolve = which => { if (!doc.resolve(which)) return false; render(); E.changed(); notify(which === "mine" ? "kept yours: sending it over theirs" : "took theirs: your unsent words are gone"); return true; };
     return E;
   }
@@ -288,7 +329,12 @@
     bar.append(say, mine, theirs);
     return { bar, show() {
       const c = E.doc.conflict; bar.hidden = !c;
-      if (c) { say.textContent = "Someone changed these words while you typed. Theirs now: “" + clip(c.theirs) + "”. "; bar.title = c.theirs; }
+      if (c) {
+        const s = c.seen;
+        say.textContent = s ? `Someone changed these words while you typed: “${clip(s.was)}” — theirs: “${clip(s.theirs)}”, yours (unsent): “${clip(s.mine)}”.`
+          : "These unsent words were typed on a version not shown here (a kept draft): keep them over the text now, or take the text now.";
+        bar.title = c.theirs;
+      }
     } };
   }
   const clip = s => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > 160 ? s.slice(0, 157) + "…" : s; };
@@ -390,7 +436,8 @@
     });
     const api = {
       el: wrapEl, doc: E.doc, src, picked, anchor, lights: setLights, raw: () => raw, state: () => E.doc.state(),
-      receive: (t, v) => E.receive(t, v), flush: () => E.flush(), resolve: w => E.resolve(w),
+      receive: (t, v) => E.receive(t, v), flush: () => E.flush(), resolve: w => E.resolve(w), adopt: (t, b, v) => E.adopt(t, b, v),
+      composing: () => E.composing(),
       titles(t) { opts.titles = t; },
       links(l) { ctx = { links: l || {} }; const r = focused() ? sel() : null; paint(r ? r.a : null, r ? r.b : null); },
       // compatibility with the painter's old document part: set(words, links) draws the words as the desk's
@@ -547,6 +594,7 @@
     input.addEventListener("keyup", () => { E.doc.sel = selNow(); });
     input.addEventListener("mouseup", () => { E.doc.sel = selNow(); E.save(); });
     return { el: input, doc: E.doc, src: () => E.doc.text, state: () => E.doc.state(), receive: (t, v) => E.receive(t, v), flush: () => E.flush(),
+      composing: () => E.composing(), adopt: (t, b, v) => E.adopt(t, b, v),
       resolve: w => E.resolve(w), anchor: () => ({ item: opts.item || null, ...E.doc.anchor(input.selectionStart, input.selectionEnd) }),
       picked: () => input.selectionEnd > input.selectionStart ? input.value.slice(input.selectionStart, input.selectionEnd) : null,
       // the customer set the box's words (a send cleared it, Discard): the desk's words now, nothing unsent

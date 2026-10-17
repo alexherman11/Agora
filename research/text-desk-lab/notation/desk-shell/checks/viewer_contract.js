@@ -8,8 +8,8 @@
   const Store = (init = []) => { const m = new Map(init); return { m, getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)),
     removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } }; };
   // as test_viewer.cjs: a localStorage with only getItem and setItem, no sessionStorage, no timers
-  const make = (local, session) => new Function("localStorage", "sessionStorage", "Style", "setInterval", src + "\nreturn Viewer;")(
-    local, session, { roleClass: n => n }, undefined)("test", "codex", "review", {}, {});
+  const make = (local, session, said = {}) => new Function("localStorage", "sessionStorage", "Style", "setInterval", src + "\nreturn Viewer;")(
+    local, session, { roleClass: n => n }, undefined)("test", "codex", "review", said, {});
   const legacy = saved => { const m = new Map([["lens-drafts:test:codex:review", JSON.stringify(saved)]]);
     return make({ getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, v) }, undefined); };
   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -70,25 +70,29 @@
     assert.equal(v.drafts.has(old), true);
   });
 
-  // a6067: the store is the window's
+  // a6067 (Sable, a6067 c6106): the unsent words are the person's (one draft per field, the same in every window, kept
+  // in step); the caret is the window's (its own, in its sessionStorage)
   {
-    const local = Store(), s1 = Store(), s2 = Store();
-    const a = make(local, s1), b = make(local, s2);
-    a.typed("doc/a5/body", "A's words", { key: "doc/a5/body", fence: { at: 1 } }); a.textState("doc/a5/body", { sel: [3, 3] });
-    b.typed("doc/a5/body", "B's words", { key: "doc/a5/body", fence: { at: 1 } }); b.textState("doc/a5/body", { sel: [9, 9] });
-    check("two windows on one document keep their own drafts and carets", a.drafts.get("doc/a5/body").text === "A's words" && b.drafts.get("doc/a5/body").text === "B's words"
-      && a.textState("doc/a5/body").sel[0] === 3 && b.textState("doc/a5/body").sel[0] === 9);
-    const slots = [...local.m.keys()].filter(k => k.includes(":w:"));
-    check("in two slots of the one store", slots.length === 2, slots);
-    // a's window closes; a slot not heard from for 20 s is taken over by the next new window
-    const ka = "lens-drafts:test:codex:review:w:" + a.window, va = JSON.parse(local.getItem(ka)); va.alive = Date.now() - 60000; local.setItem(ka, JSON.stringify(va));
+    const K = "doc/a5/body", local = Store(), s1 = Store(), s2 = Store(), saidA = {}, saidB = {};
+    const a = make(local, s1, saidA), b = make(local, s2, saidB);
+    a.typed(K, "A's words", { key: K, fence: { at: 1 } }); a.textState(K, { sel: [3, 3] });
+    b.textState(K, { sel: [9, 9] });
+    check("each window keeps its own caret, in its own sessionStorage", a.textState(K).sel[0] === 3 && b.textState(K).sel[0] === 9 && ![...local.m.keys()].some(k => k.startsWith("lens-window")));
+    check("the draft is the person's: one slot, the old one", local.getItem("lens-drafts:test:codex:review") && JSON.parse(local.getItem("lens-drafts:test:codex:review"))[0][1].text === "A's words");
     const c = make(local, Store());
-    check("a new window takes over a closed window's words (they outlive the tab)", c.drafts.get("doc/a5/body") && c.drafts.get("doc/a5/body").text === "A's words" && !local.m.has(ka));
-    check("but never a window that is still open", b.drafts.get("doc/a5/body").text === "B's words" && c.drafts.get("doc/a5/body").text !== "B's words");
-    const again = make(local, s2);
-    check("a window reloaded keeps its own slot", again.drafts.get("doc/a5/body").text === "B's words");
-    const d = make(local, Store());
-    d.drop("x"); check("an empty window leaves no slot behind", !local.m.has("lens-drafts:test:codex:review:w:" + d.window));
+    check("a window opened later shows the same unsent words (they outlive a closed tab)", c.drafts.get(K) && c.drafts.get(K).text === "A's words" && !c.textState(K));
+    // kept in step: another window's change arrives as a storage event; typed here in the last moments: said in both
+    let told = null; a.onDrafts(keys => { told = keys; });
+    const next = JSON.stringify([[K, { text: "A's words, then B's", why: "typed here, not sent", seen: { key: K, fence: { at: 1 } } }]]);
+    window.dispatchEvent(new StorageEvent("storage", { key: "lens-drafts:test:codex:review", newValue: next }));
+    check("another window's words reach this one, and it is told which field", a.drafts.get(K).text === "A's words, then B's" && JSON.stringify(told) === JSON.stringify([K]), told);
+    // (every viewer made here listens to this page's events: a, typing within 4 s, says so; b did not type)
+    check("typed in two windows at once: the window that was typing says so", /another of your windows/.test(saidA.textContent || "") && !/another of your windows/.test(saidB.textContent || ""), [saidA.textContent, saidB.textContent]);
+    // a send in flight keeps this window's generation until it is answered
+    const tok = a.beginSend(K);
+    window.dispatchEvent(new StorageEvent("storage", { key: "lens-drafts:test:codex:review", newValue: JSON.stringify([[K, { text: "other", seen: { key: K, fence: { at: 1 } } }]]) }));
+    check("a draft with a send in flight here is not replaced by another window's", a.drafts.get(K).text === "A's words, then B's");
+    a.answered(K, null, "A's words, then B's", tok);
   }
 
   const passed = out.filter(l => l.startsWith("ok")).length;
