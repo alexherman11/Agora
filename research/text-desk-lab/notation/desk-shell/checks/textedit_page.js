@@ -142,6 +142,38 @@
     check("the line is in the chat", /Sent through the composer/.test(read.text || ""), (read.text || chat.text || "").slice(0, 300));
     write("half a thought"); box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, cancelable: true }));
     check("Enter while composing does not send", box.value === "half a thought");
+    // 10. (Jeff c6229, Codex c6224) words typed while a send is on its way are never lost: the answer is slowed so the
+    // typing lands while the send is out, then the answer is a success, then (again) a refusal
+    box.value = ""; box.dispatchEvent(new Event("input", { bubbles: true }));
+    const real = window.fetch; let refuse = false;
+    window.fetch = async (u, o) => {
+      if (String(u).includes("/api/do")) { await sleep(900); if (refuse) { refuse = false; return new Response(JSON.stringify({ text: null, error: "refused: test refusal (nothing was done)" })); } }
+      return real(u, o);
+    };
+    try {
+      box.focus(); write("Message one");
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await sleep(200); box.focus(); box.setSelectionRange(box.value.length, box.value.length); write(" and more");
+      await sleep(2500);
+      check("composer, success: words typed while the send was out stay in the box and the draft", box.value.endsWith(" and more") && (draft() || "").endsWith(" and more"), [box.value, draft()]);
+      box.value = ""; box.dispatchEvent(new Event("input", { bubbles: true })); await sleep(50);
+      refuse = true; box.focus(); write("Second try");
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await sleep(200); box.focus(); box.setSelectionRange(box.value.length, box.value.length); write(" plus");
+      await sleep(2500);
+      check("composer, refusal: words typed while the send was out stay", box.value === "Second try plus" && draft() === "Second try plus", [box.value, draft()]);
+      // the document: a pause sends; more words land while it is out; the answer keeps them, and they go next
+      await until(() => painted() === mine());
+      caret(mine().length); write(" Alpha.");
+      await sleep(900);                                          // the pause's send is now out (slowed)
+      caret(mine().length); write(" Beta.");
+      await until(() => painted().endsWith(" Alpha. Beta."), 9000);
+      check("document: words typed while a send was out are kept and sent next", mine().endsWith(" Alpha. Beta.") && painted().endsWith(" Alpha. Beta."), [mine().slice(-30), painted().slice(-30)]);
+      refuse = true; caret(mine().length); write(" Gamma.");
+      await sleep(900); caret(mine().length); write(" Delta.");
+      await sleep(2500);
+      check("document, refusal: words typed while the refused send was out are still there", mine().endsWith(" Gamma. Delta."), mine().slice(-30));
+    } finally { window.fetch = real; }
   } else check("the probe has a composer", false);
 
   const passed = out.filter(l => l.startsWith("ok")).length;

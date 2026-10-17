@@ -144,6 +144,41 @@
       A.answered(K, null, "First message", tok); B.deliver();
       check("an unrelated field typed in B survives A's send being answered", stored(L, K2) === "B's other field" && words(B, K2) === "B's other field" && words(A, K2) === "B's other field" && stored(L, K) === null, [stored(L, K2), words(A, K2), stored(L, K)]);
     }
+    // Codex c6224, Jeff c6229: newer words typed in the SAME window while a send is out, with caret state stored (as
+    // every module text has), survive the send's success and a refusal; and a send that began with no draft
+    for (const [name, err] of [["success", null], ["refusal", "refused: k changed since this was painted"], ["lost answer", "the answer was lost (net)"]]) {
+      const [A, , L] = pair();
+      A.typed(K, "First message", o); A.textState(K, { sel: [3, 3] });
+      const tok = A.beginSend(K);
+      A.typed(K, "Later typing in A", o);
+      A.answered(K, err, "First message", tok);
+      check(`one window, ${name}: words typed while the send was out survive (in the window and the store)`,
+        words(A, K) === "Later typing in A" && stored(L, K) === "Later typing in A", [words(A, K), stored(L, K)]);
+    }
+    {
+      const [A, B, L] = pair();
+      A.textState(K, { sel: [0, 0] });
+      const tok = A.beginSend(K);                     // a press with no draft (nothing typed when it was sent)
+      A.typed(K, "Typed meanwhile", o); B.deliver();
+      A.answered(K, null, undefined, tok); B.deliver();
+      check("a send that began with no draft never clears words typed while it was out", words(A, K) === "Typed meanwhile" && stored(L, K) === "Typed meanwhile" && words(B, K) === "Typed meanwhile", [words(A, K), stored(L, K)]);
+    }
+    {
+      const [A, B, L] = pair();
+      A.typed(K, "First message", o); A.textState(K, { sel: [3, 3] }); B.deliver();
+      const tok = A.beginSend(K);
+      A.typed(K, "First message, and more", o); B.deliver();
+      A.answered(K, null, "First message", tok); B.deliver();
+      check("two windows, newer words typed in the sending window: kept in both windows and the store", words(A, K) === "First message, and more" && words(B, K) === "First message, and more" && stored(L, K) === "First message, and more", [words(A, K), words(B, K), stored(L, K)]);
+    }
+    {
+      const [A, B, L] = pair();
+      A.typed(K, "Sent words", o); A.textState(K, { sel: [3, 3] }); B.deliver();
+      const tok = A.beginSend(K);
+      A.rebased(K, "Sent words", { key: K, fence: { at: 2 } }, "base");      // the same words re-fenced: still the words sent
+      A.answered(K, null, "Sent words", tok); B.deliver();
+      check("the words sent, only re-fenced meanwhile, are cleared (equality by words, not by object)", words(A, K) === null && stored(L, K) === null && words(B, K) === null, [words(A, K), stored(L, K)]);
+    }
     { // a plain send with nothing newer clears the draft everywhere
       const [A, B, L] = pair();
       A.typed(K, "Only this", o); B.deliver();
