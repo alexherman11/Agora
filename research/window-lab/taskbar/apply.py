@@ -3,6 +3,7 @@
     python research/window-lab/taskbar/apply.py check            a copy of frontier-try in memory: every step, then the
                                                                   bar, its icon lens and home-base built as alex; saves nothing
     python research/window-lab/taskbar/apply.py try               the same, saved into this worktree's frontier-try
+    python research/window-lab/taskbar/apply.py preflight         read only, the live world: would door go ahead now?
     python research/window-lab/taskbar/apply.py door --as <who>   the live world through the keeper's door (127.0.0.1:8794)
 
 Alex, 17 Oct: 'Lets not have two different bars at the bottom for different widgets vs native applications. For now i
@@ -31,7 +32,8 @@ import put  # noqa: E402  (q, Try, Live: the home layout's world writer)
 
 HOME = "f5204"          # the Home base room
 STYLE, DOCK, TILING = "a5206", "a5564", "a5692"
-BEGIN, END = "# a6271 bar roles: begin", "# a6271 bar roles: end"
+MAIN_SCENE = pathlib.Path("C:/Projects/Agora4/research/text-desk-lab/notation/scene.py")     # the code the live desk runs
+BEGIN, END ="# a6271 bar roles: begin", "# a6271 bar roles: end"
 
 
 def said(out):
@@ -171,6 +173,10 @@ def preflight(w):
     if "full=" not in text_of(w, TILING):
         print("preflight: home-tiling is not lane 2's (no full=): the round-3 assembly has not landed; wait for it")
         ok = False
+    # live, the desk runs the main checkout's code: home-dock says `tip`, a word only a6271's landing teaches it
+    if isinstance(w, put.Live) and '"tip": (' not in MAIN_SCENE.read_text(encoding="utf-8"):
+        print(f"preflight: the live desk does not know the word `tip` yet ({MAIN_SCENE}): wait for a6271 to land")
+        ok = False
     return ok
 
 
@@ -203,6 +209,10 @@ def main():
         if mode == "try":
             w.save()
             print("saved into frontier-try")
+        raise SystemExit(0 if ok else 1)
+    if mode == "preflight":         # read only, against the live world: would door go ahead now?
+        ok = preflight(put.Live(who))
+        print("preflight: every thing stands; door would go ahead" if ok else "preflight: door would stop here")
         raise SystemExit(0 if ok else 1)
     if mode == "door":
         w = put.Live(who)

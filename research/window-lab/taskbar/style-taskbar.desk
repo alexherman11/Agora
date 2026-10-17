@@ -14,5 +14,5 @@ role tbpic : width gap x3
 role tbglyph : text up, align center
 role tbpip : align center, width gap x1.5, height gap /4
 role tbpip.on : on soft, align center, width gap x1.5, height gap /4, corner gap /4
-role tip : on night, edge rim, corner gap, pad gap /2, pad left gap x1.5, pad right gap x1.5, text down, ink, lift gap
+role tip : on glassdeep, edge rim, corner gap, pad gap /2, pad left gap x1.5, pad right gap x1.5, text down, ink, lift gap
 # a6271 bar roles: end
