@@ -10,6 +10,8 @@ here. So a new button is lens lines only, and a new power is one entry in VERBS 
 The table is closed on purpose: named verbs, no program to run, no shell line, no keys pressed but the media keys.
 `notify <words>` (a5824) shows a toast through notify.py; its words are shown, never run.
 `window <lens>` (a5500) opens only the desk's own painter on a lens, as lens_window.py does; never another program.
+`wm.start [lenses]` and `wm.stop` (a6113) start and stop the window manager, wm.py, as the home base's child
+(wm_switch.py); while it runs the home base says witnessed:wm.
 
 Settings are props on the lens note the home base paints (home-base, a5208), read through the door each time it opens:
     hotkey=Ctrl+Alt+J      the key that shows or hides it (Ctrl, Alt, Shift, Win + a letter, digit, F1-F24 or Space)
@@ -111,12 +113,35 @@ def _start(hud, words):
     return "opened the Start menu"
 
 
+def _wm_start(hud, words):
+    # a6113: the window manager (wm.py) from a dock icon, never a terminal. Words: the lenses to open as windows,
+    # comma-separated (none: wm.py's own three). wm_switch.py says how it never leaves a window displaced
+    lenses = words.strip().strip('"')
+    if lenses and not re.fullmatch(r"[a-z][a-z0-9-]*(,[a-z][a-z0-9-]*)*", lenses):
+        raise Refused(f"wm.start takes lens names joined by commas, or nothing; got {words!r}")
+    import wm_switch
+    try:
+        said = wm_switch.SWITCH.start(hud, lenses)
+    except RuntimeError as e:
+        raise Refused(str(e))
+    hud.hide()                                                   # the strip is under the home base: show it
+    return said
+
+
+def _wm_stop(hud, words):
+    import wm_switch
+    return wm_switch.SWITCH.stop(hud)
+
+
 VERBS = {
     "bring": ("bring that window forward and put the home base away", "window", _bring),
     "notify": ("show a Windows notification, title Agora (silent; words beginning ! ring)", "words", _notify),
     "hide": ("put the home base away", "", _hide),
     "start": ("put the home base away and open Windows' Start menu", "", _start),
     "window": ("open a lens as its own window (an Agora app) and put the home base away", "lens", _window),
+    "wm.start": ("start the window manager (Agora windows in a strip; witnessed:wm says it is on) and put the home base "
+                 "away", "lenses", _wm_start),
+    "wm.stop": ("stop the window manager: every window back where it was, its own windows closed", "", _wm_stop),
     "media.play": ("play or pause (Spotify, else the media key)", "", _media("play")),
     "media.next": ("the next song", "", _media("next")),
     "media.prev": ("the song before, or this one from its start", "", _media("prev")),
