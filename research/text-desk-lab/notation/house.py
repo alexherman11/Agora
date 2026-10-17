@@ -75,6 +75,7 @@ import export_docs   # noqa: E402  load(): the world under its lock, read only
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
 import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
+import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
@@ -587,6 +588,7 @@ class House:
         self.workshop = workshop.Workshop(self)
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
+        self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -1104,6 +1106,10 @@ class House:
             self.usage.step()
         except Exception as e:
             print(f"house: usage: {type(e).__name__}: {e}", flush=True)
+        try:     # a6249: Alex's scripts (notes role=script) kept in step with their files; only the live world's house
+            self.scripts.step(self.load(), lambda line: self.act("house", line, whole=True))
+        except Exception as e:
+            print(f"house: scripts: {type(e).__name__}: {e}", flush=True)
 
     def wake(self, r, corner, actor, lead):
         line = (corner.get("props") or {}).get("wake") or "look"       # a1027: scripts retired; arrive was the old tree
