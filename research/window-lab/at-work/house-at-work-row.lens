@@ -1,17 +1,22 @@
 # house-at-work-row: one person at work, one line (a6265), stood on their card (a worker) or corner (a resident) by
 # house-at-work. Who (a resident by name, JEFF lilac; a worker by what it is on, its maker in the popover, never an
-# id), what they are on in words
-# (the card's brief=, else its title; a resident's focus=), one status word in the light of whose move it is, since
-# when, and how full their context is (a bar and a number, from witnessed:usage; none when the house cannot read it).
-# A press opens a popover over the panel: the context in tokens, their latest word, their last few actions from the
-# feed (the press asks the house for it: watching= on the viewer note), and 'open the full feed' in the middle.
+# id), what they are on in words (the card's brief=, else its title; a resident's focus=), one status word in the
+# light of whose move it is, since when, and how full their context is (a bar and a number, from witnessed:usage; none
+# when the house cannot read it). A press opens a popover over the panel: the context in tokens, their word now (the
+# card's now=, else their latest comment; a resident's last reply), their last few actions from the feed (the press
+# asks the house for it: watching= on the viewer note), and 'open the full feed' in the middle.
 row : column
   let card = $item
-  let com = ($commission or "")
-  let ask = ($asked_by or "")
-  let task = $brief when ($brief or "") != ""
-  let task = $focus when ($focus or "") != ""
-  let task = $title otherwise
+  only when ($item or "") != ""
+  of $item as c
+  each body
+body : column
+  let com = ($c.commission or "")
+  let ask = ($c.asked_by or "")
+  let task = $c.brief when ($c.brief or "") != ""
+  let task = $c.focus when ($c.focus or "") != ""
+  let task = $c.title otherwise
+  let word = ($c.now or "")
   of prop:role=home-view,prop:actor=$me as v
   each viewer
   plain : text "No viewer note for you here (role=home-view, actor=you): a press has nowhere to open."
@@ -106,8 +111,12 @@ person : column
     noctx : text "context: not readable for this agent yet · $u.model"
       role atpopmeta
       only when ($u.ctxpct or "") = "" and ($u.model or "") != ""
-    word : column
-      only when $com != ""
+    now : text "$(word)"
+      role atpopnow
+      clamp 2
+      only when $word != ""
+    latest : column
+      only when $com != "" and $word = ""
       of comments:$card by=$u.actor as m
       each lastword
     turn : column

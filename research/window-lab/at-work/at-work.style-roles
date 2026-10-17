@@ -1,18 +1,18 @@
-# --- At work, improved (a6265: house-at-work, -row, -small). Laid between home-style and LAMPLIT's overrides (build.py's
-# BORROWED), in LAMPLIT's light: amber your move, lilac a resident's, mint acting this moment, the rest grey.
+# --- At work (a6265: house-at-work, -row, -small), by LAMPLIT's rule for a role added later (a6057): a role names a
+# meaning, its colours are only the rule's tokens. warm Alex's move, jeff a resident's, accent acting this moment.
 role athouse : between gap /4
 role atperson : corner gap, pad gap /4, pad left gap, pad right gap /2, rail ghost
-role atperson.lit : corner gap, pad gap /4, pad left gap, pad right gap /2, rail lit
-role atperson.you : corner gap, pad gap /4, pad left gap, pad right gap /2, rail lamp, on lampwash
+role atperson.lit : corner gap, pad gap /4, pad left gap, pad right gap /2, rail accent
+role atperson.you : corner gap, pad gap /4, pad left gap, pad right gap /2, rail warm, on warmwash
 role atperson.asks : corner gap, pad gap /4, pad left gap, pad right gap /2, rail jeff, on jeffwash
-role atperson.on : corner gap, pad gap /4, pad left gap, pad right gap /2, rail lit, on raisedhi, edge ink
+role atperson.on : corner gap, pad gap /4, pad left gap, pad right gap /2, rail accent, on raisedhi, edge ink
 role atline : between gap, align center
 role atwho : text.label medium, soft
 role atwho.jeff : text.label medium, jeff
 role atwhat : text down, ink
 role atstate : text.label, faint
-role atstate.lit : text.label medium, lit
-role atstate.you : text.label medium, lamp
+role atstate.lit : text.label medium, accent
+role atstate.you : text.label medium, warm
 role atstate.asks : text.label medium, jeff
 role atstate.warn : text.label medium, ink
 role atsince : text.label, faint, width 3.2em
@@ -20,14 +20,15 @@ role atbar : width 2.2em
 role atpct : text.label, faint, width 2.4em
 role atpct.full : text.label medium, ink, width 2.4em
 role atmore : text down 2, faint
-role atpop : on paper, edge rim, corner gap, pad gap, between gap /2, width 30em
+role atpop : on glassdeep, edge rim, corner gap, pad gap, between gap /2, width 30em
 role atpophead : between gap, align center
 role atpopwhat : text down, ink
 role atpopmeta : text.label, faint
+role atpopnow : text down, ink
 role atpopfeed : between gap /4
 role atpopline : between gap
 role atpoptime : text.label, faint, width 5.5em
-role atpopkind : text.label medium tracked, lit, width 5em
+role atpopkind : text.label medium tracked, accent, width 5em
 role atpopkind.quiet : text.label tracked, soft, width 5em
 role atpopword : text down, soft
 role atpopgo : between gap
@@ -40,5 +41,5 @@ role atcalm : text down, faint
 role atsmall : between gap, align center
 role atcount : text down medium, soft
 role atlimit : text.label, faint
-role atlimit.high : text.label medium, lamp
+role atlimit.high : text.label medium, warm
 role atfold : text down 2, faint
