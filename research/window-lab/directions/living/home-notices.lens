@@ -1,0 +1,175 @@
+# home-notices: the notices widget in LAMPLIT (a6057, the HUD sprint's lane 3, rewriting a5530's, whose
+# facts are the same: notes role=notice to=$me, calls not yet answered, held while a focus runs). What changed: the
+# light says whose move it is, so something that asks you (a worker asks, a review, a design, a call) is amber and
+# something that only happened (landed) is grey; the bar shows the newest that waits on you before the newest that
+# only happened; the count beside it says how many of each; and the bar never prints the painter's clamp note.
+# A widget: tag widget, slot=bar, order=4 (home-notices is untagged where this is worn).
+bar : row
+  role nbar
+  of kind:surface,prop:role=notices,prop:actor=$me as nb
+  each bell
+  none : text "no notices surface (role=notices actor=you) in the Home base room"
+    role hint
+    only when count(kind:surface,prop:role=notices,prop:actor=$me) = 0
+bell : row
+  role nbell
+  let landed = count(prop:role=notice,prop:to=$me,prop:topic=landed)
+  let asks = count(prop:role=notice,prop:to=$me,-prop:topic=landed)
+  let calls = count(sayings for:$me answered=no item!=$nb.skip eid>$nb.cleared)
+  let yours = asks + calls
+  let total = landed + yours
+  let focusing = count(prop:role=pomodoro,prop:actor=$me,prop:state=running,prop:mode=focus)
+  quiet : text "all quiet"
+    role nquiet
+    only when total = 0
+  held : text "$(total) held until your break"
+    role nheld
+    only when total > 0 and focusing > 0
+  first : row
+    role nfirst
+    share 1
+    only when total > 0 and focusing = 0
+    ask : row
+      share 1
+      only when asks > 0
+      of prop:role=notice,prop:to=$me,-prop:topic=landed as nt
+      by -came
+      each noticeline
+    call : row
+      share 1
+      only when asks = 0 and calls > 0
+      of sayings for:$me answered=no item!=$nb.skip eid>$nb.cleared as s
+      by -eid
+      each callline
+    news : row
+      share 1
+      only when yours = 0
+      of prop:role=notice,prop:to=$me,prop:topic=landed as nt
+      by -came
+      each noticeline
+  counts : row
+    role ncounts
+    only when total > 0 and focusing = 0
+    yours : text "$(yours)"
+      role ncount.you
+      only when yours > 0
+    landed : text "$(landed)"
+      role ncount
+      only when landed > 0
+  open : column
+    role nopen
+    only when total > 0 and focusing = 0
+    fold "all" float handle nmore
+    list : column
+      role nlist
+      of prop:role=home-view,prop:actor=$me as hv
+      each feed
+feed : column
+  role nfeed
+  yourshead : text "FOR YOU"
+    role nhead.you
+    only when yours > 0
+  asks : column
+    role nitems
+    of prop:role=notice,prop:to=$me,-prop:topic=landed as nt
+    by -came
+    clamp 8
+    each notice
+  calls : column
+    role nitems
+    of sayings for:$me answered=no item!=$nb.skip eid>$nb.cleared as s
+    by -eid
+    clamp 8
+    each call
+  newshead : text "HAPPENED"
+    role nhead
+    only when landed > 0
+  news : column
+    role nitems
+    of prop:role=notice,prop:to=$me,prop:topic=landed as nt
+    by -came
+    clamp 5
+    each notice
+# one line in the bar: the newest notice or call (the rest are built and not drawn, so no clamp note is painted)
+noticeline : row
+  role nline
+  only when $index = 1
+  let label = "Landed" when $nt.topic = "landed"
+  let label = "Asks you" when $nt.topic = "asking"
+  let label = "For your review" when $nt.topic = "review"
+  let label = "Waits on your word" when $nt.topic = "design"
+  let label = $nt.topic otherwise
+  dot : text "●"
+    role ndot.you
+    role ndot when $nt.topic = "landed"
+  what : text "$(label)"
+    role nlabel.you
+    role nlabel when $nt.topic = "landed"
+  about : row
+    share 1
+    the $nt.about as a
+    title : text "$a.title"
+      role ntitle
+      clamp 1
+callline : row
+  role nline
+  only when $index = 1
+  dot : text "●"
+    role ndot.you
+  what : text "$s.name"
+    role nlabel.you
+  said : text "$s.said"
+    role ntitle
+    share 1
+    clamp 1
+# in the list: one notice, its time, what it is about, and its ×; the newest 8 that ask you and 5 that happened are
+# built (a clamp: the rest are not built at all, which is what keeps this widget cheap; the list says how many wait)
+notice : row
+  role nitem
+  role nitem.you when $nt.topic != "landed"
+  let label = "Landed" when $nt.topic = "landed"
+  let label = "Asks you" when $nt.topic = "asking"
+  let label = "For your review" when $nt.topic = "review"
+  let label = "Waits on your word" when $nt.topic = "design"
+  let label = $nt.topic otherwise
+  main : column
+    role nmain
+    share 1
+    on click do prop $hv viewing=$nt.about back="$hv.viewing" find=""; do remove $nt
+    top : row
+      role ntop
+      what : text "$(label)"
+        role nlabel.you
+        role nlabel when $nt.topic = "landed"
+      at : text "$(time($nt.came))"
+        role nat
+    about : column
+      the $nt.about as a
+      title : text "$a.title"
+        role ntitle
+        clamp 1
+  x : text "×"
+    role nx
+    on click do remove $nt
+# one call: who, where, a line of what they said; × is 'seen up to here'
+call : row
+  role nitem.you
+  main : column
+    role nmain
+    share 1
+    let was = $hv.back
+    on click do prop $hv viewing=$s.item back="$hv.viewing" find=""
+    top : row
+      role ntop
+      who : text "$s.name"
+        role nlabel.you
+      where : text "in $s.in · $s.at"
+        role nat
+        clamp 1
+    said : text "$s.said"
+      role ntitle
+      clamp 1
+  x : text "×"
+    role nx
+    let was = $nb.cleared
+    on click do prop $nb cleared=$s.eid

@@ -1,0 +1,174 @@
+# home-glance: the two-second glance at the top left of the home base (a6057, the HUD sprint's lane 3, LAMPLIT). The time,
+# then one sentence of the state of everything, in numbers: what waits on you (amber, the only warm colour on the
+# screen), who is at work this moment (mint: something alive), then the machine's queue in grey. A count of nothing is
+# left out, so the sentence is as short as the day is quiet; when nothing waits on you it says so, faint.
+# Round 2 (borrowed from lane 2, a5994: full= on the layout): each number is also the way in. A press fills the room
+# with the panel that answers it (a press again gives the room back), taking it off the shelf if it was there. Which
+# panel answers is the panel's own tag: glance-you, glance-work, glance-board (one panel may answer several: lane 1's
+# inbox answers you and board), so whichever panel Alex keeps claims a number by one tag, and this lens names none. A
+# number no panel claims is still said; it just opens nothing. When two panels claim one (Waiting on you and lane 1's
+# inbox both answer 'you'), the one that is out wins (by shelf: no before yes), else the first in the room.
+# What waits on you is counted as lane 1's NEEDS YOU counts it (a6010, round 2): a look, a design waiting on your word,
+# and a stuck commission you asked for (one a resident asked for is JEFF's to answer); kept the same as the panel it
+# opens, so the two numbers always agree.
+# A widget: tag widget, slot=bar, order=1 (it takes the clock's place: home-clock is untagged where this is worn).
+glance : row
+  role lgband
+  let you = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=failed,prop:asked_by=$me,-prop:review=later)
+  let busy = count(house doing=working)
+  let queued = count(prop:commission=asked)
+  let ready = count(prop:commission=ready)
+  let landing = count(prop:commission=landing)
+  let youword = "waits on you" when you = 1
+  let youword = "wait on you" otherwise
+  clock : column
+    role lgclock
+    time : text "$today"
+      live clock
+      role lgtime
+    day : text "$today"
+      live date
+      role lgday
+  sentence : row
+    role lgsentence
+    lays : row
+      role lgsentence
+      of prop:role=home-layout,prop:actor=$me as lay
+      each stats
+    plain : text "$(you) $(youword) · $(busy) at work"
+      role lgword
+      only when count(prop:role=home-layout,prop:actor=$me) = 0
+stats : row
+  role lgsentence
+  let byou = count(prop:role=home-panel,prop:actor=$me,tag:glance-you)
+  let bwork = count(prop:role=home-panel,prop:actor=$me,tag:glance-work)
+  let bboard = count(prop:role=home-panel,prop:actor=$me,tag:glance-board)
+  you : row
+    only when you > 0
+    of prop:role=home-panel,prop:actor=$me,tag:glance-you as p
+    by shelf
+    each youstat
+  youplain : row
+    role lgstat
+    only when you > 0 and byou = 0
+    n : text "$(you)"
+      role lgnum.you
+    w : text "$(youword)"
+      role lgword.you
+  calm : text "nothing waits on you"
+    role lgcalm
+    only when you = 0
+  busy : row
+    only when busy > 0
+    of prop:role=home-panel,prop:actor=$me,tag:glance-work as p
+    by shelf
+    each busystat
+  busyplain : row
+    role lgstat
+    only when busy > 0 and bwork = 0
+    n : text "$(busy)"
+      role lgnum.lit
+    w : text "at work"
+      role lgword.lit
+  queued : row
+    only when queued > 0
+    of prop:role=home-panel,prop:actor=$me,tag:glance-board as p
+    by shelf
+    each queuedstat
+  queuedplain : row
+    role lgstat
+    only when queued > 0 and bboard = 0
+    n : text "$(queued)"
+      role lgnum
+    w : text "queued"
+      role lgword
+  ready : row
+    only when ready > 0
+    of prop:role=home-panel,prop:actor=$me,tag:glance-board as p
+    by shelf
+    each readystat
+  readyplain : row
+    role lgstat
+    only when ready > 0 and bboard = 0
+    n : text "$(ready)"
+      role lgnum
+    w : text "ready to land"
+      role lgword
+  landing : row
+    only when landing > 0
+    of prop:role=home-panel,prop:actor=$me,tag:glance-board as p
+    by shelf
+    each landingstat
+  landingplain : row
+    role lgstat
+    only when landing > 0 and bboard = 0
+    n : text "$(landing)"
+      role lgnum
+    w : text "landing"
+      role lgword
+# one number and its words; pressed, the room is its panel's (or given back)
+youstat : row
+  role lgstat
+  role lgstat.on when $item = ($lay.full or "")
+  only when $index = 1
+  let was = ($lay.full or "")
+  let out = ($p.shelf or "")
+  on click when $item != ($lay.full or "") and ($p.shelf or "") = "yes" do prop $p shelf=no; do prop $lay full=$p
+  on click when $item != ($lay.full or "") and ($p.shelf or "") != "yes" do prop $lay full=$p
+  on click when $item = ($lay.full or "") do prop $lay full=""
+  n : text "$(you)"
+    role lgnum.you
+  w : text "$(youword)"
+    role lgword.you
+busystat : row
+  role lgstat
+  role lgstat.on when $item = ($lay.full or "")
+  only when $index = 1
+  let was = ($lay.full or "")
+  let out = ($p.shelf or "")
+  on click when $item != ($lay.full or "") and ($p.shelf or "") = "yes" do prop $p shelf=no; do prop $lay full=$p
+  on click when $item != ($lay.full or "") and ($p.shelf or "") != "yes" do prop $lay full=$p
+  on click when $item = ($lay.full or "") do prop $lay full=""
+  n : text "$(busy)"
+    role lgnum.lit
+  w : text "at work"
+    role lgword.lit
+queuedstat : row
+  role lgstat
+  role lgstat.on when $item = ($lay.full or "")
+  only when $index = 1
+  let was = ($lay.full or "")
+  let out = ($p.shelf or "")
+  on click when $item != ($lay.full or "") and ($p.shelf or "") = "yes" do prop $p shelf=no; do prop $lay full=$p
+  on click when $item != ($lay.full or "") and ($p.shelf or "") != "yes" do prop $lay full=$p
+  on click when $item = ($lay.full or "") do prop $lay full=""
+  n : text "$(queued)"
+    role lgnum
+  w : text "queued"
+    role lgword
+readystat : row
+  role lgstat
+  role lgstat.on when $item = ($lay.full or "")
+  only when $index = 1
+  let was = ($lay.full or "")
+  let out = ($p.shelf or "")
+  on click when $item != ($lay.full or "") and ($p.shelf or "") = "yes" do prop $p shelf=no; do prop $lay full=$p
+  on click when $item != ($lay.full or "") and ($p.shelf or "") != "yes" do prop $lay full=$p
+  on click when $item = ($lay.full or "") do prop $lay full=""
+  n : text "$(ready)"
+    role lgnum
+  w : text "ready to land"
+    role lgword
+landingstat : row
+  role lgstat
+  role lgstat.on when $item = ($lay.full or "")
+  only when $index = 1
+  let was = ($lay.full or "")
+  let out = ($p.shelf or "")
+  on click when $item != ($lay.full or "") and ($p.shelf or "") = "yes" do prop $p shelf=no; do prop $lay full=$p
+  on click when $item != ($lay.full or "") and ($p.shelf or "") != "yes" do prop $lay full=$p
+  on click when $item = ($lay.full or "") do prop $lay full=""
+  n : text "$(landing)"
+    role lgnum
+  w : text "landing"
+    role lgword

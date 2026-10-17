@@ -34,8 +34,9 @@ DevTools), for a machine where the sandbox can't open.
 A builder before landing: run it from your worktree (it plays your painter), with --assume <your card> and --apply
 <your world half>; a run with --assume, --apply, --break or --only never writes the standing report.
 
-Steps (ids for --only): open lowdown board card later approve sendback atwork writing writedoc comment chat send
-drag fill widen restore glance dock esc winkey.
+Steps (ids for --only): open lowdown board card later approve sendback atwork timer writing writedoc comment chat send
+drag fill widen restore glance number dock esc winkey. (atwork plays The house where lane 3's home-house has taken
+At work's place; timer and number are lane 3's, a6057.)
 """
 import asyncio
 import datetime
@@ -692,13 +693,22 @@ async def walk(play, only):
     steps.append(("sendback", "answer a waiting item: Send back", s_sendback, (OK_MS, SLOW_MS)))
 
     async def s_atwork():
-        await open_panel(play, "At work", "home-work")
-        row = "window.__pt.parts('lens:home-work').find(e => /\\/busy\\/[^/]+$/.test(e.dataset.key))"
+        # a6057: where lane 3's The house (home-house) has taken At work's place, its rows are played instead; the feed
+        # they open is a5988's lens home-feed, which must be in the world
+        house = await play.has("pt.part('lens:home-house')") or await play.has(CHIP.format(json.dumps("The house")))
+        if house:
+            await open_panel(play, "The house", "home-house")
+            row = "window.__pt.parts('lens:home-house').find(e => /\\/lit\\/\\d+$/.test(e.dataset.key))"
+            if not await play.has(row):
+                raise AssertionError("no one at work in The house (the copy's house is staged busy)")
+        else:
+            await open_panel(play, "At work", "home-work")
+            row = "window.__pt.parts('lens:home-work').find(e => /\\/busy\\/[^/]+$/.test(e.dataset.key))"
         if not await play.has(row):
             raise AssertionError("no At-work rows (the copy's house is staged busy)")
         live = await play.has(f"pt.pressable({row})")
         try:
-            play.needs("a5988", "the At-work feed", ("home-work", "home-feed"))
+            play.needs("a5988", "the At-work feed", ("home-feed", "witnessed:feed") if house else ("home-work", "home-feed"))
         except Skip as e:
             raise Skip(str(e) + ("" if live else "; a press on a row does nothing today (the row has no click)"))
         who = await w.js(f"(() => {{ const pt = window.__pt, r = {row}; return r ? r.innerText.split('\\n')[0].trim() : ''; }})()")
@@ -1018,6 +1028,59 @@ async def walk(play, only):
         return {"note": note}
     steps.append(("glance", "a glance with every panel out: what is cut or squeezed", s_glance, (OK_MS, SLOW_MS)))
 
+    async def s_number():
+        """a6057: a number in the glance (top left) is the way in: a press fills the room with the panel that answers it
+        (the panel's tag glance-you), a press again gives the room back."""
+        play.needs("a6057", "the glance's numbers open their panel", ("home-glance", "glance-you"))
+        stat = "window.__pt.parts('lens:home-glance').find(e => /\\/you\\/[a-z]\\d+$/.test(e.dataset.key))"
+        if not await play.has(stat):
+            if await play.has("pt.leaf('nothing waits on you', pt.part('lens:home-glance'))"):
+                raise Skip("nothing waits on Alex in this world, so the glance has no number to press")
+            raise AssertionError("no 'wait on you' number in the glance answered by a panel (no panel tagged glance-you?)")
+        pid = (await w.js(f"(() => {{ const pt = window.__pt; return {stat}.dataset.key; }})()")).rsplit("/", 1)[-1]
+        filled = f"pt.parts('lens:home-tiling').some(e => /\\/room\\/{pid}$/.test(e.dataset.key))"
+        words = await w.js(f"(() => {{ const pt = window.__pt; return {stat}.innerText.replace(/\\s+/g, ' ').trim(); }})()")
+        r = await play.timed(filled, press(play, stat, f"'{words}' in the glance"))
+        if not r["ok"]:
+            r["want"] = f"a press on '{words}' did not fill the room with its panel ({pid})"
+            return r
+        await asyncio.sleep(0.3)
+        await w.shot(play.out / f"{play.n + 1:02d}-number-filled.png")
+        r2 = await play.timed(f"!({filled})", press(play, stat, f"'{words}' again"))
+        if not r2["ok"]:
+            r2["want"] = f"'{words}' filled the room, but a second press did not give it back"
+            return r2
+        r["note"] = f"'{words}': its panel filled the room in {r['ms']} ms, gave it back in {r2['ms']} ms"
+        r["ms"] = max(r["ms"], r2["ms"])
+        return r
+    steps.append(("number", "press a number in the glance: its panel fills the room, and back", s_number, (OK_MS, SLOW_MS)))
+
+    async def s_timer():
+        """a6057: the focus timer as one line, in The house's You row (or the top bar while The house is away): Start
+        runs it (a Pause appears), × puts it back (Start again)."""
+        play.needs("a6057", "the timer as one line", ("home-timer", "ltgo"))
+        t = "pt.part('lens:home-timer')"
+        if not await play.has(t):
+            await open_panel(play, "The house", "home-house")
+        if not await play.has(t):
+            raise AssertionError("no timer (home-timer) in The house or in the top bar")
+        if not await play.has(f"pt.leaf('Start', {t})"):
+            raise AssertionError("the timer shows no Start (it was running when the walk began?)")
+        r = await play.timed(f"!!pt.leaf('Pause', {t})", press(play, f"pt.pressable(pt.leaf('Start', {t}))", "the timer's Start"))
+        if not r["ok"]:
+            r["want"] = "Start did not run the timer (no Pause showed)"
+            return r
+        await asyncio.sleep(1.2)
+        await w.shot(play.out / f"{play.n + 1:02d}-timer-running.png")
+        r2 = await play.timed(f"!!pt.leaf('Start', {t})", press(play, f"pt.pressable(pt.leaf('×', {t}))", "the timer's ×"))
+        if not r2["ok"]:
+            r2["want"] = "the timer ran, but × did not put it back"
+            return r2
+        r["note"] = f"started in {r['ms']} ms, put back in {r2['ms']} ms"
+        r["ms"] = max(r["ms"], r2["ms"])
+        return r
+    steps.append(("timer", "start the focus timer, then put it back", s_timer, (OK_MS, SLOW_MS)))
+
     async def s_dock():
         icon = DOCK.format(json.dumps("Board"))
         if not await play.has(icon):
@@ -1065,8 +1128,8 @@ async def walk(play, only):
 
     # the board goes back before fill and widen: dragged out, a5994's tiling leaves one column, and ⇔ has nothing to
     # take room from (ran 16 Oct: widen failed so, the tiling was right)
-    order = ["open", "lowdown", "board", "card", "later", "approve", "sendback", "atwork", "writing", "writedoc", "comment",
-             "chat", "send", "drag", "restore", "fill", "widen", "glance", "dock", "esc", "winkey"]
+    order = ["open", "lowdown", "board", "card", "later", "approve", "sendback", "atwork", "timer", "writing", "writedoc",
+             "comment", "chat", "send", "drag", "restore", "fill", "widen", "glance", "number", "dock", "esc", "winkey"]
     steps.sort(key=lambda s: order.index(s[0]) if s[0] in order else len(order))
     for sid, name, fn, budget in steps:
         if want(sid):

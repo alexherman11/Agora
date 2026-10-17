@@ -1,0 +1,66 @@
+# home-timer: the focus timer as one line (a6057, the HUD sprint's lane 3), in the You row of The house, and in the top
+# bar (home-timer-bar) only while The house is put away, so it is always somewhere and never twice. Same facts as
+# home-pomodoro (a5530; Alex's timer note role=pomodoro actor=$me: mode, focus=, rest=, state, started=, left=,
+# paused=), same presses, same `on end`; only its face is smaller: the word, the time left counting in a mono (the
+# painter's `live until` without the ring), and the one press that makes sense now. Running is alive (mint); done is
+# your move (amber); idle and paused are grey.
+pomo : row
+  role ltimer
+  of prop:role=pomodoro,prop:actor=$me as t
+  each timer
+timer : row
+  role ltimer
+  let whole = $t.focus * 60 when $t.mode = "focus"
+  let whole = $t.rest * 60 otherwise
+  let ends = $t.started + $t.left * 1m / 60
+  let held = $t.left - ($t.paused - $t.started) / 1m * 60
+  let label = "focus done" when $t.state = "done" and $t.mode = "focus"
+  let label = "break over" when $t.state = "done"
+  let label = "focus" when $t.mode = "focus"
+  let label = "break" otherwise
+  mode : text "$(label)"
+    role ltmode
+    role ltmode.on when $t.state = "running"
+    role ltmode.done when $t.state = "done"
+  running : text "$(ends) of $(whole)"
+    live until
+    role lttime.on
+    only when $t.state = "running"
+    on end do prop $t state=done
+  paused : text "$(held) of $(whole)"
+    live until
+    role lttime
+    only when $t.state = "paused"
+  idle : text "$(whole) of $(whole)"
+    live until
+    role lttime
+    only when ($t.state or "idle") = "idle"
+  start : text "Start"
+    role ltgo
+    only when ($t.state or "idle") = "idle"
+    let seen = ($t.started or "") + ($t.left or "")
+    on click do prop $t state=running started=$now left=$(whole)
+  pause : text "Pause"
+    role ltbtn
+    only when $t.state = "running"
+    let seen = $t.paused or ""
+    on click do prop $t state=paused paused=$now
+  resume : text "Resume"
+    role ltgo
+    only when $t.state = "paused"
+    let seen = ($t.started or "") + ($t.left or "")
+    on click do prop $t state=running started=$now left=$(held)
+  rest : text "Break"
+    role ltgo.done
+    only when $t.state = "done" and $t.mode = "focus"
+    let seen = ($t.started or "") + ($t.left or "")
+    on click do prop $t mode=break state=running started=$now left=$($t.rest * 60)
+  back : text "Focus"
+    role ltgo.done
+    only when $t.state = "done" and $t.mode = "break"
+    let seen = ($t.started or "") + ($t.left or "")
+    on click do prop $t mode=focus state=running started=$now left=$($t.focus * 60)
+  reset : text "×"
+    role ltx
+    only when ($t.state or "idle") != "idle"
+    on click do prop $t state=idle
