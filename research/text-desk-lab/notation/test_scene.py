@@ -1463,6 +1463,43 @@ def test_picture_is_a_text_drawn():
         tmp.unlink(missing_ok=True)
 
 
+def test_tip_names_a_part_filled_as_words():
+    """a6271 (Alex, 17 Oct: icons with no text, 'if I hover them it should say what they are'): `tip "<name>" ["<what it
+    does>"]` on any part, frame or text, filled as words are ($frame.prop, $(expr)); the painter shows it on hover. An
+    absent part sends none, a missing prop fills empty, and the printer says it, since an icon has no words of its own."""
+    refused('x : column, tip', "tip")
+    refused('x : column, tip "a" "b" "c"', "tip")
+    refused('x : column, tip "a" b', "tip")
+    import deskd, lens_ir
+    tmp = _scratch("_test_tip")
+    try:
+        with deskd.Session("_test_tip", "jeff") as desk:
+            say = lambda line: desk.dispatch("desk", {"line": line})["text"]   # noqa: E731
+            say("look f01")
+            say('do create f01 kind=note title=Board role=app about="The whole board, in the middle."')
+            say("do create f01 kind=note title=Music role=app")
+            src = chr(10).join(["w : column, of prop:role=app as d, each app",
+                                "app : column",
+                                '  let k = 2',
+                                '  tip "$d.title" "$d.about $(k) apps."',
+                                '  gone : text "x"',
+                                "    only when 1 = 2",
+                                '    tip "never"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            apps = scene.painter_view(sc)["kids"]
+            tips = sorted(tuple(a["paint"]["tip"]) for a in apps)
+            assert tips == [("Board", "The whole board, in the middle. 2 apps."), ("Music", " 2 apps.")], tips
+            assert all(a["paint"]["kind"] == "frame" for a in apps)
+            assert all("tip" not in a["kids"][0]["paint"] for a in apps), [a["kids"][0]["paint"] for a in apps]
+            assert 'tip "Board" "The whole board, in the middle. 2 apps."' in scene.to_text(sc, "w", "jeff", 0)
+    finally:
+        tmp.unlink(missing_ok=True)
+    import style        # and the bar's style word beside it: `hover <colour>`, a ground under the pointer, no motion
+    lk = style.looks("token ink = #E9EEEA\ntoken wash = #E9EEEA12\nrole icon : ink, hover wash")["roles"]["icon"]["look"]
+    assert lk == {"ink": "#E9EEEA", "hover": "#E9EEEA12"}, lk
+
+
 def test_markdown_is_a_document_and_its_wikilinks_name_things():
     """a5820: `markdown` paints a text as a Markdown document; the painter reads it, the scene names each [[target]]:
     an id stays that thing (a rename keeps it), a title is matched whole in any case, and what names nothing says so."""

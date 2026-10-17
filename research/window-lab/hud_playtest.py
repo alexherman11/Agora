@@ -113,6 +113,9 @@ PT_JS = r"""(() => {
   // a leaf with exactly these words (or starting with them, words ending in …), under scope (default the page)
   pt.leaf = (words, scope) => [...(scope || document).querySelectorAll('#paint [data-key], [data-key]')].find(e =>
     pt.vis(e) && !e.querySelector('[data-key]') && (words.endsWith('…') ? e.textContent.trim().startsWith(words.slice(0, -1)) : e.textContent.trim() === words)) || null;
+  // a6271: an icon with no words is found by the name its tip says (what a person reads with the pointer on it)
+  pt.tipped = (name, scope, sub) => scope ? [...scope.querySelectorAll('[data-tip]')].find(e => pt.vis(e) && e.dataset.tip === name
+    && (!sub || e.dataset.key.includes(sub))) || null : null;
   pt.acts = e => (e && e._n && e._n.acts || []).map(a => a.on);
   pt.pressable = e => { for (let x = e; x && x.id !== 'paint'; x = x.parentElement)
     if (x.dataset && (x.dataset.host || x.dataset.carry || x.dataset.foldInline || x.dataset.clamped) || pt.acts(x).some(a => a === 'click' || a === 'edit' || a === 'menu') || x.tagName === 'BUTTON') return x;
@@ -522,9 +525,13 @@ def press(play, expr, what, right=False):
 # Finders use the words a person sees, inside the lens that paints them (keys hold `lens:<name>` segments), so a
 # restyle or a moved panel does not break a step; a step names what it looked for when it can't find it.
 
-CHIP = "pt.pressable(pt.leaf({0}, pt.part('lens:home-panels')))"
+# a6271: the shelf's chips and the dock's icons are one bar of icons now (home-dock: /apps/ and /panels/ groups), each
+# found by its tip; a chip or icon with words (the a5500 dock, home-panels) is still found by them
+CHIP = ("(() => {{ const s = pt.part('lens:home-panels'); return (s && pt.pressable(pt.leaf({0}, s))) "
+        "|| pt.tipped({0}, pt.part('lens:home-dock'), '/panels/'); }})()")
 PANEL = "(() => {{ const t = [...document.querySelectorAll('#paint [data-key$=\"/grip/title\"]')].find(e => pt.vis(e) && e.textContent.trim() === {0}); return t ? t.parentElement.parentElement : null; }})()"
-DOCK = "pt.pressable(pt.leaf({0}, pt.part('lens:home-dock')))"
+DOCK = ("(() => {{ const d = pt.part('lens:home-dock'); return (d && pt.pressable(pt.leaf({0}, d))) "
+        "|| pt.tipped({0}, d, '/apps/'); }})()")
 
 
 def panel(title):

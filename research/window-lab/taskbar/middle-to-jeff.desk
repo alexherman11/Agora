@@ -1,0 +1,4 @@
+# a6271: a playtest start with nothing open in the middle (JEFF's chat there), so `writing` can see its press:
+#   python research/window-lab/hud_playtest.py --report none --only writing,dock,esc --apply research/window-lab/taskbar/middle-to-jeff.desk
+look a5482
+do prop a5482 viewing="" find=""

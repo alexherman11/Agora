@@ -14,8 +14,10 @@ text. If i hover them it should say what they are.' The steps, in order (each ne
   4. lens home-icon (made, or rewritten)
   5. lens home-dock rewritten: the bar. Until this step nothing a person sees changes; it goes last.
 door first reads everything it will change and keeps it in before-a6271/ (the texts, and each thing's props), and sends
-nothing unless every thing data.desk names is there and home-dock still is the lens this was written against (the
-a5500 dock, or this bar on a re-run). The code it needs (the painter's `tip`, the style's `hover`) must be on main and
+nothing unless every thing data.desk names is there, home-dock still is the lens this was written against (the
+a5500 dock, or this bar on a re-run), and home-tiling is lane 2's (full=), which the round-3 assembly puts live: this
+goes after it, as one coordinated change (Alex's HUD sprint, a6049). check and try need the same: put lane 2's tiling
+into frontier-try first (home-layout/put.py try ... home-tiling.lens, as its docstring says). The code it needs (the painter's `tip`, the style's `hover`) must be on main and
 the home base's page reloaded (hud_probe.py says when it started), or the bar paints with no tips and no hover ground.
 """
 import json
@@ -28,7 +30,7 @@ sys.path.insert(0, str(HERE.parent / "home-layout"))
 import put  # noqa: E402  (q, Try, Live: the home layout's world writer)
 
 HOME = "f5204"          # the Home base room
-STYLE, DOCK = "a5206", "a5564"
+STYLE, DOCK, TILING = "a5206", "a5564", "a5692"
 BEGIN, END = "# a6271 bar roles: begin", "# a6271 bar roles: end"
 
 
@@ -98,7 +100,7 @@ def step_data(w):
     for line in (HERE / "data.desk").read_text(encoding="utf-8").splitlines():
         if line.strip() and not line.startswith("#"):
             out = w.do(line)
-            if line.startswith("do "):
+            if line.startswith("do ") and "nothing to change" not in out:      # a re-run: already said
                 print(f"  {line[:70]}: {said(out)}")
 
 
@@ -141,6 +143,11 @@ def preflight(w):
     dock = text_of(w, DOCK)
     if not (dock.startswith("# home-dock: the dock along the foot") or dock.startswith("# home-dock: the one bar")):
         print("preflight: home-dock is not the a5500 dock nor this bar; someone changed it: read it before going on")
+        ok = False
+    # the bar's panel press clears the layout's full= (lane 2's tiling, a5994); with a5496's big=/bigcol= tiling still
+    # live, putting away a widened panel would leave the room widened for nothing. The round-3 assembly puts it live.
+    if "full=" not in text_of(w, TILING):
+        print("preflight: home-tiling is not lane 2's (no full=): the round-3 assembly has not landed; wait for it")
         ok = False
     return ok
 
