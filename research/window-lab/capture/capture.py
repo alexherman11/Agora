@@ -388,14 +388,19 @@ def refs_from(parts, root, events_total, page, rect=None):
         if rect and not covered(p["rect"], rect):
             continue
         if p.get("aid"):
-            n = by_key.get(p["aid"][len("part:"):])
+            # a6067 (Sable c5977 (3)): a line of one continuous text is "part:<key>::<line>"; it is named as its text's
+            # part, with the words under the drag as its passage (document, quoted words, revision)
+            key, _, line = p["aid"][len("part:"):].partition("::")
+            n = by_key.get(key)
             if n is None:
                 continue                     # a part that shows no world object of its own (a lane, a column)
             ref = found.setdefault(n["item"], {"world": world, "item": n["item"], "subject": n["subject"], "kind": None,
                                                "resolved": "yes", "role": None, "lens": lens, "key": None, "words": [],
                                                "rev": n["rev"], "scene_count": events_total, "seen_event": None,
                                                "viewer": who, "_at": p["rect"][1::-1]})
-            ref["words"].append(p.get("words") or n["text"] or "")
+            if line:
+                ref.setdefault("passage", []).append(p.get("words") or "")
+            ref["words"].append(p.get("words") or ("" if line else n["text"]) or "")
             outer = n
             while outer["up"] and outer["up"]["item"] == n["item"]:       # the card, not its title: the item's own part
                 outer = outer["up"]
@@ -410,6 +415,8 @@ def refs_from(parts, root, events_total, page, rect=None):
     for r in out:
         if isinstance(r["words"], list):
             r["words"] = "\n".join(w for w in dict.fromkeys(r["words"]) if w)
+        if isinstance(r.get("passage"), list):
+            r["passage"] = "\n".join(w for w in r["passage"] if w)
     return out
 
 
