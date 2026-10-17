@@ -146,7 +146,7 @@ PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fo
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
 # double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop", "double")
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop", "double", "capture")
 DROP_SIDES = ("left", "right", "top", "bottom")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
@@ -1870,6 +1870,9 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: `on edit` on a clamped text: the person would replace words the clamp hides; drop the clamp, or edit through a part that shows the whole value")
+        # a6067: a capture (the control screen's) dropped into a text being written asks the world what it means there
+        if any(a["on"] == "capture" for a in k["on"]) and not any(a["on"] == "edit" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: `on capture` is sent when a capture is dropped into a text being written: this part has no `on edit`")
         if any(a["on"] == "key" for a in k["on"]) and not any(a["on"] == "edit" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: `on key` is for a text being written: this part has no `on edit`")
         if any(a["on"] == "open" for a in k["on"]) and not k["fold"]:
