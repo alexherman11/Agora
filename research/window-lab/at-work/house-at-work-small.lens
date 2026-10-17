@@ -1,0 +1,33 @@
+# house-at-work-small: the At work header in one line (a6265), beside the panel's title and on its chip in the dock:
+# '· 4' at work (every resident or worker the house has that is not resting), and Alex's limit runway (Claude's
+# five-hour window and when it resets; the week only once it is half used), amber from 80%. A press folds the whole panel to this line, or opens it
+# again: folded=yes on the panel note, which is the viewer's own (actor=), so it is remembered.
+n : row
+  role atsmall
+  let open = ($folded or "")
+  on click when ($folded or "") != "yes" do prop $item folded=yes
+  on click when ($folded or "") = "yes" do prop $item remove=folded
+  dot : text "·"
+    role atfold
+  count : text "$(count(witnessed:usage kind=agent doing!=resting))"
+    role atcount
+  limits : row
+    role atsmall
+    of witnessed:usage kind=limit as l
+    each limit
+  fold : text "▾"
+    role atfold
+    only when ($folded or "") != "yes"
+  unfold : text "▸"
+    role atfold
+    only when ($folded or "") = "yes"
+limit : row
+  role atsmall
+  five : text "limit $l.five% · $l.five_resets"
+    role atlimit
+    role atlimit.high when ($l.five or 0) >= 80
+    only when ($l.five_resets or "") != ""
+  week : text "week $l.week%"
+    role atlimit
+    role atlimit.high when ($l.week or 0) >= 80
+    only when ($l.week_resets or "") != "" and ($l.week or 0) >= 50

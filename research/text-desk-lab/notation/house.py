@@ -74,6 +74,7 @@ import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
+import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
 import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
@@ -585,6 +586,7 @@ class House:
         self.claude, self.claude_version = find_claude()
         self.workshop = workshop.Workshop(self)
         self.feeds = feeds.Feeds(world, self.dir)
+        self.usage = usage.Usage(world, self.dir)
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -1098,6 +1100,10 @@ class House:
             self.feeds.step(self.load(), corners, feeds.house_states(self, corners))
         except Exception as e:
             print(f"house: feeds: {type(e).__name__}: {e}", flush=True)
+        try:     # a6265: context and limit use for At work (written at most every usage.GAP s, only when changed)
+            self.usage.step()
+        except Exception as e:
+            print(f"house: usage: {type(e).__name__}: {e}", flush=True)
 
     def wake(self, r, corner, actor, lead):
         line = (corner.get("props") or {}).get("wake") or "look"       # a1027: scripts retired; arrive was the old tree
