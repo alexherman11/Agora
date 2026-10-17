@@ -42,6 +42,61 @@ def _touch_index(w):
     return idx
 
 
+# a6010: a selection's answer kept across builds, dropped when an event since touched what it reads. The home base asks
+# ~35 selections (count(prop:commission=working) and the like), each a walk over every thing, and every press made
+# them all again. A selection is kept only when every term says what it reads (knife.ASPECTS, or a comparison of a
+# field or prop); `age`, `unanswered` and the promise and request terms (time or talk) are never kept. Events since the
+# last look are read by desk.event_aspects: one that may touch anything (None), a create (a new thing may match any
+# selection) or an undo empties the store; otherwise each kept selection whose aspects meet the event's goes. Every
+# selection reads place (a Trash's things are left out), so any move empties it too. The whole build that
+# LENS_REUSE_VERIFY compares against (_OFF) asks the world afresh, so a stale answer would show as a difference.
+_SELS = _weakref.WeakKeyDictionary()
+
+
+def _selection_aspects(q):
+    """-> the aspects selection `q`'s members are read by, or None when a term reads something no event names."""
+    import knife
+    out = {"place"}
+    for t in [x for x in re.split(r"[,\s]+", (q or "").strip()) if x]:
+        name, op, _v = knife.term_key(t)
+        if op in ("=", "!=", "<", ">", "<=", ">=", "has"):
+            if name == "age":
+                return None
+            out.add("kind" if name == "kind" else name if name in knife.FIELDS else f"prop:{name}")
+            continue
+        if name in ("age", "unanswered", "settled") or name not in knife.ASPECTS:     # settled reads a promise's end too
+            return None
+        out |= knife.ASPECTS[name] or {name}
+    return out
+
+
+def _kept_selections(w, desk):
+    """The store of kept selections for this world and viewer, brought up to its events (see above)."""
+    ev = w.events
+    key = (w.me, getattr(desk, "today", None) or getattr(w, "today", None))
+    hit = _SELS.get(w)
+    if hit is None or hit["ev"] is not ev or hit["n"] > len(ev) or (hit["n"] and ev[hit["n"] - 1] is not hit["last"]):
+        hit = _SELS[w] = {"ev": ev, "n": len(ev), "last": ev[-1] if ev else None, "by": {}}
+    if hit["n"] < len(ev):
+        touched, everything = set(), False
+        for e in ev[hit["n"]:]:
+            a = event_aspects(e)
+            if a is None or "contents" in a or e["verb"] in ("undo", "redo"):
+                everything = True
+                break
+            touched |= a
+        if everything:
+            hit["by"].clear()
+        else:
+            for store in hit["by"].values():
+                for q in [q for q, (_h, asp) in store.items() if asp & touched]:
+                    del store[q]
+        hit["n"], hit["last"] = len(ev), ev[-1]
+    return hit["by"].setdefault(key, {})
+
+
+# (a6010 tried keeping a chat's sayings the same way, ~50 ms of a home-base build, and took it out: who a line calls
+# is the house's rule in code (rooms.calls), which can change with no event, and test_sayings (v) caught it.)
 class Accessor:
     """The seam: six questions, each recorded in R (sable-8 section 1)."""
 
@@ -82,13 +137,19 @@ class Accessor:
             if named is not None:
                 hit = (tuple(named), None)
             else:
-                try:
-                    sel = self.desk._parse_selection(q)
-                except Refusal as exc:
-                    # 15 Oct (a5398), as rows above: `count(kind:task,in:$item)` on a note asks in: of a note, and the
-                    # native refusal escaped the compiler, so the write that triggered the lens check crashed.
-                    raise S.LensRefusal(f"selection {q!r}: {exc}") from exc
-                hit = (None, tuple(sel[0]) if sel else ())
+                kept = None if _OFF[0] else _kept_selections(self.w, self.desk)
+                hit = kept.get(q, (None,))[0] if kept is not None else None
+                if hit is None:
+                    try:
+                        sel = self.desk._parse_selection(q)
+                    except Refusal as exc:
+                        # 15 Oct (a5398), as rows above: `count(kind:task,in:$item)` on a note asks in: of a note, and
+                        # the native refusal escaped the compiler, so the write that triggered the lens check crashed.
+                        raise S.LensRefusal(f"selection {q!r}: {exc}") from exc
+                    hit = (None, tuple(sel[0]) if sel else ())
+                    asp = _selection_aspects(q) if kept is not None else None
+                    if asp is not None:
+                        kept[q] = (hit, asp)
             self._sel[q] = hit
         named, ids = hit
         self.R.append(("select", q, [i for i, _ in named] if named is not None else list(ids)))
