@@ -17,7 +17,8 @@
     const el = n.parentElement;
     if (!el || el.closest("script,style,#term,.desk-term,#said")) continue;     // #said: the scene's source, never shown
     for (const m of n.data.matchAll(rx)) {
-      const key = (el.closest("[data-key]") || {}).dataset?.key || "?";
+      const full = (el.closest("[data-key]") || {}).dataset?.key || "?";
+      const key = full.split("/").filter(s => s.startsWith("lens:")).pop() + " …" + full.split("/").slice(-3).join("/");
       (dom[m[0]] ||= []).push(key);
       const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
       const b = r.getBoundingClientRect();

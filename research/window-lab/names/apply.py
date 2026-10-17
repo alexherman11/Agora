@@ -14,7 +14,9 @@ What the lines do, all world data anyone may change afterwards:
   - home-base (a5208): `on link do view $value` on its root, so a name pressed anywhere in the home base opens there;
   - home-board (a5548): an opened card says 'Open' (view it) where it said '<id> · read <id> on the desk ...';
   - waiting-on-me (a5439): the bare '$item' at the foot of an opened item goes (its title is the name, Open here opens);
-  - home-viewer (a5486): the open thing's head says its kind, not '<kind> · <id>' (the id is on hover, in Properties).
+  - home-viewer (a5486): the open thing's head says its kind, not '<kind> · <id>' (the id is on hover, in Properties);
+  - doc-page (a6079) no longer says where its links go; writing (a5911) says it, for the documents it holds (they open
+    in Writing, as before), so a document opened in the viewer opens its links in the viewer. (writing/*.lens agree.)
 At work, the chat headers ('in a5949'), notices and every other line that prints an id need no line here: the painter
 names them, and the root's `on link` opens them.
 Every line that changes a lens says the words it replaces (do replace), so it is refused where someone changed them."""
@@ -44,6 +46,10 @@ REPLACES = [
               '    open : text "Open"\n      role chip\n      on click do view $c.item\n'),
     ("a5439", '      where : text "$item"\n        role hint\n', ""),
     ("a5486", '    kind : text "$kind · $item"\n', '    kind : text "$kind"\n'),
+    # a link in a document is the lens around it to place: Writing opens it in Writing, the viewer in the viewer
+    ("a6079", '              on link do read $w; do prop $w open=$value back="$w.open"\n', ""),
+    ("a5911", "app : column\n  share 1\n  global : row\n",
+              'app : column\n  share 1\n  on link do read $w; do prop $w open=$value back="$w.open"\n  global : row\n'),
 ]
 
 
