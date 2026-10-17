@@ -95,30 +95,8 @@ def _kept_selections(w, desk):
     return hit["by"].setdefault(key, {})
 
 
-# a6010: a chat's sayings (`sayings ...`, ~50 ms for the home base's lowdown) kept across builds in the same way, but
-# dropped by every event except a prop, tag, due or link change on a thing that is not a chat (a press on a card, the
-# viewer's own note): those are the only events known not to change a line, who it is to, or whether it was answered.
-_SAYS = _weakref.WeakKeyDictionary()
-_QUIET = {"prop", "tag", "untag", "due", "link", "unlink"}
-
-
-def _kept_sayings(w, desk):
-    ev = w.events
-    key = (w.me, getattr(desk, "today", None) or getattr(w, "today", None))
-    hit = _SAYS.get(w)
-    if hit is None or hit["ev"] is not ev or hit["n"] > len(ev) or (hit["n"] and ev[hit["n"] - 1] is not hit["last"]):
-        hit = _SAYS[w] = {"ev": ev, "n": len(ev), "last": ev[-1] if ev else None, "by": {}}
-    if hit["n"] < len(ev):
-        for e in ev[hit["n"]:]:
-            n = w.nodes.get(e.get("target") or "") or {}
-            s = w.subjects.get(n.get("subject") or e.get("target") or "") or {}
-            if e["verb"] not in _QUIET or str(e.get("via") or "").startswith("rule") or s.get("kind") == "chat" or n.get("kind") == "chat":
-                hit["by"].clear()
-                break
-        hit["n"], hit["last"] = len(ev), ev[-1]
-    return hit["by"].setdefault(key, {})
-
-
+# (a6010 tried keeping a chat's sayings the same way, ~50 ms of a home-base build, and took it out: who a line calls
+# is the house's rule in code (rooms.calls), which can change with no event, and test_sayings (v) caught it.)
 class Accessor:
     """The seam: six questions, each recorded in R (sable-8 section 1)."""
 
@@ -182,14 +160,9 @@ class Accessor:
     def rows(self, src):
         # a6010: answered once per build, as select is (the world holds still while a lens is built): the home base asked
         # one chat's lines four times, ~70 ms each. Each asker gets its own copies of the rows
-        kept = None if _OFF[0] or S.source_head(src) != "sayings" else _kept_sayings(self.w, self.desk)
-        if ("rows", src) not in self._sel and kept is not None and src in kept:
-            self._sel[("rows", src)] = kept[src]
         if ("rows", src) not in self._sel:
             try:
                 self._sel[("rows", src)] = S.rows(self.desk, src, memo=self._sel)
-                if kept is not None:
-                    kept[src] = self._sel[("rows", src)]
             except Refusal as exc:
                 # Authored row queries use the native selector's refusal type. At the
                 # compiler boundary they belong to lens diagnostics and fallback,
