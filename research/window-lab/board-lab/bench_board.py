@@ -41,6 +41,25 @@ def main(argv):
     import pickle
     import store                     # the live world has a log (Snappy Desk): without one every write pickles it twice
     store.genesis(pickle.loads((tmp / "bench.pickle").read_bytes()), tmp / "bench.pickle", why="bench")
+    staged = None
+    if "--stage" in argv:
+        # a6153: the house and the host as the home base meets them (hud_playtest.py's staging): residents at work, six
+        # windows, and the host's verbs, as witnessed rows. Without them the bench builds a quieter home base than Alex's
+        import os
+        import witnessed
+        sys.path.insert(0, str(NOTATION.parents[1] / "window-lab"))
+        import host_verbs
+        staged = NOTATION / "house-state" / "bench"
+        staged.mkdir(parents=True, exist_ok=True)
+        wins = [("Visual Studio Code", "Code.exe"), ("Inbox - Mail", "olk.exe"), ("Music", "Spotify.exe"),
+                ("Agora notation - Terminal", "WindowsTerminal.exe"), ("Docs - Edge", "msedge.exe"), ("Files", "explorer.exe")]
+        witnessed.write("bench", "desktop", [{"name": str(1000000 + i), "title": t, "program": p, "front": "yes" if i == 0 else "no"}
+                                             for i, (t, p) in enumerate(wins)], by="bench")
+        witnessed.write("bench", "host", host_verbs.rows(), by="hud")
+        doing = {"f5189": ("jeff", "working"), "f571": ("sable", "working"), "f576": ("pike", "resting")}
+        (staged / "house.json").write_text(json.dumps({"pid": os.getpid(), "beat": time.time() + 3600, "world": "bench", "workers": {},
+                                                       "residents": {c: {"actor": a, "alive": True, "doing": d, "turns": 3, "last_turn": time.time()}
+                                                                     for c, (a, d) in doing.items()}}), encoding="utf-8")
     srv = ThreadingHTTPServer(("127.0.0.1", 0), deskd.Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}"
@@ -95,7 +114,10 @@ def main(argv):
             raw = r.read()
         return json.loads(raw), (time.perf_counter() - t) * 1000, len(raw) // 1024
 
-    q = f"/api/scene?session=bench&as={who}&lens={lens}&view=painter"
+    q = f"/api/scene?session=bench&as={who}&lens={lens}&view=painter" + ("" if "--text" in argv else "&text=0")
+    if "--why" in argv:
+        import lens_ir
+        lens_ir._WHY_ON[0] = True
     r, ms, kb = call(q)
     print(f"first scene (cold) {ms:.0f} ms {kb} KB")
     r, ms, kb = call(q)
@@ -118,19 +140,29 @@ def main(argv):
             import cProfile
             prof[0] = cProfile.Profile()
         spent.clear()
+        import lens_ir
+        k0, m0 = lens_ir._STATS["kept"], lens_ir._STATS["made"]
         r, ms2, kb = call(q)
         if "--rows" in argv or "--sel" in argv:
             print(f"   rows and selections, {sum(spent.values()):.0f} ms in all: " + ", ".join(
                 f"{s[:60]} {v:.1f}" for s, v in sorted(spent.items(), key=lambda kv: -kv[1])[:int(opt("--sel", "8"))]))
-        print(f"press {i + 1}: do {ms1:.0f} ms, scene {ms2:.0f} ms {kb} KB   [{said}]")
+        print(f"press {i + 1}: do {ms1:.0f} ms, scene {ms2:.0f} ms {kb} KB, kept {lens_ir._STATS['kept'] - k0} made "
+              f"{lens_ir._STATS['made'] - m0}   [{said}]")
+        if "--why" in argv:           # a6153: why instances were made, not kept (lens_ir._WHY)
+            print("   made because: " + "; ".join(f"{k} x{v}" for k, v in lens_ir._WHY.most_common(6)))
+            lens_ir._WHY.clear()
+        if "--wait" in argv:          # a6153: seconds between presses, as a person leaves them (witnessed rows age)
+            time.sleep(float(opt("--wait", "1")))
     import lens_ir
     print(f"instances kept {lens_ir._STATS['kept']}, made {lens_ir._STATS['made']}, builds {lens_ir._STATS['builds']}, "
           f"differed from a whole build {lens_ir._STATS['differed']} (LENS_REUSE_VERIFY=1 checks every build)")
     if prof[0] is not None:
         import pstats
-        pstats.Stats(prof[0]).sort_stats("cumulative").print_stats(int(opt("--profile", "25")))
+        pstats.Stats(prof[0]).sort_stats(opt("--sort", "cumulative")).print_stats(int(opt("--profile", "25")))
     srv.shutdown()
     shutil.rmtree(tmp, ignore_errors=True)
+    if staged is not None:
+        shutil.rmtree(staged, ignore_errors=True)
 
 
 if __name__ == "__main__":

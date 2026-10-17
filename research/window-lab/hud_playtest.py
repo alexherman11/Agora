@@ -82,8 +82,13 @@ PT_JS = r"""(() => {
   const pt = window.__pt = { last: 0, lastType: '', first: 0, done: 0, pred: null, host: [], errors: [], opened: 0 };
   const quiet = n => { for (let e = n && (n.nodeType === 1 ? n : n.parentElement); e; e = e.parentElement)
     if (e.dataset && e.dataset.key && /lens:home-widgets|\/live\b/.test(e.dataset.key)) return true; return false; };
+  // a6153: a press is timed from the release that ends it: the click (or a drag's eaten click) that follows a release
+  // within 500 ms is the same press, and no longer starts the clock again (a drag's landing box, shown at the release,
+  // was never counted as its first change)
   for (const t of ['mouseup', 'pointerup', 'click', 'dblclick', 'keydown', 'contextmenu'])
-    addEventListener(t, e => { pt.last = e.timeStamp || performance.now(); pt.lastType = t; pt.first = 0; }, true);
+    addEventListener(t, e => { const now = e.timeStamp || performance.now();
+      if ((t === 'click' || t === 'dblclick' || t === 'mouseup') && /^(pointerup|mouseup)$/.test(pt.lastType) && pt.last && now - pt.last < 500) return;
+      pt.last = now; pt.lastType = t; pt.first = 0; }, true);
   new MutationObserver(ms => { if (pt.last && !pt.first && ms.some(m => !quiet(m.target))) pt.first = performance.now(); })
     .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
   addEventListener('error', e => pt.errors.push(String(e.message).slice(0, 200)));
@@ -160,6 +165,13 @@ class Copy:
         self.world, self.session = world, f"{world}-playtest-{os.getpid()}"
         self.pickle = LAB / "sessions" / f"{self.session}.pickle"
         shutil.copy(src, self.pickle)
+        if not os.environ.get("PLAYTEST_NOLOG"):
+            # a6153: as the live world is kept, a snapshot plus the log since (Snappy Desk): a copy without a log pickles
+            # the whole world twice at every write, and each press's act timed ~200-250 ms slower than it is live
+            # (screen.py --logged, a6010). PLAYTEST_NOLOG=1 plays the old way, to compare
+            import pickle
+            import store
+            store.genesis(pickle.loads(self.pickle.read_bytes()), self.pickle, why="hud_playtest")
         self.state = tempfile.mkdtemp(prefix="playtest-door-")
         shell = Path(self.state) / "desk-shell"
         shutil.copytree(LAB / "desk-shell", shell)
@@ -1234,7 +1246,11 @@ def main():
     ap.add_argument("--apply", type=lambda s: s.split(","), default=[],
                     help="files applied to the copy first: .desk lines, .lens / .verb notes in Home base (as put.py does)")
     ap.add_argument("--apply-as", default="alex")
+    ap.add_argument("--profile-scenes", default=None,
+                    help="a6153: a folder; the copy's deskd profiles each scene build into it (press-speed/read_profiles.py)")
     a = ap.parse_args()
+    if a.profile_scenes:
+        os.environ["DESKD_PROFILE_SCENES"] = str(Path(a.profile_scenes).resolve())     # the door's deskd inherits it
     if a.list:
         print(__doc__.split("Steps (ids")[1])
         return 0

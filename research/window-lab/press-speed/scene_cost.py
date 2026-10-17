@@ -39,8 +39,8 @@ def main(argv):
         t = {}
         with deskd.Session("bench", who, read=True) as desk:
             t0 = time.perf_counter()
-            sc, text = scene.scene_for(desk, lens)
-            t["build+text"] = time.perf_counter() - t0
+            sc, text = scene.scene_for(desk, lens, text="--text" in argv)
+            t["build"] = time.perf_counter() - t0
             t1 = time.perf_counter()
             pv = dict(scene.painter_view(sc), **{"def": sc.get("def")})
             t["painter_view"] = time.perf_counter() - t1
@@ -59,8 +59,15 @@ def main(argv):
                 print(desk.repl(ln.strip())[:120].replace("\n", " | "))
     else:
         (tmp / "bench.pickle").touch()
-    for _ in range(2):
-        t, out, body, sc = build()
+    for k in range(2):
+        if k == 1 and "--callers" in argv:      # who calls the function named (e.g. --callers get), in the second build
+            import cProfile
+            import pstats
+            pr = cProfile.Profile()
+            t, out, body, sc = pr.runcall(build)
+            pstats.Stats(pr).sort_stats("tottime").print_callers(opt("--callers", "get"))
+        else:
+            t, out, body, sc = build()
         print("  ".join(f"{k} {v * 1000:.0f} ms" for k, v in t.items()), f"| body {len(body) // 1024} KB, text {len(out['text']) // 1024} KB")
     sizes = Counter()
     nodes = [0]

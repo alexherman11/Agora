@@ -1135,7 +1135,10 @@
     const have = !force && /^(\d+-\d+|g[0-9a-f]+)$/.test(last) ? `&have=${last}` : "";      // a build name, never the fallback text
     const keys = encodeURIComponent("Enter,Tab,Shift+Tab,Backspace,Delete");
     const on = q.get("on") ? `&on=${encodeURIComponent(q.get("on"))}` : "";   // a5949 (Sable's a4270): the thing the lens stands on
-    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}${on}&view=painter&keys=${keys}${have}`)).json();
+    // a6153: the scene's text is shown only in the inspector (#said); a page without it is not sent it (~400 KB and
+    // ~25 ms of the home base's build at every press)
+    const text = document.body.dataset.inspector === "on" ? "" : "&text=0";
+    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}${on}&view=painter&keys=${keys}${text}${have}`)).json();
     if (r.same) return;                          // deskd: nothing changed since the build this page has
     return paintAnswer(r, force);
   }
