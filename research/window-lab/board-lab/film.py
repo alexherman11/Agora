@@ -54,12 +54,14 @@ def main():
     steps += shot(1.6)
     steps += point("#testline", "60") + shot(0.8)
     steps += ["click", "#testline", "wait", "120"] + shot(1.4)                  # opened in place (local, no round trip)
-    steps += ["js", "(() => { const t = document.getElementById('testline').parentElement.querySelector('[data-key$=\"/body/say\"]');"
-                    " if (t) t.id = 'testsay'; return !!t; })()"]
-    steps += point("#testsay", "40") + ["click", "#testsay", "type", "Nice. One thing: make the reply box smaller next round."] + shot(1.6)
-    steps += ["key", "Enter", "wait", "600"] + shot(1.2)
+    if "--reply" in a:      # rounds 1 and 2: a reply typed in the card (round 3 moved words to the middle, a6049)
+        steps += ["js", "(() => { const t = document.getElementById('testline').parentElement.querySelector('[data-key$=\"/body/say\"]');"
+                        " if (t) t.id = 'testsay'; return !!t; })()"]
+        steps += point("#testsay", "40") + ["click", "#testsay", "type", "Nice. One thing: make the reply box smaller next round."] + shot(1.6)
+        steps += ["key", "Enter", "wait", "600"] + shot(1.2)
     steps += ["js", FIND] + point("#testok") + shot(0.8)
-    steps += ["click", "#testok"] + shot(0.5) + ["wait", "250"] + shot(0.5) + ["wait", "600"] + shot(2.0)
+    # round 3: the card is gone on the next frame (leaves/away), before the desk answers; then the answer is painted
+    steps += ["click", "#testok"] + shot(0.6) + ["wait", "250"] + shot(0.5) + ["wait", "600"] + shot(2.0)
     steps += ["desk", f"find title:Test"]
     cmd = [sys.executable, str(LAB / "screen.py"), "frontier-try", "--as", "alex", "--lens", lens, "--size", size,
            "--scale", "1.5", "--logged"] + steps

@@ -302,6 +302,11 @@ moving : column
       for : text "· asked by $(($c.asked_by or "nobody"))"
         role nbwhen
         only when $c.asked_by != "jeff"
+    # now= on a worker's own card: what it is doing this minute, in its own words (lane 3's proposal, a6049 c6262)
+    now : text "$c.now"
+      role nbnotetext
+      clamp 2
+      only when ($c.now or "") != ""
     last : column
       of comments:$c.item as m
       each note
