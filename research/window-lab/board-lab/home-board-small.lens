@@ -1,0 +1,19 @@
+# home-board-small: the board in one line (a5496), for its panel title, the shelf and a narrow room (a6010, round 3):
+# what needs Alex first, then what is moving; a count of nothing is left out, so a quiet day reads short.
+line : row
+  role nbsmall
+  let need = count(tag:ready-for-review,-prop:review=later) + count(prop:design=waiting,-prop:review=later) + count(prop:commission=failed,prop:asked_by=alex,-prop:review=later)
+  let move = count(prop:commission=asked) + count(prop:commission=working) + count(prop:commission=ready) + count(prop:commission=landing)
+  let jeff = count(prop:commission=waiting) + count(prop:commission=failed,prop:asked_by!=alex)
+  you : text "$(need) need you"
+    role nbsmall.need
+    only when need > 0
+  moving : text "$(move) moving"
+    role summary
+    only when move > 0
+  waits : text "$(jeff) wait on JEFF"
+    role nbsmall.jeff
+    only when jeff > 0
+  quiet : text "all quiet"
+    role summary
+    only when need + move + jeff = 0

@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (47)
+## open (48)
 
 ### F2. Scripts cannot say who is running them
 
@@ -314,6 +314,12 @@ Missing words, met by a6109 (Alex, 16 Oct: 'I should never see id names ... name
 a6191 · family=lens-words · status=open
 
 Source edit by worker-a6067, 16 Oct, for Alex (a6067: the document is one continuous text; one general module for every text a person types into), to Pike's boundary (c5974) and Sable's rules (c5977, and her split on c6106: words the person's, caret the window's). WANTED: one editing module for documents and the chat composer alike: caret, selection, composition, keys and the undo of unsent typing in the painter; edits sent against a version as the person pauses; the desk's new words (a resident's do replace) fitted over unsent typing, or refused loudly; the world's undo of a sent edit; a passage the control screen can name; a dropped capture that asks the world. DONE IN SOURCE: desk-shell/textedit.js (the module; markdown.js shrank to the grammar and drawing); viewer.js (drafts per person kept in step across windows, caret per window, rebased, onDrafts, textState); lens.js (the document and the composers are its customers; textOf names the document a text read); scene.py the gesture on capture; window-lab/capture/capture.py reads part:<key>::<line> as a passage. WHY NO WORLD EDIT COULD DO IT: typing happens below the desk's grain (a keystroke is not an event, by Pike's boundary), so caret, composition and fitting are painter work; and the seam to the desk has only one shape today, a whole value fenced by a revision. THE SMALLEST SEAM THAT WOULD MAKE MORE OF IT A WORLD EDIT: (1) an edit verb that takes a range at a version (at=, gone=, came=, version=) and that the desk maps through what it ordered since (a4865's choice is Alex's: our own ordering or a library), so fitting would move from the painter to the desk and every window would agree; (2) a text's source named in the paint contract (whose words a part shows), so the painter would not read it from the fence's reads; (3) keys as world data (a keymap note a lens names), so which press is a shortcut would not be source.
+
+### Words a press lacked to show its result before the desk answers: leaves and away (a6010)
+
+a6279 · family=lens-words · status=open
+
+worker-a6010, 17 Oct (HUD sprint round 3, the board). A press that changes the world painted only when the desk answered, 300-430 ms in the playtest (act ~100 ms, the home base's scene ~200 ms), so Looks good on a needs-you card was slow however fast the server got. Missing: a way for a lens's style to say what a press will look like at once. Added two style flags (style.py, style.js; no lens or scene word): a part whose look says `leaves` is hidden, its room kept, while a press on a part inside it whose look says `away` waits for its answer; a refusal draws it again beside the reason. Playtest: Looks good 333 -> 5-18 ms, Send back 314 -> 14 ms. Found on the way: taking the card out of the layout made the next card slide under the pointer, and a quick double-click approved two cards (headless, double.js), so the room is kept. Still missing: a press whose result is a move (Later: the card goes under a fold) shows only its leaving at once; where it went waits for the scene.
 
 ## curing (37)
 
