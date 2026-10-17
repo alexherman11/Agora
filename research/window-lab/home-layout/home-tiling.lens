@@ -7,7 +7,7 @@
 # the chat's side (right when unsaid).
 # Drag a panel by its title. Over another panel, the landing box shows where it goes: near its left or right edge, a
 # new column there; near its top or bottom, above or below it; its middle, the two trade places. Over a column's empty
-# foot, it goes last there and takes that room. A column left empty goes, and the others take its width. Each drop is
+# foot, it goes last there and takes that room (near the foot's left or right edge, a new column there). A column left empty goes, and the others take its width. Each drop is
 # one use of the verb drop-panel (Home base). ⇔ widens a column: a third, a half, two thirds of the room. A
 # double-click on a title fills the room with that panel (the others become a rail of titles; the chat stays); again,
 # or ⤡, gives it back. – shelves it (home-panels, in the dock). Nothing scrolls, nothing moves by itself.
@@ -44,7 +44,10 @@ desk : column
     role body
     scroll none
     chatleft : column
-      share 7
+      let wide = 7 when ($lay.full or "") != ""
+      let wide = 32 when ($lay.full or "") = "" and count(prop:role=home-view,prop:actor=$me,prop:viewing,-prop:viewing=a5080) + count(prop:role=home-view,prop:actor=$me,prop:find) > 0
+      let wide = 7 otherwise
+      share $wide
       role pinned
       scroll none
       only when ($lay.pin or "right") = "left"
@@ -73,7 +76,10 @@ desk : column
         of kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no as p
         each fullpanel
     chatright : column
-      share 7
+      let wide = 7 when ($lay.full or "") != ""
+      let wide = 32 when ($lay.full or "") = "" and count(prop:role=home-view,prop:actor=$me,prop:viewing,-prop:viewing=a5080) + count(prop:role=home-view,prop:actor=$me,prop:find) > 0
+      let wide = 7 otherwise
+      share $wide
       role pinned
       scroll none
       only when ($lay.pin or "right") != "left"
@@ -89,6 +95,8 @@ column : column
   foot : column
     share 1
     role tilefoot
+    on drop grip at left do drop-panel left $carried $col $col $lay
+    on drop grip at right do drop-panel right $carried $col $col $lay
     on drop grip do drop-panel end $carried $col $col $lay
 panel : column
   role pane
@@ -140,7 +148,7 @@ railitem : column
     lens $r.lesser
 fullpanel : column
   share 1
-  role pane.big
+  role pane
   scroll none
   only when $item = ($lay.full or "")
   grip : row
