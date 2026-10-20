@@ -269,6 +269,9 @@ def expr_env(desk, ctx):
     def get(name):
         if not name.startswith("$"):
             return None                     # a bare word in a command's expression names no let; it is none, and says so
+        if name == "$*":
+            # a6427: a verb's rest of the line, in an expression too (words-after($*, "save")), as $1 is
+            return None if ctx.args is None else str(ctx.rest)
         m = WORD.match(name)
         if not m:
             return None
