@@ -899,7 +899,7 @@
     draw(r) {
       const m = document.createElement(this.kinds[r.mark].tag); m.className = "t-mark " + (this.kinds[r.mark].look || "t-mark-" + r.mark); m.textContent = r.text;
       if (r.mark === "link") { m.dataset.href = r.href; m.title = r.href + "  (Ctrl+click opens it)"; }
-      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = r.title + (r.open ? "  (click opens it)" : ""); }
+      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = (window.Markdown ? Markdown.fullName({ title: r.title, name: r.text }) : r.title) + (r.open ? "  (click opens it)" : ""); }   // a6460: never the id, on hover either
       return m;
     },
     // Ctrl+B and the like, in the source: wrap what is selected, or take the mark off when it is already there
@@ -1106,7 +1106,22 @@
   }
   function runs(el, rs) {
     el._runs = rs;
+    // a6460: a name inside a sentence is drawn quiet, as a Markdown document draws it (markdown.js refDraw): first four
+    // words, the whole on hover, an arrow for a comment, event or line, a number when named again; a text that is only
+    // a name keeps it whole
+    const M = window.Markdown, prose = M && rs.some(r => !r.mark && /[A-Za-z]{3,}/.test(r.text || ""));
+    const refs = new Map(), n = new Map();
+    if (prose) {
+      for (const r of rs) if (r.mark === "thing" && r.kind !== "comment" && r.kind !== "event" && r.kind !== "line") n.set(r.id, (n.get(r.id) || 0) + 1);
+      let k = 0; for (const [id, c] of n) if (c > 1) refs.set(id, { n: ++k, seen: false });
+    }
     el.replaceChildren(...rs.map(r => {
+      if (r.mark === "thing" && prose) {
+        const m = MARKS.draw(r), full = M.fullName({ title: r.title, name: r.text });
+        m.replaceChildren(...M.refDraw({ name: r.text, kind: r.kind }, refs.get(r.id), "t-"));
+        m.title = full + (r.open ? "  (click opens it)" : "");
+        return m;
+      }
       if (r.mark) return MARKS.draw(r);
       if (!r.role) return document.createTextNode(r.text);
       const s = document.createElement(r.block ? "div" : "span"); s.className = Style.roleClass(r.role);

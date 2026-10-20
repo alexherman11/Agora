@@ -1,0 +1,5 @@
+# Local copy-world transcripts and live restore snapshots are not source.
+/try.desk
+/try2.desk
+/try.out
+/before/

@@ -1,0 +1,45 @@
+# a6460: the reader (lens reader): a thing waiting on Alex set as an article. LAMPLIT's rule: warm only on what asks
+# him (the kicker, the question), ink for the answer that says yes, the rest soft on glass; nothing moves
+token text.read = sans 17/1.65
+role rdpage : between gap
+role rdcol : between gap
+role rdhead : between gap, pad top gap, pad bottom gap x2, border bottom rim
+role rdkicker : between gap x1.5, align center
+role rdkind : text.label medium tracked, warm
+role rdfacts : text.label, soft
+role rdtitle : text up 4 strong, ink
+role rdwhat : text.read up, ink
+role rdline : between gap
+role rdlabel : text.label tracked, soft, width 7em
+role rdlabel.ask : text.label medium tracked, warm, width 7em
+role rdrec : text, ink
+role rdask : between gap, on warmwash, rail warm, corner gap, pad gap, pad left gap x1.5
+role rdasktext : text medium, ink
+role rdmodes : between gap /2, space above gap /2
+role rdtab : text down, soft, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
+role rdtab.on : text down medium, night, on ink, corner gap x2, pad gap /4, pad left gap x1.5, pad right gap x1.5
+role rdscroll : pad top gap x2, pad bottom gap x3
+role rdbody : text.read, ink
+role rdskimlist : between gap x2
+role rdparas : between gap
+role rdskimsec : between gap /2
+role rdskimh : text up medium, ink
+role rdskim : text.read, soft
+role rdpara : between gap
+role rdpara.li : between gap, pad left gap x2
+role rdmark : text.read, soft
+role rdfigure : on wash, corner gap, pad gap x2
+role rdh1 : text.read up 3 strong, ink, space above gap x2
+role rdh2 : text.read up 2 medium, ink, space above gap x3
+role rdh3 : text.read up medium, ink, space above gap x2
+role rdquote : text.read, ink, pad left gap x2, border left rim
+role rdfoot : between gap, pad top gap
+role rdbox : text, ink, on wash, corner gap, pad gap
+role rdquiet : text down, soft, pad gap /4
+role rdbar : between gap, align center, pad top gap, border top rim
+role rdgo : text down medium, night, on ink, corner gap x2, pad gap /2, pad left gap x2, pad right gap x2
+role rdbtn : text down, ink, edge rim, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role rdbtn.on : text down medium, ink, on wash, edge ink, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role rdnav : between gap x1.5, align center
+role rdpos : text.label, faint
+role rdnavlink : text down, soft

@@ -356,6 +356,7 @@
     let ctx = { links: opts.links || {}, things: opts.things || {}, media: opts.media || [] }, raw = false, active = new Set(), lit = opts.light || [];
     if (opts.hint) root.dataset.hint = opts.hint;
     const ed = !!opts.editable;
+    if (!ed) root.classList.add("md-read");                    // a6460: a document only read is set for reading (spacing, leading)
     if (ed) { root.contentEditable = "true"; root.spellcheck = true; root.setAttribute("role", "textbox"); root.setAttribute("aria-multiline", "true"); }
     const focused = () => document.activeElement === root;
     const src = () => E.doc.text;
