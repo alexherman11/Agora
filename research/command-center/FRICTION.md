@@ -1219,10 +1219,16 @@ a6631 · family=missing-word · status=cured
 Alex, 20 Oct, requested current worker status and automatic Desk/worker recovery at Windows sign-in. Missing lifecycle behavior: the Startup shortcut launches agora_start.py but has no external recovery if that process exits; AgoraHouseRecovery separately launches backend components, creating two startup owners. Codex is connecting the existing scheduled watchdog to the existing full Desk launcher, preserving live services, strengthening single-instance startup and testing restart restoration. Incomplete working tasks resume from saved house state; waiting tasks remain waiting for answers or new work.
 Ran 20 Oct: 6 focused startup tests passed (cold start, adoption, orphan recovery, inspection failure, checkout matching, real OS-lease contention/crash release). Existing builder restart/resume checks passed. Repository pytest: 201 passed, 2 skipped; changed Python Ruff and PowerShell parsing passed. Sign-in task is running. New launcher 20572 adopted the original live services; deliberately terminating only it led to watchdog replacement 91248 within the configured 60-second backoff. Keeper 62740, house 82160, door wrapper 28432, HUD 87440 and capture 33540 remained running unchanged; duplicate launcher exited without starting services. No Windows reboot/sign-out was performed. Docs checker still reports the pre-existing missing Dynamic Desk image. Source: agora_start.py, test_agora_start.py, house_supervisor.ps1; operational instructions updated in a639 and codex-residents/README.md.
 
-## source-pending (1)
+## source-pending (2)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
 a6838 · family=host · status=source-pending
 
 Host friction: independently added HUD playtest coverage required editing the same runner callbacks and order list, causing repeated landing conflicts. The missing extension point was discovery of one step per file. a6749 adds playtest_steps/*.py Step records (order, feature needs, press script with its existing assertions, budgets), scanned by hud_playtest.py. Existing bodies and numbers are preserved, including equal-footing from main. This is test-host structure, not new world behavior. Ran: 13 extraction/discovery/fixture-merge tests and 5 existing wheel-verdict tests pass; real browser acceptance is not run in the Codex sandbox.
+
+### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
+
+a6970 · family=host · status=source-pending
+
+Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
