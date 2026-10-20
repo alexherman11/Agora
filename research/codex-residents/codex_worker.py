@@ -20,6 +20,7 @@ from codex_resident import (
     deny,
     output,
     receive,
+    refresh_charter,
 )
 from openai_codex.client import CodexClient, CodexConfig
 from worker_job import child_job
@@ -227,7 +228,8 @@ def serve(args):
             watcher = threading.Thread(target=watch, daemon=True)
             watcher.start()
             try:
-                if not receive(client, turn_id, output):
+                if not receive(client, turn_id, output, lambda: refresh_charter(
+                        client, started.thread.id, args, output)):
                     return 1
             finally:
                 finished.set()
@@ -244,6 +246,9 @@ def main():
     parser.add_argument("--mcp-config", required=True)
     parser.add_argument("--prompt-file", required=True)
     parser.add_argument("--lease", action="append", default=[])
+    parser.add_argument("--world")
+    parser.add_argument("--target")
+    parser.add_argument("--actor")
     args = parser.parse_args()
     try:
         with worker_leases(args.lease):

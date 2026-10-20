@@ -72,6 +72,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
+import charter
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
 import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
@@ -418,13 +419,24 @@ class Resident:
         bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
         if bound != provider:
             raise ValueError(f"{self.rid}: saved conversation belongs to {bound}, not {provider}; preserved")
+        # A plain process resume retains the charter. Fresh memory reads start= once.
+        if not self.state.get("session") or "charter_text" not in self.state:
+            self.state["charter_text"] = charter.collect(
+                self.house.load(), self.house.act, self.rid, props.get("actor", self.rid), "start")
+        charter_file = self.dir / "charter.txt"
+        charter_file.write_text(self.state.get("charter_text", ""), encoding="utf-8")
         if provider == "codex":
             adapter = HERE.parents[1] / "codex-residents" / "codex_resident.py"
             cmd = [sys.executable, str(adapter), "--model", model,
-                   "--reasoning", props.get("reasoning", "medium")]
+                   "--reasoning", props.get("reasoning", "medium"),
+                   "--charter-file", str(charter_file), "--world", self.house.world,
+                   "--target", self.rid, "--actor", props.get("actor", self.rid)]
         elif provider == "claude":
             cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                   "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
+                   "--system-prompt", self.state.get("charter_text", ""), "--tools", "",
+                   "--strict-mcp-config", "--setting-sources", "", "--model", model,
+                   "--settings", json.dumps(charter.claude_hook(
+                       sys.executable, self.house.world, self.rid, props.get("actor", self.rid)))]
         else:
             raise ValueError(f"{self.rid}: unknown resident provider {provider}")
         self.state["session_provider"] = provider
@@ -541,6 +553,14 @@ class Resident:
                 # begins with the welcome again (Alex, 29 Sep: on compaction, or a full reset)
                 self.state["welcome_due"] = "the conversation was compacted"
                 self.state["compactions"] = self.state.get("compactions", 0) + 1
+                if self.state.get("session_provider", "claude") == "claude":
+                    # The SessionStart(compact) hook reads/injects the live charter.
+                    # Keep the resume-time system block current as well.
+                    self.state["charter_text"] = charter.read(self.house.load()).text
+                self.save()
+            elif t == "system" and ev.get("subtype") == "charter_read":
+                # Codex refreshes developer history at the actual boundary, before continuing.
+                self.state["charter_text"] = ev.get("text", "")
                 self.save()
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):
@@ -592,6 +612,7 @@ class House:
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
+        self.charter_state = {}
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -996,6 +1017,12 @@ class House:
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self):
         w = self.load()
+        if self.world == "frontier" and not self.fake:
+            try:
+                charter.sync(w, self.act, HERE.parents[2] / "AGENTS.md", self.charter_state)
+            except Exception as exc:
+                print(f"house: charter mirror: {type(exc).__name__}: {exc}", flush=True)
+            w = self.load()
         cfg = self.settings(w)
         corners = self.corners(w)
         open_ = [s for s in w.subjects.values() if (s.get("props") or {}).get("objective") == "open"]

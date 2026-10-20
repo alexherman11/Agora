@@ -44,6 +44,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+import charter
 
 HERE = Path(__file__).resolve().parent
 import shared                             # noqa: E402  (a5296: at import, before a test stubs the workers' Popen)
@@ -54,8 +55,9 @@ PY = Path(sys.executable)
 # Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
 # call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
-HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
-               "scripts_mirror.py", "codex_worker.py", "worker_lease.py", "worker_job.py"}
+HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
+               "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
+               "scripts_mirror.py", "worker_lease.py", "worker_job.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -1318,7 +1320,8 @@ class Worker:
                 # agent here reads; the protocol after it adds only the worker's particulars
                 agents = Path(self.tree) / "AGENTS.md"
                 if agents.exists():
-                    prompt = agents.read_text(encoding="utf-8").strip() + "\n\n---\n\n" + prompt
+                    # The worktree block may be old; inject exactly one current live copy.
+                    prompt = charter.without_block(agents.read_text(encoding="utf-8")).strip() + "\n\n---\n\n" + prompt
                 # the worker may use either shell (on Windows its default is PowerShell), and may call the interpreter
                 # by name or by its full path (trial help-list: every run was refused for want of these)
                 runs = ["git status", "git diff", "git add", "git commit", "git log", "git show", "git rebase", "node --check",
@@ -1374,6 +1377,13 @@ class Worker:
                 bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
                 if bound != provider:
                     raise ValueError(f"{self.cid}: saved worker conversation belongs to {bound}, not {provider}; preserved")
+                if not self.state.get("session") or "charter_text" not in self.state:
+                    self.state["charter_text"] = charter.collect(
+                        current, self.house.act, self.cid, self.actor, "start")
+                    receipt = charter.read(current).receipt
+                else:
+                    receipt = "rules injected (cached charter; no start read on ordinary resume)"
+                prompt = self.state["charter_text"] + "\n\n---\n\n" + prompt
                 if provider == "codex":
                     adapter = HERE.parents[1] / "codex-residents" / "codex_worker.py"
                     instructions = self.dir / "worker-prompt.txt"
@@ -1381,6 +1391,7 @@ class Worker:
                     cmd = [str(PY), str(adapter), "--model", model,
                            "--reasoning", props.get("worker_reasoning", "medium"),
                            "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
+                    cmd += ["--world", world, "--target", self.cid, "--actor", self.actor]
                     cmd += ["--lease", str(self.dir / "worker.lock")]
                     if self.builder:
                         cmd += ["--lease", str(self.house.dir / self.builder / "worker.lock")]
@@ -1388,7 +1399,8 @@ class Worker:
                     cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                            "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
                            "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
-                           "--append-system-prompt", prompt]
+                           "--append-system-prompt", prompt,
+                           "--settings", json.dumps(charter.claude_hook(PY, world, self.cid, self.actor))]
                 else:
                     raise ValueError(f"{self.cid}: unknown worker provider {provider}")
                 self.state["session_provider"] = provider
@@ -1402,6 +1414,7 @@ class Worker:
                 self.proc = subprocess.Popen(cmd, cwd=self.tree, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                              stderr=open(self.dir / "stderr.log", "a", encoding="utf-8"),
                                              text=True, encoding="utf-8", errors="replace", bufsize=1)
+                charter.report(self.house.act, self.cid, receipt)
                 # a5378: each process has its own queue, so a process set down (its card waits for a builder) never
                 # says its exit into the next one's, where it would read as that worker failing
                 self.events = queue.Queue()
