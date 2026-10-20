@@ -1,0 +1,13 @@
+# a6437 demo: a refused line in the middle, the rest running, a dependent line skipped with its reason.
+# python explore.py frontier-try --as <you> --whole < trials/a6437-demo.desk   (its transcript: trials/a6437-demo.txt)
+look f1230
+do create f1230 kind=note title="carry-on demo A" text="one"
+do prop zz999 x=1
+do create f1230 kind=note title="carry-on demo B" text="two"
+do prop $new status=ready
+do create zz998 kind=note title="carry-on demo C" text="three"
+do prop $new status=ready
+do comment "carry-on demo C" line="this needs C"
+read zz997
+read zz996
+look f1230 :1
