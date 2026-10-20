@@ -542,6 +542,10 @@ def saying_rows(desk, terms="", early=None):
                         and k2 not in LINE_ROW_KEYS} - skipped_keys for ln in (s.get("lines") or [])):
                 continue
         if s["kind"] == "chat" and not (me and not rooms.is_member(w, s, me)):
+            # a6638 (Alex, 20 Oct: one universal chat, each line tagged with what it is about): a line that does not say
+            # what it is about is about what the line it answers is about, else what its chat is the Talk of
+            talk_of = str((s.get("props") or {}).get("talk_of") or "")
+            abouts = None
             tl = text_lines(w, sid)
             mine_after = False              # walking back from the end: has a line of mine come after this one?
             listed = set()
@@ -607,6 +611,14 @@ def saying_rows(desk, terms="", early=None):
                     for key in ("mark", "context"):
                         value = line_fields(line).get(key, "")
                         row[key] = value if isinstance(value, str) else ""
+                if not row.get("about"):
+                    said_about = ""
+                    if row["reply_to"]:
+                        if abouts is None:
+                            abouts = {ln["id"]: str(line_fields(ln).get("about") or "") for ln in s.get("lines") or ()}
+                        said_about = abouts.get(row["reply_to"], "")
+                    if said_about or talk_of:
+                        row["about"] = said_about or talk_of
                 row["context_summary"] = ""
                 if row["context"]:
                     from message_context import summary
