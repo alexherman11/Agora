@@ -1233,10 +1233,16 @@ a6970 · family=host · status=activation-pending
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (1)
+## source-pending (2)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
 a6838 · family=host · status=source-pending
 
 Host friction: independently added HUD playtest coverage required editing the same runner callbacks and order list, causing repeated landing conflicts. The missing extension point was discovery of one step per file. a6749 adds playtest_steps/*.py Step records (order, feature needs, press script with its existing assertions, budgets), scanned by hud_playtest.py. Existing bodies and numbers are preserved, including equal-footing from main. This is test-host structure, not new world behavior. Ran: 13 extraction/discovery/fixture-merge tests and 5 existing wheel-verdict tests pass; real browser acceptance is not run in the Codex sandbox.
+
+### Shared divider gestures need a world paint word
+
+a7107 · family=missing-word · status=source-pending
+
+a7045, staged and unlanded: the painter can carry a thing or drag a free-positioned box but cannot redistribute two shared neighbours. Missing world word: resize <prop> min <pixels> on a repeated shared frame; paired, fenced prop writes preserve world layout truth. Source foundation adds generic divider gestures, bounded minima and share dependency invalidation. Alex expanded this card to a coherent slicing-tree navigation design in c7080; that representation and whole-panel/global-edge work are NOT implemented by the divider foundation. Browser endpoint did not answer in this sandbox. Do not activate the staged divider passages as the completed navigation redesign.
