@@ -1,0 +1,9 @@
+# open-found <thing> <viewer> <layout>: a result chosen in the home base's search (a6642, lens home-search) opens in the
+# person's viewer; when the viewer already shows something (not the Conversation), it opens as a panel of its own in a
+# new column on the chat's side of the tiling (lens home-thing, shows=<thing>), so both stand side by side. The words go.
+do create $3 kind=surface title=column layout=column when ($2.viewing or "") != "" and $2.viewing != "a5080" and $2.viewing != $1
+do move $new into=$3 at=0 when ($3.pin or "right") = "left" and ($2.viewing or "") != "" and $2.viewing != "a5080" and $2.viewing != $1
+do create $new kind=note title="$1.title" role=home-panel actor=$me lens=home-thing shelf=no shows=$1 when ($2.viewing or "") != "" and $2.viewing != "a5080" and $2.viewing != $1
+do prop $3 full="" when ($3.full or "") != "" and ($2.viewing or "") != "" and $2.viewing != "a5080" and $2.viewing != $1
+do prop $2 viewing=$1 back="$2.viewing" find="" with="" when ($2.viewing or "") = "" or $2.viewing = "a5080"
+do prop $2 find="" when ($2.viewing or "") != "" and $2.viewing != "a5080"

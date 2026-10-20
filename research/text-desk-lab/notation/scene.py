@@ -43,6 +43,11 @@ the one form. The words:
                                  <title>', a chat line 'X's line in <chat>', a worker 'worker on <card>'. An id that
                                  names nothing, or in a code run, stays as written. The words and printers keep ids.
     ids                          on words: keep this text's ids as written (a Properties line, a command to copy)
+    arrows                       on a frame: Up and Down move the keyboard between the texts being written and the
+                                 presses inside it (a closed `fold float` inside opens on Down); Enter presses the one
+                                 in hand, and Enter in a text whose words are unchanged presses the first press after it
+    caret <key>|typing ...       on a text with `on edit`: Ctrl+K (Ctrl+L, Ctrl+F, /) pressed where no other text took
+                                 it, or `typing` a letter while no text has the caret, brings the caret here
     on link do <command>         a name or [[wikilink]] pressed in this part or anywhere inside it (placed lenses too):
                                  the nearest `on link` above it is sent, $value the id it opens. None above: the
                                  press goes to the part it is in, as a press on its words would
@@ -142,7 +147,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
 # double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
@@ -1186,6 +1191,29 @@ def _w_ids(node, p, val, n, env):
     node["ids"] = True
 
 
+def _w_arrows(node, p, val, n, env):
+    # a6642 (Alex, 20 Oct: a search whose results are chosen with the arrow keys and Enter): on a frame, Up and Down move
+    # the keyboard between the texts being written and the presses inside it, in the order they are drawn, a closed
+    # menu (fold float) inside it opening on Down; Enter on a press presses it, and Enter in a text whose words are
+    # unchanged presses the first press after it. The viewer's hands only: no event until something is pressed
+    if (val or "").strip():
+        raise LensRefusal(f"line {n}: `arrows` takes no words (on a frame: Up and Down move between its texts and presses); got {p!r}")
+    node["arrows"] = True
+
+
+CARET_KEYS = ("Ctrl+K", "Ctrl+L", "Ctrl+F", "/")
+
+
+def _w_caret(node, p, val, n, env):
+    # a6642 (Alex, 20 Oct: the Win tap opens the HUD, then typing starts a search): on a text being written, what brings
+    # the caret to it from anywhere on the page: a key (Ctrl+K ...) pressed while no other text took it, and `typing`,
+    # a letter typed while no text has the caret, which then lands in this one. The first such text drawn wins
+    keys = (val or "").split()
+    if not keys or any(k not in CARET_KEYS + ("typing",) for k in keys) or len(set(keys)) != len(keys):
+        raise LensRefusal(f"line {n}: `caret <{'|'.join(CARET_KEYS)}|typing> ...` (what brings the caret to this text); got {p!r}")
+    node["caret"] = keys
+
+
 def _w_picture(node, p, val, n, env):
     # 13 Oct (Alex: the design-review window needs diagrams): the words are a drawing, written as SVG, and the painter
     # draws it. The text stays the drawing's source, so a reader of the print can read and write one as any other text.
@@ -1809,6 +1837,8 @@ WORDS = {
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
     "ids": ("ids", _w_ids),
+    "arrows": ("arrows", _w_arrows),
+    "caret": ("caret <key>|typing ...", _w_caret),
     "picture": ("picture", _w_picture),
     "markdown": ("markdown [links <selection>]", _w_markdown),
     "media": ("media [player]", _w_media),
@@ -1915,7 +1945,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "tip": None, "plain": False, "peek": False, "marks": False, "ids": False, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "tip": None, "plain": False, "peek": False, "marks": False, "ids": False, "arrows": False, "caret": None, "picture": False, "markdown": False, "media": False, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1946,7 +1976,9 @@ def parse(src, roles=None, style=None):
     for k in every:
         k["src"] = f"{k['name']} : " + ", ".join(k["words"])     # one spelling of the part's own words, whichever form it was written in
         _check_part(k, k["line"])          # after every line, since a part's words may follow its children
-        for wd in ("gap", "scroll", "fold", "measure"):
+        if k["caret"] and (k["text"] is None or not any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `caret` brings the caret to a text being written: this part has no `on edit`")
+        for wd in ("gap", "scroll", "fold", "measure", "arrows"):
             if k[wd] not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
         for wd in ("wrap", "lines", "hint", "commit", "light", "live"):
@@ -2533,6 +2565,10 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append(f'hint "{n["hint"]}"')
         if n.get("tip"):                  # a6271: an icon has no words of its own; its tip is what it says it is
             bits.append("tip " + " ".join(f'"{t}"' for t in n["tip"]))
+        if n.get("arrows"):
+            bits.append("arrows")
+        if n.get("caret"):
+            bits.append("caret " + " ".join(n["caret"]))
         if n.get("peek"):
             bits.append("peek" + (f" {n['peek']}" if type(n["peek"]) is int else ""))
         if n.get("picture"):
@@ -2735,6 +2771,8 @@ def emit(node):
         for k in ("tracks", "gap", "scroll", "measure"):
             if node.get(k) is not None:
                 paint[k] = node[k]
+        if node.get("arrows"):
+            paint["arrows"] = True
         if node.get("fold"):
             paint["fold"] = {"folded": not node.get("fold_open"), "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
             if node.get("fold_float"):
@@ -2787,6 +2825,8 @@ def emit(node):
             paint["commit"] = node.get("commit") or ("enter" if (not node.get("lines") or mx == 1) else "ctrl-enter")
             if node.get("commit_only"):
                 paint["commit_only"] = True
+            if node.get("caret"):
+                paint["caret"] = list(node["caret"])
         if "click" in ons:
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:
