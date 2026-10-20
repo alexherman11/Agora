@@ -1,119 +1,212 @@
-"""landing_bench (a5288): how long ten small landings take, on a throwaway clone, with this branch's landing or main's.
+"""Ten real Git landings on isolated current-main source, before/after this patch.
 
-    python landing_bench.py before|after together|staggered [--broken]
+python landing_bench.py before|after [--fixture] [--broken] [--keep]
 
-A clone of this repository in a temporary folder stands in for the live checkout, beside a copy of this worktree's
-world (sessions/frontier-try.pickle, as frontier). Ten branches each add one comment line to a different lab file, as
-a small change does; with --broken, the third (kinds.py) instead makes kinds.is_lens say no to every note (a real
-break: lenses stop compiling and test_kinds fails). Main is judged once first, untimed, as the last landing leaves it judged.
-
-  before     main's landing.py and health.py (one landing at a time, health one check after another), with only
-             the hand/parked name fix, so that main's test_landing_queue does not fail on its own collision
-  after      this branch's: the queue and its batches, health's checks at once, nearest the change first, fail-fast
-  together   the ten are asked at once (ten cards set ready in one pass)
-  staggered  one every 20 s
-
-Each landing runs as `python landing.py <branch>` in its own process, as a builder or the house runs it. Prints each
-landing's answer and when it came, the number of health runs, and the total; the clone is removed after.
+Default runs real health beside a tool-made copy of frontier-try (needs a
+browser-capable environment). --fixture substitutes 24 subprocess checks,
+identical on both sides: scheduling evidence, NOT real-suite acceptance.
+No shared Git writes, models, host queries or services.
 """
+import argparse
+import io
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
-from pathlib import Path
+import uuid
+import zipfile
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
 NOTATION = "research/text-desk-lab/notation"
-FILES = ["rooms.py", "style.py", "kinds.py", "scene.py", "door.py", "deskd.py", "world.py", "helpnotes.py", "store.py",
-         "promises.py"]
+OVERLAY = ("landing.py", "health.py", "test_landing_queue.py",
+           "test_landing_wait.py", "test_health_runner.py",
+           "test_landing_return.py", "test_house_merge.py")
 
 
 def git(*args, cwd):
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
     if r.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {r.stderr or r.stdout}")
     return r.stdout.strip()
 
 
-def main(argv):
-    which, when = argv[0], argv[1]
-    broken = "--broken" in argv
-    repo = Path(git("rev-parse", "--show-toplevel", cwd=HERE))
-    tmp = Path(tempfile.mkdtemp(prefix="landing-bench-"))
+FIXTURE = '''import json, os, pathlib, subprocess, sys, time
+here = pathlib.Path(__file__).resolve().parent
+keys = ["test_broken"] + ["test_fixture_" + str(i) for i in range(23)]
+only = sys.argv[sys.argv.index("--only")+1].split(",") if "--only" in sys.argv else []
+checks = [(k, [k + ".py"], 300, "room tests") for k in keys if not only or k in only]
+start = time.perf_counter()
+if (here / "bench_parallel").exists():
+    from bench_health_original import run_scripts
+    result, stopped = run_scripts(checks, 4, {"test_broken": 0}, "--fail-fast" in sys.argv)
+else:
+    result, stopped = {}, False
+    for k, args, timeout, group in checks:
+        r = subprocess.run([sys.executable, *args], capture_output=True, text=True)
+        result[k] = (r.returncode, r.stdout + r.stderr, 0)
+bad = [k for k, (code, out, secs) in result.items() if code]
+partial = bool(only) or stopped
+data = {"ok": not bad, "failed": [k + ": BROKEN fixture" for k in bad],
+        "failed_checks": bad, "lenses_ok": ["fixture"] if not partial else [],
+        "ran": list(result), "partial": partial, "stopped": stopped,
+        "seconds": {"total": round(time.perf_counter()-start, 3)}}
+with open(os.environ["LANDING_BENCH_RECORD"], "a") as f:
+    f.write(json.dumps(data) + "\\n")
+print(json.dumps(data))
+'''
+CALLER = '''import json, pathlib, sys, landing
+pathlib.Path(sys.argv[2]).write_text("ready")
+r = landing.land([sys.argv[1]], world=sys.argv[3], who="bench")
+print(json.dumps(r))
+'''
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("which", choices=("before", "after"))
+    parser.add_argument("--fixture", action="store_true")
+    parser.add_argument("--broken", action="store_true")
+    parser.add_argument("--keep", action="store_true")
+    opts = parser.parse_args()
+    baseline = git("rev-parse", "main", cwd=ROOT)
+    # Frozen-print basenames are long; leave room below Windows MAX_PATH.
+    tmp = ROOT / ".worktrees" / ("lb-" + uuid.uuid4().hex[:12])
     live, room = tmp / "live", tmp / "room"
-    env = {**os.environ, "LANDING_LIVE": str(live), "LANDING_ROOM": str(room), "DESKD": "off"}
+    os.makedirs(live)
+    scratch = room / "research/window-lab/.tmp-agora"
+    env = {**os.environ, "LANDING_LIVE": str(live), "LANDING_ROOM": str(room), "DESKD": "off",
+           "LANDING_BENCH_RECORD": str(tmp / "judgements.jsonl"),
+           **{k: str(scratch) for k in ("AGORA_TMP", "TMP", "TEMP", "TMPDIR")}}
+    procs = []
     try:
-        git("clone", "-q", "--shared", str(repo), str(live), cwd=tmp)
-        git("checkout", "-q", "-B", "main", git("rev-parse", "HEAD", cwd=repo), cwd=live)
-        git("config", "user.email", "bench@example.com", cwd=live)
-        git("config", "user.name", "bench", cwd=live)
+        raw = subprocess.check_output(["git", "archive", "--format=zip", baseline], cwd=ROOT)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            for entry in archive.infolist():
+                path = Path(entry.filename)
+                if entry.is_dir() or path.name.startswith(".env"):
+                    continue
+                out = live / path
+                os.makedirs(out.parent, exist_ok=True)
+                out.write_bytes(archive.read(entry))
         lab = live / NOTATION
-        if which == "before":
-            for f in ("landing.py", "health.py", "test_landing_queue.py", "test_landing_wait.py"):
-                (lab / f).write_text(git("show", f"main:{NOTATION}/{f}", cwd=repo) + "\n", encoding="utf-8")
-            src = (lab / "landing.py").read_text(encoding="utf-8")
-            stamp = 'stamp = time.strftime("%Y%m%d-%H%M%S")'
-            assert stamp in src
-            (lab / "landing.py").write_text(src.replace(stamp, stamp + ' + f"-{time.time_ns() % 1000000}"'), encoding="utf-8")
-            git("commit", "-q", "-am", "bench: main's landing and health", cwd=live)
-        branches = []
-        for k, f in enumerate(FILES):
-            b = f"bench/{k}-{Path(f).stem}"
-            git("checkout", "-q", "-b", b, "main", cwd=live)
-            p = lab / f
-            if broken and f == "kinds.py":
-                p.write_text(p.read_text(encoding="utf-8") + "\n\ndef is_lens(s):          # bench: a real break\n"
-                             "    return False\n", encoding="utf-8")
+        if opts.which == "after":
+            for name in OVERLAY:
+                (lab / name).write_bytes((HERE / name).read_bytes())
+        if opts.fixture:
+            (lab / "bench_health_original.py").write_bytes((lab / "health.py").read_bytes())
+            if opts.which == "after":
+                (lab / "bench_parallel").write_text("fixture scheduler")
+            (lab / "health.py").write_text(FIXTURE, encoding="utf-8")
+            for key in ["test_broken"] + ["test_fixture_" + str(i) for i in range(23)]:
+                (lab / (key + ".py")).write_text(
+                    "import pathlib, sys, time\ntime.sleep(.05)\n"
+                    "bad = pathlib.Path('BROKEN').exists() and " + repr(key == "test_broken") + "\n"
+                    "print('FAIL BROKEN fixture' if bad else 'all passed')\nsys.exit(int(bad))\n")
+        with (live / ".gitignore").open("a") as f:
+            f.write("\nhouse-state-bench.jsonl\nresearch/window-lab/.tmp-agora/\n")
+        git("init", "-q", "-b", "main", cwd=live)
+        git("config", "user.email", "bench@example.invalid", cwd=live)
+        git("config", "user.name", "landing fixture", cwd=live)
+        git("config", "core.autocrlf", "false", cwd=live)
+        git("add", "-A", cwd=live)
+        git("commit", "-q", "-m", "isolated landing benchmark", cwd=live)
+        for k in range(10):
+            git("checkout", "-q", "-b", f"bench/{k}", "main", cwd=live)
+            if opts.broken and k == 2 and not opts.fixture:
+                p = lab / "kinds.py"
+                p.write_text(p.read_text(encoding="utf-8") + "\ndef is_lens(s):\n    return False\n", encoding="utf-8")
             else:
-                p.write_text(p.read_text(encoding="utf-8") + f"\n# bench {k}: a small change\n", encoding="utf-8")
-            git("commit", "-q", "-am", f"bench {k}", cwd=live)
+                (lab / ("BROKEN" if opts.broken and k == 2 else f"bench{k}.txt")).write_text(f"change {k}\n")
+            git("add", "-A", cwd=live)
+            git("commit", "-q", "-m", f"small change {k}", cwd=live)
             git("checkout", "-q", "main", cwd=live)
-            branches.append(b)
-        # after the branches: sessions/frontier.pickle is tracked (an old one), and a copy made before went into one
-        (lab / "sessions").mkdir(exist_ok=True)
-        for ext in (".pickle", ".log.jsonl"):
-            if (HERE / "sessions" / f"frontier-try{ext}").exists():
-                shutil.copyfile(HERE / "sessions" / f"frontier-try{ext}", lab / "sessions" / f"frontier{ext}")
-        (lab / "house-state").mkdir(exist_ok=True)
-        t0 = time.time()
-        prime = ("import landing; k = landing._kept(); b = landing.git('rev-parse', 'HEAD', cwd=landing.LIVE).stdout.strip(); "
-                 "landing.room_at(b); h = landing.judged('frontier', b, k); landing._keep(k); print(h.get('ok'), h.get('failed'))")
-        r = subprocess.run([sys.executable, "-c", prime], cwd=lab, env=env, capture_output=True, text=True, timeout=1800)
-        print(f"main judged first (untimed): {r.stdout.strip()[-300:]} {r.stderr.strip()[-300:]} ({time.time() - t0:.0f} s)")
-        procs, start = [], time.time()
-        for k, b in enumerate(branches):
-            if when == "staggered" and k:
-                time.sleep(max(0.0, start + 20 * k - time.time()))
-            procs.append((b, time.time(), subprocess.Popen([sys.executable, "landing.py", b, "--as", f"bench-{k}"], cwd=lab,
-                                                            env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                                            text=True, encoding="utf-8", errors="replace")))
-        ends = {}
-        while len(ends) < len(procs):
-            for b, asked, p in procs:
-                if b not in ends and p.poll() is not None:
-                    ends[b] = (time.time(), p.stdout.read())
-            time.sleep(0.2)
-        total = max(t for t, _ in ends.values()) - start
-        for b, asked, p in procs:
-            t, out = ends[b]
-            said = " | ".join(l for l in out.strip().splitlines() if l.startswith(("landed", "not landed", "judged in")))
-            print(f"{b}: asked at {asked - start:5.0f} s, answered at {t - start:5.0f} s (waited {t - asked:4.0f} s): {said[:300]}")
-        logf = lab / "house-state" / "landing-log.jsonl"
-        for line in (logf.read_text(encoding="utf-8").splitlines() if logf.exists() else []):
-            print("  log", line[:400])
-        kept = json.loads((lab / "house-state" / "landing.json").read_text(encoding="utf-8"))
-        runs = len(kept.get("health", {}))
-        landed = sum(len(x["branches"]) for x in kept.get("landed", []))
-        print(f"{which} {when}{' broken' if broken else ''}: {landed} landed, {runs - 1} whole health runs kept after "
-              f"main's (stopped and some-checks-only runs are not kept), total {total:.0f} s")
+        world = "fixture" if opts.fixture else "frontier-try"
+        if not opts.fixture:
+            import landing
+            old_live = landing.LIVE
+            landing.LIVE = ROOT
+            try:
+                landing.copy_world(world, lab)
+            finally:
+                landing.LIVE = old_live
+        prime = ("import landing; k=landing._kept(); "
+                 "b=landing.git('rev-parse','HEAD',cwd=landing.LIVE).stdout.strip(); "
+                 "landing.room_at(b); h=landing.judged(" + repr(world) + ",b,k); "
+                 "landing._keep(k); print(h)")
+        os.makedirs(lab / "house-state", exist_ok=True)
+        r = subprocess.run([sys.executable, "-c", prime], cwd=lab, env=env,
+                           capture_output=True, text=True, timeout=1800)
+        if r.returncode:
+            raise RuntimeError("baseline judge failed to report: " + (r.stderr or r.stdout)[-1500:])
+        print("baseline judgement:", r.stdout[-1500:], flush=True)
+        state, start = lab / "house-state", time.perf_counter()
+        lock = state / "landing.lock"
+        lock.write_text(str(os.getpid()))  # our fixture gate, never a live/shared lock
+        for k in range(10):
+            procs.append(subprocess.Popen(
+                [sys.executable, "-c", CALLER, f"bench/{k}", str(tmp / f"caller-{k}"), world],
+                cwd=lab, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8"))
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            markers = len(list(tmp.glob("caller-*")))
+            queued = 0
+            if markers == 10 and opts.which == "after":
+                # Use the queue's own short lock; an external file reader can
+                # interfere with Windows atomic replacement.
+                q = subprocess.run(
+                    [sys.executable, "-c", "import landing; print(landing._queue(lambda q: len(q['waiting'])))"],
+                    cwd=lab, env=env, capture_output=True, text=True, timeout=30)
+                if q.returncode:
+                    raise RuntimeError("fixture queue receipt unavailable: " + q.stderr[-500:])
+                queued = int(q.stdout.strip())
+            if markers == 10 and (opts.which == "before" or queued == 10):
+                break
+            time.sleep(.05)
+        else:
+            raise RuntimeError("fixture callers did not reach gate")
+        lock.unlink()
+        answers = []
+        for p in procs:
+            out, err = p.communicate(timeout=1800)
+            if p.returncode:
+                raise RuntimeError("caller failed: " + (err or out)[-1000:])
+            answers.append(json.loads(out.splitlines()[-1]))
+        total = round(time.perf_counter() - start, 3)
+        kept = json.loads((state / "landing.json").read_text())
+        records = tmp / "judgements.jsonl"
+        judges = [json.loads(l) for l in records.read_text().splitlines()] if records.exists() else []
+        full = [j for j in judges if not j["partial"]]
+        landed = sum(len(r["landed"]) for r in answers)
+        refused = [item for r in answers for item in r["refused"]]
+        if opts.fixture:
+            required = {"test_broken"} | {"test_fixture_" + str(i) for i in range(23)}
+            assert full and len(full) == len(kept["health"]), "missing fixture judgement evidence"
+            assert all(set(j["ran"]) == required for j in full), "incomplete full fixture judgement"
+            assert all(any(key.split(":")[-1].startswith(entry["head"]) for key in kept["health"])
+                       for entry in kept["landed"]), "main advanced without kept full judgement"
+            assert landed == (9 if opts.broken else 10), (landed, refused)
+            assert len(refused) == int(opts.broken), refused
+        print(json.dumps({
+            "mode": opts.which, "baseline": baseline, "fixture": opts.fixture, "broken": opts.broken,
+            "seconds": total, "landed": landed, "refused": refused,
+            "full_judgements_after_prime": len(full)-1 if opts.fixture else len(kept.get("health", {}))-1,
+            "partial_judgements": sum(j["partial"] for j in judges),
+            "all_full_fixture_judges_ran_24_checks": bool(opts.fixture),
+            "repository": str(live),
+        }), flush=True)
     finally:
-        subprocess.run(["git", "worktree", "prune"], cwd=live, capture_output=True)
-        shutil.rmtree(tmp, ignore_errors=True)
+        for p in procs:
+            if p.poll() is None:
+                p.kill()
+                p.wait()
+        if not opts.keep:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8")
-    main(sys.argv[1:])
+    main()

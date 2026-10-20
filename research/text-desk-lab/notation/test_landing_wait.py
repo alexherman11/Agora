@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_landing_wait: a commission's landing never waits on anyone's uncommitted edits, and what it comes to is said
 once (landing.py, Alex 14 Oct: "uncommitted changes not blocking new code arriving"; before: a4644, Pike c4717).
 
@@ -19,7 +20,9 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
+import atexit
+import shutil
+from types import SimpleNamespace
 import uuid
 from pathlib import Path
 
@@ -27,7 +30,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 NOTATION = "research/text-desk-lab/notation"
-tmp = tempfile.TemporaryDirectory()
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+tmp = SimpleNamespace(name=agora_tmp.directory("lw-"))
+atexit.register(shutil.rmtree, tmp.name, ignore_errors=True)
 REPO = Path(tmp.name) / "live"
 os.environ["LANDING_LIVE"] = str(REPO)
 os.environ["LANDING_ROOM"] = str(Path(tmp.name) / "room")
@@ -71,6 +77,7 @@ def say(me, *lines):
 
 class House:
     world = "roomworld-inmemory"
+    dir = Path(tmp.name) / "house-state"      # a5292: step 6's pass meets step 3's reverted card and returns it
 
     def load(self):
         return W
@@ -94,6 +101,9 @@ class Wk:
 
     def send(self, text):
         self.heard.append(text)
+
+    def alive(self):                # a5292: a refused landing tells a worker that is running (test_landing_return)
+        return True
 
 
 ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}

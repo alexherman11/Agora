@@ -1,3 +1,4 @@
+# health: room test
 """test_landing_queue: code reaches main only judged, and uncommitted edits never stop it (landing.py, Alex 14 Oct:
 "main should only be good working code ... uncommitted changes not blocking new code arriving ... minimal clobbering").
 
@@ -25,8 +26,11 @@ Builders' branches are made beside it, and someone's uncommitted edits are left 
 import os
 import subprocess
 import sys
-import tempfile
+import atexit
+import shutil
 from pathlib import Path
+from unittest.mock import patch
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 NOTATION = "research/text-desk-lab/notation"
@@ -39,7 +43,10 @@ def check(name, ok, detail=""):
         fails.append(name)
 
 
-TMP = Path(tempfile.mkdtemp(prefix="landing-queue-"))
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+TMP = Path(agora_tmp.directory("lq-"))
+atexit.register(shutil.rmtree, TMP, ignore_errors=True)
 LIVE = TMP / "live"
 os.environ["LANDING_LIVE"] = str(LIVE)
 os.environ["LANDING_ROOM"] = str(TMP / "room")
@@ -267,6 +274,8 @@ landing._unlock(got)
 
 # 14 (a5245's landing failed on 'hand/codex-20261015-133134 already exists': 11 and 12 above in one second)
 import threading   # noqa: E402
+fixed_second = patch.object(landing.time, "strftime", return_value="20261020-160000")
+fixed_second.start()
 (n / "deskd.py").write_text(text("deskd.py") + "line fourteen\n", encoding="utf-8")
 same = [landing.hand([str(n / "deskd.py")], who="codex") for _ in range(3)]
 got, errs = [], []
@@ -284,6 +293,7 @@ for t in ts:
     t.start()
 for t in ts:
     t.join()
+fixed_second.stop()
 check("14. hand branches made by one actor in one second, in turn and at once, each get a name of their own",
       len(set(same + got)) == 7 and not errs and all(x.startswith("hand/codex-") for x in same + got), (same, got, errs))
 for x in same + got:
@@ -338,6 +348,35 @@ r = landing.land([b], who="worker-a17")
 check("17. a run stopped at a failure refuses the branch, and is never kept as that commit's health",
       not r["landed"] and "BROKEN is here" in r["refused"][0][1] and head() == was
       and not any("BROKEN is here" in (v.get("failed") or []) for v in landing._kept()["health"].values()), r)
+
+# An accidentally successful partial receipt must never move main, even if all
+# the checks it did run passed.
+was = head()
+b = branch("worker/partial", {"partial.txt": "must not land\n"})
+with patch.object(landing, "health", return_value={
+        "ok": True, "failed": [], "lenses_ok": ["notes", "board"],
+        "partial": True, "ran": ["python"], "text": "incomplete fixture"}):
+    r = landing.land([b], who="fixture")
+check("18. an incomplete successful health receipt cannot advance main",
+      head() == was and not r["landed"] and any("incomplete" in why for _, why in r["refused"]), r)
+
+receipt = '{"ok": true, "failed": [], "lenses_ok": []}'
+with patch.object(landing.subprocess, "run", return_value=SimpleNamespace(
+        stdout=receipt, stderr="", returncode=1)):
+    h = landing.health("fixture", landing.ROOM / NOTATION)
+check("19. nonzero health exit cannot be overridden by an ok JSON receipt",
+      not h["ok"] and any("exited 1" in x for x in h["failed"]), h)
+
+kept, worlds = {}, []
+def fake_health(world, cwd, **how):
+    worlds.append(world)
+    return {"ok": True, "failed": [], "lenses_ok": [], "text": ""}
+with patch.object(landing, "health", side_effect=fake_health), patch.object(landing, "copy_world"):
+    landing.judged("copy-one", was, kept)
+    landing.judged("copy-two", was, kept)
+    landing.judged("copy-one", was, kept)
+check("20. cached health never substitutes a different world at the same commit",
+      worlds == ["copy-one", "copy-two"], worlds)
 
 print(landing.status())
 print(f"{len(fails)} failed" if fails else "all passed")

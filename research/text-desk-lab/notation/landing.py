@@ -191,13 +191,25 @@ def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
         args += ["--only", ",".join(only)]
     if fail_fast:
         args += ["--fail-fast"] + (["--excuse", ",".join(excuse)] if excuse else [])
+    # The judge is another worktree: do not inherit a builder's AGORA_TMP
+    # pointing outside it (agora_tmp correctly refuses that).
+    scratch = Path(cwd).resolve().parents[2] / "research/window-lab/.tmp-agora"
+    os.makedirs(scratch, exist_ok=True)
+    env = {**os.environ, "DESKD": "off", **{key: str(scratch) for key in ("AGORA_TMP", "TMP", "TEMP", "TMPDIR")}}
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=1200, env={**os.environ, "DESKD": "off"})
+                       encoding="utf-8", errors="replace", timeout=1200, env=env)
     lines = (r.stdout or "").strip().splitlines()
     try:
         data = json.loads(lines[-1])
+        if not isinstance(data, dict) or not isinstance(data.get("ok"), bool) or not isinstance(data.get("failed"), list):
+            raise ValueError("invalid health receipt")
     except (IndexError, ValueError):
         data = {"ok": False, "lenses_ok": [], "failed": [f"health.py did not report: {(r.stderr or r.stdout)[-300:]}"]}
+    if r.returncode and data.get("ok"):
+        data = {**data, "ok": False, "failed": data["failed"] + [f"health.py exited {r.returncode} despite ok receipt"]}
+    # A diagnostic selection never becomes proof of the whole checkout, even
+    # when an older health script does not understand/report the new flags.
+    data["partial"] = bool(only) or bool(data.get("partial")) or bool(data.get("stopped"))
     data["text"] = "\n".join(lines[:-1])
     return data
 
@@ -216,16 +228,18 @@ def log(what, **said):
 def judged(world, sha, kept, **how):
     """Health of commit `sha` (the room is at it), from what is kept or by running it. Only a whole run is kept: one
     stopped at a failure, or run for some checks only (`how`, health's options), judges this landing and no other."""
-    if sha in kept.get("health", {}):
-        return kept["health"][sha]
+    key = f"{world}:{sha}"
+    if key in kept.get("health", {}):
+        return kept["health"][key]
     copy_world(world, ROOM / NOTATION)
     t0 = time.time()
     h = health(world, ROOM / NOTATION, **how)
     log("health", sha=sha[:7], how={k: v for k, v in how.items() if k != "changed"}, seconds=round(time.time() - t0, 1),
         ok=h.get("ok"), stopped=h.get("stopped"), failed=(h.get("failed") or [])[:4])
-    if not h.get("partial"):
-        kept.setdefault("health", {})[sha] = {k: h.get(k) for k in ("ok", "lenses_ok", "failed", "failed_checks", "text",
-                                                                    "seconds")}
+    h["partial"] = bool(how.get("only")) or bool(h.get("partial")) or bool(h.get("stopped"))
+    if not h["partial"]:
+        kept.setdefault("health", {})[key] = {k: h.get(k) for k in ("ok", "world_at", "lenses_ok", "failed",
+                                                                "failed_checks", "text", "seconds")}
         while len(kept["health"]) > 40:
             kept["health"].pop(next(iter(kept["health"])))
     return h
@@ -384,7 +398,8 @@ def reapply(theirs, base):
     """Put each parked edit back on top of the new main: a three-way merge of main's new file, the file as main had it
     when the edit was made (`base`), and the edit. Clean: the writer finds their edit where they left it, now over the
     landing. A conflict leaves main's file, and the edit stays on its parked branch. -> paths that conflicted."""
-    import tempfile
+    sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+    import agora_tmp
     conflicts = []
     for p, mine in theirs.items():
         now = (LIVE / p).read_bytes() if (LIVE / p).is_file() else None
@@ -392,12 +407,15 @@ def reapply(theirs, base):
         if mine is None or now is None or was.returncode:
             conflicts.append(p)        # made or removed on one side: no common ground to merge on
             continue
-        with tempfile.TemporaryDirectory() as d:
-            fa, fb, fc = (Path(d) / n for n in ("now", "was", "mine"))
+        d = Path(agora_tmp.directory("landing-reapply-"))
+        try:
+            fa, fb, fc = (d / n for n in ("now", "was", "mine"))
             fa.write_bytes(now)
             fb.write_bytes(subprocess.run(["git", "show", f"{base}:{p}"], cwd=LIVE, capture_output=True).stdout)
             fc.write_bytes(mine)
             m = subprocess.run(["git", "merge-file", "-p", str(fa), str(fb), str(fc)], capture_output=True)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
         if m.returncode == 0:
             (LIVE / p).write_bytes(m.stdout)
         else:
@@ -474,8 +492,8 @@ def _serve():
     def answer(q):
         q["waiting"] = [e for e in q["waiting"] if e["id"] not in answers]
         q["done"].update(answers)
-        while len(q["done"]) > 100:          # an asker that died never reads its answer
-            q["done"].pop(next(iter(q["done"])))
+        # Only the caller consumes its receipt. Dropping an unread answer to
+        # cap this map would leave a slow live caller waiting forever.
     _queue(answer)
 
 
@@ -559,7 +577,7 @@ def _land(branches, world, who, why, depth):
         # a5288: the checks nearest what changed start first, and the run stops at the first failure main did not
         # already have (main's own health is kept: it is the last landing's), so a broken branch costs seconds, not
         # a whole health. A run that is not stopped is the whole of health, which is what lets main move
-        known = kept.get("health", {}).get(base)
+        known = kept.get("health", {}).get(f"{world}:{base}")
         after = judged(world, sha, kept, changed=changed, fail_fast=True,
                        excuse=(known or {}).get("failed_checks") or ())
         # 14 Oct (Codex e9993: a5062 judged again and again from 16:42 while main moved by hand under it): main alone is
@@ -572,12 +590,14 @@ def _land(branches, world, who, why, depth):
                 before = judged(world, base, kept)
             else:
                 before = known
-            if after.get("stopped") and not faults(before, after):
+            if after.get("partial") and not faults(before, after):
                 # it stopped at a failure main has too (main's health was not kept when this began): judge it whole
                 room_at(sha)
                 after = judged(world, sha, kept, changed=changed)
         _keep(kept)
         bad = faults(before, after)
+        if after.get("partial") and not bad:
+            bad = ["health is incomplete; main cannot advance"]
         if bad:
             if len(merged) == 1:
                 out["refused"].append((merged[0], "judged and not landed: " + "; ".join(bad)[:1500]))

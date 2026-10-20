@@ -3,8 +3,8 @@
     python health.py <world> [--json] [--jobs N] [--changed <path>,<path>] [--fail-fast [--excuse <check>,...]]
                      [--only <check>,...]
 
-The script checks run N at once (default half this machine's processors, at most 8; --jobs 1 runs them one after
-another). --changed names what a change touched: the checks it can reach start first (affected()). --fail-fast stops
+The script checks run N at once (default half this machine's processors, at most 4; --jobs 1 runs them one after
+another; test_door and test_visit each run alone). --changed names what a change touched: the checks it can reach start first (affected()). --fail-fast stops
 the run at the first failing check not named in --excuse (a landing names those already failing on main), so a broken
 change costs seconds; a stopped run says so ("stopped" in --json) and is never a full judgement. --only runs just the
 named checks (keys as in "failed_checks"), with the compiling they need: how a landing finds which branch of several
@@ -13,10 +13,8 @@ broke a check. Every run without --only and not stopped runs every check below.
 Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
   - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
-  - the rooms tests pass (test_room_verbs, test_room_look, test_room_reads, test_blanks, test_prop_fields,
-    test_house_words, test_house_cols, test_persons, test_persons_stored, test_lines, test_help_notes, test_promises,
-    test_lived, test_rules, test_lanes, test_bound_words, test_calls, test_sayings, test_due_any), each on a small world it builds itself (roomworld.py), so a failure is
-    the code's and not today's world's
+  - the rooms tests pass: every test_*.py with '# health: room test' among its first
+    ten lines, each on a small world it builds itself (roomworld.py)
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - test_visit.py passes (a3204): `visit` and `home` through a real door, a version killed, one line written home
   - calm.style and every style note in <world> read by the one style reader (style.py; 8 Oct: the painter is handed
@@ -28,8 +26,8 @@ Checks, from this checkout:
     verb has a note, each names the arguments the code takes and shows none it doesn't. Each problem is a failed entry
     beginning "help note: "; the house excuses one that was there before the landing
 
-Prints one line per check, each ending in the seconds it took, then a total line; with --json, a last line
-{"ok": bool, "lenses_ok": [...], "failed": [...], "seconds": {check: s, ..., "total": s}}.
+Prints the world's event first, then one line per check and a total; --json adds
+ok, world_at, lenses_ok, failed, failed_checks, ran, partial, stopped and seconds.
 It reads the world under the desk's lock and never writes it.
 """
 import json
@@ -42,49 +40,35 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-ROOM_TESTS = (
-    # one a line (14 Oct): every builder adds here, and one long line made every two branches conflict
-    "test_room_verbs.py",
-    "test_room_look.py",
-    "test_room_reads.py",
-    "test_blanks.py",
-    "test_prop_fields.py",
-    "test_house_words.py",
-    "test_house_cols.py",
-    "test_persons.py",
-    "test_persons_stored.py",
-    "test_lines.py",
-    "test_kinds.py",
-    "test_help_notes.py",
-    "test_promises.py",
-    "test_lived.py",
-    "test_rules.py",
-    "test_lanes.py",
-    "test_bound_words.py",
-    "test_rule_bound.py",
-    "test_calls.py",
-    "test_sayings.py",
-    "test_due_any.py",
-    "test_kept.py",
-    "test_queries.py",
-    "test_table.py",
-    "test_house_verbs.py",
-    "test_nearest.py",
-    "test_reach.py",
-    "test_wake_fold.py",
-    "test_settled.py",
-    "test_comment_reply.py",
-    "test_design_talk.py",
-    "test_landing_wait.py",
-    "test_worker_pool.py",
-    "test_landing_queue.py",
-    "test_witnessed.py",
-    "test_bench_talk.py",
-    "test_builder_asks.py",
-    "test_line_waits.py",
-    "test_captures.py",
-)
+ROOM_MARK = "# health: room test"
+
+
+def room_tests(folder=HERE):
+    """a5296 (a5261 point 4: ROOM_TESTS, one list every builder added to, conflicted three times on 14 Oct): a rooms test
+    says so itself, with ROOM_MARK as a line among its first ten, so adding one is a new file and never a shared line."""
+    out = []
+    for p in sorted(folder.glob("test_*.py")):
+        try:
+            with p.open(encoding="utf-8") as f:
+                head = [next(f, "") for _ in range(10)]
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(l.startswith(ROOM_MARK) for l in head):
+            out.append(p.name)
+    return tuple(out)
+
+
+ROOM_TESTS = room_tests()
 HELP_FAIL = "help note: "      # each help problem's failed entry starts so; the house excuses one it had before a landing
+
+
+def world_at(world):
+    """a5296 (a5261 point 5: a worker's numbers were from a copy nobody could date): the event <world> was at, which
+    every number below is taken at. -> 'e10330 (2026-10-15T09:12:03), 10330 events', or why it could not be read."""
+    import export_docs
+    w = export_docs.load(world).world
+    last = w.events[-1] if w.events else {}
+    return f"{last.get('id', 'no event')} ({last.get('at', last.get('day', '?'))}), {len(w.events)} events"
 
 
 def check_help(world):
@@ -99,7 +83,7 @@ def check_help(world):
 
 def check_python():
     bad = []
-    for p in sorted(HERE.glob("*.py")) + sorted((HERE / "suite").glob("*.py")):
+    for p in sorted(HERE.glob("*.py")) + sorted((HERE / "suite").glob("*.py")) + sorted((HERE / "sources").glob("*.py")):
         try:
             compile(p.read_text(encoding="utf-8"), str(p), "exec")      # parse only: nothing is written
         except (SyntaxError, ValueError) as e:
@@ -165,6 +149,9 @@ def script_checks():
 
 
 SLOW = ("test_visit", "test_door", "test_store", "test_landing_queue", "test_captures")   # started first: the run ends sooner
+# These timer-sensitive integration checks run alone. Parallelism changes scheduling,
+# never their assertions, timeouts or verdicts; an intermittent failure still refuses.
+QUIET = ("test_door", "test_visit")
 
 
 def verdict(key, group, code, out):
@@ -266,27 +253,42 @@ def run_scripts(checks, jobs, first=(), fail_fast=False, excuse=()):
     results, running, lock, stop = {}, {}, threading.Lock(), threading.Event()
     todo = list(order)
 
+    def allowed(c):
+        if c[0] in QUIET:
+            return not running
+        return not any(k in QUIET for k in running)
+
     def worker():
         while not stop.is_set():
             with lock:
                 if not todo:
                     return
-                key, args, timeout, group = todo.pop(0)
+                pick = next((c for c in todo if allowed(c)), None)
+                if pick is not None:
+                    todo.remove(pick)
+                    running[pick[0]] = None          # its place is held until its process starts
+            if pick is None:
+                time.sleep(0.05)
+                continue
+            key, args, timeout, group = pick
             t0 = time.perf_counter()
-            p = subprocess.Popen([sys.executable] + args, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True, encoding="utf-8", errors="replace", env={**shutil.os.environ, "DESKD": "off"},
-                                 start_new_session=sys.platform != "win32")
-            with lock:
-                running[key] = p
-            if stop.is_set():
-                kill_tree(p)
             try:
-                out, _ = p.communicate(timeout=timeout)
-                code = p.returncode
-            except subprocess.TimeoutExpired:
-                kill_tree(p)
-                out = (p.communicate()[0] or "") + f"\ntimed out after {timeout} s"
-                code = -1
+                p = subprocess.Popen([sys.executable] + args, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace", env={**os.environ, "DESKD": "off"},
+                                     start_new_session=sys.platform != "win32")
+                with lock:
+                    running[key] = p
+                if stop.is_set():
+                    kill_tree(p)
+                try:
+                    out, _ = p.communicate(timeout=timeout)
+                    code = p.returncode
+                except subprocess.TimeoutExpired:
+                    kill_tree(p)
+                    out = (p.communicate()[0] or "") + f"\ntimed out after {timeout} s"
+                    code = -1
+            except Exception as exc:
+                code, out = -1, f"{type(exc).__name__}: {exc}"
             with lock:
                 running.pop(key, None)
                 if stop.is_set() and code:
@@ -296,7 +298,8 @@ def run_scripts(checks, jobs, first=(), fail_fast=False, excuse=()):
                 if fail_fast and failed and key not in excuse and not stop.is_set():
                     stop.set()
                     for q in list(running.values()):
-                        kill_tree(q)
+                        if q is not None:
+                            kill_tree(q)
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(max(1, jobs))]
     for t in threads:
         t.start()
@@ -333,7 +336,9 @@ def opt_list(name):
 def main():
     world = next((a for a in sys.argv[1:] if not a.startswith("--")
                   and sys.argv[sys.argv.index(a) - 1] not in ("--jobs", "--changed", "--only", "--excuse")), "frontier")
-    jobs = int(opt_list("--jobs")[0]) if opt_list("--jobs") else min(8, max(1, (os.cpu_count() or 2) // 2))
+    jobs = int(opt_list("--jobs")[0]) if opt_list("--jobs") else min(4, max(1, (os.cpu_count() or 2) // 2))
+    if jobs < 1:
+        raise SystemExit("--jobs must be positive")
     only = set(opt_list("--only"))         # a5288: just these checks (and the compiling, which they need)
     fail_fast = "--fail-fast" in sys.argv
     excuse = set(opt_list("--excuse"))     # checks that fail already (on main): never a reason to stop early
@@ -346,6 +351,11 @@ def main():
         seconds[check] = round(time.perf_counter() - t0, 1)
         return f" ({seconds[check]:.1f}s)"
 
+    try:
+        at = world_at(world)
+    except Exception as e:
+        at = f"could not be read ({type(e).__name__}: {str(e)[:120]})"
+    print(f"world: {world} at {at}")
     t0 = time.perf_counter()
     bad = check_python()
     print(f"python: {'ok' if not bad else 'FAILED'}{took('python', t0)}" + "".join(f"\n  {b}" for b in bad))
@@ -366,6 +376,9 @@ def main():
         # a5288: all of them at once, those the change can reach first (--changed), so a broken one shows soonest
         from screen import BROWSERS
         checks = [c for c in script_checks() if wanted(c[0])]
+        unknown = only - {c[0] for c in script_checks()} - {"python", "scripts", "styles", "help notes", "lenses"}
+        if unknown:
+            failed.append(("selection", f"unknown health checks: {', '.join(sorted(unknown))}"))
         changed = opt_list("--changed")
         first = affected(changed) if changed else {}
         import threading
@@ -421,6 +434,8 @@ def main():
                     failed.append((k, fault))
             if len(done) < len(keys):
                 shown.append(f"{len(keys) - len(done)} not run: the run stopped at a failure")
+                if not stopped:
+                    failed.extend((k, f"{k}: runner produced no result") for k in keys if k not in results)
             seconds[group] = round(sum(results[k][2] for k in done), 1)
             label = {"paint": "paint tests"}.get(group, group)
             print(f"{label}: {'; '.join(shown)} ({seconds[group]:.1f}s)")
@@ -448,6 +463,7 @@ def main():
         t0 = time.perf_counter()
         try:
             lenses_ok, bad, expected = check_lenses(world)
+            failed.extend(("lenses", f"lens {problem}") for problem in bad)
             # Pike a611: a refusal printed on every landing that nobody can read is on its way to noise; name it and why
             why = "; ".join(b.split(". It can say")[0].replace(": LensRefusal: ", ": ")[:90] for b in bad)
             print(f"lenses in {world}: {len(lenses_ok)} compile, {len(bad)} unexpected refusals" + (f" ({why})" if bad else "")
@@ -460,7 +476,7 @@ def main():
                                                   if jobs > 1 else "") + (f"; only {', '.join(sorted(only))}" if only else "")
           + ("; STOPPED at the first failure" if stopped else "") + ")")
     if "--json" in sys.argv:
-        print(json.dumps({"ok": not failed, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": [f for _, f in failed],
+        print(json.dumps({"ok": not failed, "world_at": at, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": [f for _, f in failed],
                           "failed_checks": sorted({k for k, _ in failed}), "ran": sorted(ran | {"python", "scripts"}),
                           "first": sorted(k for k, d in first.items() if d <= 1), "stopped": stopped, "partial": bool(only) or stopped,
                           "seconds": {**seconds, "total": total}}))
