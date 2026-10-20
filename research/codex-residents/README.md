@@ -60,6 +60,16 @@ an existing task worktree then discovered Desk and successfully read its manual.
 probe now also performs discovery before invoking Desk. This adds the runtime's
 tool-composition `exec`/`wait` helpers, without enabling other MCP servers or agents.
 
+Activated in Frontier on 20 October (`29fa11d`, then discovery repair `d49c7b0`).
+The keeper refreshed the house, both builders retained their original thread
+IDs, and each completed Desk MCP calls in production afterward. Builder one
+also reused its thread across the Music and scrolling commissions. The three
+Claude quota handoffs preserved the existing worktrees and archived state.
+These are worker-pool receipts, not acceptance of the individual commissions.
+The canonical Handbook and Rough spots card a6570 record the live evidence.
+The Markdown exporter refused pre-existing direct edits to Current Implementation
+and left both copies intact.
+
 Validation for this change: repository pytest **201 passed, 2 skipped**;
 focused transport/worker/process tests **9 passed**; builder and worker-pool
 script checks passed; changed-file Ruff checks passed. The documentation
