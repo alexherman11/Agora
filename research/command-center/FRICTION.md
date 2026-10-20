@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (51)
+## open (50)
 
 ### F2. Scripts cannot say who is running them
 
@@ -333,12 +333,6 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-### Plan usage and resumable provider pauses need a house word (a6646)
-
-a6662 · family=missing-word · status=open
-
-Read: usage.py already follows Claude rate_limit_event.unifiedWindows and context-token streams; workshop.py persists provider retry times, but there is no durable per-window Usage surface, event-driven plan snapshot, per-provider deduplicated notice episode, or configurable fuel-start rule. A world lens cannot read CLI stream metadata or schedule a process resume. Source work for a6646 will bridge only these observations and lifecycle transitions, leaving the gauge and glance in world lenses. No credentials or account settings are read or changed.
-
 ## curing (38)
 
 ### F13. A lens named like its room makes the room's name ambiguous
@@ -634,7 +628,7 @@ a6728 · family=missing-word · status=curing
 
 Missing world word: start= on a resident corner, parallel to wake= but only for fresh memory and compaction. Source draft adds charter.py, house/workshop startup hooks, Claude SessionStart(compact) context and Codex developer-history reinjection. It mirrors only a generated AGENTS.md block from the single live agent-charter note. Source remains unlanded; provider boundary acceptance still requires a real runtime observation. No rules or account settings changed.
 
-## unchecked (4)
+## unchecked (5)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -651,6 +645,13 @@ Correction/follow-up after JEFF e12858: relocation failed because tools still us
 Read/source after JEFF e12874: screen.py headless launch and sandbox_window.py Edge/WebView2 debugging launches now include --remote-allow-origins=*; both Python websocket clients explicitly set origin=None. Ran: screen.py --visible still resets during the first Runtime.evaluate(document.readyState), WinError 10054 then ConnectionClosedError. A later HTTP /json/version request to that same test port is refused (WinError 10061). Closed the owned sandbox screen-88068 with alex: untouched. Origin flag did not establish browser readiness; root cause unknown. Pipe transport was considered but not implemented: current desktop launcher does not inherit handles, so pipe mode needs explicit Windows pipe/handle transport work, not just a flag.
 Final source scope per JEFF e12889: removed ineffective --remote-allow-origins=* after the failed retest; explicit origin=None remains. hud_playtest.py uses the same temp helper and adds seven copy-only real-wheel cases via hud_scroll.py; no world-level word could express test-driver wheel input. Assertions require the panel and its content to move together, observe a wheel event, stay inside a HUD pane and keep the page at zero. test_hud_scroll.py: 5 stand-in verdict tests pass; this does NOT run the browser. test_agora_tmp.py passes child write, painter copytree, TMP/TEMP/Python-temp and override checks. Old tiling-fix.desk is commented as superseded by JEFF's live lens fix. Source/browser integration and wheel shots remain UNVERIFIED for the browser-capable follow-up.
 
+### Plan usage and resumable provider pauses need a house word (a6646)
+
+a6662 · family=missing-word · status=unchecked
+
+Read: usage.py already follows Claude rate_limit_event.unifiedWindows and context-token streams; workshop.py persists provider retry times, but there is no durable per-window Usage surface, event-driven plan snapshot, per-provider deduplicated notice episode, or configurable fuel-start rule. A world lens cannot read CLI stream metadata or schedule a process resume. Source work for a6646 will bridge only these observations and lifecycle transitions, leaving the gauge and glance in world lenses. No credentials or account settings are read or changed.
+Ran final a6646 recheck: 16 fake-feed/native-world tests OK, including evaluated gauge roles at 69/70/89/90/100%; builder lifecycle and existing usage tests all passed. Source bridges provider observations, native Usage facts, durable pause/notice episodes and fuel-start policy; widget/glance remain world lenses. Full health, actual Codex quota and browser acceptance remain unverified as recorded on the commission and handoff.
+
 ### A line's about= never reached the one it called, and a Talk's lines said nothing of their document (a6638)
 
 a6703 · family=conversation · status=unchecked
@@ -663,6 +664,7 @@ a6713 · family=missing-word · status=unchecked
 
 Missing world word: check runtime. The world cannot hash a host executable, run isolated compiled-runtime probes, hold an OS publication lock or atomically replace runtime lock files. Draft source in a6498 adds runtime_pin.py, adapter startup gates and probe_support.py, plus empty-profile/stand-in Desk probes and fake binary/inventory tests. Both locks remain untouched until every candidate check passes. Source is not landed. The resident mock probe passed here; the worker mock probe failed at CreateRestrictedToken failed: 87. This is not live agent or current re-pin acceptance.
 Final source checks in this builder: 39 focused tests passed in 7.46s; changed-file Ruff All checks passed; git diff --check exit 0. Tests include fake binaries/inventories, a real cross-process lease, and fake-house receipt/notice delivery. Final resident mock source passed with -E and empty CODEX_HOME. Source uses the worker's existing MCP door route without changing DESKD=off in shells. Source and precise rerun instructions are preserved in research/codex-residents/runtime-pin-handoff.md. Not landed; worker-capable environment and live acceptance are still needed.
+20 Oct source-ready update under JEFF c6757/c6760: 48 focused tests passed in 6.70s; changed-file Ruff passed and diff check exit 0. Source now checks updater provenance and valid OpenAI OpCo, LLC Authenticode before candidate execution; Windows read-only inspection confirms that publisher on the installed candidate. Python-open guards with the real home present and fake credentials prove empty-home launch routing, not native IO containment. Both locks and inventories remain unchanged. Host-side --recheck, full worker mock matrix, real harmless resident/Astra turns and live notice/no-wake observation remain unverified. A healthy ordinary startup skips probes, so JEFF must explicitly --recheck after landing. No account or profile settings changed.
 
 ## cured (65)
 
