@@ -48,9 +48,13 @@
   .md-doc .md-fence.md-open{border-radius:.4em .4em 0 0;padding-top:.3em}
   .md-doc .md-fence.md-close{border-radius:0 0 .4em .4em;padding-bottom:.3em}
   .md-doc .md-fence:not(.md-active) .md-syn{display:none}
-  .md-doc .md-fence.md-close:not(.md-active){height:.5em;min-height:0;overflow:hidden}
+  .md-doc .md-fence.md-close:not(.md-active),.md-doc .md-fence.md-bare:not(.md-active){height:.5em;min-height:0;overflow:hidden}
   .md-doc code.md-ic{font:.88em var(--md-mono);background:var(--t-wash,#eef3f0);padding:.08em .32em;border-radius:.3em}
   .md-doc mark.md-hl{background:color-mix(in srgb,var(--t-mark,#B4571C) 22%,transparent);color:inherit;border-radius:.2em;padding:0 .1em}
+  .md-doc img.md-img{display:block;max-width:100%;max-height:24em;border-radius:.4em;margin:.3em 0}
+  .md-doc .md-imgalt{color:var(--t-hush,#889);border-bottom:1px dashed var(--t-faint,#ccc)}
+  .md-doc:not([contenteditable]) .md-check{cursor:default}
+  .md-doc:not([contenteditable]) .md-check:hover{border-color:var(--t-hush,#889)}
   .md-doc .md-tag{color:var(--t-accent,#0F6B57);background:var(--t-wash,#eef3f0);border-radius:.6em;padding:0 .35em}
   .md-doc a.md-a,.md-doc .md-wl{color:var(--t-accent,#0F6B57);text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--t-accent,#0F6B57) 35%,transparent);text-underline-offset:.18em;cursor:pointer}
   .md-doc .md-wl:hover,.md-doc a.md-a:hover{text-decoration-color:currentColor}
@@ -151,7 +155,8 @@
     /(?<![\w])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w])/.source, // 13 stress
     /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/.source,          // 14 bare address
     /(?<![\w&#])(#[A-Za-z][\w/-]*)/.source,                      // 15 tag
-    /(?<![\w-])((?:worker-)?(?:[afscep]\d{2,}|m\d{2,}))(?![\w-])/.source,  // 16 a bare id (a6109): drawn as its name
+    /(?<![\w/\\-])((?:worker-)?(?:[afscep]\d{2,}|m\d{2,}))(?![\w/\\-])/.source,  // 16 a bare id (a6109): drawn as its name; not in a path (a6452)
+    /!\[([^\[\]\n]*)\]\(([^()\s]+)\)/.source,                    // 17,18 picture (a6452): last, it is the only one that starts at its `!`
   ].join("|"), "g");
 
   function syn(t) { const s = document.createElement("span"); s.className = "md-syn"; s.textContent = t; return s; }
@@ -182,6 +187,10 @@
         into.append(a); into.append(syn("]]"));
       } else if (m[6] != null) {
         into.append(syn("[")); const a = document.createElement("a"); a.className = "md-a"; a.dataset.href = m[7]; a.title = m[7]; inline(m[6], ctx, a); into.append(a); into.append(syn("](" + m[7] + ")"));
+      } else if (m[8] != null && m[8].length > 1 && m[8][0] === "*" && text[rx.lastIndex] === "*") {
+        // ***both*** (a6452): the lazy ** took '*both' and left a star; it is strong and stressed at once
+        // the same characters as **, *both*, **: the source stays every character, in order
+        put("strong", "", m[8] + "*", "**", "**"); rx.lastIndex++;
       } else if (m[8] != null) put("strong", "", m[8], "**", "**");
       else if (m[9] != null) put("strong", "", m[9], "__", "__");
       else if (m[10] != null) put("s", "", m[10], "~~", "~~");
@@ -199,6 +208,15 @@
           a.append(syn(m[16])); const t = document.createElement("span"); t.dataset.deco = "1"; t.contentEditable = "false"; t.textContent = hit.name; a.append(t);
           into.append(a);
         }
+      } else if (m[18] != null) {
+        // a6452: a picture is drawn only when the scene showed its path (ctx.media, media_links' judgement): no address
+        // in someone's words is fetched by the page. Any other stays its words, the address on hover
+        into.append(syn(m[0]));
+        const hit = (ctx.media || []).find(x => x.path === m[18] && x.kind === "image" && x.src);
+        const e = document.createElement(hit ? "img" : "span"); e.dataset.deco = "1"; e.contentEditable = "false";
+        if (hit) { e.className = "md-img"; e.src = hit.src; e.alt = m[17] || hit.name; e.title = m[17] || hit.name; e.draggable = false; e.dataset.media = hit.src; }
+        else { e.className = "md-imgalt"; e.textContent = m[17] || m[18]; e.title = `a picture this page does not show: ${m[18]}`; }
+        into.append(e);
       }
       at = rx.lastIndex;
     }
@@ -228,7 +246,7 @@
     else if (d.k === "quote") { add("md-quote"); lead(d.pre); }
     else if (d.k === "hr") { add("md-hr"); el.append(syn(src)); rest = ""; }
     else if (d.k === "fence") {
-      add("md-fence"); add(d.open ? "md-open" : "md-close");
+      add("md-fence"); add(d.open ? "md-open" : "md-close"); if (d.open && !d.lang) add("md-bare");
       if (d.open) { el.append(syn(d.pre)); if (d.lang) el.append(document.createTextNode(src.slice(d.pre.length))); else rest = src.slice(d.pre.length); if (d.lang) rest = ""; }
       else { el.append(syn(src)); rest = ""; }
     }
