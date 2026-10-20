@@ -20,7 +20,10 @@ HERE = Path(__file__).resolve().parent
 def main():
     a = sys.argv[1:]
     py = sys.executable  # retain the environment that supplies pywebview
-    subprocess.run([py, str(HERE / "hud.py"), "--stop"], cwd=HERE)
+    stopped = subprocess.run([py, str(HERE / "hud.py"), "--stop"], cwd=HERE)
+    if stopped.returncode:
+        print("hud_restart: stop not confirmed; leaving the current home base alone")
+        return
     env = dict(os.environ)
     env.pop("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", None)
     if "--debug-port" in a:

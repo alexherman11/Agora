@@ -12,7 +12,8 @@ the moment before. Hidden, it holds nothing on screen and takes no keys but Ctrl
 
 a5834: while it runs, so does the control screen (capture/capture.py, its child): hold Ctrl+Alt and drag over
 anything, the home base too, and the capture goes on the person's own chat draft, unsent. capture=off on the lens
-note turns it off (at the next Ctrl+Alt+J); --stop ends both. Its output: state/capture.log.
+note turns it off (at the next Ctrl+Alt+J); on --stop the capture's parent guard ends it
+within two seconds. Its output: state/capture.log.
 
 a6113: the window manager (wm.py) is its child too, but only from the dock: the host verbs wm.start and wm.stop
 (wm_switch.py). Closing the home base stops it; --stop, and the next start, put back whatever a killed one left.
@@ -46,6 +47,8 @@ import urllib.parse
 import urllib.request
 from ctypes import wintypes as wt
 from pathlib import Path
+from hud_lifecycle import (Mutex, Scope, Windows, inventory, mutex_name, option,
+                           other_hosts, pid_path, read_pid, remove_own_pid, script_args)
 
 ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))      # per monitor v2: pixels are pixels
 
@@ -407,8 +410,16 @@ class Hud:
 
     def stop_capture(self):
         if self.capture is not None and self.capture.poll() is None:
-            # the venv's python is a launcher: the interpreter is its child, so the whole tree goes
-            subprocess.run(["taskkill", "/PID", str(self.capture.pid), "/T", "/F"], capture_output=True)
+            native = Windows()
+            processes = inventory(native)
+            if processes is None:
+                print("hud: capture stop deferred: process inventory unknown", flush=True)
+                return
+            for proc in processes:
+                args = script_args(proc, str(HERE / "capture" / "capture.py"))
+                if (proc.pid == self.capture.pid or proc.parent == self.capture.pid) and args is not None \
+                        and option(args, "--parent", "") == str(os.getpid()):
+                    print(f"hud: capture {proc.pid} created={proc.created}: {native.end(proc)}", flush=True)
         self.capture = None
 
     # -- what the page asks of the host (pywebview's js_api)
@@ -431,8 +442,9 @@ class Hud:
     def keys(self):
         self.keys_tid = kernel32.GetCurrentThreadId()
         mods, vk = host_verbs.hotkey(self.settings["hotkey"]) or (MOD_CONTROL | MOD_ALT, VK_J)      # read once
-        if not user32.RegisterHotKey(None, HK_TOGGLE, mods | MOD_NOREPEAT, vk):
-            print(f"hud: {self.settings['hotkey']} is taken by another program; only --show and --stop work", flush=True)
+        registered = bool(user32.RegisterHotKey(None, HK_TOGGLE, mods | MOD_NOREPEAT, vk))
+        if not registered:
+            print(f"hud: {self.settings['hotkey']} is taken; retrying while the home base runs", flush=True)
         msg = wt.MSG()
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
             if msg.message == WM_HOTKEY and msg.wParam == HK_TOGGLE:
@@ -441,6 +453,10 @@ class Hud:
                 self.hide()
             elif msg.message == WM_APP + 2:                                       # a5980: a bare Win tap
                 self.toggle()
+            elif msg.message == WM_APP + 3 and not registered:
+                registered = bool(user32.RegisterHotKey(None, HK_TOGGLE, mods | MOD_NOREPEAT, vk))
+                if registered:
+                    print(f"hud: {self.settings['hotkey']} is available again; registered", flush=True)
             elif msg.message == WM_APP + 1:
                 if msg.wParam:
                     if not user32.RegisterHotKey(None, HK_ESC, MOD_NOREPEAT, VK_ESCAPE):
@@ -460,6 +476,8 @@ class Hud:
     def guard_winkey(self):
         me, n, said, slow = os.getpid(), 0, None, (0, 0)
         while True:
+            if self.keys_tid:
+                user32.PostThreadMessageW(self.keys_tid, WM_APP + 3, 0, 0)  # an old duplicate may have held the key
             if self.winkey and self.winkey.on:
                 if n % 60 == 59:
                     self.winkey.reseat()                  # Windows drops a slow hook without a word: put it back
@@ -547,7 +565,7 @@ class Hud:
         witnessed.clear(self.a.world, "host")
         if self.keys_tid:
             user32.PostThreadMessageW(self.keys_tid, WM_QUIT, 0, 0)
-        PIDFILE.unlink(missing_ok=True)
+        remove_own_pid(PIDFILE, os.getpid())
 
     def run(self):
         import webview
@@ -580,17 +598,8 @@ class Api:
         return host_verbs.call(self._hud, verb, words)
 
 
-def alive(pid):
-    h = kernel32.OpenProcess(0x1000, False, pid)
-    if not h:
-        return False
-    code = wt.DWORD()
-    ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
-    kernel32.CloseHandle(h)
-    return code.value == 259
-
-
 def main():
+    global PIDFILE
     ap = argparse.ArgumentParser()
     ap.add_argument("--lens", default="home-base")
     ap.add_argument("--as", dest="who", default="alex")
@@ -602,31 +611,63 @@ def main():
                     help="off: the Win key stays Windows' whatever the lens note says (a5980)")
     a = ap.parse_args()
     STATE.mkdir(parents=True, exist_ok=True)
-    old = int(PIDFILE.read_text()) if PIDFILE.exists() and PIDFILE.read_text().strip().isdigit() else 0
+    PIDFILE = pid_path(STATE, a.world, a.door)
+    native = Windows()
+    scope = Scope(str(HERE / "hud.py"), str(NOTATION / "keeper.py"), a.world, a.door)
     if a.stop:
-        if old and alive(old):
-            os.system(f"taskkill /PID {old} /T /F >NUL 2>&1")
-            print("hud: stopped", old)
-        else:
-            print("hud: not running")
-        PIDFILE.unlink(missing_ok=True)
-        wm_switch.release_left()                      # a6113: the tree went with /F, so its window manager could not
+        processes = inventory(native)
+        if processes is None:
+            print("hud: stop refused: process inventory unknown; pid file preserved", flush=True)
+            return 75
+        hosts = scope.hosts(processes)
+        # Interpreter first, launcher afterwards. Every end checks the original
+        # creation time and executable on the exact handle it terminates.
+        for proc in sorted(hosts, key=lambda p: p.created, reverse=True):
+            result = native.end(proc)
+            print(f"hud: stop {proc.pid} created={proc.created}: {result}", flush=True)
+        remaining = inventory(native)
+        if remaining is None or scope.hosts(remaining):
+            print("hud: stop not confirmed; pid file preserved", flush=True)
+            return 75
+        for proc in hosts:
+            remove_own_pid(PIDFILE, proc.pid)
+        wm_switch.release_left()                      # a6113: put back a killed window manager's windows
         witnessed.clear(a.world, "desktop")
         witnessed.clear(a.world, "media")
         witnessed.clear(a.world, "clock")
         witnessed.clear(a.world, "host")
         witnessed.clear(a.world, "wm")
-        return
-    if old and alive(old):
-        print("hud: already running as", old)
-        sys.exit(76)
-    PIDFILE.write_text(str(os.getpid()))
-    wm_switch.release_left()                          # a6113: a window manager a killed home base left, put back
-    witnessed.clear(a.world, "wm")
-    print("hud: running; a bare Win tap or Ctrl+Alt+J shows or hides it, Esc hides it, `python hud.py --stop` ends it",
-          flush=True)
-    Hud(a).run()
+        return 0
+    guard = Mutex(native, mutex_name(a.world, a.door))
+    if not guard.acquire():
+        print("hud: already running (home-base OS mutex exists); exiting", flush=True)
+        return 76
+    claimed = False
+    try:
+        # Existing hosts from before the mutex change must also block a start.
+        processes = inventory(native)
+        if processes is None or read_pid(PIDFILE) is None:
+            print("hud: start deferred: process inventory or pid record unknown", flush=True)
+            return 75
+        others = other_hosts(processes, scope, os.getpid(), os.getppid())
+        if others:
+            print("hud: already running as", ", ".join(str(p.pid) for p in others), flush=True)
+            return 76
+        PIDFILE.write_text(str(os.getpid()))
+        claimed = True
+        wm_switch.release_left()                      # a6113: put back a killed window manager's windows
+        witnessed.clear(a.world, "wm")
+        print("hud: running; a bare Win tap or Ctrl+Alt+J shows or hides it, Esc hides it, `python hud.py --stop` ends it",
+              flush=True)
+        Hud(a).run()
+        return 0
+    finally:
+        try:
+            if claimed:
+                remove_own_pid(PIDFILE, os.getpid())
+        finally:
+            guard.close()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

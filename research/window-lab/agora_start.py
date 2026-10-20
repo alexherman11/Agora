@@ -2,7 +2,7 @@
 
     pythonw agora_start.py            keep Agora up: the desk (keeper.py: house, door on 8794) if it is not answering,
                                       then the home base (hud.py, hidden, on the Windows key and Ctrl+Alt+J); checks
-                                      once a minute and starts again whichever has stopped
+                                      once a minute; absence/unknown checks retry in five seconds
     python agora_start.py --stop      end this supervisor (the desk and the home base keep running; hud.py --stop ends
                                       the home base, and the keeper is stopped as keeper-runs-detached says)
     python agora_start.py --install   run it at every logon: a shortcut "Agora.lnk" in Alex's Startup folder (no admin;
@@ -11,13 +11,18 @@
 
 One instance (state/agora_start.pid). It never opens a window: the home base starts hidden and waits for its key.
 What it did is in state/agora_start.log.
+hud.pid is never deleted here. HUD starts require two confirmed misses, a live
+keeper and an answering backend. Inventory failures and keeper restarts defer.
+Duplicate hosts are reconciled by hud_lifecycle.py, by verified process identity.
 """
 import os
+import json
 import subprocess
 import sys
 import time
 import urllib.request
 from pathlib import Path
+from hud_lifecycle import Monitor, Scope, Windows, inventory, read_pid, with_health
 
 LAB = Path(__file__).resolve().parent
 ROOT = LAB.parents[1]
@@ -37,34 +42,14 @@ def log(msg):
 
 
 def alive(pid):
-    import ctypes
-    from ctypes import wintypes as wt
-    k = ctypes.windll.kernel32
-    h = k.OpenProcess(0x1000, False, int(pid))
-    if not h:
-        return False
-    code = wt.DWORD()
-    k.GetExitCodeProcess(h, ctypes.byref(code))
-    k.CloseHandle(h)
-    return code.value == 259
+    return Windows().identity(int(pid)) is not None
 
 
 def door_up():
     try:
         with urllib.request.urlopen(DOOR, timeout=3) as r:
-            return r.status == 200
-    except OSError:
-        return False
-
-
-def running(script):
-    """Is a python process running this script? (WMI, as wm.py finds its browser)"""
-    q = f"Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | Where-Object {{ $_.CommandLine -like '*{script}*' -and $_.ProcessId -ne {os.getpid()} -and $_.ParentProcessId -ne {os.getpid()} }} | Measure-Object | % Count"
-    try:
-        out = subprocess.run(["powershell", "-NoProfile", "-Command", q], capture_output=True, text=True, timeout=30,
-                             creationflags=NO_WINDOW).stdout.strip()
-        return int(out or 0) > 0
-    except (OSError, ValueError, subprocess.SubprocessError):
+            return r.status == 200 and json.load(r).get("up") is True
+    except (OSError, ValueError):
         return False
 
 
@@ -73,26 +58,18 @@ def start(args, cwd):
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def hud_alive():
-    p = STATE / "hud.pid"
-    try:
-        return alive(int(p.read_text().strip()))
-    except (OSError, ValueError):
-        return False
+SCOPE = Scope(str(LAB / "hud.py"), str(NOTATION / "keeper.py"))
 
 
-def tend():
-    if not door_up() and not running("keeper.py"):
-        log("the desk is not answering and no keeper runs: starting keeper.py frontier --port 8794")
-        start([str(PY), str(NOTATION / "keeper.py"), "frontier", "--port", "8794"], NOTATION)
-    if not hud_alive():
-        for _ in range(60):                       # the home base paints from the door: wait for it, up to 3 minutes
-            if door_up():
-                break
-            time.sleep(3)
-        if not hud_alive():
-            log("the home base is not running: starting hud.py (hidden; Windows key or Ctrl+Alt+J)")
+def tend(monitor, native):
+    processes = with_health(inventory(native), SCOPE, native)
+    def launch(which):
+        if which == "keeper":
+            start([str(PY), str(NOTATION / "keeper.py"), "frontier", "--port", "8794"], NOTATION)
+        else:
             start([str(PYW), str(LAB / "hud.py")], LAB)
+    return monitor.tick(processes, read_pid(STATE / "hud.pid"), door_up(), time.monotonic(),
+                        start=launch, end=native.end, healthy=native.healthy, log=log)
 
 
 STARTUP = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Agora.lnk"
@@ -123,13 +100,17 @@ def main():
     OFF.unlink(missing_ok=True)
     PIDFILE.write_text(str(os.getpid()))
     log(f"supervisor started (pid {os.getpid()})")
+    monitor, native = Monitor(SCOPE), Windows()
     try:
         while not OFF.exists():
+            delay = 60
             try:
-                tend()
+                delay = tend(monitor, native)
             except Exception as e:                # one bad check never ends the supervisor
+                monitor.hud_misses.first = monitor.keeper_misses.first = None
+                delay = 5
                 log(f"check failed: {e!r}")
-            for _ in range(60):
+            for _ in range(delay):
                 if OFF.exists():
                     break
                 time.sleep(1)
