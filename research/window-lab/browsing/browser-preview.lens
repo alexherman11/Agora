@@ -1,0 +1,44 @@
+# Inactive layout fixture. Only fake tab selection changes; no engine is wired.
+# JEFF may stage this new lens with style=home-style, not replace home-viewer.
+viewer : column
+  share 1
+  of prop:role=browser-fixture-a7234 as b
+  each browser
+browser : column
+  share 1
+  role viewer
+  tabs : row
+    desk : text "Project report"
+      role chip
+      role chip.on when $b.active = "desk"
+      on click do prop $b active=desk
+    web : text "Example website"
+      role chip
+      role chip.on when $b.active = "web"
+      on click do prop $b active=web
+    local : text "Selected example.txt"
+      role chip
+      role chip.on when $b.active = "local"
+      on click do prop $b active=local
+  location : row
+    label : text "Location"
+      role meta
+    desk : text "Agora / Project report"
+      only when $b.active = "desk"
+    web : text "https://example.test/"
+      only when $b.active = "web"
+    local : text "This device / Selected example.txt"
+      only when $b.active = "local"
+  unavailable : text "Back, Forward and Reload are not connected in this layout preview."
+    role meta
+  body : column
+    share 1
+    scroll scroll
+    desk : text "Project report — a fake Agora document. Tabs do not attach chat context."
+      only when $b.active = "desk"
+    web : text "Web engine not connected. In the finished viewer, an explicit Open in browser button will offer a fallback."
+      only when $b.active = "web"
+    local : text "No device file has been read. A real local tab will require you to choose that file."
+      only when $b.active = "local"
+  status : text "Layout fixture only. Nothing was opened, sent or downloaded."
+    role hint
