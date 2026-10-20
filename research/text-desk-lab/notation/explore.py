@@ -159,13 +159,16 @@ REPLY = __import__("uuid").uuid4().hex   # a806: the lines of one call are one r
 
 def via_deskd(name, me, lines, whole=False, stored="", as_of=None):
     """When deskd is up it is the one owner of every world: send each line as one turn and hold nothing between
-    turns. A refusal stops the lines after it, as it does without deskd. Returns False when no server answers, and
-    the caller falls back to the file lock."""
+    turns. A refused line refuses only itself (a6437, carry_on): the lines after it run, as they do without deskd, and
+    the receipt ends saying what ran, was refused or was skipped. Returns False when no server answers, and the caller
+    falls back to the file lock."""
     import os, urllib.request, urllib.error
+    import carry_on
     if os.environ.get("DESKD", "") == "off":
         return False
     url = os.environ.get("DESKD", "http://127.0.0.1:8780") + "/api/do"
     reply = REPLY
+    tally = carry_on.Tally()
     for k, line in enumerate(lines):
         body = json.dumps({"session": name, "as": me, "line": line, "cli": True, "whole": whole,
                            "reply": reply, **({"stored": stored} if stored else {}),
@@ -182,12 +185,10 @@ def via_deskd(name, me, lines, whole=False, stored="", as_of=None):
         said = r.get("text") or ("ERR " + str(r.get("error")))
         print(said)
         print()
-        rest = lines[k + 1:]
-        if (r.get("error") or said.startswith("ERR")) and rest:
-            # a736: through deskd the lines after a refusal ran anyway; they stop here as they do under the file lock
-            print(f"stopped: {len(rest)} later line(s) not run because this one was refused. Not run: " + " | ".join(rest))
-            print()
-            break
+        tally.add(line, said, r.get("error"))
+    if tally.summary():
+        print(tally.summary())
+        print()
     return True
 
 
@@ -283,7 +284,9 @@ def main():
     # 7 Oct: a world that has a log (store.py) gets one record per line, as it does through deskd: the world as facts
     # before the line (logged), and the difference written when the next line begins or the lines end
     import store
+    import carry_on
     logged = said = None
+    tally = carry_on.Tally()
 
     def record():
         if logged is not None:
@@ -343,16 +346,13 @@ def main():
         text = r.get("text") or ("ERR " + r["error"])
         print(text)
         print()
-        if r.get("error") or text.startswith("ERR") or "\nERR" in text:
-            rest = [l.rstrip("\n") for l in sys.stdin if l.strip() and not l.startswith("#")]
-            if rest:
-                # Sable and Juniper: after a refused create, the next line ran against the previous $item. A refusal ends the batch.
-                # Juniper (a736): and say which, so they can be sent again
-                print(f"stopped: {len(rest)} later line(s) not run because this one was refused. "
-                      f"Not run: " + " | ".join(rest))
-                print()
-            break
+        # a6437 (Alex): a refused line refuses only itself; the lines after it run. Sable and Juniper's lesson (a refused
+        # create, then a line on the previous $new) is kept by the desk, which skips a line that depends on it (carry_on)
+        tally.add(line, text, r.get("error"))
     record()
+    if tally.summary():
+        print(tally.summary())
+        print()
     per[slot] = (desk.seen, desk.open, desk.last_event_seen)
     desk._as_of = None
     save_desk(path, desk)

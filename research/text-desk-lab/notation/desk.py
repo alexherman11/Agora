@@ -254,6 +254,9 @@ class Desk:
                         error = True
                         if i < len(parts) - 1:
                             rest = parts[i + 1:]
+                            if not getattr(self, "_ctxs", None) and hasattr(self, "_hold"):
+                                for p in rest:      # a6437: what they would have made is held back from later lines
+                                    self._hold(p)
                             outs.append(f"(stopped; {len(rest)} later command(s) not run. Not run: {'; '.join(rest)}. "
                                         f"Fix [{i + 1}] and resubmit them in one call)")
                         break
