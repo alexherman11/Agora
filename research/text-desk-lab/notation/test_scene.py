@@ -1670,6 +1670,48 @@ def test_search_box_words():
         tmp.unlink(missing_ok=True)
 
 
+def test_page_shows_a_lens_at_a_device_size():
+    """a6431 (Alex, 17 Oct: 'a webapp running in the middle the size of a phone'): `page <w> <h> ...` on a text whose
+    words name a lens (or a /path here) paints the real painter at that size; its size and choices may come from lets
+    (a person's chosen device), an empty let says nothing; `on pick` belongs to a page; an address elsewhere is no page.
+    Imagined use: Alex turns an iPhone on its side with safe areas on, and the same part repaints at 852 x 393."""
+    ok = scene.page_of("393 852 touch picks safe 59 0 34 0 cutout island mark app/a12/list")
+    assert (ok["w"], ok["h"], ok["touch"], ok["picks"], ok["safe"], ok["cutout"], ok["mark"]) == \
+        (393, 852, True, True, [59, 0, 34, 0], "island", "app/a12/list"), ok
+    for bad, said in (("393", "a width and a height"), ("10 852", "a width and a height"), ("393 852 safe 1 2", "four insets"),
+                      ("393 852 cutout star", "cutout <"), ("393 852 zoom", "none of these")):
+        assert "error" in scene.page_of(bad) and said in scene.page_of(bad)["error"], (bad, scene.page_of(bad))
+    refused('root : column\n  p : text "notes", page 393', "a width and a height")
+    refused('root : column\n  p : text "notes", on pick do prop $item picked="$value"', "has no `page`")
+    refused('root : column\n  p : text "notes", page 393 852, on edit do prop $item x="$value"', "is edited")
+    assert scene.page_source("notes") == "notes" and scene.page_source("notes on a12") == "notes on a12"
+    assert not scene.page_source("https://example.com/") and scene.page_source("/lens.html?lens=x") == "/lens.html?lens=x"
+    import deskd, lens_ir
+    tmp = _scratch("_test_page")
+    try:
+        with deskd.Session("_test_page", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=note title=Preview app=notes up=no safe=on")
+            src = chr(10).join(["root : column, the title:Preview as pv",
+                                '  phone : text "$pv.app"',
+                                '    let w = 393 when ($pv.up or "yes") = "yes"',
+                                "    let w = 852 otherwise",
+                                '    let h = 852 when ($pv.up or "yes") = "yes"',
+                                "    let h = 393 otherwise",
+                                '    let insets = "safe 0 59 21 59 cutout island" when ($pv.safe or "") = "on"',
+                                '    let insets = "" otherwise',
+                                '    let picks = ""',
+                                "    page $w $h touch $picks $insets",
+                                '    on pick do prop $pv picked="$value" part="$part"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pg = sc["kids"][0]["paint"]["page"]
+            assert (pg["src"], pg["w"], pg["h"], pg["touch"], pg["picks"], pg["safe"], pg["cutout"]) == \
+                ("notes", 852, 393, True, False, [0, 59, 21, 59], "island"), pg
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 # a5820: this block stood above test_picture_is_a_text_drawn (13 Oct), so that test was never run; it stays last
 if __name__ == "__main__":
     import os

@@ -152,6 +152,12 @@
     }
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
+    // a6431: a page in a frame is one element for as long as it shows the same page: a new size, turn or toggle changes
+    // the frame where it stands (a new element would load the page again)
+    if (old && old.el._page && p.page && old.el._page.src === p.page.src) {
+      old.el._n = n; old.sig = sig; old.el.className = (p.role ? Style.roleClass(p.role) + " " : "") + "t-page";
+      old.el._page.update(p.page); next.set(n.key, old); return old.el;
+    }
     if (old && old.el._composer && old.el._composer.config === JSON.stringify([p, n.acts])) {
       old.el._n = n; old.sig = sig; old.el._composer.sync(); next.set(n.key, old); return old.el;
     }
@@ -164,7 +170,11 @@
     if (role) el.className = Style.roleClass(role);
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
-    if (p.text != null && p.markdown) markdown(el, n, p);
+    // a6431: `page`: the page the words name, the real painter at a device's size (page.js); `on pick` names a part of it
+    if (p.text != null && p.page && window.Page) Page.draw(el, p.page, { session, who,
+      canPick: () => el._n.acts.some(a => a.on === "pick"),
+      pick: async (name, key) => { for (const a of el._n.acts.filter(a => a.on === "pick")) await send(el._n, a.line.replace(/\$value\b/g, () => TEXT.esc(name)).replace(/\$part\b/g, () => TEXT.esc(key))); } });
+    else if (p.text != null && p.markdown) markdown(el, n, p);
     else if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
     // `wave` (14 Oct): a role that waves draws each character as its own span, each a beat after the one before
     else if (p.text != null && role && ((Style.style || {}).roles || {})[role] && Style.style.roles[role].look.wave)

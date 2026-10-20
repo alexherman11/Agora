@@ -1,0 +1,17 @@
+# --- the app dev workspace's phone preview (a6431: app-preview, app-preview-small), by LAMPLIT's rule for a role added
+# later (a6057): a role names a meaning, its colours are only the rule's tokens. The phone's bezel is pageframe.
+role apview : between gap
+role aptools : between gap /2, align center
+role apdevices : between gap /2, align center
+role apbtn : soft, pad gap /2, corner gap /2, hover raised
+role apbtn.on : ink, on raisedhi, pad gap /2, corner gap /2, edge rim
+role apglyph : width 1.5em
+role apstage : align stretch
+role apphone : align stretch
+role pageframe : on night, pad gap x1.5, corner gap x6, edge rim, lift gap
+role appicked : between gap, align center, pad gap /2, pad left gap, on warmwash, corner gap
+role apfoot : between gap, align center, pad gap /2, pad left gap
+role aplabel : text.label tracked, warm
+role apname : text down, ink
+role apmeta : text.label, faint
+role apsmall : between gap, align center
