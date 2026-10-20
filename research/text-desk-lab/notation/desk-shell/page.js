@@ -11,7 +11,7 @@
              the key the control screen reads (id="part:<key>")
      safe    the insets the device keeps clear, drawn over the page, with its cutout (island, hole, notch)
      mark    a part of the page by its key, drawn round: what was picked is world data, so anyone can point
-   What is drawn over the page is mechanics only; the frame's look is the role `page` and the box's `pagemark`. */
+   What is drawn over the page is mechanics only; the frame's look is the role `pageframe` and the box's `pagemark`. */
 (() => {
   const roleClass = r => (window.Style && Style.roleClass ? Style.roleClass(r) : "r-" + r);
   const HOLD_MS = 550, SLOP = 6;
@@ -41,8 +41,9 @@
   function draw(el, spec, hands) {
     el.classList.add("t-page");
     el.replaceChildren();
-    const hold = document.createElement("div"); hold.className = "page-hold";
-    const dev = document.createElement("div"); dev.className = "page-device " + roleClass("page");
+    // the bezel is the role `pageframe` (its ground, padding, corner and edge) round the screen, which is scaled to fit
+    const hold = document.createElement("div"); hold.className = "page-hold " + roleClass("pageframe");
+    const dev = document.createElement("div"); dev.className = "page-device";
     const frame = document.createElement("iframe"); frame.className = "page-frame"; frame.title = spec.src;
     const over = document.createElement("div"); over.className = "page-over";
     const mark = document.createElement("div"); mark.className = "page-mark " + roleClass("pagemark"); mark.hidden = true;
@@ -53,12 +54,15 @@
 
     function fit() {
       if (!cur) return;
-      const cs = getComputedStyle(dev), bx = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0),
-            by = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-      const W = cur.w + bx, H = cur.h + by, aw = el.clientWidth - 16, ah = el.clientHeight - 16;
-      scale = Math.max(0.05, Math.min(1, aw / W, ah / H));
-      Object.assign(dev.style, { width: cur.w + "px", height: cur.h + "px", transform: `scale(${scale})` });
-      Object.assign(hold.style, { width: W * scale + "px", height: H * scale + "px" });
+      const cs = getComputedStyle(hold), px = k => parseFloat(cs[k]) || 0;
+      const bx = px("paddingLeft") + px("paddingRight") + px("borderLeftWidth") + px("borderRightWidth"),
+            by = px("paddingTop") + px("paddingBottom") + px("borderTopWidth") + px("borderBottomWidth");
+      const aw = el.clientWidth - 16 - bx, ah = el.clientHeight - 16 - by;
+      scale = Math.max(0.05, Math.min(1, aw / cur.w, ah / cur.h));
+      const r = Math.max(0, px("borderTopLeftRadius") - px("paddingLeft"));
+      Object.assign(dev.style, { width: cur.w + "px", height: cur.h + "px", transform: `scale(${scale})`,
+                                 left: px("paddingLeft") + "px", top: px("paddingTop") + "px", borderRadius: r / scale + "px" });
+      Object.assign(hold.style, { width: cur.w * scale + "px", height: cur.h * scale + "px" });
       dev.dataset.scale = scale.toFixed(3);
     }
     new ResizeObserver(fit).observe(el);

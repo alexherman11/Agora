@@ -151,19 +151,19 @@
   .media-speeds { display: flex; gap: .25em; }
   .media-speeds > [data-on] { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
   /* `page` (a6431, page.js): a page at a device's size in a frame, scaled to fit the part. The look of the frame is the
-     role `page` (its edge is the device's bezel), of the box round a picked part the role `pagemark`. The exceptions to
-     "no colour here", as a film's letterbox is one: a display cutout is black, a home bar and the safe insets are
-     tints of the words' colour over the page, so they read on any app */
+     role `pageframe` (its edge is the device's bezel), of the box round a picked part the role `pagemark`. The exceptions to
+     "no colour here", as a film's letterbox is one: a display cutout is black; a home bar and the safe insets are white
+     in difference with the app under them, so they read on a light app and a dark one, as a phone's own home bar does */
   .t-page { display: grid; place-items: center; overflow: hidden; min-height: 0; min-width: 0; white-space: normal; }
-  .page-hold { position: relative; flex: none; }
-  .page-device { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; box-sizing: content-box; }
+  .page-hold { position: relative; flex: none; box-sizing: content-box; }
+  .page-device { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
   .page-frame { display: block; border: 0; width: 100%; height: 100%; background: transparent; }
   .page-over, .page-mark, .page-aim { position: absolute; pointer-events: none; }
   .page-over { inset: 0; }
-  .page-inset { position: absolute; background: repeating-linear-gradient(45deg, color-mix(in srgb, currentColor 14%, transparent) 0 6px, transparent 6px 12px); }
+  .page-inset { position: absolute; mix-blend-mode: difference; background: repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 6px, transparent 6px 12px); }
   .page-cutout { position: absolute; background: #000; border-radius: 999px; }
   .page-cutout-notch { border-radius: 0 0 18px 18px; }
-  .page-homebar { position: absolute; height: 5px; border-radius: 3px; background: color-mix(in srgb, currentColor 55%, transparent); }
+  .page-homebar { position: absolute; height: 5px; border-radius: 3px; background: rgba(255,255,255,.85); mix-blend-mode: difference; }
   .page-mark { box-sizing: border-box; border: 2px solid var(--t-accent, currentColor); border-radius: 6px; }
   .page-aim { box-sizing: border-box; border: 1px dashed var(--t-accent, currentColor); border-radius: 4px; }
   .page-mark[hidden], .page-aim[hidden] { display: none; }
