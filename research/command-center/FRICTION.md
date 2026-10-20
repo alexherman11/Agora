@@ -333,7 +333,7 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-## curing (38)
+## curing (39)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -628,6 +628,12 @@ a6728 · family=missing-word · status=curing
 
 Missing world word: start= on a resident corner, parallel to wake= but only for fresh memory and compaction. Source draft adds charter.py, house/workshop startup hooks, Claude SessionStart(compact) context and Codex developer-history reinjection. It mirrors only a generated AGENTS.md block from the single live agent-charter note. Source remains unlanded; provider boundary acceptance still requires a real runtime observation. No rules or account settings changed.
 20 Oct takeover source-ready update under JEFF c6735/c6737: 16 charter tests OK (0.639s), transport 5 passed in 1.02s, builders/pool/grants/house-words all passed, changed-file Ruff passed, diff check exit 0. Added explicit one-line missing/empty startup disclosure and tested mirror changes with real knock/news/worker-hearing logic: no knock, no session start/send/process spawn, cached sessions retain rules until fresh start or compaction. Copy e13175 (13162 events) proves edited rules reach both provider stub prompts and 411-word receipts e13178/e13181. No real model/process was used; live spawn receipt, Claude/Codex compaction timing and already-running interactive apps remain unverified. Handbook source descriptions updated for landing; existing wake reads remain.
+
+### Album art needs a picture-only media part (music source awaiting landing)
+
+a6988 · family=lens-words · status=curing
+
+Music needs Windows-session album art as a rounded picture with no filename, caption or pop-out controls. The missing world word is media picture: compiler admission and the shared media painter gain this read-only mode; generated art tests compile both music forms. No new timer word is needed: progress is ordinary static row shares updated from reported playback state. The earlier live until bar/since draft was withdrawn under Alex's charter. Source is in worker-a6443; browser checks are blocked before launch by the old branch's system-temp ACL error. PKCE library access and the explicit Connect host verb also need host code; lens/style behavior remains world text.
 
 ## unchecked (5)
 
@@ -1219,16 +1225,18 @@ a6631 · family=missing-word · status=cured
 Alex, 20 Oct, requested current worker status and automatic Desk/worker recovery at Windows sign-in. Missing lifecycle behavior: the Startup shortcut launches agora_start.py but has no external recovery if that process exits; AgoraHouseRecovery separately launches backend components, creating two startup owners. Codex is connecting the existing scheduled watchdog to the existing full Desk launcher, preserving live services, strengthening single-instance startup and testing restart restoration. Incomplete working tasks resume from saved house state; waiting tasks remain waiting for answers or new work.
 Ran 20 Oct: 6 focused startup tests passed (cold start, adoption, orphan recovery, inspection failure, checkout matching, real OS-lease contention/crash release). Existing builder restart/resume checks passed. Repository pytest: 201 passed, 2 skipped; changed Python Ruff and PowerShell parsing passed. Sign-in task is running. New launcher 20572 adopted the original live services; deliberately terminating only it led to watchdog replacement 91248 within the configured 60-second backoff. Keeper 62740, house 82160, door wrapper 28432, HUD 87440 and capture 33540 remained running unchanged; duplicate launcher exited without starting services. No Windows reboot/sign-out was performed. Docs checker still reports the pre-existing missing Dynamic Desk image. Source: agora_start.py, test_agora_start.py, house_supervisor.ps1; operational instructions updated in a639 and codex-residents/README.md.
 
-## source-pending (2)
+## activation-pending (1)
+
+### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
+
+a6970 · family=host · status=activation-pending
+
+Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
+
+## source-pending (1)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
 a6838 · family=host · status=source-pending
 
 Host friction: independently added HUD playtest coverage required editing the same runner callbacks and order list, causing repeated landing conflicts. The missing extension point was discovery of one step per file. a6749 adds playtest_steps/*.py Step records (order, feature needs, press script with its existing assertions, budgets), scanned by hud_playtest.py. Existing bodies and numbers are preserved, including equal-footing from main. This is test-host structure, not new world behavior. Ran: 13 extraction/discovery/fixture-merge tests and 5 existing wheel-verdict tests pass; real browser acceptance is not run in the Codex sandbox.
-
-### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
-
-a6970 · family=host · status=source-pending
-
-Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
