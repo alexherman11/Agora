@@ -36,6 +36,7 @@ research/archive/tessera-lab/evidence/
 
 # the house: resident transcripts and live state (outside the world, never committed)
 research/text-desk-lab/notation/house-state/
+research/window-lab/.tmp-agora/
 research/text-desk-lab/notation/fake-model-log.jsonl
 research/text-desk-lab/notation/house-test.log
 

@@ -1401,6 +1401,8 @@ def test_live_words_now_and_newest_first():
     import datetime, re as _re
     import deskd, expr as X, lens_ir, moo
     refused('x : text "a", live sometimes', "live <clock|date|until|until ring>")
+    assert scene.parse('x : text "media/now-playing/a.jpg", media picture')[1]["x"]["media"] == "picture"
+    refused('x : text "a", media poster', "media picture")
     refused('x : column, live clock', "is a text word")
     refused('x : text "a", on end do prop $item state=done', "needs `live until`")
     refused('x : text "a", live clock, on end do prop $item state=done', "needs `live until`")

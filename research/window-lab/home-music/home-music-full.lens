@@ -1,0 +1,97 @@
+# home-music-full: the music panel when it fills the room (a6443): the album art large beside the song, as Spotify's own Now Playing view. The same row (witnessed:media), the same heart, time and controls as home-music (home-music-time, home-music-keys placed). Shown by home-tiling's fullpanel when the panel note says filled=home-music-full.
+music : column
+  role mufull
+  share 1
+  connect : text "Connect Spotify"
+    role muconnect
+    tip "Connect Spotify" "One-time app setup and Spotify consent; never your password"
+    on click host media.connect
+  playing : column
+    share 1
+    of witnessed:media as m
+    each nowplaying
+  none : column
+    role mufullempty
+    share 1
+    only when count(witnessed:media) = 0
+    mark : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.4V3.6l7-1.5v8.8'/><circle cx='4.2' cy='12.4' r='1.8'/><circle cx='11.2' cy='10.9' r='1.8'/></g></svg>"
+      picture
+      role mufullnone
+    quiet : text "Nothing playing"
+      role mufulltitle.quiet
+    how : text "Play something in Spotify and it shows here, with its art, its time and a heart for Liked Songs."
+      role mufullartist
+nowplaying : row
+  role mufullrow
+  share 1
+  art : column
+    role mufullart
+    pic : text "$m.art"
+      media picture
+      role mufullpic
+      only when ($m.art or "") != ""
+    blank : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='.8' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.4V3.6l7-1.5v8.8'/><circle cx='4.2' cy='12.4' r='1.8'/><circle cx='11.2' cy='10.9' r='1.8'/></g></svg>"
+      picture
+      role mufullblank
+      only when ($m.art or "") = ""
+  side : column
+    role mufullside
+    share 1
+    above : column
+      share 1
+    source : row
+      role musource
+      dot : text "<svg viewBox='0 0 8 8'><circle cx='4' cy='4' r='3'/></svg>"
+        picture
+        role mudot
+        role mudot.on when $m.playing = "yes"
+      on : text "Playing on $m.player"
+        role mulabel
+        only when $m.playing = "yes"
+      off : text "Paused in $m.player"
+        role mulabel
+        only when $m.playing != "yes"
+    head : row
+      role mufullhead
+      words : column
+        role muwords
+        share 1
+        title : text "$m.title"
+          role mufulltitle
+          clamp 2
+        artist : text "$m.artist"
+          role mufullartist
+          clamp 1
+        album : text "$m.album"
+          role muartist
+          clamp 1
+          only when ($m.album or "") != ""
+      like : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.3' stroke-linejoin='round'><path d='M8 13.6S1.6 9.9 1.6 5.6A3.2 3.2 0 0 1 8 4.4a3.2 3.2 0 0 1 6.4 1.2c0 4.3-6.4 8-6.4 8z'/></g></svg>"
+        picture
+        role muheartbig
+        tip "Like" "Save to your Liked Songs"
+        on click host media.like
+        only when $m.liked = "no"
+      liked : text "<svg viewBox='0 0 16 16'><path d='M8 13.6S1.6 9.9 1.6 5.6A3.2 3.2 0 0 1 8 4.4a3.2 3.2 0 0 1 6.4 1.2c0 4.3-6.4 8-6.4 8z'/></svg>"
+        picture
+        role muheartbig.on
+        tip "In your Liked Songs" "Press to take it out"
+        on click host media.unlike
+        only when $m.liked = "yes"
+      unknown : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.3' stroke-linejoin='round' stroke-dasharray='2 1.6'><path d='M8 13.6S1.6 9.9 1.6 5.6A3.2 3.2 0 0 1 8 4.4a3.2 3.2 0 0 1 6.4 1.2c0 4.3-6.4 8-6.4 8z'/></g></svg>"
+        picture
+        role muheartbig.unknown
+        tip "Liked or not: not known" "$m.like_why"
+        on click host media.like
+        only when ($m.liked or "unknown") = "unknown" and ($m.title or "") != ""
+    why : text "$m.like_why"
+      role muwhy
+      clamp 2
+      only when ($m.liked or "unknown") = "unknown" and ($m.like_why or "") != ""
+    time : column
+      lens home-music-time
+    keys : row
+      role mukeysbox
+      lens home-music-keys
+    below : column
+      share 1

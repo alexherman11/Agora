@@ -1,4 +1,57 @@
-# a5592: the music panel (home-music)
-role musictop : between gap
-role mediakey : text up 2, ink, on wash, corner gap x3, pad gap /2, pad left gap, pad right gap, touch
-role nowplaying : between gap /4
+# Music has its own Spotify palette inside the light home base. Green marks state only.
+# Static event-reported progress; no clock, continuous motion or decorative animation.
+token spotify = #1ED760
+token spbg = #121212
+token spraised = #282828
+token spink = #FFFFFF
+token spsoft = #B3B3B3
+token spfaint = #727272
+token sphover = #FFFFFF1A
+role mu : on spbg, spink, corner gap x1.5, pad gap x2, between gap
+role muempty : between gap x1.5
+role muartnone : spfaint, on spraised, width gap x8, pad gap x2, corner gap
+role mutitle.quiet : text medium, spsoft
+role mucard : between gap x1.5
+role mutop : between gap x1.5
+role muart : width gap x8, corner gap, align center
+role muartpic : corner gap
+role muartblank : spfaint, on spraised, width gap x8, pad gap x2, corner gap
+role muwords : between gap /4
+role mutitle : text strong, spink
+role muartist : text down, spsoft
+role muheart : spsoft, width gap x3, pad gap /4, corner gap x3, hover sphover, align center
+role muheart.on : spotify, width gap x3, pad gap /4, corner gap x3, hover sphover, align center
+role muheart.unknown : spfaint, width gap x3, pad gap /4, corner gap x3, hover sphover, align center
+role mutime : between gap
+role mutimenum : text down 2, spsoft, align center
+role mubarbox : align center
+role mubar : on spfaint, height gap /2, corner gap
+role mubar.on : on spink, height gap /2, corner gap
+role murest : on spraised, height gap /2, corner gap
+role muconnect : text down, spsoft, on spraised, corner gap, pad gap /2, hover sphover
+role mukeysbox : align center
+role mukeys : align center
+role mukeyrow : between gap x2.5, align center
+role mukey : spsoft, width gap x3, pad gap /4, corner gap x3, hover sphover, align center
+role mukey.on : spotify, width gap x3, pad gap /4, corner gap x3, hover sphover, align center
+role muplay : spbg, on spink, width gap x4, pad gap /1.25, corner gap x3, align center
+role mufull : on spbg, spink, corner gap x2, pad gap x3, between gap x2
+role mufullempty : between gap, pad gap x6, align center
+role mufullnone : spfaint, width gap x8, align center
+role mufulltitle.quiet : text up 2 medium, spsoft, align center
+role mufullrow : between gap x5, pad gap x2
+role mufullart : width gap x56, corner gap x1.5, lift gap x2, align center
+role mufullpic : corner gap x1.5
+role mufullblank : spfaint, on spraised, width gap x56, pad gap x14, corner gap x1.5
+role mufullside : between gap x2
+role musource : between gap
+role mudot : spfaint, width gap, align center
+role mudot.on : spotify, width gap, align center
+role mulabel : text down 2 medium tracked, spsoft
+role mufullhead : between gap x2
+role mufulltitle : text up 3 strong, spink
+role mufullartist : text up, spsoft
+role muheartbig : spsoft, width gap x4.5, pad gap /2, corner gap x3, hover sphover, align center
+role muheartbig.on : spotify, width gap x4.5, pad gap /2, corner gap x3, hover sphover, align center
+role muheartbig.unknown : spfaint, width gap x4.5, pad gap /2, corner gap x3, hover sphover, align center
+role muwhy : text down 2, spfaint

@@ -1,0 +1,25 @@
+# Static last-reported position; updates on session playback events, never a clock animation.
+time : column
+  of witnessed:media as m
+  each timerow
+timerow : row
+  role mutime
+  only when ($m.at or "") != ""
+  now : text "$m.elapsed"
+    role mutimenum
+  bar : row
+    share 1
+    role mubarbox
+    fill : column
+      only when $m.position > 0
+      share $m.position
+      ink : column
+        role mubar
+        role mubar.on when $m.playing = "yes"
+    rest : column
+      only when $m.remaining > 0
+      share $m.remaining
+      ink : column
+        role murest
+  length : text "$m.length"
+    role mutimenum

@@ -560,6 +560,7 @@ class Hud:
             print("hud: window manager stop:", e, flush=True)
         witnessed.clear(self.a.world, "wm")
         witnessed.clear(self.a.world, "desktop")
+        media.stop()                                  # a6443: the media session's reader (smtc.ps1) ends with it
         witnessed.clear(self.a.world, "media")
         witnessed.clear(self.a.world, "clock")
         witnessed.clear(self.a.world, "host")

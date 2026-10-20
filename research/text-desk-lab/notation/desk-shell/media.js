@@ -109,5 +109,14 @@
     el.replaceChildren(box);
   }
 
-  window.Media = { draw(el, media, pop) { if (!media || !media.items || !media.items.length) return; (media.mode === "player" ? player : embed)(el, media.items, pop); } };
+  // picture (a6443, album art): the first picture alone fills the part, square, in the part's corners; no name, no
+  // buttons, and the words that name it are not drawn. A film in the words is left as words here
+  function picture(el, items) {
+    const item = items.find(i => i.kind === "image"); if (!item) return;
+    const box = document.createElement("div"); box.className = "t-media media-picture"; box.dataset.media = item.src;
+    const img = document.createElement("img"); img.src = item.src; img.alt = ""; img.draggable = false; img.decoding = "async";
+    box.append(img); el.replaceChildren(box);
+  }
+
+  window.Media = { draw(el, media, pop) { if (!media || !media.items || !media.items.length) return; (media.mode === "player" ? player : media.mode === "picture" ? picture : embed)(el, media.items, pop); } };
 })();
