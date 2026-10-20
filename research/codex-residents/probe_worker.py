@@ -1,6 +1,7 @@
 """Inspect the compiled worker runtime using loopback mock inference."""
 
 import json
+import os
 import shutil
 import threading
 import uuid
@@ -11,6 +12,7 @@ from pathlib import Path
 from codex_resident import ThreadEnvelope, deny, receive
 from codex_worker import MODEL, runtime_config, thread_parameters
 from openai_codex.client import CodexClient
+from worker_job import child_job
 
 
 @contextmanager
@@ -40,16 +42,20 @@ def main():
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
-            item = ({"type": "function_call", "id": "call_probe", "call_id": "call_probe",
+            item = ({"type": "tool_search_call", "id": "search_desk", "call_id": "search_desk",
+                     "execution": "client", "status": "completed",
+                     "arguments": {"query": "desk shared world", "limit": 1}}
+                    if len(requests) == 1 else
+                    {"type": "function_call", "id": "call_probe", "call_id": "call_probe",
                      "name": "exec_command", "namespace": "functions",
                      "arguments": json.dumps({
                          "cmd": "Set-Content -LiteralPath worker-probe.txt -Value passed",
                          "workdir": directory, "max_output_tokens": 200,
-                     })} if len(requests) == 1 else {
+                     })} if len(requests) == 2 else {
                          "type": "function_call", "id": "call_desk", "call_id": "call_desk",
                          "name": "desk", "namespace": "mcp__desk",
                          "arguments": json.dumps({"line": "help", "as": "codex"}),
-                     } if len(requests) == 2 else {
+                     } if len(requests) == 3 else {
                          "type": "message", "id": "probe", "role": "assistant",
                          "phase": "final_answer",
                          "content": [{"type": "output_text", "text": "WORKER_PROBE_OK"}],
@@ -76,9 +82,13 @@ def main():
             import sys
             mcp.write_text(json.dumps({"mcpServers": {"desk": {
                 "command": sys.executable, "args": [str(lab / "desk_mcp.py")],
-                "env": {"DESK_AS": "codex", "DESK_SESSION": "frontier", "DESKD": "off"},
+                "env": {"DESK_AS": "codex", "DESK_SESSION": "frontier",
+                        "DESKD": os.environ.get("DESKD") or "http://127.0.0.1:8794"},
             }}}))
-            with CodexClient(runtime_config(directory), approval_handler=deny) as client:
+            with (
+                CodexClient(runtime_config(directory), approval_handler=deny) as client,
+                child_job(client._proc),
+            ):
                 timer = threading.Timer(60, client.close)
                 timer.daemon = True
                 timer.start()
@@ -112,7 +122,11 @@ def main():
                     assert (Path(directory) / "worker-probe.txt").read_text().strip() == "passed"
                 finally:
                     timer.cancel()
-        assert len(requests) == 3
+        assert len(requests) == 4
+        discovered = [
+            i for i in requests[1]["input"] if i.get("type") == "tool_search_output"
+        ]
+        assert discovered and "mcp__desk" in json.dumps(discovered), discovered
         request = requests[0]
         path = Path(__file__).with_name("worker-runtime-inventory.json")
         path.write_text(json.dumps(request, indent=2), encoding="utf-8")

@@ -34,6 +34,10 @@ DevTools), for a machine where the sandbox can't open.
 A builder before landing: run it from your worktree (it plays your painter), with --assume <your card> and --apply
 <your world half>; a run with --assume, --apply, --break or --only never writes the standing report.
 
+Scroll checks (UNVERIFIED in a6549): --only scroll runs scrollnote scrollwriting scrollchat scrollconversation
+scrollfeed scrollboard scrollreader. Fixtures stay in the copy; real wheel input must move content while the HUD
+stays at 0. Reader waits on a6460 or --assume a6460 with its --apply files. See hud_scroll.py.
+
 Steps (ids for --only): open lowdown board card later approve sendback atwork timer writing writedoc comment chat send
 drag fill widen restore glance number dock esc winkey. (atwork plays The house where lane 3's home-house has taken
 At work's place; timer and number are lane 3's, a6057.)
@@ -45,7 +49,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -60,6 +63,7 @@ sys.path.insert(0, str(HERE))
 import screen        # noqa: E402  (the browser list, Page, free_port, wait_http)
 import screen_tools  # noqa: E402  (demos/, DPI awareness)
 import witnessed     # noqa: E402
+import agora_tmp     # noqa: E402
 
 PY = sys.executable
 LIVE = "http://127.0.0.1:8794"
@@ -176,7 +180,7 @@ class Copy:
             import pickle
             import store
             store.genesis(pickle.loads(self.pickle.read_bytes()), self.pickle, why="hud_playtest")
-        self.state = tempfile.mkdtemp(prefix="playtest-door-")
+        self.state = agora_tmp.directory("playtest-door-")
         shell = Path(self.state) / "desk-shell"
         shutil.copytree(LAB / "desk-shell", shell)
         # the house as the real one stands: windows open, residents and builders at work (hud_stage.py, a5534)
@@ -247,7 +251,7 @@ class Window:
 
     async def open(self, url):
         w, h = SIZE
-        self.prof = tempfile.mkdtemp(prefix="playtest-profile-")
+        self.prof = agora_tmp.directory("playtest-profile-")
         if self.headless:
             exe = next((b for b in screen.BROWSERS if Path(b).exists()), None)
             port = screen.free_port()
@@ -264,7 +268,7 @@ class Window:
             port = SB.open_edge(self.name, url, f"{w}x{h}")["port"]
         screen.wait_http(f"http://127.0.0.1:{port}/json/version")
         tabs = json.loads(screen.wait_http(f"http://127.0.0.1:{port}/json"))
-        self.ws = await websockets.connect(next(t["webSocketDebuggerUrl"] for t in tabs if t.get("type") == "page"), max_size=64 * 1024 * 1024)
+        self.ws = await websockets.connect(next(t["webSocketDebuggerUrl"] for t in tabs if t.get("type") == "page"), origin=None, max_size=64 * 1024 * 1024)
         self.p = screen.Page(self.ws)
         if self.SB:
             self.SB.join(self.name)
@@ -348,6 +352,15 @@ class Window:
             self.SB.type_text(self.SB.focused(self.win), text)
         else:
             await self.p.call("Input.insertText", text=text)
+
+    async def wheel(self, x, y, dy):
+        """Real wheel input, never a scrollTop assignment or scrollIntoView."""
+        if self.SB:
+            ox, oy, dpr = await self.origin()
+            self.SB.wheel_at(self.win, ox + x * dpr, oy + y * dpr, dy)
+        else:
+            await self.p.call("Input.dispatchMouseEvent", type="mouseMoved", x=x, y=y)
+            await self.p.call("Input.dispatchMouseEvent", type="mouseWheel", x=x, y=y, deltaX=0, deltaY=dy)
 
     async def key(self, k):
         if self.SB and "+" not in k[1:] and (k in self.SB.VK or len(k) == 1):
@@ -553,7 +566,7 @@ async def walk(play, only):
     S = play.step
 
     def want(sid):
-        return not only or sid in only
+        return not only or sid in only or ("scroll" in only and sid.startswith("scroll"))
 
     async def skip_unwanted(sid, name):
         async def no():
@@ -1116,6 +1129,60 @@ async def walk(play, only):
         return r
     steps.append(("esc", "press Esc: what is open closes", s_esc, (OK_MS, SLOW_MS)))
 
+    async def s_search():
+        """a6642 (Alex, 20 Oct: 'I want search to be outside of the tiling'): the find is the bar's own, at the top
+        middle. Typing with nothing in hand starts a search there, Enter drops the results under it (titles first), Down
+        and Enter open the first, beside the chat when the viewer already shows something; a filled panel leaves it
+        where it was."""
+        play.needs("a6642", "the search in the top bar", ("home-tiling", "lens home-search"))
+        box = "[...(pt.part('lens:home-search') || document).querySelectorAll('[data-caret]')].find(e => pt.vis(e))"
+        if not await play.has(box):
+            raise AssertionError("no search box in the top bar (lens home-search)")
+        where = f"(() => {{ const pt = window.__pt, r = {box}.closest('[data-arrows]').getBoundingClientRect(); return [Math.round(r.left + r.width / 2 - innerWidth / 2), Math.round(r.top), Math.round(r.width)]; }})()"
+        at = await w.js(where)
+        if abs(at[0]) > 40 or at[1] > 80:
+            raise AssertionError(f"the search is not at the top middle: its centre is {at[0]} px from the page's, its top at {at[1]} px")
+        await w.js("(() => { if (document.activeElement) document.activeElement.blur(); })()")
+        r0 = await play.timed(f"(({box}) || {{}}).innerText === 'h' && document.activeElement === {box}", lambda: w.key("h"))
+        if not r0["ok"]:
+            r0["want"] = "typing with no text in hand did not start a search in the bar"
+            return r0
+        await w.type("ome")
+        hits = "pt.parts('lens:home-search').filter(e => /\\/titles\\/[af]\\d+$/.test(e.dataset.key) && pt.vis(e))"
+        r = await play.timed(f"{hits}.length > 0", lambda: w.key("Enter"))
+        if not r["ok"]:
+            r["want"] = "Enter did not drop results under the search (words 'home')"
+            return r
+        await asyncio.sleep(0.3)
+        await w.shot(play.out / f"{play.n + 1:02d}-search-results.png")
+        first = (await w.js(f"(() => {{ const pt = window.__pt; return {hits}[0].dataset.key; }})()")).rsplit("/", 1)[-1]
+        things = "pt.parts('lens:home-thing').filter(e => pt.vis(e)).length"
+        before = await w.js(f"(() => {{ const pt = window.__pt; return {things}; }})()")
+        await w.key("ArrowDown")
+        opened = (f"{things} > {before} || pt.parts('lens:home-viewer').some(e => e.dataset.key.endsWith('/open/{first}') && pt.vis(e))")
+        r2 = await play.timed(opened, lambda: w.key("Enter"))
+        if not r2["ok"]:
+            r2["want"] = f"Down and Enter did not open the first result ({first})"
+            return r2
+        await asyncio.sleep(0.3)
+        await w.shot(play.out / f"{play.n + 1:02d}-search-opened.png")
+        grip = panel("The board")
+        if await play.has(grip):
+            x, y = await play.find(f"{grip}.querySelector('[data-key$=\"/grip/title\"]')", "The board's title")
+            await w.dblclick(x, y)
+            await asyncio.sleep(1.2)
+            filled = await w.js(where)
+            await w.shot(play.out / f"{play.n + 1:02d}-search-filled.png")
+            x, y = await play.find(f"{grip}.querySelector('[data-key$=\"/grip/title\"]')", "The board's title, filled")
+            await w.dblclick(x, y)
+            if filled != at:
+                raise AssertionError(f"filling a panel moved the search: {at} -> {filled}")
+        r["note"] = (f"bar centred ({at[0]:+d} px), {at[2]} px wide; typing started it in {r0['ms']} ms, results in {r['ms']} ms, "
+                     f"the first opened in {r2['ms']} ms" + ("; a filled panel left it in place" if await play.has(grip) else ""))
+        r["ms"] = max(r["ms"], r2["ms"])
+        return r
+    steps.append(("search", "search from the top bar: type, results drop down, open one", s_search, (OK_MS, SLOW_MS)))
+
     async def s_winkey():
         play.needs("a5980", "the Windows key")
         p = await asyncio.to_thread(subprocess.run, [PY, str(HERE / "test_winkey.py")], capture_output=True, text=True, timeout=180)
@@ -1128,8 +1195,10 @@ async def walk(play, only):
 
     # the board goes back before fill and widen: dragged out, a5994's tiling leaves one column, and ⇔ has nothing to
     # take room from (ran 16 Oct: widen failed so, the tiling was right)
+    from hud_scroll import steps as scroll_steps
+    steps.extend(scroll_steps(play))
     order = ["open", "lowdown", "board", "card", "later", "approve", "sendback", "atwork", "timer", "writing", "writedoc",
-             "comment", "chat", "send", "drag", "restore", "fill", "widen", "glance", "number", "dock", "esc", "winkey"]
+             "comment", "chat", "send", "drag", "restore", "fill", "widen", "glance", "number", "search", "dock", "esc", "winkey"]
     steps.sort(key=lambda s: order.index(s[0]) if s[0] in order else len(order))
     for sid, name, fn, budget in steps:
         if want(sid):
@@ -1333,7 +1402,7 @@ async def amain(a):
         print(write_live(md, verdict, play.results, meta, a.by))
     elif a.report == "live":
         print("not written to the live world: a run with --break, --only, --apply or --assume is a check, not the standing report")
-    return 1 if guard[0] else 0
+    return 1 if guard[0] or any(r["outcome"] == "fail" for r in play.results) else 0
 
 
 def main():
@@ -1356,6 +1425,8 @@ def main():
     if a.profile_scenes:
         os.environ["DESKD_PROFILE_SCENES"] = str(Path(a.profile_scenes).resolve())     # the door's deskd inherits it
     if a.list:
+        print("Scroll checks (UNVERIFIED): --only scroll selects scrollnote scrollwriting scrollchat "
+              "scrollconversation scrollfeed scrollboard scrollreader (reader waits on a6460).")
         print(__doc__.split("Steps (ids")[1])
         return 0
     for b in a.breaks:

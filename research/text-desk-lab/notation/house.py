@@ -228,7 +228,8 @@ def unmarked_in(reply):
 
 
 def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
-    """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
+    """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; a refused line refuses only itself (a6437,
+    carry_on: the desk skips a later line that depends on it, and the text ends saying what ran). -> the text,
     or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736).
     kind (a3204): the line is signed `who` but is the house's own, 'rest' or 'wake'; it is sent as by=house with that
     kind. A line without it is `who`'s own."""
@@ -237,7 +238,8 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
     url = os.environ.get("DESKD", "")
     if not url or url == "off":
         return None
-    lines, out = desk_mcp.split_lines(text), []
+    import carry_on
+    lines, out, tally = desk_mcp.split_lines(text), [], carry_on.Tally()
     reply = __import__("uuid").uuid4().hex      # a806: one reply's lines share it, so $new names what the line before made
     for k, line in enumerate(lines):
         body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply,
@@ -255,11 +257,9 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
             break
         said = r.get("text") or ("ERR " + str(r.get("error")))
         out.append(f"> {line}\n{said}\n")
-        if r.get("error") or said.startswith("ERR"):
-            if k < len(lines) - 1:
-                out.append(f"stopped: {len(lines) - k - 1} later line(s) not run because this one was refused. "
-                           f"Not run: " + " | ".join(lines[k + 1:]))
-            break
+        tally.add(line, said, r.get("error"))
+    if tally.summary():
+        out.append(tally.summary() + "\n")
     return "\n".join(out)
 
 
@@ -383,7 +383,9 @@ class Resident:
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
-        self.state_path.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        temp = self.state_path.with_suffix(".tmp")
+        temp.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        os.replace(temp, self.state_path)
 
     def log(self, kind, data):
         with (self.dir / "transcript.jsonl").open("a", encoding="utf-8") as f:
@@ -538,6 +540,7 @@ class Resident:
                 # claude compacted the conversation: the memory is a summary now, so the next thing the house sends
                 # begins with the welcome again (Alex, 29 Sep: on compaction, or a full reset)
                 self.state["welcome_due"] = "the conversation was compacted"
+                self.state["compactions"] = self.state.get("compactions", 0) + 1
                 self.save()
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):

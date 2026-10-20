@@ -179,6 +179,8 @@
   @keyframes live-end { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .t-ring .ring-arc { transition: none; } .t-live[data-ended] { animation: none; } }
   [data-focus] [contenteditable]:focus { outline: 1px solid var(--t-focus); outline-offset: 2px; }
+  /* a6642: the press the arrow keys are on, inside an `arrows` frame (its float too): a state, not a motion */
+  [data-arrows] [role="button"]:focus-visible { outline: 2px solid var(--t-focus, currentColor); outline-offset: -2px; border-radius: .3em; }
   [data-tool] { cursor: pointer; user-select: none; }
   [data-pressed] { opacity: 0.45; }   /* a press that is on its way to the desk */
   /* marks in a text (a3486): weight and slant are the reader's own signs, so they are not roles of a style */

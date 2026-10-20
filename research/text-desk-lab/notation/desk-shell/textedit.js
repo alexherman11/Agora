@@ -352,7 +352,8 @@
     const M = globalThis.Markdown;
     const root = document.createElement("div"); root.className = "md-doc";
     const wrapEl = document.createElement("div"); wrapEl.className = "te-wrap"; wrapEl.append(root);
-    let ctx = { links: opts.links || {}, things: opts.things || {} }, raw = false, active = new Set(), lit = opts.light || [];
+    // media (a6452): the pictures the scene showed for these words, which a ![picture](path) may draw in its place
+    let ctx = { links: opts.links || {}, things: opts.things || {}, media: opts.media || [] }, raw = false, active = new Set(), lit = opts.light || [];
     if (opts.hint) root.dataset.hint = opts.hint;
     const ed = !!opts.editable;
     if (ed) { root.contentEditable = "true"; root.spellcheck = true; root.setAttribute("role", "textbox"); root.setAttribute("aria-multiline", "true"); }
@@ -442,9 +443,9 @@
       receive: (t, v) => E.receive(t, v), flush: () => E.flush(), resolve: w => E.resolve(w), adopt: (t, b, v) => E.adopt(t, b, v),
       composing: () => E.composing(),
       titles(t) { opts.titles = t; },
-      links(l, th) { ctx = { links: l || {}, things: th || {} }; const r = focused() ? sel() : null; paint(r ? r.a : null, r ? r.b : null); },
+      links(l, th) { ctx = { ...ctx, links: l || {}, things: th || {} }; const r = focused() ? sel() : null; paint(r ? r.a : null, r ? r.b : null); },
       // compatibility with the painter's old document part: set(words, links, things) draws the words as the desk's
-      set(t, l, th) { if (l) ctx = { links: l, things: th || ctx.things }; if (t != null) E.receive(t, E.doc.version); else render(); },
+      set(t, l, th) { if (l) ctx = { ...ctx, links: l, things: th || ctx.things }; if (t != null) E.receive(t, E.doc.version); else render(); },
       press(key) {
         const k = key.split("+").pop().toLowerCase(), r = sel() || { a: E.doc.sel[0], b: E.doc.sel[1] };
         if (k === "e") { raw = !raw; return paint(focused() ? r.a : null, focused() ? r.b : null); }

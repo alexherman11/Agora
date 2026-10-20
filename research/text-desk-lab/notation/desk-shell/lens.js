@@ -147,7 +147,8 @@
     // a6067: a document is one element for as long as its key and its lens's words for it stand (rule 1): the desk's new
     // words go INTO it (textedit.js fits them over what this window has not sent), never a new element under the caret
     if (old && old.el._te && p.markdown && old.el._teConf === textConf(n, p)) {
-      textFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el;
+      try { textFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el; }
+      catch (e) { console.warn("a document could not take the desk's new words; it is drawn again", e); }   // a6452
     }
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
@@ -207,7 +208,10 @@
     if (p.live && p.text != null) live(el, n, p);
     // a5941: `media`: the films and pictures the words name, drawn by media.js; Pop out sends the part's `on pop` acts
     // in order, desk lines and host verbs alike, with $value the path as written
-    if (p.media && window.Media) Media.draw(el, p.media, n.acts.some(a => a.on === "pop") ? async item => {
+    // a6452: in a Markdown text, a picture the document drew in its place is not drawn again under the words
+    const inline = p.media && el._te ? new Set([...el.querySelectorAll("img.md-img[data-media]")].map(i => i.dataset.media)) : null;
+    const media = inline && inline.size ? { ...p.media, items: p.media.items.filter(i => !inline.has(i.src)) } : p.media;
+    if (media && window.Media) Media.draw(el, media, n.acts.some(a => a.on === "pop") ? async item => {
       for (const a of el._n.acts.filter(a => a.on === "pop")) {
         const line = a.line.replace(/\$value\b/g, () => TEXT.esc(item.path));
         if (line.startsWith("host ")) await host(line.slice(5)); else await send(el._n, line);
@@ -224,6 +228,8 @@
     if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
+    if (p.caret) el.dataset.caret = p.caret.join(" ");    // a6642: what brings the caret here from anywhere (caretKeys)
+    if (p.arrows) arrows(el);
     if (p.tip && p.tip[0]) { el._tip = p.tip; el.dataset.tip = p.tip[0]; el.setAttribute("aria-label", p.tip.join(": ")); }   // a6271
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
     if (Number.isInteger(p.peek)) { el.dataset.peekLines = p.peek; el.style.setProperty("--peek-lines", p.peek); }
@@ -345,6 +351,60 @@
       c.style.top = (r.bottom + h > innerHeight && r.top - h >= 0 ? r.top - h : r.bottom) + "px";
     }
   }
+  // a6642 (Alex, 20 Oct: search results chosen with the arrow keys and Enter): `arrows` on a frame. Its stops are the
+  // texts being written and the presses inside it, in the order drawn (a float lifted into the top layer is still
+  // inside it). Up and Down go from stop to stop; Down past the last opens a closed float inside it. A press in hand
+  // takes Enter as a button does (semantic); Enter in a text whose words are unchanged presses the first press after
+  // it, so a search sent once is opened by Enter again. The viewer's hands only: nothing is sent until a press
+  const writes = t => t.isContentEditable || t.tagName === "TEXTAREA";
+  function arrows(el) {
+    el.dataset.arrows = "1";
+    const stops = () => [...el.querySelectorAll("[data-key], textarea")].filter(t => (writes(t) || t._clicks) && t.getClientRects().length);
+    el.addEventListener("keydown", e => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+      const t = e.target, all = stops(), i = all.indexOf(t);
+      if (i < 0) return;
+      const lines = t._n && t._n.paint && t._n.paint.lines;
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(writes(t) && lines && (lines[1] == null || lines[1] > 1))) {
+        const down = e.key === "ArrowDown";
+        let to = all[i + (down ? 1 : -1)];
+        if (!to && down) {
+          const h = [...el.querySelectorAll('.l-float[data-folded="1"] > button')][0];
+          if (h) { h.click(); const again = stops(); to = again[again.indexOf(t) + 1]; }
+        }
+        if (!to) return;
+        e.preventDefault();
+        if (!writes(to) && to.tabIndex < 0) to.tabIndex = -1;
+        to.focus();
+        if (writes(to) && to.isContentEditable) getSelection().selectAllChildren(to), getSelection().collapseToEnd();
+        return;
+      }
+      if (e.key === "Enter" && !writes(t)) { e.preventDefault(); e.stopPropagation(); t.click(); return; }   // a press that is a frame has no button keys of its own
+      if (e.key === "Enter" && !e.shiftKey && writes(t)) {
+        const said = ((t._n && t._n.paint && t._n.paint.text) || "").trim();
+        if (!said || (t.isContentEditable ? t.innerText : t.value).trim() !== said) return;
+        const first = all.slice(i + 1).find(s => !writes(s));
+        if (!first) return;
+        e.preventDefault(); e.stopPropagation(); first.click();
+      }
+    }, true);
+  }
+  // a6642: `caret <key>|typing` on a text. A key it names (Ctrl+K, ...) pressed anywhere that no text took (a document's
+  // own Ctrl+K stays the document's), or a letter typed while no text has the caret (`typing`), brings the caret to the
+  // first such text drawn, at its end; a typed letter lands in it
+  document.addEventListener("keydown", e => {
+    if (e.defaultPrevented || e.isComposing || e.altKey || document.getElementById("menu-pop")) return;
+    const a = document.activeElement, busy = a && a !== document.body && (writes(a) || /^(INPUT|SELECT)$/.test(a.tagName));
+    const ctrl = e.ctrlKey || e.metaKey, combo = (ctrl ? "Ctrl+" : "") + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+    const letter = !ctrl && e.key.length === 1 && e.key.trim() !== "";
+    if (busy && !ctrl) return;
+    const want = t => { const ks = t.dataset.caret.split(" "); return ks.includes(combo) || (letter && !busy && ks.includes("typing")); };
+    const to = [...paint.querySelectorAll("[data-caret]")].find(t => t.getClientRects().length && want(t));
+    if (!to || to === a) return;
+    e.preventDefault();
+    to.focus(); getSelection().selectAllChildren(to); getSelection().collapseToEnd();
+    if (letter && !to.dataset.caret.split(" ").includes(combo)) document.execCommand("insertText", false, e.key);
+  });
   const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) { m._close(); placeFloat(m); } });
   document.addEventListener("pointerdown", e => closeFloats(e.target));
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
@@ -603,7 +663,14 @@
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
-      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
+      // a6642: sent by Enter inside an `arrows` frame (a search box), the caret comes back once the answer is painted,
+      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile
+      const back = committing && el.closest("[data-arrows]") ? n.key : null;
+      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw).then(() => {
+        const k = back && kept.get(back);
+        if (!k || !k.el.isConnected || (document.activeElement && document.activeElement !== document.body)) return;
+        k.el.focus(); getSelection().selectAllChildren(k.el); getSelection().collapseToEnd();
+      }); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
   }
 
@@ -614,7 +681,8 @@
   // edits wait on Alex's choice; they would replace this one function). `on link` is sent with $value the id a
   // [[wikilink]] or ![[embed]] names; `on capture` with $value what a dropped capture carries. Without `on edit` it is
   // drawn only.
-  const textConf = (n, p) => JSON.stringify([n.acts.map(a => [a.on, a.line]), p.hint || ""]);
+  // a6452: and the media it draws: those are drawn when the element is made, so new ones make a new element
+  const textConf = (n, p) => JSON.stringify([n.acts.map(a => [a.on, a.line]), p.hint || "", p.media || null]);
   // the thing whose words a text shows: the read of its `text` (a lens that reads $d.text under another thing's part,
   // as doc-page does, is fenced on that part's thing, but its words are the document's subject), else the part's thing
   const textOf = n => { const f = n.fence || {}, r = (f.reads || []).find(e => Array.isArray(e[2]) && e[2].includes("text")); return (r && r[0]) || f.item || null; };
@@ -645,12 +713,21 @@
     const ok = !!r && !r.error && !/(^|\n)ERR\b/.test(t);
     return { ok, error: ok ? null : t, event: ok ? (r.events || []).slice(-1)[0] : null };
   }
+  // a6452: Markdown the drawing cannot take still shows its words, as plain text: never an empty part, never a stopped page
   function markdown(el, n, p) {
+    try { document_(el, n, p); }
+    catch (e) {
+      console.warn("a Markdown text could not be drawn; its words are shown as written", e);
+      delete el._te; delete el._md; delete el._teConf; el.classList.remove("md-part");
+      el.textContent = p.text; el.dataset.mdFailed = "1"; el.classList.add("t-verbatim");
+    }
+  }
+  function document_(el, n, p) {
     if (!window.TextEdit || !window.Markdown) { el.textContent = p.text; return; }
     const a = n.acts.find(x => x.on === "edit");
     const te = TextEdit.create({
       text: p.text, version: n.fence, editable: !!a, key: n.key, item: textOf(n),
-      links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint,
+      links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint, media: (p.media && p.media.items) || [],
       light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
       keep: a ? textKeeper(n.key, () => el._n) : null,
       seam: a ? { send: out => sendEdit(el, out) } : null,
@@ -683,6 +760,7 @@
     });
     el._te = el._md = te; el._teConf = textConf(n, p); el._mdLinks = JSON.stringify([p.wikilinks || {}, p.things || {}]);
     el.classList.add("md-part"); el.append(te.el);
+    if (!a && p.text.trim() && !drawsSomething(te.el)) throw new Error("its marks hide every word");   // a lone ``` (a6452)
     if (!a) return;
     const root = te.el.querySelector(".md-doc");
     root.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
@@ -691,6 +769,13 @@
       te.flush(); V.hold = null;
     });
   }
+  // a read document shows something when a word outside its hidden marks, or a drawn rule, box, table or picture, is in it
+  function drawsSomething(root) {
+    if (root.querySelector("img, table, .md-hr, .md-check, .md-embed")) return true;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (t.data.trim() && !t.parentElement.closest(".md-syn")) return true;
+    return false;
+  }
   function textFresh(el, n, p) {
     el._n = n;
     const l = JSON.stringify([p.wikilinks || {}, p.things || {}]);
@@ -698,6 +783,7 @@
     el._te.lights(p.light);                                     // a5949: a new comment's words light at once
     el._te.titles(p.titles);
     el._te.receive(p.text, n.fence);                            // a6067: the desk's words, at this version
+    if (!n.acts.some(a => a.on === "edit") && p.text.trim() && !drawsSomething(el._te.el)) throw new Error("its marks hide every word");
   }
 
   // a text's keys (Alex, 7 Oct: 'Enter should create a new line, tab should indent'). A lens gives a text `on key
