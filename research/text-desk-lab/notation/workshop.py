@@ -140,10 +140,13 @@ builders' notebook (above). Then, through the desk:
 The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both. The done
 comment is unmarked: it waits on the card, where {asked_by} reads it when the landing wakes them.
 
-When main moves under you (another landing touched your files), bring it in yourself, in your worktree:
-  git merge main             (or git rebase main; resolve conflicts with Edit, then git add and git commit)
-  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)
-then re-make any goldens you changed and run health again before setting ready."""
+When main moves under you (another landing touched your files), the house merges main into your branch when it lands
+it (a6753): a clean merge is committed and judged with no word from you; a conflict leaves its <<<<<<< ======= >>>>>>>
+markers in your files (not committed) and the card lists the files and the blocks. Edit each block to what it should
+hold (plain file edits, no git), re-make any goldens you changed, run health, and set ready again: the house commits
+the merge. A binary conflict is not merged: the card says which files. If you can run git you may still merge first:
+  git merge main             (resolve conflicts with Edit, then git add and git commit)
+  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)"""
 
 
 WHO_WORKER = "You are a worker in Agora's house: a disposable builder for one commission, then gone."
@@ -294,6 +297,7 @@ class Workshop:
         # 14 Oct (Codex e9951: the house's beat stopped for the minutes a landing's health ran inside its pass): a
         # landing is judged on a thread beside the house; its outcome is said on the house's own thread, a pass later
         self.landing = {}              # commission -> {"thread", "result"}: judged now, beside the house
+        self._waits = {}               # a6753: commission -> how its landing was asked (a clean house merge asks the same)
 
     # ---- the world ---------------------------------------------------------------------------------------------
     def commissions(self, w):
@@ -1135,6 +1139,144 @@ class Workshop:
         self.say(cid, "its worker was told the failure, and its turn ended without setting ready or asking anything. "
                       "It waits on you." + (f" Its last words: {last[-1][:300]}" if last else ""))
 
+    # ---- the house merges main into a branch (a6753) -------------------------------------------------------------
+    # Codex builders cannot write .git (ORIG_HEAD.lock is denied), yet a branch that did not merge was answered 'merge
+    # main into your branch'; five cards stalled on it on 20 Oct. The house can write .git, so it merges main into the
+    # branch in the worker's own worktree. Clean: committed and judged again. Conflicts: the markers stay in the files,
+    # uncommitted, and the card lists them with their hunks; the builder edits the files (no git) and sets ready, and
+    # the house commits the resolution before judging. The house never chooses a side of a conflict itself, and the
+    # branch still reaches main only through landing.py's judging.
+    HOUSE_MERGES = 2             # clean merges in a row before the card goes back: main keeps moving under it
+    MARKERS = ("<<<<<<< ", ">>>>>>> ")
+
+    def merge_main(self, w, cid, s, wk):
+        """Merge main into the branch in its worktree. -> None when there is no worktree to merge in (the caller says
+        what it said before), else True once the outcome is said or a new judging is started."""
+        tree = Path(getattr(wk, "tree", "") or "")
+        if not str(getattr(wk, "tree", "") or "") or not tree.exists() or not self.real_tree(tree):
+            return None
+        kept = self.commit_for(wk, f"{cid}: uncommitted work kept by the house before it merged main into the branch")
+        kept_said = f" Your {kept} uncommitted file(s) were committed to the branch first." if kept else ""
+        r = git("merge", "--no-ff", "-m", f"Merge main into {wk.branch} (the house, a6753)", "main", cwd=tree)
+        if r.returncode == 0:
+            merges = wk.state.get("house_merges", 0) + 1
+            wk.state["house_merges"] = merges
+            wk.save()
+            head = git("rev-parse", "--short", "HEAD", cwd=tree).stdout.strip()
+            if merges > self.HOUSE_MERGES:
+                wk.state["house_merges"] = 0
+                return self.returned(cid, s, wk, "working",
+                                     f"the house merged main into the branch {merges} times in a row ({head}) and it still did "
+                                     f"not merge into main: main keeps moving under it.{kept_said} Set ready again to try once "
+                                     f"more.", "~ house: main keeps moving under your branch; set ready again to try once more.") or True
+            self.say(cid, f"the branch did not merge into main, so the house merged main into it (cleanly, {head}) and judges "
+                          f"it again.{kept_said}")
+            self.land(w, cid, s, wk, wait=self._waits.get(cid, True))
+            return True
+        wk.state["house_merges"] = 0
+        conflicted = [p for p in (git("diff", "--name-only", "--diff-filter=U", cwd=tree).stdout or "").splitlines() if p]
+        said = (r.stdout + r.stderr).strip()
+        if not conflicted:
+            # it did not start, or stopped for another reason (a file in the way): nothing is left half-done
+            git("merge", "--abort", cwd=tree)
+            return self.returned(cid, s, wk, "working",
+                                 f"the branch does not merge into main, and the house could not merge main into it: "
+                                 f"{said[-600:]}. Nothing on the branch changed.{kept_said} Tell {wk.asked_by} on the card "
+                                 f"(mark=ask) if you cannot clear this with plain file edits.",
+                                 f"~ house: your branch does not merge into main and the house could not merge main into "
+                                 f"it: {said[-600:]}") or True
+        binary = [p for p in conflicted if self._binary(tree, p)]
+        if binary:
+            git("merge", "--abort", cwd=tree)
+            return self.returned(cid, s, wk, "working",
+                                 f"the branch does not merge into main, and {len(binary)} of the files that conflict are binary "
+                                 f"({', '.join(binary[:8])}): a binary conflict has no markers to edit, so the house did not "
+                                 f"merge (nothing on the branch changed{', apart from your uncommitted work, now committed' if kept else ''}). "
+                                 f"Make the branch take main's version of those files or leave them out of it, or ask "
+                                 f"{wk.asked_by} (mark=ask) which version should win.",
+                                 f"~ house: a binary conflict ({', '.join(binary[:8])}); the house did not merge. See the card.") or True
+        wk.state["house_merge"] = {"files": conflicted, "at": time.time(),
+                                   "main": git("rev-parse", "--short", "main", cwd=tree).stdout.strip()}
+        wk.save()
+        card = (f"the branch did not merge into main, so the house merged main into your worktree: {len(conflicted)} file(s) "
+                f"conflict, and their conflict markers are left in the files, not committed: {', '.join(conflicted)}.{kept_said} "
+                f"Edit each to what it should hold (every <<<<<<< ... ======= ... >>>>>>> block becomes the text you mean; "
+                f"plain file edits, no git), then set ready again: the house commits the merge and judges it. The conflicts:\n"
+                + self._hunks(tree, conflicted))
+        return self.returned(cid, s, wk, "working", card[:3500], "~ house: " + card[:6000]) or True
+
+    def merge_resolved(self, cid, s, wk):
+        """Ready after a house merge left conflicts: the builder's edits are committed as the merge, by the house, unless
+        a conflict marker is still in one of the files. -> True when the landing may go on."""
+        pending = wk.state.get("house_merge") or {}
+        tree = Path(getattr(wk, "tree", "") or "")
+        merging = tree.exists() and git("rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=tree).returncode == 0
+        if not merging:                    # a builder that can run git finished the merge itself, or the tree is gone
+            wk.state.pop("house_merge", None)
+            wk.save()
+            return True
+        left = [p for p in pending.get("files", []) if self._marked(tree / p)]
+        if left:
+            self.returned(cid, s, wk, "working",
+                          f"conflict markers are still in {', '.join(left)}: edit them out (the text between them is "
+                          f"the choice to make), then set ready again. The house committed nothing.",
+                          f"~ house: conflict markers are still in {', '.join(left)}; edit them out and set ready again.")
+            return False
+        git("add", "-A", "--", ".", f":(exclude){NOTATION}/sessions", cwd=tree)
+        r = git("commit", "--no-edit", "-m", f"Merge main into {wk.branch}: conflicts resolved by {wk.actor}, committed by "
+                                            f"the house (a6753)", cwd=tree)
+        if r.returncode:
+            self.returned(cid, s, wk, "working", f"the house could not commit your resolution of the merge: "
+                                                 f"{(r.stdout + r.stderr).strip()[-500:]}",
+                          f"~ house: the house could not commit your resolution of the merge; see the card.")
+            return False
+        wk.state.pop("house_merge", None)
+        wk.save()
+        self.say(cid, f"the conflicts in {', '.join(pending.get('files', []))} are resolved as {wk.actor} edited them; "
+                      f"the house committed the merge ({git('rev-parse', '--short', 'HEAD', cwd=tree).stdout.strip()}) "
+                      f"and judges it.")
+        return True
+
+    def _marked(self, path):
+        try:
+            return any(l.startswith(self.MARKERS) or l.rstrip("\r\n") in ("<<<<<<<", ">>>>>>>")
+                       for l in path.read_text(encoding="utf-8", errors="replace").splitlines())
+        except OSError:
+            return False
+
+    @staticmethod
+    def _binary(tree, path):
+        """A conflicted file is binary when any of its sides (base, ours, theirs) holds a NUL byte, as git judges."""
+        for stage in (1, 2, 3):
+            out = subprocess.run(["git", "show", f":{stage}:{path}"], cwd=tree, capture_output=True).stdout
+            if b"\0" in out[:8000]:
+                return True
+        return False
+
+    def _hunks(self, tree, files, room=2800):
+        """Each conflicted block, with its line number and its two sides, as the builder will find it in the file."""
+        out = []
+        for p in files:
+            try:
+                lines = (Path(tree) / p).read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                out.append(f"--- {p}: (could not be read)")
+                continue
+            block, start = None, 0
+            for i, l in enumerate(lines, 1):
+                if l.startswith("<<<<<<<"):
+                    block, start = [l], i
+                elif block is not None:
+                    block.append(l)
+                    if l.startswith(">>>>>>>"):
+                        body = block if len(block) <= 24 else block[:12] + [f"... ({len(block) - 24} lines) ..."] + block[-12:]
+                        out.append(f"--- {p}, line {start}:\n" + "\n".join(body))
+                        block = None
+            if not any(o.startswith(f"--- {p}") for o in out):
+                out.append(f"--- {p}: conflicts without markers (added or deleted on one side): keep it, or delete it")
+        text = "\n".join(out)
+        return text if len(text) <= room else text[:room] + f"\n... (more: open the files; {len(files)} in all)"
+
     def commit_for(self, wk, message):
         """Everything uncommitted in a worker's worktree, outside sessions/, committed to its branch by the house.
         -> how many files, 0 when there was nothing (or no worktree)."""
@@ -1199,6 +1341,9 @@ class Workshop:
         failure = wk.state.pop("failure", None)       # a5292: set ready again, so the last failure is answered
         if held is not None or failure is not None:
             wk.save()
+        self._waits[cid] = wait
+        if wk.state.get("house_merge") and not self.merge_resolved(cid, s, wk):
+            return                                     # a6753: markers left, or the commit refused: said on the card
         if wk.state.get("session_provider") == "codex":
             # a5284: a Codex worker's sandbox cannot write .git (a1666 c1884), so its work is committed here (CODEX_LIMITS)
             self.commit_for(wk, f"{cid}: {wk.actor}'s work, committed by the house (its sandbox cannot write .git)")
@@ -1251,6 +1396,8 @@ class Workshop:
                                  "~ house: your branch failed the checks in the landing room and did not land:\n" + why
                                  + "\nFix it on your branch and set the commission ready again.")
         if why.startswith("does not merge"):
+            if self.merge_main(w, cid, s, wk) is not None:
+                return                                 # a6753: the house merged main into the branch itself
             why = "the branch " + why
             return self.returned(cid, s, wk, "working", why + ". Merge main into your branch (git merge main), then set ready again.",
                                  f"~ house: {why}. Merge main into your branch (git merge main) and set ready again.")
