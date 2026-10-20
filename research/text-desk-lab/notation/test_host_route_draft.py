@@ -1,3 +1,4 @@
+# health: room test
 """Fake-only tests. No imports of house/world or Windows process APIs."""
 import os
 from pathlib import Path
