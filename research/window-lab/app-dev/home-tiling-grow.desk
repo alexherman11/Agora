@@ -1,0 +1,2 @@
+# home-tiling-grow (a6431): SUPERSEDED, 20 Oct. a6549 gave every panel and its body `share 1`, so a panel already
+# takes room in its column; what was left was the column's empty foot taking an equal share. See home-tiling-foot.desk.

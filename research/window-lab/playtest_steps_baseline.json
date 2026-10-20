@@ -240,6 +240,23 @@
       "body": "23ce2221ed538acc6fb926a2e3808dcacb885719f8fe9ed938e097f295c33742"
     },
     {
+      "name": "workspace",
+      "description": "press a workspace in the dock (writing), then back",
+      "order": 1750,
+      "needs": [
+        [
+          "a6427",
+          "workspaces from the dock"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_workspace",
+      "body": "383f1f2cf603f1ea46615277814bc6585b4fc007fe75e9673400324f37a844ac"
+    },
+    {
       "name": "drag",
       "description": "drag the board to another column",
       "order": 1800,
@@ -499,5 +516,9 @@
     "widen_column": "f242aefca6dce159bceae8d0c1aa740b75ddf9c4bec3f6cfdd7161782cc3b2dc",
     "feed_has": "e10ae8b9a02eacce195682affb308d6ac9b5c6e88e0b7f78c81535eb3b5cad00"
   },
-  "reference": "43e352b7c1ac67b417deb32e6c4b5a57f7bf7dcb"
+  "reference": "0a6b9d273d3d6ecb27abe9cb872bce4c6a39273f",
+  "workspace_constants": {
+    "WSICON": "ca755bbba25a25d9a3d8ecb229aa0130d9fae7653314ad374cfbc61c5e7352c5",
+    "TITLES": "8a6d5008e9b33f0007a64767b05bd149860f98edcbdf14b72018cb334df42fd1"
+  }
 }

@@ -1,0 +1,44 @@
+# a6460: the reader (lens reader) in the Writing room's style: what asks Alex wears mark, the yes is ink, the rest quiet
+token text.read = sans 17/1.65
+role rdpage : between gap
+role rdcol : between gap
+role rdhead : between gap, pad top gap, pad bottom gap x2, border bottom ghost
+role rdkicker : between gap x1.5, align center
+role rdkind : text.mono down 2 tracked, mark
+role rdfacts : text.mono down 2, soft
+role rdtitle : text.display up 4, ink
+role rdwhat : text.read up, ink
+role rdline : between gap
+role rdlabel : text.mono down 2 tracked, soft, width 7em
+role rdlabel.ask : text.mono down 2 tracked, mark, width 7em
+role rdrec : text, ink
+role rdask : between gap, on mark at 10%, rail mark, corner gap /2, pad gap, pad left gap x1.5
+role rdasktext : text medium, ink
+role rdmodes : between gap /2, space above gap /2
+role rdtab : text.mono down, soft, pad gap /4, pad left gap, pad right gap
+role rdtab.on : text.mono down, accent, pad gap /4, pad left gap, pad right gap, border bottom accent
+role rdscroll : pad top gap x2, pad bottom gap x3
+role rdbody : text.read, ink
+role rdskimlist : between gap x2
+role rdparas : between gap
+role rdskimsec : between gap /2
+role rdskimh : text strong, ink
+role rdskim : text.read, soft
+role rdpara : between gap
+role rdpara.li : between gap, pad left gap x2
+role rdmark : text.read, accent
+role rdfigure : on paper, corner gap /2, pad gap x2
+role rdh1 : text.display up 3, ink, space above gap x2
+role rdh2 : text.display up 2, ink, space above gap x3
+role rdh3 : text strong, accent, space above gap x2
+role rdquote : text.read, ink, pad left gap x2, border left accent
+role rdfoot : between gap, pad top gap
+role rdbox : text down, ink, on paper, edge faint, corner gap /2, pad gap
+role rdquiet : text.mono down, soft, pad gap /4
+role rdbar : between gap, align center, pad top gap, border top ghost
+role rdgo : text down medium, card, on accent, corner gap /2, pad gap /2, pad left gap x2, pad right gap x2
+role rdbtn : text down, accent, on card, edge accent, corner gap /2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role rdbtn.on : text down medium, card, on accent, corner gap /2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role rdnav : between gap x1.5, align center
+role rdpos : text.mono down 2, faint
+role rdnavlink : text down, soft

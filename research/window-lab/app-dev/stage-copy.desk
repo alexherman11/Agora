@@ -1,0 +1,16 @@
+# stage-copy: the app dev arrangement on a COPY (frontier-try) for a6431's shots, as a6427's 'app dev' workspace makes
+# it: The house alone on the left, the phone preview in a column of its own (two thirds), the chat pinned right.
+# Ids are Alex's layout in frontier-try on 20 Oct (f5664, its left column f5665, its panels); re-read them after a recopy.
+# Run: python research/window-lab/app-dev/apply.py lines research/window-lab/app-dev/stage-copy.desk
+look f5664
+do prop f5664 full=""
+read a5676
+do prop a5676 shelf=yes
+read a5674
+do prop a5674 shelf=yes
+look f5664
+do create f5664 kind=surface title="Phone column" layout=column
+do prop $new span=2
+do create $new kind=note title="Phone" role=home-panel actor=alex lens=app-preview lesser=app-preview-small shelf=no
+read a5482
+do prop prop:role=home-view,prop:actor=alex viewing=""

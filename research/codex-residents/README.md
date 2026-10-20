@@ -1,5 +1,97 @@
 # Codex residents in Frontier
 
+## Runtime update gate (a6498, acceptance pending)
+
+`runtime_pin.py` is the sole runtime-lock writer. Both adapters call it before
+starting an agent. A healthy existing pin starts without running probes or
+sending a notice. If its binary is absent or has changed, the checker selects
+the newest installation under `%LOCALAPPDATA%/OpenAI/Codex/bin`, copies its exact
+bytes into Git-ignored `local/codex-residents/pin-checker/runtime/<sha256>/`,
+and checks that retained copy. It does not change Codex, account, profile,
+provider or model settings.
+
+Before executing even `--version`, Windows Authenticode must report `Valid`
+and publisher `OpenAI OpCo, LLC` for the retained bytes. The original source
+must resolve inside Codex's updater bin folder. A retained pin can be rechecked
+only if an identical updater-installed source still exists there. Signature
+verification or source-provenance failures refuse without executing the binary.
+The checker rehashes both copies after signature verification and after probes.
+
+The candidate must print a recognized version that advances within the same
+major (including ordered alpha versions). A different hash at the same version,
+a downgrade or a major jump requires review. The resident probe must deliver
+completed house-protocol text without tools or system/developer instructions.
+Worker probes for both Sol and Astra must discover and invoke the stand-in Desk
+and write a fixture through the real sandboxed command tool. All three probes
+use empty scratch `CODEX_HOME` directories and loopback mock inference, with no
+sign-in. The stand-in advertises the real Desk schema but cannot access a world.
+All offered tool declarations, including descriptions and argument schemas,
+must match the reviewed inventories exactly.
+
+Only after every check passes does the checker preserve both previous locks,
+append a dated verification receipt to the Handbook note **Runtime pins**
+(`role=runtime-pins`), then publish both locks. A process-held OS lease prevents
+two adapters updating together. A durable transaction restores both old locks
+after an interrupted partial publication; a complete publication is retained.
+Hashes, catalogs and probe contracts are checked again before publication.
+The existing catalog pins accept Git's exact CRLF-to-LF checkout conversion;
+other content changes still refuse.
+
+Successful checks are quiet. Rejections retain the old locks and add one silent
+Alex notification per candidate, with `to=nobody` so no resident is called.
+The local receipt and the world's gesture identity suppress duplicate notices.
+Door failures queue notifications for retry, and prevent publishing a new pin
+without its visible verification record. A pending verification record alone
+does not claim publication. Publication receipts are retried if the door stops
+answering after both locks have been written.
+
+Worker shells intentionally retain `DESKD=off`. The adapter obtains the record
+route from its existing, authorized Desk MCP configuration; it does not enable
+the live door in shell commands. A standalone checker in that environment can
+use `--mcp-config <existing-worker-mcp.json>` to select the same route.
+
+Run from the checkout that owns the live adapters:
+
+```powershell
+& .venv/Scripts/python.exe research/codex-residents/runtime_pin.py --recheck
+& .venv/Scripts/python.exe research/codex-residents/runtime_pin.py --rollback <receipt>
+```
+
+Rechecking an unchanged approved runtime keeps its existing binary path.
+Rollback reads a checker-owned `history/<receipt>/previous.json` and requires
+the previous executable to exist, match its saved hash, and pass all current
+probes again, including updater-source and publisher checks. If the updater has
+removed that installation, automatic rollback refuses rather than bypassing
+provenance. It cannot approve arbitrary caller-supplied locks. Keep
+`local/codex-residents/pin-checker/` when recovering a deployment.
+
+Standalone probes require `--output <scratch.json>`; they never update the
+reviewed inventories by default. `--binary <path>` inspects a candidate without
+editing either lock, and `probe_worker.py --model gpt-6-astra` checks Astra.
+
+Builder evidence, 20 October: **48 focused tests passed in 6.70s**, using fake executables
+and inventories for updates and a real child process for lease contention.
+Refusal tests cover changed tools, missing/corrupt binaries, a major jump,
+untrusted publishers and outside-bin candidates; previous-lock rollback is
+reprobed. A file-open guard with the real user home present and fake signed-in
+credential sentinels verifies the Python checker opens no guarded profile and
+passes separate empty homes to all four child launches. Those children are
+stand-ins: this is not an OS-level file-access audit of native Codex.
+Read-only Windows signature inspection of the installed binary reported valid
+publisher `OpenAI OpCo, LLC`; it did not execute that candidate.
+The isolated resident probe passed on the current retained runtime. The worker
+probe reached command execution but Windows rejected `CreateRestrictedToken`
+with error 87. Current-runtime certification and real signed-in resident/worker
+turns therefore remain unverified; neither runtime lock was changed.
+The full checker refused the current candidate, and its failure notice remains
+queued because the standalone builder environment has `DESKD=off`. Notice
+deduplication and record delivery passed against a fake loopback house API;
+live delivery has not been verified.
+JEFF authorized source landing before live acceptance (card comments c6757,
+c6760), then host-side verification outside this nested token. A healthy pin
+does not rerun probes on startup: use the explicit `--recheck` above for this
+acceptance run, then perform the authorized harmless resident and Astra turns.
+
 ## Persistent worker recovery (20 October 2026)
 
 The house supports persistent Codex builders in the existing worker pool:
@@ -103,8 +195,8 @@ and the Study without assigning a fixed specialty.
 `codex_resident.py` uses Python `openai-codex==0.147.0`, managed ChatGPT sign-in,
 and exactly `gpt-6-astra` at medium reasoning. `runtime-lock.json` pins the
 current Codex executable and model catalog by SHA-256. Missing or
-changed binaries/catalogs are refused, rather than silently changing the model
-or runtime. A future update needs a new inventory check before repinning.
+changed catalogs are refused. Binary updates require the verified gate described
+above; changing a pin never silently changes the model.
 
 Pinned 1 Oct: 0.159.2 (`bin/c6fe824d725f02d7`). **Repinned 15 Oct (a5352)** after
 Codex updated itself and removed that binary: `codex-cli 0.162.0-alpha.17.2`,
@@ -113,8 +205,8 @@ it first, mock inference only: `probe_runtime.py` (also with a PNG crop) and
 `probe_worker.py` for Sol and for Astra all printed PASS. The tool lists and
 instruction-free resident request match the 1 Oct inventory. (The resident request
 also lost an empty `additional_tools` item.) The catalog hashes are of the
-CRLF files as checked out in `C:/Projects/Agora4`; a checkout with LF endings
-fails the pin with the same "changed or missing" message.
+CRLF files as checked out in `C:/Projects/Agora4`; this historically made LF
+checkouts fail. The a6498 gate accepts only the exact line-ending conversion.
 
 The custom system and developer instructions are empty. There are no model
 tools. The host sends the world's existing door welcome and wake text as user
@@ -174,7 +266,7 @@ them to sleep.
 ```powershell
 & .venv/Scripts/python.exe -m pytest -q research/codex-residents/test_transport.py
 & .venv/Scripts/python.exe -m ruff check research/codex-residents
-& .venv/Scripts/python.exe research/codex-residents/probe_runtime.py
+& .venv/Scripts/python.exe research/codex-residents/probe_runtime.py --output local/codex-residents/resident-probe.json
 ```
 
 Ran: five focused tests passed; Ruff passed. The real compiled runtime with

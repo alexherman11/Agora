@@ -54,9 +54,9 @@ acceptance run `hud_playtest.py --report none` on the same copied-world
 snapshot before and after; compare ids, outcomes, scripts and budgets.
 Milliseconds measure real presses and naturally vary. This refactor's
 browser comparison was **not run in the Codex sandbox**. The captured
-`playtest_steps_baseline.json` records 35 registrations and
-AST hashes from main at 43e352b (including the equal-footing step that
-landed during this extraction); the migration tests check those original bodies
+`playtest_steps_baseline.json` records 36 registrations and
+AST hashes from main at 0a6b9d2 (including the equal-footing and workspace
+steps that landed during this extraction); the migration tests check those original bodies
 without copying or changing their scripts. Adding a new step does not
 require updating that historical baseline. An intentional change to an old
 script should explicitly update its baseline entry.

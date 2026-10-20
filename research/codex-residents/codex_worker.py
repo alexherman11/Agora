@@ -50,19 +50,27 @@ def pinned_catalog(model):
     )
 
 
-def runtime_config(directory, model=MODEL):
-    if importlib.metadata.version("openai-codex") != SDK_VERSION:
-        raise RuntimeError(f"Worker requires openai-codex=={SDK_VERSION}")
+def runtime_config(directory, model=MODEL, *, mcp=None):
+    from runtime_pin import catalog_matches, ensure_runtime, worker_record_url
+
+    ensure_runtime(record_url=worker_record_url(mcp) if mcp else None)
     lock = json.loads((HERE / "worker-runtime-lock.json").read_text(encoding="utf-8"))
     catalog, catalog_sha = pinned_catalog(model)
-    binary = (
-        os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
-    )  # as the resident adapter: still hash-checked
-    for path, expected in ((Path(binary), lock["binary_sha256"]), (catalog, catalog_sha)):
-        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise RuntimeError(
-                f"Pinned worker runtime changed or missing: {path}; recheck the inventory"
-            )
+    binary = os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
+    if (
+        not Path(binary).is_file()
+        or hashlib.sha256(Path(binary).read_bytes()).hexdigest() != lock["binary_sha256"]
+    ):
+        raise RuntimeError("Worker runtime override does not match the checked pin")
+    if not catalog_matches(catalog, catalog_sha):
+        raise RuntimeError("Pinned worker catalog changed")
+    return build_config(directory, binary, PROFILE, catalog)
+
+
+def build_config(directory, binary, profile, catalog):
+    """Configuration only; candidate probes cannot load the sign-in profile."""
+    if importlib.metadata.version("openai-codex") != SDK_VERSION:
+        raise RuntimeError(f"Worker requires openai-codex=={SDK_VERSION}")
     enabled = {
         "shell_tool",
         "unified_exec",
@@ -105,7 +113,7 @@ def runtime_config(directory, model=MODEL):
     for key in list(os.environ):
         if key.startswith("CODEX_"):
             os.environ.pop(key)
-    env = {"CODEX_HOME": str(PROFILE)}
+    env = {"CODEX_HOME": str(profile)}
     return CodexConfig(
         codex_bin=binary,
         cwd=str(directory),
@@ -164,7 +172,9 @@ def serve(args):
     threading.Thread(target=read_input, daemon=True).start()
     prompt = Path(args.prompt_file).read_text(encoding="utf-8")
     with (
-        CodexClient(runtime_config(directory, args.model), approval_handler=deny) as client,
+        CodexClient(
+            runtime_config(directory, args.model, mcp=args.mcp_config), approval_handler=deny
+        ) as client,
         child_job(client._proc),
     ):
         client.initialize()

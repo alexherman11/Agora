@@ -49,6 +49,7 @@ def resident_inputs(content):
             if source.get("type") != "base64" or source.get("media_type") != "image/png":
                 raise ValueError("Resident images must be selected PNG crops")
             import base64
+
             raw = base64.b64decode(source["data"], validate=True)
             if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > 2 * 1024 * 1024:
                 raise ValueError("Invalid resident PNG crop")
@@ -83,19 +84,28 @@ def deny(method, params):
 
 
 def runtime_config(directory, binary=None):
+    from runtime_pin import catalog_matches, ensure_runtime
+
+    lock = ensure_runtime()
+    binary = binary or os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
+    if (
+        not Path(binary).is_file()
+        or hashlib.sha256(Path(binary).read_bytes()).hexdigest() != lock["binary_sha256"]
+    ):
+        raise RuntimeError("Runtime override does not match the checked pin")
+    catalog = Path(__file__).with_name("model-catalog.json")
+    if not catalog_matches(catalog, lock["catalog_sha256"]):
+        raise RuntimeError("Pinned resident catalog changed")
+    return build_config(directory, binary, PROFILE)
+
+
+def build_config(directory, binary, profile):
+    """Configuration only; candidate probes use their own empty profile."""
     if importlib.metadata.version("openai-codex") != SDK_VERSION:
         raise RuntimeError(
             f"This adapter was verified with openai-codex=={SDK_VERSION}; recheck before upgrading"
         )
-    lock = json.loads(Path(__file__).with_name("runtime-lock.json").read_text(encoding="utf-8"))
-    binary = binary or os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
-    for path, expected in (
-        (Path(binary), lock["binary_sha256"]),
-        (Path(__file__).with_name("model-catalog.json"), lock["catalog_sha256"]),
-    ):
-        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise RuntimeError(f"Pinned runtime changed or missing: {path}; recheck the inventory")
-    if any((PROFILE / name).exists() for name in ("AGENTS.md", "AGENTS.override.md")):
+    if any((Path(profile) / name).exists() for name in ("AGENTS.md", "AGENTS.override.md")):
         raise RuntimeError("Resident profile contains global instructions; keep its prompt empty")
     overrides = [f"features.{name}=false" for name in DISABLED] + [
         'web_search="disabled"',
@@ -122,7 +132,7 @@ def runtime_config(directory, binary=None):
         "model_catalog_json=" + json.dumps(str(Path(__file__).with_name("model-catalog.json"))),
     ]
     env = {k: "" for k in os.environ if k.startswith("CODEX_") and k != "CODEX_HOME"}
-    env["CODEX_HOME"] = str(PROFILE)
+    env["CODEX_HOME"] = str(profile)
     return CodexConfig(
         codex_bin=binary,
         cwd=str(directory),
@@ -161,6 +171,45 @@ def event_data(event):
     return raw if isinstance(raw, dict) else value.model_dump(by_alias=True, mode="json")
 
 
+def emit_plan_usage(client, emit, timeout=2):
+    """Optional metadata must not hold up answers or accumulate hung requests."""
+    previous = vars(client).get("_agora_usage_job")
+    if previous is not None and previous.is_alive():
+        return
+    job = threading.Thread(target=_read_plan_usage, args=(client, emit), daemon=True)
+    client._agora_usage_job = job
+    job.start()
+    job.join(timeout)
+    if job.is_alive():
+        emit({"type": "plan_usage_unavailable", "provider": "codex",
+              "reason": "Codex account/rateLimits/read timed out; waiting for CLI response"})
+
+
+def _read_plan_usage(client, emit):
+    """Read-only CLI account metadata. No account/credit mutations or model turn."""
+    from openai_codex.generated.v2_all import GetAccountRateLimitsResponse
+    try:
+        result = client.request("account/rateLimits/read", None, response_model=GetAccountRateLimitsResponse)
+        raw = result.model_dump(by_alias=True, mode="json")
+        # Never put account/credit details in the house stream.
+        def bucket(value):
+            if not isinstance(value, dict):
+                return {}
+            clean = {"limitId": value.get("limitId")}
+            for name in ("primary", "secondary"):
+                window = value.get(name)
+                if isinstance(window, dict):
+                    clean[name] = {k: window.get(k) for k in ("usedPercent", "windowDurationMins", "resetsAt")}
+            return clean
+        data = {"rateLimits": bucket(raw.get("rateLimits")),
+                "rateLimitsByLimitId": {k: bucket(v) for k, v in (raw.get("rateLimitsByLimitId") or {}).items()}}
+        emit({"type": "codex_event", "method": "account/rateLimits/read", "data": data})
+    except Exception as exc:
+        # Error strings can include request details; retain only the class.
+        emit({"type": "plan_usage_unavailable", "provider": "codex",
+              "reason": "Codex account/rateLimits/read unavailable (" + type(exc).__name__ + ")"})
+
+
 def receive(client, turn_id, emit):
     """Keep completed text in order; a failed/interrupted turn runs no desk lines."""
     messages = {}
@@ -178,6 +227,7 @@ def receive(client, turn_id, emit):
             elif event.method == "thread/compacted":
                 emit({"type": "system", "subtype": "compact_boundary"})
             elif event.method == "turn/completed":
+                emit_plan_usage(client, emit)
                 turn = data["turn"]
                 if turn["status"] != "completed":
                     error = turn.get("error") or {}
@@ -206,8 +256,13 @@ def receive(client, turn_id, emit):
         client.unregister_turn_notifications(turn_id)
 
 
+_OUTPUT_LOCK = threading.Lock()
+
+
 def output(event):
-    print(json.dumps(event, ensure_ascii=False), flush=True)
+    # A late quota response may arrive alongside the next turn's stream.
+    with _OUTPUT_LOCK:
+        print(json.dumps(event, ensure_ascii=False), flush=True)
 
 
 def serve(args):

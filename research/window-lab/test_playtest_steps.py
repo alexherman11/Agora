@@ -67,7 +67,7 @@ class Migration(unittest.IsolatedAsyncioTestCase):
         old_walk = original("hud_playtest.py", "walk", dict(vars(runner)))
         import hud_scroll
         old_scroll = original("hud_scroll.py", "steps", dict(vars(hud_scroll)))
-        for only in (None, ["scroll"], ["writing", "open"], ["no-such-step"]):
+        for only in (None, ["scroll"], ["writing", "open"], ["workspace"], ["no-such-step"]):
             before, after = StandIn(), StandIn()
             with patch("hud_playtest.asyncio.sleep", new=AsyncMock()):
                 with patch("hud_scroll.steps", old_scroll):
@@ -99,6 +99,10 @@ class Migration(unittest.IsolatedAsyncioTestCase):
             node = next(n for n in ast.walk(tree)
                         if (isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name)
                         or (isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name) and n.targets[0].id == name))
+            self.assertEqual(digest(node), expected, name)
+        workspace = ast.parse((HERE / "playtest_steps/workspace.py").read_text(encoding="utf-8"))
+        for name, expected in BASELINE["workspace_constants"].items():
+            node = next(n for n in workspace.body if isinstance(n, ast.Assign) and n.targets[0].id == name)
             self.assertEqual(digest(node), expected, name)
 
     def test_all_callbacks_bind_and_resolve_their_globals(self):
@@ -158,6 +162,22 @@ class Migration(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(runner.Skip, "not landed"):
             await step.script(play, None)()
         play.w.js.assert_not_awaited()
+
+    async def test_workspace_press_back_and_changed_panels_failure(self):
+        step = next(s for s in discover() if s.name == "workspace")
+        for after, okay in (("Chat|Viewer", True), ("Chat|Music|Viewer", False)):
+            play = StandIn()
+            play.w.js = AsyncMock(side_effect=["Chat|Viewer", True, after])
+            play.needs = lambda *args: None
+            play.has = AsyncMock(return_value=True)
+            play.timed = AsyncMock(side_effect=[{"ok": True, "ms": 41}, {"ok": True, "ms": 43}])
+            result = await step.script(play, None)()
+            self.assertEqual(result["ok"], okay)
+            self.assertEqual(play.timed.await_count, 2)
+            if okay:
+                self.assertIn("same panels out as before", result["note"])
+            else:
+                self.assertIn("back did not return the panels", result["want"])
 
     def test_wheel_factory_compatibility(self):
         from hud_scroll import steps

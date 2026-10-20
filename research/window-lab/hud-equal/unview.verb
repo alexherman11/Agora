@@ -1,0 +1,6 @@
+# unview <viewer>: close what that home-base viewer shows (Back keeps it), put the person's Viewer panel away, and bring
+# their JEFF chat panel out if it was away (a5994, equal footing: the viewer and the chat are panels). The viewer's × and
+# the dock's JEFF use it; `view <id>` is its other half and brings the Viewer panel out.
+do prop $1 back="$1.viewing" viewing="" with="" when ($1.viewing or "") != ""
+do prop prop:role=home-panel,prop:actor=$me,prop:lens=home-viewer shelf=yes when count(prop:role=home-panel,prop:actor=$me,prop:lens=home-viewer,prop:shelf=no) > 0
+do prop prop:role=home-panel,prop:actor=$me,prop:lens=jeff-chat shelf=no when count(prop:role=home-panel,prop:actor=$me,prop:lens=jeff-chat,prop:shelf=yes) > 0

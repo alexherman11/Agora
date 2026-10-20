@@ -152,6 +152,12 @@
     }
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
+    // a6431: a page in a frame is one element for as long as it shows the same page: a new size, turn or toggle changes
+    // the frame where it stands (a new element would load the page again)
+    if (old && old.el._page && p.page && old.el._page.src === p.page.src) {
+      old.el._n = n; old.sig = sig; old.el.className = (p.role ? Style.roleClass(p.role) + " " : "") + "t-page";
+      old.el._page.update(p.page); next.set(n.key, old); return old.el;
+    }
     if (old && old.el._composer && old.el._composer.config === JSON.stringify([p, n.acts])) {
       old.el._n = n; old.sig = sig; old.el._composer.sync(); next.set(n.key, old); return old.el;
     }
@@ -164,7 +170,11 @@
     if (role) el.className = Style.roleClass(role);
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
-    if (p.text != null && p.markdown) markdown(el, n, p);
+    // a6431: `page`: the page the words name, the real painter at a device's size (page.js); `on pick` names a part of it
+    if (p.text != null && p.page && window.Page) Page.draw(el, p.page, { session, who,
+      canPick: () => el._n.acts.some(a => a.on === "pick"),
+      pick: async (name, key) => { for (const a of el._n.acts.filter(a => a.on === "pick")) await send(el._n, a.line.replace(/\$value\b/g, () => TEXT.esc(name)).replace(/\$part\b/g, () => TEXT.esc(key))); } });
+    else if (p.text != null && p.markdown) markdown(el, n, p);
     else if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
     // `wave` (14 Oct): a role that waves draws each character as its own span, each a beat after the one before
     else if (p.text != null && role && ((Style.style || {}).roles || {})[role] && Style.style.roles[role].look.wave)
@@ -654,11 +664,17 @@
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
       // a6642: sent by Enter inside an `arrows` frame (a search box), the caret comes back once the answer is painted,
-      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile
+      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile. a5994 (found by the
+      // playtest): a press anywhere closes an open float, the frame's own list too while it was empty, so the words'
+      // answer filled a closed list and nothing showed: sending them is asking for that list, so a closed float in the
+      // frame opens again
       const back = committing && el.closest("[data-arrows]") ? n.key : null;
       if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw).then(() => {
         const k = back && kept.get(back);
-        if (!k || !k.el.isConnected || (document.activeElement && document.activeElement !== document.body)) return;
+        if (!k || !k.el.isConnected) return;
+        const frame = k.el.closest("[data-arrows]");
+        if (frame) frame.querySelectorAll('.l-float[data-folded="1"] > button').forEach(h => h.click());
+        if (document.activeElement && document.activeElement !== document.body) return;
         k.el.focus(); getSelection().selectAllChildren(k.el); getSelection().collapseToEnd();
       }); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
@@ -899,7 +915,7 @@
     draw(r) {
       const m = document.createElement(this.kinds[r.mark].tag); m.className = "t-mark " + (this.kinds[r.mark].look || "t-mark-" + r.mark); m.textContent = r.text;
       if (r.mark === "link") { m.dataset.href = r.href; m.title = r.href + "  (Ctrl+click opens it)"; }
-      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = r.title + (r.open ? "  (click opens it)" : ""); }
+      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = (window.Markdown ? Markdown.fullName({ title: r.title, name: r.text }) : r.title) + (r.open ? "  (click opens it)" : ""); }   // a6460: never the id, on hover either
       return m;
     },
     // Ctrl+B and the like, in the source: wrap what is selected, or take the mark off when it is already there
@@ -1106,7 +1122,22 @@
   }
   function runs(el, rs) {
     el._runs = rs;
+    // a6460: a name inside a sentence is drawn quiet, as a Markdown document draws it (markdown.js refDraw): first four
+    // words, the whole on hover, an arrow for a comment, event or line, a number when named again; a text that is only
+    // a name keeps it whole
+    const M = window.Markdown, prose = M && rs.some(r => !r.mark && /[A-Za-z]{3,}/.test(r.text || ""));
+    const refs = new Map(), n = new Map();
+    if (prose) {
+      for (const r of rs) if (r.mark === "thing" && r.kind !== "comment" && r.kind !== "event" && r.kind !== "line") n.set(r.id, (n.get(r.id) || 0) + 1);
+      let k = 0; for (const [id, c] of n) if (c > 1) refs.set(id, { n: ++k, seen: false });
+    }
     el.replaceChildren(...rs.map(r => {
+      if (r.mark === "thing" && prose) {
+        const m = MARKS.draw(r), full = M.fullName({ title: r.title, name: r.text });
+        m.replaceChildren(...M.refDraw({ name: r.text, kind: r.kind }, refs.get(r.id), "t-"));
+        m.title = full + (r.open ? "  (click opens it)" : "");
+        return m;
+      }
       if (r.mark) return MARKS.draw(r);
       if (!r.role) return document.createTextNode(r.text);
       const s = document.createElement(r.block ? "div" : "span"); s.className = Style.roleClass(r.role);
