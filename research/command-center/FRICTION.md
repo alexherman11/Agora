@@ -339,7 +339,7 @@ a6662 · family=missing-word · status=open
 
 Read: usage.py already follows Claude rate_limit_event.unifiedWindows and context-token streams; workshop.py persists provider retry times, but there is no durable per-window Usage surface, event-driven plan snapshot, per-provider deduplicated notice episode, or configurable fuel-start rule. A world lens cannot read CLI stream metadata or schedule a process resume. Source work for a6646 will bridge only these observations and lifecycle transitions, leaving the gauge and glance in world lenses. No credentials or account settings are read or changed.
 
-## curing (37)
+## curing (38)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -628,6 +628,12 @@ a6240 · family=code · status=curing
 
 Source edits of a6153 (HUD presses), 16 Oct. No world word was missing: every cause was the engine's. (1) lens_ir kept instances in 24 stores, one per placed lens per place, and the home base with the board out places more: nothing was kept (now 400). (2) A part holding a by/run repeat was never kept, because its sort keys were read around the accessor (now through it, Accessor.props). (3) Every part made escaped its whole context for gestures it may not have. (4) The painter was sent the scene text it never shows (text=0) and the body was encoded twice. (5) sayings read every saying to keep one (early terms). (6) deskd's world lock was a file tried every 50 ms, even between its own threads (now an in-process lock first). (7) hud.py rewrote four unchanged witnessed files every 2 s, so every page rebuilt every 2 s (witnessed.write changed_only). What is still not a world word: a lens cannot say 'this press changes only my panel' (optimistic paint); see a6153's done comment. Tools and numbers: research/window-lab/press-speed/README.md.
 
+### Agents need a live charter at fresh memory and compaction (a6536)
+
+a6728 · family=missing-word · status=curing
+
+Missing world word: start= on a resident corner, parallel to wake= but only for fresh memory and compaction. Source draft adds charter.py, house/workshop startup hooks, Claude SessionStart(compact) context and Codex developer-history reinjection. It mirrors only a generated AGENTS.md block from the single live agent-charter note. Source remains unlanded; provider boundary acceptance still requires a real runtime observation. No rules or account settings changed.
+
 ## unchecked (4)
 
 ### Reader words and quiet references missing from the world (a6460)
@@ -656,6 +662,7 @@ Source edits for a6638 (the universal conversation), each a world-level word tha
 a6713 · family=missing-word · status=unchecked
 
 Missing world word: check runtime. The world cannot hash a host executable, run isolated compiled-runtime probes, hold an OS publication lock or atomically replace runtime lock files. Draft source in a6498 adds runtime_pin.py, adapter startup gates and probe_support.py, plus empty-profile/stand-in Desk probes and fake binary/inventory tests. Both locks remain untouched until every candidate check passes. Source is not landed. The resident mock probe passed here; the worker mock probe failed at CreateRestrictedToken failed: 87. This is not live agent or current re-pin acceptance.
+Final source checks in this builder: 39 focused tests passed in 7.46s; changed-file Ruff All checks passed; git diff --check exit 0. Tests include fake binaries/inventories, a real cross-process lease, and fake-house receipt/notice delivery. Final resident mock source passed with -E and empty CODEX_HOME. Source uses the worker's existing MCP door route without changing DESKD=off in shells. Source and precise rerun instructions are preserved in research/codex-residents/runtime-pin-handoff.md. Not landed; worker-capable environment and live acceptance are still needed.
 
 ## cured (65)
 
