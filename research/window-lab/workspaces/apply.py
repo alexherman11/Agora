@@ -54,13 +54,14 @@ TILING_EDITS = [
     ('      only when ($lay.full or "") != ""\n      rail : column\n',
      '      only when ($lay.full or "") != "" and count(kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no) > 0\n'
      '      rail : column\n', 1),
-    ('  body : column\n    role panebody\n    lens $p.lens\nrailitem : column\n',
-     '  body : column\n    role panebody\n    only when ($p.thing or "") = ""\n    lens $p.lens\n'
-     '  on : column\n    role panebody\n    only when ($p.thing or "") != ""\n    of $p.thing as t\n    each stood\n'
+    # a6549 (20 Oct) gave both panel bodies share 1 and scroll scroll: a long panel scrolls inside itself
+    ('  body : column\n    share 1\n    scroll scroll\n    role panebody\n    lens $p.lens\nrailitem : column\n',
+     '  body : column\n    share 1\n    scroll scroll\n    role panebody\n    only when ($p.thing or "") = ""\n    lens $p.lens\n'
+     '  on : column\n    share 1\n    scroll scroll\n    role panebody\n    only when ($p.thing or "") != ""\n    of $p.thing as t\n    each stood\n'
      'stood : column\n  share 1\n  lens $p.lens\nrailitem : column\n', 1),
-    ('  body : column\n    role panebody\n    share 1\n    scroll none\n    lens $p.lens',
-     '  body : column\n    role panebody\n    share 1\n    scroll none\n    only when ($p.thing or "") = ""\n    lens $p.lens\n'
-     '  on : column\n    role panebody\n    share 1\n    scroll none\n    only when ($p.thing or "") != ""\n'
+    ('  body : column\n    role panebody\n    share 1\n    scroll scroll\n    lens $p.lens',
+     '  body : column\n    role panebody\n    share 1\n    scroll scroll\n    only when ($p.thing or "") = ""\n    lens $p.lens\n'
+     '  on : column\n    role panebody\n    share 1\n    scroll scroll\n    only when ($p.thing or "") != ""\n'
      '    of $p.thing as t\n    each stood', 1),
 ]
 
@@ -184,7 +185,9 @@ def build_workspace(w, ws_home, base, name, title, glyph, about, cols, props, id
                 must(w.do(f"do prop {sel} shelf=no"), f"{name}: {ln} out")
     vals = {k: v.format(**ids) for k, v in props.items()}
     kv = " ".join(f"{k}={put.q(v)}" for k, v in vals.items())
-    must(w.do(f"do prop {ws} role=workspace actor=alex name={name} glyph={glyph} full=\"\" about={put.q(about)} {kv}"),
+    # a rearranged workspace fills nothing; 'default' (keep) keeps his full= as copy remapped it to its own panel
+    full = "" if keep else ' full=""'
+    must(w.do(f"do prop {ws} role=workspace actor=alex name={name} glyph={glyph}{full} about={put.q(about)} {kv}"),
          f"{name}: its props")
     print(f"workspace {name}: {ws}")
     return ws

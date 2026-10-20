@@ -39,7 +39,7 @@ scrollfeed scrollboard scrollreader. Fixtures stay in the copy; real wheel input
 stays at 0. Reader waits on a6460 or --assume a6460 with its --apply files. See hud_scroll.py.
 
 Steps (ids for --only): open lowdown board card later approve sendback atwork timer writing writedoc comment chat send
-drag fill widen restore glance number dock esc winkey. (atwork plays The house where lane 3's home-house has taken
+workspace drag fill widen restore glance number dock esc winkey. (atwork plays The house where lane 3's home-house has taken
 At work's place; timer and number are lane 3's, a6057.)
 """
 import asyncio
@@ -896,6 +896,37 @@ async def walk(play, only):
         return r
     steps.append(("send", "send it with Enter: it shows in the feed", s_send, (OK_MS, SLOW_MS)))
 
+    # a6427 (Alex, 17 Oct: 'if I say let's start app dev right now, the screen reorganizes around it'): a workspace from
+    # the dock, then back. Panels are counted by their title bars; Writing by its lens beside the chat
+    WSICON = "pt.tipped({0}, pt.part('lens:home-workspaces'))"
+    TITLES = "[...document.querySelectorAll('#paint [data-key$=\"/grip/title\"]')].filter(e => pt.vis(e)).map(e => e.textContent.trim()).sort().join('|')"
+
+    async def s_workspace():
+        play.needs("a6427", "workspaces from the dock", ("home-workspaces", "workspace"))
+        if not await play.has(WSICON.format(json.dumps("writing"))):
+            raise AssertionError("no 'writing' workspace icon in the dock")
+        before = await w.js(f"(() => {{ const pt = window.__pt; return {TITLES}; }})()")
+        r = await play.timed("pt.part('lens:writing') && " + TITLES.replace("pt.vis", "pt.vis") + " === ''",
+                             press(play, WSICON.format(json.dumps("writing")), "the dock's writing icon"), timeout=6000)
+        if not r["ok"]:
+            r["want"] = "pressing writing did not lay the home base out as Writing beside the chat with nothing else out"
+            return r
+        side = await w.js("(() => { const pt = window.__pt, a = pt.rect(pt.part('lens:writing')), b = pt.rect(pt.part('lens:jeff-chat')); return a && b ? a[0] + a[2] <= b[0] + 2 : null; })()")
+        r2 = await play.timed(f"!pt.part('lens:writing') || {TITLES} === {json.dumps(before)}",
+                              press(play, WSICON.format(json.dumps("back")), "the dock's back icon"), timeout=6000)
+        after = await w.js(f"(() => {{ const pt = window.__pt; return {TITLES}; }})()")
+        if not r2["ok"] or after != before:
+            r2["ok"] = False
+            r2["want"] = f"back did not return the panels as they were ({before!r} before, {after!r} after)"
+            return r2
+        r2["note"] = (f"writing in {r['ms']} ms (Writing {'left of' if side else 'NOT left of'} the chat, no panel out); "
+                      f"back in {r2['ms']} ms, the same panels out as before")
+        if not side:
+            r2["ok"] = False
+            r2["want"] = "Writing is not beside the chat"
+        return r2
+    steps.append(("workspace", "press a workspace in the dock (writing), then back", s_workspace, (OK_MS, SLOW_MS)))
+
     COLS = "window.__pt.parts('lens:home-tiling').filter(e => /\\/tiling\\/[a-z]\\d+$/.test(e.dataset.key))"
 
     async def s_drag():
@@ -1144,7 +1175,7 @@ async def walk(play, only):
     from hud_scroll import steps as scroll_steps
     steps.extend(scroll_steps(play))
     order = ["open", "lowdown", "board", "card", "later", "approve", "sendback", "atwork", "timer", "writing", "writedoc",
-             "comment", "chat", "send", "drag", "restore", "fill", "widen", "glance", "number", "dock", "esc", "winkey"]
+             "comment", "chat", "send", "workspace", "drag", "restore", "fill", "widen", "glance", "number", "dock", "esc", "winkey"]
     steps.sort(key=lambda s: order.index(s[0]) if s[0] in order else len(order))
     for sid, name, fn, budget in steps:
         if want(sid):
