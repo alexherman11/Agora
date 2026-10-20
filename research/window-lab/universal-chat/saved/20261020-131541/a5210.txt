@@ -1,0 +1,172 @@
+# jeff-chat: Alex and JEFF talking, in the Conversation (a5080). The feed groups a run of lines by one writer under one
+# name; Alex's own lines stand at the right. "Everything" shows every line anyone said to or by Alex, anywhere; JEFF
+# chooses what reaches Alex now, and the whole feed is always here to read. The draft (role=conversation-draft,
+# actor=$me) holds who it goes to (to), what it answers (reply_to, quote) and which feed is shown (view).
+chat : column
+  share 1
+  role chat
+  of prop:role=conversation-draft,prop:actor=$me as draft
+  each room
+room : column
+  share 1
+  role room
+  head : row
+    role chathead
+    face : text "J"
+      role face
+    who : column
+      share 1
+      name : text "JEFF"
+        role chatname
+      state : text "thinking…"
+        role thinking
+        only when count(house doing=working resident=jeff) > 0
+      rest : text "here when you want him"
+        role meta
+        only when count(house doing=working resident=jeff) = 0
+    tabs : row
+      role tabs
+      mine : text "JEFF"
+        role tab
+        role tab.on when $draft.view != "all"
+        on click do prop $draft view=jeff
+      all : text "Everything"
+        role tab
+        role tab.on when $draft.view = "all"
+        on click do prop $draft view=all
+  hello : column
+    role hello
+    only when count(sayings in:a5080) = 0
+    hi : text "JEFF is new, as of today."
+      role heading
+    what : text "He keeps the whole picture: what the residents and builders are doing, what is waiting on you, and what can wait. Ask him anything, or ask for the lowdown."
+      role meta
+  feed : column
+    share 1
+    scroll end
+    role feed
+    only when $draft.view != "all"
+    of sayings in:a5080 as s
+    clamp last 120
+    run name
+    each said
+  everything : column
+    share 1
+    scroll end
+    role feed
+    only when $draft.view = "all"
+    of sayings involving:alex as s
+    clamp last 120
+    run name
+    each said
+  working : row
+    role working
+    of house doing=working as h
+    each typing
+  dock : column
+    role dock
+    answering : row
+      role answering
+      only when ($draft.reply_to or "") != ""
+      q : text "Answering: $draft.quote"
+        role meta
+        clamp 1
+        share 1
+      x : text "×"
+        role tool
+        on click do prop $draft reply_to="" quote=""
+    to : row
+      role to
+      label : text "To"
+        role meta
+      j : text "JEFF"
+        role chip
+        role chip.on when $draft.to = "jeff"
+        on click do prop $draft to=jeff
+      s : text "Sable"
+        role chip
+        role chip.on when $draft.to = "sable"
+        on click do prop $draft to=sable
+      p : text "Pike"
+        role chip
+        role chip.on when $draft.to = "pike"
+        on click do prop $draft to=pike
+      u : text "Juniper"
+        role chip
+        role chip.on when $draft.to = "juniper"
+        on click do prop $draft to=juniper
+      r : text "Rowan"
+        role chip
+        role chip.on when $draft.to = "rowan"
+        on click do prop $draft to=rowan
+      c : text "Claude"
+        role chip
+        role chip.on when $draft.to = "claude"
+        on click do prop $draft to=claude
+    attachments : column
+      of captures $draft.context
+      each attachment
+    say : text ""
+      role input
+      hint "Write to JEFF, or anyone above…"
+      lines 1..12
+      commit explicit
+      on edit do append a5080 line="$value" default_to="$draft.to" captures="$draft.context" context_from="$draft" reply_to="$draft.reply_to"
+    help : text "Enter sends · Shift+Enter for a new line · @name to send to someone else · Ctrl+Alt drag to show JEFF something"
+      role hint
+said : column
+  role said
+  role said.mine when $s.name = "alex"
+  head : row
+    role saidhead
+    only when $run = 1
+    who : text "$s.by"
+      role who
+      role who.jeff when $s.name = "jeff"
+    to : text "to $s.to"
+      role meta
+      only when $s.to != "" and $s.to != "alex" and $s.to != "jeff"
+    at : text "$s.at"
+      role meta
+    where : text "in $s.in"
+      role place
+      only when $s.item != "a5080"
+  bubble : column
+    role bubble
+    role bubble.mine when $s.name = "alex"
+    role bubble.jeff when $s.name = "jeff"
+    body : text "$s.said"
+      marks
+      role words
+      media
+      on pop do prop prop:role=media-player,prop:actor=$me src="$value" opened=$now
+      on pop host window media-player
+    more : column
+      only when $s.context != ""
+      fold "What was shown"
+      what : text "$s.context_summary"
+        role meta
+  acts : row
+    role acts
+    answer : text "Answer"
+      role tool
+      on click do prop $draft reply_to=$s.line quote="$s.said"
+typing : row
+  role typingrow
+  dots : text "• • •"
+    role dots
+  who : text "$h.resident is working"
+    role meta
+attachment : row
+  role attachment
+  pic : text "$thumb"
+    picture
+    role attachthumb
+    only when ($thumb or "") != ""
+  label : text "$label"
+    role meta
+    share 1
+  remove : text "Remove"
+    role tool
+    on click do prop $draft context="$remaining"
+

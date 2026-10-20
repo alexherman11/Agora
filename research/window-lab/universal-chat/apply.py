@@ -10,7 +10,9 @@ a line points at).
     python research/window-lab/universal-chat/apply.py check [--world frontier] [--port 8794]
                                        every old= passage against the world's text now (each must stand once); sends nothing
     python research/window-lab/universal-chat/apply.py door [--as <name>] [--world frontier] [--port 8794]
-                                       check, then all of it through the door, line by line, stopping at a refusal
+                                       check, then all of it through the door, line by line, stopping at a refusal;
+                                       first it saves the live text of every note it changes under saved/<stamp>/
+    python research/window-lab/universal-chat/apply.py restore <saved dir> [--as <name>]   puts those texts back
 
 What it changes, all world data anyone may change again:
   - jeff-chat (the Conversation in the home base): the feed shows everything said to or by Alex (a 'Just JEFF' tab
@@ -402,9 +404,24 @@ def check(who, port, world, read=None):
     return bad
 
 
+def restore(saved, who, port, world):
+    """One step back: every saved note text rewritten as it was (whatever was edited since in those notes goes too:
+    read them first), and Alex's writer view as it was."""
+    for f in sorted(saved.glob("*.txt")):
+        note = f.stem if f.stem.startswith("a") else f'"{f.stem}"'
+        door(f"read {note} :3", who, port, world)
+        said = door(f"do rewrite {note} text={q(f.read_text(encoding='utf-8').rstrip(chr(10)))}", who, port, world)
+        print(f"{note}: {said.splitlines()[0][:160] if said else '(no answer)'}")
+    w = json.loads((saved / "writer.json").read_text(encoding="utf-8"))
+    if w.get("id"):
+        door(f"read {w['id']}", who, port, world)
+        print(door(f"do prop {w['id']} view={w['view'] or 'margins'}", who, port, world).splitlines()[0])
+    return 0
+
+
 def main(argv):
     opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d       # noqa: E731
-    if not argv or argv[0] not in ("lines", "undo", "check", "door"):
+    if not argv or argv[0] not in ("lines", "undo", "check", "door", "restore"):
         print(__doc__)
         return 0
     if argv[0] in ("lines", "undo"):
@@ -413,11 +430,24 @@ def main(argv):
         print(f"wrote {len(out)} lines to {argv[1]}")
         return 0
     who, port, world = opt("--as", "worker-a6638"), opt("--port", "8794"), opt("--world", "frontier")
+    if argv[0] == "restore":
+        return restore(pathlib.Path(argv[1]), who, port, world)
     if check(who, port, world):
         print("stopped: a passage does not stand once; nothing was sent")
         return 1
     if argv[0] == "check":
         return 0
+    # before the first write: the live text of every note it changes, and Alex's writer view, under saved/<stamp>/
+    import time
+    saved = HERE / "saved" / time.strftime("%Y%m%d-%H%M%S")
+    saved.mkdir(parents=True)
+    for note in (STYLE, JEFF_CHAT, DOC_PAGE, VERB):
+        (saved / f"{note.strip(chr(34))}.txt").write_text(body(door(f"read {note} :3", who, port, world)), encoding="utf-8")
+    w = door("find prop:role=writer,prop:actor=alex", who, port, world)
+    wid = next((x.split()[0] for x in w.splitlines() if x.strip().startswith("a") and "role=writer" in x), "")
+    wview = next((x.split("view=")[1].split()[0] for x in w.splitlines() if "role=writer" in x and "view=" in x), "")
+    (saved / "writer.json").write_text(json.dumps({"id": wid, "view": wview}), encoding="utf-8")
+    print(f"saved: {saved} (restore: python research/window-lab/universal-chat/apply.py restore {saved.relative_to(HERE.parents[2]).as_posix()})")
     for line in lines():
         said = door(line, who, port, world)
         print(said[:300])
