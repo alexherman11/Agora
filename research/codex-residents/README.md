@@ -51,6 +51,15 @@ the older app-installation paths below and keeps an app update from deleting
 the pinned worker runtime. Real compiled-runtime probes with mock inference
 verified the resident inventory and worker command/Desk tools on this binary.
 
+The initial live activation exposed a discovery failure that a direct scripted
+MCP call missed: the model's call failed with
+`unsupported call: tool_searchtool_search_tool`. Workers now enable the pinned
+runtime's code-mode host and code-mode tool wrapper together. A real model in
+an existing task worktree then discovered Desk and successfully read its manual.
+`probe_worker_desk.py --live [--cwd <worktree>]` checks this path; the compiled
+probe now also performs discovery before invoking Desk. This adds the runtime's
+tool-composition `exec`/`wait` helpers, without enabling other MCP servers or agents.
+
 Validation for this change: repository pytest **201 passed, 2 skipped**;
 focused transport/worker/process tests **9 passed**; builder and worker-pool
 script checks passed; changed-file Ruff checks passed. The documentation

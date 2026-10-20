@@ -52,9 +52,10 @@ NOTATION = HERE.relative_to(REPO).as_posix()
 TREES = REPO / ".worktrees"
 PY = Path(sys.executable)
 # Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
-# call) and deskd restarts on every commit; only these, which the house process itself runs, need the house to restart
+# call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
+# changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
 HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
-               "scripts_mirror.py"}
+               "scripts_mirror.py", "codex_worker.py", "worker_lease.py", "worker_job.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 

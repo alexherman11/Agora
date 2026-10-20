@@ -71,6 +71,10 @@ def runtime_config(directory, model=MODEL):
         "web_search",
         "web_search_request",
         "standalone_web_search",
+        # The pinned runtime's native discovery path emits an unsupported call
+        # with live inference. Code mode exposes its supported discovery wrapper.
+        "code_mode",
+        "code_mode_host",
     }
     overrides = [f"features.{name}=false" for name in DISABLED if name not in enabled]
     overrides += [f"features.{name}=true" for name in enabled]

@@ -42,16 +42,20 @@ def main():
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
-            item = ({"type": "function_call", "id": "call_probe", "call_id": "call_probe",
+            item = ({"type": "tool_search_call", "id": "search_desk", "call_id": "search_desk",
+                     "execution": "client", "status": "completed",
+                     "arguments": {"query": "desk shared world", "limit": 1}}
+                    if len(requests) == 1 else
+                    {"type": "function_call", "id": "call_probe", "call_id": "call_probe",
                      "name": "exec_command", "namespace": "functions",
                      "arguments": json.dumps({
                          "cmd": "Set-Content -LiteralPath worker-probe.txt -Value passed",
                          "workdir": directory, "max_output_tokens": 200,
-                     })} if len(requests) == 1 else {
+                     })} if len(requests) == 2 else {
                          "type": "function_call", "id": "call_desk", "call_id": "call_desk",
                          "name": "desk", "namespace": "mcp__desk",
                          "arguments": json.dumps({"line": "help", "as": "codex"}),
-                     } if len(requests) == 2 else {
+                     } if len(requests) == 3 else {
                          "type": "message", "id": "probe", "role": "assistant",
                          "phase": "final_answer",
                          "content": [{"type": "output_text", "text": "WORKER_PROBE_OK"}],
@@ -118,7 +122,11 @@ def main():
                     assert (Path(directory) / "worker-probe.txt").read_text().strip() == "passed"
                 finally:
                     timer.cancel()
-        assert len(requests) == 3
+        assert len(requests) == 4
+        discovered = [
+            i for i in requests[1]["input"] if i.get("type") == "tool_search_output"
+        ]
+        assert discovered and "mcp__desk" in json.dumps(discovered), discovered
         request = requests[0]
         path = Path(__file__).with_name("worker-runtime-inventory.json")
         path.write_text(json.dumps(request, indent=2), encoding="utf-8")
