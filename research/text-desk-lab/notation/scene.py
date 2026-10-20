@@ -441,6 +441,7 @@ def source_head(source):
 
 
 SAYING_EARLY = ("item", "what", "eid", "source", "chat", "in")      # a6153: a saying's fields known before it is read
+INVOLVING_EARLY = True      # a6638: involving:<name> passes over sayings no name of theirs is on (saying_rows)
 LINE_ROW_KEYS = {"item", "what", "saying", "by", "name", "at", "in", "to", "said", "answered", "edited", "before", "state",
                  "eid", "chat", "who", "open", "index", "line", "_t", "source", "thread", "reply_to", "mark", "context",
                  "context_summary"}      # a line's row before its own fields: those are never one of its own fields
@@ -500,6 +501,18 @@ def saying_rows(desk, terms="", early=None):
     # a6153 (rows): early = (terms over SAYING_EARLY fields, binds), asked of each saying before it is read. Not with
     # involving:, whose own filter runs after the rows are made
     early = early if early and not involving else None
+    # a6638 (the universal chat reads involving:alex at every build: 3042 sayings made to keep 556, ~65 ms): a saying
+    # can involve a person only if its writer or a name it is addressed to is a name that person has borne, so the
+    # others are passed over before their rows are made. The full test (`included`, below) still judges what is left.
+    # Only where persons are on (their names are known); INVOLVING_EARLY = False turns it off to compare
+    could = None
+    if involving and INVOLVING_EARLY and persons.on(w):
+        pid = persons.resolve(w, involving)[0]
+        could = {persons.norm(n) for n, _ in persons.index(w).people.get(pid, [])} | {involving, persons.norm(pid)} \
+            if pid else None
+
+        def might(writer, to):
+            return persons.norm(writer) in could or any(persons.norm(n) in could for n in to or ())
     skipped_keys = set()
     if early:
         import knife
@@ -547,6 +560,10 @@ def saying_rows(desk, terms="", early=None):
                         and k2 not in LINE_ROW_KEYS} - skipped_keys for ln in (s.get("lines") or [])):
                 continue
         if s["kind"] == "chat" and not (me and not rooms.is_member(w, s, me)):
+            # a6638 (Alex, 20 Oct: one universal chat, each line tagged with what it is about): a line that does not say
+            # what it is about is about what the line it answers is about, else what its chat is the Talk of
+            talk_of = str((s.get("props") or {}).get("talk_of") or "")
+            abouts = None
             tl = text_lines(w, sid)
             mine_after = False              # walking back from the end: has a line of mine come after this one?
             listed = set()
@@ -581,6 +598,8 @@ def saying_rows(desk, terms="", early=None):
                 # a1581: a line's address is its writer's stored word, never its words searched again; a chat from
                 # before lines is read by the rule it was written under (every @name outside quotes)
                 to = line["to"] if line is not None else addressed_before(said)
+                if could is not None and not might(who, to):
+                    continue
                 before = ""
                 if me:
                     if not rooms.shown(w, s, to, me):
@@ -612,6 +631,14 @@ def saying_rows(desk, terms="", early=None):
                     for key in ("mark", "context"):
                         value = line_fields(line).get(key, "")
                         row[key] = value if isinstance(value, str) else ""
+                if not row.get("about"):
+                    said_about = ""
+                    if row["reply_to"]:
+                        if abouts is None:
+                            abouts = {ln["id"]: str(line_fields(ln).get("about") or "") for ln in s.get("lines") or ()}
+                        said_about = abouts.get(row["reply_to"], "")
+                    if said_about or talk_of:
+                        row["about"] = said_about or talk_of
                 row["context_summary"] = ""
                 if row["context"]:
                     from message_context import summary
@@ -625,6 +652,8 @@ def saying_rows(desk, terms="", early=None):
                 continue
             writer = str(c.get("by") or "").split("/")[0].lower()
             to = (e or {}).get("to")
+            if could is not None and not might(writer, to):
+                continue
             if me and (rooms.same_person(w, writer, me) or to is None or not rooms.shown(w, s, to, me, comment=True)):
                 continue
             state = "open"
@@ -663,6 +692,8 @@ def saying_rows(desk, terms="", early=None):
                 writer = str(reply.get("by") or "").split("/")[0].lower()
                 to = rooms.comment_to(e)
                 if e.get("args", {}).get("line") != reply.get("text"):
+                    continue
+                if could is not None and not might(writer, to):
                     continue
                 if me and (rooms.same_person(w, writer, me) or not rooms.shown(w, s, to, me, comment=True)):
                     continue
