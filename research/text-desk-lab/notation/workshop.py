@@ -55,7 +55,8 @@ PY = Path(sys.executable)
 # call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
 HOUSE_FILES = {"house.py", "workshop.py", "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
-               "scripts_mirror.py", "codex_worker.py", "worker_lease.py", "worker_job.py"}
+               "scripts_mirror.py", "codex_worker.py", "codex_resident.py", "plan_usage.py",
+               "worker_lease.py", "worker_job.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -439,7 +440,17 @@ class Workshop:
                     continue
                 lane = self.lane(cid, s, cfg, running)
                 if lane is False:
+                    if plans := getattr(self.house, "plans", None):
+                        provider = self.provider_of(cid, s) or "claude"
+                        reason = plans.queue_reason(provider, cfg)
+                        plans.target(cid, reason)
                     continue
+                if plans := getattr(self.house, "plans", None):
+                    provider = (lane or {}).get("provider") or self.provider_of(cid, s) or "claude"
+                    reason = plans.queue_reason(provider, cfg)
+                    plans.target(cid, reason)
+                    if reason:
+                        continue
                 if self.builds(lane, s, cfg):
                     # a5378: a Claude lane is its standing builders; the card waits until one is free
                     props, last = s.get("props") or {}, self.card_state(cid).get("builder")
@@ -580,8 +591,11 @@ class Workshop:
         `workers` bounds it), a lane, or False (its lane is full: it waits). A card held to no provider takes the lane
         with the most room, the first listed on a tie, so four cards on "2 claude, 2 codex" start two and two."""
         lanes = self.pool(cfg)
+        plans = getattr(self.house, "plans", None)
+        allowed = lambda p: not plans or not plans.fuel_reason(p, cfg)
         if not lanes:
-            return None
+            provider = self.provider_of(cid, s) or "claude"
+            return None if allowed(provider) and self.provider_wait(provider) <= time.time() else False
         used = {}
         for x in running:
             p = x.state.get("session_provider") or "claude"
@@ -590,12 +604,12 @@ class Workshop:
         if held:
             mine = [ln for ln in lanes if ln["provider"] == held]
             if not mine:
-                return None
-            if self.provider_wait(held) > time.time():
+                return None if allowed(held) and self.provider_wait(held) <= time.time() else False
+            if self.provider_wait(held) > time.time() or not allowed(held):
                 return False
             return mine[0] if used.get(held, 0) < sum(ln["n"] for ln in mine) else False
         room = [(ln["n"] - used.get(ln["provider"], 0), -i, ln) for i, ln in enumerate(lanes)
-                if self.provider_wait(ln["provider"]) <= time.time()]
+                if self.provider_wait(ln["provider"]) <= time.time() and allowed(ln["provider"])]
         if not room:
             return False
         free, _, best = max(room, key=lambda r: r[:2])
@@ -608,7 +622,9 @@ class Workshop:
             return {}
 
     def provider_wait(self, provider):
-        return self.provider_limits().get(provider, {}).get("retry_at", 0)
+        plans = getattr(self.house, "plans", None)
+        return max(self.provider_limits().get(provider, {}).get("retry_at", 0),
+                   plans.wait_until(provider) if plans else 0)
 
     def limit_handoffs(self, w, cfg):
         """Transfer a stopped, quota-held Claude card without reusing its conversation or losing its files.
@@ -970,7 +986,7 @@ class Workshop:
             if props.get("commission") == "reverted":
                 self.hand_back(cid, wk, "it has no saved conversation to come back to")
             return None
-        if wk.state.get("retry_at", 0) > time.time():
+        if max(wk.state.get("retry_at", 0), self.provider_wait(self.provider_of(cid, s) or "claude")) > time.time():
             return None                          # stopped by a usage limit: it resumes after the reset (failed)
         wk.state.pop("retry_at", None)
         self.workers[cid] = wk
@@ -1017,13 +1033,17 @@ class Workshop:
             first = not wk.state.get("retry_at")
             wk.stop()
             self.workers.pop(cid, None)
-            retry_at = reset + 60 if reset else time.time() + 300
+            provider = wk.state.get("session_provider", "claude")
+            plans = getattr(self.house, "plans", None)
+            reset = (plans.reset(provider) if plans else 0) or reset
+            retry_at = max(reset + 60 if reset else time.time() + 300, self.provider_wait(provider))
             wk.state.update(retry_at=retry_at, retry_kind="limit", last_error=detail)
             wk.save()
-            provider = wk.state.get("session_provider", "claude")
             limits = self.provider_limits()
             limits[provider] = {"retry_at": retry_at, "detail": detail}
             atomic_state(self.house.dir / "provider-limits.json", limits)
+            if plans:
+                plans.paused(provider, cid, retry_at)
             if getattr(wk, "builder", None):
                 b = Builder(self.house, wk.builder)
                 b.state["retry_at"] = retry_at

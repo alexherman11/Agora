@@ -19,9 +19,11 @@ the world copy and every process stubbed (Popen is caught: each start is a comma
   8. a conversation that cannot be found: the builder starts fresh and is told so
   9. the protocol: the notebook rule (found by role), Alex's screen and the demo rule; a builder is told who it is
 """
+import atexit
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import time
@@ -52,8 +54,11 @@ def check(name, ok, detail=""):
 D, R = roomworld.build(say=False)
 W = D.world
 B = R.BOARD
-tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)     # the stubbed starts leave stderr.log open
-TMP = Path(tmp.name)
+# Inherit the parent's ACL: TemporaryDirectory's mode 0700 excludes the
+# Windows builder sandbox token, even below a writable AGORA_TMP.
+TMP = Path(os.environ.get("AGORA_TMP") or tempfile.gettempdir()) / ("builders-" + uuid.uuid4().hex)
+os.makedirs(TMP, exist_ok=True)
+atexit.register(shutil.rmtree, TMP, ignore_errors=True)  # stubbed starts leave stderr.log open
 
 
 def say(me, *lines):

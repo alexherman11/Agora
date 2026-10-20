@@ -1,0 +1,40 @@
+usage : column
+  share 1
+  scroll scroll
+  measure 70ch
+  role pupage
+  title : text "Plan usage"
+    role puheading
+  explain : text "Last CLI readings. Each window is separate. Unavailable means the CLI has not reported a current reading; it never means zero."
+    role puwords
+  rows : column
+    role pupage
+    of prop:role=usage-window,prop:usage_visible=yes as u
+    each reading
+  fuel : column
+    role pupage
+    of kind:note,prop:role=house-settings as h
+    each setting
+reading : column
+  role pureading
+  title : text "$u.title"
+    role pulabel
+  detail : text "$u.usage_detail"
+    role puwords
+setting : column
+  role pureading
+  label : text "Hold new Claude starts above: $(($h.claude_start_threshold or 'off'))"
+    role pulabel
+  choices : row
+    role puwidgets
+    off : text "Off"
+      role pubutton
+      on click do prop $h claude_start_threshold=off
+    seventy : text "70%"
+      role pubutton
+      on click do prop $h claude_start_threshold=70
+    ninety : text "90%"
+      role pubutton
+      on click do prop $h claude_start_threshold=90
+  help : text "Queued cards keep their work. Existing turns and reset retries continue."
+    role puquiet
