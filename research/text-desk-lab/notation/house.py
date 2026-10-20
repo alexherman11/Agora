@@ -383,7 +383,9 @@ class Resident:
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
-        self.state_path.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        temp = self.state_path.with_suffix(".tmp")
+        temp.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        os.replace(temp, self.state_path)
 
     def log(self, kind, data):
         with (self.dir / "transcript.jsonl").open("a", encoding="utf-8") as f:
@@ -538,6 +540,7 @@ class Resident:
                 # claude compacted the conversation: the memory is a summary now, so the next thing the house sends
                 # begins with the welcome again (Alex, 29 Sep: on compaction, or a full reset)
                 self.state["welcome_due"] = "the conversation was compacted"
+                self.state["compactions"] = self.state.get("compactions", 0) + 1
                 self.save()
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):

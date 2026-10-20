@@ -1532,6 +1532,33 @@ def test_markdown_is_a_document_and_its_wikilinks_name_things():
         tmp.unlink(missing_ok=True)
 
 
+def test_a_markdown_message_keeps_its_media_and_its_names():
+    """a6452 (Alex, 17 Oct: rich chat): `markdown` and `media` on one read text (a chat message) compose: the scene
+    paints the document, the films and pictures its words name, and its ids as names; an id in a path stays the path.
+    Editing such a part is still refused (the words are written in a part without `media`)."""
+    scene.parse('x : text "a", markdown, media')
+    refused('x : text "a", markdown, media, on edit do rewrite $item text="$value"', "is edited")
+    import deskd, lens_ir
+    tmp = _scratch("_test_md_media")
+    shown = {"path": "media/clip.mp4", "src": "/media/media/clip.mp4", "kind": "video", "name": "clip.mp4"}
+    real = scene.media_of
+    scene.media_of = lambda text: [shown] if "clip.mp4" in text else []
+    try:
+        with deskd.Session("_test_md_media", "jeff") as desk:
+            w = desk.world
+            some = next(i for i, n in w.nodes.items() if n.get("type") != "surface" and (w.subjects.get(n.get("subject")) or {}).get("title"))
+            md = f"# Head\\n| a | b |\\n|---|---|\\n| {some} | 1 |\\n\\nmedia/clip.mp4 and demos/{some}/x.png"
+            sc = lens_ir.evaluate(desk, chr(10).join(["w : column", f'  doc : text "{md}", markdown, media']))
+            scene.emit(sc)
+            p = scene.painter_view(sc)["kids"][0]["paint"]
+            assert p["markdown"] is True and "runs" not in p
+            assert p["media"] == {"mode": "embed", "items": [shown]}, p.get("media")
+            assert list(p["things"]) == [some], p.get("things")        # named once, in the table; not inside the path
+    finally:
+        scene.media_of = real
+        tmp.unlink(missing_ok=True)
+
+
 def test_ids_in_words_are_drawn_as_the_names_of_what_they_name():
     """a6109 (Alex, 16 Oct: 'I should never see id names'): an id in words that are only read is drawn as its thing's
     name, a link carrying the id; an id-looking word that names nothing, an id in code, a text that says `ids` and a

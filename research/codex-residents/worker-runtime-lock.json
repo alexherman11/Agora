@@ -1,8 +1,8 @@
 {
   "sdk": "0.147.0",
-  "binary": "C:\\Users\\Alex\\AppData\\Local\\OpenAI\\Codex\\bin\\9614f1d9b40d9c4f\\codex.exe",
-  "version": "codex-cli 0.162.0-alpha.17.2",
-  "binary_sha256": "e98c516f1c8935789aabe9122ee7e05ec4c3efd1ba6acf179242e031c495b99e",
+  "binary": "C:/Projects/Agora4/local/codex-residents/runtime/896a0166b774037a/codex.exe",
+  "version": "codex-cli 0.163.0-alpha.10.2",
+  "binary_sha256": "f6dbf48cb70f62649c645f26c87dc9bf84cc36986202dfad8e12fb5b8ca70312",
   "catalog_sha256": "4b7cba75e32a43b740f18255f1019474ffe18f5c24f846b3750877cbf800d903",
   "model": "gpt-6.1-sol"
 }

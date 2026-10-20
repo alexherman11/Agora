@@ -41,6 +41,8 @@ What it can't do: SendInput, drag and drop between windows (OLE), and DWM thumbn
 windows are not tried (a desktop no one sees is, as I understand it, not composed by DWM; unchecked). PrintWindow
 with PW_RENDERFULLCONTENT does draw them, GPU pages included (ran 16 Oct: WebGL on the RTX 2080 Ti, D3D11).
 Edge runs InPrivate: a fresh Edge profile signs itself into Alex's Microsoft account and syncs (seen 16 Oct).
+AGORA_TMP chooses scratch space inside this worktree (relative paths start at its root); by default it is
+research/window-lab/.tmp-agora. State, profiles, film frames and child TMP/TEMP use that same directory.
 """
 import base64
 import ctypes
@@ -48,7 +50,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.request
@@ -57,10 +58,13 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import agora_tmp
+
+agora_tmp.configure()  # before STATE, profiles, films, and any child process
 import screen_tools  # noqa: E402  (DPI awareness first; ffmpeg and demos/)
 
 u32, k32, g32 = ctypes.windll.user32, ctypes.windll.kernel32, ctypes.windll.gdi32
-STATE = Path(tempfile.gettempdir()) / "agora-sandbox"
+STATE = agora_tmp.configure() / "agora-sandbox"
 EDGE = next((p for p in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
                          r"C:\Program Files\Microsoft\Edge\Application\msedge.exe") if Path(p).exists()), None)
 
@@ -292,7 +296,7 @@ class Cdp:
         from websockets.sync.client import connect
         tabs = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/json", timeout=5).read())
         url = next(t["webSocketDebuggerUrl"] for t in tabs if t.get("type") == "page")
-        self.ws, self.n = connect(url, max_size=64 * 1024 * 1024), 0
+        self.ws, self.n = connect(url, origin=None, max_size=64 * 1024 * 1024), 0
 
     def call(self, method, **params):
         self.n += 1
@@ -412,6 +416,13 @@ def cls_of(h):
 def click_at(hwnd, cx, cy, right=False):
     """A click at client pixel cx, cy of the top window, sent to the deepest visible child under it (a WebView2 page
     lives in child windows; Edge's own page has none), in that child's own client pixels. -> the window clicked."""
+    target, pt = deepest(hwnd, cx, cy)
+    click(target, pt.x, pt.y, right)
+    return target
+
+
+def deepest(hwnd, cx, cy):
+    """The deepest visible child under client pixel cx, cy of the top window, and the point in its client pixels."""
     target, pt = hwnd, wt.POINT(int(cx), int(cy))
     while True:
         c = u32.ChildWindowFromPointEx(target, pt, 1)          # CWP_SKIPINVISIBLE
@@ -420,7 +431,27 @@ def click_at(hwnd, cx, cy, right=False):
             break
         u32.MapWindowPoints(target, c, ctypes.byref(pt), 1)
         target = c
-    click(target, pt.x, pt.y, right)
+    return target, pt
+
+
+WM_MOUSEWHEEL = 0x20A
+
+
+def wheel_at(hwnd, cx, cy, dy):
+    """A wheel turn at client pixel cx, cy of the top window, as Windows delivers it (a6549): WM_MOUSEWHEEL carries
+    SCREEN coordinates and goes to the window under them; dy > 0 scrolls down (a notch is 120, as the wheel reports
+    -120). One message per notch, as a real wheel sends. -> the window it went to."""
+    if not dy:
+        return hwnd
+    target, inner = deepest(hwnd, cx, cy)
+    pt = wt.POINT(int(cx), int(cy))
+    u32.ClientToScreen(hwnd, ctypes.byref(pt))
+    post(target, WM_MOUSEMOVE, 0, xy(inner.x, inner.y))
+    notches = max(1, round(abs(dy) / 120))
+    delta = -120 if dy > 0 else 120
+    for _ in range(notches):
+        time.sleep(0.03)
+        post(target, WM_MOUSEWHEEL, (delta & 0xFFFF) << 16, xy(pt.x, pt.y))
     return target
 
 
@@ -510,7 +541,8 @@ def open_edge(name, url, size="1500x900", tries=2):
     prof = STATE / f"{name}-profile"
     for attempt in range(tries):
         port = free_port()
-        pid = start(name, [EDGE, f"--user-data-dir={prof}", f"--remote-debugging-port={port}", "--inprivate",
+        pid = start(name, [EDGE, f"--user-data-dir={prof}", f"--remote-debugging-port={port}",
+                           "--inprivate",
                            "--no-first-run", "--no-default-browser-check", "--disable-sync", "--disable-extensions",
                            f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"])
         st = {"pid": pid, "port": port, "url": url, "pids": [pid], "profile": str(prof), "at": time.time()}
@@ -540,7 +572,8 @@ def run_hidden(name, argv, cdp=False, env=None):
     env adds to its environment (a6113: AGORA_WM_KEYS=off, so a window manager there takes no global key)."""
     STATE.mkdir(parents=True, exist_ok=True)
     port = free_port() if cdp else None
-    env = {**(env or {}), **({"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": f"--remote-debugging-port={port}"} if cdp else {})} or None
+    env = {**(env or {}), **({"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS":
+                            f"--remote-debugging-port={port}"} if cdp else {})} or None
     argv = [sys.executable if a == "python" else a for a in argv]
     pid = start(name, argv, env)
     st = json.loads(state_file(name).read_text(encoding="utf-8")) if state_file(name).exists() else \
@@ -692,7 +725,7 @@ def main(argv):
 
 def film(hwnd, cdp, seconds, out, fps=10):
     """Shots strung together: `seconds` of the window (or the page), `fps` a second, into an mp4 by ffmpeg."""
-    frames = Path(tempfile.mkdtemp(prefix="sandbox-film-"))
+    frames = Path(agora_tmp.directory("sandbox-film-"))
     n, t0 = 0, time.time()
     try:
         while time.time() - t0 < seconds:

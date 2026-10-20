@@ -1,0 +1,4 @@
+read a5210 :3
+do replace a5210 old="      marks\n      role words\n      media" new="      markdown\n      role words\n      media"
+read a5086 :3
+do replace a5086 old="    marks\n    role body\n    media" new="    markdown\n    role body\n    media"
