@@ -5,6 +5,7 @@ import re
 import shlex
 
 import blanks
+import carry_on
 import names
 import harness   # registers launch; provides sync
 import helpnotes
@@ -1297,6 +1298,31 @@ class DeskKnife(DeskMoo):
     _reply = None       # the reply the current top-level call belongs to (the caller's token, or one per call)
     _made = None        # {reader slot: (reply, ids made most recently in that reply)}: what $new reads next
     _taught_new = None  # the reply whose receipt last taught $new (a948 (6)): once per reply
+    _held = None        # a6437: {reader slot: (reply, what its refused lines would have made)} (carry_on.taint)
+
+    def _held_back(self):
+        rec = (self._held or {}).get(self._slot())
+        return rec[1] if rec and rec[0] == self._reply else None
+
+    def _hold(self, line):
+        """A line of this reply was refused, skipped or not run: what it would have made is held back from the lines
+        after it (carry_on.depends)."""
+        t = dict(carry_on.taint(line), line=line)
+        self._held = dict(self._held or {})
+        self._held[self._slot()] = (self._reply, carry_on.merge(dict(self._held_back() or {}), t))
+
+    def _unhold(self, line, made):
+        """A line that ran: what it made is real now, so $new, its handle or its title name it, not a refused one's."""
+        held = self._held_back()
+        if not held:
+            return
+        t = carry_on.taint(line)
+        if made:
+            held["new"] = False
+        for n in t["names"]:
+            (held.get("names") or {}).pop(n, None)
+        for x in t["titles"]:
+            (held.get("titles") or {}).pop(x, None)
 
     def dispatch(self, name, args):
         if not self._ctxs:
@@ -1347,6 +1373,12 @@ class DeskKnife(DeskMoo):
                 self.world.chat_lines(sid)        # a1581: once per chat, its lines become things (one event each)
             promises.migrate(self)        # a1587: once per world, owe= and awaiting= become promises and requests
             persons.migrate(self)         # a1590: once per world, stored names become the persons who bore them then
+        line = str(args.get("line") or "") if top and name == "desk" else ""
+        why = carry_on.depends(line, self._held_back()) if line else None
+        if why:
+            # a6437: a refused line refuses only itself; a later line that uses what it would have made is not run
+            self._hold(line)
+            return {"text": why, "skipped": True}
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
@@ -1372,6 +1404,11 @@ class DeskKnife(DeskMoo):
         if top:
             self._made = dict(self._made or {})
             self._made[self._slot()] = (self._reply, ctx.prev, dict(ctx.handles))
+        if line:
+            if "error" in r and not r.get("miss"):
+                self._hold(line)
+            else:
+                self._unhold(line, made)
         # 14 Oct (Snappy Desk): a step of a world verb is not a deed of its own: the rules answer the verb once it is
         # done (its own line comes back here with every step's events), not after each step. A split of 5 steps chose
         # each standing rule's things over the whole world 5 times (65 of its 150 ms); an event rule still sees every
