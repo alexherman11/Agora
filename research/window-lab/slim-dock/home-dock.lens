@@ -1,0 +1,71 @@
+# a7223: pin data only, no auto-generated duplicate panel/widget buttons.
+# `dock-pin` and `dock-open` are world verbs. Colour is each pin's tint intent.
+foot : row
+  share 1
+  role sd.foot
+  left : column
+    share 1
+  bar : row
+    of kind:surface,prop:role=dock,prop:actor=$me as k
+    each dock
+  right : column
+    share 1
+dock : row
+  role sd.bar
+  on drop any do dock-pin $carried $k.item
+  on menu "Restore removed pins" when count(in:$k.item,prop:dock_removed=yes) > 0 do prop in:$k.item,prop:dock_removed=yes dock_removed=no
+  empty : column
+    role sd.empty
+    only when count(in:$k.item,kind:note,-prop:dock_removed=yes) = 0
+    tip "Dock" "Drag something here to pin it."
+  layouts : row
+    of kind:surface,prop:role=home-layout,prop:actor=$me as lay
+    each layout
+layout : row
+  of prop:role=home-view,prop:actor=$me as v
+  each viewer
+viewer : row
+  apps : row
+    role sd.group
+    of in:$k.item,kind:note,-prop:dock_removed=yes as d
+    each app
+app : column
+  role sd.item
+  carry
+  on drop app do dock-place $carried $d.item $k.item
+  on drop app at right do dock-place-after $carried $d.item $k.item
+  on menu "Remove pin" do prop $d.item dock_removed=yes
+  on menu "Open as a window" when ($d.window or "") != "" host window $d.window
+  let shown = ($d.shows or "")
+  let panel = ($d.lens or "")
+  let current = (max($id of $v.viewing) or "") when ($v.viewing or "") != ""
+  let current = "" otherwise
+  let opened = count(in:$lay.item,prop:role=home-panel,prop:lens=$d.lens,prop:shelf=no,-prop:shows) when panel != "" and shown = ""
+  let opened = count(in:$lay.item,prop:role=home-panel,prop:lens=$d.lens,prop:shelf=no,prop:shows=$d.shows) when panel != "" and shown != ""
+  let opened = 1 when panel = "" and ($d.opens or "") != "" and ($d.opens = ($v.viewing or "") or $d.opens = current)
+  let opened = count(in:$lay.item,prop:role=home-panel,prop:lens=jeff-chat,prop:shelf=no) when ($d.opens or "") = "chat"
+  let opened = 0 otherwise
+  role sd.item.open when opened > 0
+  tip "$d.title" "Pinned. Drag to reorder; use the menu to remove."
+  on click when ($d.opens or "") != "" or panel != "" do dock-open $d.item $lay.item $v.item
+  on click when ($d.opens or "") = "" and panel = "" and ($d.window or "") != "" host window $d.window
+  icon : column
+    role sd.icon
+    role sd.icon.green when ($d.tint or "") = "green"
+    role sd.icon.amber when ($d.tint or "") = "amber"
+    role sd.icon.purple when ($d.tint or "") = "purple"
+    role sd.icon.rose when ($d.tint or "") = "rose"
+    pics : column
+      only when ($d.icon or "") != ""
+      of kind:note,prop:role=icon,prop:icon=$d.icon as ic
+      each picture
+    glyph : text "$(($d.glyph or "◆"))"
+      role sd.glyph
+      only when ($d.icon or "") = "" or count(kind:note,prop:role=icon,prop:icon=$d.icon) = 0
+  pip : column
+    role sd.pip
+    role sd.pip.open when opened > 0
+picture : text "$text"
+  role sd.picture
+  picture
+  only when $index = 1

@@ -112,6 +112,16 @@ def part_of(w, ident, p, what="", resolve=None):
     if nid not in w.nodes and nid not in w.subjects:
         raise Refusal(f"{what}: {ident} names no thing, so it has no {p}")
     nid, sid, n = thing_of(w, nid)
+    # The same identity fields a lens frame exposes are also available to
+    # command templates, so references can outlive one appearance.
+    if p == "id":
+        return sid or nid
+    if p == "item":
+        return nid
+    if p == "kind":
+        return w.subjects[sid]["kind"] if sid in w.subjects else n["type"]
+    if p == "tags":
+        return " ".join(w.subjects[sid].get("tags") or []) if sid in w.subjects else ""
     if p == "title":
         return w.subjects[sid]["title"] if sid in w.subjects else w.title(n) if n else ""
     if p == "maker":

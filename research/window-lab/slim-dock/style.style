@@ -1,0 +1,27 @@
+# a7223 slim dock begin — additive, no existing roles/tokens replaced
+token sdunit = 1
+token sdground = #f8fafc
+token sdrim = #cbd5e1
+token sdhover = #e2e8f0
+token sdopen = #dbeafe
+token sdblue = #1d4ed8
+token sdgreen = #13703b
+token sdamber = #925500
+token sdpurple = #7434bd
+token sdrose = #b32151
+role sd.foot : pad top sdunit x2, pad bottom sdunit x2
+role sd.bar : on sdground, edge sdrim, corner sdunit x8, pad sdunit x3
+role sd.empty : width sdunit x96, height sdunit x28
+role sd.group : between sdunit x2, align center
+role sd.item : corner sdunit x5, pad sdunit x5, between sdunit x2, hover sdhover
+role sd.item.open : on sdopen, corner sdunit x5, pad sdunit x5, between sdunit x2, hover sdhover
+role sd.icon : sdblue, width sdunit x18, align center
+role sd.icon.green : sdgreen, width sdunit x18, align center
+role sd.icon.amber : sdamber, width sdunit x18, align center
+role sd.icon.purple : sdpurple, width sdunit x18, align center
+role sd.icon.rose : sdrose, width sdunit x18, align center
+role sd.picture : width sdunit x18
+role sd.glyph : text down, align center
+role sd.pip : height sdunit x2, width sdunit x8, align center
+role sd.pip.open : on sdblue, height sdunit x2, width sdunit x8, align center, corner sdunit
+# a7223 slim dock end

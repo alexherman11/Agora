@@ -483,7 +483,7 @@
       // to type in (Enter sends, Shift+Enter is a new line, Escape leaves), since a line with $value is not yet whole
       const picked = TEXT.selected(el._n), fill = l => l.replace("$selected", () => picked);
       b.addEventListener("click", () => {
-        if (!a.line.includes("$value")) { closeMenu(); return send(el._n, fill(a.line)); }
+        if (!a.line.includes("$value")) { closeMenu(); const line = fill(a.line); return line.startsWith("host ") ? host(line.slice(5)) : send(el._n, line); }
         menuComposer(box, el, a, picked, e.clientX, e.clientY);
       });
       box.append(b);
@@ -1188,20 +1188,13 @@
   // carry is relation (pike-3): pick a thing up, put it down on a part that says `on drop <its part>`; the receiver says
   // what that means, and both are fenced. Pointer: press, move, release over a receiver. Keys: Space takes it, Tab
   // reaches the receivers that accept it, Enter puts it down, Escape cancels. Nothing is sent onto the receiver it came from.
-  let carrying = null; const receivers = part => [...paint.querySelectorAll(`[data-drop="${CSS.escape(part)}"]`)];
+  let carrying = null;
+  const receivers = part => [...paint.querySelectorAll("[data-drop]")].filter(r => CarryTargets.accepts(r, part));
   // a5994: a receiver may say an act per side (`on drop <part> at left`); the one taken is the side whose edge the
   // pointer is within a third of (nearest first), else the plain act, else the nearest side. On the receiver it came
   // from, only a left or right act (a panel set beside its own column); its middle would put it where it is.
   function landing(r, m) {
-    const own = r.contains(carrying.el);
-    const acts = (r._drops || []).filter(a => a.part === carrying.n.part && (!own || a.side === "left" || a.side === "right"));
-    if (!acts.length) return null;
-    const b = r.getBoundingClientRect(), fx = m ? (m.clientX - b.left) / b.width : .5, fy = m ? (m.clientY - b.top) / b.height : .5;
-    const d = { left: fx, right: 1 - fx, top: fy, bottom: 1 - fy };
-    const sided = acts.filter(a => a.side).sort((x, y) => d[x.side] - d[y.side]);
-    const a = sided.find(x => d[x.side] < 1 / 3) || acts.find(x => !x.side) || sided[0];
-    const half = { left: [0, 0, .5, 1], right: [.5, 0, .5, 1], top: [0, 0, 1, .5], bottom: [0, .5, 1, .5] }[a.side] || [0, 0, 1, 1];
-    return { act: a, box: [b.left + half[0] * b.width, b.top + half[1] * b.height, half[2] * b.width, half[3] * b.height] };
+    return CarryTargets.plan(r, { el: carrying.el, part: carrying.n.part }, carrying.seen, m);
   }
   const over = (r, m) => {
     const c = Style.roleClass("tool.on"), l = r ? landing(r, m) : null;
@@ -1215,7 +1208,7 @@
     Object.assign(carrying.box.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" }); carrying.box.hidden = false;
   };
   // a receiver is judged on what it meant at pick-up (pike-3), though the view keeps repainting while a card is in the air
-  function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: new Map(rs.map(r => [r.dataset.key, r._n.fence])) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
+  function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: CarryTargets.snapshot(paint, el._n.part) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
   function put(r, m) {
     const c = carrying; if (!c) return;
     const l = r ? landing(r, m) : null;
@@ -1223,15 +1216,9 @@
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
     if (!l) { if (c.box) c.box.remove(); V.hold = null; c.el.focus(); return; }
-    const f = c.seen.get(r.dataset.key) || r._n.fence || {};
-    // a5994 round 2 (lane 1's 'a press is seen on the next frame'): the landing box stays where the thing is going until
-    // the desk's answer is painted, then fades once (none for reduced motion), so the hand never sees it snap back
+    // Keep the direct placement preview until the answer is painted; no decorative fade.
     const box = c.box; if (box) { box.hidden = false; Object.assign(box.style, l.box.reduce((o, v, i) => (o[["left", "top", "width", "height"][i]] = v + "px", o), {})); }
-    Promise.resolve(send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f })).finally(() => {
-      if (!box) return;
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return box.remove();
-      box.style.transition = "opacity 160ms ease-out"; box.style.opacity = "0"; setTimeout(() => box.remove(), 200);
-    });
+    Promise.resolve(CarryTargets.submit(send, l, c.n.fence)).finally(() => { if (box) box.remove(); });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
@@ -1260,7 +1247,8 @@
       if (e.target.isContentEditable || e.button !== 0) return;
       const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
       let c = null;
-      const at = m => document.elementsFromPoint(m.clientX, m.clientY).find(x => x.dataset && x.dataset.drop === n.part) || null;
+      const at = m => carrying ? CarryTargets.at(document.elementsFromPoint(m.clientX, m.clientY),
+        { el, part: n.part }, carrying.seen, m)?.receiver || null : null;
       const move = m => {
         if (m.pointerId !== pid) return;
         if (!c) {
@@ -1288,10 +1276,10 @@
   }
   document.addEventListener("keydown", e => {
     if (!carrying) return;
-    const r = document.activeElement && document.activeElement.dataset.drop === carrying.n.part ? document.activeElement : null;
+    const r = CarryTargets.accepts(document.activeElement, carrying.n.part) ? document.activeElement : null;
     if (e.key === "Escape") { e.preventDefault(); put(null); }
     else if (e.key === "Enter" && r) { e.preventDefault(); put(r); }
-    else if (e.key === "Tab") setTimeout(() => over(document.activeElement.dataset.drop === carrying?.n.part ? document.activeElement : null));
+    else if (e.key === "Tab") setTimeout(() => { if (carrying) over(CarryTargets.accepts(document.activeElement, carrying.n.part) ? document.activeElement : null); });
   });
 
   let held = null;                               // the last scene answer painted, carried over a reload for new painter code
