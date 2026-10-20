@@ -147,7 +147,8 @@
     // a6067: a document is one element for as long as its key and its lens's words for it stand (rule 1): the desk's new
     // words go INTO it (textedit.js fits them over what this window has not sent), never a new element under the caret
     if (old && old.el._te && p.markdown && old.el._teConf === textConf(n, p)) {
-      textFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el;
+      try { textFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el; }
+      catch (e) { console.warn("a document could not take the desk's new words; it is drawn again", e); }   // a6452
     }
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
@@ -197,7 +198,10 @@
     if (p.live && p.text != null) live(el, n, p);
     // a5941: `media`: the films and pictures the words name, drawn by media.js; Pop out sends the part's `on pop` acts
     // in order, desk lines and host verbs alike, with $value the path as written
-    if (p.media && window.Media) Media.draw(el, p.media, n.acts.some(a => a.on === "pop") ? async item => {
+    // a6452: in a Markdown text, a picture the document drew in its place is not drawn again under the words
+    const inline = p.media && el._te ? new Set([...el.querySelectorAll("img.md-img[data-media]")].map(i => i.dataset.media)) : null;
+    const media = inline && inline.size ? { ...p.media, items: p.media.items.filter(i => !inline.has(i.src)) } : p.media;
+    if (media && window.Media) Media.draw(el, media, n.acts.some(a => a.on === "pop") ? async item => {
       for (const a of el._n.acts.filter(a => a.on === "pop")) {
         const line = a.line.replace(/\$value\b/g, () => TEXT.esc(item.path));
         if (line.startsWith("host ")) await host(line.slice(5)); else await send(el._n, line);
@@ -604,7 +608,8 @@
   // edits wait on Alex's choice; they would replace this one function). `on link` is sent with $value the id a
   // [[wikilink]] or ![[embed]] names; `on capture` with $value what a dropped capture carries. Without `on edit` it is
   // drawn only.
-  const textConf = (n, p) => JSON.stringify([n.acts.map(a => [a.on, a.line]), p.hint || ""]);
+  // a6452: and the media it draws: those are drawn when the element is made, so new ones make a new element
+  const textConf = (n, p) => JSON.stringify([n.acts.map(a => [a.on, a.line]), p.hint || "", p.media || null]);
   // the thing whose words a text shows: the read of its `text` (a lens that reads $d.text under another thing's part,
   // as doc-page does, is fenced on that part's thing, but its words are the document's subject), else the part's thing
   const textOf = n => { const f = n.fence || {}, r = (f.reads || []).find(e => Array.isArray(e[2]) && e[2].includes("text")); return (r && r[0]) || f.item || null; };
@@ -635,12 +640,21 @@
     const ok = !!r && !r.error && !/(^|\n)ERR\b/.test(t);
     return { ok, error: ok ? null : t, event: ok ? (r.events || []).slice(-1)[0] : null };
   }
+  // a6452: Markdown the drawing cannot take still shows its words, as plain text: never an empty part, never a stopped page
   function markdown(el, n, p) {
+    try { document_(el, n, p); }
+    catch (e) {
+      console.warn("a Markdown text could not be drawn; its words are shown as written", e);
+      delete el._te; delete el._md; delete el._teConf; el.classList.remove("md-part");
+      el.textContent = p.text; el.dataset.mdFailed = "1"; el.classList.add("t-verbatim");
+    }
+  }
+  function document_(el, n, p) {
     if (!window.TextEdit || !window.Markdown) { el.textContent = p.text; return; }
     const a = n.acts.find(x => x.on === "edit");
     const te = TextEdit.create({
       text: p.text, version: n.fence, editable: !!a, key: n.key, item: textOf(n),
-      links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint,
+      links: p.wikilinks, things: p.things, titles: p.titles, hint: p.hint, media: (p.media && p.media.items) || [],
       light: p.light, lightClass: Style.roleClass("light"),        // a5949: `light` on a document lights its quoted words
       keep: a ? textKeeper(n.key, () => el._n) : null,
       seam: a ? { send: out => sendEdit(el, out) } : null,
@@ -673,6 +687,7 @@
     });
     el._te = el._md = te; el._teConf = textConf(n, p); el._mdLinks = JSON.stringify([p.wikilinks || {}, p.things || {}]);
     el.classList.add("md-part"); el.append(te.el);
+    if (!a && p.text.trim() && !drawsSomething(te.el)) throw new Error("its marks hide every word");   // a lone ``` (a6452)
     if (!a) return;
     const root = te.el.querySelector(".md-doc");
     root.addEventListener("focus", () => { TEXT.last = el; if (!V.repainting) V.hold = n.key; });
@@ -681,6 +696,13 @@
       te.flush(); V.hold = null;
     });
   }
+  // a read document shows something when a word outside its hidden marks, or a drawn rule, box, table or picture, is in it
+  function drawsSomething(root) {
+    if (root.querySelector("img, table, .md-hr, .md-check, .md-embed")) return true;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (t.data.trim() && !t.parentElement.closest(".md-syn")) return true;
+    return false;
+  }
   function textFresh(el, n, p) {
     el._n = n;
     const l = JSON.stringify([p.wikilinks || {}, p.things || {}]);
@@ -688,6 +710,7 @@
     el._te.lights(p.light);                                     // a5949: a new comment's words light at once
     el._te.titles(p.titles);
     el._te.receive(p.text, n.fence);                            // a6067: the desk's words, at this version
+    if (!n.acts.some(a => a.on === "edit") && p.text.trim() && !drawsSomething(el._te.el)) throw new Error("its marks hide every word");
   }
 
   // a text's keys (Alex, 7 Oct: 'Enter should create a new line, tab should indent'). A lens gives a text `on key
