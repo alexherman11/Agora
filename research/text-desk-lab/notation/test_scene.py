@@ -1400,7 +1400,13 @@ def test_live_words_now_and_newest_first():
     first; two ids of one letter compare by number (e9 < e10)."""
     import datetime, re as _re
     import deskd, expr as X, lens_ir, moo
-    refused('x : text "a", live sometimes', "live <clock|date|until|until ring>")
+    refused('x : text "a", live sometimes', "live <clock|date|until|until ring|until bar|since>")
+    # a6443: a song's progress, `until bar` and `since`, read until's words; `on end` is a count's (until*), not since's
+    for w in ("until bar", "since"):
+        assert scene.parse(f'x : text "2026-10-15 17:06:28 of 227", live {w}')[1]["x"]["live"] == w
+    refused('x : text "a", live since, on end do prop $item state=done', "needs `live until`")
+    assert scene.parse('x : text "media/now-playing/a.jpg", media picture')[1]["x"]["media"] == "picture"
+    refused('x : text "a", media poster', "media picture")
     refused('x : column, live clock', "is a text word")
     refused('x : text "a", on end do prop $item state=done', "needs `live until`")
     refused('x : text "a", live clock, on end do prop $item state=done', "needs `live until`")

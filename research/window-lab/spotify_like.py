@@ -50,6 +50,7 @@ FRESH = 30                                            # seconds a like state is 
 STEPS = ("To like songs from here, once: 1) at developer.spotify.com/dashboard, Create app (any name; Redirect URI "
          f"{REDIRECT}; Web API ticked); 2) run python research/window-lab/spotify_like.py connect and paste the app's "
          "Client ID; 3) press Agree on Spotify's page")
+SHORT = "Spotify is not connected yet: a one-time step, then the heart works (press it to see how)"
 
 
 class Refused(Exception):
@@ -183,7 +184,7 @@ class Library:
         if player != "Spotify":
             return "unknown", f"the song is playing in {player}; Liked Songs is Spotify's"
         if not self.client_id() or not self.connected():
-            return "unknown", "Spotify is not connected. " + STEPS
+            return "unknown", SHORT
         key = (title, artist)
         with self.lock:
             k = self.known.get(key)

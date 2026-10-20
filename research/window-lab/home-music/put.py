@@ -27,6 +27,7 @@ NOTATION = HERE.parents[1] / "text-desk-lab" / "notation"
 ROOM, STYLE, TILING = "f5204", "a5206", "a5692"
 LENSES = ["home-music-keys", "home-music-time", "home-music-full", "home-music", "home-music-small"]
 PANEL = "prop:role=home-panel,prop:lens=home-music"
+HEADER = "# a6443: the music panel in Spotify's look (home-music*): its own dark palette; its green is a state only"
 BODY_OLD = ("  body : column\n    role panebody\n    share 1\n    scroll none\n    lens $p.lens")   # the text's last lines
 BODY_NEW = ("  body : column\n    role panebody\n    share 1\n    scroll none\n    only when ($p.filled or \"\") = \"\"\n"
             "    lens $p.lens\n"
@@ -55,18 +56,25 @@ def lines(ask):
     """ask(line) -> the desk's text. The desk lines, built from what the world has now."""
     out = []
     style = body_of(ask(f"read {STYLE}"))            # the roles first: a lens naming a missing role does not compile
-    have = {head(l): l for l in style.splitlines() if head(l)}
-    new = []
-    for r in (HERE / "home-music.style").read_text(encoding="utf-8").splitlines():
-        h = head(r)
-        if not h:
-            continue
-        if h not in have:
-            new.append(r)
-        elif have[h].strip() != r.strip():
-            out.append(f"do replace {STYLE} old={q(have[h])} new={q(r)}")
-    if new:                                          # one append, its lines under one comment
-        out.append(f"do append {STYLE} line={q(chr(10).join(['# a6443: the music panel in Spotify' + chr(39) + 's look (home-music*); its green is a state only'] + new))}")
+    mine = [r for r in (HERE / "home-music.style").read_text(encoding="utf-8").splitlines() if head(r)]
+    block = "\n".join([HEADER] + mine)
+    names = {head(r) for r in mine}
+    lines_ = style.splitlines()
+    at = [k for k, l in enumerate(lines_) if l.startswith("# a6443: the music panel")]
+    if at:                                           # put before: its block is replaced whole, in one act
+        i = at[0]
+        j = i + 1
+        while j < len(lines_) and head(lines_[j]) in names:
+            j += 1
+        old = "\n".join(lines_[i:j])
+        if old != block:
+            out.append(f"do replace {STYLE} old={q(old)} new={q(block)}")
+    else:
+        have = {head(l): l for l in lines_ if head(l)}
+        clash = [h for h in names if h in have]
+        if clash:
+            raise SystemExit(f"home-style already names {', '.join(sorted(clash))} outside this panel's block; nothing sent")
+        out.append(f"do append {STYLE} line={q(block)}")   # one append, its lines under one comment
     for name in LENSES:
         text = (HERE / f"{name}.lens").read_text(encoding="utf-8").rstrip("\n")
         found = ask(f"find title:{name},tag:lens")

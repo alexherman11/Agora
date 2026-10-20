@@ -37,7 +37,7 @@ CID = "0123456789abcdef0123456789abcdef"
 T, A = "Night Drive", "Stand-in Band"
 try:
     st = lib.state_of(T, A)
-    check("before connecting, the heart is unknown and says the steps", st[0] == "unknown" and "developer.spotify.com" in st[1], st)
+    check("before connecting, the heart is unknown and says so in one line", st == ("unknown", sl.SHORT), st)
     try:
         lib.set(T, A, True)
         check("before connecting, a like is refused", False, "liked")
