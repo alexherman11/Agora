@@ -628,7 +628,7 @@ a6240 · family=code · status=curing
 
 Source edits of a6153 (HUD presses), 16 Oct. No world word was missing: every cause was the engine's. (1) lens_ir kept instances in 24 stores, one per placed lens per place, and the home base with the board out places more: nothing was kept (now 400). (2) A part holding a by/run repeat was never kept, because its sort keys were read around the accessor (now through it, Accessor.props). (3) Every part made escaped its whole context for gestures it may not have. (4) The painter was sent the scene text it never shows (text=0) and the body was encoded twice. (5) sayings read every saying to keep one (early terms). (6) deskd's world lock was a file tried every 50 ms, even between its own threads (now an in-process lock first). (7) hud.py rewrote four unchanged witnessed files every 2 s, so every page rebuilt every 2 s (witnessed.write changed_only). What is still not a world word: a lens cannot say 'this press changes only my panel' (optimistic paint); see a6153's done comment. Tools and numbers: research/window-lab/press-speed/README.md.
 
-## unchecked (2)
+## unchecked (4)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -644,6 +644,18 @@ Read: no world-level scratch-space word controls Python tempfile or the browser 
 Correction/follow-up after JEFF e12858: relocation failed because tools still used tempfile-created owner-only directories. Replacing mkdtemp/TemporaryDirectory with uuid-named os.makedirs (default inherited ACL) passes file-write/copytree and child TMP/TEMP/Python-temp checks. screen.py now reaches Edge DevTools; the subsequent document.readyState evaluation loses its websocket (WinError 10054, ConnectionClosedError). Browser startup is not verified. sandbox close screen-6120 completed and printed alex: untouched. No wheel or lens change made.
 Read/source after JEFF e12874: screen.py headless launch and sandbox_window.py Edge/WebView2 debugging launches now include --remote-allow-origins=*; both Python websocket clients explicitly set origin=None. Ran: screen.py --visible still resets during the first Runtime.evaluate(document.readyState), WinError 10054 then ConnectionClosedError. A later HTTP /json/version request to that same test port is refused (WinError 10061). Closed the owned sandbox screen-88068 with alex: untouched. Origin flag did not establish browser readiness; root cause unknown. Pipe transport was considered but not implemented: current desktop launcher does not inherit handles, so pipe mode needs explicit Windows pipe/handle transport work, not just a flag.
 Final source scope per JEFF e12889: removed ineffective --remote-allow-origins=* after the failed retest; explicit origin=None remains. hud_playtest.py uses the same temp helper and adds seven copy-only real-wheel cases via hud_scroll.py; no world-level word could express test-driver wheel input. Assertions require the panel and its content to move together, observe a wheel event, stay inside a HUD pane and keep the page at zero. test_hud_scroll.py: 5 stand-in verdict tests pass; this does NOT run the browser. test_agora_tmp.py passes child write, painter copytree, TMP/TEMP/Python-temp and override checks. Old tiling-fix.desk is commented as superseded by JEFF's live lens fix. Source/browser integration and wheel shots remain UNVERIFIED for the browser-capable follow-up.
+
+### A line's about= never reached the one it called, and a Talk's lines said nothing of their document (a6638)
+
+a6703 · family=conversation · status=unchecked
+
+Source edits for a6638 (the universal conversation), each a world-level word that was missing. (1) house.py points_at: a chat line's fields (about=, quote=, heading=) were kept in the world but the house handed a called resident only its words, so 'about this item' and 'these words' were lost on delivery; no world word can change what the house says to a resident. Missing word: a way for a line to say how it is delivered (or the delivery to carry the line's fields by rule). (2) scene.py sayings rows: a line in a Talk, or a reply, had no about unless its writer typed one, so the Conversation could not tag an agent's answer with its document; a lens can read the chat's talk_of only by a frame per row. Missing word: a row field that inherits from the line's chat or the line it answers. (3) scene.py involving: early pass-over (INVOLVING_EARLY), a speed fix, the same rows (check_involving_early.py).
+
+### Runtime updates lack a verified re-pin gate (a6498)
+
+a6713 · family=missing-word · status=unchecked
+
+Missing world word: check runtime. The world cannot hash a host executable, run isolated compiled-runtime probes, hold an OS publication lock or atomically replace runtime lock files. Draft source in a6498 adds runtime_pin.py, adapter startup gates and probe_support.py, plus empty-profile/stand-in Desk probes and fake binary/inventory tests. Both locks remain untouched until every candidate check passes. Source is not landed. The resident mock probe passed here; the worker mock probe failed at CreateRestrictedToken failed: 87. This is not live agent or current re-pin acceptance.
 
 ## cured (65)
 
