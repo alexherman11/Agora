@@ -2,8 +2,8 @@
 
     python put.py try [world] [--as who]      into a copy (default frontier-try), through explore.py
     python put.py live [--as who]             into the live world, through the door (127.0.0.1:8794): only AFTER the
-                                              branch that taught the desk `live until bar`, `live since` and
-                                              `media picture` has landed (before, the lenses do not compile)
+                                              branch that taught the desk `media picture` has landed
+                                              (before, the lenses do not compile)
     python put.py lines                       print the desk lines only
 
 What it puts (each read from the world first, so it can run again after editing the files here):
@@ -28,10 +28,10 @@ ROOM, STYLE, TILING = "f5204", "a5206", "a5692"
 LENSES = ["home-music-keys", "home-music-time", "home-music-full", "home-music", "home-music-small"]
 PANEL = "prop:role=home-panel,prop:lens=home-music"
 HEADER = "# a6443: the music panel in Spotify's look (home-music*): its own dark palette; its green is a state only"
-BODY_OLD = ("  body : column\n    role panebody\n    share 1\n    scroll none\n    lens $p.lens")   # the text's last lines
-BODY_NEW = ("  body : column\n    role panebody\n    share 1\n    scroll none\n    only when ($p.filled or \"\") = \"\"\n"
+BODY_OLD = ("  body : column\n    role panebody\n    share 1\n    scroll scroll\n    lens $p.lens")   # fullpanel's last lines, read 20 Oct after the scrolling fix
+BODY_NEW = ("  body : column\n    role panebody\n    share 1\n    scroll scroll\n    only when $item != ($lay.full or \"\") or ($p.filled or \"\") = \"\"\n"
             "    lens $p.lens\n"
-            "  filledbody : column\n    role panebody\n    share 1\n    scroll none\n    only when ($p.filled or \"\") != \"\"\n"
+            "  filledbody : column\n    role panebody\n    share 1\n    scroll scroll\n    only when $item = ($lay.full or \"\") and ($p.filled or \"\") != \"\"\n"
             "    lens $p.filled")
 
 

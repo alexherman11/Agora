@@ -40,17 +40,17 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STORE = HERE.parents[1] / "text-desk-lab" / "notation" / "house-state" / "spotify"
+STORE = HERE.parent / "text-desk-lab" / "notation" / "house-state" / "spotify"
 API = "https://api.spotify.com/v1"
 ACCOUNTS = "https://accounts.spotify.com"
 PORT = 8797                                           # the consent page sends him back here, to this PC only
 REDIRECT = f"http://127.0.0.1:{PORT}/callback"        # Spotify takes a loopback address only as 127.0.0.1, not localhost
 SCOPES = "user-library-read user-library-modify user-read-currently-playing"
 FRESH = 30                                            # seconds a like state is trusted before it is asked again
-STEPS = ("To like songs from here, once: 1) at developer.spotify.com/dashboard, Create app (any name; Redirect URI "
-         f"{REDIRECT}; Web API ticked); 2) run python research/window-lab/spotify_like.py connect and paste the app's "
-         "Client ID; 3) press Agree on Spotify's page")
-SHORT = "Spotify is not connected yet: a one-time step, then the heart works (press it to see how)"
+STEPS = ("Once: create an app at developer.spotify.com/dashboard (Web API; redirect "
+         f"{REDIRECT}), press Connect Spotify here, paste its Client ID, then approve Spotify's consent page. "
+         "Development Mode requires the app owner to have Premium. No client secret is needed.")
+SHORT = "Spotify is not connected. Press Connect Spotify for the one-time setup."
 
 
 class Refused(Exception):
@@ -58,11 +58,8 @@ class Refused(Exception):
 
 
 def _norm(s):
-    """Words compared loosely: case, accents left as they are, brackets and ' - Remastered' style tails dropped."""
-    s = (s or "").lower()
-    s = re.sub(r"\s*[\(\[].*?[\)\]]", "", s)
-    s = re.sub(r"\s+-\s+.*$", "", s)
-    return re.sub(r"[^\w]+", " ", s).strip()
+    """Case/spacing only: distinct live/remastered versions must not match."""
+    return " ".join((s or "").casefold().split())
 
 
 class Library:
@@ -72,6 +69,7 @@ class Library:
         self.known = {}                 # (title, artist) -> {"uri", "liked", "why", "at"}
         self.asking = set()
         self.stopped = False
+        self.connect_status = ""
 
     # -- the store
     def _read(self, name):
@@ -155,7 +153,7 @@ class Library:
 
     def contains(self, uri):
         code, o = self.call("GET", "/me/library/contains", {"uris": uri})
-        if code != 200 or not isinstance(o, list) or not o:
+        if code != 200 or not isinstance(o, list) or not o or not isinstance(o[0], bool):
             raise Refused("Spotify did not say whether the song is liked")
         return bool(o[0])
 
@@ -167,7 +165,9 @@ class Library:
             p = self.playing()
             if not p:
                 got = {"uri": "", "liked": "unknown", "why": "Spotify's account says nothing is playing on it"}
-            elif _norm(p["name"]) != _norm(title):
+            elif (not (p["uri"] or "").startswith("spotify:track:")
+                  or _norm(p["name"]) != _norm(title) or not artist
+                  or _norm(artist) not in {_norm(a) for a in p["artists"]}):
                 got = {"uri": "", "liked": "unknown", "why": "Spotify's account says another song is playing than "
                        "Windows does (another device?)"}
             else:
@@ -184,7 +184,7 @@ class Library:
         if player != "Spotify":
             return "unknown", f"the song is playing in {player}; Liked Songs is Spotify's"
         if not self.client_id() or not self.connected():
-            return "unknown", SHORT
+            return "unknown", self.connect_status or SHORT
         key = (title, artist)
         with self.lock:
             k = self.known.get(key)
@@ -192,7 +192,7 @@ class Library:
             if old and key not in self.asking and not self.stopped:
                 self.asking.add(key)
                 threading.Thread(target=self._ask, args=key, daemon=True).start()
-        if not k:
+        if not k or old:
             return "unknown", "asking Spotify"
         return k["liked"], k["why"]
 
@@ -227,11 +227,9 @@ class Library:
         cid = (client_id or self.client_id()).strip()
         if not re.fullmatch(r"[0-9a-zA-Z]{16,64}", cid):
             raise Refused("that is not a Spotify client id (32 letters and digits, from the app's page)")
-        self._write("app.json", {"client_id": cid})
         verifier = secrets.token_urlsafe(64)[:96]
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
         state = secrets.token_urlsafe(16)
-        redirect = f"http://127.0.0.1:{port}/callback"
         got = {}
 
         class H(BaseHTTPRequestHandler):
@@ -243,9 +241,10 @@ class Library:
                     self.end_headers()
                     return
                 ok = q.get("state") == state and "code" in q
-                got.update(q if ok else {"error": q.get("error") or "the answer did not match this sign-in"})
-                body = ("Spotify is connected. You can close this tab." if ok else
-                        "Not connected: " + got["error"]).encode()
+                if q.get("state") == state:
+                    got.update(q if ok else {"error": "consent was not granted"})
+                body = ("Authorization received. Finishing the connection; you can close this tab." if ok else
+                        "Not connected: the answer did not match this sign-in.").encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -256,6 +255,7 @@ class Library:
                 pass
 
         srv = HTTPServer(("127.0.0.1", port), H)
+        redirect = f"http://127.0.0.1:{srv.server_port}/callback"
         srv.timeout = 1
         url = self.accounts + "/authorize?" + urllib.parse.urlencode({
             "client_id": cid, "response_type": "code", "redirect_uri": redirect, "scope": SCOPES, "state": state,
@@ -268,7 +268,7 @@ class Library:
         finally:
             srv.server_close()
         if not got:
-            raise Refused("no answer from Spotify's page in time; run connect again")
+            raise Refused("no answer from Spotify's page in time; press Connect Spotify again")
         if "error" in got:
             raise Refused("Spotify did not connect: " + got["error"])
         try:
@@ -277,6 +277,7 @@ class Library:
         except (urllib.error.HTTPError, OSError) as e:
             raise Refused(f"Spotify did not trade the code for a sign-in: {e}")
         self._keep(tok)
+        self._write("app.json", {"client_id": cid})
         return "connected: the house can now read and change Liked Songs"
 
     def forget(self):
@@ -295,9 +296,9 @@ if __name__ == "__main__":
             print(STEPS)
     elif what == "connect":
         import webbrowser
-        cid = lib.client_id() or input("The app's Client ID (developer.spotify.com, your app's page): ").strip()
+        import spotify_connect
         try:
-            print(lib.connect(webbrowser.open, cid))
+            print(spotify_connect.connect(lib, webbrowser.open))
         except Refused as e:
             sys.exit(str(e))
     elif what == "forget":

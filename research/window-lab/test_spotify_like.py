@@ -9,7 +9,13 @@ fake's (checked first), so nothing reaches Spotify or Alex's library.
 """
 import shutil
 import sys
-import tempfile
+import os
+import uuid
+import urllib.parse
+import urllib.request
+import re
+import threading
+from unittest.mock import patch
 import time
 from pathlib import Path
 
@@ -19,6 +25,7 @@ import fake_spotify      # noqa: E402
 import host_verbs        # noqa: E402
 import media             # noqa: E402
 import spotify_like as sl  # noqa: E402
+import spotify_connect
 
 fails = []
 
@@ -30,7 +37,8 @@ def check(what, ok, got=""):
 
 
 fake = fake_spotify.Fake()
-store = Path(tempfile.mkdtemp(prefix="spotify-like-"))
+store = HERE / ".tmp-agora" / ("spotify-like-" + uuid.uuid4().hex)
+os.makedirs(store, exist_ok=True)
 lib = sl.Library(store=store, api=fake.url + "/v1", accounts=fake.url, fresh=0)
 assert lib.api.startswith("http://127.0.0.1") and lib.accounts.startswith("http://127.0.0.1"), "not the fake"
 CID = "0123456789abcdef0123456789abcdef"
@@ -48,7 +56,22 @@ try:
         check("a wrong client id is refused", False)
     except sl.Refused as e:
         check("a wrong client id is refused", "client id" in str(e), str(e))
-    said = lib.connect(fake_spotify.browser, CID, port=8799, wait=10)
+    def setup_browser(url):
+        if "/setup?" not in url:
+            return fake_spotify.browser(url)
+        page = urllib.request.urlopen(url, timeout=10).read().decode()
+        state = re.search(r'name="state" value="([^"]+)"', page)[1]
+        target = url.split("?", 1)[0]
+        bad = urllib.parse.urlencode({"state": "wrong", "client_id": CID}).encode()
+        try:
+            urllib.request.urlopen(target, bad, timeout=10)
+            check("setup rejects a forged form", False)
+        except urllib.error.HTTPError as e:
+            check("setup rejects a forged form", e.code == 400)
+        form = urllib.parse.urlencode({"state": state, "client_id": CID}).encode()
+        urllib.request.urlopen(target, form, timeout=10).read()
+
+    said = spotify_connect.connect(lib, setup_browser, port=0, wait=10)
     check("connect: consent, code traded with the PKCE verifier", said.startswith("connected") and lib.connected(), said)
     tok = (store / "token.json").read_text()
     check("the tokens are in the house's store only", "refresh_token" in tok and lib.client_id() == CID)
@@ -61,6 +84,19 @@ try:
     check("a liked song reads yes", lib.check(T, A)["liked"] == "yes")
     check("like again says already", lib.set(T, A, True).startswith("already"))
     check("unlike: removed", lib.set(T, A, False) == "removed from Liked Songs" and not fake.liked, fake.liked)
+
+    # Refuse at the actual write after both preceding reads succeeded.
+    old_call = lib.call
+    def reject_write(method, path, *args, **kwargs):
+        if method == "PUT":
+            raise sl.Refused("Spotify refused the write")
+        return old_call(method, path, *args, **kwargs)
+    with patch.object(lib, "call", reject_write):
+        try:
+            lib.set(T, A, True)
+            check("a failed write cannot fill the heart", False)
+        except sl.Refused:
+            check("a failed write cannot fill the heart", lib.known[(T, A)]["liked"] == "no" and not fake.liked)
 
     fake.expire()
     check("an expired token is renewed and the call goes on", lib.check(T, A)["liked"] == "no"
@@ -77,7 +113,15 @@ try:
     except sl.Refused:
         check("...and a like then is refused", "spotify:track:fake0002" not in fake.liked)
     fake.playing = {**fake.playing, "name": "Night Drive (2024 Remaster)", "uri": "spotify:track:fake0001"}
-    check("a remaster's tail still matches", lib.check(T, A)["liked"] == "no")
+    check("a different remaster refuses to guess", lib.check(T, A)["liked"] == "unknown")
+    fake.playing = {**fake.playing, "name": T, "artists": [{"name": "Other Artist"}]}
+    check("same title with a different artist refuses to guess", lib.check(T, A)["liked"] == "unknown")
+    try:
+        lib.set(T, A, True)
+        check("wrong artist cannot modify the library", False)
+    except sl.Refused:
+        check("wrong artist cannot modify the library", not fake.liked)
+    fake.playing = {**fake.playing, "artists": [{"name": A}]}
     check("another player: unknown, says which", lib.state_of(T, A, "Edge") == ("unknown", "the song is playing in Edge; Liked Songs is Spotify's"))
 
     # the host verbs, as the home base answers them, with a stand-in session (what Windows says is playing)
@@ -104,12 +148,40 @@ try:
     check("signed out, host media.like is refused with the steps", r.startswith("ERR") and "developer.spotify.com" in r, r)
     # state_of answers at once and asks in the background
     lib2 = sl.Library(store=store, api=fake.url + "/v1", accounts=fake.url)
-    lib2.connect(fake_spotify.browser, CID, port=8799, wait=10)
+    lib2.connect(fake_spotify.browser, CID, port=0, wait=10)
     first = lib2.state_of(T, A)
     time.sleep(0.5)
     check("state_of answers at once (asking), then knows", first == ("unknown", "asking Spotify") and lib2.state_of(T, A)[0] == "no",
           (first, lib2.state_of(T, A)))
+    lib2.known[(T, A)]["at"] = 0
+    check("a stale heart becomes unknown while refreshed", lib2.state_of(T, A) == ("unknown", "asking Spotify"))
+    time.sleep(0.1)
+
+    # The actual host Connect button returns immediately. No real browser opens.
+    entered, release, done = threading.Event(), threading.Event(), threading.Event()
+    def connect_stub(library, browser):
+        entered.set()
+        release.wait(3)
+        return "connected"
+    class ConnectHud:
+        def say_desktop(self):
+            done.set()
+    with patch.object(spotify_connect, "connect", connect_stub):
+        r = host_verbs.call(ConnectHud(), "media.connect")
+        check("host Connect starts the explicit flow", r == "ok opening Spotify connection" and entered.wait(1), r)
+        r = host_verbs.call(ConnectHud(), "media.connect")
+        check("double Connect cannot open two flows", "already open" in r, r)
+        release.set()
+        check("Connect refreshes the panel when finished", done.wait(2))
+
+    # A revoked refresh token must not leave a trusted green heart.
+    fake.refresh.clear()
+    fake.expire()
+    revoked = lib2.check(T, A)
+    check("revoked consent is unknown with a reconnect explanation",
+          revoked["liked"] == "unknown" and "connect again" in revoked["why"])
 finally:
+    lib.stop()
     fake.close()
     shutil.rmtree(store, ignore_errors=True)
 

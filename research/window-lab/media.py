@@ -18,14 +18,13 @@ with no Spotify window, the media key itself (SendInput), which Windows gives to
 rows() is what the home base keeps as `witnessed:media`: one row or none.
     name media · player (Spotify, Edge ...) · playing yes|no · title · artist · album · line ("song · artist")
     art     the album art's path (media/now-playing/<hash>.jpg), or empty
-    at      the song's progress as `live until` words: "<the moment it ends> of <its length in s>" while it plays, or
-            "<seconds left> of <length>" while paused (standing still); empty when the app says no length
+    at      static "<seconds left> of <length>"; empty when the app says no length
+    position, remaining  last reported seconds; elapsed is the reported position as m:ss
     length  its length as m:ss · shuffle on|off|"" (the app does not say) · repeat off|track|list|""
     can     the controls the app offers now: the words of play pause next prev shuffle repeat, joined by spaces
     liked   yes|no|unknown, and like_why: why unknown (spotify_like.py: Liked Songs, through Spotify's Web API)
     source  session | window (which of the two above answered)
-The moment is fixed while the song plays on, so the row (and every page built from it) changes only on a new song, a
-pause, a seek or a new like: the painter moves the bar and the time from its own clock (scene.py `live`).
+Progress is static between reported session changes. The music panel uses no painter clock or animation.
 
 The panel is the lens home-music (Home base f5204; its source and put script in home-music/ here). Its parts ask the
 home base with host verbs (host_verbs.py): media.play, media.next, media.prev, media.shuffle, media.repeat,
@@ -190,25 +189,12 @@ def clock(s):
     return f"{s // 3600}:{s // 60 % 60:02d}:{s % 60:02d}" if s >= 3600 else f"{s // 60}:{s % 60:02d}"
 
 
-_KEPT = {}               # the moment last written for a track, so the row stands still while it plays on
-
-
 def progress(s, now=None):
-    """-> the `live until` words for a session state, or "" when the app gives no length. The moment is the song's
-    end: updated + (end - position). While it plays on, a new estimate within 2 s of the kept one keeps the old."""
+    """Static remaining/total words from the last reported playback position."""
     end, pos = float(s.get("end") or 0), float(s.get("position") or 0)
     if end <= 0:
         return ""
-    key = (s.get("title"), s.get("artist"), s.get("album"))
-    if s.get("status") != "Playing":
-        _KEPT.pop("moment", None)
-        return f"{max(0, round(end - pos))} of {round(end)}"
-    at = float(s.get("updated") or (now or time.time())) + (end - pos)
-    kept = _KEPT.get("moment")
-    if kept and kept[0] == key and abs(kept[1] - at) < 2:
-        at = kept[1]
-    _KEPT["moment"] = (key, at)
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(at)) + f" of {round(end)}"
+    return f"{max(0, round(end - max(0, pos)))} of {round(end)}"
 
 
 def _rel(path):
@@ -239,6 +225,7 @@ def session_row(s, liked=("unknown", "")):
     """A session state (smtc.ps1's "s") -> the witnessed:media row."""
     title, artist = (s.get("title") or "").strip(), (s.get("artist") or "").strip()
     end = float(s.get("end") or 0)
+    pos = min(max(0, float(s.get("position") or 0)), max(0, end))
     can = s.get("can") or {}
     rep = {"None": "off", "Track": "track", "List": "list"}.get(s.get("repeat") or "", "")
     shuf = "" if s.get("shuffle") is None else ("on" if s.get("shuffle") else "off")
@@ -246,6 +233,7 @@ def session_row(s, liked=("unknown", "")):
             "playing": "yes" if s.get("status") == "Playing" else "no", "title": title, "artist": artist,
             "album": (s.get("album") or "").strip(), "line": f"{title} · {artist}" if artist else title,
             "art": _rel(s.get("art")), "at": progress(s), "length": clock(end) if end > 0 else "",
+            "position": pos, "remaining": max(0, end - pos), "elapsed": clock(pos),
             "shuffle": shuf, "repeat": rep, "can": " ".join(k for k in ("play", "pause", "next", "prev", "shuffle", "repeat") if can.get(k)),
             "liked": liked[0], "like_why": liked[1]}
 

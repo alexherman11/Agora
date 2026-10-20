@@ -3,10 +3,8 @@ look and Like since a6443). 17 Oct 2026.
 
     python research/window-lab/test_media.py [world] [--as who]      (default frontier-try, as alex)
 
-1. The row (no screen): media.session_row and media.progress from made-up session states: the progress words
-   (`live until` words: a moment while playing, standing seconds while paused, none without a length), a moment that
-   stands still while the song plays on (estimates within 2 s keep the first), shuffle and repeat words, the player's
-   name, and the art's path as the desk names it.
+1. The row (--logic-only, no screen): static event-reported progress, times, seeks,
+   shuffle/repeat, player names and the art's path. Wall time never advances the bar.
 2. The panel (home-music/stage.py: a stand-in media session, a fake Spotify; headless): the home-base lens is painted
    with the Music panel, a stand-in home base records what the painter asks, and each control is pressed: pause, next,
    back, shuffle, repeat, the heart; the title asks nothing. Nothing reaches Windows' media session, Spotify or anyone's
@@ -37,15 +35,17 @@ s = {"app": "Spotify.exe", "title": "A", "artist": "B", "album": "C", "status": 
      "end": 200.0, "updated": now, "shuffle": True, "repeat": "Track", "art": str(media.ART / "0123456789abcdef.jpg"),
      "can": {"play": True, "pause": True, "next": True, "prev": False, "shuffle": True, "repeat": True}}
 r = media.session_row(s, ("yes", ""))
-want_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now + 140)) + " of 200"
-check("playing: the song's end as a moment, of its length", r["at"] == want_at, r["at"])
+want_at = "140 of 200"
+check("playing: static reported position and remaining duration", r["at"] == want_at
+      and r["position"] == 60 and r["remaining"] == 140 and r["elapsed"] == "1:00", r)
 check("the length as m:ss", r["length"] == "3:20", r["length"])
 check("shuffle on, repeat this song, player Spotify, liked yes",
       (r["shuffle"], r["repeat"], r["player"], r["liked"], r["playing"]) == ("on", "track", "Spotify", "yes", "yes"), r)
 check("the controls the app offers", r["can"] == "play pause next shuffle repeat", r["can"])
 check("the art as the desk names it", r["art"] == "media/now-playing/0123456789abcdef.jpg", r["art"])
 s2 = {**s, "position": 61.2, "updated": now + 1.0}
-check("a new estimate within 2 s keeps the moment (the row stands still)", media.session_row(s2)["at"] == want_at)
+check("a new playback position updates the static bar", media.session_row(s2)["position"] == 61.2)
+check("wall clock alone does not advance the bar", media.progress(s, now=now + 90) == want_at)
 s3 = {**s, "position": 150.0, "updated": now + 1.0}
 check("a seek moves it", media.session_row(s3)["at"] != want_at)
 p = media.session_row({**s, "status": "Paused", "position": 61.4})
@@ -56,15 +56,21 @@ check("repeat off reads off, no shuffle word when the app says none",
       (lambda x: (x["repeat"], x["shuffle"]))(media.session_row({**s, "repeat": "None", "shuffle": None})) == ("off", ""))
 
 # -- 2. the panel, pressed
+if "--logic-only" in sys.argv:
+    print(f"{len(fails)} failed: static media rows; browser checks not run")
+    sys.exit(1 if fails else 0)
 world = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "frontier-try"
 who = sys.argv[sys.argv.index("--as") + 1] if "--as" in sys.argv else "alex"
 find = ("JSON.stringify([...document.querySelectorAll('[data-key]')].map(e => e.dataset.key)"
         ".filter(k => /lens:home-music-keys\\/keys\\/media$/.test(k) || /lens:home-music\\/music\\/playing\\/media\\/top$/.test(k)))")
 stub = ("window.pywebview = {api: {host: (v, w) => { (window.__asked = window.__asked || []).push([v, w]); "
         "return Promise.resolve('ok ' + v); }}}; 1")
-out = subprocess.run([sys.executable, str(HERE / "home-music" / "stage.py"), world, "--as", who, "--lens", "home-base",
+attempt = subprocess.run([sys.executable, str(HERE / "home-music" / "stage.py"), world, "--as", who, "--lens", "home-base",
                       "--size", "2560x1440", "wait", "1500", "js", find],
-                     capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+                     capture_output=True, text=True, encoding="utf-8", errors="replace")
+out = attempt.stdout
+if attempt.returncode:
+    print("browser stage failed (not a panel result):", attempt.stderr[-2000:])
 keys = next((json.loads(json.loads(l)) for l in out.splitlines() if l.startswith('"[')), [])
 row = next((k for k in keys if k.endswith("keys/media")), None)
 top = next((k for k in keys if k.endswith("/top")), None)

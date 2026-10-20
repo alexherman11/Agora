@@ -104,6 +104,34 @@ def _like(liked):
     return press
 
 
+_CONNECT_LOCK = threading.Lock()
+
+
+def _connect(hud, words):
+    """Only an explicit button press may open the account setup pages."""
+    import media
+    import spotify_connect
+    import webbrowser
+    if not _CONNECT_LOCK.acquire(blocking=False):
+        return "Spotify connection is already open"
+    library = media.likes()
+    library.connect_status = "Spotify connection is open in your browser."
+
+    def run():
+        try:
+            spotify_connect.connect(library, webbrowser.open)
+            library.connect_status = ""
+        except Exception:
+            # Do not publish account replies, codes or tokens into the world.
+            library.connect_status = "Spotify did not connect. Press Connect Spotify to try again."
+        finally:
+            _CONNECT_LOCK.release()
+            hud.say_desktop()
+
+    threading.Thread(target=run, daemon=True).start()
+    return "opening Spotify connection"
+
+
 def _window(hud, words):
     # a5500: a dock icon opens an Agora app as its own window: one lens, painted as the home base's own person in its
     # world, as lens_window.py does (Edge in app mode). A lens name only: no program, path or address
@@ -174,6 +202,7 @@ VERBS = {
     "media.repeat": ("repeat: off, then all, then this song, then off", "", _media("repeat")),
     "media.like": ("save the song playing to Spotify's Liked Songs", "", _like(True)),
     "media.unlike": ("take the song playing out of Spotify's Liked Songs", "", _like(False)),
+    "media.connect": ("connect Spotify through its consent page; no library changes", "", _connect),
 }
 
 

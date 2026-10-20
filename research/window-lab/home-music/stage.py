@@ -20,7 +20,7 @@ import json
 import os
 import shutil
 import sys
-import tempfile
+import uuid
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +35,7 @@ import fake_spotify   # noqa: E402
 import host_verbs     # noqa: E402
 import media          # noqa: E402
 import spotify_like   # noqa: E402
+import put
 
 SONGS = [{"title": "Night Drive", "artist": "Stand-in Band", "album": "Made Up For Tests", "end": 227.0,
           "colours": ((30, 215, 96), (18, 40, 70), (240, 180, 70))},
@@ -112,14 +113,17 @@ class Stand:
 
 def main():
     a = sys.argv[1:]
+    if "--live" in a or "--on-screen" in a:
+        raise SystemExit("music stage is sandbox-only")
     empty, signed_out = "--empty" in a, "--signed-out" in a
     a = [x for x in a if x not in ("--empty", "--signed-out")]
     session = f"{a[0]}-screen-{os.getpid()}"             # as hud_stage names the copy
     stand, fake = Stand(), fake_spotify.Fake()
-    store = Path(tempfile.mkdtemp(prefix="music-stage-"))
+    store = WL / ".tmp-agora" / ("music-stage-" + uuid.uuid4().hex)
+    os.makedirs(store, exist_ok=True)  # inherited ACL; tempfile's mode 0700 breaks builder sandboxes
     lib = spotify_like.Library(store=store, api=fake.url + "/v1", accounts=fake.url, fresh=1)
     if not signed_out:
-        lib.connect(fake_spotify.browser, "0123456789abcdef0123456789abcdef", port=0 or 8799, wait=10)
+        lib.connect(fake_spotify.browser, "0123456789abcdef0123456789abcdef", port=0, wait=10)
     media.SESSION, media.LIKES = stand, lib
 
     class Hud:                                           # the home base, as host_verbs sees it
@@ -146,7 +150,9 @@ def main():
             n = int(self.headers.get("Content-Length") or 0)
             o = json.loads(self.rfile.read(n) or b"{}")
             if self.path == "/host":
-                said = host_verbs.call(hud, o.get("verb", ""), o.get("words", ""))
+                # Never let a test page open Alex's real browser/account flow.
+                said = ("ERR Connect disabled in the stand-in" if o.get("verb") == "media.connect"
+                        else host_verbs.call(hud, o.get("verb", ""), o.get("words", "")))
                 print(f"stage: host {o.get('verb')} -> {said}", flush=True)
                 time.sleep(0.2)                          # host_verbs' own say_desktop timer runs first
                 hud.say_desktop()
@@ -190,9 +196,24 @@ def main():
         opts += a[k:k + n]
         k += n
     sys.argv = ["hud_stage.py"] + opts + ["js", js] + a[k:]
+    original_run = hud_stage.screen.run
+
+    async def prepared(*args, **kwargs):
+        # screen.main has made its copy by now. Apply draft lenses to that copy
+        # before the browser paints; never depend on live/source having landed.
+        ask = put.explore(session, "worker-a6443")
+        for line in put.lines(ask):
+            target = line.split()[2]
+            receipt = ask(f"{'look' if target.startswith('f') else 'read'} {target}\n{line}")
+            if "ERR" in receipt or "refused" in receipt:
+                raise RuntimeError("draft music setup refused: " + receipt[-600:])
+        return await original_run(*args, **kwargs)
+
+    hud_stage.screen.run = prepared
     try:
         hud_stage.main()
     finally:
+        hud_stage.screen.run = original_run
         srv.shutdown()
         fake.close()
         witnessed.clear(session, "media")

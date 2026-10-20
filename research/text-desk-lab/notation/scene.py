@@ -1218,7 +1218,7 @@ def _w_media(node, p, val, n, env):
     node["media"] = v or "embed"
 
 
-LIVE =("clock", "date", "until", "until ring", "until bar", "since")
+LIVE =("clock", "date", "until", "until ring")
 
 
 def _w_live(node, p, val, n, env):
@@ -1227,9 +1227,6 @@ def _w_live(node, p, val, n, env):
     # words as a moment (2026-10-15 17:05:12, or a number of seconds left when the count stands still) with `of <secs>`
     # for the whole, and draws the time left, `ring` with a ring that empties. At zero it sends the part's `on end`.
     # The words stay what the printers print, so a reader of the scene sees the moment, not a picture of it.
-    # a6443 (a song's progress, from the system's media session): `until bar` draws a thin bar that fills as the time
-    # passes, and `since` the time passed (the whole less what is left); both read until's words, so one moment (the
-    # song's end) and its whole (the song's length) give the left time, the bar and the right time alike
     if (val or "").strip() not in LIVE:
         raise LensRefusal(f"line {n}: `live <{'|'.join(LIVE)}>`; got {p!r}")
     node["live"] = val.strip()
@@ -1818,7 +1815,7 @@ WORDS = {
     "picture": ("picture", _w_picture),
     "markdown": ("markdown [links <selection>]", _w_markdown),
     "media": ("media [player|picture]", _w_media),
-    "live": ("live clock|date|until [ring|bar]|since", _w_live),
+    "live": ("live clock|date|until [ring]", _w_live),
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),

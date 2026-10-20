@@ -1,4 +1,5 @@
-# a6443: the music panel in Spotify's look (home-music, home-music-full, home-music-keys, home-music-time). It is Spotify's own surface inside the home base, as an embedded player is: its own dark palette (sp*), whatever theme the home base wears, the art rounded, the title strong, the artist grey, white controls with a round white play. Spotify's green is a STATE only (liked, shuffle or repeat on, playing): its own token, not the theme's accent, which means an agent at work. Nothing moves; the bar steps once a second. To follow the theme instead, point the sp* tokens at ink, soft, faint, raised, wash and night.
+# Music has its own Spotify palette inside the light home base. Green marks state only.
+# Static event-reported progress; no clock, continuous motion or decorative animation.
 token spotify = #1ED760
 token spbg = #121212
 token spraised = #282828
@@ -24,8 +25,10 @@ role muheart.unknown : spfaint, width gap x3, pad gap /4, corner gap x3, hover s
 role mutime : between gap
 role mutimenum : text down 2, spsoft, align center
 role mubarbox : align center
-role mubar : spfaint
-role mubar.on : spink
+role mubar : on spfaint, height gap /2, corner gap
+role mubar.on : on spink, height gap /2, corner gap
+role murest : on spraised, height gap /2, corner gap
+role muconnect : text down, spsoft, on spraised, corner gap, pad gap /2, hover sphover
 role mukeysbox : align center
 role mukeys : align center
 role mukeyrow : between gap x2.5, align center

@@ -2,6 +2,10 @@
 music : column
   role mufull
   share 1
+  connect : text "Connect Spotify"
+    role muconnect
+    tip "Connect Spotify" "One-time app setup and Spotify consent; never your password"
+    on click host media.connect
   playing : column
     share 1
     of witnessed:media as m

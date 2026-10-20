@@ -1,6 +1,11 @@
-# home-music: the music panel, as Spotify would draw it (a6443; a5592's controller before it). Alex, 17 Oct: 'I want it to look like Spotify made it, and I want to be able to save songs to my liked songs from here.' The row is witnessed:media (media.py: Windows' media session, with the album art as a picture; else Spotify's window title). Compact: the art, the song and its artist, the heart, where in the song, the controls. When the panel fills the room it shows home-music-full instead (the panel note's filled=). Green is a state only: liked, shuffle or repeat on. Nothing moves but the time.
+# Compact music: system media metadata and art, explicit Spotify Connect, truthful heart state.
+# Progress changes only when the media session reports a new position. Nothing animates.
 music : column
   role mu
+  connect : text "Connect Spotify"
+    role muconnect
+    tip "Connect Spotify" "One-time app setup and Spotify consent; never your password"
+    on click host media.connect
   playing : column
     of witnessed:media as m
     each nowplaying

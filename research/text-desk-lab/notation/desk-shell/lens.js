@@ -914,7 +914,6 @@
   addEventListener("pointerdown", () => { try { audio = audio || new AudioContext(); audio.resume(); } catch (e) { /* no sound here */ } }, true);
   function live(el, n, p) {
     el.classList.add("t-live"); el._live = { kind: p.live, src: p.text, was: null };
-    if (p.live === "since") el.dataset.since = "1";      // a6443: time passed does not blink at its end, as a count left does
     LIVE.add(el); tick(el, false);
     liveTimer = liveTimer || setInterval(() => {
       for (const e of LIVE) if (e.isConnected) tick(e, true); else LIVE.delete(e);
@@ -939,18 +938,11 @@
       }
       L.arc.style.strokeDashoffset = String(1 - (whole ? Math.min(1, left / whole) : 1));
       L.time.textContent = clockOf(left);
-    } else if (L.kind === "until bar") {
-      // a6443: a thin bar that fills as the time passes (a song's progress); the part's role gives its colour, the
-      // track is that colour faint. Its width steps once a second, with no transition: nothing glides
-      if (!L.fill) { el.classList.add("t-bar"); el.innerHTML = '<span class="bar-fill"></span>'; L.fill = el.firstChild; el.setAttribute("role", "progressbar"); }
-      const done = whole ? Math.max(0, Math.min(1, 1 - left / whole)) : 0;
-      L.fill.style.width = (done * 100).toFixed(2) + "%"; el.setAttribute("aria-valuenow", String(Math.round(done * 100)));
-    } else if (L.kind === "since") el.textContent = clockOf(whole ? Math.max(0, whole - left) : 0);
-    else el.textContent = clockOf(left);
+    } else el.textContent = clockOf(left);
     el.toggleAttribute("data-ended", left === 0);
     if (moving && left === 0 && !ENDED.has(el.dataset.key + "|" + L.src)) {
       ENDED.add(el.dataset.key + "|" + L.src);
-      if (watching && L.was > 0 && (L.kind === "until" || L.kind === "until ring")) chime();     // a song's end is silent
+      if (watching && L.was > 0) chime();
       for (const a of el._n.acts.filter(a => a.on === "end")) send(el._n, a.line);
     }
     L.was = left;

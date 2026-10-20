@@ -5,8 +5,8 @@
 # half second it reads the sessions and, when anything changed, prints one JSON line on stdout:
 #   {"ok":true,"apps":[...],"s":{app,title,artist,album,status,position,end,updated,shuffle,repeat,art,can:{...}}}
 # s is the session it chose: Spotify's when there is one, else the one Windows calls current; none: "s":null.
-# position and end are seconds; updated is when the app last said its position (unix seconds), so the position now is
-# position + (now - updated) while it plays. art is the album art written to $env:AGORA_ART_DIR, one file per track.
+# position and end are seconds; updated is when the app last said its position (unix seconds).
+# The panel shows that static report, never a clock estimate. Art is written to AGORA_ART_DIR.
 #
 # It reads lines on stdin: play, pause, toggle, next, prev, shuffle on|off, repeat none|track|list. Each is sent to the
 # chosen session (Try*Async: the app's own transport controls; no key is pressed, no window takes focus) and answered
@@ -81,7 +81,7 @@ function Read-State() {
   $o = [ordered]@{
     app = $s.SourceAppUserModelId; title = $props.Title; artist = $props.Artist; album = $props.AlbumTitle
     status = [string]$info.PlaybackStatus
-    position = [math]::Round($tl.Position.TotalSeconds, 1); end = [math]::Round(($tl.EndTime - $tl.StartTime).TotalSeconds, 1)
+    position = [math]::Round(($tl.Position - $tl.StartTime).TotalSeconds, 1); end = [math]::Round(($tl.EndTime - $tl.StartTime).TotalSeconds, 1)
     updated = [math]::Round($tl.LastUpdatedTime.ToUnixTimeMilliseconds() / 1000.0, 1)
     shuffle = $shuf; repeat = $rep
     art = (ArtOf $s $props $key); artwhy = $script:artWhy
