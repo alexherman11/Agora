@@ -56,6 +56,11 @@ B = R.BOARD
 sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
 import agora_tmp
 TMP = Path(agora_tmp.directory("b-"))  # short: Claude's cwd-keyed fixture doubles this path
+# The landing-room worktree has a longer name than a card's worktree. These
+# synthetic Claude project paths embed that full cwd a second time; use Windows
+# extended paths so their tool-results children do not hit legacy MAX_PATH.
+if os.name == "nt" and not str(TMP).startswith("\\\\?\\"):
+    TMP = Path("\\\\?\\" + str(TMP))
 atexit.register(shutil.rmtree, TMP, ignore_errors=True)  # stubbed starts leave stderr.log open
 
 

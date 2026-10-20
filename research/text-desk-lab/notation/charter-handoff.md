@@ -130,3 +130,23 @@ Additional test_house_merge.py attempt was blocked before its scenarios by
 TemporaryDirectory ACLs: WinError 5 creating the fixture's live directory under
 system temp. No claim about that test or real provider acceptance is made.
 No git mutation was performed; the house must commit the resolved merge and judge.
+
+## Landing-room test repairs, 20 Oct
+
+The house committed the merge as 8a99a94, then refused landing on test_builders
+and test_shared. Both test failures are repaired in the branch:
+
+- Builder fixtures now use Windows extended paths. Their synthetic Claude project
+  directories encode the full scratch cwd again, exceeding legacy MAX_PATH in the
+  longer house-landing worktree. Shortening only section 7's cwd was insufficient:
+  a deliberately deeper scratch root reproduced the same problem in section 1.
+  The extended-path repair retains all original fixture paths and assertions.
+- Shared-file checks count shared-file warning comments, allowing independent
+  charter receipts. Another house pass explicitly asserts the warning is not
+  repeated. This fixture also uses agora_tmp inherited-ACL directories so its
+  scenarios can run in the builder sandbox.
+
+Ran: test_builders printed all passed with AGORA_TMP set to the additional
+research/window-lab/.tmp-agora/landing-room-length directory; test_shared printed
+all passed; charter 16 tests OK in 0.742s. No real model/process acceptance is
+implied. The house must judge again; earlier real-provider acceptance remains open.
