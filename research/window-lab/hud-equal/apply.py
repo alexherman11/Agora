@@ -34,7 +34,8 @@ import put  # noqa: E402  (Try, Live, q)
 import apply as hs  # noqa: E402  (a6642's world half: text_of, found, plan, check, apply)
 
 ROOM = "f5204"
-NOTES = {"style": "a5206", "viewer": "a5486", "tiling": "a5692", "dock": "a5564", "widgets": "a5707", "view": "a6194"}
+NOTES = {"style": "a5206", "viewer": "a5486", "tiling": "a5692", "dock": "a5564", "widgets": "a5707", "view": "a6194",
+         "drop": "a6340"}
 
 PASSAGES = {
     "style": [("role tool : text down, faint, pad gap /2", "role tool : text down, faint, pad gap /2\nrole tool.on : text down, ink, pad gap /2")],
@@ -82,6 +83,10 @@ PASSAGES = {
         ('''    on click do prop $v viewing=$d.opens back="$v.viewing" find="" with=""''', '''    on click do view $d.opens'''),
         ('''    on click do prop $v viewing="" back="$v.viewing" find=""''', '''    on click do unview $v'''),
     ],
+    "drop": [("do remove $from when count(in:$from) = 0",
+              "do remove $from when count(in:$from) = 0\n"
+              "# a5994 (Alex, 20 Oct): a drop while a panel fills the room gives the room back, so what moved is seen\n"
+              "do prop $5 full=\"\" when ($5.full or \"\") != \"\"")],
     "widgets": [('''  role widget.wide when $w.size = "m"
   lens $w.title''', '''  role widget.wide when $w.size = "m"
   carry
@@ -197,7 +202,7 @@ def apply(w, saved=None):
             continue
         w.do(f"look {ROOM}")
         step(f"do create {ROOM} kind=note title={p.stem} tags=verb on=f5189 text={put.q(text)}", f"{p.stem} create")
-    order = ["style", "view", "open-found", "viewer", "dock", "widgets", "home-widgets-end"]
+    order = ["style", "view", "drop", "open-found", "viewer", "dock", "widgets", "home-widgets-end"]
     tg = targets(w)
     for key in order:
         if key not in tg:

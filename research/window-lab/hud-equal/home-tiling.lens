@@ -16,6 +16,8 @@
 # empty goes, and the others take its width. Each drop is one use of the verb drop-panel (Home base). ⇔ widens a
 # column: a third, a half, two thirds of the room. A double-click on a title fills the room with that panel; again,
 # or ⤡, gives it back. – shelves it (the dock's panels). Nothing moves by itself.
+# While one fills the room, its header, the pinned ones' and the rail's titles still drag (Alex, 20 Oct 12:48: 'window
+# dragging no longer seems to be working' was a filled board, whose header had no carry); a drop gives the room back.
 stage : column
   share 1
   role stage
@@ -146,13 +148,15 @@ railitem : column
   only when $item != ($lay.full or "") and ($r.pin or "") != "yes" and not (($r.lens or "") = "home-viewer" and showing > 0)
   let was = ($lay.full or "")
   on click do prop $lay full=$r
-  name : text "$title"
-    role chipname
-    clamp 1
-  sum : column
-    role chipsum
-    only when ($r.lesser or "") != ""
-    lens $r.lesser
+  grip : column
+    carry
+    name : text "$title"
+      role chipname
+      clamp 1
+    sum : column
+      role chipsum
+      only when ($r.lesser or "") != ""
+      lens $r.lesser
 fullpanel : column
   let big = 13 when $item = ($lay.full or "")
   let big = 6 otherwise
@@ -160,8 +164,14 @@ fullpanel : column
   role pane
   scroll none
   only when $item = ($lay.full or "") or ($p.pin or "") = "yes" or (($p.lens or "") = "home-viewer" and showing > 0)
+  on drop grip at left do drop-panel left $carried $p $p.in $lay
+  on drop grip at right do drop-panel right $carried $p $p.in $lay
+  on drop grip at top do drop-panel top $carried $p $p.in $lay
+  on drop grip at bottom do drop-panel bottom $carried $p $p.in $lay
+  on drop grip do drop-panel swap $carried $p $p.in $lay
   grip : row
     role panehead
+    carry
     let was = ($lay.full or "")
     on double when $item = ($lay.full or "") do prop $lay full=""
     on double when $item != ($lay.full or "") do prop $lay full=$p
