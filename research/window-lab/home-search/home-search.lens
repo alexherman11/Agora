@@ -1,0 +1,74 @@
+# home-search: the home base's find, at the top middle of its bar, outside the tiling (a6642; Alex, 20 Oct: 'the
+# search at the top still isn't at the top. I want search to be outside of the tiling'). It is the bar's own control,
+# not a panel: home-tiling places it between the widgets and the bar's tools, so no drag, fill or shelf moves it.
+# The words are the person's own value, find= on their viewer note (role=home-view, actor=$me). Enter sends them, and
+# the results drop down under the box, over the page: titles holding every word first, then things that mention them,
+# eight in all, each with its kind. Up and Down choose, Enter opens (Enter again on the same words opens the first);
+# Escape or a press elsewhere closes the list, Down opens it again; an empty box and Enter puts it away. Ctrl+K, or typing while no text has the caret,
+# puts the caret in the box. A result opens in the viewer or, when the viewer already shows something, as a panel of
+# its own beside the chat (the verb open-found; its × closes it).
+search : column
+  role searchbar
+  scroll none
+  arrows
+  of prop:role=home-view,prop:actor=$me as v
+  each bar
+  none : text "No viewer of yours here (a note in Home base with role=home-view actor=<you>)."
+    role hint
+    only when count(prop:role=home-view,prop:actor=$me) = 0
+bar : column
+  drop : column
+    fold float open inline handle hint
+    line : row
+      role findbar
+      peek
+      box : text "$v.find"
+        role find
+        hint "Find anything  ·  Ctrl+K"
+        lines 1..1
+        share 1
+        commit enter only
+        caret Ctrl+K typing
+        on edit do prop $v find="$value"
+    list : column
+      role searchdrop
+      only when ($v.find or "") != ""
+      the prop:role=home-layout,prop:actor=$me as lay
+      let q = words-of($v.find)
+      let nt = count(title:$q)
+      nothing : text "Nothing holds those words."
+        role meta
+        only when count(?$q) = 0
+      titles : column
+        role foundlist
+        of title:$q as f
+        each titled
+      rest : column
+        only when nt < 8
+        hits : column
+          role foundlist
+          of ?$q,-title:$q as f
+          each mentioned
+      more : text "$(count(?$q) - 8) more hold these words: add a word to narrow them"
+        role hitkind
+        only when count(?$q) > 8
+titled : row
+  role hit
+  only when $index <= 8
+  on click do open-found $f $v $lay
+  name : text "$title"
+    role hitname
+    clamp 1
+    share 1
+  kind : text "$kind"
+    role hitkind
+mentioned : row
+  role hit
+  only when $index <= 8 - nt
+  on click do open-found $f $v $lay
+  name : text "$title"
+    role hitname.mention
+    clamp 1
+    share 1
+  kind : text "$kind"
+    role hitkind
