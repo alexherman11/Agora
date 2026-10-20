@@ -1,0 +1,503 @@
+{
+  "steps": [
+    {
+      "name": "open",
+      "description": "open the home base: tiles and dock painted",
+      "order": 100,
+      "needs": [],
+      "budget": [
+        1000,
+        3000
+      ],
+      "function": "s_open",
+      "body": "08883731f62c142dd29f70238926b1c8f8db7263c44e491d1cf719cf3da81bca"
+    },
+    {
+      "name": "lowdown",
+      "description": "read the lowdown (its chip on the shelf)",
+      "order": 200,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_lowdown",
+      "body": "030461eae4deefb0372e4150fe81f24b29bc3462bc2b2f390178ad69a48861ed"
+    },
+    {
+      "name": "board",
+      "description": "see the board (its chip on the shelf)",
+      "order": 300,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_board",
+      "body": "5252d8bc5cb3cd23361d23216ef971add54955f8f4fc489775136e830d1e29b5"
+    },
+    {
+      "name": "card",
+      "description": "click a card to expand it, and again to close it",
+      "order": 400,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_card",
+      "body": "f22a6239f9ac993b6094866c081ed3b886ae7588ade247c61414d690387880f5"
+    },
+    {
+      "name": "later",
+      "description": "answer a waiting item: Later, and see it go below",
+      "order": 500,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": null,
+      "body": "Lambda(args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=Call(func=Name(id='answer', ctx=Load()), args=[Constant(value='Later'), Constant(value=True), Constant(value='moved below LATER')], keywords=[]))"
+    },
+    {
+      "name": "approve",
+      "description": "answer a waiting item: Seen / Done, and see it leave",
+      "order": 600,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": null,
+      "body": "Lambda(args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=Call(func=Name(id='answer', ctx=Load()), args=[Constant(value='Seen / Done'), Constant(value=True), Constant(value='left the list')], keywords=[]))"
+    },
+    {
+      "name": "sendback",
+      "description": "answer a waiting item: Send back",
+      "order": 700,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_sendback",
+      "body": "9e529642fcf3d06199d72906068af301c79e46eec4be9648d44a161b52e96793"
+    },
+    {
+      "name": "atwork",
+      "description": "click an At-work row and watch its feed",
+      "order": 800,
+      "needs": [
+        [
+          "a5988",
+          "the At-work feed"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_atwork",
+      "body": "5e24868279fd7379650c351968757d9faf898feae08a3362ddba0f4026a4a709"
+    },
+    {
+      "name": "timer",
+      "description": "start the focus timer, then put it back",
+      "order": 900,
+      "needs": [
+        [
+          "a6057",
+          "the timer as one line"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_timer",
+      "body": "b8dccec0e72384c14b0310427fec59c3f4b103b924934cbb99ea2f6ac14f9326"
+    },
+    {
+      "name": "writing",
+      "description": "open Writing from the dock",
+      "order": 1000,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_writing",
+      "body": "8ee1f15bfa36a588df32ada3824be99e6f692346a69ba2ef129041036bb3e70d"
+    },
+    {
+      "name": "writedoc",
+      "description": "Writing on the left of the chat",
+      "order": 1100,
+      "needs": [
+        [
+          "a5949",
+          "Writing on the left of the chat"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_writeleft",
+      "body": "3b59ebc1e5cd7e3458fbe637fc2f8ee670d6ec847a657314a86d24e8036b3df4"
+    },
+    {
+      "name": "comment",
+      "description": "type in Writing, select words, comment: margin note",
+      "order": 1200,
+      "needs": [
+        [
+          "a5949",
+          "highlight-to-comment in Writing"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_comment",
+      "body": "545297add5236e71b076f7e5f499ebd2faef53000c900acfd2b76d8b8a5828ff"
+    },
+    {
+      "name": "chat",
+      "description": "type in the chat composer; the draft survives a repaint",
+      "order": 1300,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_chat",
+      "body": "43f1db5cb6b919be0e641d284e4dab58b5c9e645fbb87138132e23275dce7601"
+    },
+    {
+      "name": "send",
+      "description": "send it with Enter: it shows in the feed",
+      "order": 1400,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_send",
+      "body": "77899bbffdd5b40a656d0c1f0cd69cff112906e6d4c8b575fd1b0b71364a0a93"
+    },
+    {
+      "name": "about",
+      "description": "open a document: the chat is about it; a question carries it",
+      "order": 1500,
+      "needs": [
+        [
+          "a6638",
+          "the chat is about what is open"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_about",
+      "body": "e93d05f673c29d296394ce843b1aee69c044d61cda5287bda7dd50ca0f78d66f"
+    },
+    {
+      "name": "anchor",
+      "description": "highlight words, comment in the chat: routed, anchored, a receipt",
+      "order": 1600,
+      "needs": [
+        [
+          "a6638",
+          "highlight and comment through the chat"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_anchor",
+      "body": "f95413b5bd69325eacea7c5c0bdb2e512f50922340ebbe570d5661754e461413"
+    },
+    {
+      "name": "reply",
+      "description": "the author answers in the Talk: it arrives in the chat, tagged",
+      "order": 1700,
+      "needs": [
+        [
+          "a6638",
+          "an agent's answer arrives in the chat"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_reply",
+      "body": "23ce2221ed538acc6fb926a2e3808dcacb885719f8fe9ed938e097f295c33742"
+    },
+    {
+      "name": "drag",
+      "description": "drag the board to another column",
+      "order": 1800,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_drag",
+      "body": "27cf7428fd28a0b94f752d455113b076c9708108c1ee6065e5a872c17aa5a2dd"
+    },
+    {
+      "name": "restore",
+      "description": "drag the board back where it was",
+      "order": 1900,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_restore",
+      "body": "1a1076bccbf51f8a15b6c34fb7231e297bab7b5425ddb5d949bcda6c03f28590"
+    },
+    {
+      "name": "fill",
+      "description": "double-click Music to fill the space, then restore",
+      "order": 2000,
+      "needs": [
+        [
+          "a5994",
+          "double-click to fill the space"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_fill",
+      "body": "4367e468102d22f495164d55b82aaeff3de77f26e937630afa3b74bf1c8bcb9a"
+    },
+    {
+      "name": "equal",
+      "description": "the viewer and the chat are panels: fill keeps the pinned chat, \u00d7 and the dock",
+      "order": 2050,
+      "needs": [
+        [
+          "a5994",
+          "the viewer and the chat as panels"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_equal",
+      "body": "afcbd2c4a0dba6a6269f6768dd0fdcb67e26ff504f3e80ee3d5c86a8bffadeea"
+    },
+    {
+      "name": "widen",
+      "description": "widen Music (\u2922, or \u21d4 in a5994's tiling), then give the room back",
+      "order": 2100,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_widen",
+      "body": "cdd7a38d4f2782818d463927a87992396f2123c4e9161e97917f1f88d8452d1b"
+    },
+    {
+      "name": "glance",
+      "description": "a glance with every panel out: what is cut or squeezed",
+      "order": 2200,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_glance",
+      "body": "000506e4ae5942e4cd025d70fd0bd001589544835805b08e96bce1008c7c166c"
+    },
+    {
+      "name": "number",
+      "description": "press a number in the glance: its panel fills the room, and back",
+      "order": 2300,
+      "needs": [
+        [
+          "a6057",
+          "the glance's numbers open their panel"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_number",
+      "body": "eccbbfa1d91e1ddd365f9cb4952a18e66d49ee398f356efb0748d60961171896"
+    },
+    {
+      "name": "search",
+      "description": "search from the top bar: type, results drop down, open one",
+      "order": 2400,
+      "needs": [
+        [
+          "a6642",
+          "the search in the top bar"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_search",
+      "body": "38dbceca25725b29823b0a3308b77c208e0de384c7c726e456afacc12f9d2792"
+    },
+    {
+      "name": "dock",
+      "description": "use the dock: Board, then back to JEFF",
+      "order": 2500,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_dock",
+      "body": "c9922a649ca55b265a8b886b866ba304142fb2cfb0d708ca4ca5846997ae4977"
+    },
+    {
+      "name": "esc",
+      "description": "press Esc: what is open closes",
+      "order": 2600,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_esc",
+      "body": "d4dcf3ebafeb9b09edbe1624bab0a4e0ce9cfc6581f92f86fbf1ac3c31fb99e9"
+    },
+    {
+      "name": "winkey",
+      "description": "the Windows key shows and hides it (test_winkey.py)",
+      "order": 2700,
+      "needs": [
+        [
+          "a5980",
+          "the Windows key"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "s_winkey",
+      "body": "5f29ba6d354b67738d1a012b6be94694e07320fd8e55a987310bee1a073c22da"
+    },
+    {
+      "name": "scrollnote",
+      "description": "wheel a long note inside its panel",
+      "order": 2800,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "note",
+      "body": "8490149a007c8a445ecf0e6b03115f77fa631a2cba2dd0e6fe8eb66b5ab75fcc"
+    },
+    {
+      "name": "scrollwriting",
+      "description": "wheel a long Writing document",
+      "order": 2900,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "writing",
+      "body": "f899e085ea0a16f9e2e187021b5d5f1da31645a191a74f5a2367d7b107362e15"
+    },
+    {
+      "name": "scrollchat",
+      "description": "wheel the HUD chat feed",
+      "order": 3000,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "chat",
+      "body": "b6cc0b5c103d66a835084ce0ed6c135ddddbd50d7361b84c79c04874d28d6885"
+    },
+    {
+      "name": "scrollconversation",
+      "description": "wheel the Conversation feed",
+      "order": 3100,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "conversation",
+      "body": "f6e7081c624e74782533c71e57b67e7263924bcc4f4c061051e516e61058c484"
+    },
+    {
+      "name": "scrollfeed",
+      "description": "wheel the At-work feed",
+      "order": 3200,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "feed",
+      "body": "446fc3099540c9c1e23832bbca7283159aaaeb85d130eb7776fe420d4d09aad8"
+    },
+    {
+      "name": "scrollboard",
+      "description": "wheel the board's Landed list",
+      "order": 3300,
+      "needs": [],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "board",
+      "body": "9589138b35e91f4ec54be73996a20df39c396cd5963d61c0849eb2a1ce64f3e3"
+    },
+    {
+      "name": "scrollreader",
+      "description": "wheel a long proposal in the reader",
+      "order": 3400,
+      "needs": [
+        [
+          "a6460",
+          "proposal reader wheel check"
+        ]
+      ],
+      "budget": [
+        100,
+        300
+      ],
+      "function": "reader",
+      "body": "098e2b136be3d118a49278d3f624d3087f10ec7b0ff10dbfabe7f07974581969"
+    }
+  ],
+  "helpers": {
+    "WAIT_ITEMS": "04830c853f2d50ef88f8f65512a233b8e05e9a736005775bb1bec45308cd31ef",
+    "BOARD_NEED": "5ae530adfca88e016216158403d44b3a7b570045a3d204e108ebbf48fc38d9a8",
+    "ON_BOARD": "5e0c44762cfc119acf4b8f42db6299501b97983dffa296bc96f72399619a138a",
+    "COMPOSER": "7ba979c746742cc3d6640bf3e258ad3c3347775a38381b8dcf9bd2a0e96d4583",
+    "CHAT": "c828329daa35452a2fe3e1f9ba9aa9754dfec22987c8b1b6e2c35b8f6e1d7ff7",
+    "FEEDHAS": "392544a10b236e175a9774610c5d909c0a422facd2c23271e4daa54aaeadda13",
+    "COLS": "905f3b54e9e85892323a7be469b8be689aabd8699ea9b3032f3a9ba5dfb2ceac",
+    "on_board": "d8834dac36efadacf09bc3457b0c42eaed7e2c6371fb909cbedda2125e4dc5b2",
+    "answer": "fe219ffe5daddbe6639212621615aa906ffa01783a6b67c42b5a0d4b76d25e5c",
+    "widen_column": "f242aefca6dce159bceae8d0c1aa740b75ddf9c4bec3f6cfdd7161782cc3b2dc",
+    "feed_has": "e10ae8b9a02eacce195682affb308d6ac9b5c6e88e0b7f78c81535eb3b5cad00"
+  },
+  "reference": "43e352b7c1ac67b417deb32e6c4b5a57f7bf7dcb"
+}
