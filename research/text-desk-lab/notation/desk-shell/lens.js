@@ -654,11 +654,17 @@
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
       // a6642: sent by Enter inside an `arrows` frame (a search box), the caret comes back once the answer is painted,
-      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile
+      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile. a5994 (found by the
+      // playtest): a press anywhere closes an open float, the frame's own list too while it was empty, so the words'
+      // answer filled a closed list and nothing showed: sending them is asking for that list, so a closed float in the
+      // frame opens again
       const back = committing && el.closest("[data-arrows]") ? n.key : null;
       if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw).then(() => {
         const k = back && kept.get(back);
-        if (!k || !k.el.isConnected || (document.activeElement && document.activeElement !== document.body)) return;
+        if (!k || !k.el.isConnected) return;
+        const frame = k.el.closest("[data-arrows]");
+        if (frame) frame.querySelectorAll('.l-float[data-folded="1"] > button').forEach(h => h.click());
+        if (document.activeElement && document.activeElement !== document.body) return;
         k.el.focus(); getSelection().selectAllChildren(k.el); getSelection().collapseToEnd();
       }); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
