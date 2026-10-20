@@ -25,8 +25,9 @@ def check(what, ok, more=""):
 
 
 def layout(W):
-    """Alex's layout as facts, ids left out: its props, then each column's span and panels (lens, shelf, thing) in
-    order. full= names a panel by its lens, so two copies of one arrangement read the same."""
+    """Alex's layout as facts, ids left out: its props, then each column's span and panels (lens, shelf, shows, pin)
+    in order. full= names a panel by its lens, so two copies of one arrangement read the same. Since a5994's equal
+    footing the chat (jeff-chat) and the viewer (home-viewer) are panels, counted like the rest."""
     lays = [n for n in W.nodes.values() if n["type"] == "surface" and (n.get("props") or {}).get("role") == "home-layout"
             and (n.get("props") or {}).get("actor") == "alex"]
     assert len(lays) == 1, f"{len(lays)} layouts"
@@ -39,10 +40,11 @@ def layout(W):
         for k in W.children(c["id"]):
             sp = W.subjects[k["subject"]].get("props") or {}
             lens_of[k["id"]] = sp.get("lens")
-            panels.append((W.subjects[k["subject"]]["title"], sp.get("lens"), sp.get("shelf"), sp.get("thing", "")))
+            panels.append((W.subjects[k["subject"]]["title"], sp.get("lens"), sp.get("shelf"), sp.get("shows", ""),
+                           sp.get("pin", "")))
         cols.append(((c.get("props") or {}).get("span", "1"), tuple(panels)))
     full = lens_of.get(p.get("full", ""), p.get("full", ""))
-    keep = {k: p.get(k, "") for k in ("pin", "chat", "widgets")}
+    keep = {k: p.get(k, "") for k in ("widgets",)}
     return {"props": keep, "full": full, "cols": tuple(cols)}
 
 
@@ -58,7 +60,7 @@ def out_lenses(L):
 
 def main():
     w = put.Try("worker-a6427")
-    if "a6427" in apply.text_of(w, apply.TILING):
+    if "nothing matches" not in w.do("find kind:surface,prop:role=workspaces,prop:actor=alex"):
         apply.undo(w)               # frontier-try holds an install (apply.py try): start from the world without it
     apply.run(w)
     W = w.d.world
@@ -87,29 +89,31 @@ def main():
     out = say("jeff", "workspace app-dev")
     check("jeff: workspace app-dev is taken", not out.startswith("ERR"), out[:600])
     L = layout(W)
-    check("app-dev: The house out on the left, the phone preview in the middle (span 2)",
-          out_lenses(L) == ["home-house", "app-preview"] and [c[0] for c in L["cols"] if any(p[2] != "yes" for p in c[1])] == ["1", "2"], L)
+    check("app-dev: The house on the left, the phone preview in the middle (span 2), the chat on the right",
+          out_lenses(L) == ["home-house", "app-preview", "jeff-chat"]
+          and [c[0] for c in L["cols"] if any(p[2] != "yes" for p in c[1])] == ["1", "2", "1"], L)
     check("app-dev: the receipt says what changed in a sentence (its about=)", "App dev: the phone preview" in out, out[-500:])
     check("app-dev: the viewer closed, the chat alone on the right", viewer(W)[0] == "", viewer(W))
     print(f"     ({len(W.events) - n0} events in the one call)")
 
     out = say("jeff", "workspace writing")
-    check("writing: no panel out, the Writing lens open beside the chat", out_lenses(layout(W)) == [] and viewer(W)[0] != "", (layout(W), viewer(W), out[:400]))
+    check("writing: the viewer (Writing open in it) beside the chat, nothing else out",
+          out_lenses(layout(W)) == ["home-viewer", "jeff-chat"] and viewer(W)[0] != "", (layout(W), viewer(W), out[:400]))
 
     out = say("jeff", "workspace back")
     check("back: app-dev again, as it was", layout(W) == L, (layout(W), L, out[-600:]))
     out = say("jeff", "workspace back")
-    check("back twice: writing again", out_lenses(layout(W)) == [] and viewer(W)[0] != "", out[-400:])
+    check("back twice: writing again", out_lenses(layout(W)) == ["home-viewer", "jeff-chat"] and viewer(W)[0] != "", out[-400:])
 
     out = say("jeff", "workspace default")
     check("default: Alex's own arrangement, as he had it", layout(W) == mine and viewer(W) == v0, (layout(W), mine, viewer(W), v0))
 
-    # save, change, apply, equal: with a pinned thing and its lens among the panels (Codex c6468)
+    # save, change, apply, equal: with a panel showing one outside thing (a5994's shows=, Codex c6468) among the panels
     lay = next(n["id"] for n in W.nodes.values() if n["type"] == "surface" and (n.get("props") or {}).get("role") == "home-layout")
     col = W.children(lay)[0]["id"]
     say("alex", f"look {col}")
-    out = say("alex", f'do create {col} kind=note title="Plan, pinned" role=home-panel actor=alex lens=doc-page thing=a604 shelf=no')
-    check("a pinned panel: thing=a604 lens=doc-page in the layout", "created" in out, out[:300])
+    out = say("alex", f'do create {col} kind=note title="Plan, pinned" role=home-panel actor=alex lens=home-thing shows=a604 shelf=no pin=yes')
+    check("a panel showing one thing: shows=a604 lens=home-thing pin=yes in the layout", "created" in out, out[:300])
     say("alex", "look f5204")
     say("alex", "read a5482")
     say("alex", "do prop a5482 viewing=a604 with=design-review")
@@ -118,11 +122,12 @@ def main():
     check("save mine is taken", not out.startswith("ERR"), out[:600])
     check("save left the layout as it was", layout(W) == saved, layout(W))
     out = say("jeff", "workspace review")
-    check("change: review is a different arrangement", layout(W) != saved and out_lenses(layout(W)) == ["waiting-on-me", "home-board"], (layout(W), out[-300:]))
+    check("change: review is a different arrangement", layout(W) != saved
+          and out_lenses(layout(W)) == ["waiting-on-me", "home-board", "jeff-chat"], (layout(W), out[-300:]))
     out = say("alex", "workspace mine")
-    check("apply mine: equal to what was saved, the pinned thing and its lens too", layout(W) == saved, (layout(W), saved))
+    check("apply mine: equal to what was saved, the panel showing one thing too", layout(W) == saved, (layout(W), saved))
     check("apply mine: the viewer's thing and lens as saved", viewer(W) == vsaved, (viewer(W), vsaved))
-    check("the pinned panel still names the outside thing (not remapped)", any(p[3] == "a604" for _, ps in layout(W)["cols"] for p in ps))
+    check("the panel still shows the outside thing (shows= not remapped)", any(p[3] == "a604" for _, ps in layout(W)["cols"] for p in ps))
     out = say("jeff", "workspace save mine")
     n_mine = sum(1 for n in W.nodes.values() if n["type"] == "surface" and (n.get("props") or {}).get("name") == "mine"
                  and (n.get("props") or {}).get("role") == "workspace")
@@ -141,11 +146,11 @@ def main():
 
     out = say("jeff", "workspace play")
     L = layout(W)
-    check("play: nothing out, no chat, only the timer and the notices", out_lenses(L) == [] and L["props"]["chat"] == "no"
+    check("play: nothing out, not even the chat, only the timer and the notices", out_lenses(L) == []
           and L["props"]["widgets"] == "home-timer-bar,home-notices", L)
     out = say("jeff", "workspace quiet")
     L = layout(W)
-    check("quiet: nothing out, the chat, only the glance", out_lenses(L) == [] and L["props"]["chat"] == "" and L["props"]["widgets"] == "home-glance", L)
+    check("quiet: only the chat out, only the glance", out_lenses(L) == ["jeff-chat"] and L["props"]["widgets"] == "home-glance", L)
 
     print(f"\n{len(FAILS)} failed" if FAILS else "\nall passed")
     sys.exit(1 if FAILS else 0)

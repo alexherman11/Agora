@@ -1,6 +1,7 @@
 # workspace-use <name>: lay Alex's home base out as the workspace of that name (a6427; say `workspace <name>`).
-# A workspace is a surface in Workspaces ({WS}) shaped like his layout: columns (span=) of panel notes (shelf=, and
-# thing= for a pinned thing), with pin= chat= widgets= view= with= about= glyph= on it; name= is the word you say.
+# A workspace is a surface in Workspaces ({WS}) shaped like his layout: columns (span=) of panel notes (lens= shelf=
+# pin= shows=; the chat and the viewer are panels too, a5994), with widgets= view= with= about= glyph= on it; name= is
+# the word you say.
 # His layout as it stands becomes the workspace 'before' (the old one goes, through {R}); a COPY of the named one
 # becomes his layout, so a workspace never changes by use; the viewer opens its view= with its with= lens.
 # Alex and JEFF both change these, so the verb reads them first: an act on what its caller saw before someone else

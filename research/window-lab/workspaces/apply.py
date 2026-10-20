@@ -8,9 +8,8 @@
 Alex, 17 Oct 10:11: 'I need you to be able to quickly reorganize the desk for me. So if I say let's start app dev right
 now, the screen reorganizes around it.' What it writes, in order (each needs the one before it; nothing a person sees
 changes until step 5, and the shipped workspaces only change his screen when someone says `workspace <name>`):
-  1. home-tiling: four small words (exact passages, all must stand): chat=no on the layout hides the chat; with no
-     panel out the chat (and what is open beside it) takes the room; a panel with thing=<id> stands its lens on that
-     thing (Codex's Pin contract, c6468); and a line in its header saying so
+  1. home-tiling: nothing since a5994's equal footing (20 Oct): the chat and the viewer are panels like any other, so a
+     workspace places them as it places the rest (TILING_EDITS is empty; the step remains for a word a later day needs)
   2. home-widgets: a layout's widgets=<titles> shows only those (rewritten whole; it must still be a5530's)
   3. Workspaces (role=workspaces actor=alex) and Workspaces going (role=workspaces-going: emptied by every use) in Home
      base; the six shipped workspaces in it, each a copy of Alex's layout as it stands, rearranged: default (his own,
@@ -35,35 +34,11 @@ LAYOUT = "kind:surface,prop:role=home-layout,prop:actor=alex"
 VIEW = "prop:role=home-view,prop:actor=alex"
 OUT = "kind:note,in:{ws},prop:role=home-panel,prop:shelf=no"
 
-TILING_EDITS = [
-    # (old, new, how many times old must stand)
-    ('# or ⤡, gives it back. – shelves it (home-panels, in the dock). Nothing scrolls, nothing moves by itself.\n',
-     '# or ⤡, gives it back. – shelves it (home-panels, in the dock). Nothing scrolls, nothing moves by itself.\n'
-     '# a6427 (workspaces): chat=no on the layout hides the chat; with no panel out, the chat and what is open beside it\n'
-     '# take the room; a panel with thing=<id> stands its lens= on that thing (a pinned document with its chosen lens).\n', 1),
-    ('      let wide = 7 when ($lay.full or "") != ""\n',
-     '      let wide = 1 when count(kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no) = 0\n'
-     '      let wide = 7 when ($lay.full or "") != ""\n', 2),
-    ('      only when ($lay.pin or "right") = "left"\n',
-     '      only when ($lay.pin or "right") = "left" and ($lay.chat or "") != "no"\n', 1),
-    ('      only when ($lay.pin or "right") != "left"\n',
-     '      only when ($lay.pin or "right") != "left" and ($lay.chat or "") != "no"\n', 1),
-    ('      only when ($lay.full or "") = ""\n      of kind:surface,in:$lay.item as col\n',
-     '      only when ($lay.full or "") = "" and count(kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no) > 0\n'
-     '      of kind:surface,in:$lay.item as col\n', 1),
-    ('      only when ($lay.full or "") != ""\n      rail : column\n',
-     '      only when ($lay.full or "") != "" and count(kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no) > 0\n'
-     '      rail : column\n', 1),
-    # a6549 (20 Oct) gave both panel bodies share 1 and scroll scroll: a long panel scrolls inside itself
-    ('  body : column\n    share 1\n    scroll scroll\n    role panebody\n    lens $p.lens\nrailitem : column\n',
-     '  body : column\n    share 1\n    scroll scroll\n    role panebody\n    only when ($p.thing or "") = ""\n    lens $p.lens\n'
-     '  on : column\n    share 1\n    scroll scroll\n    role panebody\n    only when ($p.thing or "") != ""\n    of $p.thing as t\n    each stood\n'
-     'stood : column\n  share 1\n  lens $p.lens\nrailitem : column\n', 1),
-    ('  body : column\n    role panebody\n    share 1\n    scroll scroll\n    lens $p.lens',
-     '  body : column\n    role panebody\n    share 1\n    scroll scroll\n    only when ($p.thing or "") = ""\n    lens $p.lens\n'
-     '  on : column\n    role panebody\n    share 1\n    scroll scroll\n    only when ($p.thing or "") != ""\n'
-     '    of $p.thing as t\n    each stood', 1),
-]
+# a5994's equal footing (live 20 Oct 13:08, c6808): everything on the home base is a panel, the viewer (lens
+# home-viewer) and the chat (lens jeff-chat, pin=yes) too, and one thing shown alone is a panel with shows=<id>; so a
+# workspace needs no home-tiling edit at all. (Until then this card made four: chat=no, the chat taking the room,
+# thing=; all gone.)
+TILING_EDITS = []
 
 DOCK_OLD = ("  left : column\n    share 1\n  dock : row\n",
             "  left : column\n    share 1\n    spaces : row\n      lens home-workspaces\n  dock : row\n")
@@ -72,19 +47,20 @@ DOCK_BAR = ("  sep1 : column\n",
 
 # the shipped workspaces: (name, title, glyph, about, columns [(span, [panel lens, ...])], props)
 # a panel lens the layout lacks is made (app-preview: worker-a6431's phone preview, c6483)
-NEW_PANELS = {"app-preview": ("Phone preview", "app-preview-small",
-                              "The app you are building, live, at a phone's size.")}
+NEW_PANELS = {"app-preview": ("Phone preview", "app-preview-small", "The app you are building, live, at a phone's size."),
+              "home-viewer": ("Viewer", "", "What your viewer has open."),
+              "jeff-chat": ("Chat", "", "JEFF's chat.")}
 SHIPPED = [
     ("app-dev", "app dev", "▯", "App dev: the phone preview in the middle, the workers on the left, the chat on the right.",
-     [(1, ["home-house"]), (2, ["app-preview"])], {"pin": "right", "chat": "", "widgets": "", "view": "", "with": ""}),
+     [(1, ["home-house"]), (2, ["app-preview"]), (1, ["jeff-chat"])], {"widgets": "", "view": "", "with": ""}),
     ("writing", "writing", "✎", "Writing: your documents open beside the chat, nothing else out.",
-     [], {"pin": "right", "chat": "", "widgets": "", "view": "{writing}", "with": ""}),
+     [(2, ["home-viewer"]), (1, ["jeff-chat"])], {"widgets": "", "view": "{writing}", "with": ""}),
     ("review", "review", "☷", "Review: what waits on you on the left and the board large beside it, the chat on the right.",
-     [(1, ["waiting-on-me"]), (2, ["home-board"])], {"pin": "right", "chat": "", "widgets": "", "view": "", "with": ""}),
+     [(1, ["waiting-on-me"]), (2, ["home-board"]), (1, ["jeff-chat"])], {"widgets": "", "view": "", "with": ""}),
     ("quiet", "quiet", "◌", "Quiet: only the glance at the top and the chat.",
-     [], {"pin": "right", "chat": "", "widgets": "home-glance", "view": "", "with": ""}),
+     [(1, ["jeff-chat"])], {"widgets": "home-glance", "view": "", "with": ""}),
     ("play", "play", "▶", "Play: everything put away; only the focus timer and the notices at the top.",
-     [], {"pin": "right", "chat": "no", "widgets": "home-timer-bar,home-notices", "view": "", "with": ""}),
+     [], {"widgets": "home-timer-bar,home-notices", "view": "", "with": ""}),
 ]
 
 
@@ -178,8 +154,9 @@ def build_workspace(w, ws_home, base, name, title, glyph, about, cols, props, id
             sel = f"kind:note,in:{ws},prop:role=home-panel,prop:lens={ln}"
             if "nothing matches" in w.do(f"find {sel}"):
                 ptitle, lesser, pabout = NEW_PANELS[ln]
+                pin = " pin=yes" if ln == "jeff-chat" else ""        # a5994: the chat stays beside a filled panel
                 must(w.do(f"do create {col} kind=note title={put.q(ptitle)} role=home-panel actor=alex lens={ln} "
-                          f"lesser={lesser} shelf=no about={put.q(pabout)}"), f"{name}: panel {ln}")
+                          f"lesser={lesser} shelf=no{pin} about={put.q(pabout)}"), f"{name}: panel {ln}")
             else:
                 must(w.do(f"do move {sel} into={col}"), f"{name}: move {ln}")
                 must(w.do(f"do prop {sel} shelf=no"), f"{name}: {ln} out")
@@ -200,7 +177,8 @@ def run(w, keep=None):
         for k, t in texts.items():
             (keep / f"{k}.txt").write_text(t + "\n", encoding="utf-8")
     # 1, 2: the lenses
-    rewrite(w, TILING, tiling_text(texts[TILING]), "home-tiling")
+    if TILING_EDITS:
+        rewrite(w, TILING, tiling_text(texts[TILING]), "home-tiling")
     rewrite(w, WIDGETS, (HERE / "home-widgets.lens").read_text(encoding="utf-8").rstrip("\n"), "home-widgets")
     # 3: Workspaces, its going-box, and the shipped workspaces
     w.do(f"look {HOME}")
