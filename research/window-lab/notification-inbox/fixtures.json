@@ -1,0 +1,25 @@
+{
+  "status": "design-only: invented content; no executable connector",
+  "connections": [
+    {"name": "Example email", "enabled": false, "state": "not-connected"},
+    {"name": "Example phone", "enabled": false, "state": "not-connected"}
+  ],
+  "items": [
+    {"source": "example-agora", "connection": "fixture-house", "source_key": "review-one", "revision": "1", "sender": "Example builder", "summary": "Example panel is ready for review", "local_state": "new", "provider_unread": "unknown", "action_state": "needs-you", "priority": "quiet", "target": {"type": "fixture-only", "label": "Example panel"}},
+    {"source": "example-mail", "connection": "fixture-mail-a", "source_key": "message-one", "revision": "1", "sender": "Example club", "summary": "Example meeting time", "local_state": "new", "provider_unread": true, "action_state": "informational", "priority": "quiet", "target": {"type": "fixture-only", "label": "Open example inbox"}},
+    {"source": "example-phone", "connection": "fixture-phone", "source_key": "message-one", "revision": "1", "sender": "Example contact", "summary": "Private preview hidden", "local_state": "new", "provider_unread": "unknown", "action_state": "informational", "priority": "quiet", "target": {"type": "fixture-only", "label": "Open example phone app"}}
+  ],
+  "journeys": [
+    {"given": "Same connection and source_key replayed twice", "expect": "One item; revision may update, count does not double"},
+    {"given": "Same source_key in another account", "expect": "Separate item"},
+    {"given": "Dismiss email locally then replay a changed provider revision", "expect": "Still locally dismissed; provider unread unchanged; Undo available"},
+    {"given": "Open email in Agora", "expect": "Local seen only; no remote mark-read request; provider application may change read state after explicit Open"},
+    {"given": "New message in a dismissed thread", "expect": "New source_key remains new; grouping does not discard it"},
+    {"given": "Permission revoked", "expect": "Permission lost, not an empty successful inbox; no silent re-consent"},
+    {"given": "Disabled connector receives an import request", "expect": "Refuse without account call; world props cannot grant consent"},
+    {"given": "Same words via email and phone without verified shared identity", "expect": "Never fuzzy-merge; suppress mirrored app only by explicit source policy"},
+    {"given": "Game guard unknown, gaming or machine asleep", "expect": "No sync, wake timer, app launch or prompt"},
+    {"given": "Normal wake with a backlog", "expect": "One bounded catch-up after guard allows; no toast storm or resident wake"},
+    {"given": "Disconnect while an import is queued", "expect": "Generation invalidated; queued import refused; private cache removed locally, remote revocation reported separately"}
+  ]
+}
