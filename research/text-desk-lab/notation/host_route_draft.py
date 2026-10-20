@@ -74,6 +74,8 @@ class ReferenceModel:
                 generation TEXT, operation TEXT, state TEXT, receipt TEXT);
             CREATE UNIQUE INDEX IF NOT EXISTS one_active_card
                 ON requests(card) WHERE state = 'running';
+            CREATE UNIQUE INDEX IF NOT EXISTS one_active_inventory
+                ON requests(state) WHERE state = 'running';
             CREATE TABLE IF NOT EXISTS audit (
                 sequence INTEGER PRIMARY KEY, at REAL, action TEXT, detail TEXT);
         """)
@@ -154,13 +156,6 @@ class ReferenceModel:
                 return json.loads(old[6])
             if grant[4] or grant[3] <= self.clock() or grant[5]:
                 return self._deny(request, "grant revoked, expired or already used")
-            try:
-                guard = self.guards()
-            except Exception:
-                return self._deny(request, "guard unavailable")
-            if not isinstance(guard, Guards) or any(x is not True for x in (
-                    guard.awake, guard.interactive_session, guard.game_absent)):
-                return self._deny(request, "awake/session/no-game admission not established")
             # BEGIN IMMEDIATE plus the unique partial index also fences other
             # connections using this same journal. No stale lease auto-expiry.
             try:
@@ -170,6 +165,17 @@ class ReferenceModel:
                 if current[0] or current[1] or current[2] <= self.clock():
                     self.db.rollback()
                     return self._deny(request, "grant changed before admission")
+                # Observe guards AFTER obtaining the executor's write fence,
+                # not before a potentially blocking journal acquisition.
+                try:
+                    guard = self.guards()
+                except Exception:
+                    self.db.rollback()
+                    return self._deny(request, "guard unavailable")
+                if not isinstance(guard, Guards) or any(x is not True for x in (
+                        guard.awake, guard.interactive_session, guard.game_absent)):
+                    self.db.rollback()
+                    return self._deny(request, "awake/session/no-game admission not established")
                 self.db.execute("INSERT INTO requests VALUES(?,?,?,?,?,?,?,NULL)",
                                 (request, gid, binding.card, binding.worker,
                                  binding.generation, operation, "running"))
@@ -180,7 +186,13 @@ class ReferenceModel:
                 self.db.commit()
             except sqlite3.IntegrityError:
                 self.db.rollback()
-                return self._deny(request, "card lease or request already held")
+                return self._deny(request, "executor/card lease or request already held")
+            except sqlite3.Error:
+                self.db.rollback()
+                # Admission cannot be confirmed; never query or retry blindly.
+                # The failed journal cannot be relied upon to record this.
+                return {"request": request, "status": "unknown",
+                        "reason": "journal admission unavailable; no inventory attempted"}
             try:
                 result = self.inventory()
                 # Fixed projected fields; do not disclose unrelated argv/output.

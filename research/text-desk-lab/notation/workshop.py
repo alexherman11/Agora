@@ -57,7 +57,8 @@ PY = Path(sys.executable)
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
 HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
-               "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py"}
+               "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
+               "host_route_parent.py", "host_route_draft.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -1584,22 +1585,24 @@ class Worker:
                 # a5378: each process has its own queue, so a process set down (its card waits for a builder) never
                 # says its exit into the next one's, where it would read as that worker failing
                 self.events = queue.Queue()
-                threading.Thread(target=self._read_into, args=(self.proc, self.events), daemon=True).start()
+                source = self._bind_child(self.proc)
+                threading.Thread(target=self._read_into, args=(self.proc, self.events, source), daemon=True).start()
                 self.busy, self.reply, self.failed = False, [], False
                 self.log("start", {"cmd": [c if len(c) < 200 else c[:200] + "…" for c in cmd[1:]], "pid": self.proc.pid,
                                    **({"builder": self.builder} if self.builder else {})})
 
-            def _read_into(self, proc, events):
+            def _read_into(self, proc, events, source=None):
                 for raw in proc.stdout:
                     try:
                         ev = json.loads(raw)
                     except json.JSONDecodeError:
                         continue
                     self.log("event", ev)
-                    events.put(ev)
+                    events.put(H.host_route_parent.ChildEvent(source, ev) if source else ev)
                 code = proc.wait()
                 self.log("exit", {"code": code, "pid": proc.pid})
-                events.put({"type": "exit", "code": code})
+                event = {"type": "exit", "code": code}
+                events.put(H.host_route_parent.ChildEvent(source, event) if source else event)
 
             def set_down(self, why):
                 """a5378: its builder leaves this card (for another card, or handed on): the process stops and what it
@@ -1612,6 +1615,10 @@ class Worker:
             def turns_ended(self):
                 had = self.state.get("session")
                 ended = super().turns_ended()
+                receipts = [line for text in ended for line in getattr(text, "host_receipts", ())]
+                if receipts:
+                    self.state.setdefault("inbox", []).extend(receipts)
+                    self.save()
                 if self.builder and self.state.get("session") and self.state["session"] != had:
                     b = Builder(self.house, self.builder)        # a5378: the builder's conversation, wherever it went
                     b.state["session"] = self.state["session"]

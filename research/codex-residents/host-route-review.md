@@ -1,5 +1,10 @@
 # Narrow host-command route: trust-boundary review
 
+Follow-up source review: [Parent dispatcher integration](host-route-parent-review.md)
+adds real queue/turn integration behind an always-disabled dispatcher.
+This earlier review remains the historical reference-model record; no live
+host route is enabled.
+
 Status: **disabled source/reference tests ready for review; live boundary unimplemented**, 20 Oct 2026.
 This is a review proposal, not an enabled capability. No process query,
 termination, launch, settings change, broker startup or live model trial ran.
