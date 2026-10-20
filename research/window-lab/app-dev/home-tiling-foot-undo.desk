@@ -1,0 +1,3 @@
+# home-tiling-foot-undo (a6431): puts the column's foot back to an equal share.
+read "home-tiling" :3
+do replace title:home-tiling,in:f5204 old="  foot : column\n    share 0.05\n    role tilefoot" new="  foot : column\n    share 1\n    role tilefoot"

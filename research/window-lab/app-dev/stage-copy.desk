@@ -1,20 +1,16 @@
-# stage-copy: the app dev arrangement on a COPY (frontier-try) for a6431's shots, as a6427's 'app dev' workspace will
-# make it live: The house alone on the left, the phone preview in the middle (two thirds), the chat pinned right.
-# Run: python research/window-lab/app-dev/apply.py lines research/window-lab/app-dev/stage-copy.desk (a line refused,
-# a panel already shelved, stops nothing after it)
-read a5668
-do prop a5668 shelf=yes
-read a5670
-do prop a5670 shelf=yes
-read a5678
-do prop a5678 shelf=yes
-read a5674
-do prop a5674 shelf=yes
+# stage-copy: the app dev arrangement on a COPY (frontier-try) for a6431's shots, as a6427's 'app dev' workspace makes
+# it: The house alone on the left, the phone preview in a column of its own (two thirds), the chat pinned right.
+# Ids are Alex's layout in frontier-try on 20 Oct (f5664, its left column f5665, its panels); re-read them after a recopy.
+# Run: python research/window-lab/app-dev/apply.py lines research/window-lab/app-dev/stage-copy.desk
+look f5664
+do prop f5664 full=""
 read a5676
 do prop a5676 shelf=yes
-look f5666
-do create f5666 kind=note title="Phone" role=home-panel actor=alex lens=app-preview lesser=app-preview-small shelf=no grow=20
-read prop:role=home-panel,prop:actor=alex,prop:lens=app-preview
-do prop prop:role=home-panel,prop:actor=alex,prop:lens=app-preview grow=20
-read prop:role=home-view,prop:actor=alex
-do prop prop:role=home-view,prop:actor=alex viewing=a5080
+read a5674
+do prop a5674 shelf=yes
+look f5664
+do create f5664 kind=surface title="Phone column" layout=column
+do prop $new span=2
+do create $new kind=note title="Phone" role=home-panel actor=alex lens=app-preview lesser=app-preview-small shelf=no
+read a5482
+do prop prop:role=home-view,prop:actor=alex viewing=""

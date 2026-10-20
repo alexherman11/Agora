@@ -1,9 +1,2 @@
-# home-tiling-grow (a6431): a panel may take its column's spare room. grow=<weight> on a panel note (role=home-panel)
-# is its share of the column's height beside the column's foot (share 1); none or 0 is its own height, as before. The
-# phone preview needs it: a page fits the room it is given, and a panel of its own height gives it none. Two exact
-# replacements in home-tiling (read from the copy's text, 20 Oct); check them against the live text before a live run.
-# Run on the copy: python research/window-lab/app-dev/apply.py lines research/window-lab/app-dev/home-tiling-grow.desk
-read "home-tiling" :3
-do replace title:home-tiling,in:f5204 old="panel : column\n  role pane\n  scroll none\n  on drop grip at left do drop-panel left \$carried \$p \$col \$lay" new="panel : column\n  role pane\n  scroll none\n  let grow = (\$p.grow or 0)\n  share \$grow\n  on drop grip at left do drop-panel left \$carried \$p \$col \$lay"
-read "home-tiling" :3
-do replace title:home-tiling,in:f5204 old="  body : column\n    role panebody\n    lens \$p.lens\nrailitem : column" new="  body : column\n    role panebody\n    let grow = (\$p.grow or 0)\n    share \$grow\n    scroll none\n    lens \$p.lens\nrailitem : column"
+# home-tiling-grow (a6431): SUPERSEDED, 20 Oct. a6549 gave every panel and its body `share 1`, so a panel already
+# takes room in its column; what was left was the column's empty foot taking an equal share. See home-tiling-foot.desk.
