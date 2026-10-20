@@ -436,6 +436,7 @@ def source_head(source):
 
 
 SAYING_EARLY = ("item", "what", "eid", "source", "chat", "in")      # a6153: a saying's fields known before it is read
+INVOLVING_EARLY = True      # a6638: involving:<name> passes over sayings no name of theirs is on (saying_rows)
 LINE_ROW_KEYS = {"item", "what", "saying", "by", "name", "at", "in", "to", "said", "answered", "edited", "before", "state",
                  "eid", "chat", "who", "open", "index", "line", "_t", "source", "thread", "reply_to", "mark", "context",
                  "context_summary"}      # a line's row before its own fields: those are never one of its own fields
@@ -495,6 +496,18 @@ def saying_rows(desk, terms="", early=None):
     # a6153 (rows): early = (terms over SAYING_EARLY fields, binds), asked of each saying before it is read. Not with
     # involving:, whose own filter runs after the rows are made
     early = early if early and not involving else None
+    # a6638 (the universal chat reads involving:alex at every build: 3042 sayings made to keep 556, ~65 ms): a saying
+    # can involve a person only if its writer or a name it is addressed to is a name that person has borne, so the
+    # others are passed over before their rows are made. The full test (`included`, below) still judges what is left.
+    # Only where persons are on (their names are known); INVOLVING_EARLY = False turns it off to compare
+    could = None
+    if involving and INVOLVING_EARLY and persons.on(w):
+        pid = persons.resolve(w, involving)[0]
+        could = {persons.norm(n) for n, _ in persons.index(w).people.get(pid, [])} | {involving, persons.norm(pid)} \
+            if pid else None
+
+        def might(writer, to):
+            return persons.norm(writer) in could or any(persons.norm(n) in could for n in to or ())
     skipped_keys = set()
     if early:
         import knife
@@ -580,6 +593,8 @@ def saying_rows(desk, terms="", early=None):
                 # a1581: a line's address is its writer's stored word, never its words searched again; a chat from
                 # before lines is read by the rule it was written under (every @name outside quotes)
                 to = line["to"] if line is not None else addressed_before(said)
+                if could is not None and not might(who, to):
+                    continue
                 before = ""
                 if me:
                     if not rooms.shown(w, s, to, me):
@@ -632,6 +647,8 @@ def saying_rows(desk, terms="", early=None):
                 continue
             writer = str(c.get("by") or "").split("/")[0].lower()
             to = (e or {}).get("to")
+            if could is not None and not might(writer, to):
+                continue
             if me and (rooms.same_person(w, writer, me) or to is None or not rooms.shown(w, s, to, me, comment=True)):
                 continue
             state = "open"
@@ -670,6 +687,8 @@ def saying_rows(desk, terms="", early=None):
                 writer = str(reply.get("by") or "").split("/")[0].lower()
                 to = rooms.comment_to(e)
                 if e.get("args", {}).get("line") != reply.get("text"):
+                    continue
+                if could is not None and not might(writer, to):
                     continue
                 if me and (rooms.same_person(w, writer, me) or not rooms.shown(w, s, to, me, comment=True)):
                     continue

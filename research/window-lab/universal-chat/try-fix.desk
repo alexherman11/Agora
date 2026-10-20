@@ -1,0 +1,5 @@
+read a5206 :3
+do replace a5206 old="role chatquote : text down, soft, rail faint, pad left gap, space below gap /2" new="role chatquote : text down, soft, border left faint, pad left gap, space below gap /2"
+read a5210 :3
+do replace a5210 old="    kept : text \"kept in \$s.item\"\n      role meta\n      clamp 1\n      only when \$s.name = \"alex\" and \$s.item != \"a5080\"\n" new=""
+do replace a5210 old="          q : text \"“\$(held)”\"\n            role chatquote\n" new="          q : text \"“\$(held)”\"\n            role meta\n"
