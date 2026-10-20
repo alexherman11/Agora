@@ -25,7 +25,6 @@ import os
 import re
 import shutil
 import sys
-import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -54,10 +53,14 @@ def check(name, ok, detail=""):
 D, R = roomworld.build(say=False)
 W = D.world
 B = R.BOARD
-# Inherit the parent's ACL: TemporaryDirectory's mode 0700 excludes the
-# Windows builder sandbox token, even below a writable AGORA_TMP.
-TMP = Path(os.environ.get("AGORA_TMP") or tempfile.gettempdir()) / ("builders-" + uuid.uuid4().hex)
-os.makedirs(TMP, exist_ok=True)
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+TMP = Path(agora_tmp.directory("b-"))  # short: Claude's cwd-keyed fixture doubles this path
+# The landing-room worktree has a longer name than a card's worktree. These
+# synthetic Claude project paths embed that full cwd a second time; use Windows
+# extended paths so their tool-results children do not hit legacy MAX_PATH.
+if os.name == "nt" and not str(TMP).startswith("\\\\?\\"):
+    TMP = Path("\\\\?\\" + str(TMP))
 atexit.register(shutil.rmtree, TMP, ignore_errors=True)  # stubbed starts leave stderr.log open
 
 

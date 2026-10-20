@@ -1,8 +1,8 @@
 """Codex SDK transport for house messages, including explicitly selected image crops.
 
-No desk code is imported here. The house owns identity, the welcome, wake/rest,
-news, commands and commissions. This process only turns a user message into
-assistant text, with an empty system/developer prompt and no tools.
+The house owns identity, wake/rest, news, commands and commissions. The sole
+developer instruction is the live charter; its read-only compaction hook shares
+the house reader. Residents still have no tools.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import threading
 from pathlib import Path
 
 from openai_codex.client import CodexClient, CodexConfig
+from openai_codex.generated.v2_all import ThreadInjectItemsResponse
 from pydantic import BaseModel
 
 SDK_VERSION = "0.147.0"
@@ -171,6 +172,33 @@ def event_data(event):
     return raw if isinstance(raw, dict) else value.model_dump(by_alias=True, mode="json")
 
 
+def refresh_charter(client, thread_id, args, emit):
+    """A raw developer item is model-visible history, not a synthetic user turn."""
+    if not getattr(args, "world", None):
+        return
+    notation = Path(__file__).resolve().parents[1] / "text-desk-lab" / "notation"
+    if str(notation) not in sys.path:
+        sys.path.insert(0, str(notation))
+    import charter
+    try:
+        text = charter.live(args.world, args.target, args.actor, "compaction")
+        client.request("thread/inject_items",
+                       {"threadId": thread_id, "items": [
+                           {"type": "message", "role": "developer",
+                            "content": [{"type": "input_text", "text": text}]}]},
+                       response_model=ThreadInjectItemsResponse)
+        emit({"type": "system", "subtype": "charter_read", "text": text})
+    except Exception as exc:
+        # The current turn/pending messages must survive an unavailable charter.
+        try:
+            charter.report(lambda who, line: __import__("desk_mcp").run_desk(
+                {"session": args.world, "as": who, "line": line})[0], args.target,
+                f"Charter reinjection unavailable ({type(exc).__name__}); tell JEFF.")
+        except Exception:
+            pass
+        emit({"type": "system", "subtype": "charter_unavailable", "why": type(exc).__name__})
+
+
 def emit_plan_usage(client, emit, timeout=2):
     """Optional metadata must not hold up answers or accumulate hung requests."""
     previous = vars(client).get("_agora_usage_job")
@@ -189,7 +217,8 @@ def _read_plan_usage(client, emit):
     """Read-only CLI account metadata. No account/credit mutations or model turn."""
     from openai_codex.generated.v2_all import GetAccountRateLimitsResponse
     try:
-        result = client.request("account/rateLimits/read", None, response_model=GetAccountRateLimitsResponse)
+        result = client.request(
+            "account/rateLimits/read", None, response_model=GetAccountRateLimitsResponse)
         raw = result.model_dump(by_alias=True, mode="json")
         # Never put account/credit details in the house stream.
         def bucket(value):
@@ -199,10 +228,12 @@ def _read_plan_usage(client, emit):
             for name in ("primary", "secondary"):
                 window = value.get(name)
                 if isinstance(window, dict):
-                    clean[name] = {k: window.get(k) for k in ("usedPercent", "windowDurationMins", "resetsAt")}
+                    clean[name] = {
+                        k: window.get(k) for k in ("usedPercent", "windowDurationMins", "resetsAt")}
             return clean
         data = {"rateLimits": bucket(raw.get("rateLimits")),
-                "rateLimitsByLimitId": {k: bucket(v) for k, v in (raw.get("rateLimitsByLimitId") or {}).items()}}
+                "rateLimitsByLimitId": {
+                    k: bucket(v) for k, v in (raw.get("rateLimitsByLimitId") or {}).items()}}
         emit({"type": "codex_event", "method": "account/rateLimits/read", "data": data})
     except Exception as exc:
         # Error strings can include request details; retain only the class.
@@ -210,9 +241,21 @@ def _read_plan_usage(client, emit):
               "reason": "Codex account/rateLimits/read unavailable (" + type(exc).__name__ + ")"})
 
 
-def receive(client, turn_id, emit):
+def receive(client, turn_id, emit, on_compact=None):
     """Keep completed text in order; a failed/interrupted turn runs no desk lines."""
     messages = {}
+    compacted_items = set()
+
+    def compact(key):
+        if key != "legacy" and "legacy" in compacted_items:
+            compacted_items.remove("legacy")
+            compacted_items.add(key)
+            return
+        if key not in compacted_items:
+            compacted_items.add(key)
+            emit({"type": "system", "subtype": "compact_boundary"})
+            if on_compact:
+                on_compact()
     try:
         while True:
             event = client.next_turn_notification(turn_id)
@@ -223,9 +266,10 @@ def receive(client, turn_id, emit):
                 if item.get("type") == "agentMessage":
                     messages[item["id"]] = item.get("text", "")
                 elif item.get("type") == "contextCompaction":
-                    emit({"type": "system", "subtype": "compact_boundary"})
+                    compact(item.get("id", "legacy"))
             elif event.method == "thread/compacted":
-                emit({"type": "system", "subtype": "compact_boundary"})
+                if not compacted_items:   # legacy duplicate of the item lifecycle
+                    compact("legacy")
             elif event.method == "turn/completed":
                 emit_plan_usage(client, emit)
                 turn = data["turn"]
@@ -286,6 +330,9 @@ def serve(args):
         if args.model not in available:
             raise RuntimeError(f"{args.model} is unavailable; no model was substituted")
         parameters = thread_parameters(client, directory, args.model)
+        if getattr(args, "charter_file", None):
+            parameters["developerInstructions"] = Path(args.charter_file).read_text(
+                encoding="utf-8")
         if args.resume:
             parameters.pop("dynamicTools")
             parameters.pop("ephemeral")
@@ -308,7 +355,7 @@ def serve(args):
                 "model": started.model,
                 "sdk": SDK_VERSION,
                 "tools": [],
-                "system_prompt": "",
+                "system_prompt": parameters["developerInstructions"],
             }
         )
         while True:
@@ -345,7 +392,8 @@ def serve(args):
             watcher = threading.Thread(target=watch, daemon=True)
             watcher.start()
             try:
-                if not receive(client, turn_id, output):
+                if not receive(client, turn_id, output, lambda: refresh_charter(
+                        client, started.thread.id, args, output)):
                     return 1
             finally:
                 finished.set()
@@ -359,6 +407,10 @@ def main():
     parser.add_argument("--resume")
     parser.add_argument("--reasoning", default="medium")
     parser.add_argument("--timeout", type=float, default=1200)
+    parser.add_argument("--charter-file")
+    parser.add_argument("--world")
+    parser.add_argument("--target")
+    parser.add_argument("--actor")
     args = parser.parse_args()
     try:
         return serve(args)

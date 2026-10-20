@@ -17,7 +17,6 @@ git, the world copy and the worker's process stubbed, so each start is a command
 import os
 import re
 import sys
-import tempfile
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -46,8 +45,9 @@ def check(name, ok, detail=""):
 D, R = roomworld.build(say=False)
 W = D.world
 B = R.BOARD
-tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)     # a stubbed start leaves stderr.log open
-TMP = Path(tmp.name)
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+TMP = Path(agora_tmp.directory("worker-grant-test-"))  # inherited ACL; stub leaves stderr open
 
 
 def say(me, *lines):

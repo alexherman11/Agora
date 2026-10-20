@@ -18,12 +18,12 @@ checkout; the workshop's own step() runs, with the worker's process and world co
      with no conflict and touch neither health.py nor scene.py
   7. after a landing, every worker's -try copy is the live world again, taken under its own lock
 """
+import atexit
 import os
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -54,8 +54,10 @@ def check(name, ok, detail=""):
 D, R = roomworld.build(say=False)
 W = D.world
 B = R.BOARD
-tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)     # a stubbed worker's log may still be open
-TMP = Path(tmp.name)
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+TMP = Path(agora_tmp.directory("shared-"))
+atexit.register(shutil.rmtree, TMP, ignore_errors=True)  # stubbed worker logs may remain open
 ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
 
 
@@ -211,7 +213,11 @@ paint = card("Fold fix in the painter", "lens.js folds wrongly")
 WS.step(W, FREE)
 sent = " ".join(str(c) for c in popen.return_value.stdin.write.call_args_list)
 check("3. a card naming a changed file is a note, said once, and it starts",
-      paint in WS.workers and len(comments(paint)) == 1 and comments(paint)[0].startswith("note:"), comments(paint))
+      paint in WS.workers and len([c for c in comments(paint) if c.startswith("note:")]) == 1,
+      comments(paint))
+WS.step(W, FREE)
+check("3. another pass does not repeat the shared-file note",
+      len([c for c in comments(paint) if c.startswith("note:")]) == 1, comments(paint))
 check("3. its worker's first message says what the house found", "lens.js (changed)" in sent, sent[-800:])
 
 mock.patch.stopall()
