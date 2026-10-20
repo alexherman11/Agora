@@ -1,0 +1,7 @@
+role abouthead : on jeffwash, corner gap, pad gap, pad left gap x1.5, pad right gap, between gap, space below gap /2
+role aboutkey : text down medium, jeff
+role aboutname : text down medium, ink
+role chatquote : text down, soft, border left faint, pad left gap, space below gap /2
+role tagline : between gap /2, pad top gap /2
+role receipt : text down 2, accent
+role commenting : on jeffwash, corner gap, pad gap, between gap /2

@@ -9,21 +9,30 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from prepare_worker import TARGET, candidate
+from prepare_worker import TARGET
 
 
 def pinned_bytes(path):
-    """The catalog as it was hashed: the main checkout's CRLF bytes (a worktree checks it out with LF)."""
+    """Accept the pinned CRLF bytes or the LF checkout of the same catalog."""
     raw = path.read_bytes()
-    return {hashlib.sha256(raw).hexdigest(), hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()}
+    return {
+        hashlib.sha256(raw).hexdigest(),
+        hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest(),
+    }
 
 
 def test_pinned_catalog_per_model():
-    """a5284: Astra workers use the residents' pinned catalog; Sol keeps the worker's; nothing else is substituted."""
+    """Astra uses the residents' pinned catalog; Sol keeps its own. No model substitution."""
     from codex_worker import pinned_catalog
+
     path, sha = pinned_catalog("gpt-6-astra")
     assert path.name == "model-catalog.json"
-    assert sha == json.loads((path.parent / "runtime-lock.json").read_text(encoding="utf-8"))["catalog_sha256"]
+    assert (
+        sha
+        == json.loads((path.parent / "runtime-lock.json").read_text(encoding="utf-8"))[
+            "catalog_sha256"
+        ]
+    )
     assert sha in pinned_bytes(path)
     path, sha = pinned_catalog("gpt-6.1-sol")
     assert path.name == "worker-model-catalog.json"
@@ -36,11 +45,13 @@ def test_provider_selection_and_resume_guard(tmp_path):
     sys.path.insert(0, str(TARGET.parent))
     module = types.ModuleType("candidate_workshop")
     module.__file__ = str(TARGET)
-    source = candidate(TARGET.read_text(encoding="utf-8"))
+    source = TARGET.read_text(encoding="utf-8")
     exec(compile(source, str(TARGET), "exec"), module.__dict__)
     host = SimpleNamespace(dir=tmp_path, fake=None, claude="claude.exe", load=lambda: None)
-    with (patch.object(module.subprocess, "Popen") as popen,
-          patch.object(module.threading, "Thread")):
+    with (
+        patch.object(module.subprocess, "Popen") as popen,
+        patch.object(module.threading, "Thread"),
+    ):
         popen.return_value.pid = 123
         worker = module.Worker(host, "test", tmp_path, "worker/test", "mica")
         worker.start("claude-opus-5-5", "frontier", {"props": {}})

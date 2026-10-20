@@ -1,5 +1,21 @@
 # Agora
 
+<!-- agora:standing-rules:begin -->
+## Alex's standing rules
+Read the live charter first: `read a6529 :3`. Single source in the world; snapshot as of event e12574.
+Generated; never hand-edit this block. First ten rules in charter order:
+- Nothing that waits on Alex may ask him to type a command or start something. Run it, or make it one click. (17 Oct)
+- Never show him ids (a5143). Show what a thing is called, and make every name clickable. (16 Oct)
+- Reply like texting: few words, no big blocks. (15 Oct)
+- No black on black: the home screen wants a light theme with nice colours. (20 Oct)
+- Nothing scrolls on the HUD; no replaying decorative animation; only the pomodoro ring moves. (16 Oct)
+- The Conversation is only Alex and JEFF. Agents coordinate in Shop talk. No tests or checks in the Conversation. (16 Oct)
+- No visible test windows or interactive tests on his screen, ever; they take his focus and keys. Use the sandbox (hidden desktop, with its guard). (16 Oct)
+- Nothing may wake his computer from sleep. (15 Oct)
+- Ask first before: ending a program, changing settings, installing, sending as him, spending, deleting. Never his passwords or card, never security settings, never anything while he is in a game. (15 Oct)
+- A worker's tool permissions come from JEFF, narrow, per card. Alex's word through JEFF carries his authority. (16 Oct)
+<!-- agora:standing-rules:end -->
+
 Agora is a personal computing environment shared by one person, Alex, and a persistent agent, JEFF. It is built on one substrate wherever possible, so that anything on a computer can be represented, viewed, changed and extended in the same way. Read [Agora](docs/Agora.md) for the vision. It is the larger goal everything here works toward.
 
 Right now Agora is a **text desk**: a world of things, surfaces and lenses that people and agents enter and change through a small text language. It lives in `research/text-desk-lab/notation/`. The desk is both the prototype we are building and the place the team lives and works.

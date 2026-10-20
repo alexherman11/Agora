@@ -297,8 +297,10 @@ def parse_selection(w, token, trash=False, binds=None):
             # a3359: has a due date, as comments:any and awaits:any ask; it could only be asked as due<2999-12-31
             cands = [c for c in cands if w.nodes[c]["type"] == "appearance" and w.subjects[w.nodes[c]["subject"]]["due"]]
         elif t.startswith("title:"):
-            word = t[6:].lower()
-            cands = [c for c in cands if word in w.title(w.nodes[c]).lower()]
+            # a6642: `title:home+base`, the title holds every word, as ?home+base does over title, text and tags, so a
+            # lens can put title hits first from the one words-of() it gives ?: `of title:$q`, then `of ?$q,-title:$q`
+            words = [x for x in t[6:].lower().split("+") if x]
+            cands = [c for c in cands if all(x in w.title(w.nodes[c]).lower() for x in words)]
         elif t.startswith("comments:"):
             want = t[9:]
             def okc(nid, want=want):

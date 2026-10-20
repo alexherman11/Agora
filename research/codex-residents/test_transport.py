@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from codex_resident import receive
-from prepare_house import HOUSE, candidate
+from prepare_house import HOUSE
 from setup_corners import made
 
 
@@ -54,19 +54,27 @@ def test_failed_or_interrupted_turn_cannot_apply_partial_commands(status):
     assert output[-1]["is_error"] is True
 
 
-def test_house_hook_routes_only_new_provider_and_preserves_claude(tmp_path):
+def test_house_hook_routes_only_new_provider_and_preserves_claude():
     sys.path.insert(0, str(HOUSE.parent))
     module = types.ModuleType("candidate_house")
     module.__file__ = str(HOUSE)
     # Read/import the existing house, without running it or touching any world.
-    exec(compile(candidate(HOUSE.read_text(encoding="utf-8")), str(HOUSE), "exec"), module.__dict__)
+    exec(compile(HOUSE.read_text(encoding="utf-8"), str(HOUSE), "exec"), module.__dict__)
+    sys.path.insert(0, str(HOUSE.parents[2] / "window-lab"))
+    from agora_tmp import directory
+    tmp_path = Path(directory("transport-charter-test-"))
+    from roomworld import build
+    desk, _ = build(say=False)
+    world = desk.world
     props = {"provider": "codex", "reasoning": "medium"}
     host = SimpleNamespace(
-        dir=tmp_path,
+        dir=tmp_path, world="transport-inmemory",
         fake=None,
         claude="claude.exe",
-        load=lambda: SimpleNamespace(nodes={"f_test": {"props": props}}),
+        load=lambda: world,
+        act=lambda *a, **k: "",  # charter receipt only; no native world act under test here
     )
+    world.nodes["f_test"] = {"props": props}
     resident = module.Resident(host, "f_test")
     with (
         patch.object(module.subprocess, "Popen") as popen,
@@ -75,7 +83,9 @@ def test_house_hook_routes_only_new_provider_and_preserves_claude(tmp_path):
         popen.return_value.pid = 12345
         resident.start("gpt-6-astra")
         cmd = popen.call_args.args[0]
-        assert Path(cmd[1]).name == "codex_resident.py" and cmd[-1] == "medium"
+        assert Path(cmd[1]).name == "codex_resident.py"
+        assert cmd[cmd.index("--reasoning") + 1] == "medium"
+        assert "--charter-file" in cmd
         resident.state["session"] = "codex-thread"
         resident.start("gpt-6-astra")
         assert popen.call_args.args[0][-2:] == ["--resume", "codex-thread"]
@@ -87,5 +97,5 @@ def test_house_hook_routes_only_new_provider_and_preserves_claude(tmp_path):
         legacy.start("claude-opus-5-5")
         cmd = popen.call_args.args[0]
         assert cmd[0] == "claude.exe" and cmd[-2:] == ["--resume", "claude-session"]
-        assert cmd[cmd.index("--system-prompt") + 1] == ""
+        assert "charter: not read: note missing" in cmd[cmd.index("--system-prompt") + 1]
         assert cmd[cmd.index("--tools") + 1] == ""

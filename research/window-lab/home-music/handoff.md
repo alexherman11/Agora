@@ -67,6 +67,30 @@ unavailable until app registration and consent.
   which is on newer main), 1 expected refusal. This is **not** a whole-host pass;
   the house must merge main and judge these independently of the music tests.
 
+## Post-merge checks (20 Oct)
+
+Resolved both `scene.py` conflicts by retaining `media picture` alongside main's
+`page` word and its text output. Re-ran fake Spotify tests (all ok), static media
+rows (0 failed), both in-memory music forms (all ok), and the scene checks for
+live/media-picture, Markdown with media/names, and device-sized pages (ok).
+`git diff --check` passed.
+
+With main's inherited-ACL temp repair, the headless capture now gets past the
+copy but receives no response at the DevTools `/json/version` endpoint within
+20 seconds. Retried with `--visible --reduced-motion` (a guarded hidden desktop,
+never Alex's desktop): Edge reaches DevTools, but `open_edge` fails evaluating
+`document.readyState` with WinError 10054 / ConnectionClosedError. No screenshot
+was produced. Closed this run's sandbox `screen-83724`: the helper reported
+`its desktop is gone` and `alex: untouched`. No guard bypass attempted.
+
+Post-merge `health.py frontier-try` **failed**, world e13652, 13644 events,
+total **152.8s**. Python/JavaScript parsing passed; 93 help notes true to code;
+69 lenses compiled with 0 unexpected refusals and 1 expected (`p-if`).
+Builder, charter, shared and plan-usage suites passed. Other suites still hit
+system-temp PermissionError, textedit lock and door timeouts, or browser
+unavailability; `test_reach` still reported 4 failures. Thus the merge fixes the
+older branch's missing-word refusals, but this is not whole-host acceptance.
+
 ## Remaining verification and apply
 
 The house must merge current main and run its checks. Browser-capable reviewer:

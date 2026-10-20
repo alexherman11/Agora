@@ -1,0 +1,30 @@
+# home-widgets: every widget of the home base's top bar, left to right (a5530). A widget is a lens note tagged lens and
+# widget, with slot=bar and order=<n> (size=s|m is a hint for the layout, a5496): adding one is one note in the Home base
+# room, never an edit to home-base. This lens is their one reader; home-base places it first in its bar (top left).
+# a6427: a person's layout may say widgets=<titles, with commas> (a workspace sets it): then only those show.
+widgets : row
+  role widgets
+  mine : row
+    role widgets
+    of prop:role=home-layout,prop:actor=$me as lay
+    each chosen
+  all : row
+    role widgets
+    only when count(prop:role=home-layout,prop:actor=$me) = 0
+    of tag:widget,prop:slot=bar as w
+    by order
+    each widget
+chosen : row
+  role widgets
+  of tag:widget,prop:slot=bar as w
+  by order
+  each picked
+picked : row
+  role widget
+  role widget.wide when $w.size = "m"
+  only when ($lay.widgets or "") = "" or $lay.widgets has $w.title
+  lens $w.title
+widget : row
+  role widget
+  role widget.wide when $w.size = "m"
+  lens $w.title

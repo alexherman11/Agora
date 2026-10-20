@@ -150,6 +150,23 @@
   .media-seek { flex: 3; min-width: 6em; accent-color: var(--t-accent, currentColor); }
   .media-speeds { display: flex; gap: .25em; }
   .media-speeds > [data-on] { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+  /* `page` (a6431, page.js): a page at a device's size in a frame, scaled to fit the part. The look of the frame is the
+     role `pageframe` (its edge is the device's bezel), of the box round a picked part the role `pagemark`. The exceptions to
+     "no colour here", as a film's letterbox is one: a display cutout is black; a home bar and the safe insets are white
+     in difference with the app under them, so they read on a light app and a dark one, as a phone's own home bar does */
+  .t-page { display: grid; place-items: center; overflow: hidden; min-height: 0; min-width: 0; white-space: normal; }
+  .page-hold { position: relative; flex: none; box-sizing: content-box; }
+  .page-device { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+  .page-frame { display: block; border: 0; width: 100%; height: 100%; background: transparent; }
+  .page-over, .page-mark, .page-aim { position: absolute; pointer-events: none; }
+  .page-over { inset: 0; }
+  .page-inset { position: absolute; mix-blend-mode: difference; background: repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 6px, transparent 6px 12px); }
+  .page-cutout { position: absolute; background: #000; border-radius: 999px; }
+  .page-cutout-notch { border-radius: 0 0 18px 18px; }
+  .page-homebar { position: absolute; height: 5px; border-radius: 3px; background: rgba(255,255,255,.85); mix-blend-mode: difference; }
+  .page-mark { box-sizing: border-box; border: 2px solid var(--t-accent, currentColor); border-radius: 6px; }
+  .page-aim { box-sizing: border-box; border: 1px dashed var(--t-accent, currentColor); border-radius: 4px; }
+  .page-mark[hidden], .page-aim[hidden] { display: none; }
   /* `live` (a5530): the painter's clock and counts; `until ring` a ring that empties, the time left inside it */
   .t-live { font-variant-numeric: tabular-nums; }
   .t-ring { position: relative; display: grid; place-items: center; aspect-ratio: 1; width: 100%; max-width: 9em; margin-inline: auto; white-space: nowrap; }
@@ -165,6 +182,8 @@
   @keyframes live-end { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .t-ring .ring-arc { transition: none; } .t-live[data-ended] { animation: none; } }
   [data-focus] [contenteditable]:focus { outline: 1px solid var(--t-focus); outline-offset: 2px; }
+  /* a6642: the press the arrow keys are on, inside an `arrows` frame (its float too): a state, not a motion */
+  [data-arrows] [role="button"]:focus-visible { outline: 2px solid var(--t-focus, currentColor); outline-offset: -2px; border-radius: .3em; }
   [data-tool] { cursor: pointer; user-select: none; }
   [data-pressed] { opacity: 0.45; }   /* a press that is on its way to the desk */
   /* marks in a text (a3486): weight and slant are the reader's own signs, so they are not roles of a style */
@@ -193,6 +212,7 @@
 <script src="markdown.js"></script>
 <script src="textedit.js"></script>
 <script src="media.js"></script>
+<script src="page.js"></script>
 <script src="lens.js"></script>
 <script src="term.js"></script>
 </body>

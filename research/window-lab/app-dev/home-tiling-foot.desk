@@ -1,0 +1,7 @@
+# home-tiling-foot (a6431, 20 Oct): since a6549 each panel in a column has `share 1`, and so does the column's empty
+# foot, so a column holding one panel gives it only half the height (the phone preview drew at half size; a6427's app dev
+# workspace showed the same). The foot keeps a thin share (0.05): still a place to drop a panel, no longer half a column.
+# One exact passage in home-tiling; undo: the same line with new and old swapped (home-tiling-foot-undo.desk).
+# Try: python research/window-lab/app-dev/apply.py lines research/window-lab/app-dev/home-tiling-foot.desk
+read "home-tiling" :3
+do replace title:home-tiling,in:f5204 old="  foot : column\n    share 1\n    role tilefoot" new="  foot : column\n    share 0.05\n    role tilefoot"

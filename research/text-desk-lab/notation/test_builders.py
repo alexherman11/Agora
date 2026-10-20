@@ -19,11 +19,12 @@ the world copy and every process stubbed (Popen is caught: each start is a comma
   8. a conversation that cannot be found: the builder starts fresh and is told so
   9. the protocol: the notebook rule (found by role), Alex's screen and the demo rule; a builder is told who it is
 """
+import atexit
 import json
 import os
 import re
+import shutil
 import sys
-import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -52,8 +53,15 @@ def check(name, ok, detail=""):
 D, R = roomworld.build(say=False)
 W = D.world
 B = R.BOARD
-tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)     # the stubbed starts leave stderr.log open
-TMP = Path(tmp.name)
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+TMP = Path(agora_tmp.directory("b-"))  # short: Claude's cwd-keyed fixture doubles this path
+# The landing-room worktree has a longer name than a card's worktree. These
+# synthetic Claude project paths embed that full cwd a second time; use Windows
+# extended paths so their tool-results children do not hit legacy MAX_PATH.
+if os.name == "nt" and not str(TMP).startswith("\\\\?\\"):
+    TMP = Path("\\\\?\\" + str(TMP))
+atexit.register(shutil.rmtree, TMP, ignore_errors=True)  # stubbed starts leave stderr.log open
 
 
 def say(me, *lines):
@@ -363,11 +371,108 @@ check("9. the protocol reads the notebook rule: found by role, read before, an e
 check("9. the protocol says how to see and record Alex's screen, and the demo rule",
       "screen_tools.py look" in P and "screen_tools.py record" in P and "research/window-lab/demos/" in P
       and "say on the card what will appear" in P and "names its recording" in P)
-codex = card("A Codex card", worker_provider="codex")
+codex = card("A fresh Codex card", worker_provider="codex", worker_fresh="yes")
 WS.step(W, POOL)
 cp = (WS.workers[codex].dir / "worker-prompt.txt").read_text(encoding="utf-8")
 check("9. a Codex worker's prompt has the notebook rule too, and is a disposable worker",
       "find role=builders-notebook" in cp and "a disposable builder" in cp and WS.workers[codex].builder is None)
+reset()
+
+# Codex builders keep their own thread across commissions, without Claude's cwd copying.
+POOL.update(worker_pool="2 codex gpt-6.1-sol", limit_fallback="codex")
+one = card("Codex first")
+WS.step(W, POOL)
+check("10. first Codex task owns stable builder one", WS.workers[one].builder == "codex-builder-1")
+end_turn(one, "CODEX-S1")
+setp(one, commission="waiting")
+two = card("Codex next")
+WS.step(W, POOL)
+cmd, p = procs[-1]
+check("10. next task resumes the same Codex thread and gets its own task context",
+      WS.workers[two].builder == "codex-builder-1" and cmd[-2:] == ["--resume", "CODEX-S1"]
+      and "on a new commission" in sent(p)[0] and builder_state("codex-builder-1")["provider"] == "codex")
+three = card("Other Codex builder")
+four = card("Queued until a builder is free")
+WS.step(W, POOL)
+check("10. exactly two busy Codex builders; a third task stays queued",
+      WS.workers[three].builder == "codex-builder-2" and four not in WS.workers
+      and len([x for x in WS.workers.values() if x.alive() and x.busy]) == 2)
+end_turn(three, "CODEX-S2")
+WS.workers[three].events.put({"type": "system", "subtype": "compact_boundary"})
+WS.workers[three].turns_ended()
+check("10. compaction preserves session identity and records a boundary",
+      WS.workers[three].state["session"] == "CODEX-S2" and WS.workers[three].state["compactions"] == 1)
+setp(three, commission="waiting")
+WS.step(W, POOL)
+check("10. completion frees builder two for the queued task", WS.workers[four].builder == "codex-builder-2")
+wk = WS.workers[two]
+wk.tree.mkdir(parents=True, exist_ok=True)
+WS.failed(two, wk, {"detail": "adapter unexpectedly exited"})
+check("11. Codex crash retains work/session and schedules retry instead of failing the task",
+      props(two)["commission"] == "working" and wk.state["session"] == "CODEX-S1"
+      and wk.state["retry_kind"] == "process" and wk.state["retry_at"] > time.time())
+n = len(procs)
+WS.step(W, POOL)
+check("11. retry backoff survives a fresh Worker object", len(procs) == n)
+wk.state["retry_at"] = time.time() - 1
+wk.save()
+WS.workers.pop(two, None)  # simulate house restart rereading state
+WS.step(W, POOL)
+check("11. the crashed builder resumes its saved thread after backoff",
+      WS.workers[two].alive() and WS.workers[two].builder == "codex-builder-1"
+      and procs[-1][0][-2:] == ["--resume", "CODEX-S1"])
+reset()
+
+# Provider limits do not discard a card or replay its effects. The fallback starts from the work already on disk.
+POOL.update(worker_pool="2 claude, 2 codex gpt-6.1-sol")
+limited = card("Interrupted Claude implementation", worker_provider="claude", worker_fresh="yes")
+WS.step(W, POOL)
+wk = WS.workers[limited]
+wk.state["session"] = "CLAUDE-KEPT"
+wk.state["pending"] = {"carry": "Finish the change after checking what ran.", "delivered": True}
+wk.tree.mkdir(parents=True, exist_ok=True)
+(wk.tree / "unfinished.txt").write_text("keep this edit")
+wk.save()
+wk.busy = False  # model has reported the usage-limit result
+WS.failed(limited, wk, {"detail": "You've hit your session limit; resets 5pm"})
+WS.step(W, POOL)
+replacement = WS.workers[limited]
+archive = json.loads(Path(replacement.state["last_handoff"]["archive"]).read_text())
+check("12. usage-limit handoff archives Claude identity and preserves uncommitted edits",
+      archive["session"] == "CLAUDE-KEPT" and (replacement.tree / "unfinished.txt").read_text() == "keep this edit"
+      and props(limited)["worker_provider"] == "codex" and replacement.builder.startswith("codex-builder-"))
+check("12. replacement never resumes Claude's id and receives the original task plus recovery instructions",
+      "CLAUDE-KEPT" not in procs[-1][0] and "Do not assume you have Claude's conversation" in sent(procs[-1][1])[0]
+      and "Interrupted Claude implementation" in sent(procs[-1][1])[0])
+n = len(list((replacement.dir / "handoffs").glob("*.json")))
+WS.step(W, POOL)
+check("12. repeat passes do not transfer twice or put Claude back on its card",
+      len(list((replacement.dir / "handoffs").glob("*.json"))) == n and props(limited)["worker_provider"] == "codex")
+check("12. Claude cooldown sends unassigned work to Codex", WS.lane("not-yet", {"props": {}}, POOL, [])["provider"] == "codex")
+check("12. ordinary errors are not usage limits", not workshop.usage_limited("Pinned worker runtime changed or missing"))
+reset()
+
+# Recover a crash between preparing the handoff and updating the native card.
+interrupted = card("Recover prepared handoff", worker_provider="claude")
+setp(interrupted, commission="working")
+transfer_tree = workshop.TREES / interrupted
+transfer_tree.mkdir(parents=True, exist_ok=True)
+transfer_path = H.dir / f"worker-{interrupted}" / "state.json"
+workshop.atomic_state(transfer_path, {"session": "CLAUDE-BEFORE-CRASH", "session_provider": "claude",
+                                     "retry_at": time.time() + 300, "pending": {"carry": "Keep going"}})
+with mock.patch.object(WS, "set_state"):
+    check("13. a refused native change leaves the prepared handoff pending", not WS.limit_handoffs(W, POOL))
+prepared = json.loads(transfer_path.read_text())
+check("13. prepared handoff cannot resume Claude and keeps its archival identity",
+      prepared["session_provider"] == "codex" and "session" not in prepared
+      and json.loads(Path(prepared["handoff_pending"]["archive"]).read_text())["session"] == "CLAUDE-BEFORE-CRASH")
+WS = workshop.Workshop(H)
+WS.land = lambda w, cid, s, wk, wait=True: None
+WS.step(W, POOL)
+check("13. a restarted house completes the prepared transfer once",
+      props(interrupted)["worker_provider"] == "codex" and WS.workers[interrupted].alive()
+      and "handoff_pending" not in WS.workers[interrupted].state
+      and len(list((transfer_path.parent / "handoffs").glob("*.json"))) == 1)
 reset()
 
 mock.patch.stopall()

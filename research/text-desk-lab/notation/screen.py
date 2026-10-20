@@ -40,7 +40,9 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
     drag <part> <part|x,y>       press on the first, move, release on the second
     hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there.
                                  A hold while holding moves on from where the hand is (`hold - 400,900`), to film a carry
-    scroll <part> <dy>           scroll a part by dy pixels
+    scroll <part> <dy>           scroll a part by dy pixels (sets scrollTop, so it cannot find a wheel that never arrives)
+    wheel <part|x,y> <dy>        a real wheel turn there (dy > 0 down; with --visible a Windows WM_MOUSEWHEEL per 120);
+                                 prints which scrolling parts under the pointer moved, or NOTHING moved (a6549)
     wait <ms>
     answer <text>                the next prompt() or confirm() the page opens is answered with text, as a person
                                  typing into it would; a dialog with no answer set is dismissed (and said)
@@ -72,6 +74,8 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
 --bare serves the copy from a deskd alone, without the door (as before a1505); `land` then restarts it as the keeper did.
 --logged gives the copy a log, as the live world has one (a snapshot plus the log since): time presses with it, or each
 write pickles the whole copy twice and a press looks ~250 ms slower than it is live (a6010).
+AGORA_TMP chooses scratch space inside this worktree (relative paths start at its root); by default it is
+research/window-lab/.tmp-agora. Python temp files and child TMP/TEMP use it, including Chrome/Edge.
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
 """
@@ -83,7 +87,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -91,6 +94,10 @@ from pathlib import Path
 import websockets
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+
+agora_tmp.configure()  # includes TMP/TEMP inherited by the door and Chrome/Edge
 PY = sys.executable
 SCALE = 1.0          # --scale: the display's scale, as devicePixelRatio (a5736)
 SB = None            # sandbox_window (research/window-lab), loaded by --visible
@@ -174,13 +181,13 @@ class Page:
             raise RuntimeError(r["exceptionDetails"].get("exception", {}).get("description") or str(r["exceptionDetails"]))
         return r.get("result", {}).get("value")
 
-    async def where(self, target):
+    async def where(self, target, reveal=True):
         if "," in target and all(p.strip().lstrip("-").replace(".", "").isdigit() for p in target.split(",")):
             x, y = (float(p) for p in target.split(","))
             return x, y
         if target[:1] in "#.":                  # a1047: a part with no key (the terminal's line, a shell window) by CSS
             r = await self.js(f"""(() => {{ const e = document.querySelector({json.dumps(target)}); if (!e) return null;
-                e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
+                if ({str(reveal).lower()}) e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
                 return [r.left + r.width / 2, r.top + r.height / 2, r.width, r.height]; }})()""")
             if not r or (r[2] == 0 and r[3] == 0):
                 raise RuntimeError(f"nothing visible matches {target!r}")
@@ -189,7 +196,7 @@ class Page:
         key = target[:-len("/handle")] if handle else target
         r = await self.js(f"""(() => {{ let e = document.querySelector('[data-key="{key}"]'); if (!e) return null;
             {"e = e.querySelector(':scope > button') || e;" if handle else ""}
-            e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
+            if ({str(reveal).lower()}) e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
             return [r.left + r.width / 2, r.top + r.height / 2, r.width, r.height]; }})()""")
         if not r:
             raise RuntimeError(f"no painted part {key!r} (try `facts` to list the keys)")
@@ -211,7 +218,7 @@ class Page:
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "window", "facts", "click", "hover", "double", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
+STEPS = ("shot", "window", "facts", "click", "hover", "double", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wheel", "wait", "answer", "text",
          "css", "blur", "events", "resend", "desk", "restart", "stop", "start",
          "land", "page", "js", "stream")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
@@ -264,7 +271,7 @@ async def run(url, steps, size, shots, restart=None, still=False):
     exe = next((b for b in BROWSERS if Path(b).exists()), None)
     if not exe:
         raise SystemExit("screen: no Chrome or Edge found; looked in " + ", ".join(BROWSERS))
-    prof = tempfile.mkdtemp(prefix="screen-profile-")
+    prof = agora_tmp.directory("screen-profile-")
     port = free_port()
     br, sandbox, guard = None, None, None
     if VISIBLE == "sandbox":
@@ -292,7 +299,7 @@ async def run(url, steps, size, shots, restart=None, still=False):
         wait_http(f"http://127.0.0.1:{port}/json/version")
         tabs = json.loads(wait_http(f"http://127.0.0.1:{port}/json"))
         ws_url = next(t["webSocketDebuggerUrl"] for t in tabs if t.get("type") == "page")
-        async with websockets.connect(ws_url, max_size=64 * 1024 * 1024) as ws:
+        async with websockets.connect(ws_url, origin=None, max_size=64 * 1024 * 1024) as ws:
             p = Page(ws)
             if sandbox:
                 SB.join(sandbox)
@@ -440,6 +447,26 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     key, dy = arg(), steps[i + 1]
                     i += 2
                     print(await p.js(f"(() => {{ const e = document.querySelector('[data-key=\"{key}\"]'); if (!e) return 'no part {key}'; e.scrollTop += {float(dy)}; return 'scrolled {key} to ' + Math.round(e.scrollTop); }})()"))
+                elif s == "wheel":                          # a6549: a real wheel turn over a part, not a scrollTop set
+                    x, y = await p.where(arg(), reveal=False)
+                    dy = float(steps[i + 1])
+                    i += 2
+                    probe = f"""(() => {{ const out = []; let e = document.elementFromPoint({x}, {y});
+                        for (; e; e = e.parentElement) {{ if (e.scrollHeight > e.clientHeight + 1 || e === document.scrollingElement)
+                          out.push([e.dataset && e.dataset.key || e.tagName, Math.round(e.scrollTop), getComputedStyle(e).overflowY]); }}
+                        return out; }})()"""
+                    before = await p.js(probe)
+                    if getattr(p, "win", None):
+                        ox, oy, dpr = SB.page_origin(p.win, inner=await p.js("[innerWidth, innerHeight, devicePixelRatio]"))
+                        SB.wheel_at(p.win, ox + x * dpr, oy + y * dpr, dy)
+                    else:
+                        await p.mouse("mouseMoved", x, y, "none", 0)
+                        await p.call("Input.dispatchMouseEvent", type="mouseWheel", x=x, y=y, deltaX=0, deltaY=dy)
+                    await asyncio.sleep(0.6)
+                    after = await p.js(probe)
+                    moved = [f"{a[0]} {a[2]} {a[1]}->{b[1]}" for a, b in zip(before, after) if a[1] != b[1]]
+                    print(f"wheel {round(dy)} at {round(x)},{round(y)}: " + ("; ".join(moved) if moved else
+                          "NOTHING moved (" + "; ".join(f"{a[0]} {a[2]} at {a[1]}" for a in before) + ")"))
                 elif s == "wait":
                     await asyncio.sleep(float(arg()) / 1000)
                     i += 1
@@ -598,7 +625,7 @@ def main():
             # a1505: served as the keeper serves it, through a door (door.py) with its own deskd behind it, its news
             # kept in a temporary directory, and the painter from a copy of this checkout's desk-shell/ made now, so
             # `land painter` can change it without touching files any other page is served from. --bare: a deskd alone
-            state = tempfile.mkdtemp(prefix="screen-door-")
+            state = agora_tmp.directory("screen-door-")
             shell = Path(state) / "desk-shell"
             shutil.copytree(HERE / "desk-shell", shell)
             serve = (lambda: [PY, "deskd.py", str(port)]) if bare else \
