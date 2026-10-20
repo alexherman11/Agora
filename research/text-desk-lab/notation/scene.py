@@ -121,7 +121,7 @@ the one form. The words:
     on click host <verb> [words] the button asks the program the page is painted in (the home base) to do <verb>, one of
                                  the rows it publishes as witnessed:host; $fields fill as in any command. Never a desk
                                  line; a page with no host says so
-    on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
+    on drop <part|any> do <command>  receive a carried thing (any also accepts other lenses); `$carried` fills at drop; one command
     on drop <part> at <side> do  side left|right|top|bottom: the act for a drop near that edge (the outer third) of the
                                  receiver; the plain `on drop` is the middle. The painter draws the landing box (that
                                  half of the receiver, or all of it) while the thing is in the air (a5994)
@@ -1863,6 +1863,14 @@ ACT_COMMANDS = ("do", "look", "read", "examine", "find", "undo", "run", "scene",
 
 
 def _w_on(node, p, val, n, env):
+    # Host acts may use the same guard/menu shape as desk acts. They still
+    # dispatch only to the host's closed verb table, never through desk verbs.
+    host_act = re.fullmatch(r'(click|pop|menu\s+"[^"]+")(?:\s+when\s+(.+?))?\s+host\s+(.+)', val.strip())
+    if host_act:
+        action, guard, words = host_act.groups()
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", words):
+            raise LensRefusal(f"line {n}: `on {action} host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")
+        val = action + (f" when {guard}" if guard else "") + " do host " + words
     # Alex, 7 Oct ('buttons on top'): a button presses a key in the text the caret is in. It is the painter's own act:
     # the line `press Ctrl+B` is never sent to the desk
     m = re.fullmatch(r"click press (.+)", val.strip())
@@ -1920,7 +1928,7 @@ def _w_on(node, p, val, n, env):
         raise LensRefusal(f"line {n}: a drop is one proposal: one desk command, not {len(split_batch(cmd))}")
     # `on drag do move $item ...` reads as English; the desk wants `do move ...`. A gesture names a verb
     # unless it begins with one of the desk's own reading or session commands.
-    if cmd.split(" ")[0] not in ACT_COMMANDS:
+    if not host_act and cmd.split(" ")[0] not in ACT_COMMANDS:
         cmd = "do " + cmd
     node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"side": side} if side else {}),
                        **({"label": label} if label else {}),
@@ -2132,7 +2140,7 @@ def parse(src, roles=None, style=None):
         if k["carry"] and any(a["on"] == "drag" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: a part cannot both `carry` and `on drag`; a carried thing is put down by a drop")
         for a in k["on"]:
-            if a["on"] == "drop" and not any(x["name"] == a["part"] and x["carry"] for x in every):
+            if a["on"] == "drop" and a["part"] != "any" and not any(x["name"] == a["part"] and x["carry"] for x in every):
                 raise LensRefusal(f"line {k['line']}: `on drop {a['part']}`: no part named {a['part']!r} says `carry`")
 
     def reach(name, trail):

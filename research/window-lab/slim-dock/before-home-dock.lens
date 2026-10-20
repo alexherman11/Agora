@@ -1,0 +1,112 @@
+# home-dock: the dock along the foot of the home base (a5500), where Alex's taskbar was. Its icons are not lines here:
+# they are the notes in his dock (the surface with role=dock actor=$me in the Home base room, f5204), in its order.
+# A note's title is the label and glyph= its icon. opens=<id> shows that thing in the middle (home-viewer); opens=chat
+# gives JEFF's chat back; window=<lens> opens a lens as its own window (the home base's host verb `window`).
+# Add one: press + while something is open in the middle, or
+#   do create <the dock> kind=note title="Label" glyph=◆ opens=<id>
+# switch=wm (a6113): the icon starts the window manager (host wm.start) and, lit while it runs (witnessed:wm),
+# a second click puts every window back (host wm.stop); opens= is used only by a home base that lacks wm.start.
+# Right-click an icon to take it off the dock or move it along. The icon of what is open now is lit.
+foot : row
+  share 1
+  role appfoot
+  left : column
+    share 1
+  dock : row
+    role appdock
+    of kind:surface,prop:role=dock,prop:actor=$me as k
+    each shelf
+    none : text "No dock yet: make a row surface in the Home base room (f5204) and give it role=dock actor=<you>"
+      role hint
+      only when count(kind:surface,prop:role=dock,prop:actor=$me) = 0
+  right : column
+    share 1
+    panels : row
+      lens home-panels
+    # a5496's panel toggles go here once their lens exists (a lens named here must exist, or this one stops compiling):
+    #   panels : row
+    #     lens home-panels
+shelf : row
+  share 1
+  role appshelf
+  of prop:role=home-view,prop:actor=$me as v
+  each icons
+icons : row
+  share 1
+  role appshelf
+  apps : row
+    role appicons
+    of in:$k.item,kind:note as d
+    each app
+  add : row
+    role appicons
+    only when ($v.viewing or "") != "" and count(in:$k.item,prop:opens=$v.viewing) = 0
+    of $v.viewing as r
+    each adder
+app : column
+  role appslot
+  carry
+  on drop app do move $carried before=$d.item
+  on menu "Take off the dock" do remove $d.item
+  on menu "Move left" when ($d.before or "") != "" do move $d.item before=$d.before
+  on menu "Move right" when ($d.after or "") != "" do move $d.item after=$d.after
+  view : column
+    only when ($d.opens or "") != "" and $d.opens != "chat" and (($d.switch or "") != "wm" or count(witnessed:host name=wm.start) = 0)
+    role appicon
+    role appicon.on when $d.opens = $v.viewing
+    on click do view $d.opens
+    glyph : text "$d.glyph"
+      role appglyph
+    label : text "$d.title"
+      role applabel
+      clamp 1
+  chat : column
+    only when $d.opens = "chat"
+    role appicon
+    role appicon.on when ($v.viewing or "") = "" and ($v.find or "") = ""
+    on click do unview $v
+    glyph : text "$d.glyph"
+      role appglyph
+    label : text "$d.title"
+      role applabel
+      clamp 1
+  pop : text "pop out"
+    role applabel
+    only when ($d.window or "") != "" and ($d.opens or "") != ""
+    on click host window $d.window
+  window : column
+    only when ($d.window or "") != "" and ($d.opens or "") = ""
+    role appicon
+    on click host window $d.window
+    glyph : text "$d.glyph"
+      role appglyph
+    label : text "$d.title"
+      role applabel
+      clamp 1
+  wm : column
+    only when ($d.switch or "") = "wm" and count(witnessed:host name=wm.start) > 0 and count(witnessed:wm) = 0
+    role appicon
+    on click host wm.start
+    glyph : text "$d.glyph"
+      role appglyph
+    label : text "$d.title"
+      role applabel
+      clamp 1
+  wmon : column
+    only when ($d.switch or "") = "wm" and count(witnessed:wm) > 0
+    role appicon.on
+    on click host wm.stop
+    glyph : text "$d.glyph"
+      role appglyph
+    label : text "Put back"
+      role applabel
+      clamp 1
+adder : column
+  role appadd
+  on click do create $k.item kind=note title="$r.title" glyph="◆" opens=$v.viewing
+  glyph : text "+"
+    role appglyph
+  label : text "Dock this"
+    role applabel
+    clamp 1
+
