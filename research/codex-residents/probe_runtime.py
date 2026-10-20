@@ -2,24 +2,25 @@
 
 import json
 import os
-import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from codex_resident import (
-    MODEL,
     ThreadEnvelope,
+    build_config,
     deny,
     receive,
     resident_inputs,
-    runtime_config,
     thread_parameters,
 )
 from openai_codex.client import CodexClient
+from probe_support import empty_profile, options, probe_directory
+from worker_job import child_job
 
 
 def main():
+    args = options("resident")
     requests, events = [], []
     attachment = os.environ.get("RESIDENT_PROBE_IMAGE")
     blocks = [{"type": "text", "text": "The door probe."}]
@@ -84,8 +85,14 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", 0), Model)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        with tempfile.TemporaryDirectory(prefix="agora-resident-probe-") as temp:
-            with CodexClient(runtime_config(temp), approval_handler=deny) as client:
+        with probe_directory() as temp:
+            profile = empty_profile(temp)
+            with (
+                CodexClient(
+                    build_config(temp, str(args.binary), profile), approval_handler=deny
+                ) as client,
+                child_job(client._proc),
+            ):
                 timer = threading.Timer(45, client.close)
                 timer.daemon = True
                 timer.start()
@@ -94,7 +101,7 @@ def main():
                     params = thread_parameters(
                         client,
                         temp,
-                        MODEL,
+                        args.model,
                         ephemeral=True,
                         config={
                             "model_providers.resident_probe": {
@@ -117,6 +124,7 @@ def main():
                     timer.cancel()
         assert len(requests) == 1, len(requests)
         req = requests[0]
+        assert req.get("model") == args.model, "Resident model was substituted"
         summary = {
             "model": req.get("model"),
             "tools": req.get("tools"),
@@ -125,10 +133,7 @@ def main():
             "reply": [e for e in events if e.get("type") in ("assistant", "result")],
             "kind": "actual compiled runtime, local mock inference; no live model",
         }
-        output = Path(
-            os.environ.get("RESIDENT_PROBE_OUTPUT")
-            or Path(__file__).parent / "runtime-inventory.json"
-        )
+        output = args.output
         output.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(
             json.dumps(
