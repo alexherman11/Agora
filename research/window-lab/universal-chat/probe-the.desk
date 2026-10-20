@@ -1,3 +1,0 @@
-read "probe-the"
-do rewrite "probe-the" text="probe : column\n  role chat\n  a : column\n    the prop:role=nosuchthing,prop:actor=$me as w\n    t : text \"none: [$w.quote]\"\n      role meta\n    u : text \"still drawn\"\n      role meta\n  b : column\n    the prop:role=writer,prop:actor=$me as w\n    t : text \"writer: [$w.title] [$w.quote_in] [$w.view]\"\n      role meta"
-scene probe-the

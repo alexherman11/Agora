@@ -1,6 +1,0 @@
-read a6685
-do remove a6685
-read a4033 :3
-do replace a4033 old="# review <document>: make it the design you are reviewing (kept on your own review desk as reviewing=, so each person has their own)\ndo prop prop:role=reviewer,prop:actor=\$me reviewing=\$1" new="# review <document>: make it the design you are reviewing (kept on your own review desk as reviewing=, so each person has their own)\n# review <thing> for <who> with \"<one line>\": send it to someone to look over (a6638).\ndo prop prop:role=reviewer,prop:actor=\$me reviewing=\$1 when \$2 != \"for\"\nread \$1 when \$2 = \"for\"\ndo prop \$1 brief=\"\$5\" for=\$3 sent_by=\$me when \$2 = \"for\"\ndo tag \$1 add=ready-for-review when \$2 = \"for\""
-review a4865 for alex with "Continuous documents: one text module for every place you type"
-examine a4865
