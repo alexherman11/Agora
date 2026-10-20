@@ -238,6 +238,23 @@ function Window(desk, name, gate) {
   check("Ctrl+B wraps, and again unwraps", back === "a **word** here" && T.apply(back, [M.wrap(back, 4, 8, "**", "**")]) === "a word here");
 }
 
+// ---- a6452: a chat message drawn read-only: pictures only when the scene showed them, ***both***, ids in paths
+{
+  const shown = [{ path: "demos/a1/p.png", src: "/media/demos/a1/p.png", kind: "image", name: "p.png" }];
+  const ctx = { links: {}, things: { a5208: { name: "home-base", title: "home-base" }, a1: { name: "NO", title: "NO" } }, media: shown };
+  const src = "***both*** ![the view](demos/a1/p.png) ![far](https://example.com/x.png) see a5208 and demos/a1/p.png";
+  const root = document.createElement("div"); M.draw(root, src, ctx, new Set(), false);
+  const words = M.textNodes(root).map(t => t.data).join("");
+  check("a read message keeps every source character, in order", words === src, words);
+  const img = root.querySelector("img.md-img");
+  check("a picture the scene showed is drawn in its place, from the scene's address", !!img && img.getAttribute("src") === "/media/demos/a1/p.png" && img.alt === "the view", img && img.outerHTML);
+  check("a picture the scene did not show is its words, never fetched", root.querySelectorAll("img").length === 1 && /far/.test(root.querySelector(".md-imgalt").textContent));
+  const strong = root.querySelector("strong");
+  check("***both*** is strong and stressed, with no stray star", !!strong && strong.querySelector("em") && strong.querySelector("em").textContent === "both", strong && strong.outerHTML);
+  const named = [...root.querySelectorAll(".md-thing")].map(e => e.dataset.target);
+  check("an id is a name; an id inside a path stays the path", JSON.stringify(named) === '["a5208"]', named);
+}
+
 const passed = out.filter(l => l.startsWith("ok")).length;
 return out.filter(l => !l.startsWith("ok")).concat([fails ? `${passed} passed, ${fails} FAILED` : `all ${passed} passed`]).join("\n");
 })()

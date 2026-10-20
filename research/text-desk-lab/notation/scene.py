@@ -1331,7 +1331,8 @@ def wikilinks_of(w, text, thing=None):
 # tasks, workers etc. should ALL be clickable'): an id written in words (a5143, f155, s5948, c5957, e11454, m6012,
 # worker-a6010) is drawn as the name of what it names, a link; the words stay as written, so agents keep writing ids
 # and every printer and fence sees them. Only an id that names something is drawn so; any other stays words.
-_THING = re.compile(r"(?<![\w-])(worker-)?([afscep]\d{2,}|m\d{2,})(?![\w-])")
+# a6452: an id that is a folder or file name in a path (demos/a6109/names-demo.mp4) is part of the path, not a name
+_THING = re.compile(r"(?<![\w/\\-])(worker-)?([afscep]\d{2,}|m\d{2,})(?![\w/\\-])")
 # a6109, JEFF c6186: a person is printed by name, not id, so their name is the link: where a text is only a name, or
 # ends 'by|to|from <name>' (a card's owner, who is at work, a chat line's writer, 'by Juniper'). Never in prose, where
 # a name is also a word, and never in a text that is itself a button (the To chips)
@@ -1967,8 +1968,10 @@ def parse(src, roles=None, style=None):
             raise LensRefusal(f"line {k['line']}: `picture` draws a text that is a drawing (SVG): this part " + ("prints no text" if k["text"] is None else "is edited, and a drawing is edited as its source, in a part without `picture`"))
         if k["markdown"] and (k["text"] is None or k["picture"] or k["live"]):
             raise LensRefusal(f"line {k['line']}: `markdown` draws a text that is a Markdown document: this part " + ("prints no text" if k["text"] is None else "is also a picture or a live count"))
-        if k["media"] and (k["text"] is None or k["picture"] or k["markdown"] or k["live"] or any(a["on"] == "edit" for a in k["on"])):
-            raise LensRefusal(f"line {k['line']}: `media` draws the films and pictures a text's words name, under them: this part " + ("prints no text" if k["text"] is None else "is edited (the words are written in a part without `media`)" if any(a["on"] == "edit" for a in k["on"]) else "is also a picture, a Markdown document or a live count"))
+        # a6452: `media` and `markdown` together are a read Markdown message with its films and pictures (the chats): the
+        # document draws a ![picture](path) the scene showed in its place, and media draws the rest under the words
+        if k["media"] and (k["text"] is None or k["picture"] or k["live"] or any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `media` draws the films and pictures a text's words name, under them: this part " + ("prints no text" if k["text"] is None else "is edited (the words are written in a part without `media`)" if any(a["on"] == "edit" for a in k["on"]) else "is also a picture or a live count"))
         if any(a["on"] == "pop" for a in k["on"]) and not k["media"]:
             raise LensRefusal(f"line {k['line']}: `on pop` is sent when Pop out is pressed on a film or picture a `media` text draws; this part has no `media`")
         # a6109: `on link` is no longer the Markdown text's alone: a name or a [[wikilink]] pressed in this part or any
