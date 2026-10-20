@@ -1630,6 +1630,46 @@ def test_a_persons_name_is_a_link_where_it_stands_alone():
         tmp.unlink(missing_ok=True)
 
 
+def test_search_box_words():
+    """a6642 (Alex: a search at the top of the HUD; Ctrl+K or typing reaches it, arrows choose, titles first): `caret`
+    on a text being written, `arrows` on a frame, and `title:a+b` (every word in the title) beside ?a+b. Imagined use:
+    a person who wrote 'Garden plan' and, elsewhere, a shopping list that mentions the garden plan, searches 'plan
+    garden': the title is first, the mention after, and 'gardenplan' or one word alone does not stand for both."""
+    assert scene.parse('root : column, arrows\n  a : text "x"')[1]["root"]["arrows"] is True
+    refused("root : column\n  a : text \"x\", arrows", "frame word")
+    refused('root : column\n  a : text "x", caret Ctrl+K', "no `on edit`")
+    refused('root : column\n  a : text "x", caret Alt+F4, on edit do prop $item q="$value"', "caret <")
+    refused('root : column\n  a : text "x", caret typing typing, on edit do prop $item q="$value"', "caret <")
+    import deskd, lens_ir
+    tmp = _scratch("_test_search_box")
+    try:
+        with deskd.Session("_test_search_box", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=note title='Garden plan' text='beds by the fence'")
+            desk.repl("do create f01 kind=note title=Shopping text='seeds for the garden plan, twine'")
+            desk.repl("do create f01 kind=note title='Plan for the shed'")
+            desk.repl("do create f01 kind=note title=Search q='plan garden'")
+            src = chr(10).join(["root : column, arrows, the title:Search as s",
+                                '  box : text "$s.q", caret Ctrl+K typing, on edit do prop $s q="$value"',
+                                "  list : column",
+                                "    let q = words-of($s.q)",
+                                "    titles : column, of title:$q as f, each hit",
+                                "    rest : column, of ?$q,-title:$q as f, each hit",
+                                'hit : text "$title", on click do prop $s q=""'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            assert sc["paint"].get("arrows") is True, sc["paint"]
+            box, lst = sc["kids"]
+            assert box["paint"]["caret"] == ["Ctrl+K", "typing"] and box["paint"]["commit"] == "enter", box["paint"]
+            titles, rest = lst["kids"]
+            assert [k["text"] for k in titles["kids"]] == ["Garden plan"], titles["kids"]
+            assert [k["text"] for k in rest["kids"]] == ["Shopping"], rest["kids"]
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "arrows" in text and "caret Ctrl+K typing" in text, text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 # a5820: this block stood above test_picture_is_a_text_drawn (13 Oct), so that test was never run; it stays last
 if __name__ == "__main__":
     import os

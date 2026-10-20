@@ -39,13 +39,16 @@ scrollfeed scrollboard scrollreader. Fixtures stay in the copy; real wheel input
 stays at 0. Reader waits on a6460 or --assume a6460 with its --apply files. See hud_scroll.py.
 
 Steps (ids for --only): open lowdown board card later approve sendback atwork timer writing writedoc comment chat send
-workspace drag fill widen restore glance number dock esc winkey. (atwork plays The house where lane 3's home-house has taken
+about anchor reply workspace drag fill widen restore glance number dock esc winkey. (about anchor reply are a6638's universal
+conversation: a document open beside the chat, a comment through the chat, its author's answer arriving there; workspace
+is a6427's: a workspace pressed in the dock, then back.) (atwork plays The house where lane 3's home-house has taken
 At work's place; timer and number are lane 3's, a6057.)
 """
 import asyncio
 import datetime
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -784,7 +787,9 @@ async def walk(play, only):
               return {{ words: m[0], x0: b.left + 1, x1: b.right - 1, y: b.top + b.height / 2 }}; }} return null; }})()""")
         if not span:
             raise AssertionError("no line of words in the Writing page to select")
-        box = "pt.parts('lens:writing').find(e => /\\/pending\\/box$/.test(e.dataset.key))"
+        # a6638: with Alex's writer note at view=conversation the comment box is the chat's own (dock/commenting)
+        box = ("(pt.parts('lens:writing').find(e => /\\/pending\\/box$/.test(e.dataset.key))"
+               " || pt.parts('lens:jeff-chat').find(e => /\\/dock\\/commenting\\/on\\/say$/.test(e.dataset.key) && pt.vis(e)))")
         # posted window messages select no text in Chromium (ran 16 Oct, with a control over the chat's words), so the
         # drag goes as DevTools mouse events: a mouse drag down Chromium's own input path, selection and all
         r1 = await play.timed(f"!!({box})", lambda: w.drag(span["x0"], span["y"], span["x1"], span["y"], steps=8, devtools=True))
@@ -834,10 +839,11 @@ async def walk(play, only):
         note = f"playtest note {int(time.time()) % 100000}"
         await w.type(note)
         await asyncio.sleep(0.3)
-        r = await play.timed(f"pt.parts('lens:writing').filter(e => !e.querySelector('[data-key]') && e.textContent.includes({json.dumps(note)})).length >= 2",
-                             lambda: w.key("Enter"), timeout=6000)
+        # shown twice: the margin note, and its line in the page's Talk or (a6638) in the Conversation
+        shown = f"[...pt.parts('lens:writing'), ...pt.parts('lens:jeff-chat')].filter(e => !e.querySelector('[data-key]') && e.textContent.includes({json.dumps(note)}))"
+        r = await play.timed(f"{shown}.length >= 2", lambda: w.key("Enter"), timeout=6000)
         if not r["ok"]:
-            n = await w.js(f"window.__pt.parts('lens:writing').filter(e => !e.querySelector('[data-key]') && e.textContent.includes({json.dumps(note)})).map(e => e.dataset.key.split('/').slice(-3).join('/'))")
+            n = await w.js(f"(() => {{ const pt = window.__pt; return {shown}.map(e => e.dataset.key.split('/').slice(-3).join('/')); }})()")
             r["want"] = f"the comment did not show both as a margin note and a line in the page's Talk (it shows in: {n or 'nowhere'})"
             r["timeout"] = 6000
             return r
@@ -926,6 +932,115 @@ async def walk(play, only):
             r2["want"] = "Writing is not beside the chat"
         return r2
     steps.append(("workspace", "press a workspace in the dock (writing), then back", s_workspace, (OK_MS, SLOW_MS)))
+
+    # a6638 (Alex, 20 Oct: 'this chat is the universal chat'): a document from Pike opened in the middle, the chat beside
+    # it about it; a question to JEFF carries it; words highlighted and commented on go to its author through the chat;
+    # the author's answer arrives in the same chat. In the copy only; Pike is played through its door
+    CHAT = "pt.part('lens:jeff-chat')"
+    FEEDHAS = ("(words => [...pt.parts('lens:jeff-chat')].some(e => !e.querySelector('[data-key]') && /\\/(feed|everything)\\//.test(e.dataset.key)"
+               " && e.textContent.includes(words)))")
+
+    def feed_has(words, also=None):
+        tail = (f" && pt.parts('lens:jeff-chat').some(e => /\\/tagline\\//.test(e.dataset.key) && e.textContent.includes({json.dumps(also)}))"
+                if also else "")
+        return f"{FEEDHAS}({json.dumps(words)}){tail}"
+
+    async def s_about():
+        play.needs("a6638", "the chat is about what is open", ("jeff-chat", "abouting"))
+        found = await asyncio.to_thread(c.do, "find prop:role=doc,prop:author", "alex")
+        doc = re.search(r"(a\d+) note \"([^\"]+)\"", found)
+        view = re.search(r"(a\d+) note \"[^\"]*\" · role=home-view actor=alex",
+                         await asyncio.to_thread(c.do, "find prop:role=home-view,prop:actor=alex", "alex"))
+        if not doc or not view:
+            raise AssertionError("no authored document (role=doc, a note) or no viewer note of Alex's in this world")
+        play.doc, play.doc_title = doc.group(1), doc.group(2)
+
+        async def open_it():
+            await asyncio.to_thread(c.do, f"read {view.group(1)}", "alex")
+            await asyncio.to_thread(c.do, f"do prop {view.group(1)} viewing={play.doc}", "alex")
+        r = await play.timed(f"pt.parts('lens:jeff-chat').some(e => /\\/about\\//.test(e.dataset.key) && pt.vis(e) && e.textContent.includes({json.dumps(play.doc_title)}))",
+                             open_it, timeout=6000, scripted=True)
+        if not r["ok"]:
+            r["want"] = f"the chat did not say About {play.doc_title!r} once it was open in the middle"
+            return r
+        side = await w.js("(() => { const pt = window.__pt, a = pt.rect(pt.part('lens:doc-page')), b = pt.rect(pt.part('lens:jeff-chat')); return a && b ? a[0] + a[2] <= b[0] + 2 : null; })()")
+        x, y = await play.find(f"{CHAT}.querySelector('[data-key$=\"/dock/say\"] textarea')", "the chat composer")
+        await w.click(x, y)
+        ask = f"playtest question {int(time.time()) % 100000}"
+        await w.type(ask)
+        r2 = await play.timed(feed_has(ask, play.doc_title), lambda: w.key("Enter"), timeout=6000)
+        if not r2["ok"]:
+            r2["want"] = "the question did not show in the feed tagged with what was open"
+            return r2
+        r2["note"] = (f"About {play.doc_title!r} in {r['ms']} ms after it opened; the page {'stands left of' if side else 'is NOT left of'} the chat; "
+                      f"the question shown tagged in {r2['ms']} ms" + ("" if side else " (FAIL: not beside)"))
+        if not side:
+            r2["ok"] = False
+            r2["want"] = "the document and the chat are not side by side"
+        return r2
+    steps.append(("about", "open a document: the chat is about it; a question carries it", s_about, (OK_MS, SLOW_MS)))
+
+    async def s_anchor():
+        play.needs("a6638", "highlight and comment through the chat", ("jeff-chat", "commenting"))
+        if not getattr(play, "doc", None):
+            raise AssertionError("no document open from the step before (about)")
+        writer = await asyncio.to_thread(c.do, "find prop:role=writer,prop:actor=alex", "alex")
+        if "view=conversation" not in writer:
+            raise Skip("Alex's writer note is not at view=conversation in this world: the comment box is doc-page's own")
+        await asyncio.sleep(1.0)
+        box = "pt.parts('lens:jeff-chat').find(e => /\\/dock\\/commenting\\/on\\/say$/.test(e.dataset.key) && pt.vis(e))"
+        pick = """(() => { const pt = window.__pt, l = pt.part('lens:doc-page'), d = l && (l.querySelector('.md-doc') || l);
+            const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT); let n;
+            while ((n = tw.nextNode())) { const m = /[A-Za-z]{3,} [A-Za-z]{3,} [A-Za-z]{3,}/.exec(n.data); if (!m || !pt.vis(n.parentElement)) continue;
+              getSelection().setBaseAndExtent(n, m.index, n, m.index + m[0].length); document.dispatchEvent(new PointerEvent('pointerup', {bubbles: true}));
+              return m[0]; } return null; })()"""
+        words = {}
+
+        async def select():
+            words["w"] = await w.js(pick)
+        # a scripted selection: headless drags over a contenteditable Markdown text leave none (the comment step says why)
+        r1 = await play.timed(f"!!({box})", select, timeout=6000, scripted=True)
+        if not r1["ok"]:
+            r1["want"] = f"selecting {words.get('w')!r} in the open document did not turn the chat's box into its comment"
+            return r1
+        x, y = await play.find(box, "the chat's comment box")
+        await w.click(x, y)
+        note = f"playtest comment {int(time.time()) % 100000}"
+        await w.type(note)
+        r = await play.timed(feed_has(note, "sent to"), lambda: w.key("Enter"), timeout=6000)
+        if not r["ok"]:
+            r["want"] = "the comment did not show in the chat with a receipt (sent to ...)"
+            return r
+        margin = await play.has(f"pt.parts('lens:doc-page').some(e => !e.querySelector('[data-key]') && e.textContent.includes({json.dumps(note)}))")
+        talk = re.search(r"talk=(a\d+)", await asyncio.to_thread(c.do, f"read {play.doc}", "hud-playtest"))
+        play.talk = talk.group(1) if talk else None
+        r["note"] = (f"selected {words.get('w')!r}: the chat's comment box in {r1['ms']} ms; shown quoted with its receipt in {r['ms']} ms; "
+                     f"{'anchored in the margin' if margin else 'NOT in the margin'}; kept in {'its Talk ' + play.talk if play.talk else 'no Talk (FAIL)'}")
+        if not margin or not play.talk:
+            r["ok"] = False
+            r["want"] = "the comment is not both in the margin and in the document's Talk"
+        return r
+    steps.append(("anchor", "highlight words, comment in the chat: routed, anchored, a receipt", s_anchor, (OK_MS, SLOW_MS)))
+
+    async def s_reply():
+        play.needs("a6638", "an agent's answer arrives in the chat", ("jeff-chat", "tagline"))
+        talk = getattr(play, "talk", None)
+        if not talk:
+            raise AssertionError("no Talk from the step before (anchor)")
+        words = f"playtest answer {int(time.time()) % 100000}"
+        said = []
+
+        async def answer():
+            await asyncio.to_thread(c.do, f"read {talk} :3", "pike")
+            said.append(await asyncio.to_thread(c.do, f"do append {talk} line={q('@alex: ' + words)}", "pike"))
+        r = await play.timed(feed_has(words, play.doc_title), answer, timeout=6000, scripted=True)
+        rep, r["ms"], r["first_ms"] = r.get("ms"), None, None
+        if not r["ok"]:
+            r["want"] = f"Pike's answer in the Talk did not arrive in the chat tagged about {play.doc_title!r} (the door: {(said or [''])[0][:160]!r})"
+            return r
+        r["note"] = f"Pike's answer (in the copy) painted in the chat, tagged with the document, {rep} ms after it was said"
+        return r
+    steps.append(("reply", "the author answers in the Talk: it arrives in the chat, tagged", s_reply, (OK_MS, SLOW_MS)))
 
     COLS = "window.__pt.parts('lens:home-tiling').filter(e => /\\/tiling\\/[a-z]\\d+$/.test(e.dataset.key))"
 
@@ -1160,6 +1275,60 @@ async def walk(play, only):
         return r
     steps.append(("esc", "press Esc: what is open closes", s_esc, (OK_MS, SLOW_MS)))
 
+    async def s_search():
+        """a6642 (Alex, 20 Oct: 'I want search to be outside of the tiling'): the find is the bar's own, at the top
+        middle. Typing with nothing in hand starts a search there, Enter drops the results under it (titles first), Down
+        and Enter open the first, beside the chat when the viewer already shows something; a filled panel leaves it
+        where it was."""
+        play.needs("a6642", "the search in the top bar", ("home-tiling", "lens home-search"))
+        box = "[...(pt.part('lens:home-search') || document).querySelectorAll('[data-caret]')].find(e => pt.vis(e))"
+        if not await play.has(box):
+            raise AssertionError("no search box in the top bar (lens home-search)")
+        where = f"(() => {{ const pt = window.__pt, r = {box}.closest('[data-arrows]').getBoundingClientRect(); return [Math.round(r.left + r.width / 2 - innerWidth / 2), Math.round(r.top), Math.round(r.width)]; }})()"
+        at = await w.js(where)
+        if abs(at[0]) > 40 or at[1] > 80:
+            raise AssertionError(f"the search is not at the top middle: its centre is {at[0]} px from the page's, its top at {at[1]} px")
+        await w.js("(() => { if (document.activeElement) document.activeElement.blur(); })()")
+        r0 = await play.timed(f"(({box}) || {{}}).innerText === 'h' && document.activeElement === {box}", lambda: w.key("h"))
+        if not r0["ok"]:
+            r0["want"] = "typing with no text in hand did not start a search in the bar"
+            return r0
+        await w.type("ome")
+        hits = "pt.parts('lens:home-search').filter(e => /\\/titles\\/[af]\\d+$/.test(e.dataset.key) && pt.vis(e))"
+        r = await play.timed(f"{hits}.length > 0", lambda: w.key("Enter"))
+        if not r["ok"]:
+            r["want"] = "Enter did not drop results under the search (words 'home')"
+            return r
+        await asyncio.sleep(0.3)
+        await w.shot(play.out / f"{play.n + 1:02d}-search-results.png")
+        first = (await w.js(f"(() => {{ const pt = window.__pt; return {hits}[0].dataset.key; }})()")).rsplit("/", 1)[-1]
+        things = "pt.parts('lens:home-thing').filter(e => pt.vis(e)).length"
+        before = await w.js(f"(() => {{ const pt = window.__pt; return {things}; }})()")
+        await w.key("ArrowDown")
+        opened = (f"{things} > {before} || pt.parts('lens:home-viewer').some(e => e.dataset.key.endsWith('/open/{first}') && pt.vis(e))")
+        r2 = await play.timed(opened, lambda: w.key("Enter"))
+        if not r2["ok"]:
+            r2["want"] = f"Down and Enter did not open the first result ({first})"
+            return r2
+        await asyncio.sleep(0.3)
+        await w.shot(play.out / f"{play.n + 1:02d}-search-opened.png")
+        grip = panel("The board")
+        if await play.has(grip):
+            x, y = await play.find(f"{grip}.querySelector('[data-key$=\"/grip/title\"]')", "The board's title")
+            await w.dblclick(x, y)
+            await asyncio.sleep(1.2)
+            filled = await w.js(where)
+            await w.shot(play.out / f"{play.n + 1:02d}-search-filled.png")
+            x, y = await play.find(f"{grip}.querySelector('[data-key$=\"/grip/title\"]')", "The board's title, filled")
+            await w.dblclick(x, y)
+            if filled != at:
+                raise AssertionError(f"filling a panel moved the search: {at} -> {filled}")
+        r["note"] = (f"bar centred ({at[0]:+d} px), {at[2]} px wide; typing started it in {r0['ms']} ms, results in {r['ms']} ms, "
+                     f"the first opened in {r2['ms']} ms" + ("; a filled panel left it in place" if await play.has(grip) else ""))
+        r["ms"] = max(r["ms"], r2["ms"])
+        return r
+    steps.append(("search", "search from the top bar: type, results drop down, open one", s_search, (OK_MS, SLOW_MS)))
+
     async def s_winkey():
         play.needs("a5980", "the Windows key")
         p = await asyncio.to_thread(subprocess.run, [PY, str(HERE / "test_winkey.py")], capture_output=True, text=True, timeout=180)
@@ -1175,7 +1344,8 @@ async def walk(play, only):
     from hud_scroll import steps as scroll_steps
     steps.extend(scroll_steps(play))
     order = ["open", "lowdown", "board", "card", "later", "approve", "sendback", "atwork", "timer", "writing", "writedoc",
-             "comment", "chat", "send", "workspace", "drag", "restore", "fill", "widen", "glance", "number", "dock", "esc", "winkey"]
+             "comment", "chat", "send", "about", "anchor", "reply", "workspace", "drag", "restore", "fill", "widen", "glance",
+             "number", "search", "dock", "esc", "winkey"]
     steps.sort(key=lambda s: order.index(s[0]) if s[0] in order else len(order))
     for sid, name, fn, budget in steps:
         if want(sid):

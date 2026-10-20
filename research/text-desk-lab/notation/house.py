@@ -115,6 +115,30 @@ def it_is():
     return f" · it is {t.tm_mday} {time.strftime('%b, %H:%M', t)}"
 
 
+def points_at(w, e, s):
+    """a6638 (Alex, 20 Oct: 'anything I comment on gets routed to the right person'): what a chat line points at, said
+    after its words when it is handed to someone, since the words alone lose it: the thing it is about by its name and
+    id (' [about "Proposal reader" (a6460)'), the words it quotes and the section they stood in. '' when it points at
+    nothing. The line's fields are the writer's (world.py append); nothing here is guessed."""
+    mid = (e.get("args") or {}).get("line_id")
+    line = next((ln for ln in (s or {}).get("lines") or () if ln.get("id") == mid), None) if mid else None
+    if not line:
+        return ""
+    fields = dict((line.get("fields") or {}), **{k: line[k] for k in ("about", "quote") if line.get(k)})
+    said = []
+    about = str(fields.get("about") or "").strip()
+    if about:
+        n = w.nodes.get(about)
+        title = w.title(n) if n else (w.subjects.get(about) or {}).get("title", "")
+        said.append(f"about \"{title}\" ({about})" if title else f"about {about}")
+    quote = " ".join(str(fields.get("quote") or "").split())
+    if quote:
+        heading = str(fields.get("heading") or "").strip()
+        said.append(f"on the words \"{quote[:300]}{'…' if len(quote) > 300 else ''}\""
+                    + (f" under § {heading}" if heading else ""))
+    return f"  [{'; '.join(said)}]" if said else ""
+
+
 def limit_reset(detail):
     """'You've hit your session limit · resets 5:30pm (...)' -> the next 5:30pm as a time, else None. 30 Sep: residents
     stopped by the limit at 15:06 backed off to an hour at a time and were still waiting at 17:39, after it reset."""
@@ -790,23 +814,24 @@ class House:
                 # with none (from before lines) is read once by the same rule. The receipt asks the same question.
                 to, _ = rooms.line_to(e)
                 now_ = rooms.calls(w, s, to, actor)
+                words = f"{args.get('append')}{points_at(w, e, s)}"      # a6638: and what it points at
                 if sid in mine:                                    # a chat in its own corner is its own
                     if waits:                                      # a1062 (5): a book line is a note at the door,
-                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {words}")
                         urgent = urgent or now_                    # a1566: and a line addressed to it knocks
                         if now_:
                             self._knocked(r, e, s, resting)
                         continue
-                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {words}")
                     urgent = True
                     self._knocked(r, e, s, resting)
                 elif "all" in members or actor in members or now_:
                     if now_ and waits:                             # a1566: kept, first and marked, and it knocks
-                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {words}")
                         urgent = True
                         self._knocked(r, e, s, resting)
                         continue
-                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {words}")
                     urgent = urgent or now_
                     if now_:
                         self._knocked(r, e, s, resting)

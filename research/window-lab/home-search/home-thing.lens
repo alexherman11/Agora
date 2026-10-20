@@ -1,0 +1,70 @@
+# home-thing: one thing in a panel of its own (a6642). A panel note (role=home-panel, lens=home-thing) says which with
+# shows=<id>; the search's open-found makes one beside the chat when the viewer already shows something, so two things
+# stand side by side (Alex, 17 Oct: equal footing). A lens runs; a document is its page (doc-page, which stands on the
+# thing); anything else is drawn here from the thing itself (the viewer's home-<kind> lenses draw what the VIEWER has
+# open, so they cannot stand in a panel): its facts and words, a surface's things by name, a chat's last lines.
+thing : column
+  share 1
+  only when ($item or "") != ""
+  panel : column
+    share 1
+    of $item as pn
+    each one
+one : column
+  share 1
+  of $pn.shows as t
+  each shown
+shown : column
+  share 1
+  let islens = "yes" when ($tags or "") has "lens" and $kind = "note"
+  let islens = "no" otherwise
+  let isdoc = "yes" when ($role or "") = "doc"
+  let isdoc = "no" otherwise
+  run : column
+    share 1
+    only when islens = "yes"
+    lens $title
+  doc : column
+    share 1
+    only when islens = "no" and isdoc = "yes"
+    lens doc-page
+  plain : column
+    share 1
+    only when islens = "no" and isdoc = "no"
+    facts : text "$kind · status $status · owner $owner"
+      role meta
+      only when ($status or "") != ""
+    next : text "Next: $next"
+      role meta
+      marks
+      only when ($next or "") != ""
+    words : text "$text"
+      role prose
+      marks
+      only when $kind != "chat" and ($text or "") != ""
+    inside : column
+      role foundlist
+      only when $kind = "surface"
+      of kind:note|task|chat|surface,in:$t.item as c
+      each named
+    said : column
+      role foundlist
+      only when $kind = "chat"
+      of lines:$t.item as m
+      each line
+named : row
+  role hit
+  only when $index <= 60
+  name : text "$item"
+    role hitname
+    clamp 1
+    share 1
+  kind : text "$kind"
+    role hitkind
+line : column
+  only when $index > $count - 30
+  who : text "$who · $at"
+    role hitkind
+  said : text "$said"
+    role prose
+    marks

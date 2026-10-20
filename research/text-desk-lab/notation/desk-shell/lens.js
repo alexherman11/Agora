@@ -218,6 +218,8 @@
     if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
+    if (p.caret) el.dataset.caret = p.caret.join(" ");    // a6642: what brings the caret here from anywhere (caretKeys)
+    if (p.arrows) arrows(el);
     if (p.tip && p.tip[0]) { el._tip = p.tip; el.dataset.tip = p.tip[0]; el.setAttribute("aria-label", p.tip.join(": ")); }   // a6271
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
     if (Number.isInteger(p.peek)) { el.dataset.peekLines = p.peek; el.style.setProperty("--peek-lines", p.peek); }
@@ -339,6 +341,60 @@
       c.style.top = (r.bottom + h > innerHeight && r.top - h >= 0 ? r.top - h : r.bottom) + "px";
     }
   }
+  // a6642 (Alex, 20 Oct: search results chosen with the arrow keys and Enter): `arrows` on a frame. Its stops are the
+  // texts being written and the presses inside it, in the order drawn (a float lifted into the top layer is still
+  // inside it). Up and Down go from stop to stop; Down past the last opens a closed float inside it. A press in hand
+  // takes Enter as a button does (semantic); Enter in a text whose words are unchanged presses the first press after
+  // it, so a search sent once is opened by Enter again. The viewer's hands only: nothing is sent until a press
+  const writes = t => t.isContentEditable || t.tagName === "TEXTAREA";
+  function arrows(el) {
+    el.dataset.arrows = "1";
+    const stops = () => [...el.querySelectorAll("[data-key], textarea")].filter(t => (writes(t) || t._clicks) && t.getClientRects().length);
+    el.addEventListener("keydown", e => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+      const t = e.target, all = stops(), i = all.indexOf(t);
+      if (i < 0) return;
+      const lines = t._n && t._n.paint && t._n.paint.lines;
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(writes(t) && lines && (lines[1] == null || lines[1] > 1))) {
+        const down = e.key === "ArrowDown";
+        let to = all[i + (down ? 1 : -1)];
+        if (!to && down) {
+          const h = [...el.querySelectorAll('.l-float[data-folded="1"] > button')][0];
+          if (h) { h.click(); const again = stops(); to = again[again.indexOf(t) + 1]; }
+        }
+        if (!to) return;
+        e.preventDefault();
+        if (!writes(to) && to.tabIndex < 0) to.tabIndex = -1;
+        to.focus();
+        if (writes(to) && to.isContentEditable) getSelection().selectAllChildren(to), getSelection().collapseToEnd();
+        return;
+      }
+      if (e.key === "Enter" && !writes(t)) { e.preventDefault(); e.stopPropagation(); t.click(); return; }   // a press that is a frame has no button keys of its own
+      if (e.key === "Enter" && !e.shiftKey && writes(t)) {
+        const said = ((t._n && t._n.paint && t._n.paint.text) || "").trim();
+        if (!said || (t.isContentEditable ? t.innerText : t.value).trim() !== said) return;
+        const first = all.slice(i + 1).find(s => !writes(s));
+        if (!first) return;
+        e.preventDefault(); e.stopPropagation(); first.click();
+      }
+    }, true);
+  }
+  // a6642: `caret <key>|typing` on a text. A key it names (Ctrl+K, ...) pressed anywhere that no text took (a document's
+  // own Ctrl+K stays the document's), or a letter typed while no text has the caret (`typing`), brings the caret to the
+  // first such text drawn, at its end; a typed letter lands in it
+  document.addEventListener("keydown", e => {
+    if (e.defaultPrevented || e.isComposing || e.altKey || document.getElementById("menu-pop")) return;
+    const a = document.activeElement, busy = a && a !== document.body && (writes(a) || /^(INPUT|SELECT)$/.test(a.tagName));
+    const ctrl = e.ctrlKey || e.metaKey, combo = (ctrl ? "Ctrl+" : "") + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+    const letter = !ctrl && e.key.length === 1 && e.key.trim() !== "";
+    if (busy && !ctrl) return;
+    const want = t => { const ks = t.dataset.caret.split(" "); return ks.includes(combo) || (letter && !busy && ks.includes("typing")); };
+    const to = [...paint.querySelectorAll("[data-caret]")].find(t => t.getClientRects().length && want(t));
+    if (!to || to === a) return;
+    e.preventDefault();
+    to.focus(); getSelection().selectAllChildren(to); getSelection().collapseToEnd();
+    if (letter && !to.dataset.caret.split(" ").includes(combo)) document.execCommand("insertText", false, e.key);
+  });
   const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) { m._close(); placeFloat(m); } });
   document.addEventListener("pointerdown", e => closeFloats(e.target));
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
@@ -597,7 +653,14 @@
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
-      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
+      // a6642: sent by Enter inside an `arrows` frame (a search box), the caret comes back once the answer is painted,
+      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile
+      const back = committing && el.closest("[data-arrows]") ? n.key : null;
+      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw).then(() => {
+        const k = back && kept.get(back);
+        if (!k || !k.el.isConnected || (document.activeElement && document.activeElement !== document.body)) return;
+        k.el.focus(); getSelection().selectAllChildren(k.el); getSelection().collapseToEnd();
+      }); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
   }
 

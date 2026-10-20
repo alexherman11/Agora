@@ -1,0 +1,7 @@
+# review <document>: make it the design you are reviewing (kept on your own review desk as reviewing=, so each person has their own)
+# review <thing> for <who> with "<one line>": send it to someone to look over (a6638; Alex, 20 Oct: 'anything that gets sent to me to look over must be well formatted and nice to look at'). It writes brief= (the reader's one sentence on top) and for= (whom it waits on), and tags it ready-for-review, so it stands in Alex's Waiting on you list and opens in the reader with the Conversation beside it. First open its text with a For Alex block (the Handbook's For Alex rule): what it is, what you recommend, what you need, five lines at most.
+# e.g.  review a6460 for alex with "A reader for proposals: summary on top, answer buttons at the foot"
+do prop prop:role=reviewer,prop:actor=$me reviewing=$1 when $2 != "for"
+read $1 when $2 = "for"
+do prop $1 brief="$5" for=$3 sent_by=$me when $2 = "for"
+do tag $1 add=ready-for-review when $2 = "for"
