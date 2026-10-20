@@ -49,7 +49,9 @@ VIEWER_HEAD_OLD = '''  let using = ($v.with or "")
 VIEWER_HEAD_NEW = '''  let using = ($v.with or "")
   let waits = "yes" when ($tags or "") has "ready-for-review" or ($design or "") = "waiting"
   let waits = "no" otherwise
-  let reading = "yes" when using = "" and islens = "no" and waits = "yes"
+  let answered = "yes" when count(prop:role=reader,prop:actor=$me,prop:last=$item) > 0
+  let answered = "no" otherwise
+  let reading = "yes" when using = "" and islens = "no" and (waits = "yes" or answered = "yes")
   let reading = "no" otherwise
   head : row
     role viewhead
@@ -120,6 +122,7 @@ WRITING_NEW = '''# a6460: Read sets the open document as an article (lens reader
 shown : column
   share 1
   let waits = "yes" when ($tags or "") has "ready-for-review" or ($design or "") = "waiting"
+  let waits = "yes" when count(prop:role=reader,prop:actor=$me,prop:last=$item) > 0
   let waits = "no" otherwise
   let reading = "yes" when ($w.mode or "") = "read" or (($w.mode or "") = "" and waits = "yes")
   let reading = "no" otherwise
@@ -183,6 +186,14 @@ WAITING_NEW = '''  let was = $hv.back
   let using = ($hv.with or "")
   on click when ($hv.find or "") != "" do prop $hv viewing=$w back="$hv.viewing" find="" with=""
   on click when ($hv.find or "") = "" do prop $hv viewing=$w back="$hv.viewing" with=""'''
+WAITING_HEAD_OLD = '''    on click when $item != ($rd.reviewing or "") and $rd.full = "yes" do prop $rd reviewing=$w full=no
+    on click when $item != ($rd.reviewing or "") and ($rd.full or "") != "yes" do prop $rd reviewing=$w
+    on click when $item = $rd.reviewing and $rd.full = "yes" do prop $rd reviewing="" full=no
+    on click when $item = $rd.reviewing and ($rd.full or "") != "yes" do prop $rd reviewing=""
+'''
+WAITING_HEAD_NEW = '''    # a6460: one press reads the item in the middle, through the same house verb as a named reference.
+    on click do view $w
+'''
 
 # (note, old, new): each old passage must stand in the note exactly once
 REPLACES = [
@@ -195,6 +206,17 @@ REPLACES = [
     ("a5548", BOARD_DESIGN_OLD, BOARD_DESIGN_NEW),
     ("a5548", BOARD_READ_OLD, BOARD_READ_NEW),
     ("a5439", WAITING_OLD, WAITING_NEW),
+    ("a5439", WAITING_HEAD_OLD, WAITING_HEAD_NEW),
+]
+# a copy where an earlier round of these lines ran (20 Oct, before an answered thing stayed in the reader): its lines
+# brought up to today's. relens and test_reader.py use them; the live world never had the earlier round
+UPGRADES = [
+    ("a5439", WAITING_HEAD_OLD, WAITING_HEAD_NEW),
+    ("a5486", '  let reading = "yes" when using = "" and islens = "no" and waits = "yes"\n',
+     '  let answered = "yes" when count(prop:role=reader,prop:actor=$me,prop:last=$item) > 0\n  let answered = "no" otherwise\n'
+     '  let reading = "yes" when using = "" and islens = "no" and (waits = "yes" or answered = "yes")\n'),
+    ("a5911", '  let waits = "no" otherwise\n  let reading = "yes" when ($w.mode',
+     '  let waits = "yes" when count(prop:role=reader,prop:actor=$me,prop:last=$item) > 0\n  let waits = "no" otherwise\n  let reading = "yes" when ($w.mode'),
 ]
 STYLES = [("a5206", "home-style.roles"), ("a4200", "review.roles")]
 
@@ -255,7 +277,7 @@ def main(argv):
         return 0
     if argv[0] == "relens":          # a copy where the lines already ran: the lens again, from reader.lens
         out = [f"look {ROOM}", "read reader :3", f"do rewrite reader text={q(text('reader.lens'))}"]
-        for note, old, new in REPLACES:               # and the replaces of any notes named after the file
+        for note, old, new in (UPGRADES if "upgrade" in argv[2:] else REPLACES):   # and any notes named after the file
             if note in argv[2:]:
                 out += [f"read {note} :3", f"do replace {note} old={q(old)} new={q(new)}"]
         pathlib.Path(argv[1]).write_text("\n".join(out) + "\n", encoding="utf-8")

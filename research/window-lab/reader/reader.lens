@@ -4,10 +4,10 @@
 # first sentence of prose), who wrote it and when, how long it takes to read, what it recommends and what it asks of
 # Alex; then the words set as an article in a column about 70 characters wide, or with Skim only each heading and its
 # first sentence; at the foot a bar that stays in view: the answers that fit the thing, one press each, acting on the
-# thing itself (Looks good, Later, Send back with a note, Ask JEFF; Build it, Not now on a design), and Previous / Next
+# thing itself (Looks good, Later, Send back with a note; Build it, Not now on a design), and Previous / Next
 # through everything waiting. The For Alex block is the Handbook's rule for anything tagged for Alex.
 # What the reader keeps for its person is their reader note (role=reader, actor=$me): skim=yes, box= the answer being
-# written (send | ask) and for= the thing it is about.
+# written (send) and for= the thing it is about. Questions and selection comments use the shared Conversation.
 # Previous and Next are names (an id in the words, drawn as its name), so a press goes to the nearest `on link` above:
 # the home base's viewer opens it in the middle, the Writing app in its page. Names in the words are drawn quiet by the
 # painter (a6460: four words, the rest on hover, an arrow for a comment or an event, a number when named again).
@@ -29,20 +29,21 @@ thing : column
   let isdesign = "no" otherwise
   let waiting = "yes" when ($d.tags or "") has "ready-for-review" or ($d.design or "") = "waiting"
   let waiting = "no" otherwise
-  let isnote = "yes" when $d.kind = "note"
-  let isnote = "no" otherwise
-  let words = ($d.text or "") when isnote = "yes"
-  let words = (join($text of in:$d.item) or "") otherwise
+  let isnote = "no" when $d.kind = "surface"
+  let isnote = "yes" otherwise
+  let words = (join($text of in:$d.item) or "") when isnote = "no"
+  let words = ($d.text or "") otherwise
   let rest = (for-alex(words, "rest") or "")
   let what = ($d.brief or for-alex(words, "what") or lead(words) or "")
   let rec = (for-alex(words, "recommend") or "")
   let need = (for-alex(words, "need") or $d.question or "")
   let mins = read-minutes(words)
-  let who = ($d.by or $d.author or $d.owner or "")
+  let who = ($d.by or $d.author or "")
+  let sender = ($d.sent_by or "")
   let since = day-or-time($changed.tags, $today) when isdesign = "no" and ($changed.tags or "") != ""
   let since = day-or-time($changed.design, $today) when isdesign = "yes" and ($changed.design or "") != ""
   let since = "" otherwise
-  let na = count(tag:ready-for-review)
+  let na = count(tag:ready-for-review,-prop:design=waiting)
   let nb = count(prop:design=waiting)
   mine : column
     share 1
@@ -85,7 +86,13 @@ page : column
         by : text "by $(who)"
           role rdfacts
           only when who != ""
-        since : text "$(since)"
+        sender : text "Sent by $(sender)"
+          role rdfacts
+          only when who = "" and sender != ""
+        unknown : text "Author not recorded"
+          role rdfacts
+          only when who = "" and sender = ""
+        since : text "Sent $(since)"
           role rdfacts
           only when since != ""
       title : text "$d.title"
@@ -134,26 +141,36 @@ page : column
     col : column
       role rdcol
       measure 72ch
-      note : text "$(rest)"
-        role rdbody
-        markdown
+      note : column
         only when isnote = "yes" and skim = "no" and rest != ""
-      noteskim : column
-        role rdskimlist
+        writer : column
+          of prop:role=writer,prop:actor=$me as w
+          each article
+        plain : text "$(rest)"
+          role rdbody
+          markdown
+          only when count(prop:role=writer,prop:actor=$me) = 0
+      skimming : column
         only when isnote = "yes" and skim = "yes"
-        of sections:$d.item as s
-        each skimsec
-      paras : column
-        role rdparas
-        only when isnote = "no" and skim = "no"
-        of in:$d.item as p
-        run block
-        each para
-      parskim : column
-        role rdskimlist
-        only when isnote = "no" and skim = "yes"
-        of in:$d.item as p
-        each skimpara
+        noteskim : column
+          role rdskimlist
+          of sections:$d.item as s
+          each skimsec
+      # `of in:` only under a guard on the part above it: a bind runs before its own part's guard, and in: on a note
+      # or a task is refused, which stops the whole lens (and the viewer around it) compiling
+      surface : column
+        only when isnote = "no"
+        paras : column
+          role rdparas
+          only when skim = "no"
+          of in:$d.item as p
+          run block
+          each para
+        parskim : column
+          role rdskimlist
+          only when skim = "yes"
+          of in:$d.item as p
+          each skimpara
       empty : text "There are no words in it to read."
         role meta
         only when words = ""
@@ -162,22 +179,20 @@ page : column
     box : column
       role rdcol
       measure 72ch
-      only when boxed != ""
+      only when boxed = "send"
       sendsay : text "Send it back to JEFF with a note: what should change?"
         role rdlabel
         only when boxed = "send"
-      asksay : text "Ask JEFF about it: the question goes to your conversation with him, naming this."
-        role rdlabel
-        only when boxed = "ask"
-      words : text ""
+      say : text ""
         role rdbox
         lines 2..6
         commit enter only
         hint "Enter sends, Shift+Enter for a new line"
-        on edit when boxed = "send" and isdesign = "no" do read $d; do tag $d remove=ready-for-review; do comment $d line="@jeff: sent back from the reader: $value"; read $r; do prop $r box="" for=""
-        on edit when boxed = "send" and isdesign = "yes" and ($d.talk or "") != "" do read $d; do prop $d design=answered verdict=questions; do append $d.talk line="$value"; read $r; do prop $r box="" for=""
-        on edit when boxed = "send" and isdesign = "yes" and ($d.talk or "") = "" do read $d; do prop $d design=answered verdict=questions; do comment $d line="@jeff: sent back from the reader: $value"; read $r; do prop $r box="" for=""
-        on edit when boxed = "ask" do read a5080; do append a5080 line="@jeff: about $d.item: $value"; read $r; do prop $r box="" for=""
+        on edit when boxed = "send" and isdesign = "no" do look $d; do tag $d remove=ready-for-review; do comment $d line="@jeff: sent back from the reader: $value"; read $r; do prop $r box="" for="" last=$d.item answered=$now
+        on edit when boxed = "send" and isdesign = "yes" and ($d.talk or "") != "" and ($d.tags or "") !has "ready-for-review" do look $d; do prop $d design=answered verdict=questions; do append $d.talk line="$value"; read $r; do prop $r box="" for="" last=$d.item answered=$now
+        on edit when boxed = "send" and isdesign = "yes" and ($d.talk or "") != "" and ($d.tags or "") has "ready-for-review" do look $d; do tag $d remove=ready-for-review; do prop $d design=answered verdict=questions; do append $d.talk line="$value"; read $r; do prop $r box="" for="" last=$d.item answered=$now
+        on edit when boxed = "send" and isdesign = "yes" and ($d.talk or "") = "" and ($d.tags or "") !has "ready-for-review" do look $d; do prop $d design=answered verdict=questions; do comment $d line="@jeff: sent back from the reader: $value"; read $r; do prop $r box="" for="" last=$d.item answered=$now
+        on edit when boxed = "send" and isdesign = "yes" and ($d.talk or "") = "" and ($d.tags or "") has "ready-for-review" do look $d; do tag $d remove=ready-for-review; do prop $d design=answered verdict=questions; do comment $d line="@jeff: sent back from the reader: $value"; read $r; do prop $r box="" for="" last=$d.item answered=$now
       cancel : text "Cancel"
         role rdquiet
         on click when boxed != "" do read $r; do prop $r box="" for=""
@@ -186,34 +201,34 @@ page : column
       good : text "Looks good"
         role rdgo
         only when isdesign = "no" and waiting = "yes"
-        on click do read $d; do tag $d remove=ready-for-review; do comment $d line="@jeff: looks good (from the reader)"
+        on click do look $d; do tag $d remove=ready-for-review; do comment $d line="@jeff: looks good (from the reader)"; read $r; do prop $r last=$d.item answered=$now
       build : text "Build it"
         role rdgo
         only when isdesign = "yes" and waiting = "yes"
-        on click when ($d.talk or "") != "" do read $d; do prop $d design=answered verdict=build; do append $d.talk line="Build it. (from the reader)"
-        on click when ($d.talk or "") = "" do read $d; do prop $d design=answered verdict=build; do comment $d line="@jeff: build it (from the reader)"
+        on click when ($d.talk or "") != "" and ($d.tags or "") !has "ready-for-review" do look $d; do prop $d design=answered verdict=build; do append $d.talk line="Build it. (from the reader)"; read $r; do prop $r last=$d.item answered=$now
+        on click when ($d.talk or "") != "" and ($d.tags or "") has "ready-for-review" do look $d; do tag $d remove=ready-for-review; do prop $d design=answered verdict=build; do append $d.talk line="Build it. (from the reader)"; read $r; do prop $r last=$d.item answered=$now
+        on click when ($d.talk or "") = "" and ($d.tags or "") !has "ready-for-review" do look $d; do prop $d design=answered verdict=build; do comment $d line="@jeff: build it (from the reader)"; read $r; do prop $r last=$d.item answered=$now
+        on click when ($d.talk or "") = "" and ($d.tags or "") has "ready-for-review" do look $d; do tag $d remove=ready-for-review; do prop $d design=answered verdict=build; do comment $d line="@jeff: build it (from the reader)"; read $r; do prop $r last=$d.item answered=$now
       notnow : text "Not now"
         role rdbtn
         only when isdesign = "yes" and waiting = "yes"
-        on click when ($d.talk or "") != "" do read $d; do prop $d design=answered verdict=not-now; do append $d.talk line="Not now. (from the reader)"
-        on click when ($d.talk or "") = "" do read $d; do prop $d design=answered verdict=not-now; do comment $d line="@jeff: not now (from the reader)"
+        on click when ($d.talk or "") != "" and ($d.tags or "") !has "ready-for-review" do look $d; do prop $d design=answered verdict=not-now; do append $d.talk line="Not now. (from the reader)"; read $r; do prop $r last=$d.item answered=$now
+        on click when ($d.talk or "") != "" and ($d.tags or "") has "ready-for-review" do look $d; do tag $d remove=ready-for-review; do prop $d design=answered verdict=not-now; do append $d.talk line="Not now. (from the reader)"; read $r; do prop $r last=$d.item answered=$now
+        on click when ($d.talk or "") = "" and ($d.tags or "") !has "ready-for-review" do look $d; do prop $d design=answered verdict=not-now; do comment $d line="@jeff: not now (from the reader)"; read $r; do prop $r last=$d.item answered=$now
+        on click when ($d.talk or "") = "" and ($d.tags or "") has "ready-for-review" do look $d; do tag $d remove=ready-for-review; do prop $d design=answered verdict=not-now; do comment $d line="@jeff: not now (from the reader)"; read $r; do prop $r last=$d.item answered=$now
       later : text "Later"
         role rdbtn
         only when waiting = "yes" and ($d.review or "") != "later"
-        on click do read $d; do prop $d review=later
+        on click do look $d; do prop $d review=later
       unlater : text "Not later"
         role rdbtn
         only when waiting = "yes" and $d.review = "later"
-        on click do read $d; do prop $d remove=review
+        on click do look $d; do prop $d remove=review
       send : text "Send back…"
         role rdbtn
         role rdbtn.on when boxed = "send"
         only when waiting = "yes"
         on click when boxed != "send" do read $r; do prop $r box=send for=$d.item
-      ask : text "Ask JEFF…"
-        role rdbtn
-        role rdbtn.on when boxed = "ask"
-        on click when boxed != "ask" do read $r; do prop $r box=ask for=$d.item
       said : text "You said: $d.verdict"
         role rdfacts
         only when waiting = "no" and ($d.verdict or "") != ""
@@ -222,7 +237,7 @@ page : column
       nava : row
         role rdnav
         only when waiting = "yes" and isdesign = "no"
-        of tag:ready-for-review as tg
+        of tag:ready-for-review,-prop:design=waiting as tg
         each fromtagged
       navb : row
         role rdnav
@@ -234,37 +249,41 @@ page : column
         only when waiting = "no" and na + nb > 0
         first : row
           only when na > 0
-          of tag:ready-for-review as nx
-          each firstone
+          one : row
+            of tag:ready-for-review,-prop:design=waiting as nx
+            each firstone
         firstd : row
           only when na = 0
-          of prop:design=waiting as nx
-          each firstone
+          one : row
+            of prop:design=waiting as nx
+            each firstone
 # Previous and Next from a tagged thing: only the instance that is the open thing draws; inside it, its neighbours
 fromtagged : row
   role rdnav
   only when $item = $d.item
   let at = $index
   prev : row
-    of tag:ready-for-review as nx
+    of tag:ready-for-review,-prop:design=waiting as nx
     each prevone
   pos : text "$(at) of $(na + nb)"
     role rdpos
   next : row
-    of tag:ready-for-review as nx
+    of tag:ready-for-review,-prop:design=waiting as nx
     each nextone
   intodesigns : row
     only when at = na and nb > 0
-    of prop:design=waiting as nx
-    each firstone
+    one : row
+      of prop:design=waiting as nx
+      each firstone
 fromdesign : row
   role rdnav
   only when $item = $d.item
   let at = $index
   fromtags : row
     only when at = 1 and na > 0
-    of tag:ready-for-review as nx
-    each lastone
+    one : row
+      of tag:ready-for-review,-prop:design=waiting as nx
+      each lastone
   prev : row
     of prop:design=waiting as nx
     each prevone
@@ -273,7 +292,7 @@ fromdesign : row
   next : row
     of prop:design=waiting as nx
     each nextone
-prevone : text "← $item"
+prevone : text "Previous: $item"
   role rdnavlink
   only when $index = at - 1
 nextone : text "Next: $item"
@@ -282,10 +301,17 @@ nextone : text "Next: $item"
 firstone : text "Next: $item"
   role rdnavlink
   only when $index = 1
-lastone : text "← $item"
+lastone : text "Previous: $item"
   role rdnavlink
-  only when $index = na
+  only when $index = $count
 # Skim: each heading and the first sentence under it (a section that is only a list gives its first item)
+article : text "$(rest)"
+  role rdbody
+  markdown
+  let held = $w.quote when ($w.quote_in or "") = $d.item and ($w.quote or "") != ""
+  let held = "" otherwise
+  light "" "$(held)"
+  on select do read $w; do prop $w quoting=$d.item quote_in=$d.item quote="$value"
 skimsec : column
   role rdskimsec
   only when $heading !has "For Alex"
@@ -311,17 +337,34 @@ para : row
     picture
     share 1
     only when $block = "figure"
-  words : text "$text"
-    role rdbody
-    role rdh1 when $block = "h1"
-    role rdh2 when $block = "h2"
-    role rdh3 when $block = "h3"
-    role rdquote when $block = "quote"
-    marks
+  words : column
     share 1
     only when $block != "figure"
+    writer : column
+      of prop:role=writer,prop:actor=$me as w
+      each paragraphtext
+    plain : text "$text"
+      role rdbody
+      role rdh1 when $block = "h1"
+      role rdh2 when $block = "h2"
+      role rdh3 when $block = "h3"
+      role rdquote when $block = "quote"
+      marks
+      only when count(prop:role=writer,prop:actor=$me) = 0
+paragraphtext : text "$p.text"
+  role rdbody
+  role rdh1 when $p.block = "h1"
+  role rdh2 when $p.block = "h2"
+  role rdh3 when $p.block = "h3"
+  role rdquote when $p.block = "quote"
+  marks
+  let held = $w.quote when ($w.quote_in or "") = $d.item and ($w.quoting or "") = $p.item
+  let held = "" otherwise
+  light "" "$(held)"
+  on select do read $w; do prop $w quoting=$p.item quote_in=$d.item quote="$value"
 skimpara : column
   role rdskimsec
+  let beforeblock = (max($block of $before) or "")
   h : text "$text"
     role rdskimh
     marks
@@ -329,4 +372,4 @@ skimpara : column
   g : text "$(gist($text) or "")"
     role rdskim
     marks
-    only when ($block or "") != "h1" and ($block or "") != "h2" and ($block or "") != "h3" and ($block or "") != "bullet" and ($block or "") != "number" and ($block or "") != "check" and ($block or "") != "figure" and (gist($text) or "") != ""
+    only when ($index = 1 or beforeblock = "h1" or beforeblock = "h2" or beforeblock = "h3") and ($block or "") != "h1" and ($block or "") != "h2" and ($block or "") != "h3" and ($block or "") != "figure" and (gist($text) or "") != ""
