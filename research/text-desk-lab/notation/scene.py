@@ -50,7 +50,9 @@ the one form. The words:
                                  research/window-lab/demos or media/, mp4 webm m4v png jpg gif webp) is drawn under
                                  the words, a film as a poster that plays where it is, with Pop out (`on pop`); any
                                  other path stays words. `media player`: the first one fills the part, with play,
-                                 seek, speed and full window. The printer says `media 1 video` (and what was not shown)
+                                 seek, speed and full window. `media picture` (a6443): the first picture fills the
+                                 part and nothing else is drawn (album art: no name, no buttons; the part's role gives
+                                 its corners). The printer says `media 1 video` (and what was not shown)
     on pop do <command>          on a `media` text: Pop out was pressed on one of its films or pictures, $value its path
                                  as written; `on pop host <verb> [words]` asks the host too (both run, in order)
     clamp <N>                    on words: at most N lines (printed as ~, the painter clamps wrapped lines).
@@ -1209,12 +1211,14 @@ def _w_media(node, p, val, n, env):
     # the words to a film or picture the desk may show is drawn as one. The link stays words in the text; which paths
     # are shown is media_links.py's, judged when the scene is built and again when the file is asked for
     v = (val or "").strip()
-    if v not in ("", "player"):
-        raise LensRefusal(f"line {n}: `media` (each film or picture the words name, under them) or `media player` (the first, filling the part); got {p!r}")
+    # a6443 (Alex, 17 Oct: a music panel 'that looks like Spotify made it'): `media picture`, the first picture alone,
+    # filling the part, for album art from the system's media session (research/window-lab/media.py)
+    if v not in ("", "player", "picture"):
+        raise LensRefusal(f"line {n}: `media` (each film or picture the words name, under them), `media player` (the first, filling the part) or `media picture` (the first picture alone, filling the part); got {p!r}")
     node["media"] = v or "embed"
 
 
-LIVE =("clock", "date", "until", "until ring")
+LIVE =("clock", "date", "until", "until ring", "until bar", "since")
 
 
 def _w_live(node, p, val, n, env):
@@ -1222,7 +1226,10 @@ def _w_live(node, p, val, n, env):
     # from its own clock, redrawn each second with no scene built. `clock` the time, `date` the day; `until` reads the
     # words as a moment (2026-10-15 17:05:12, or a number of seconds left when the count stands still) with `of <secs>`
     # for the whole, and draws the time left, `ring` with a ring that empties. At zero it sends the part's `on end`.
-    # The words stay what the printers print, so a reader of the scene sees the moment, not a picture of it
+    # The words stay what the printers print, so a reader of the scene sees the moment, not a picture of it.
+    # a6443 (a song's progress, from the system's media session): `until bar` draws a thin bar that fills as the time
+    # passes, and `since` the time passed (the whole less what is left); both read until's words, so one moment (the
+    # song's end) and its whole (the song's length) give the left time, the bar and the right time alike
     if (val or "").strip() not in LIVE:
         raise LensRefusal(f"line {n}: `live <{'|'.join(LIVE)}>`; got {p!r}")
     node["live"] = val.strip()
@@ -1810,8 +1817,8 @@ WORDS = {
     "ids": ("ids", _w_ids),
     "picture": ("picture", _w_picture),
     "markdown": ("markdown [links <selection>]", _w_markdown),
-    "media": ("media [player]", _w_media),
-    "live": ("live clock|date|until [ring]", _w_live),
+    "media": ("media [player|picture]", _w_media),
+    "live": ("live clock|date|until [ring|bar]|since", _w_live),
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
@@ -2556,7 +2563,7 @@ def to_text(scene, name, who, at, roots=None, part=None):
             kinds = [m["kind"] for m in ms if m.get("src")]
             said = ", ".join(f"{kinds.count(k)} {k}" for k in ("video", "image") if k in kinds) or "none"
             no = [m["refused"] for m in ms if not m.get("src")]
-            bits.append(("media player " if n["media"] == "player" else "media ") + said + (f" (not shown: {'; '.join(no)})" if no else ""))
+            bits.append(("media " + n["media"] + " " if n["media"] in ("player", "picture") else "media ") + said + (f" (not shown: {'; '.join(no)})" if no else ""))
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:

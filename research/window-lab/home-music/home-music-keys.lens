@@ -1,0 +1,49 @@
+# home-music-keys: the music panel's controls, as Spotify draws them (a6443): shuffle, back, a round white play or pause, next, repeat. Placed by home-music and home-music-full. Each asks the home base (host media.*, through Windows' media session: no key, no focus). Green only on a state that is on (shuffle, repeat); a control the app does not offer now is not drawn.
+keys : row
+  role mukeys
+  of witnessed:media as m
+  each keyrow
+keyrow : row
+  role mukeyrow
+  shuffle : text "<svg viewBox='0 0 16 17'><g fill='none' stroke='currentColor' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><path d='M1.5 4h2.2c1.4 0 2.3.6 3.1 1.8l2.4 4.4c.8 1.2 1.7 1.8 3.1 1.8h2.2'/><path d='M1.5 12h2.2c1.4 0 2.3-.6 3.1-1.8l.3-.5M9.2 5.9l.1-.1c.8-1.2 1.7-1.8 3.1-1.8h2.1'/><path d='M12.8 2.2 14.6 4l-1.8 1.8M12.8 10.2l1.8 1.8-1.8 1.8'/></g></svg>"
+    picture
+    role mukey
+    role mukey.on when $m.shuffle = "on"
+    tip "Shuffle" "Shuffle is $m.shuffle"
+    on click host media.shuffle
+    only when ($m.shuffle or "") != ""
+  prev : text "<svg viewBox='0 0 16 16'><rect x='2.6' y='2.6' width='1.8' height='10.8' rx='.6'/><path d='M13.4 3.3v9.4a.6.6 0 0 1-.93.5L5.7 8.5a.6.6 0 0 1 0-1l6.77-4.7a.6.6 0 0 1 .93.5z'/></svg>"
+    picture
+    role mukey
+    tip "Back" "The song before, or this one from its start"
+    on click host media.prev
+  play : text "<svg viewBox='0 0 16 16'><path d='M5.2 3.1v9.8a.6.6 0 0 0 .92.5l7.6-4.9a.6.6 0 0 0 0-1L6.12 2.6a.6.6 0 0 0-.92.5z'/></svg>"
+    picture
+    role muplay
+    tip "Play"
+    on click host media.play
+    only when $m.playing != "yes"
+  pause : text "<svg viewBox='0 0 16 16'><rect x='3.6' y='2.6' width='3' height='10.8' rx='.7'/><rect x='9.4' y='2.6' width='3' height='10.8' rx='.7'/></svg>"
+    picture
+    role muplay
+    tip "Pause"
+    on click host media.play
+    only when $m.playing = "yes"
+  next : text "<svg viewBox='0 0 16 16'><rect x='11.6' y='2.6' width='1.8' height='10.8' rx='.6'/><path d='M2.6 3.3v9.4a.6.6 0 0 0 .93.5l6.77-4.7a.6.6 0 0 0 0-1L3.53 2.8a.6.6 0 0 0-.93.5z'/></svg>"
+    picture
+    role mukey
+    tip "Next" "The next song"
+    on click host media.next
+  repeat : text "<svg viewBox='0 0 16 17'><g fill='none' stroke='currentColor' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 4h7a3 3 0 0 1 3 3v.5M11.5 12h-7a3 3 0 0 1-3-3v-.5'/><path d='M10 2.2 11.8 4 10 5.8M6 10.2 4.2 12 6 13.8'/></g></svg>"
+    picture
+    role mukey
+    role mukey.on when $m.repeat = "list"
+    tip "Repeat" "Each press: all, then this song, then off"
+    on click host media.repeat
+    only when ($m.repeat or "") != "" and $m.repeat != "track"
+  repeatone : text "<svg viewBox='0 0 16 17'><g fill='none' stroke='currentColor' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 4h4M11.5 12h-7a3 3 0 0 1-3-3v-.5'/><path d='M6 10.2 4.2 12 6 13.8'/></g><circle cx='12.2' cy='5' r='3.2'/><path d='M12.6 3.4v3.3h-.9V4.6l-.6.3v-.8l1-.7z' fill='var(--t-night)'/></svg>"
+    picture
+    role mukey.on
+    tip "Repeat this song" "Press to turn repeat off"
+    on click host media.repeat
+    only when $m.repeat = "track"

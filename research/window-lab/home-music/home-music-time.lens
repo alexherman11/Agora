@@ -1,0 +1,19 @@
+# home-music-time: where in the song, as Spotify draws it (a6443): the time passed, a thin bar, the length. The words are one moment (the song's end) and its whole, from witnessed:media's `at`: the painter moves the bar and the time each second from its own clock, so nothing is rebuilt while the song plays on. Placed by home-music and home-music-full; not drawn when the app gives no length.
+time : column
+  of witnessed:media as m
+  each timerow
+timerow : row
+  role mutime
+  only when ($m.at or "") != ""
+  now : text "$m.at"
+    live since
+    role mutimenum
+  bar : column
+    share 1
+    role mubarbox
+    fill : text "$m.at"
+      live until bar
+      role mubar
+      role mubar.on when $m.playing = "yes"
+  length : text "$m.length"
+    role mutimenum

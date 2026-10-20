@@ -1,0 +1,11 @@
+# home-music-small: what is playing, in one line (a5592; a6443: from Windows' media session), for the music panel's title and the shelf.
+music : column
+  playing : column
+    of witnessed:media as m
+    each musicline
+  none : text "Nothing playing"
+    role summary
+    only when count(witnessed:media) = 0
+musicline : text "$m.line"
+  role summary
+  clamp 1

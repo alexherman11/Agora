@@ -1,36 +1,72 @@
-# home-music: a small music controller, one panel of the home base (a5208), placed at the top of its right column. hud.py says witnessed:media (media.py, a5245: Spotify's window title, no sign-in, so a paused Spotify shows no song); the buttons ask the home base with host verbs (a5300). a5592.
+# home-music: the music panel, as Spotify would draw it (a6443; a5592's controller before it). Alex, 17 Oct: 'I want it to look like Spotify made it, and I want to be able to save songs to my liked songs from here.' The row is witnessed:media (media.py: Windows' media session, with the album art as a picture; else Spotify's window title). Compact: the art, the song and its artist, the heart, where in the song, the controls. When the panel fills the room it shows home-music-full instead (the panel note's filled=). Green is a state only: liked, shuffle or repeat on. Nothing moves but the time.
 music : column
-  role panel
-  top : row
-    role musictop
-    head : text "Music"
-      role heading
-      share 1
-    prev : text "⏮"
-      role mediakey
-      on click host media.prev
-    play : text "⏯"
-      role mediakey
-      on click host media.play
-    next : text "⏭"
-      role mediakey
-      on click host media.next
+  role mu
   playing : column
     of witnessed:media as m
     each nowplaying
-  none : text "Spotify is not open; the buttons press the media keys."
-    role meta
+  none : row
+    role muempty
     only when count(witnessed:media) = 0
+    mark : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.4V3.6l7-1.5v8.8'/><circle cx='4.2' cy='12.4' r='1.8'/><circle cx='11.2' cy='10.9' r='1.8'/></g></svg>"
+      picture
+      role muartnone
+    words : column
+      role muwords
+      share 1
+      quiet : text "Nothing playing"
+        role mutitle.quiet
+      how : text "Play something in Spotify and it shows here."
+        role muartist
 nowplaying : column
-  role nowplaying
-  title : text "$m.title"
-    role who
-    clamp 1
-    only when $m.playing = "yes"
-  artist : text "$m.artist"
-    role meta
-    clamp 1
-    only when $m.playing = "yes"
-  paused : text "Paused"
-    role meta
-    only when $m.playing = "no"
+  role mucard
+  top : row
+    role mutop
+    art : column
+      role muart
+      pic : text "$m.art"
+        media picture
+        role muartpic
+        only when ($m.art or "") != ""
+      blank : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.4V3.6l7-1.5v8.8'/><circle cx='4.2' cy='12.4' r='1.8'/><circle cx='11.2' cy='10.9' r='1.8'/></g></svg>"
+        picture
+        role muartblank
+        only when ($m.art or "") = ""
+    words : column
+      role muwords
+      share 1
+      above : column
+        share 1
+      title : text "$m.title"
+        role mutitle
+        clamp 1
+      artist : text "$m.artist"
+        role muartist
+        clamp 1
+      paused : text "Paused in $m.player"
+        role muartist
+        only when $m.playing != "yes" and ($m.title or "") = ""
+      below : column
+        share 1
+    like : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.4' stroke-linejoin='round'><path d='M8 13.6S1.6 9.9 1.6 5.6A3.2 3.2 0 0 1 8 4.4a3.2 3.2 0 0 1 6.4 1.2c0 4.3-6.4 8-6.4 8z'/></g></svg>"
+      picture
+      role muheart
+      tip "Like" "Save to your Liked Songs"
+      on click host media.like
+      only when $m.liked = "no"
+    liked : text "<svg viewBox='0 0 16 16'><path d='M8 13.6S1.6 9.9 1.6 5.6A3.2 3.2 0 0 1 8 4.4a3.2 3.2 0 0 1 6.4 1.2c0 4.3-6.4 8-6.4 8z'/></svg>"
+      picture
+      role muheart.on
+      tip "In your Liked Songs" "Press to take it out"
+      on click host media.unlike
+      only when $m.liked = "yes"
+    unknown : text "<svg viewBox='0 0 16 16'><g fill='none' stroke='currentColor' stroke-width='1.4' stroke-linejoin='round' stroke-dasharray='2 1.6'><path d='M8 13.6S1.6 9.9 1.6 5.6A3.2 3.2 0 0 1 8 4.4a3.2 3.2 0 0 1 6.4 1.2c0 4.3-6.4 8-6.4 8z'/></g></svg>"
+      picture
+      role muheart.unknown
+      tip "Liked or not: not known" "$m.like_why"
+      on click host media.like
+      only when ($m.liked or "unknown") = "unknown" and ($m.title or "") != ""
+  time : column
+    lens home-music-time
+  keys : row
+    role mukeysbox
+    lens home-music-keys

@@ -37,7 +37,8 @@ class Home:
 
 h = Home()
 names = [r["name"] for r in H.rows()]
-check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "start", "window", "wm.start", "wm.stop", "media.play", "media.next", "media.prev"]
+check("the rows are the verbs, each with what it does", names == ["bring", "notify", "hide", "start", "window", "wm.start", "wm.stop", "media.play", "media.next", "media.prev",
+                                                     "media.shuffle", "media.repeat", "media.like", "media.unlike"]
       and all(r["about"] for r in H.rows()), H.rows())
 check("hide hides", H.call(h, "hide") == "ok hidden" and h.did[-1] == ("hide",), h.did)
 # a5980: start puts the home base away, then asks for the Start menu (stood in for: nothing reaches the screen)

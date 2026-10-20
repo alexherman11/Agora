@@ -8,6 +8,8 @@ A lens asks with `on click host <verb> [words]` (scene.py). The painter sends th
 here. So a new button is lens lines only, and a new power is one entry in VERBS below, never a new js_api in hud.py.
 
 The table is closed on purpose: named verbs, no program to run, no shell line, no keys pressed but the media keys.
+media.* (a6443) press through Windows' media session first (media.py); media.like and media.unlike change Spotify's
+Liked Songs through its Web API, once Alex has connected it (spotify_like.py).
 `notify <words>` (a5824) shows a toast through notify.py; its words are shown, never run.
 `window <lens>` (a5500) opens only the desk's own painter on a lens, as lens_window.py does; never another program.
 `wm.start [lenses]` and `wm.stop` (a6113) start and stop the window manager, wm.py, as the home base's child
@@ -73,9 +75,32 @@ def _media(action):
         import media
         did = media.press(action)
         if not did:
-            raise Refused(f"media.{action}: neither Spotify nor the media key took it")
+            raise Refused(f"media.{action}: " + ("the media session did not take it" if action in ("shuffle", "repeat")
+                                                  else "neither the media session, Spotify nor the media key took it"))
         threading.Timer(0.8, hud.say_desktop).start()            # the new song, soon after
         return f"media.{action} to {did}"
+    return press
+
+
+def _like(liked):
+    # a6443: the heart. The song is what Windows' media session says now; spotify_like.Library asks Spotify's account
+    # which track that is (never a guess) and saves or removes it. Refused with the reason when it cannot know
+    def press(hud, words):
+        import media
+        import spotify_like
+        st = media.SESSION.state() if media.SESSION.start() else None
+        s = (st or {}).get("s") if st else None
+        if not s or not (s.get("title") or "").strip():
+            raise Refused("nothing is playing that Windows' media session names")
+        player = media.player_of(s.get("app"))
+        if player != "Spotify":
+            raise Refused(f"the song is playing in {player}; Liked Songs is Spotify's")
+        try:
+            said = media.likes().set(s["title"], s.get("artist") or "", liked)
+        except spotify_like.Refused as e:
+            raise Refused(str(e))
+        threading.Timer(0.1, hud.say_desktop).start()             # the heart, filled or not, at once
+        return said
     return press
 
 
@@ -145,6 +170,10 @@ VERBS = {
     "media.play": ("play or pause (Spotify, else the media key)", "", _media("play")),
     "media.next": ("the next song", "", _media("next")),
     "media.prev": ("the song before, or this one from its start", "", _media("prev")),
+    "media.shuffle": ("shuffle on or off (the media session's own control)", "", _media("shuffle")),
+    "media.repeat": ("repeat: off, then all, then this song, then off", "", _media("repeat")),
+    "media.like": ("save the song playing to Spotify's Liked Songs", "", _like(True)),
+    "media.unlike": ("take the song playing out of Spotify's Liked Songs", "", _like(False)),
 }
 
 

@@ -1,4 +1,48 @@
-# a5592: the music panel (home-music)
-role musictop : between gap
-role mediakey : text up 2, ink, on wash, corner gap x3, pad gap /2, pad left gap, pad right gap, touch
-role nowplaying : between gap /4
+# a6443: the music panel in Spotify's look (home-music, home-music-full, home-music-keys, home-music-time). Dark glass, the art rounded, the title strong, the artist soft, white controls with a round white play. Spotify's green is a STATE only (liked, shuffle or repeat on, playing): it is its own token, not LAMPLIT's accent, which means an agent at work. Nothing moves; the bar steps once a second.
+token spotify = #1ED760
+role mu : between gap
+role muempty : between gap x1.5
+role muartnone : faint, on raised, width gap x8, pad gap x2, corner gap
+role mutitle.quiet : text medium, soft
+role mucard : between gap x1.5
+role mutop : between gap x1.5
+role muart : width gap x8, corner gap, align center
+role muartpic : corner gap
+role muartblank : faint, on raised, width gap x8, pad gap x2, corner gap
+role muwords : between gap /4
+role mutitle : text strong, ink
+role muartist : text down, soft
+role muheart : soft, width gap x3, pad gap /4, corner gap x3, hover wash, align center
+role muheart.on : spotify, width gap x3, pad gap /4, corner gap x3, hover wash, align center
+role muheart.unknown : faint, width gap x3, pad gap /4, corner gap x3, hover wash, align center
+role mutime : between gap
+role mutimenum : text down 2, soft, align center
+role mubarbox : align center
+role mubar : soft
+role mubar.on : ink
+role mukeysbox : align center
+role mukeys : align center
+role mukeyrow : between gap x2.5, align center
+role mukey : soft, width gap x3, pad gap /4, corner gap x3, hover wash, align center
+role mukey.on : spotify, width gap x3, pad gap /4, corner gap x3, hover wash, align center
+role muplay : night, on ink, width gap x4, pad gap /1.25, corner gap x3, align center
+role mufull : between gap x2
+role mufullempty : between gap, pad gap x6, align center
+role mufullnone : faint, width gap x8, align center
+role mufulltitle.quiet : text up 2 medium, soft, align center
+role mufullrow : between gap x5, pad gap x2
+role mufullart : width gap x44, corner gap x1.5, lift gap x2, align center
+role mufullpic : corner gap x1.5
+role mufullblank : faint, on raised, width gap x44, pad gap x11, corner gap x1.5
+role mufullside : between gap x2
+role musource : between gap
+role mudot : faint, width gap, align center
+role mudot.on : spotify, width gap, align center
+role mulabel : text down 2 medium tracked, soft
+role mufullhead : between gap x2
+role mufulltitle : text up 3 strong, ink
+role mufullartist : text up, soft
+role muheartbig : soft, width gap x4.5, pad gap /2, corner gap x3, hover wash, align center
+role muheartbig.on : spotify, width gap x4.5, pad gap /2, corner gap x3, hover wash, align center
+role muheartbig.unknown : faint, width gap x4.5, pad gap /2, corner gap x3, hover wash, align center
+role muwhy : text down 2, faint
