@@ -1,0 +1,12 @@
+# home-widgets-end: the widgets at the right end of the home base's top bar (a6642: the search took the middle, so the
+# clock and glance stay top left and the rest go right). A widget says slot=bar-end to stand here, slot=bar for the
+# left (home-widgets); order= orders each end.
+widgets : row
+  role widgets
+  of tag:widget,prop:slot=bar-end as w
+  by order
+  each widget
+widget : row
+  role widget
+  role widget.wide when $w.size = "m"
+  lens $w.title
