@@ -75,6 +75,7 @@ import export_docs   # noqa: E402  load(): the world under its lock, read only
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
 import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
+import plan_usage    # noqa: E402  a6646: provider plan windows and durable pause episodes
 import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 
@@ -95,7 +96,7 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "on"}
+            "timers": "on", "claude_start_threshold": "off"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -520,6 +521,11 @@ class Resident:
         # when the turn then fails, so a delivered message is never sent again into the same conversation (see wake)
         self.state["pending"]["delivered"] = True
         self.save()
+        if plans := getattr(self.house, "plans", None):
+            try:
+                plans.restarting(getattr(self, "cid", self.rid))
+            except Exception as e:
+                self.log("plan_usage", f"{type(e).__name__}: {e}"[:200])
         self.log("sent", text)
         self.busy, self.reply = True, []
 
@@ -532,6 +538,16 @@ class Resident:
             except queue.Empty:
                 return ended
             t = ev.get("type")
+            if plans := getattr(self.house, "plans", None):
+                try:
+                    plans.observe(ev)
+                    if t == "result" and not ev.get("is_error"):
+                        plans.resumed(self.state.get("session_provider", "claude"), getattr(self, "cid", self.rid))
+                    if t == "result":
+                        plans.dirty = True
+                        plans.publish()
+                except Exception as e:  # quota display failure must never eat a completed turn
+                    self.log("plan_usage", f"{type(e).__name__}: {e}"[:200])
             if t == "system" and ev.get("subtype") == "init" and ev.get("session_id"):
                 if self.state.get("session") != ev["session_id"]:
                     self.state["session"] = ev["session_id"]
@@ -554,7 +570,7 @@ class Resident:
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
                 self.state["last_turn"] = now()
-                for k in ("pending", "failures", "retry_at"):
+                for k in ("pending", "failures", "retry_at", "retry_kind"):
                     self.state.pop(k, None)
                 # what it wrote, the last few turns, for Alex's view (the `turns` row source; Alex, 29 Sep)
                 said = self.state.setdefault("said", [])
@@ -591,6 +607,7 @@ class House:
         self.workshop = workshop.Workshop(self)
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
+        self.plans = plan_usage.Plans(self)
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
 
     # ---- the world -------------------------------------------------------------------------------------------
@@ -1025,13 +1042,19 @@ class House:
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if not r.alive():
-                if props.get("call") and r.state.get("retry_at", 0) > now():
+                provider = props.get("provider", "claude")
+                held = self.plans.wait_until(provider)
+                if held > now():
+                    self.plans.paused(provider, rid, held)
+                    self.set_status(r, corner, "paused")
+                    continue
+                if props.get("call") and r.state.get("retry_at", 0) > now() and r.state.get("retry_kind") != "limit":
                     # a press of wake overrides a back-off, once: the call is used up, so a failure after it backs off again
                     r.state.pop("retry_at")
                     r.log("retry", {"why": f"called by {props['call']} while backing off"})
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
                 if r.state.get("retry_at", 0) > now():
-                    self.set_status(r, corner, "error")
+                    self.set_status(r, corner, "paused" if r.state.get("retry_kind") == "limit" else "error")
                     continue
                 first = not r.started
                 r.start(props.get("model") or cfg["model"])
@@ -1107,6 +1130,7 @@ class House:
             print(f"house: feeds: {type(e).__name__}: {e}", flush=True)
         try:     # a6265: context and limit use for At work (written at most every usage.GAP s, only when changed)
             self.usage.step()
+            self.plans.publish()
         except Exception as e:
             print(f"house: usage: {type(e).__name__}: {e}", flush=True)
         try:     # a6249: Alex's scripts (notes role=script) kept in step with their files; only the live world's house
@@ -1299,8 +1323,21 @@ class House:
         r.hold_unanswered(pending, (why or {}).get("detail") if isinstance(why, dict) else "the process ended")
         n = r.state.get("failures", 0) + 1
         reset = limit_reset((why or {}).get("detail") if isinstance(why, dict) else "")
+        detail = (why or {}).get("detail", "") if isinstance(why, dict) else ""
+        if reset or workshop.usage_limited(detail):
+            provider = r.state.get("session_provider", "claude")
+            plans = getattr(self, "plans", None)
+            reset = (plans.reset(provider) if plans else 0) or reset
+            retry_at = reset + 60 if reset else now() + 300
+            r.state.update(retry_at=retry_at, retry_kind="limit")
+            r.save()
+            if plans:
+                plans.paused(provider, r.rid, retry_at)
+            self.set_status(r, corner, "paused")
+            return
         # a usage limit is not the resident failing: try again a minute after the reset it names, not on a doubling
         r.state["failures"], r.state["retry_at"] = n, (reset + 60 if reset else now() + min(60 * 2 ** (n - 1), 3600))
+        r.state["retry_kind"] = "process"
         r.log("failed", {"why": why, "failures": n, "retry_in": int(r.state["retry_at"] - now())})
         r.save()
         self.set_status(r, corner, "error")

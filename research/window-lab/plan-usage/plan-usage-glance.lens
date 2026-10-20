@@ -1,0 +1,7 @@
+usage : row
+  role puwidgets
+  of prop:role=usage-window,prop:usage_visible=yes as u
+  each reading
+reading : text "$u.usage_label · $u.window"
+  role puquiet
+  tip "Plan usage" "$u.usage_detail"

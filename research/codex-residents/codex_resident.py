@@ -161,6 +161,45 @@ def event_data(event):
     return raw if isinstance(raw, dict) else value.model_dump(by_alias=True, mode="json")
 
 
+def emit_plan_usage(client, emit, timeout=2):
+    """Optional metadata must not hold up answers or accumulate hung requests."""
+    previous = vars(client).get("_agora_usage_job")
+    if previous is not None and previous.is_alive():
+        return
+    job = threading.Thread(target=_read_plan_usage, args=(client, emit), daemon=True)
+    client._agora_usage_job = job
+    job.start()
+    job.join(timeout)
+    if job.is_alive():
+        emit({"type": "plan_usage_unavailable", "provider": "codex",
+              "reason": "Codex account/rateLimits/read timed out; waiting for CLI response"})
+
+
+def _read_plan_usage(client, emit):
+    """Read-only CLI account metadata. No account/credit mutations or model turn."""
+    from openai_codex.generated.v2_all import GetAccountRateLimitsResponse
+    try:
+        result = client.request("account/rateLimits/read", None, response_model=GetAccountRateLimitsResponse)
+        raw = result.model_dump(by_alias=True, mode="json")
+        # Never put account/credit details in the house stream.
+        def bucket(value):
+            if not isinstance(value, dict):
+                return {}
+            clean = {"limitId": value.get("limitId")}
+            for name in ("primary", "secondary"):
+                window = value.get(name)
+                if isinstance(window, dict):
+                    clean[name] = {k: window.get(k) for k in ("usedPercent", "windowDurationMins", "resetsAt")}
+            return clean
+        data = {"rateLimits": bucket(raw.get("rateLimits")),
+                "rateLimitsByLimitId": {k: bucket(v) for k, v in (raw.get("rateLimitsByLimitId") or {}).items()}}
+        emit({"type": "codex_event", "method": "account/rateLimits/read", "data": data})
+    except Exception as exc:
+        # Error strings can include request details; retain only the class.
+        emit({"type": "plan_usage_unavailable", "provider": "codex",
+              "reason": "Codex account/rateLimits/read unavailable (" + type(exc).__name__ + ")"})
+
+
 def receive(client, turn_id, emit):
     """Keep completed text in order; a failed/interrupted turn runs no desk lines."""
     messages = {}
@@ -178,6 +217,7 @@ def receive(client, turn_id, emit):
             elif event.method == "thread/compacted":
                 emit({"type": "system", "subtype": "compact_boundary"})
             elif event.method == "turn/completed":
+                emit_plan_usage(client, emit)
                 turn = data["turn"]
                 if turn["status"] != "completed":
                     error = turn.get("error") or {}
@@ -206,8 +246,13 @@ def receive(client, turn_id, emit):
         client.unregister_turn_notifications(turn_id)
 
 
+_OUTPUT_LOCK = threading.Lock()
+
+
 def output(event):
-    print(json.dumps(event, ensure_ascii=False), flush=True)
+    # A late quota response may arrive alongside the next turn's stream.
+    with _OUTPUT_LOCK:
+        print(json.dumps(event, ensure_ascii=False), flush=True)
 
 
 def serve(args):
