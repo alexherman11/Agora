@@ -274,7 +274,7 @@ def outcomes(cmds, answer):
         if line.startswith("> "):
             cur = line[2:]
             blocks.setdefault(cur, [])
-        elif line.startswith(("stopped:", "~ house:", "---")):
+        elif line.startswith(("stopped:", "~ house:", "~ this reply:", "---")):
             cur = None
         elif cur is not None:
             blocks[cur].append(line)
@@ -292,6 +292,8 @@ def outcomes(cmds, answer):
             res.append((c, "MISS", body[0]))
         elif body and body[0].startswith("ERR"):
             res.append((c, "ERR", body[0]))
+        elif body and body[0].startswith("skipped: depends on"):      # a6437: it used what a refused line would make
+            res.append((c, "skipped", body[0]))
         elif body and re.match(r"help\b", c) and re.match(r"no (verb|help|topic|command)\b", body[0]):
             res.append((c, "NOHELP", body[0]))
         else:
