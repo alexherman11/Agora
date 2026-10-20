@@ -1,0 +1,15 @@
+# drop-panel <how> <panel> <next to> <column> <layout>: where a panel dragged in the home base lands (a5994; the lens home-tiling says it on each drop).
+# how: left or right = a new column beside <column>, holding the panel; first or last = a new column at that edge of <layout>;
+# top or bottom = above or below <next to>; swap = trade places with <next to>; end = last in <column> (its empty space).
+# A column the panel leaves empty goes, so the others take its room.
+set from = $2.in
+do create $5 kind=surface title=column layout=column when $1 = "left" or $1 = "right" or $1 = "first" or $1 = "last"
+do move $new before=$4 when $1 = "left"
+do move $new after=$4 when $1 = "right"
+do move $new into=$5 at=0 when $1 = "first"
+do move $2 into=$new when $1 = "left" or $1 = "right" or $1 = "first" or $1 = "last"
+do move $2 before=$3 when $1 = "top"
+do move $2 after=$3 when $1 = "bottom"
+do swap $2 $3 when $1 = "swap"
+do move $2 into=$4 at=999 when $1 = "end"
+do remove $from when count(in:$from) = 0
