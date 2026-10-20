@@ -152,6 +152,12 @@
     }
     if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
+    // a6431: a page in a frame is one element for as long as it shows the same page: a new size, turn or toggle changes
+    // the frame where it stands (a new element would load the page again)
+    if (old && old.el._page && p.page && old.el._page.src === p.page.src) {
+      old.el._n = n; old.sig = sig; old.el.className = (p.role ? Style.roleClass(p.role) + " " : "") + "t-page";
+      old.el._page.update(p.page); next.set(n.key, old); return old.el;
+    }
     if (old && old.el._composer && old.el._composer.config === JSON.stringify([p, n.acts])) {
       old.el._n = n; old.sig = sig; old.el._composer.sync(); next.set(n.key, old); return old.el;
     }
@@ -164,7 +170,11 @@
     if (role) el.className = Style.roleClass(role);
     if (p.kind === "frame") el.classList.add("l-" + p.flow);
     if (p.box) { el.classList.add("boxed"); Object.assign(el.style, { left: p.box[0] + "px", top: p.box[1] + "px", width: p.box[2] + "px", height: p.box[3] + "px" }); }
-    if (p.text != null && p.markdown) markdown(el, n, p);
+    // a6431: `page`: the page the words name, the real painter at a device's size (page.js); `on pick` names a part of it
+    if (p.text != null && p.page && window.Page) Page.draw(el, p.page, { session, who,
+      canPick: () => el._n.acts.some(a => a.on === "pick"),
+      pick: async (name, key) => { for (const a of el._n.acts.filter(a => a.on === "pick")) await send(el._n, a.line.replace(/\$value\b/g, () => TEXT.esc(name)).replace(/\$part\b/g, () => TEXT.esc(key))); } });
+    else if (p.text != null && p.markdown) markdown(el, n, p);
     else if (p.text != null && p.picture) { picture(el, p.text); pictureRegions(el, p.regions || []); }
     // `wave` (14 Oct): a role that waves draws each character as its own span, each a beat after the one before
     else if (p.text != null && role && ((Style.style || {}).roles || {})[role] && Style.style.roles[role].look.wave)
@@ -218,6 +228,8 @@
     if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
+    if (p.caret) el.dataset.caret = p.caret.join(" ");    // a6642: what brings the caret here from anywhere (caretKeys)
+    if (p.arrows) arrows(el);
     if (p.tip && p.tip[0]) { el._tip = p.tip; el.dataset.tip = p.tip[0]; el.setAttribute("aria-label", p.tip.join(": ")); }   // a6271
     if (p.peek) el.dataset.peek = "1";          // a1032: stays shown while its parent is folded (lens.html)
     if (Number.isInteger(p.peek)) { el.dataset.peekLines = p.peek; el.style.setProperty("--peek-lines", p.peek); }
@@ -339,6 +351,60 @@
       c.style.top = (r.bottom + h > innerHeight && r.top - h >= 0 ? r.top - h : r.bottom) + "px";
     }
   }
+  // a6642 (Alex, 20 Oct: search results chosen with the arrow keys and Enter): `arrows` on a frame. Its stops are the
+  // texts being written and the presses inside it, in the order drawn (a float lifted into the top layer is still
+  // inside it). Up and Down go from stop to stop; Down past the last opens a closed float inside it. A press in hand
+  // takes Enter as a button does (semantic); Enter in a text whose words are unchanged presses the first press after
+  // it, so a search sent once is opened by Enter again. The viewer's hands only: nothing is sent until a press
+  const writes = t => t.isContentEditable || t.tagName === "TEXTAREA";
+  function arrows(el) {
+    el.dataset.arrows = "1";
+    const stops = () => [...el.querySelectorAll("[data-key], textarea")].filter(t => (writes(t) || t._clicks) && t.getClientRects().length);
+    el.addEventListener("keydown", e => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+      const t = e.target, all = stops(), i = all.indexOf(t);
+      if (i < 0) return;
+      const lines = t._n && t._n.paint && t._n.paint.lines;
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(writes(t) && lines && (lines[1] == null || lines[1] > 1))) {
+        const down = e.key === "ArrowDown";
+        let to = all[i + (down ? 1 : -1)];
+        if (!to && down) {
+          const h = [...el.querySelectorAll('.l-float[data-folded="1"] > button')][0];
+          if (h) { h.click(); const again = stops(); to = again[again.indexOf(t) + 1]; }
+        }
+        if (!to) return;
+        e.preventDefault();
+        if (!writes(to) && to.tabIndex < 0) to.tabIndex = -1;
+        to.focus();
+        if (writes(to) && to.isContentEditable) getSelection().selectAllChildren(to), getSelection().collapseToEnd();
+        return;
+      }
+      if (e.key === "Enter" && !writes(t)) { e.preventDefault(); e.stopPropagation(); t.click(); return; }   // a press that is a frame has no button keys of its own
+      if (e.key === "Enter" && !e.shiftKey && writes(t)) {
+        const said = ((t._n && t._n.paint && t._n.paint.text) || "").trim();
+        if (!said || (t.isContentEditable ? t.innerText : t.value).trim() !== said) return;
+        const first = all.slice(i + 1).find(s => !writes(s));
+        if (!first) return;
+        e.preventDefault(); e.stopPropagation(); first.click();
+      }
+    }, true);
+  }
+  // a6642: `caret <key>|typing` on a text. A key it names (Ctrl+K, ...) pressed anywhere that no text took (a document's
+  // own Ctrl+K stays the document's), or a letter typed while no text has the caret (`typing`), brings the caret to the
+  // first such text drawn, at its end; a typed letter lands in it
+  document.addEventListener("keydown", e => {
+    if (e.defaultPrevented || e.isComposing || e.altKey || document.getElementById("menu-pop")) return;
+    const a = document.activeElement, busy = a && a !== document.body && (writes(a) || /^(INPUT|SELECT)$/.test(a.tagName));
+    const ctrl = e.ctrlKey || e.metaKey, combo = (ctrl ? "Ctrl+" : "") + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+    const letter = !ctrl && e.key.length === 1 && e.key.trim() !== "";
+    if (busy && !ctrl) return;
+    const want = t => { const ks = t.dataset.caret.split(" "); return ks.includes(combo) || (letter && !busy && ks.includes("typing")); };
+    const to = [...paint.querySelectorAll("[data-caret]")].find(t => t.getClientRects().length && want(t));
+    if (!to || to === a) return;
+    e.preventDefault();
+    to.focus(); getSelection().selectAllChildren(to); getSelection().collapseToEnd();
+    if (letter && !to.dataset.caret.split(" ").includes(combo)) document.execCommand("insertText", false, e.key);
+  });
   const closeFloats = keep => document.querySelectorAll('.l-float:not([data-folded="1"])').forEach(m => { if (!m.contains(keep)) { m._close(); placeFloat(m); } });
   document.addEventListener("pointerdown", e => closeFloats(e.target));
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeFloats(null); });
@@ -597,7 +663,20 @@
       // Rook: never show a person text they did not write. Escape for the desk's quoting; do not rewrite.
       const raw = el.innerText.trim(), v = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n");
       const seen = V.editOrigin(n.key, el._n); if (!seen) { V.hold = null; return; }   // pike-8: never a fresher fence than was shown
-      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
+      // a6642: sent by Enter inside an `arrows` frame (a search box), the caret comes back once the answer is painted,
+      // so Down reaches what the words found; only if nothing else took the keyboard meanwhile. a5994 (found by the
+      // playtest): a press anywhere closes an open float, the frame's own list too while it was empty, so the words'
+      // answer filled a closed list and nothing showed: sending them is asking for that list, so a closed float in the
+      // frame opens again
+      const back = committing && el.closest("[data-arrows]") ? n.key : null;
+      if (raw !== (el._n.paint.text || "").trim()) send(seen, a.line.replace("$value", () => v).replace("$selected", () => TEXT.selected(el._n)), raw).then(() => {
+        const k = back && kept.get(back);
+        if (!k || !k.el.isConnected) return;
+        const frame = k.el.closest("[data-arrows]");
+        if (frame) frame.querySelectorAll('.l-float[data-folded="1"] > button').forEach(h => h.click());
+        if (document.activeElement && document.activeElement !== document.body) return;
+        k.el.focus(); getSelection().selectAllChildren(k.el); getSelection().collapseToEnd();
+      }); else { V.hold = null; V.drop(n.key); if (el._n.paint.runs) runs(el, el._n.paint.runs); }
     });
   }
 
@@ -836,7 +915,7 @@
     draw(r) {
       const m = document.createElement(this.kinds[r.mark].tag); m.className = "t-mark " + (this.kinds[r.mark].look || "t-mark-" + r.mark); m.textContent = r.text;
       if (r.mark === "link") { m.dataset.href = r.href; m.title = r.href + "  (Ctrl+click opens it)"; }
-      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = r.title + (r.open ? "  (click opens it)" : ""); }
+      if (r.mark === "thing") { m.dataset.thing = r.open || ""; m.dataset.id = r.id; m.dataset.kind = r.kind || ""; m.title = (window.Markdown ? Markdown.fullName({ title: r.title, name: r.text }) : r.title) + (r.open ? "  (click opens it)" : ""); }   // a6460: never the id, on hover either
       return m;
     },
     // Ctrl+B and the like, in the source: wrap what is selected, or take the mark off when it is already there
@@ -1043,7 +1122,22 @@
   }
   function runs(el, rs) {
     el._runs = rs;
+    // a6460: a name inside a sentence is drawn quiet, as a Markdown document draws it (markdown.js refDraw): first four
+    // words, the whole on hover, an arrow for a comment, event or line, a number when named again; a text that is only
+    // a name keeps it whole
+    const M = window.Markdown, prose = M && rs.some(r => !r.mark && /[A-Za-z]{3,}/.test(r.text || ""));
+    const refs = new Map(), n = new Map();
+    if (prose) {
+      for (const r of rs) if (r.mark === "thing" && r.kind !== "comment" && r.kind !== "event" && r.kind !== "line") n.set(r.id, (n.get(r.id) || 0) + 1);
+      let k = 0; for (const [id, c] of n) if (c > 1) refs.set(id, { n: ++k, seen: false });
+    }
     el.replaceChildren(...rs.map(r => {
+      if (r.mark === "thing" && prose) {
+        const m = MARKS.draw(r), full = M.fullName({ title: r.title, name: r.text });
+        m.replaceChildren(...M.refDraw({ name: r.text, kind: r.kind }, refs.get(r.id), "t-"));
+        m.title = full + (r.open ? "  (click opens it)" : "");
+        return m;
+      }
       if (r.mark) return MARKS.draw(r);
       if (!r.role) return document.createTextNode(r.text);
       const s = document.createElement(r.block ? "div" : "span"); s.className = Style.roleClass(r.role);

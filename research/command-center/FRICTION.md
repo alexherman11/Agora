@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (51)
+## open (50)
 
 ### F2. Scripts cannot say who is running them
 
@@ -333,13 +333,7 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-### Plan usage and resumable provider pauses need a house word (a6646)
-
-a6662 · family=missing-word · status=open
-
-Read: usage.py already follows Claude rate_limit_event.unifiedWindows and context-token streams; workshop.py persists provider retry times, but there is no durable per-window Usage surface, event-driven plan snapshot, per-provider deduplicated notice episode, or configurable fuel-start rule. A world lens cannot read CLI stream metadata or schedule a process resume. Source work for a6646 will bridge only these observations and lifecycle transitions, leaving the gauge and glance in world lenses. No credentials or account settings are read or changed.
-
-## curing (37)
+## curing (38)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -628,7 +622,14 @@ a6240 · family=code · status=curing
 
 Source edits of a6153 (HUD presses), 16 Oct. No world word was missing: every cause was the engine's. (1) lens_ir kept instances in 24 stores, one per placed lens per place, and the home base with the board out places more: nothing was kept (now 400). (2) A part holding a by/run repeat was never kept, because its sort keys were read around the accessor (now through it, Accessor.props). (3) Every part made escaped its whole context for gestures it may not have. (4) The painter was sent the scene text it never shows (text=0) and the body was encoded twice. (5) sayings read every saying to keep one (early terms). (6) deskd's world lock was a file tried every 50 ms, even between its own threads (now an in-process lock first). (7) hud.py rewrote four unchanged witnessed files every 2 s, so every page rebuilt every 2 s (witnessed.write changed_only). What is still not a world word: a lens cannot say 'this press changes only my panel' (optimistic paint); see a6153's done comment. Tools and numbers: research/window-lab/press-speed/README.md.
 
-## unchecked (2)
+### Agents need a live charter at fresh memory and compaction (a6536)
+
+a6728 · family=missing-word · status=curing
+
+Missing world word: start= on a resident corner, parallel to wake= but only for fresh memory and compaction. Source draft adds charter.py, house/workshop startup hooks, Claude SessionStart(compact) context and Codex developer-history reinjection. It mirrors only a generated AGENTS.md block from the single live agent-charter note. Source remains unlanded; provider boundary acceptance still requires a real runtime observation. No rules or account settings changed.
+20 Oct takeover source-ready update under JEFF c6735/c6737: 16 charter tests OK (0.639s), transport 5 passed in 1.02s, builders/pool/grants/house-words all passed, changed-file Ruff passed, diff check exit 0. Added explicit one-line missing/empty startup disclosure and tested mirror changes with real knock/news/worker-hearing logic: no knock, no session start/send/process spawn, cached sessions retain rules until fresh start or compaction. Copy e13175 (13162 events) proves edited rules reach both provider stub prompts and 411-word receipts e13178/e13181. No real model/process was used; live spawn receipt, Claude/Codex compaction timing and already-running interactive apps remain unverified. Handbook source descriptions updated for landing; existing wake reads remain.
+
+## unchecked (5)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -644,6 +645,27 @@ Read: no world-level scratch-space word controls Python tempfile or the browser 
 Correction/follow-up after JEFF e12858: relocation failed because tools still used tempfile-created owner-only directories. Replacing mkdtemp/TemporaryDirectory with uuid-named os.makedirs (default inherited ACL) passes file-write/copytree and child TMP/TEMP/Python-temp checks. screen.py now reaches Edge DevTools; the subsequent document.readyState evaluation loses its websocket (WinError 10054, ConnectionClosedError). Browser startup is not verified. sandbox close screen-6120 completed and printed alex: untouched. No wheel or lens change made.
 Read/source after JEFF e12874: screen.py headless launch and sandbox_window.py Edge/WebView2 debugging launches now include --remote-allow-origins=*; both Python websocket clients explicitly set origin=None. Ran: screen.py --visible still resets during the first Runtime.evaluate(document.readyState), WinError 10054 then ConnectionClosedError. A later HTTP /json/version request to that same test port is refused (WinError 10061). Closed the owned sandbox screen-88068 with alex: untouched. Origin flag did not establish browser readiness; root cause unknown. Pipe transport was considered but not implemented: current desktop launcher does not inherit handles, so pipe mode needs explicit Windows pipe/handle transport work, not just a flag.
 Final source scope per JEFF e12889: removed ineffective --remote-allow-origins=* after the failed retest; explicit origin=None remains. hud_playtest.py uses the same temp helper and adds seven copy-only real-wheel cases via hud_scroll.py; no world-level word could express test-driver wheel input. Assertions require the panel and its content to move together, observe a wheel event, stay inside a HUD pane and keep the page at zero. test_hud_scroll.py: 5 stand-in verdict tests pass; this does NOT run the browser. test_agora_tmp.py passes child write, painter copytree, TMP/TEMP/Python-temp and override checks. Old tiling-fix.desk is commented as superseded by JEFF's live lens fix. Source/browser integration and wheel shots remain UNVERIFIED for the browser-capable follow-up.
+
+### Plan usage and resumable provider pauses need a house word (a6646)
+
+a6662 · family=missing-word · status=unchecked
+
+Read: usage.py already follows Claude rate_limit_event.unifiedWindows and context-token streams; workshop.py persists provider retry times, but there is no durable per-window Usage surface, event-driven plan snapshot, per-provider deduplicated notice episode, or configurable fuel-start rule. A world lens cannot read CLI stream metadata or schedule a process resume. Source work for a6646 will bridge only these observations and lifecycle transitions, leaving the gauge and glance in world lenses. No credentials or account settings are read or changed.
+Ran final a6646 recheck: 16 fake-feed/native-world tests OK, including evaluated gauge roles at 69/70/89/90/100%; builder lifecycle and existing usage tests all passed. Source bridges provider observations, native Usage facts, durable pause/notice episodes and fuel-start policy; widget/glance remain world lenses. Full health, actual Codex quota and browser acceptance remain unverified as recorded on the commission and handoff.
+
+### A line's about= never reached the one it called, and a Talk's lines said nothing of their document (a6638)
+
+a6703 · family=conversation · status=unchecked
+
+Source edits for a6638 (the universal conversation), each a world-level word that was missing. (1) house.py points_at: a chat line's fields (about=, quote=, heading=) were kept in the world but the house handed a called resident only its words, so 'about this item' and 'these words' were lost on delivery; no world word can change what the house says to a resident. Missing word: a way for a line to say how it is delivered (or the delivery to carry the line's fields by rule). (2) scene.py sayings rows: a line in a Talk, or a reply, had no about unless its writer typed one, so the Conversation could not tag an agent's answer with its document; a lens can read the chat's talk_of only by a frame per row. Missing word: a row field that inherits from the line's chat or the line it answers. (3) scene.py involving: early pass-over (INVOLVING_EARLY), a speed fix, the same rows (check_involving_early.py).
+
+### Runtime updates lack a verified re-pin gate (a6498)
+
+a6713 · family=missing-word · status=unchecked
+
+Missing world word: check runtime. The world cannot hash a host executable, run isolated compiled-runtime probes, hold an OS publication lock or atomically replace runtime lock files. Draft source in a6498 adds runtime_pin.py, adapter startup gates and probe_support.py, plus empty-profile/stand-in Desk probes and fake binary/inventory tests. Both locks remain untouched until every candidate check passes. Source is not landed. The resident mock probe passed here; the worker mock probe failed at CreateRestrictedToken failed: 87. This is not live agent or current re-pin acceptance.
+Final source checks in this builder: 39 focused tests passed in 7.46s; changed-file Ruff All checks passed; git diff --check exit 0. Tests include fake binaries/inventories, a real cross-process lease, and fake-house receipt/notice delivery. Final resident mock source passed with -E and empty CODEX_HOME. Source uses the worker's existing MCP door route without changing DESKD=off in shells. Source and precise rerun instructions are preserved in research/codex-residents/runtime-pin-handoff.md. Not landed; worker-capable environment and live acceptance are still needed.
+20 Oct source-ready update under JEFF c6757/c6760: 48 focused tests passed in 6.70s; changed-file Ruff passed and diff check exit 0. Source now checks updater provenance and valid OpenAI OpCo, LLC Authenticode before candidate execution; Windows read-only inspection confirms that publisher on the installed candidate. Python-open guards with the real home present and fake credentials prove empty-home launch routing, not native IO containment. Both locks and inventories remain unchanged. Host-side --recheck, full worker mock matrix, real harmless resident/Astra turns and live notice/no-wake observation remain unverified. A healthy ordinary startup skips probes, so JEFF must explicitly --recheck after landing. No account or profile settings changed.
 
 ## cured (65)
 
@@ -1196,3 +1218,11 @@ a6631 · family=missing-word · status=cured
 
 Alex, 20 Oct, requested current worker status and automatic Desk/worker recovery at Windows sign-in. Missing lifecycle behavior: the Startup shortcut launches agora_start.py but has no external recovery if that process exits; AgoraHouseRecovery separately launches backend components, creating two startup owners. Codex is connecting the existing scheduled watchdog to the existing full Desk launcher, preserving live services, strengthening single-instance startup and testing restart restoration. Incomplete working tasks resume from saved house state; waiting tasks remain waiting for answers or new work.
 Ran 20 Oct: 6 focused startup tests passed (cold start, adoption, orphan recovery, inspection failure, checkout matching, real OS-lease contention/crash release). Existing builder restart/resume checks passed. Repository pytest: 201 passed, 2 skipped; changed Python Ruff and PowerShell parsing passed. Sign-in task is running. New launcher 20572 adopted the original live services; deliberately terminating only it led to watchdog replacement 91248 within the configured 60-second backoff. Keeper 62740, house 82160, door wrapper 28432, HUD 87440 and capture 33540 remained running unchanged; duplicate launcher exited without starting services. No Windows reboot/sign-out was performed. Docs checker still reports the pre-existing missing Dynamic Desk image. Source: agora_start.py, test_agora_start.py, house_supervisor.ps1; operational instructions updated in a639 and codex-residents/README.md.
+
+## source-pending (1)
+
+### Adding independent HUD checks needed a shared-list edit (a6749)
+
+a6838 · family=host · status=source-pending
+
+Host friction: independently added HUD playtest coverage required editing the same runner callbacks and order list, causing repeated landing conflicts. The missing extension point was discovery of one step per file. a6749 adds playtest_steps/*.py Step records (order, feature needs, press script with its existing assertions, budgets), scanned by hud_playtest.py. Existing bodies and numbers are preserved, including equal-footing from main. This is test-host structure, not new world behavior. Ran: 13 extraction/discovery/fixture-merge tests and 5 existing wheel-verdict tests pass; real browser acceptance is not run in the Codex sandbox.

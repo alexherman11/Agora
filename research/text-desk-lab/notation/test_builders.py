@@ -19,9 +19,11 @@ the world copy and every process stubbed (Popen is caught: each start is a comma
   8. a conversation that cannot be found: the builder starts fresh and is told so
   9. the protocol: the notebook rule (found by role), Alex's screen and the demo rule; a builder is told who it is
 """
+import atexit
 import json
 import os
 import re
+import shutil
 import sys
 import time
 import uuid
@@ -54,6 +56,7 @@ B = R.BOARD
 sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
 import agora_tmp
 TMP = Path(agora_tmp.directory("b-"))  # short: Claude's cwd-keyed fixture doubles this path
+atexit.register(shutil.rmtree, TMP, ignore_errors=True)  # stubbed starts leave stderr.log open
 
 
 def say(me, *lines):

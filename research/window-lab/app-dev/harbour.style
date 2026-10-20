@@ -1,0 +1,34 @@
+# harbour-style: the sample phone app's own look (a6431). A phone app, light and plain: a sea-blue bar, white rows.
+token paper    = #F4F1EA
+token card     = #FFFFFF
+token ink      = #18232A
+token accent   = #1E6A85
+token sand     = #E6DDCB
+token gap      = 8
+token ramp     = 1.15
+token text     = ui 16/1.45
+token line     = ink at 12%
+token hush     = ink at 62%
+
+role desk      : on paper, ink, text
+role happ      : between gap /2
+role hhint     : text down, hush, pad gap x2
+role hbar      : on accent, card, pad gap x2, pad top gap x3, between gap /4
+role htitle    : text up 3 strong, card
+role hsub      : text down, hush
+role hlist     : between gap /8, pad gap
+role hrow      : on card, pad gap x1.5, corner gap, between gap, edge line
+role hbarsub   : text down, sand
+role hwords    : between gap /4
+role hname     : text medium, ink
+role hmeta     : text down, hush
+role hrating   : text down medium, accent
+role hback     : pad gap x1.5, pad top gap x3, on sand
+role hbackword : text medium, accent
+role hhero     : pad gap x2, between gap /4
+role hbig      : text up 3 strong, ink
+role hfacts    : pad left gap x2, pad right gap x2, between gap x2
+role hfact     : on card, pad gap x1.5, corner gap, edge line, between gap /4
+role hkey      : text down 2 tracked, hush
+role hval      : text medium, ink
+role hbody     : text, ink, pad gap x2

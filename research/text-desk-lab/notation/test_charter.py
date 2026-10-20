@@ -278,6 +278,10 @@ class CharterTests(unittest.TestCase):
         args = SimpleNamespace(world="roomworld", target=self.card, actor="worker")
         emitted = []
         client = MagicMock()
+        client.request.return_value.model_dump.return_value = {
+            "rateLimits": {"limitId": "codex", "primary": {"usedPercent": 12}},
+            "rateLimitsByLimitId": {},
+        }
         notifications = [
             ("item/completed", {"item": {"type": "contextCompaction", "id": "c1"}}),
             ("thread/compacted", {}),
@@ -299,13 +303,20 @@ class CharterTests(unittest.TestCase):
                 lambda: codex_resident.refresh_charter(client, "thread1", args, emitted.append),
             )
         self.assertTrue(ok)
-        client.request.assert_called_once()
-        method, data = client.request.call_args.args
-        self.assertEqual("thread/inject_items", method)
+        self.assertEqual(
+            ["thread/inject_items", "account/rateLimits/read"],
+            [call.args[0] for call in client.request.call_args_list],
+        )
+        _, data = client.request.call_args_list[0].args
         self.assertEqual("developer", data["items"][0]["role"])
         self.assertIn("Fresh at Codex compaction", data["items"][0]["content"][0]["text"])
         self.assertEqual(1, sum(e.get("subtype") == "compact_boundary" for e in emitted))
         self.assertTrue(any(e.get("subtype") == "charter_read" for e in emitted))
+        self.assertTrue(any(
+            e.get("method") == "account/rateLimits/read"
+            and e["data"]["rateLimits"]["primary"]["usedPercent"] == 12
+            for e in emitted
+        ))
 
     def test_mirror_updates_file_and_carried_note_without_churn(self):
         carried = self.create("note", "AGENTS.md", text="# Agora\n\nCarried human edits.\n")

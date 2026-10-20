@@ -59,6 +59,17 @@
   .md-doc a.md-a,.md-doc .md-wl{color:var(--t-accent,#0F6B57);text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--t-accent,#0F6B57) 35%,transparent);text-underline-offset:.18em;cursor:pointer}
   .md-doc .md-wl:hover,.md-doc a.md-a:hover{text-decoration-color:currentColor}
   .md-doc .md-wl.md-missing{color:var(--t-hush,#889);text-decoration-style:dashed}
+  .md-doc .md-wl.md-thing{color:inherit;text-decoration-style:dotted;text-decoration-color:color-mix(in srgb,currentColor 40%,transparent);text-underline-offset:.22em}
+  .md-doc .md-wl.md-thing:hover{text-decoration-style:solid;text-decoration-color:currentColor;color:var(--t-accent,#0F6B57)}
+  .md-doc .md-glyph,.md-doc .md-refn,.t-ref-glyph,.t-ref-n{font-size:.72em;line-height:0;vertical-align:.32em;color:var(--t-accent,#0F6B57);font-variant-numeric:tabular-nums;padding:0 .08em}
+  .md-doc .md-wl.md-thing:has(> [data-deco].md-glyph),.md-doc .md-wl.md-thing:has(> [data-deco].md-refn){text-decoration:none}
+  .md-doc:not(.md-raw) .md-line.md-active .md-wl > .md-syn{display:none}
+  .md-doc.md-raw .md-wl > [data-deco]{display:none}
+  .md-doc.md-read{line-height:1.62}
+  .md-doc.md-read .md-p{margin:0 0 .8em}
+  .md-doc.md-read .md-li{margin:0 0 .3em}
+  .md-doc.md-read .md-h1,.md-doc.md-read .md-h2{margin-top:1.3em}
+  .md-doc.md-read .md-blank{height:0}
   .md-doc .md-widget .md-syn{display:none}
   .md-doc .md-widget{position:relative;margin:.4em 0 .6em;cursor:text}
   .md-doc table.md-table{border-collapse:collapse;width:auto;min-width:50%;font-size:.95em}
@@ -159,6 +170,42 @@
     /!\[([^\[\]\n]*)\]\(([^()\s]+)\)/.source,                    // 17,18 picture (a6452): last, it is the only one that starts at its `!`
   ].join("|"), "g");
 
+  // ---- quiet references (a6460, Alex 17 Oct: 'They are ugly af'; every id had become a long underlined name) -----------
+  // A name drawn for an id inside a sentence must not break the reading: its first four words, the whole name on hover
+  // (never the id, there either); a comment, an event or a chat line is only a small arrow (what it is, on hover); an id
+  // named again in the same text is a tiny number after the first time, the first carrying the same number. Shared with
+  // lens.js, which draws the names in a text that is not Markdown (marks) the same way.
+  const IDS = /(?<![\w-])(?:worker-)?(?:[afscep]\d{2,}|m\d{2,})(?![\w-])/g;
+  const GLYPHS = new Set(["comment", "event", "line"]);
+  function fullName(hit) {          // the scene's title names the id ('c5255: a comment by ...', '<title> · task a5245'): without it
+    const t = String(hit.title || "").replace(/^\S+:\s+/, s => s.replace(IDS, "").trim() === ":" ? "" : s);
+    const parts = t.split(" · ").map(p => p.replace(IDS, "").replace(/\s{2,}/g, " ").trim()).filter(p => p && p !== ":");
+    return parts.join(" · ") || hit.name || "";
+  }
+  function shortName(name) {
+    const w = String(name || "").replace(/…$/, "").split(/\s+/).filter(Boolean);
+    if (w.length <= 4 && !/…$/.test(name || "")) return name;
+    return w.slice(0, 4).join(" ").replace(/[\s,;:·\-—(]+$/, "") + "…";
+  }
+  // ids named more than once in a text -> Map id -> {n, seen}; numbered in the order they first stand (arrows have none)
+  function refsOf(src, things) {
+    const plain = String(src || "").replace(/```[\s\S]*?```|`[^`\n]*`/g, s => " ".repeat(s.length)), count = new Map();
+    for (const m of plain.matchAll(IDS)) { const h = (things || {})[m[0]]; if (h && !GLYPHS.has(h.kind)) count.set(m[0], (count.get(m[0]) || 0) + 1); }
+    const out = new Map(); let n = 0;
+    for (const [id, c] of count) if (c > 1) out.set(id, { n: ++n, seen: false });
+    return out;
+  }
+  // the elements a name is drawn as: [words] or [words, number] or [number] or [arrow]; `pre` is the class prefix
+  function refDraw(hit, ref, pre) {
+    const el = (cls, t) => { const e = document.createElement("span"); if (cls) e.className = cls; e.textContent = t; return e; };
+    const glyph = pre === "md-" ? "md-glyph" : "t-ref-glyph", num = pre === "md-" ? "md-refn" : "t-ref-n";
+    if (GLYPHS.has(hit.kind)) return [el(glyph, "↗")];
+    if (ref && ref.seen) return [el(num, String(ref.n))];
+    const out = [el("", shortName(hit.name))];
+    if (ref) { ref.seen = true; out.push(el(num, String(ref.n))); }
+    return out;
+  }
+
   function syn(t) { const s = document.createElement("span"); s.className = "md-syn"; s.textContent = t; return s; }
   function inline(text, ctx, into) {
     const rx = new RegExp(INLINE.source, "g");       // its own: marks inside marks read the same grammar again
@@ -180,7 +227,7 @@
         const pre = (m[3] || "") + "[[" + (alias != null ? m[4] + "|" : "");
         into.append(syn(pre));
         const a = document.createElement("span"); a.className = "md-wl" + (hit && hit.id ? "" : " md-missing");
-        a.dataset.target = target; if (hit && hit.id) { a.dataset.id = hit.id; a.title = `${hit.title} · ${hit.kind || ""} ${hit.id}`.trim(); } else a.title = `nothing is called “${target}” yet`;
+        a.dataset.target = target; if (hit && hit.id) { a.dataset.id = hit.id; a.title = `${hit.title} · ${hit.kind || ""}`.trim(); } else a.title = `nothing is called “${target}” yet`;   // a6460: no id on hover
         // an id with no words of its own shows the thing's title: the id lives in the hidden marks
         if (alias == null && hit && hit.id && /^[afs]\d+$/.test(target)) { a.append(syn(m[4])); const t = document.createElement("span"); t.dataset.deco = "1"; t.contentEditable = "false"; t.textContent = shown; a.append(t); }
         else a.textContent = shown;
@@ -200,12 +247,14 @@
       else if (m[14] != null) { const a = document.createElement("a"); a.className = "md-a"; a.dataset.href = m[14]; a.textContent = m[14]; into.append(a); }
       else if (m[15] != null) { const t = document.createElement("span"); t.className = "md-tag"; t.textContent = m[15]; into.append(t); }
       else if (m[16] != null) {
-        // a6109: an id the scene names (ctx.things) shows the name, the id kept as the hidden source; any other stays words
+        // a6109: an id the scene names (ctx.things) shows the name, the id kept as the hidden source; any other stays words.
+        // a6460: drawn quiet (refDraw): never the id, not even on the caret's line (only Ctrl+E's source shows it)
         const hit = (ctx.things || {})[m[16]];
         if (!hit) into.append(m[16]);
         else {
-          const a = document.createElement("span"); a.className = "md-wl md-thing"; a.dataset.target = m[16]; a.title = hit.title;
-          a.append(syn(m[16])); const t = document.createElement("span"); t.dataset.deco = "1"; t.contentEditable = "false"; t.textContent = hit.name; a.append(t);
+          const a = document.createElement("span"); a.className = "md-wl md-thing"; a.dataset.target = m[16]; a.title = fullName(hit);
+          a.append(syn(m[16]));
+          for (const t of refDraw(hit, ctx.refs && ctx.refs.get(m[16]), "md-")) { t.dataset.deco = "1"; t.contentEditable = "false"; a.append(t); }
           into.append(a);
         }
       } else if (m[18] != null) {
@@ -278,7 +327,7 @@
       if (hit && hit.id) {
         card.dataset.id = hit.id;
         const state = hit.commission || hit.status || "";
-        card.innerHTML = `<div class="md-eh"><span class="md-et">${esc(hit.title || target)}</span>${state ? `<span class="md-es" data-s="${esc(state)}">${esc(state)}</span>` : ""}<span class="md-ek">${esc(hit.kind || "")} ${esc(hit.id)}</span></div>`
+        card.innerHTML = `<div class="md-eh"><span class="md-et">${esc(hit.title || target)}</span>${state ? `<span class="md-es" data-s="${esc(state)}">${esc(state)}</span>` : ""}<span class="md-ek">${esc(hit.kind || "")}</span></div>`
           + (hit.excerpt ? `<div class="md-ex">${esc(hit.excerpt)}</div>` : hit.inside != null ? `<div class="md-ex">${hit.inside} inside</div>` : "")
           + (hit.owner ? `<div class="md-eo">owner ${esc(hit.owner)}</div>` : "");
       } else card.textContent = `nothing is called “${target}” yet`;
@@ -290,6 +339,7 @@
   // the whole document, every line drawn; `active` is a set of line numbers whose marks show and whose widget is lines
   function draw(root, src, ctx, active, raw) {
     const lines = src.split("\n"), r = read(lines), out = [];
+    ctx.refs = refsOf(src, ctx.things);                  // a6460: names drawn again in this text are numbered, afresh each drawing
     const open = w => raw || [...Array(w.to - w.from + 1).keys()].some(k => active.has(w.from + k));
     for (let i = 0; i < lines.length; i++) {
       const d = r.lines[i];
@@ -383,7 +433,8 @@
     let left = at - st[l];
     const ts = textNodes(el);
     for (let k = 0; k < ts.length; k++) {
-      const t = ts[k], hidden = t.parentElement.closest(".md-syn") && !el.classList.contains("md-active");
+      // a6460: a name's id is hidden on the caret's line too (only the source, Ctrl+E, shows it)
+      const t = ts[k], hidden = t.parentElement.closest(".md-syn") && (!el.classList.contains("md-active") || (t.parentElement.parentElement.closest(".md-wl") && !root.classList.contains("md-raw")));
       if (left < t.data.length || (left === t.data.length && (k === ts.length - 1 || !hidden))) return [t, left];
       left -= t.data.length;
     }
@@ -440,6 +491,6 @@
     return { a: k, b: k + 1, s: m[4] === " " ? "x" : " " };
   }
 
-  globalThis.Markdown = { read, draw, inline, starts, textNodes, lineOf, offsetOf, pointAt, lightUp, findWords,
+  globalThis.Markdown = { read, draw, inline, starts, fullName, shortName, refsOf, refDraw, textNodes, lineOf, offsetOf, pointAt, lightUp, findWords,
     enter, unmark, indent, wrap, link, toggle, lineAround };
 })();

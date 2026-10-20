@@ -643,6 +643,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         if isinstance(out.get("share"), str):
             del out["share"]                    # a5496: filled below, once the lets are known; never sent unfilled
         out.pop("tip", None)                    # a6271: the same, for a tip's words
+        out.pop("page", None)                   # a6431: and a page's
         if isinstance(out.get("fold"), str) and "$" in out["fold"]:
             out["fold"] = S._fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
         if b and b["kind"] == "one":
@@ -795,6 +796,11 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             tc = {**(ctx.get("_props") or {}), **ctx}
             out["tip"] = [S._fill_text(t, tc, track, lambda e: X.run(e, xenv()))[0] if "$(" in t else S._fill(t, tc, track)
                           for t in em["tip"]]
+        if em.get("page") and em["text"] is not None:     # a6431: a page's size and choices, filled as words are, then read
+            tc = {**(ctx.get("_props") or {}), **ctx}
+            pw = em["page"]
+            pw = S._fill_text(pw, tc, track, lambda e: X.run(e, xenv()))[0] if "$(" in pw else S._fill(pw, tc, track)
+            out["page"] = S.page_of(pw)
         if isinstance(em.get("share"), str):          # a5496: `share $(expr)`, a weight that follows data
             sc_ctx = {**(ctx.get("_props") or {}), **ctx}
             s = em["share"]

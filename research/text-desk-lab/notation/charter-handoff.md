@@ -110,3 +110,23 @@ keeper” (a639) are updated for source landing, with live acceptance explicitly
 pending. The exported source documents file was not edited. The house must
 preserve/reconcile main's human AGENTS edits and the overlapping runtime-pin
 transport changes from a6498; no merge was retried here.
+
+## House merge conflict resolution, 20 Oct
+
+The house subsequently merged main into this worktree and returned three text
+conflicts. Resolved with plain file edits: retained charter compaction injection
+alongside bounded plan-usage reads in the resident transport; retained the shared
+inherited-ACL, short-path temp helper plus exit cleanup in test_builders; retained
+both charter.py and plan_usage.py in HOUSE_FILES. Runtime-pin changes are preserved.
+The compaction test now asserts one developer injection followed by one usage read,
+including the fake usage value, rather than assuming only one request of any kind.
+
+Ran after resolution: charter 16 tests OK (0.661s), transport 5 passed (0.96s),
+plan usage 16 tests OK (1.357s); builders, worker_pool and worker_grant each all
+passed. No conflict marker lines remain in the three files. Handbook HOUSE_FILES
+list includes plan_usage.py (e13391).
+
+Additional test_house_merge.py attempt was blocked before its scenarios by
+TemporaryDirectory ACLs: WinError 5 creating the fixture's live directory under
+system temp. No claim about that test or real provider acceptance is made.
+No git mutation was performed; the house must commit the resolved merge and judge.

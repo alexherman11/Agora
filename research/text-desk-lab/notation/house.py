@@ -76,6 +76,7 @@ import charter
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
 import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
+import plan_usage    # noqa: E402  a6646: provider plan windows and durable pause episodes
 import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 
@@ -96,7 +97,7 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "on"}
+            "timers": "on", "claude_start_threshold": "off"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -114,6 +115,30 @@ def it_is():
     'It is 13 Oct, 10:46.' writes it; the house's own time, the clock the '~ 10:45 in chat' stamps are read from)."""
     t = time.localtime()
     return f" · it is {t.tm_mday} {time.strftime('%b, %H:%M', t)}"
+
+
+def points_at(w, e, s):
+    """a6638 (Alex, 20 Oct: 'anything I comment on gets routed to the right person'): what a chat line points at, said
+    after its words when it is handed to someone, since the words alone lose it: the thing it is about by its name and
+    id (' [about "Proposal reader" (a6460)'), the words it quotes and the section they stood in. '' when it points at
+    nothing. The line's fields are the writer's (world.py append); nothing here is guessed."""
+    mid = (e.get("args") or {}).get("line_id")
+    line = next((ln for ln in (s or {}).get("lines") or () if ln.get("id") == mid), None) if mid else None
+    if not line:
+        return ""
+    fields = dict((line.get("fields") or {}), **{k: line[k] for k in ("about", "quote") if line.get(k)})
+    said = []
+    about = str(fields.get("about") or "").strip()
+    if about:
+        n = w.nodes.get(about)
+        title = w.title(n) if n else (w.subjects.get(about) or {}).get("title", "")
+        said.append(f"about \"{title}\" ({about})" if title else f"about {about}")
+    quote = " ".join(str(fields.get("quote") or "").split())
+    if quote:
+        heading = str(fields.get("heading") or "").strip()
+        said.append(f"on the words \"{quote[:300]}{'…' if len(quote) > 300 else ''}\""
+                    + (f" under § {heading}" if heading else ""))
+    return f"  [{'; '.join(said)}]" if said else ""
 
 
 def limit_reset(detail):
@@ -532,6 +557,11 @@ class Resident:
         # when the turn then fails, so a delivered message is never sent again into the same conversation (see wake)
         self.state["pending"]["delivered"] = True
         self.save()
+        if plans := getattr(self.house, "plans", None):
+            try:
+                plans.restarting(getattr(self, "cid", self.rid))
+            except Exception as e:
+                self.log("plan_usage", f"{type(e).__name__}: {e}"[:200])
         self.log("sent", text)
         self.busy, self.reply = True, []
 
@@ -544,6 +574,16 @@ class Resident:
             except queue.Empty:
                 return ended
             t = ev.get("type")
+            if plans := getattr(self.house, "plans", None):
+                try:
+                    plans.observe(ev)
+                    if t == "result" and not ev.get("is_error"):
+                        plans.resumed(self.state.get("session_provider", "claude"), getattr(self, "cid", self.rid))
+                    if t == "result":
+                        plans.dirty = True
+                        plans.publish()
+                except Exception as e:  # quota display failure must never eat a completed turn
+                    self.log("plan_usage", f"{type(e).__name__}: {e}"[:200])
             if t == "system" and ev.get("subtype") == "init" and ev.get("session_id"):
                 if self.state.get("session") != ev["session_id"]:
                     self.state["session"] = ev["session_id"]
@@ -574,7 +614,7 @@ class Resident:
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
                 self.state["last_turn"] = now()
-                for k in ("pending", "failures", "retry_at"):
+                for k in ("pending", "failures", "retry_at", "retry_kind"):
                     self.state.pop(k, None)
                 # what it wrote, the last few turns, for Alex's view (the `turns` row source; Alex, 29 Sep)
                 said = self.state.setdefault("said", [])
@@ -611,6 +651,7 @@ class House:
         self.workshop = workshop.Workshop(self)
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
+        self.plans = plan_usage.Plans(self)
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
         self.charter_state = {}
 
@@ -811,23 +852,24 @@ class House:
                 # with none (from before lines) is read once by the same rule. The receipt asks the same question.
                 to, _ = rooms.line_to(e)
                 now_ = rooms.calls(w, s, to, actor)
+                words = f"{args.get('append')}{points_at(w, e, s)}"      # a6638: and what it points at
                 if sid in mine:                                    # a chat in its own corner is its own
                     if waits:                                      # a1062 (5): a book line is a note at the door,
-                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {words}")
                         urgent = urgent or now_                    # a1566: and a line addressed to it knocks
                         if now_:
                             self._knocked(r, e, s, resting)
                         continue
-                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {words}")
                     urgent = True
                     self._knocked(r, e, s, resting)
                 elif "all" in members or actor in members or now_:
                     if now_ and waits:                             # a1566: kept, first and marked, and it knocks
-                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {words}")
                         urgent = True
                         self._knocked(r, e, s, resting)
                         continue
-                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {words}")
                     urgent = urgent or now_
                     if now_:
                         self._knocked(r, e, s, resting)
@@ -1052,13 +1094,19 @@ class House:
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if not r.alive():
-                if props.get("call") and r.state.get("retry_at", 0) > now():
+                provider = props.get("provider", "claude")
+                held = self.plans.wait_until(provider)
+                if held > now():
+                    self.plans.paused(provider, rid, held)
+                    self.set_status(r, corner, "paused")
+                    continue
+                if props.get("call") and r.state.get("retry_at", 0) > now() and r.state.get("retry_kind") != "limit":
                     # a press of wake overrides a back-off, once: the call is used up, so a failure after it backs off again
                     r.state.pop("retry_at")
                     r.log("retry", {"why": f"called by {props['call']} while backing off"})
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
                 if r.state.get("retry_at", 0) > now():
-                    self.set_status(r, corner, "error")
+                    self.set_status(r, corner, "paused" if r.state.get("retry_kind") == "limit" else "error")
                     continue
                 first = not r.started
                 r.start(props.get("model") or cfg["model"])
@@ -1134,6 +1182,7 @@ class House:
             print(f"house: feeds: {type(e).__name__}: {e}", flush=True)
         try:     # a6265: context and limit use for At work (written at most every usage.GAP s, only when changed)
             self.usage.step()
+            self.plans.publish()
         except Exception as e:
             print(f"house: usage: {type(e).__name__}: {e}", flush=True)
         try:     # a6249: Alex's scripts (notes role=script) kept in step with their files; only the live world's house
@@ -1326,8 +1375,21 @@ class House:
         r.hold_unanswered(pending, (why or {}).get("detail") if isinstance(why, dict) else "the process ended")
         n = r.state.get("failures", 0) + 1
         reset = limit_reset((why or {}).get("detail") if isinstance(why, dict) else "")
+        detail = (why or {}).get("detail", "") if isinstance(why, dict) else ""
+        if reset or workshop.usage_limited(detail):
+            provider = r.state.get("session_provider", "claude")
+            plans = getattr(self, "plans", None)
+            reset = (plans.reset(provider) if plans else 0) or reset
+            retry_at = reset + 60 if reset else now() + 300
+            r.state.update(retry_at=retry_at, retry_kind="limit")
+            r.save()
+            if plans:
+                plans.paused(provider, r.rid, retry_at)
+            self.set_status(r, corner, "paused")
+            return
         # a usage limit is not the resident failing: try again a minute after the reset it names, not on a doubling
         r.state["failures"], r.state["retry_at"] = n, (reset + 60 if reset else now() + min(60 * 2 ** (n - 1), 3600))
+        r.state["retry_kind"] = "process"
         r.log("failed", {"why": why, "failures": n, "retry_in": int(r.state["retry_at"] - now())})
         r.save()
         self.set_status(r, corner, "error")

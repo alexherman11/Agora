@@ -1,0 +1,4 @@
+read a6614
+do prop a6614 grow=20
+read a5482
+do prop a5482 viewing=a5080

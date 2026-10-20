@@ -269,6 +269,9 @@ def expr_env(desk, ctx):
     def get(name):
         if not name.startswith("$"):
             return None                     # a bare word in a command's expression names no let; it is none, and says so
+        if name == "$*":
+            # a6427: a verb's rest of the line, in an expression too (words-after($*, "save")), as $1 is
+            return None if ctx.args is None else str(ctx.rest)
         m = WORD.match(name)
         if not m:
             return None
@@ -430,6 +433,8 @@ def made_by(events):
                 and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
             out.append(e["undo"]["drop_link"])      # a3295: a link is made too; $new is its id (examine, unlink id=)
             continue
+        if e.get("copy") and (e.get("undo") or {}).get("delete") != e["copy"]:
+            continue                                # a6427: a copy made many parts; $new is the copy itself
         if e["verb"] in ("create", "group") and isinstance(e.get("undo"), dict) and e["undo"].get("delete") \
                 and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
             out.append(e["undo"]["delete"])

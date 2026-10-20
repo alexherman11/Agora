@@ -1,0 +1,23 @@
+font sans = Geist, Segoe UI, system-ui, sans-serif
+token text = sans 12/1.5
+token gap = 8
+token paper = #FBF8F2
+token ink = #1C2430
+token soft = ink at 58%
+token rim = ink at 12%
+token fill = #0B8F6E
+token amber = #B85C00
+token red = #B53030
+role puwidgets : between gap
+role pugauge : width 7em, between gap /8
+role pulabel : text medium, ink
+role puquiet : text down, soft
+role putrack : height gap /2, on rim
+role pufill : on fill
+role pufill.amber : on amber
+role pufill.red : on red
+role pupage : between gap x2, pad gap
+role puheading : text up 2 medium, ink
+role puwords : text, ink
+role pureading : between gap /2, pad gap, border bottom rim
+role pubutton : text medium, ink, edge rim, corner gap, pad gap /2

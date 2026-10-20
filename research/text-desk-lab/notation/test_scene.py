@@ -1630,6 +1630,88 @@ def test_a_persons_name_is_a_link_where_it_stands_alone():
         tmp.unlink(missing_ok=True)
 
 
+def test_search_box_words():
+    """a6642 (Alex: a search at the top of the HUD; Ctrl+K or typing reaches it, arrows choose, titles first): `caret`
+    on a text being written, `arrows` on a frame, and `title:a+b` (every word in the title) beside ?a+b. Imagined use:
+    a person who wrote 'Garden plan' and, elsewhere, a shopping list that mentions the garden plan, searches 'plan
+    garden': the title is first, the mention after, and 'gardenplan' or one word alone does not stand for both."""
+    assert scene.parse('root : column, arrows\n  a : text "x"')[1]["root"]["arrows"] is True
+    refused("root : column\n  a : text \"x\", arrows", "frame word")
+    refused('root : column\n  a : text "x", caret Ctrl+K', "no `on edit`")
+    refused('root : column\n  a : text "x", caret Alt+F4, on edit do prop $item q="$value"', "caret <")
+    refused('root : column\n  a : text "x", caret typing typing, on edit do prop $item q="$value"', "caret <")
+    import deskd, lens_ir
+    tmp = _scratch("_test_search_box")
+    try:
+        with deskd.Session("_test_search_box", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=note title='Garden plan' text='beds by the fence'")
+            desk.repl("do create f01 kind=note title=Shopping text='seeds for the garden plan, twine'")
+            desk.repl("do create f01 kind=note title='Plan for the shed'")
+            desk.repl("do create f01 kind=note title=Search q='plan garden'")
+            src = chr(10).join(["root : column, arrows, the title:Search as s",
+                                '  box : text "$s.q", caret Ctrl+K typing, on edit do prop $s q="$value"',
+                                "  list : column",
+                                "    let q = words-of($s.q)",
+                                "    titles : column, of title:$q as f, each hit",
+                                "    rest : column, of ?$q,-title:$q as f, each hit",
+                                'hit : text "$title", on click do prop $s q=""'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            assert sc["paint"].get("arrows") is True, sc["paint"]
+            box, lst = sc["kids"]
+            assert box["paint"]["caret"] == ["Ctrl+K", "typing"] and box["paint"]["commit"] == "enter", box["paint"]
+            titles, rest = lst["kids"]
+            assert [k["text"] for k in titles["kids"]] == ["Garden plan"], titles["kids"]
+            assert [k["text"] for k in rest["kids"]] == ["Shopping"], rest["kids"]
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "arrows" in text and "caret Ctrl+K typing" in text, text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_page_shows_a_lens_at_a_device_size():
+    """a6431 (Alex, 17 Oct: 'a webapp running in the middle the size of a phone'): `page <w> <h> ...` on a text whose
+    words name a lens (or a /path here) paints the real painter at that size; its size and choices may come from lets
+    (a person's chosen device), an empty let says nothing; `on pick` belongs to a page; an address elsewhere is no page.
+    Imagined use: Alex turns an iPhone on its side with safe areas on, and the same part repaints at 852 x 393."""
+    ok = scene.page_of("393 852 touch picks safe 59 0 34 0 cutout island mark app/a12/list")
+    assert (ok["w"], ok["h"], ok["touch"], ok["picks"], ok["safe"], ok["cutout"], ok["mark"]) == \
+        (393, 852, True, True, [59, 0, 34, 0], "island", "app/a12/list"), ok
+    for bad, said in (("393", "a width and a height"), ("10 852", "a width and a height"), ("393 852 safe 1 2", "four insets"),
+                      ("393 852 cutout star", "cutout <"), ("393 852 zoom", "none of these")):
+        assert "error" in scene.page_of(bad) and said in scene.page_of(bad)["error"], (bad, scene.page_of(bad))
+    refused('root : column\n  p : text "notes", page 393', "a width and a height")
+    refused('root : column\n  p : text "notes", on pick do prop $item picked="$value"', "has no `page`")
+    refused('root : column\n  p : text "notes", page 393 852, on edit do prop $item x="$value"', "is edited")
+    assert scene.page_source("notes") == "notes" and scene.page_source("notes on a12") == "notes on a12"
+    assert not scene.page_source("https://example.com/") and scene.page_source("/lens.html?lens=x") == "/lens.html?lens=x"
+    import deskd, lens_ir
+    tmp = _scratch("_test_page")
+    try:
+        with deskd.Session("_test_page", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=note title=Preview app=notes up=no safe=on")
+            src = chr(10).join(["root : column, the title:Preview as pv",
+                                '  phone : text "$pv.app"',
+                                '    let w = 393 when ($pv.up or "yes") = "yes"',
+                                "    let w = 852 otherwise",
+                                '    let h = 852 when ($pv.up or "yes") = "yes"',
+                                "    let h = 393 otherwise",
+                                '    let insets = "safe 0 59 21 59 cutout island" when ($pv.safe or "") = "on"',
+                                '    let insets = "" otherwise',
+                                '    let picks = ""',
+                                "    page $w $h touch $picks $insets",
+                                '    on pick do prop $pv picked="$value" part="$part"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pg = sc["kids"][0]["paint"]["page"]
+            assert (pg["src"], pg["w"], pg["h"], pg["touch"], pg["picks"], pg["safe"], pg["cutout"]) == \
+                ("notes", 852, 393, True, False, [0, 59, 21, 59], "island"), pg
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 # a5820: this block stood above test_picture_is_a_text_drawn (13 Oct), so that test was never run; it stays last
 if __name__ == "__main__":
     import os

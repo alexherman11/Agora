@@ -1,0 +1,10 @@
+# workspace-keep <name>: keep Alex's home base as it stands as the workspace of that name, one word (a6427; say
+# `workspace save <name>`). An older workspace of that name goes (through {R}); his layout is not changed.
+table kind:surface,in:{WS},prop:role=workspace,prop:name=$1 cols=name when count(kind:surface,in:{WS},prop:role=workspace,prop:name=$1) > 0
+do move kind:surface,in:{WS},prop:role=workspace,prop:name=$1 into={R} when count(kind:surface,in:{WS},prop:role=workspace,prop:name=$1) > 0
+do copy kind:surface,prop:role=home-layout,prop:actor=alex into={WS} title=$1
+do prop kind:surface,in:{WS},prop:role=home-layout,prop:actor=alex role=workspace name=$1 view=$((max($viewing of prop:role=home-view,prop:actor=alex) or \"\")) with=$((max($with of prop:role=home-view,prop:actor=alex) or \"\")) glyph=◇ about="Saved from the home base as it stood."
+table in:{R} cols=kind when count(in:{R}) > 0
+do remove kind:note,in:{R} when count(kind:note,in:{R}) > 0
+do remove kind:surface,in:{R},-prop:role=workspace when count(kind:surface,in:{R},-prop:role=workspace) > 0
+do remove kind:surface,in:{R} when count(kind:surface,in:{R}) > 0
