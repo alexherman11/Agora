@@ -1,0 +1,3 @@
+# app-preview-small: STAND-IN (a6427) for the phone preview's one-line view (worker-a6431's, which replaces it).
+line : text "coming with a6431"
+  role meta

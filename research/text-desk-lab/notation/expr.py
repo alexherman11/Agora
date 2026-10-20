@@ -419,7 +419,7 @@ _TOKEN = re.compile(r"""
   | (?P<dur>\d+(?:\.\d+)?[wdhm]\b)
   | (?P<num>\d+(?:\.\d+)?)
   | (?P<str>"[^"]*")
-  | (?P<name>\$\w+(?:\.\w+)?)
+  | (?P<name>\$\*|\$\w+(?:\.\w+)?)
   | (?P<at>@[\w$.-]+)
   | (?P<call>[A-Za-z_][\w-]*)(?=\()
   | (?P<word>[A-Za-z_]\w*)
