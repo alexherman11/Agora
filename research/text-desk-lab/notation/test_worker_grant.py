@@ -95,7 +95,7 @@ mock.patch.object(workshop.threading, "Thread").start()
 H = House()
 WS = workshop.Workshop(H)
 WS.land = lambda w, cid, s, wk, wait=True: None
-SETTINGS = {"model": "claude-opus-5-5", "workers": "8", "worker_model": "", "worker_pool": ""}
+SETTINGS = {"model": "claude-opus-5-5", "workers": "4", "worker_model": "", "worker_pool": ""}
 
 
 def card(title, **props):
@@ -199,6 +199,11 @@ a = card("Alex grants")
 setby("alex", a, "powercfg /a")
 r = workshop.extra_tools(W, W.subjects[W.nodes[a]["subject"]])
 check("5. alex's grant counts", r[0] == ["PowerShell(powercfg /a)", "Bash(powercfg /a)"], r)
+# This test isolates grants, not concurrency. Finish the stand-in turns before
+# asking another card; the production scheduler now enforces four for every start.
+for cid, wk in WS.workers.items():
+    wk.busy = False
+    WS.set_state(cid, "waiting")
 cx = card("Codex", worker_provider="codex")
 setby("jeff", cx, "powercfg /a")
 ask(cx)

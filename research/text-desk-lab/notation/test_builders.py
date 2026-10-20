@@ -372,7 +372,7 @@ check("9. the protocol says how to see and record Alex's screen, and the demo ru
       "screen_tools.py look" in P and "screen_tools.py record" in P and "research/window-lab/demos/" in P
       and "say on the card what will appear" in P and "names its recording" in P)
 codex = card("A fresh Codex card", worker_provider="codex", worker_fresh="yes")
-WS.step(W, POOL)
+WS.step(W, {**POOL, "worker_pool": "2 codex gpt-6-astra"})
 cp = (WS.workers[codex].dir / "worker-prompt.txt").read_text(encoding="utf-8")
 check("9. a Codex worker's prompt has the notebook rule too, and is a disposable worker",
       "find role=builders-notebook" in cp and "a disposable builder" in cp and WS.workers[codex].builder is None)
