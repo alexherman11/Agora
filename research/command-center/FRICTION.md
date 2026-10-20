@@ -635,7 +635,7 @@ a6988 · family=lens-words · status=curing
 
 Music needs Windows-session album art as a rounded picture with no filename, caption or pop-out controls. The missing world word is media picture: compiler admission and the shared media painter gain this read-only mode; generated art tests compile both music forms. No new timer word is needed: progress is ordinary static row shares updated from reported playback state. The earlier live until bar/since draft was withdrawn under Alex's charter. Source is in worker-a6443; browser checks are blocked before launch by the old branch's system-temp ACL error. PKCE library access and the explicit Connect host verb also need host code; lens/style behavior remains world text.
 
-## unchecked (5)
+## unchecked (6)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -672,6 +672,12 @@ a6713 · family=missing-word · status=unchecked
 Missing world word: check runtime. The world cannot hash a host executable, run isolated compiled-runtime probes, hold an OS publication lock or atomically replace runtime lock files. Draft source in a6498 adds runtime_pin.py, adapter startup gates and probe_support.py, plus empty-profile/stand-in Desk probes and fake binary/inventory tests. Both locks remain untouched until every candidate check passes. Source is not landed. The resident mock probe passed here; the worker mock probe failed at CreateRestrictedToken failed: 87. This is not live agent or current re-pin acceptance.
 Final source checks in this builder: 39 focused tests passed in 7.46s; changed-file Ruff All checks passed; git diff --check exit 0. Tests include fake binaries/inventories, a real cross-process lease, and fake-house receipt/notice delivery. Final resident mock source passed with -E and empty CODEX_HOME. Source uses the worker's existing MCP door route without changing DESKD=off in shells. Source and precise rerun instructions are preserved in research/codex-residents/runtime-pin-handoff.md. Not landed; worker-capable environment and live acceptance are still needed.
 20 Oct source-ready update under JEFF c6757/c6760: 48 focused tests passed in 6.70s; changed-file Ruff passed and diff check exit 0. Source now checks updater provenance and valid OpenAI OpCo, LLC Authenticode before candidate execution; Windows read-only inspection confirms that publisher on the installed candidate. Python-open guards with the real home present and fake credentials prove empty-home launch routing, not native IO containment. Both locks and inventories remain unchanged. Host-side --recheck, full worker mock matrix, real harmless resident/Astra turns and live notice/no-wake observation remain unverified. A healthy ordinary startup skips probes, so JEFF must explicitly --recheck after landing. No account or profile settings changed.
+
+### Browsing lacks a typed private navigation and selected-file boundary
+
+a7309 · family=missing-word · status=unchecked
+
+The staged browsing controller and request-policy experiment live only under research/window-lab/browsing. Missing world word: intentional typed navigation with per-tab history and an authenticated, unprivileged renderer/file-selection boundary. A lens can arrange chrome but cannot enforce native request isolation or authorize local file handles. Existing page embeds are trusted previews; scripts_mirror is an explicitly commissioned write-through script integration, not a general file browser or file-selection permission. This stage activates neither. See [[Browsing — architecture and acceptance]] for the staged source and unresolved security gates.
 
 ## cured (65)
 
