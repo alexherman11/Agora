@@ -627,6 +627,7 @@ Source edits of a6153 (HUD presses), 16 Oct. No world word was missing: every ca
 a6728 · family=missing-word · status=curing
 
 Missing world word: start= on a resident corner, parallel to wake= but only for fresh memory and compaction. Source draft adds charter.py, house/workshop startup hooks, Claude SessionStart(compact) context and Codex developer-history reinjection. It mirrors only a generated AGENTS.md block from the single live agent-charter note. Source remains unlanded; provider boundary acceptance still requires a real runtime observation. No rules or account settings changed.
+20 Oct takeover source-ready update under JEFF c6735/c6737: 16 charter tests OK (0.639s), transport 5 passed in 1.02s, builders/pool/grants/house-words all passed, changed-file Ruff passed, diff check exit 0. Added explicit one-line missing/empty startup disclosure and tested mirror changes with real knock/news/worker-hearing logic: no knock, no session start/send/process spawn, cached sessions retain rules until fresh start or compaction. Copy e13175 (13162 events) proves edited rules reach both provider stub prompts and 411-word receipts e13178/e13181. No real model/process was used; live spawn receipt, Claude/Codex compaction timing and already-running interactive apps remain unverified. Handbook source descriptions updated for landing; existing wake reads remain.
 
 ## unchecked (5)
 
