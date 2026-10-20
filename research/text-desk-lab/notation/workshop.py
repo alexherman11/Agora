@@ -148,7 +148,7 @@ then re-make any goldens you changed and run health again before setting ready."
 WHO_WORKER = "You are a worker in Agora's house: a disposable builder for one commission, then gone."
 # a5378 (Alex, 15 Oct: persistent compacting workers with shared memory; Jeff uses the workers, not Claude)
 WHO_BUILDER = """You are {builder}, one of Agora's standing builders. Your conversation carries on from commission to
-commission (Claude Code compacts it when it grows long), so what you learned on earlier cards is still yours; what the
+commission (your model runtime compacts it when it grows long), so what you learned on earlier cards is still yours; what the
 other builders learned is in the builders' notebook (below). Each commission has its own worktree and branch, and on the
 desk you sign as {actor} while you work on {task}: the name belongs to the card, so whoever calls it reaches the card's
 builder. A card can come to you from another builder: its card, its comments and its git log are where it stands. To hand
@@ -205,8 +205,7 @@ class Builder:
             self.state = {}
 
     def save(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        atomic_state(self.path, self.state)
 
 
 def git(*args, cwd=REPO, check=False, timeout=120):
@@ -222,6 +221,20 @@ def limit_reset(detail):
     H = sys.modules.get("house") or sys.modules.get("__main__")
     f = getattr(H, "limit_reset", None)
     return f(detail) if f else None
+
+
+def usage_limited(detail):
+    """Provider exhaustion only: a missing runtime or ordinary tool failure must never trigger a provider switch."""
+    return bool(re.search(r"(?:hit|reached|exceeded).{0,40}(?:usage|session|weekly|rate) limit|"
+                          r"usage limit|rate_limit_exceeded|insufficient_quota|"
+                          r"(?:weekly|session) limit.{0,80}reset", detail or "", re.I))
+
+
+def atomic_state(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(value, indent=1), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def health(world, cwd=HERE):
@@ -386,6 +399,8 @@ class Workshop:
         self.compare_lived(w)
         if self.keeper_reverts(w):
             w = self.house.load()
+        if self.limit_handoffs(w, cfg):
+            w = self.house.load()
         cs = self.commissions(w)
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
         for cid, (s, state) in sorted(cs.items(), key=lambda kv: kv[1][1] == "asked"):
@@ -428,7 +443,7 @@ class Workshop:
                     # a5378: a Claude lane is its standing builders; the card waits until one is free
                     props, last = s.get("props") or {}, self.card_state(cid).get("builder")
                     hand = str(props.get("hand_to") or "").strip()
-                    name = self.free_builder(w, cfg, prefer=hand or last, strict=bool(hand))
+                    name = self.free_builder(w, cfg, prefer=hand or last, strict=bool(hand), provider=lane["provider"])
                     if name:
                         self.begin(w, cid, s, cfg, lane, builder=name)
                     continue
@@ -575,25 +590,112 @@ class Workshop:
             mine = [ln for ln in lanes if ln["provider"] == held]
             if not mine:
                 return None
+            if self.provider_wait(held) > time.time():
+                return False
             return mine[0] if used.get(held, 0) < sum(ln["n"] for ln in mine) else False
-        room = [(ln["n"] - used.get(ln["provider"], 0), -i, ln) for i, ln in enumerate(lanes)]
+        room = [(ln["n"] - used.get(ln["provider"], 0), -i, ln) for i, ln in enumerate(lanes)
+                if self.provider_wait(ln["provider"]) <= time.time()]
+        if not room:
+            return False
         free, _, best = max(room, key=lambda r: r[:2])
         return best if free > 0 else False
+
+    def provider_limits(self):
+        try:
+            return json.loads((self.house.dir / "provider-limits.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+    def provider_wait(self, provider):
+        return self.provider_limits().get(provider, {}).get("retry_at", 0)
+
+    def limit_handoffs(self, w, cfg):
+        """Transfer a stopped, quota-held Claude card without reusing its conversation or losing its files.
+
+        The saved handoff marker is a recovery journal: if the house dies between saving local state and changing
+        the native card, the next pass completes that same handoff before any worker can be resumed.
+        """
+        if cfg.get("limit_fallback") != "codex":
+            return False
+        lanes = [ln for ln in self.pool(cfg) if ln["provider"] == "codex" and ln["n"] > 0]
+        if not lanes:
+            return False
+        changed = False
+        for cid, (s, state) in self.commissions(w).items():
+            if (state == "asked" and self.provider_of(cid, s) == "claude"
+                    and not self.card_state(cid).get("session")
+                    and self.provider_wait("claude") > time.time()):
+                wk = self.workers.get(cid)
+                if not wk or not (wk.alive() or wk.busy):
+                    self.set_state(cid, "asked", worker_provider="codex",
+                                   worker_model=lanes[0]["model"] or CODEX_MODEL)
+                    changed = True
+                continue
+            if state not in ("working", "waiting", "reverted"):
+                continue
+            st = self.card_state(cid)
+            transfer = st.get("handoff_pending")
+            # Old versions stored retry_at only for a known provider limit. New retryable crashes use retry_kind.
+            limited = st.get("retry_at") and st.get("retry_kind", "limit") == "limit"
+            if not transfer and not (limited and st.get("session_provider", "claude") == "claude"):
+                continue
+            wk = self.workers.get(cid)
+            if wk and (wk.busy or wk.alive()):
+                continue
+            if not self.real_tree(TREES / cid):
+                continue
+            path = self.house.dir / f"worker-{cid}" / "state.json"
+            if not transfer:
+                archive = path.parent / "handoffs" / f"claude-{time.time_ns()}.json"
+                atomic_state(archive, st)
+                limits = self.provider_limits()
+                limits["claude"] = {"retry_at": max(st.get("retry_at", 0), self.provider_wait("claude")),
+                                    "detail": st.get("last_error", "Claude usage-limit handoff")}
+                atomic_state(self.house.dir / "provider-limits.json", limits)
+                transfer = {"from": "claude", "to": "codex", "archive": str(archive),
+                            "model": lanes[0]["model"] or CODEX_MODEL}
+                carry = (st.get("pending") or {}).get("carry", "")
+                for key in ("session", "builder", "retry_at", "retry_kind", "failures", "unanswered",
+                            "unanswered_why", "last_error"):
+                    st.pop(key, None)
+                st.update(session_provider="codex", handoff_pending=transfer)
+                st["pending"] = {"delivered": False, "carry":
+                    f"Claude hit its usage limit. You now own commission {cid}; its old process is stopped. "
+                    f"The existing worktree and all edits are preserved. Read the card and comments, git status "
+                    f"and git diff before acting; verify what the last command did before repeating an effect. "
+                    f"Do not assume you have Claude's conversation.\n\n{s.get('title', '')}\n{s.get('text', '')}"
+                    f"\n\nLast pending instruction (may refer to Claude's prior context):\n{carry}"}
+                atomic_state(path, st)
+            self.set_state(cid, "working", worker_provider="codex", worker_model=transfer["model"])
+            # set_state is a native gateway operation, not a projection edit. Verify it before clearing the journal.
+            current = self.commissions(self.house.load()).get(cid)
+            if not current or current[0].get("props", {}).get("worker_provider") != "codex":
+                continue
+            st.pop("handoff_pending", None)
+            st["last_handoff"] = transfer
+            atomic_state(path, st)
+            self.workers.pop(cid, None)
+            self.say(cid, "Claude reached its usage limit. A persistent Codex builder will continue this card in "
+                          "the same worktree; edits and Claude's saved conversation are preserved. "
+                          "Claude will not resume this card automatically.")
+            changed = True
+        return changed
 
     # ---- standing builders (a5378) -----------------------------------------------------------------------------
     # Alex, 15 Oct: "persistent compacting workers with shared memory"; "make sure the new workers can do everything
     # you've been able to do". The pool's Claude lane is n builders, builder-1 .. builder-n, each one conversation that
     # resumes from card to card. A card keeps its own worktree, branch, desk name (worker-<card>) and state, so a
     # builder can set a waiting card down for the next asked one, and any free builder can pick it up again.
-    def builders(self, cfg):
-        """The pool's Claude lane as builder names; [] with no pool (every Claude card a disposable worker, as before)."""
-        n = sum(ln["n"] for ln in self.pool(cfg) if ln["provider"] == "claude")
-        return [f"builder-{i}" for i in range(1, n + 1)]
+    def builders(self, cfg, provider="claude"):
+        """Stable identities per provider. Codex threads resume directly; Claude sessions travel with their cwd."""
+        n = sum(ln["n"] for ln in self.pool(cfg) if ln["provider"] == provider)
+        prefix = "builder" if provider == "claude" else "codex-builder"
+        return [f"{prefix}-{i}" for i in range(1, n + 1)]
 
     def builds(self, lane, s, cfg):
-        """Does this asked card go to a builder? A Claude lane of the pool, and the card does not ask for a fresh one."""
+        """A pool lane uses persistent builders unless the card explicitly requests a fresh worker."""
         fresh = str((s.get("props") or {}).get("worker_fresh") or "").strip().lower() in FRESH
-        return bool(lane) and lane["provider"] == "claude" and not fresh and bool(self.builders(cfg))
+        return bool(lane) and not fresh and bool(self.builders(cfg, lane["provider"]))
 
     def card_state(self, cid):
         try:
@@ -605,14 +707,18 @@ class Workshop:
         """The card worker running on this builder now (its process alive), or None."""
         return next((x for x in self.workers.values() if getattr(x, "builder", None) == name and x.alive()), None)
 
-    def free_builder(self, w, cfg, prefer=None, strict=False):
+    def free_builder(self, w, cfg, prefer=None, strict=False, provider="claude"):
         """A builder that may take a card: no process, or one idle on a card that is not being worked (waiting, ready,
         landing). `prefer` first (the card's own builder, or the one it was handed to); with `strict` only it. The
         lowest-numbered free one otherwise, so cards in a row go to one builder and its memory gathers there."""
         cs = self.commissions(w)
-        names = self.builders(cfg)
+        names = self.builders(cfg, provider)
 
         def free(name):
+            if self.provider_wait(provider) > time.time():
+                return False
+            if Builder(self.house, name).state.get("retry_at", 0) > time.time():
+                return False
             x = self.holding(name)
             return x is None or not (x.busy or (cs.get(x.cid) or (None, ""))[1] in ("working", "reverted"))
         if prefer in names:
@@ -672,12 +778,15 @@ class Workshop:
         one. -> whether a builder took it."""
         if state not in ("working", "waiting", "reverted"):
             return False
+        if wk.state.get("retry_at", 0) > time.time():
+            return False
         hand = str((s.get("props") or {}).get("hand_to") or "").strip()
         pending = wk.state.get("pending") or {}
         untold = (wk.state.get("failure") or {}).get("told") is False
         if not (pending.get("carry") or untold or hand or state != "waiting" or self.heard(w, cid, s, wk, peek=True)):
             return False
-        name = self.free_builder(w, cfg, prefer=hand or wk.state.get("builder"), strict=bool(hand))
+        provider = self.provider_of(cid, s) or "claude"
+        name = self.free_builder(w, cfg, prefer=hand or wk.state.get("builder"), strict=bool(hand), provider=provider)
         if not name:
             return False
         if pending and wk.state.get("builder") != name:
@@ -844,6 +953,13 @@ class Workshop:
                           "a fresh worktree on the same branch.")
             return None
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))     # a1590: the name, never p2919
+        if not getattr(wk, "builder", None) and self.provider_of(cid, s) == "codex" and self.builders(cfg, "codex"):
+            name = self.free_builder(w, cfg, provider="codex")
+            if not name:
+                return None
+            wk.builder = name
+            wk.state["builder"] = name
+            wk.save()
         if getattr(wk, "builder", None):
             # a5378: a builder's card is not started on its own: it waits, parked, and the next pass gives it a builder
             # (its own first) when it has something to do, told what the restart cut short (parked)
@@ -892,7 +1008,7 @@ class Workshop:
     def failed(self, cid, wk, why):
         detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
         reset = limit_reset(detail)
-        if reset:
+        if reset or usage_limited(detail):
             # 1 Oct (Sable e4431, a1566 c1903): at 09:22 the usage limit failed every worker twice in a row; each was
             # marked failed and its worktree removed with its uncommitted edits, and the re-asked worker resumed a
             # conversation that remembered them. A limit is not the worker failing: stop it, keep its worktree and its
@@ -900,13 +1016,33 @@ class Workshop:
             first = not wk.state.get("retry_at")
             wk.stop()
             self.workers.pop(cid, None)
-            wk.state["retry_at"] = reset + 60
+            retry_at = reset + 60 if reset else time.time() + 300
+            wk.state.update(retry_at=retry_at, retry_kind="limit", last_error=detail)
             wk.save()
+            provider = wk.state.get("session_provider", "claude")
+            limits = self.provider_limits()
+            limits[provider] = {"retry_at": retry_at, "detail": detail}
+            atomic_state(self.house.dir / "provider-limits.json", limits)
+            if getattr(wk, "builder", None):
+                b = Builder(self.house, wk.builder)
+                b.state["retry_at"] = retry_at
+                b.save()
             if first:
                 self.say(cid, f"the worker hit the usage limit ({detail}); its worktree and conversation are kept, "
-                              f"and it resumes at {time.strftime('%H:%M', time.localtime(reset + 60))}.")
+                              f"and it retries at {time.strftime('%H:%M', time.localtime(retry_at))} "
+                              "unless the configured fallback takes over first.")
             return
         wk.state["failures"] = wk.state.get("failures", 0) + 1
+        if str(getattr(wk, "builder", "") or "").startswith("codex-builder-"):
+            wk.stop()
+            self.workers.pop(cid, None)
+            wk.state.update(retry_at=time.time() + min(30 * 2 ** min(wk.state["failures"] - 1, 4), 300),
+                            retry_kind="process", last_error=detail)
+            wk.save()
+            if wk.state["failures"] == 1:
+                self.say(cid, "The Codex builder stopped; its conversation and edits are kept. "
+                              "The house will restart it automatically with backoff.")
+            return
         wk.save()
         if wk.state["failures"] >= 2:
             self.hand_back(cid, wk, f"the worker stopped twice ({detail})")
@@ -995,8 +1131,8 @@ class Workshop:
             if e.get("by") == wk.actor and e["verb"] == "comment" and (e.get("args") or {}).get("mark") == "ask":
                 return
         last = ((wk.state.get("said") or [{}])[-1].get("text") or "").strip().splitlines()
-        self.say(cid, f"its worker was told the failure, and its turn ended without setting ready or asking anything. "
-                      f"It waits on you." + (f" Its last words: {last[-1][:300]}" if last else ""))
+        self.say(cid, "its worker was told the failure, and its turn ended without setting ready or asking anything. "
+                      "It waits on you." + (f" Its last words: {last[-1][:300]}" if last else ""))
 
     def commit_for(self, wk, message):
         """Everything uncommitted in a worker's worktree, outside sessions/, committed to its branch by the house.
@@ -1209,11 +1345,24 @@ class Worker:
                     self.state["extra_said"] = said
                 tools = tools + extra
                 if self.builder:
-                    # a5378: the conversation is the builder's, moved to where claude will look for it from this worktree
+                    # Claude keeps cwd-specific sessions; Codex resumes one durable thread with the new cwd/tools.
                     b = Builder(self.house, self.builder)
+                    if b.state.get("provider", provider) != provider:
+                        raise ValueError(f"{self.builder}: builder belongs to another provider; preserved")
                     sid = b.state.get("session")
-                    if sid and carry_conversation(sid, self.tree):
+                    if not sid and provider == "codex" and self.state.get("session_provider") == "codex":
+                        # Adopt an existing per-card Codex thread into an unused standing builder; never discard it.
+                        sid = self.state.get("session")
+                        if sid:
+                            b.state.update(session=sid, provider=provider)
+                            b.save()
+                    if sid and (provider == "codex" or carry_conversation(sid, self.tree)):
+                        old = self.state.get("session")
+                        if old and old != sid:
+                            self.state.setdefault("previous_sessions", []).append(
+                                {"session": old, "provider": self.state.get("session_provider", "claude")})
                         self.state["session"] = sid
+                        self.state["session_provider"] = provider
                     else:
                         if sid:
                             self.log("conversation lost", {"builder": self.builder, "session": sid})
@@ -1231,6 +1380,9 @@ class Worker:
                     cmd = [str(PY), str(adapter), "--model", model,
                            "--reasoning", props.get("worker_reasoning", "medium"),
                            "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
+                    cmd += ["--lease", str(self.dir / "worker.lock")]
+                    if self.builder:
+                        cmd += ["--lease", str(self.house.dir / self.builder / "worker.lock")]
                 elif provider == "claude":
                     cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                            "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
@@ -1283,6 +1435,7 @@ class Worker:
                 if self.builder and self.state.get("session") and self.state["session"] != had:
                     b = Builder(self.house, self.builder)        # a5378: the builder's conversation, wherever it went
                     b.state["session"] = self.state["session"]
+                    b.state["provider"] = self.state.get("session_provider", "claude")
                     b.save()
                 return ended
 

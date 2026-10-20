@@ -1,6 +1,7 @@
 """Inspect the compiled worker runtime using loopback mock inference."""
 
 import json
+import os
 import shutil
 import threading
 import uuid
@@ -11,6 +12,7 @@ from pathlib import Path
 from codex_resident import ThreadEnvelope, deny, receive
 from codex_worker import MODEL, runtime_config, thread_parameters
 from openai_codex.client import CodexClient
+from worker_job import child_job
 
 
 @contextmanager
@@ -76,9 +78,13 @@ def main():
             import sys
             mcp.write_text(json.dumps({"mcpServers": {"desk": {
                 "command": sys.executable, "args": [str(lab / "desk_mcp.py")],
-                "env": {"DESK_AS": "codex", "DESK_SESSION": "frontier", "DESKD": "off"},
+                "env": {"DESK_AS": "codex", "DESK_SESSION": "frontier",
+                        "DESKD": os.environ.get("DESKD") or "http://127.0.0.1:8794"},
             }}}))
-            with CodexClient(runtime_config(directory), approval_handler=deny) as client:
+            with (
+                CodexClient(runtime_config(directory), approval_handler=deny) as client,
+                child_job(client._proc),
+            ):
                 timer = threading.Timer(60, client.close)
                 timer.daemon = True
                 timer.start()

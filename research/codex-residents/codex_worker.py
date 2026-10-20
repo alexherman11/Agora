@@ -22,22 +22,32 @@ from codex_resident import (
     receive,
 )
 from openai_codex.client import CodexClient, CodexConfig
+from worker_job import child_job
+from worker_lease import worker_leases
 
 HERE = Path(__file__).resolve().parent
 MODEL = "gpt-6.1-sol"
 
 
 def pinned_catalog(model):
-    """The pinned catalog that lists `model`, with the hash its lock expects. a5284: Astra workers use the residents'
-    catalog (model-catalog.json, pinned by runtime-lock.json); Sol keeps its own. -> (path, sha256)."""
-    for name, lock_name in (("worker-model-catalog.json", "worker-runtime-lock.json"),
-                            ("model-catalog.json", "runtime-lock.json")):
+    """Return the pinned catalog and hash for `model`.
+
+    Astra uses the residents' model-catalog.json/runtime-lock.json; Sol keeps its own.
+    """
+    for name, lock_name in (
+        ("worker-model-catalog.json", "worker-runtime-lock.json"),
+        ("model-catalog.json", "runtime-lock.json"),
+    ):
         path = HERE / name
-        slugs = {m.get("slug") for m in json.loads(path.read_text(encoding="utf-8")).get("models", [])}
+        slugs = {
+            m.get("slug") for m in json.loads(path.read_text(encoding="utf-8")).get("models", [])
+        }
         if model in slugs:
             lock = json.loads((HERE / lock_name).read_text(encoding="utf-8"))
             return path, lock["catalog_sha256"]
-    raise RuntimeError(f"Requested model unavailable: {model} is in no pinned catalog; no substitution")
+    raise RuntimeError(
+        f"Requested model unavailable: {model} is in no pinned catalog; no substitution"
+    )
 
 
 def runtime_config(directory, model=MODEL):
@@ -45,25 +55,45 @@ def runtime_config(directory, model=MODEL):
         raise RuntimeError(f"Worker requires openai-codex=={SDK_VERSION}")
     lock = json.loads((HERE / "worker-runtime-lock.json").read_text(encoding="utf-8"))
     catalog, catalog_sha = pinned_catalog(model)
-    binary = os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]      # as the resident adapter: still hash-checked
-    for path, expected in ((Path(binary), lock["binary_sha256"]),
-                           (catalog, catalog_sha)):
+    binary = (
+        os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
+    )  # as the resident adapter: still hash-checked
+    for path, expected in ((Path(binary), lock["binary_sha256"]), (catalog, catalog_sha)):
         if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise RuntimeError(f"Pinned worker runtime changed or missing: {path}; recheck the inventory")
-    enabled = {"shell_tool", "unified_exec", "apply_patch_freeform", "view_image",
-               "web_search", "web_search_request", "standalone_web_search"}
+            raise RuntimeError(
+                f"Pinned worker runtime changed or missing: {path}; recheck the inventory"
+            )
+    enabled = {
+        "shell_tool",
+        "unified_exec",
+        "apply_patch_freeform",
+        "view_image",
+        "web_search",
+        "web_search_request",
+        "standalone_web_search",
+    }
     overrides = [f"features.{name}=false" for name in DISABLED if name not in enabled]
     overrides += [f"features.{name}=true" for name in enabled]
     overrides += [
-        'web_search="live"', "project_doc_max_bytes=0", "skills.include_instructions=false",
-        "skills.bundled.enabled=false", "features.skip_host_skill_discovery=true",
-        "orchestrator.skills.enabled=false", "orchestrator.mcp.enabled=false",
-        "memories.generate_memories=false", "memories.use_memories=false",
-        "include_apps_instructions=false", "include_collaboration_mode_instructions=false",
-        "analytics.enabled=false", 'history.persistence="none"', "agents.enabled=false",
-        "tools.experimental_request_user_input.enabled=false", "notify=[]",
+        'web_search="live"',
+        "project_doc_max_bytes=0",
+        "skills.include_instructions=false",
+        "skills.bundled.enabled=false",
+        "features.skip_host_skill_discovery=true",
+        "orchestrator.skills.enabled=false",
+        "orchestrator.mcp.enabled=false",
+        "memories.generate_memories=false",
+        "memories.use_memories=false",
+        "include_apps_instructions=false",
+        "include_collaboration_mode_instructions=false",
+        "analytics.enabled=false",
+        'history.persistence="none"',
+        "agents.enabled=false",
+        "tools.experimental_request_user_input.enabled=false",
+        "notify=[]",
         'windows.sandbox="unelevated"',
-        'sandbox_mode="workspace-write"', 'approval_policy="never"',
+        'sandbox_mode="workspace-write"',
+        'approval_policy="never"',
         "model_catalog_json=" + json.dumps(str(catalog)),
     ]
     # The SDK merges env into this process. Presence-only internal switches (CI,
@@ -73,8 +103,11 @@ def runtime_config(directory, model=MODEL):
             os.environ.pop(key)
     env = {"CODEX_HOME": str(PROFILE)}
     return CodexConfig(
-        codex_bin=binary, cwd=str(directory), env=env,
-        config_overrides=tuple(overrides), client_name="agora_desk_worker",
+        codex_bin=binary,
+        cwd=str(directory),
+        env=env,
+        config_overrides=tuple(overrides),
+        client_name="agora_desk_worker",
         client_title="Agora Desk worker",
     )
 
@@ -83,19 +116,32 @@ def thread_parameters(directory, model, prompt, mcp, extra_config=None):
     servers = json.loads(Path(mcp).read_text(encoding="utf-8"))["mcpServers"]
     if set(servers) != {"desk"}:
         raise ValueError("Worker configuration must expose only the authorized desk server")
-    config = {"mcp_servers": {name: {**entry, "enabled": True,
-                                    "enabled_tools": ["desk"],
-                                    "tools": {"desk": {"approval_mode": "approve"}}}
-                              for name, entry in servers.items()}}
+    config = {
+        "mcp_servers": {
+            name: {
+                **entry,
+                "enabled": True,
+                "enabled_tools": ["desk"],
+                "tools": {"desk": {"approval_mode": "approve"}},
+            }
+            for name, entry in servers.items()
+        }
+    }
     # Git commits in the worker's existing tree use the shared object database.
     repo = HERE.parents[1]
     config["sandbox_workspace_write.writable_roots"] = [str(directory), str(repo / ".git")]
+    # Compact before the pinned 272k context fills; retain the thread across cards and restarts.
+    config["model_auto_compact_token_limit"] = 180000
     config.update(extra_config or {})
     return {
-        "model": model, "modelProvider": "openai", "cwd": str(directory),
+        "model": model,
+        "modelProvider": "openai",
+        "cwd": str(directory),
         "config": config,
-        "approvalPolicy": "never", "sandbox": "workspace-write",
-        "developerInstructions": prompt, "dynamicTools": [],
+        "approvalPolicy": "never",
+        "sandbox": "workspace-write",
+        "developerInstructions": prompt,
+        "dynamicTools": [],
     }
 
 
@@ -113,7 +159,10 @@ def serve(args):
 
     threading.Thread(target=read_input, daemon=True).start()
     prompt = Path(args.prompt_file).read_text(encoding="utf-8")
-    with CodexClient(runtime_config(directory, args.model), approval_handler=deny) as client:
+    with (
+        CodexClient(runtime_config(directory, args.model), approval_handler=deny) as client,
+        child_job(client._proc),
+    ):
         client.initialize()
         if args.model not in {m.model for m in client.model_list(True).data}:
             raise RuntimeError(f"Requested model unavailable: {args.model}; no substitution")
@@ -122,13 +171,22 @@ def serve(args):
             params.pop("dynamicTools")
             params["threadId"] = args.resume
         started = client.request(
-            "thread/resume" if args.resume else "thread/start", params,
+            "thread/resume" if args.resume else "thread/start",
+            params,
             response_model=ThreadEnvelope,
         )
         if started.model != args.model or (args.resume and started.thread.id != args.resume):
             raise RuntimeError("Worker model or resumed conversation identity changed")
-        output({"type": "system", "subtype": "init", "session_id": started.thread.id,
-                "model": started.model, "sdk": SDK_VERSION, "provider": "codex"})
+        output(
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": started.thread.id,
+                "model": started.model,
+                "sdk": SDK_VERSION,
+                "provider": "codex",
+            }
+        )
         while True:
             message = incoming.get()
             if message is None:
@@ -136,16 +194,17 @@ def serve(args):
             if message.get("type") != "user":
                 raise ValueError("Expected house user message")
             content = message["message"]["content"]
-            text = content if isinstance(content, str) else "\n".join(
-                c["text"] for c in content if c.get("type") == "text"
+            text = (
+                content
+                if isinstance(content, str)
+                else "\n".join(c["text"] for c in content if c.get("type") == "text")
             )
-            turn_id = client.turn_start(
-                started.thread.id, text, {"effort": args.reasoning}
-            ).turn.id
+            turn_id = client.turn_start(started.thread.id, text, {"effort": args.reasoning}).turn.id
             finished = threading.Event()
 
             def watch(turn=turn_id, done=finished):
                 import time
+
                 deadline = time.monotonic() + args.timeout
                 while not done.wait(0.1):
                     if closed.is_set() or time.monotonic() >= deadline:
@@ -180,12 +239,20 @@ def main():
     parser.add_argument("--timeout", type=float, default=3600)
     parser.add_argument("--mcp-config", required=True)
     parser.add_argument("--prompt-file", required=True)
+    parser.add_argument("--lease", action="append", default=[])
     args = parser.parse_args()
     try:
-        return serve(args)
+        with worker_leases(args.lease):
+            return serve(args)
     except Exception as exc:
-        output({"type": "result", "is_error": True,
-                "subtype": type(exc).__name__, "result": str(exc)[:1000]})
+        output(
+            {
+                "type": "result",
+                "is_error": True,
+                "subtype": type(exc).__name__,
+                "result": str(exc)[:1000],
+            }
+        )
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         return 1
 
