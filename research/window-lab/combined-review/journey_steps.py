@@ -814,8 +814,468 @@ async def escdiag(J):
     J.record("escdiag", escdiag.__doc__, "ran", json.dumps(out), out, [])
 
 
+# ---- round 2 (c7492): the repaired bytes, with no selection clearing and no masking waits -------------------------
+
+CHAT_TA = "[...document.querySelectorAll('textarea')].find(e => __cr.vis(e) && e.closest('[data-key*=\"lens:jeff-chat\"]'))"
+STATUS = "((document.getElementById('status') || {}).textContent || '').slice(0, 160)"
+
+
+async def wrap_fetch(J):
+    """One page-side wrapper for /api/do: window.__delay holds every answer back (ms); window.__refuse answers it refused."""
+    await J.js("""(() => { if (window.__dwrap) return; window.__dwrap = 1; window.__delay = 0; window.__refuse = false; const f = window.fetch;
+      window.fetch = (u, o) => { if (!String(u).startsWith('/api/do')) return f(u, o);
+        if (window.__refuse) return Promise.resolve(new Response(JSON.stringify({ text: 'ERR refused: review test refusal (a7466)' }), { headers: { 'Content-Type': 'application/json' } }));
+        return window.__delay ? new Promise(r => setTimeout(r, window.__delay)).then(() => f(u, o)) : f(u, o); }; })()""")
+
+
+async def answered(J, timeout=5.0):
+    """Wait until the world's answer to the last drop is painted (tools rebuilt, none stale); -> ms waited."""
+    t0 = asyncio.get_event_loop().time()
+    while asyncio.get_event_loop().time() - t0 < timeout:
+        ch = await J.js("__cr.chrome()")
+        if [c for c in ch if c["cls"] == "l-divider"] and not [p for p in await problems(J) if "stale" in p]:
+            return round((asyncio.get_event_loop().time() - t0) * 1000)
+        await asyncio.sleep(0.05)
+    return None
+
+
+async def consecutive_paced(J):
+    """three carries of the same panel, each started once the previous drop's answer is painted (no selection clearing)"""
+    await J.reload()
+    await fixture(J)
+    fr = await frame(J)
+    notes, rows = [], []
+    for side, (x, y) in (("bottom", (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)), ("top", (fr[0] + fr[2] / 2, fr[1] + 3)),
+                         ("left", (fr[0] + 3, fr[1] + fr[3] / 2))):
+        sel0 = await J.js("__cr.selection()")
+        gx, gy = await grip(J, "The board")
+        seen, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (x, y)], lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection()})"))
+        waited = await answered(J)
+        rows.append({"side": side, "selected before": sel0, "mid": seen[1], "answer painted after ms": waited})
+        if not seen[1]["ghost"] or seen[1]["sel"]:
+            notes.append(f"{side}: carry {'started' if seen[1]['ghost'] else 'did not start'}, {seen[1]['sel']} selected")
+    b = await box(J, "The board")
+    if not b or abs(b["r"][3] - fr[3]) > TOL:
+        notes.append(f"final board {b and b['r']}")
+    J.record("consecutive-paced", consecutive_paced.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"each carry started with nothing selected and landed; answers painted after {[r['answer painted after ms'] for r in rows]} ms",
+             {"rows": rows}, [await J.shot("consecutive-paced")])
+    await restore(J)
+
+
+async def consecutive(J):
+    """three carries of the same panel back to back, no wait and no selection clearing: each picks up and lands"""
+    await J.reload()
+    await fixture(J)
+    fr = await frame(J)
+    notes, rows = [], []
+    for side, (x, y) in (("bottom", (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)), ("top", (fr[0] + fr[2] / 2, fr[1] + 3)),
+                         ("left", (fr[0] + 3, fr[1] + fr[3] / 2))):
+        before = {"sel": await J.js("__cr.selection()"), "us": await J.js("document.body.style.userSelect")}
+        gx, gy = await grip(J, "The board")
+        seen, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (x, y)],
+                               lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection(), us: document.body.style.userSelect, pv: __cr.previews().length})"))
+        after = {"sel": await J.js("__cr.selection()"), "us": await J.js("document.body.style.userSelect")}
+        rows.append({"side": side, "before": before, "mid": seen[1], "after": after})
+        if not seen[1]["ghost"]:
+            notes.append(f"{side}: the carry did not start")
+        if seen[1]["sel"]:
+            notes.append(f"{side}: {seen[1]['sel']} characters selected mid-carry")
+        if seen[1]["us"] != "none":
+            notes.append(f"{side}: selection not suppressed mid-carry (userSelect {seen[1]['us']!r})")
+        if after["us"] != before["us"]:
+            notes.append(f"{side}: userSelect {before['us']!r} -> {after['us']!r} after release")
+    await J.settle(2.5)
+    b = await box(J, "The board")
+    if not b or abs(b["r"][3] - fr[3]) > TOL or abs(b["r"][0] - fr[0]) > TOL:
+        notes.append(f"after the third drop the board is {b and b['r']}, not the left edge spanning {fr[3]:.1f}")
+    notes += await problems(J)
+    left = await J.js("__cr.selection()")
+    if left:
+        notes.append(f"{left} characters still selected at the end (the next carry starting on them would be cancelled)")
+    J.record("consecutive", consecutive.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or "bottom, top, left with no pause: each picked up (ghost, 0 selected, userSelect none mid-carry, restored after), the last one landed",
+             {"rows": rows}, [await J.shot("consecutive")])
+    await restore(J)
+
+
+async def immediate(J):
+    """with the world's answer held back 1.5 s: straight after a drop no obsolete divider/Fit tool stands where panels were, the optimistic layout holds, a second carry is tried, and the answer brings tools back"""
+    await J.reload()
+    await fixture(J)
+    await wrap_fetch(J)
+    old = [c for c in await J.js("__cr.chrome()") if c["label"].startswith("Resize neighbouring")]
+    await J.js("window.__delay = 1500")
+    fr = await frame(J)
+    gx, gy = await grip(J, "The board")
+    await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)])
+    now = {"stale": [p for p in await problems(J) if "stale" in p], "board": await box(J, "The board"),
+           "tools": len(await J.js("__cr.chrome()")),
+           "at old dividers": [await J.js(f"(() => {{ const e = document.elementFromPoint({c['r'][0] + 6}, {c['r'][1] + c['r'][3] * .25}); return e ? (typeof e.className === 'string' ? e.className.split(' ')[0] : e.tagName) : null; }})()") for c in old]}
+    shot = await J.shot("immediate-pending")
+    cx, cy = await grip(J, "Chat")
+    seen, handle = await J.hold(cx, cy, [(cx - 40, cy + 30)], lambda a, b: J.js("!!__cr.ghost()"), release=False)
+    J.w.SB.press_key(J.w.SB.focused(J.w.win), "Escape")
+    await asyncio.sleep(0.2)
+    J.up(handle)
+    second = seen[0]
+    await J.settle(3)
+    await J.js("window.__delay = 0")
+    later = {"stale": [p for p in await problems(J) if "stale" in p], "dividers": len([c for c in await J.js("__cr.chrome()") if c["cls"] == "l-divider"]),
+             "board": await box(J, "The board")}
+    notes = []
+    if now["stale"]:
+        notes.append(f"obsolete tools stood right after the drop: {now['stale'][:2]}")
+    if "l-divider" in now["at old dividers"]:
+        notes.append(f"a press where an old divider was still lands on a divider ({now['at old dividers']})")
+    if not now["board"] or abs(now["board"]["r"][2] - fr[2]) > TOL:
+        notes.append(f"optimistic layout not held while pending ({now['board'] and now['board']['r']})")
+    if later["stale"] or not later["dividers"]:
+        notes.append(f"after the answer: stale {later['stale'][:2]}, dividers {later['dividers']}")
+    J.record("immediate", immediate.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"pending 1.5 s: no obsolete tool, old divider spots now hit {now['at old dividers']}, board held at {now['board']['r']}; "
+             f"a second carry during the pending answer {'started' if second else 'was declined (no ghost) and left nothing behind'}; answer: {later['dividers']} dividers, none stale",
+             {"now": now, "later": later, "second carry started": second}, [shot, await J.shot("immediate-answered")])
+    await restore(J)
+
+
+async def refusal(J):
+    """a refused drop rolls back to the world's layout, tools come back, the selection policy is restored"""
+    f = await fixture(J)
+    await wrap_fetch(J)
+    b0, us0 = await J.js("__cr.boxes()"), await J.js("document.body.style.userSelect")
+    await J.js("window.__refuse = true")
+    fr = await frame(J)
+    gx, gy = await grip(J, "The board")
+    await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)])
+    await J.settle(2.5)
+    await J.js("window.__refuse = false")
+    b1, st, status = await J.js("__cr.boxes()"), await J.js("__cr.state()"), await J.js(STATUS)
+    notes = []
+    if json.loads(st["tree"]) != json.loads(f["tree"]):
+        notes.append("the world tree changed despite the refusal")
+    if len(b0) != len(b1) or not all(agree(a["r"], b["r"]) for a, b in zip(b0, b1)):
+        notes.append(f"the page did not roll back ({[b['r'] for b in b1]})")
+    if "review test refusal" not in status:
+        notes.append(f"the refusal was not said ({status!r})")
+    if await J.js("document.body.style.userSelect") != us0 or await J.js("__cr.selection()"):
+        notes.append("selection policy/state not restored after the refusal")
+    notes += await problems(J)
+    if not [c for c in await J.js("__cr.chrome()") if c["cls"] == "l-divider"]:
+        notes.append("no dividers after the rollback")
+    J.record("refusal", refusal.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"refused drop rolled back to the world's boxes, dividers back, status {status!r}",
+             {"status": status}, [await J.shot("refusal")])
+    await restore(J)
+
+
+async def cancel_policy(J):
+    """Escape, resize and blur mid-carry each restore the page's own selection policy, including a prior inline one"""
+    await fixture(J)
+    fr = await frame(J)
+    notes, seen_rows = [], []
+    for prior in ("", "text"):
+        await J.js(f"document.body.style.userSelect = {json.dumps(prior)}")
+        for how in ("escape", "resize", "blur"):
+            gx, gy = await grip(J, "The board")
+            seen, handle = await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)],
+                                        lambda a, b: J.js("document.body.style.userSelect"), release=False)
+            if how == "escape":
+                J.w.SB.press_key(J.w.SB.focused(J.w.win), "Escape")
+            else:
+                await J.js(f"window.dispatchEvent(new Event({json.dumps(how)}))")
+            await asyncio.sleep(0.3)
+            J.up(handle)
+            await J.settle(1.2)
+            us, sel, st, gh = await J.js("document.body.style.userSelect"), await J.js("__cr.selection()"), await J.js("__cr.state()"), await J.js("__cr.ghost()")
+            seen_rows.append([prior, how, seen[1], us, sel])
+            if seen[1] != "none":
+                notes.append(f"prior {prior!r} {how}: not suppressed mid-carry ({seen[1]!r})")
+            if us != prior:
+                notes.append(f"prior {prior!r} {how}: userSelect {us!r} after cancel")
+            if sel or gh:
+                notes.append(f"prior {prior!r} {how}: selection {sel} / ghost left")
+            if json.loads(st["tree"]) != json.loads((await fixture(J))["tree"]):
+                notes.append(f"prior {prior!r} {how}: the cancel committed")
+                await restore(J)
+    await J.js("document.body.style.userSelect = ''")
+    J.record("cancel-policy", cancel_policy.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or "6 cancels (prior '' and 'text' × Escape, resize, blur): suppressed mid-carry, prior policy back, nothing selected or committed (resize/blur are dispatched events)",
+             {"rows": seen_rows}, [await J.shot("cancel-policy")])
+
+
+async def composer(J):
+    """an unsent draft, its selected range and the chat's context survive carries and a divider drag"""
+    await fixture(J)
+    c = await J.js(f"(() => {{ const t = {CHAT_TA}; return t ? __cr.hit(t) : null; }})()")
+    if not c or not c["ok"]:
+        J.record("composer", composer.__doc__, "blocked", f"the chat composer cannot be pressed at this size ({c})", {}, [await J.shot("composer-cut")])
+        return
+    await J.w.click(c["x"], c["y"])
+    await asyncio.sleep(0.3)
+    await J.w.type("unsent review draft")
+    await J.js(f"{CHAT_TA}.setSelectionRange(3, 9)")
+    read = f"(() => {{ const t = {CHAT_TA}; const chat = t.closest('[data-key*=\"lens:jeff-chat\"]'); return {{ v: t.value, s: t.selectionStart, e: t.selectionEnd, ctx: (() => {{ const s = (__cr.byLabel('Chat') || chat).innerText.replace(/\\s+/g, ' '); const i = s.lastIndexOf('Attach open item'); return i < 0 ? 'no context row' : s.slice(i, i + 120); }})() }}; }})()"
+    v0 = await J.js(read)
+    out, notes = {"start": v0}, []
+    fr = await frame(J)
+    await carry_to(J, "The board", fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)
+    out["after drop"] = await J.js(read)
+    await carry_to(J, "The board", fr[0] + 3, fr[1] + fr[3] / 2)
+    out["after second drop"] = await J.js(read)
+    ds = [d for d in await J.js("__cr.chrome()") if d["label"].startswith("Resize neighbouring")]
+    if ds:
+        d = ds[0]
+        x, y = d["r"][0] + d["r"][2] / 2, d["r"][1] + d["r"][3] / 2
+        await J.hold(x, y, [(x + 60, y)] if d["axis"] == "x" else [(x, y + 60)])
+        await J.settle(1.6)
+        out["after divider"] = await J.js(read)
+    for k, v in out.items():
+        if k != "start" and v != v0:
+            notes.append(f"{k}: {v} (was {v0})")
+    sent = await J.js("[...document.querySelectorAll('[data-key*=\"lens:jeff-chat\"]')].some(e => e.innerText.includes('unsent review draft') && !e.querySelector('textarea') && e.tagName !== 'TEXTAREA')")
+    if sent:
+        notes.append("the draft appears outside the composer (sent?)")
+    J.record("composer", composer.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"words, range {v0['s']}-{v0['e']} and context {v0['ctx']} unchanged through two drops and a divider; nothing sent",
+             out, [await J.shot("composer")])
+    await restore(J)
+
+
+async def tabs_focus(J):
+    """drops started from a tab group and from focused mode: preview == result"""
+    await fixture(J)
+    notes, shots = [], []
+    v = await box(J, "Viewer")
+    await carry_to(J, "The board", v["r"][0] + v["r"][2] / 2, v["r"][1] + v["r"][3] / 2)
+    shown = [b["label"] for b in await J.js("__cr.boxes()")]
+    member = "The board" if "The board" in shown else "Viewer"
+    other = "Viewer" if member == "The board" else "The board"
+    fr = await frame(J)
+    seen = await carry_to(J, member, fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)
+    pv = [p for p in seen[1]["previews"] if p["in"] == "partition"]
+    b = await box(J, member)
+    if not pv or not b or not agree(pv[0]["r"], b["r"]) or abs(b["r"][2] - fr[2]) > TOL:
+        notes.append(f"from a tab: preview {pv and pv[0]['r']} result {b and b['r']}")
+    if not await box(J, other):
+        notes.append(f"{other} vanished when its tab partner left")
+    shots.append(await J.shot("tab-drop"))
+    await restore(J)
+    x, y = await grip(J, "The board")
+    await J.w.dblclick(x, y)
+    await J.settle(2)
+    if not (await J.js("__cr.state()"))["focus"]:
+        notes.append("could not enter focus")
+    else:
+        fr = await frame(J)
+        seen = await carry_to(J, "Chat", fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)
+        pv = [p for p in seen[1]["previews"] if p["in"] == "partition"]
+        b, st = await box(J, "Chat"), await J.js("__cr.state()")
+        if st["focus"]:
+            notes.append("a drop in focus did not exit focus")
+        if not pv or not b or not agree(pv[0]["r"], b["r"]):
+            notes.append(f"from focus: preview {pv and pv[0]['r']} result {b and b['r']}")
+        notes += await problems(J)
+        shots.append(await J.shot("focus-drop"))
+    J.record("tabs-focus", tabs_focus.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"{member} carried out of its tab group to the bottom (preview = result, {other} stays); Chat dropped at the bottom from focus: focus exits, preview = result",
+             {}, shots)
+    await restore(J)
+
+
+async def receivers(J):
+    """the dock or the carried panel changing while held: the drop is refused and nothing falls back to a split"""
+    f = await fixture(J)
+    dock = await J.js("(() => { const d = document.querySelector('[data-key$=\"/foot/bar/f5565\"]'); return d ? __cr.R(d) : null; })()")
+    count = "[...document.querySelectorAll('[data-key*=\"/foot/bar/f5565/\"]')].filter(e => /\\/apps\\/a\\d+$/.test(e.dataset.key) && __cr.vis(e)).map(e => (e._n.paint.tip || [])[0])"
+    notes, shots = [], []
+    p0 = await J.js(count)
+    gx, gy = await grip(J, "Viewer")
+    seen, handle = await J.hold(gx, gy, [(gx + 30, gy + 10), (dock[0] + dock[2] / 2, dock[1] + dock[3] / 2)], lambda a, b: J.js("__cr.previews()"), release=False)
+    J.copy.do("look f5565", "hud-playtest")
+    said = J.copy.do('do create f5565 kind=note title="review probe" role=dock-pin glyph=• opens=f155', "hud-playtest")
+    await asyncio.sleep(1.0)
+    J.up(handle)
+    await J.settle(2.5)
+    p1, st, status1 = await J.js(count), await J.js("__cr.state()"), await J.js(STATUS)
+    viewer_pins = [t for t in p1 if t and t.lower().startswith("viewer")]
+    if len(viewer_pins) > len([t for t in p0 if t and t.lower().startswith("viewer")]):
+        notes.append(f"the drop on the changed dock still pinned the viewer ({p1})")
+    if json.loads(st["tree"]) != json.loads(f["tree"]):
+        notes.append("the refused dock drop fell back to rearranging the tree")
+        await restore(J)
+    shots.append(await J.shot("receiver-changed"))
+    fr = await frame(J)
+    gx, gy = await grip(J, "The board")
+    _, handle = await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)], release=False)
+    J.copy.do("read a5674", "hud-playtest")
+    J.copy.do("do prop a5674 about=\"review probe\"", "hud-playtest")
+    await asyncio.sleep(1.0)
+    J.up(handle)
+    await J.settle(2.5)
+    st2, status2 = await J.js("__cr.state()"), await J.js(STATUS)
+    if json.loads(st2["tree"]) != json.loads(f["tree"]):
+        notes.append(f"a drop of a panel changed while held still committed ({status2!r})")
+    shots.append(await J.shot("carried-changed"))
+    J.copy.do("read a5674", "hud-playtest")
+    J.copy.do("do prop a5674 about=\"\"", "hud-playtest")
+    J.record("receivers", receivers.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"dock changed while held: no viewer pin, tree untouched (status {status1!r}); board changed while held: no commit (status {status2!r})",
+             {"probe": said[:160], "pins before": p0, "pins after": p1}, shots)
+    await restore(J)
+
+
+async def doc_pins(J):
+    """pin the viewer's surface and a document by the viewer title; each pin opens it; the window-definition pin offers Open as a window and asks the host"""
+    await fixture(J)
+    pins = "[...document.querySelectorAll('[data-key*=\"/foot/bar/f5565/\"]')].filter(e => /\\/apps\\/a\\d+$/.test(e.dataset.key) && __cr.vis(e)).map(e => ({id: e.dataset.key.split('/').pop(), tip: (e._n.paint.tip || [])[0], h: __cr.hit(e)}))"
+    vtitle = ("(() => { const p = __cr.byLabel('Viewer'); const g = [...p.querySelectorAll('[data-carry]')].filter(g => __cr.vis(g) && g._n && g._n.fence && "
+              "g._n.fence.item !== p._n.paint.partition_item); const t = g[0]; return t ? {hit: __cr.hit(t), text: t.innerText.trim().slice(0, 60)} : null; })()")
+    dock = await J.js("(() => { const d = document.querySelector('[data-key$=\"/foot/bar/f5565\"]'); return d ? __cr.R(d) : null; })()")
+    notes, shots, made = [], [], []
+    for what in ("surface", "document"):
+        if what == "document":
+            b = await J.js("(() => { const b = [...__cr.byLabel('Viewer').querySelectorAll('[data-key]')].find(x => x.innerText.trim() === 'The lowdown' && __cr.vis(x)); return b ? __cr.hit(b) : null; })()")
+            if not b:
+                notes.append("no 'The lowdown' chip in the viewer to open a document")
+                break
+            await J.w.click(b["x"], b["y"])
+            await J.settle(2)
+        t = await J.js(vtitle)
+        if not t or not t["hit"]["ok"]:
+            notes.append(f"no pressable viewer title for the {what} ({t})")
+            continue
+        p0 = await J.js(pins)
+        await J.hold(t["hit"]["x"], t["hit"]["y"], [(t["hit"]["x"] + 30, t["hit"]["y"] + 10), (dock[0] + dock[2] - 4, dock[1] + dock[3] / 2)])
+        await J.settle(2.5)
+        p1 = await J.js(pins)
+        new = [p for p in p1 if p["id"] not in {x["id"] for x in p0}]
+        if len(new) != 1:
+            notes.append(f"pinning the {what} {t['text']!r} made {len(new)} pins")
+        else:
+            made.append((what, t["text"], new[0]))
+        shots.append(await J.shot(f"pin-{what}"))
+    for what, title, pin in made[:1]:
+        p = [x for x in await J.js(pins) if x["id"] == pin["id"]][0]
+        await J.w.click(p["h"]["x"], p["h"]["y"])
+        await J.settle(2.5)
+        t = await J.js(vtitle)
+        if not t or title.split()[0] not in t["text"]:
+            notes.append(f"its pin did not reopen the {what} {title!r} (viewer shows {t and t['text']!r})")
+        shots.append(await J.shot("pin-reopened"))
+    w = [x for x in await J.js(pins) if x["tip"] == "Writing room"]
+    host = None
+    if w:
+        await J.w.click(w[0]["h"]["x"], w[0]["h"]["y"], right=True)
+        await J.settle(0.8)
+        menu = await J.js("(() => { const m = document.getElementById('menu-pop'); return m ? [...m.querySelectorAll('button')].map(b => b.textContent) : null; })()")
+        if not menu or "Open as a window" not in menu:
+            notes.append(f"the window-definition pin's menu is {menu}")
+            await J.w.key("Escape")
+        else:
+            r = await J.js("(() => { const b = [...document.querySelectorAll('#menu-pop button')].find(b => b.textContent === 'Open as a window'); const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()")
+            await J.w.click(*r)
+            await J.settle(1.5)
+            host = await J.js("(window.__pt && window.__pt.host || []).slice(-3)")
+            if not any("window" in h and "writing" in h for h in host):
+                notes.append(f"Open as a window asked the host {host}")
+    else:
+        notes.append("no Writing room pin")
+    J.record("doc-pins", doc_pins.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"pinned {[(w_, t_) for w_, t_, _ in made]} by the viewer title, one pin each; the surface pin reopened it; Writing room: 'Open as a window' asked the (stand-in) host {host}",
+             {"made": made, "host": host}, shots)
+    await restore(J)
+
+
+async def tints(J):
+    """the staged optional tints applied to the copy (a5567 purple, a5569 amber, a5571 blue, a5573 green): pins coloured apart"""
+    for pid, tint in (("a5567", "purple"), ("a5569", "amber"), ("a5571", "blue"), ("a5573", "green")):
+        J.copy.do(f"read {pid}", "hud-playtest")
+        J.copy.do(f"do prop {pid} tint={tint}", "hud-playtest")
+    await J.settle(2.5)
+    pins = await J.js("[...document.querySelectorAll('[data-key*=\"/foot/bar/f5565/\"]')].filter(e => /\\/apps\\/a\\d+$/.test(e.dataset.key) && __cr.vis(e)).map(e => { const i = e.querySelector('[data-key$=\"/icon\"]') || e; const g = e.querySelector('[data-key*=\"/glyph\"]') || i; return {tip: (e._n.paint.tip || [])[0], cls: i.className, bg: getComputedStyle(i).backgroundColor, fg: getComputedStyle(g).color}; })")
+    staged = {"JEFF": "purple", "Board": "amber", "Conversation": "blue", "Writing room": "green"}
+    looks = {p["tip"]: (p["bg"], p["fg"]) for p in pins if p["tip"] in staged}
+    notes = []
+    if len(set(looks.values())) < 3:
+        notes.append(f"tinted pins are not coloured apart: {looks}")
+    if "sd_icon_blue" not in " ".join(p["cls"] for p in pins):
+        blue = looks.get("Conversation")
+        notes_blue = f"tint=blue has no role in home-dock (green/amber/purple/rose only): Conversation draws {blue}, the untinted default"
+    else:
+        notes_blue = ""
+    J.record("tints", tints.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"coloured apart: {looks}" + (f"; note: {notes_blue}" if notes_blue else ""),
+             {"pins": pins}, [await J.shot("tints")])
+
+
+async def workspace_identity(J):
+    """EMULATED workspace switch (no workspace exists in the world): the layout is replaced by its own copy; the tree's typed refs remap to the copy's panels with the same geometry; a panel pin opens a panel of the CURRENT layout"""
+    f = await fixture(J)
+    pins = "[...document.querySelectorAll('[data-key*=\"/foot/bar/f5565/\"]')].filter(e => /\\/apps\\/a\\d+$/.test(e.dataset.key) && __cr.vis(e)).map(e => ({id: e.dataset.key.split('/').pop(), tip: (e._n.paint.tip || [])[0], h: __cr.hit(e)}))"
+    notes, shots = [], []
+    if not [p for p in await J.js(pins) if p["tip"] == "The board"]:
+        dock = await J.js("(() => { const d = document.querySelector('[data-key$=\"/foot/bar/f5565\"]'); return __cr.R(d); })()")
+        await carry_to(J, "The board", dock[0] + dock[2] - 4, dock[1] + dock[3] / 2)
+    b0 = await J.js("__cr.boxes()")
+    old_ids = {b["id"] for b in b0}
+    J.copy.do("look f5204", "hud-playtest")
+    said = J.copy.do(f"do copy {f['layout']} into=f5204", "hud-playtest")
+    import re
+    found = J.copy.do("find kind:surface,prop:role=home-layout,prop:actor=alex", "hud-playtest")
+    ids = [i for i in re.findall(r"^\s+(f\d+) ", found, re.M) if i != f["layout"]]
+    new = ids[0] if len(ids) == 1 else None
+    if not new or new == f["layout"]:
+        J.record("workspace", workspace_identity.__doc__, "blocked", f"could not read the copied layout's id: {said[:200]}", {}, [])
+        return
+    J.copy.do(f"look {f['layout']}", "hud-playtest")
+    J.copy.do(f"do prop {f['layout']} role=workspace-review-old", "hud-playtest")
+    J.copy.do(f"look {new}", "hud-playtest")
+    J.copy.do(f"do prop {new} role=home-layout", "hud-playtest")
+    await J.settle(3)
+    root = await J.js("__cr.root() && __cr.root()._n.fence.item")
+    b1 = await J.js("__cr.boxes()")
+    tree_ids = set(re.findall(r'"\$ref": ?"(a\d+)"', (await J.js("__cr.state()"))["tree"]))
+    member_ids = set(await J.js("__cr.members().map(e => e._n.paint.partition_item)"))
+    if root != new:
+        notes.append(f"the page still paints {root}, not the copy {new}")
+    if tree_ids & old_ids:
+        notes.append(f"the copy's tree still names old panels {sorted(tree_ids & old_ids)}")
+    if not tree_ids <= member_ids:
+        notes.append(f"tree refs {sorted(tree_ids - member_ids)} are not the copy's panels")
+    if len(b0) != len(b1) or not all(agree(a["r"], b["r"]) for a, b in zip(b0, b1)):
+        notes.append(f"geometry changed with the copy: {[b['r'] for b in b1]}")
+    shots.append(await J.shot("workspace-copy"))
+    h = await J.js("(() => { const e = __cr.byLabel('The board'); const b = e && [...e.querySelectorAll('[data-key]')].find(x => x.innerText.trim() === '–' && __cr.vis(x)); return b ? __cr.hit(b) : null; })()")
+    if h:
+        await J.w.click(h["x"], h["y"])
+        await J.settle(2)
+        p = [x for x in await J.js(pins) if x["tip"] == "The board"]
+        if p:
+            await J.w.click(p[0]["h"]["x"], p[0]["h"]["y"])
+            await J.settle(2.5)
+            boards = [b for b in await J.js("__cr.boxes()") if "board" in b["label"].lower()]
+            if len(boards) != 1:
+                notes.append(f"{len(boards)} boards after opening the pin in the copied layout")
+            elif boards[0]["id"] in old_ids:
+                notes.append(f"the pin opened the OLD layout's panel {boards[0]['id']}")
+        else:
+            notes.append("no board pin to open")
+    else:
+        notes.append("no shelf control on the board in the copied layout")
+    shots.append(await J.shot("workspace-pin"))
+    J.record("workspace", workspace_identity.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"layout {f['layout']} replaced by its copy {new}: typed refs remapped to the copy's panels, geometry identical; the board pin reopened the copy's own panel",
+             {"new": new, "tree ids": sorted(tree_ids)}, shots)
+
+
+ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive),("immediate", immediate), ("refusal", refusal), ("cancel-policy", cancel_policy),
+          ("composer", composer), ("tabs-focus", tabs_focus), ("receivers", receivers), ("doc-pins", doc_pins), ("tints", tints),
+          ("workspace", workspace_identity)]
+
 ALL = [("facts", facts), ("clicks", clicks), ("ghost", ghost), ("edges", edges), ("local", local), ("fit", fit),
        ("dividers", dividers), ("focus", focus), ("shelf", shelf), ("cancel", cancel), ("stale", stale), ("draft", draft),
        ("bare", bare), ("dock-pin", dock_pins), ("dock-order", dock_order), ("dock-look", dock_look), ("reload", reload_keeps)]
+ALL = ALL[:3] + ROUND2[:4] + ALL[3:] + ROUND2[4:]     # the workspace emulation replaces the layout: always last
 DIAGNOSES = [("escdiag", escdiag), ("debug", debug), ("syncdiag", syncdiag)]      # --only escdiag / debug runs these
 ALL += DIAGNOSES

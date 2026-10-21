@@ -52,7 +52,7 @@ class Journeys:
     def __init__(self, win, copy, out, size):
         self.w, self.copy, self.out, self.size = win, copy, out, size
         self.play = pt.Play(win, copy, out, ["a7045", "a7223"])
-        self.rows, self.shots, self.selection_left = [], 0, []
+        self.rows, self.shots, self.selection_left, self.reloads = [], 0, [], []
 
     async def js(self, src):
         await self.w.js(HELPERS)
@@ -81,13 +81,11 @@ class Journeys:
     # a hand's drag that can stop in the middle: messages to the window, as hud_playtest.Window.drag sends them
     async def hold(self, x0, y0, points, look=None, release=True, steps=10):
         SB, w = self.w.SB, self.w
-        # Defect found here (syncdiag, ran 20 Oct): a partition carry leaves page text selected, and the next press on
-        # it starts Chromium's own text drag (pointercancel), so that carry never starts. Each press below first counts
-        # and clears what an earlier carry left selected, as a person clicking elsewhere would; the count is reported
+        # Round 1 (ebe9a91) found a carry left page text selected and cleared it here before each press. Round 2
+        # (c7492) rechecks the repair WITHOUT that workaround: what is left selected is only counted and reported
         left = await w.js("getSelection().toString().length")
         if left:
             self.selection_left.append(left)
-            await w.js("getSelection().removeAllRanges()")
         ox, oy, dpr = await w.origin()
         cx, cy = ox + x0 * dpr, oy + y0 * dpr
         t, dx, dy = w._descend(cx, cy)
@@ -165,6 +163,10 @@ async def main():
                 if (a.only and jid not in a.only) or (not a.only and (jid, fn) in journey_steps.DIAGNOSES):
                     continue
                 try:
+                    left = await win.js("getSelection().toString().length")
+                    if left:          # never cleared in place: a fresh page, and it is reported
+                        j.reloads.append((jid, left))
+                        await j.reload()
                     await fn(j)
                 except Exception as e:
                     j.record(jid, fn.__doc__ or jid, "error", f"{type(e).__name__}: {e}", {"trace": traceback.format_exc()[-1500:]},
@@ -186,7 +188,8 @@ async def main():
     md = [f"# Combined tiling + dock journeys, {size[0]}x{size[1]}", "", f"guard: {guard[1] if guard else 'none'}", "",
           "| journey | outcome | note | shots |", "|---|---|---|---|"]
     md += [f"| {r['id']} | {r['outcome']} | {r['note'].replace('|', '/')[:400]} | {', '.join(r['shots'])} |" for r in rows]
-    md += ["", f"Text left selected before presses (cleared by the driver; the selection defect): {j.selection_left if j else []}",
+    md += ["", f"Text left selected before presses (counted only, never cleared): {j.selection_left if j else []}",
+           f"Journeys started on a reloaded page because the previous one left text selected (journey, chars): {j.reloads if j else []}",
            f"Old dividers/Fit tools left standing after each carry's release, ms until gone (first read included; None = still stale at 2 s): {getattr(j, 'stale_ms', []) if j else []}",
            f"Page errors: {errors if win else None}"]
     (out / "report.md").write_text("\n".join(md) + "\n", encoding="utf-8")

@@ -2,7 +2,82 @@
 
 worker-a7466 (builder-1), 20 Oct 2026. Acceptance only: no source fix to the reviewed code, no live apply.
 
-## Verdict
+## Round 2 (c7492): the owner's repair c7487, reviewed by its bytes
+
+**Bytes reviewed:** partition-ui.js 2CD497F27AE22C621CB7B4140BC938564E7293178563DF0878F30ADA6168B535 and
+test_partition_ui.js 44D7F9040B7E36235FC1F867DC216AFC02060869305B0D5ADAEF97E073744749. Both match c7487.
+
+**Setup:** recomposed by the landed overlay.py over main a981e1a: 57 files, the same 4 block-only unions, 0 new
+conflicts. The disposable copy was staged by review_copy.stage_copy with no refusals.
+
+**Driver:**
+- Round 1's selection-clearing workaround is **removed**; leftover selection is only counted.
+- A journey that starts with text left selected by the previous one runs on a reloaded page instead, and that is
+  reported.
+
+**Verdict: still not accepted. One residual defect, plus one small geometry miss at 1280x800.**
+
+1. **Both round-1 defects are fixed when carries wait for the world's answer.**
+   - Every carry ran with nothing selected and body userSelect `none`; release and all 6 cancel routes put the
+     prior policy back, including an inline `text`.
+   - After each release, old dividers and Fit tools were gone within 15–47 ms, which is just the first poll (round
+     1: 406–1,000 ms).
+   - With the answer held back 1.5 s, no obsolete tool stood, the spots where old dividers had been hit panel
+     content, and the optimistic layout held.
+   - A refused drop rolled back, with the dividers back and the refusal said.
+2. **Residual: a carry started while the previous drop's answer is still pending is declined, and its drag selects
+   page text.**
+   - The pending window is 422–610 ms on this copy.
+   - `carry()` owns the press but returns busy without suppressing selection, so the drag selects text (818
+     characters); then the press after that, landing on the selection, is cancelled by Chromium's text drag.
+   - Reproduce: drag the Board title to the bottom edge, release, and grab it again at once. No ghost appears, and
+     text is selected. The `consecutive` journey failed this way at both sizes; `consecutive-paced` (waiting for the
+     answer) passed at both.
+   - The same thing left 7–27 characters behind in `immediate` (its declined second carry). That is why the next
+     journey ran on a reloaded page.
+   - Suggested scope, for the owner: a declined press should still suppress selection (or the carry should
+     queue).
+3. **Minor, 1280x800 only: a drop from focus mode misses its preview by 1.2–1.5 px.** Preview
+   [16, 527.1, 1248, 182], result [16, 525.9, 1248, 183.5]. At 2560x1440 the two agree exactly.
+
+**Newly covered c7475 cases (ran):**
+
+| journey | 2560x1440 | 1280x800 |
+|---|---|---|
+| consecutive carries, paced by the world's answer | pass | pass |
+| consecutive carries with no wait | **fail** (residual 2) | **fail** |
+| answer held back 1.5 s: no obsolete tools, optimistic layout, answer restores tools | pass | pass |
+| refused drop rolls back | pass | pass |
+| Escape, resize and blur restore the selection policy (prior '' and 'text') | pass | pass |
+| composer: words, selected range 3–9, attach item and To row through two drops and a divider | pass | blocked (composer cut off, pre-existing) |
+| drop from a tab group / from focus mode | pass | **fail** (focus drop off by 1.5 px) |
+| dock changed while held / carried panel changed while held: no pin, no commit, no split fallback | pass | pass |
+| pin a surface and a document by the viewer title; the window-definition pin's "Open as a window" asks the host | pass | surface pass; document blocked (the viewer scrolled its own chips and title out of reach in a 383 px panel) |
+| staged tints applied in the copy | pass: purple, amber, green, and blue (blue has no role in home-dock, so it draws the default blue) | pass |
+| workspace identity, EMULATED by replacing the layout with its own copy (no workspace exists in the world) | pass: typed refs remapped, same geometry, the pin opened the copy's own panel | pass |
+| all round-1 journeys (edges, local, dividers, focus, shelf, stale, bare, dock…) | pass, no workaround | pass (Fit bounded by allocation; draft blocked as before) |
+
+**a7045's recipe step:** `partition_navigation` no longer fails on an old divider, but it fails on its own test
+logic.
+- Normal size: the "top" check is the same "spans the width" test as "bottom", so it was already true and the
+  harness refused to time it.
+- Small: the fixture restore did `look` then `prop`, the page's own commit landed in between, and the prop was
+  refused as stale. That hides whatever happened first.
+- Both are test defects for the owner, not product defects.
+
+**Not run:**
+- Real touch `pointercancel`.
+- A real workspace switch (a6427's world half was never applied).
+- A drag-created window-definition pin (there is no drag source for one).
+- Media controls.
+- Tabs 3cc2796 with a7439/a7441, left separate.
+
+**Guard:** "alex: untouched" on every run. Page errors: none.
+
+**Reports:** demos/combined-review/2026-10-20-183512-2560x1440, 2026-10-20-184201-1280x800, and composer
+2026-10-20-185103-2560x1440. Recipe runs: demos/hud-playtest/2026-10-20-184854 and 184921.
+
+## Round 1 verdict (superseded above)
 
 Not accepted yet: two defects for the source owner (a7045), both reproduced in the real hidden Edge. Everything else
 I could drive passed at both sizes. Production apply stays gated.
