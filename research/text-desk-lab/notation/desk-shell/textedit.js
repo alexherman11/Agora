@@ -435,6 +435,10 @@
       if (emb && (!ed || !e.altKey)) { e.preventDefault(); return follow(emb.closest(".md-widget").dataset.src.replace(/^\s*!\[\[|\]\]\s*$/g, "").split("|")[0].split("#")[0].trim()); }
       // a link whose marks are hidden is followed; on the line being written a click places the caret (Ctrl+click follows)
       if (wl && (shown || e.ctrlKey || e.metaKey)) { e.preventDefault(); return follow(wl.dataset.target); }
+      if (a && (shown || e.ctrlKey || e.metaKey) && /^agora:\/\//.test(a.dataset.href || "")) {
+        e.preventDefault();
+        return opts.hooks && opts.hooks.follow && opts.hooks.follow(a.dataset.href, a.textContent);
+      }
       if (a && (shown || e.ctrlKey || e.metaKey) && /^https?:/.test(a.dataset.href || "")) { e.preventDefault(); window.open(a.dataset.href, "_blank", "noopener"); return; }
       const w = e.target.closest(".md-widget");
       if (w && ed) { root.focus(); const at = M.starts(src())[+w.dataset.from] || 0; E.doc.sel = [at, at]; paint(at, at); }

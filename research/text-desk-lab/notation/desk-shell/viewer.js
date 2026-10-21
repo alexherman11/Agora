@@ -299,6 +299,7 @@ const Viewer = (session, who, lens, said, status) => {
     // changed is made again, and a new element starts at the top. Every scrolling frame the viewer wasn't at the end
     // of keeps its place by the line at its top: which child, and how far down the frame it sat.
     places() {
+      v.captureReading();
       const all = [...document.querySelectorAll('[data-scroll="end"]')];
       const out = { ends: all.filter(e => e.scrollTop + e.clientHeight >= e.scrollHeight - 2).map(e => e.dataset.key), seen: all.map(e => e.dataset.key), at: {} };
       for (const e of document.querySelectorAll("[data-scroll]")) {
@@ -316,6 +317,43 @@ const Viewer = (session, who, lens, said, status) => {
         const kid = p.kid && [...e.children].find(c => c.dataset.key === p.kid);
         if (kid) e.scrollTop += kid.getBoundingClientRect().top - e.getBoundingClientRect().top - p.off;
         else e.scrollTop = p.y;
+      }
+      v.restoreReading();
+    },
+    // Generic reading scopes: positions only, partitioned by world/person/lens.
+    // No DOM, text, forms or composer state enters this independent store.
+    readingKey(e) {
+      const scope = e.closest("[data-remember]");
+      if (!scope || !scope.dataset.remember || !e.dataset.key) return null;
+      const relative = e.dataset.key.startsWith(scope.dataset.key) ? e.dataset.key.slice(scope.dataset.key.length) : e.dataset.key;
+      return JSON.stringify([scope.dataset.remember, relative]);
+    },
+    reading() {
+      if (!v.readingPositions) {
+        let saved = [];
+        try { saved = JSON.parse(localStorage.getItem(`lens-reading:${session}:${who}:${lens}`) || "[]"); } catch (_) {}
+        v.readingPositions = new Map(Array.isArray(saved) ? saved.filter(x =>
+          Array.isArray(x) && typeof x[0] === "string" && x[0].length <= 2048 &&
+          Number.isFinite(x[1]) && x[1] >= 0 && x[1] <= 1e9).slice(-2000) : []);
+      }
+      return v.readingPositions;
+    },
+    captureReading() {
+      const positions = v.reading();
+      for (const e of document.querySelectorAll("[data-scroll]")) {
+        const key = v.readingKey(e);
+        if (!key || e.dataset.scroll === "none" || (e.getClientRects && !e.getClientRects().length)) continue;
+        positions.delete(key); positions.set(key, e.scrollTop);
+      }
+      while (positions.size > 2000) positions.delete(positions.keys().next().value);
+      try { localStorage.setItem(`lens-reading:${session}:${who}:${lens}`, JSON.stringify([...positions])); } catch (_) {}
+    },
+    restoreReading() {
+      const positions = v.reading();
+      for (const e of document.querySelectorAll("[data-scroll]")) {
+        const key = v.readingKey(e);
+        if (key && e.dataset.scroll !== "none" && (!e.getClientRects || e.getClientRects().length))
+          e.scrollTop = positions.get(key) || 0;
       }
     },
     // Pike (run 1, Alex's workspace): everything repaints but the part in hand; focus, caret and selection are put back
@@ -362,5 +400,12 @@ const Viewer = (session, who, lens, said, status) => {
     v.publish();
     if (notice !== was) v.show();
   });
+  if (typeof document !== "undefined" && document.addEventListener) {
+    let pending;
+    document.addEventListener("scroll", () => {
+      if (v.repainting || pending) return;
+      pending = setTimeout(() => { pending = null; v.captureReading(); }, 100);
+    }, true);
+  }
   return v;
 };
