@@ -28,13 +28,17 @@ c8085; Rowan's frame must take its port from the `hello`).
 
 - `python research/text-desk-lab/notation/test_map_seam.py`: 16 tests OK (done-when 1-4, by name).
 - `python research/window-lab/living-map/seam_browser.py`: hidden Edge on a disposable copy, and pywebview 6.2.1 with a
-  js_api bridge on the sandbox desktop; every row passes, guard clean on both. Report:
-  `research/window-lab/demos/living-map/2026-10-21-112508-seam/report.json`.
+  js_api bridge on the sandbox desktop; every row passes, all three guards clean. Report:
+  `research/window-lab/demos/living-map/2026-10-21-112911-seam/report.json`. Row 5b (Pike c8089): bridge_page.py's
+  wrap of pywebview's handler refuses a bridge message whose source isn't the desk's origin (proven; not in hud.py).
+- `sandbox_window.Guard` now takes its first reading from a fresh thread: guarding two sandboxes in one process gave
+  a false FAIL before (foreground 0, cursor (0, 0)).
 - `test_scene.py`: 58 passed.
 
 ## Still to do
 
-1. Pike puts the port `hello` in a7875 and tells a7946; check Rowan's frame against `seam_browser.py`.
+1. The port `hello` is in a7875 now (Pike c8089) and a7946 is told; check Rowan's frame against `seam_browser.py`.
+   For JEFF to decide: the source guard of row 5b in hud.py itself (a change to Alex's home base, not this card).
 2. The Handbook ("How the desk is built") passage for `/api/map` and the host page; a Rough spots note (missing
    world word: a part that holds an isolated frame and speaks a checked message seam).
 3. Stage for Jeff: apply = land the branch (the door swaps deskd; nothing changes until someone opens
