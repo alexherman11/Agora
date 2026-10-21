@@ -115,6 +115,96 @@ Reports are under `research/window-lab/demos/tabs-review/` (main checkout):
 7. **Minor:** Down on the Tabs handle does not enter the list (the handle is not one of the `arrows` stops). Tab does.
 8. **Minor:** migration drops the old one-step Back. The live viewer is closed (viewing= back=a6866), so the first tab starts blank and back=a6866 goes.
 
+## Round 2 (builder-1, 20–21 Oct): repaired source, JEFF's composed payload, the float fix
+
+worker-a7544 (builder-1), after the source repair 319b57d (a7319) and JEFF's c7704, e15996 and e16026. Nothing was applied live.
+
+### Verdict
+
+**JEFF may apply the menu, search, notice and the eleven `do view` route hunks of a7761 with a7439/a7693, once this branch's `placeFloat` lands.** Four route clauses must change first:
+
+- a5544 home-work: 2 clauses
+- a6352 home-house: 2 clauses
+- a6771 home-usage: 2 clauses (one passage, used twice)
+
+Each of these clauses ends in `do prop …home-viewer shelf=no when count(…) > 0`. A trailing `when` on a lens click line is refused ("unexpected words after the target: 'when > 0'"). The browse open before it stands, but the Viewer stays shelved. Unguarded, `shelf=no` is refused as a no-op whenever the Viewer is already out. The guard has to live in a verb: for example, `view` taking an optional lens, as in `do view $u lens=plan-usage-reader`. That is JEFF's hunk to write (c7846).
+
+### What was reviewed (ran)
+
+- **Source:** branch worker/a7544 on main 4d7f671 (contains 319b57d).
+  - `test_viewer_tabs.py`: 16 tests OK.
+  - `test_scene.py`: 58 passed.
+- **SHA-256:**
+
+  | file | hash |
+  |---|---|
+  | viewer_tabs.py | F5F4DA5F… |
+  | tab_history.py | 69C55E1C… |
+  | lens.js (with placeFloat) | FD918FB9… |
+  | viewer.js | F899DD0E… |
+  | textedit.js | A6F912EE… |
+  | search-exclusions.json | 8E315231… |
+  | patches.json | D716135D… |
+  | originals.json | DB379801… |
+
+  The full hashes are in each report.json.
+- **Staging on the copy:**
+  1. `tabs_world.apply_copy`: a7439's six hunks, then init.
+  2. `compose_jeff`: a7693's six search hunks (stage.prepare: every one once).
+  3. a7761's menu (`role searchdrop`, `by order`) and 20 route clauses, each counted at its exact expected times before anything is written, then read back equal.
+  4. Every lens compiled.
+  - The intermediate "home-viewer does not compile" line comes from the known hunk order (defect 5 above); the end state compiles.
+- **Browser:** the guarded hidden Edge, CSS 2560x1440 and 1280x800 at DPR 1.5.
+  - Page errors [] at both sizes.
+  - Guard on every run: "alex: untouched by the sandbox".
+- **Reports** (in `research/window-lab/demos/tabs-review/`):
+  - 2560: `2026-10-20-231140-2560x1440-jeff-fixes`, and the final run (see the done comment)
+  - 1280: `2026-10-20-231524-1280x800-jeff-fixes`
+- **Door repros:** `repro.py notice` and `repro.py usage`.
+
+### Journeys
+
+| journey | 2560 | 1280 |
+|---|---|---|
+| migrate (the copy's Viewer is now out on Board): tab-1 on f155, second init "Already", heading kept over reload | pass | pass |
+| pins, Back, Forward, Back×2, a search drops Forward, 6=6 columns | pass | pass |
+| new tab, menu rows, select restores Back | pass | pass |
+| reading position A 600 / B 1500 through switches and reload | pass | blocked: the viewer has no room at 1280 (as before) |
+| lens entry, open in new tab, keyboard, refused targets | pass | pass |
+| board "Read it in the middle" (now `do view`): the tab's own history, Back to the page before | **pass** (was defect 2) | **pass** |
+| rerouted entries pressed in the browser | notices: removed, same tab, Back right; **usage: the Viewer stayed shelved** | notices pass; usage not pressable at this size |
+| 34 tabs: menu opaque, inside the page, scrolls, last row selectable | **pass**: [1205, 164, 398x1008] | **pass** (was defect 4): [560, 4, 398x383] above its handle |
+| order: closed slots reused, notes do not grow, menu rows = tabs by numeric order | pass | pass |
+| floats: as-is, a real window resize, and the CSS page of 125% zoom (each side / 1.25, a real resize); keys reach the last row inside the box; Escape closes it and keeps the Viewer | pass (2560x1295, 2049x1152) | pass (1280x720, 1025x641) |
+| search lists a page once (tab notes excluded) | **pass** (was defect 3) | pass |
+| close moves to the neighbour; all closed leaves one blank tab | pass | **pass** (was defect 4) |
+| unview and resume | pass | pass |
+| draft words, range and About unchanged; nothing sent | pass | blocked: composer covered at 1280 (as before) |
+
+Shot looked at: `22-overflow-menu.png` (1280). The menu is white, above the Tabs handle, inside the page, with its scrollbar.
+
+### Door results (ran, copy)
+
+- **Notice** `do view a5723; do remove a5733` after a shelve: the Viewer comes out on the item in the same tab, the notice is gone ("not in the world now"), and Back returns to Board.
+- **Usage** `do browse … lens=plan-usage-reader; do prop … shelf=no when count(…) > 0`:
+  - the open stands, with the right lens and Back;
+  - the second command is refused (above).
+  - With the guard removed: it works while the Viewer is shelved. With the Viewer out, it is refused "already has shelf=no; nothing to change; earlier steps undone", although the state read afterwards still shows the open.
+
+### The float fix (source, approved by JEFF e15996)
+
+- `desk-shell/lens.js` `placeFloat`: a lifted float opens below its line, or above it when it does not fit below and above has more room. It is no taller than the room on that side; the rest scrolls inside it (`overflow: auto` from lens.html). It is placed again on every settle (repaint, scroll, resize).
+- Ordinary floats keep their place: the notices list and the search drop measured unchanged.
+- No world sizing could say this: 70vh ignores where the handle sits.
+- Recorded:
+  - Rough spots a7781.
+  - The Handbook's lens section a243 (e16166).
+
+### Also found
+
+- At 1280x496 the HUD gives the viewer tile no room at all. At 1280x720 the dock covers the viewer's Tabs handle. Both are the HUD's layout, not the float.
+- The landing gate's test_landing_queue case 14 passed here every time (20 of 20 cases). This branch changes no queue code, so treat it as a room transient (c7755).
+
 ## Not run
 
 - Clicking an agora:// link inside markdown (the textedit hook).

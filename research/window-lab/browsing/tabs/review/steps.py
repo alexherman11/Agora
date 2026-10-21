@@ -145,7 +145,8 @@ async def show(R):
 async def pins_history(R):
     """pins open in the active tab (mouse); Back and Forward follow the tab's trail; a new page after Back drops Forward"""
     notes, seen = [], {}
-    start = (await state(R))["viewing"]
+    s_start = await state(R)
+    start = s_start["viewing"]          # (with the migrated page before it, the start has its own Back: a7544 ran it)
     await R.press(pin("f155"), what="pin Board")
     seen["after Board"] = await state(R)
     await R.press(pin("a5202"), what="pin The lowdown")
@@ -167,9 +168,9 @@ async def pins_history(R):
     await R.press(chip("Back"), what="Back")
     await R.press(chip("Back"), what="Back")
     seen["back2"] = await state(R)
-    if seen["back2"]["viewing"] != start or seen["back2"]["can_back"] != "no":
-        notes.append(f"Back twice: {seen['back2']} (start {start})")
-    if await R.js(chip("Back")):
+    if seen["back2"]["viewing"] != start or seen["back2"]["can_back"] != s_start["can_back"]:
+        notes.append(f"Back twice: {seen['back2']} (start {start}, can_back {s_start['can_back']})")
+    if s_start["can_back"] == "no" and await R.js(chip("Back")):
         notes.append("Back still shown at the first page")
     cols0 = columns(R)
     branch = R.made["long"][0]
