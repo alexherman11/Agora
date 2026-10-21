@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (51)
+## open (52)
 
 ### F2. Scripts cannot say who is running them
 
@@ -338,6 +338,12 @@ Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower 
 a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
+
+### JEFF can't restart the house from the world
+
+a9135 · family=missing-word · status=open
+
+Alex (21 Oct, m9114/m9123) allows house restarts whenever nothing important would break, and asked JEFF to restart now. No world verb does it: a restart happens only as a side effect of landing a house file, once the house finds itself idle. Wanted: a world verb (e.g. restart-house) that waits for idle, says what is in flight, keeps drafts and receipts, and refuses during a game; JEFF uses it under Alex's standing approval.
 
 ## curing (46)
 
@@ -740,7 +746,7 @@ a8490 · family=silence · status=unchecked
 
 Missing world word: explicit followups attach/ack/pending/receipts. Read: current House.news preserves pending calls, but Resident.send's delivered flag attests only successful pipe flush; listeners' handed-on ids are not recipient acknowledgment. Source-only preparation on Keep JEFF moving adds an isolated obligation journal and exact staged Desk/House hunks; no live imports, timers, retries, process launches or new host authority. A deployment-blocked comment/prop is not an executable landing gate: refusal must precede serialized landing mutation, not only the post-land restart flag. This separate lifecycle repair remains unimplemented. (worker-a8438, 21 Oct)
 
-## cured (67)
+## cured (68)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1305,6 +1311,18 @@ a7922 · family=missing-word · status=cured
 21 Oct: Alex reported JEFF and agents not responding after restart. Live house heartbeat was fresh; other enabled residents rested normally. JEFF had seven process failures, gpt-6.1-sol unavailable, and worker-a7877 failed importing require_subscription. Root cause: a7816 landing preserved conflicting uncommitted adapter changes only on parked/20261020-230555; the active adapter reverted to Astra-only catalog and lost the subscription guard. Outside Codex three-way merged those additions with the new parent-owned charter code, tested before atomic application, then used native call to retry JEFF. Same saved thread retained, turns 655 to 658, zero failures, real Conversation reply confirmed. No house/HUD restart, provider switch, credentials or pin changes. Ran: 8 focused auth/model checks, pinned Sol mock-runtime zero-tools probe, read-only ChatGPT Sol/medium preflight, 24 transport/charter tests, Ruff F/E9, diff checks. Added adapter import/catalog regression coverage. Two broader old tests reproduced failures before repair; empty charter receipt fixture corrected, unrelated worker-routing expectation left unchanged. Repair commit awaiting Alex approval; uncommitted repair can be parked by another overlapping landing. Separate house portable-handover/relay/lease changes remain preserved on parked/20261020-155934, not restored here. Evidence: local/jeff-recovery-20261021/; research/codex-residents/resident-provider-handoff.md has the current caveat.
 Additional verification: required default repository pytest 201 passed, 2 skipped in 27.43s. Documentation checker still reports the pre-existing missing Dynamic Desk image. JEFF advanced to turn 662 on the same saved thread, zero failures; the affected Codex worker restarted automatically and is working. No manual worker wake or task alteration. Repair consists of codex_resident.py and test_transport.py, 85 additions/10 removals; commit approval requested from Alex under AGENTS.md, no push requested.
 
+### Coordination needs editable policy and dependable delivery
+
+a8851 · family=coordination · status=cured
+
+Alex approved implementing coordination changes and repairing the provider handover before safe activation (21 October, outside Codex).
+
+Missing world words/capabilities: ordered followup policy, dependable task-transition wake, explicit capacity yield, portable provider handover. World-authored assign-task/accept-task/block-task/worker-update notes and the worker-owned documentation index now express editable policy; the host supplies durable delivery and scheduling underneath.
+
+Source: conversation_policy.py plus desk.py/rooms.py implement opt-in reply_policy=queue and precise recipient/stop checks. task_flow.py plus house.py handle task notices and durable inbox transfer. workshop.py adds yielded capacity resumption and focused documentation/summary guidance. resident_continuity.py plus house.py repair provider-bound state handover without pretending provider tokens transfer. Detailed contract and test evidence: [[Coordination flow: tested implementation and activation handoff]], with repository evidence at research/text-desk-lab/notation/coordination-flow.md.
+
+Status cured for this scope: authorized activation completed, exact Claude runtime and preserved state verified, and the implementation checkpoint woke JEFF once and received his task acknowledgement. The live snapshot gap was corrected and regression-tested. Worker delivery records and voice latency work remain separate staged commissions.
+
 ## active (1)
 
 ### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
@@ -1313,7 +1331,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (7)
+## source-pending (8)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1360,3 +1378,21 @@ A resident has no host shell, and a > line cannot carry pixels: only the painter
 a8537 · family=missing-word · status=source-pending
 
 The living map's seam is source: deskd (GET and POST /api/map, and serving ground's four frame files under /map/ground/) and a host page (desk-shell/map-host.html, map-host.js). The missing world word: a lens part that holds a page in a sandboxed frame and names the one message contract it speaks (here agora-map/1: draw in; press, drop, move out). The host would then give it a fresh port on each load, refuse anything off that port, and turn each message into one fenced line. Today that is all in map-host.js, so a second isolated app (a web tab, a game) would copy the whole page. Also found by running Pike's real pins: how a pin LOOKS (icon, colour) had no agreed form, and the real frame refused all three pins over icon=museum. A redraw that changed nothing still rebuilt the frame's pins, and a press could fall between pointer down and up (2 of 20 lost). Both are fixed in the frame and the host; the first wants one line in the contract a7875.
+
+### Source edit (a8901): a part could not act on words it was given, a line had no order to compare, and speech is host code
+
+a9125 · family=missing-word · status=source-pending
+
+Voice with JEFF step 3 (a8901, 21 Oct) needed three source words; each is staged, not live.
+- `on spoken` (lens.js, scene.py GESTURES): no gesture acts because a part was painted with new words (a host row became final). Missing world word: an act on arrival, once per distinct filled line, with a gesture id so a repeat is refused. Made general, not voice-only.
+- lines rows carry `seq` (scene.py): a lens could not ask for 'JEFF's lines after this one'; no row field said order. Missing word: a comparable position on a line row.
+- voice.listen/stop/hush/say (host_verbs.py, voice.py, voice_host.ps1): hearing and speaking are PC capabilities, rightly source; the control, consent and placement are world (home-voice lens, props on Alex's draft and the home-base note).
+Friction met, not fixed (ran): `$(let)` is not filled in a selection; a let is not a number in another repeat's `only when`; `the` refuses row sources; `let after` is reserved. Worked around with a one-row `of` frame; recipe in [[Lens recipes and gotchas; sandbox films with a stand-in host]]. The first two are worth a lens word.
+
+## source-staged (1)
+
+### A log comparison needed an explicit documented baseline without erasing historical divergence
+
+a8855 · family=missing-word · status=source-staged
+
+Missing world-level word: log-world baseline <request-note>. A retained historical divergence previously could not begin a new explicitly documented observation period. Staged engine code requires a new exact full fact match and the reviewed full retained-list hash, fsyncs a new receipt and keeps every historical divergence. Last queued result/refusal survives updates/restart in public Evidence. Any new discrepancy ends the period. No source has landed or loaded; health and lifecycle gates remain. See [[Log-world baseline — resumed source and acceptance gates]] for evidence, operator steps and limits.
