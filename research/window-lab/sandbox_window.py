@@ -889,7 +889,9 @@ class Guard:
         self.t = threading.Thread(target=self.watch, daemon=True)
 
     def __enter__(self):
-        self.first, self.input0 = _alex(), last_input()
+        # a7950: from a fresh thread, as the watcher reads (alex()): a caller that has joined an earlier sandbox's desktop
+        # read foreground 0 and cursor (0, 0) here, and the watcher's first true reading was then judged a FAIL
+        self.first, self.input0 = alex(), last_input()
         self.his = 0                                   # changes that came with real input: his, not ours
         self.t.start()
         return self
