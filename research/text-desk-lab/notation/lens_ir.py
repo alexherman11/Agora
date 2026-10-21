@@ -304,8 +304,16 @@ def _static(node, irs, memo):
         return got
     em, b = node["emit"], node["bind"]
     words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
-             *(em.get("tip") or ())]
+             *(em.get("tip") or ()), em.get("share"),
+             "$" + em["resize"][0] if em.get("resize") else None]
+    if em.get("partition"):
+        words += ["$" + em["partition"]["prop"]]
+        if em["partition"].get("focus_prop"):
+            words += ["$" + em["partition"]["focus_prop"]]
     exprs = [c for _, c in em["role_when"]]
+    for word in ("companion", "sizing", "chrome"):
+        if em.get(word):
+            exprs.append(em[word])
     if node["guard"]:
         exprs.append(node["guard"]["src"])
     for let in node["lets"]:
@@ -849,6 +857,35 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             if not ctx.get("item"):
                 raise S.LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")
             acts.append({"on": "carry"})
+        if em.get("resize"):
+            if not ctx.get("item") or not out.get("share") or not em["layout"]:
+                raise S.LensRefusal(f"line {node['line']}: `resize` needs a world thing and a positive share on a frame")
+            prop = em["resize"][0]
+            # Read even a missing prop: a concurrent first resize must stale this gesture.
+            track.setdefault("own", set()).add(prop)
+            acts.append({"on": "resize", "line": f"do prop {ctx['item']} {prop}=$value"})
+        if em.get("partition"):
+            if not ctx.get("item") or not em["layout"]:
+                raise S.LensRefusal(f"line {node['line']}: `partition` needs a frame standing on a world thing")
+            spec = em["partition"]
+            prop, fp = spec["prop"], spec.get("focus_prop")
+            track.setdefault("own", set()).add(prop)
+            partition_props = acc.props(ctx["item"])
+            raw = partition_props.get(prop) or ""
+            out["partition"] = {**spec, "tree": raw}
+            line = f'do prop {ctx["item"]} {prop}="$value"'
+            if fp:
+                track["own"].add(fp)
+                out["partition"]["focus"] = partition_props.get(fp) or ""
+                line += f' {fp}="$partition_focus"'
+                acts.append({"on": "partition-focus", "line": f'do prop {ctx["item"]} {fp}="$value"'})
+            acts.append({"on": "arrange", "line": line})
+        if em.get("companion"):
+            out["companion"] = X.holds(X.run(em["companion"], xenv())[0]) is True
+        for word in ("sizing", "chrome"):
+            if em.get(word):
+                policy = X.run(em[word], xenv())[0]
+                out[word] = "" if policy.is_none() else X.fmt(policy, reach=False)
         out["acts"] = acts
         if track["bad"]:
             raise S.LensRefusal(f"line {node['line']}: ${sorted(track['bad'])[0]}.field: no part above this one is named `as {sorted(track['bad'])[0]}`")
@@ -1029,6 +1066,30 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     # a5949 (Sable's a4270): a lens stood on a thing starts on it, its fields and $item, as an instance of a repeat does
     root_ctx = {k: v for k, v in acc.thing(on).items() if k != "_frames"} if on else {}
     sc = make(irs[root], root_ctx, f"{prefix}/{root}" if prefix else root, cb=cb)
+    def partition_reads(n):
+        # A partition gesture depends on its direct members, including guarded
+        # ones, not on the changing app content inside them. Recompute after
+        # reuse too: storing these in the ordinary reads would retain an old
+        # revision on a kept instance. Whole member revisions conservatively
+        # fence visibility, sizing, chrome and companion policy changes.
+        if n.get("partition"):
+            ids, selects = [], []
+            for k in n.get("kids") or []:
+                i = k.get("item")
+                if i in w.nodes:
+                    ids.append((i, True))
+                    sj = w.nodes[i].get("subject")
+                    if sj:
+                        ids.append((sj, True))
+            members = n.get("members")
+            if members:
+                named, found = acc.select(members["of"])
+                selects.append(["select", members["of"],
+                                [list(x) for x in named] if named is not None else list(found)])
+            n["partition_reads"] = _fence_reads(w, {}, ids, selects)
+        for k in n.get("kids") or []:
+            partition_reads(k)
+    partition_reads(sc)
     if prefix:
         sc["key"] = prefix              # the placed lens's root stands at its placer's key; its parts under <prefix>/<root>
     sc["R"] = list(acc.R)

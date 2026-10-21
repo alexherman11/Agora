@@ -123,6 +123,15 @@
     return r;
   }
   let imageCommentsBusy = () => false;
+  let resizing = false;
+  const dividers = window.Dividers?.install(paint, {
+    send, refresh: () => refresh(true), busy: () => !!carrying || resizing,
+    hold: held => { resizing = held; }
+  });
+  const partitions = window.PartitionUI?.install(paint, {
+    send, refresh: () => refresh(true), busy: () => !!carrying || resizing,
+    hold: held => { resizing = held; }
+  });
   async function startImageComments() {
     try {
       // A retained HTML page can meet newer JS during a live update. An optional
@@ -163,6 +172,9 @@
     }
     if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { tracks(old.el); next.set(n.key, old); return old.el; } }
     const el = document.createElement("div");
+    // A bounded partition's changing children must not change its ancestors'
+    // intrinsic size/baseline (and therefore the desk frame) on focus exit.
+    if (p.partition) el.style.contain = "size layout";
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
     el.id = "part:" + n.key;  // stable native part identity for platform accessibility clients
     next.set(n.key, { el, sig }); if (p.why) el.dataset.why = p.why;
@@ -483,7 +495,7 @@
       // to type in (Enter sends, Shift+Enter is a new line, Escape leaves), since a line with $value is not yet whole
       const picked = TEXT.selected(el._n), fill = l => l.replace("$selected", () => picked);
       b.addEventListener("click", () => {
-        if (!a.line.includes("$value")) { closeMenu(); return send(el._n, fill(a.line)); }
+        if (!a.line.includes("$value")) { closeMenu(); const line = fill(a.line); return line.startsWith("host ") ? host(line.slice(5)) : send(el._n, line); }
         menuComposer(box, el, a, picked, e.clientX, e.clientY);
       });
       box.append(b);
@@ -1188,20 +1200,13 @@
   // carry is relation (pike-3): pick a thing up, put it down on a part that says `on drop <its part>`; the receiver says
   // what that means, and both are fenced. Pointer: press, move, release over a receiver. Keys: Space takes it, Tab
   // reaches the receivers that accept it, Enter puts it down, Escape cancels. Nothing is sent onto the receiver it came from.
-  let carrying = null; const receivers = part => [...paint.querySelectorAll(`[data-drop="${CSS.escape(part)}"]`)];
+  let carrying = null;
+  const receivers = part => [...paint.querySelectorAll("[data-drop]")].filter(r => CarryTargets.accepts(r, part));
   // a5994: a receiver may say an act per side (`on drop <part> at left`); the one taken is the side whose edge the
   // pointer is within a third of (nearest first), else the plain act, else the nearest side. On the receiver it came
   // from, only a left or right act (a panel set beside its own column); its middle would put it where it is.
   function landing(r, m) {
-    const own = r.contains(carrying.el);
-    const acts = (r._drops || []).filter(a => a.part === carrying.n.part && (!own || a.side === "left" || a.side === "right"));
-    if (!acts.length) return null;
-    const b = r.getBoundingClientRect(), fx = m ? (m.clientX - b.left) / b.width : .5, fy = m ? (m.clientY - b.top) / b.height : .5;
-    const d = { left: fx, right: 1 - fx, top: fy, bottom: 1 - fy };
-    const sided = acts.filter(a => a.side).sort((x, y) => d[x.side] - d[y.side]);
-    const a = sided.find(x => d[x.side] < 1 / 3) || acts.find(x => !x.side) || sided[0];
-    const half = { left: [0, 0, .5, 1], right: [.5, 0, .5, 1], top: [0, 0, 1, .5], bottom: [0, .5, 1, .5] }[a.side] || [0, 0, 1, 1];
-    return { act: a, box: [b.left + half[0] * b.width, b.top + half[1] * b.height, half[2] * b.width, half[3] * b.height] };
+    return CarryTargets.plan(r, { el: carrying.el, part: carrying.n.part }, carrying.seen, m);
   }
   const over = (r, m) => {
     const c = Style.roleClass("tool.on"), l = r ? landing(r, m) : null;
@@ -1215,7 +1220,7 @@
     Object.assign(carrying.box.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" }); carrying.box.hidden = false;
   };
   // a receiver is judged on what it meant at pick-up (pike-3), though the view keeps repainting while a card is in the air
-  function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: new Map(rs.map(r => [r.dataset.key, r._n.fence])) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
+  function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: CarryTargets.snapshot(paint, el._n.part) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
   function put(r, m) {
     const c = carrying; if (!c) return;
     const l = r ? landing(r, m) : null;
@@ -1223,15 +1228,9 @@
     if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
     if (!l) { if (c.box) c.box.remove(); V.hold = null; c.el.focus(); return; }
-    const f = c.seen.get(r.dataset.key) || r._n.fence || {};
-    // a5994 round 2 (lane 1's 'a press is seen on the next frame'): the landing box stays where the thing is going until
-    // the desk's answer is painted, then fades once (none for reduced motion), so the hand never sees it snap back
+    // Keep the direct placement preview until the answer is painted; no decorative fade.
     const box = c.box; if (box) { box.hidden = false; Object.assign(box.style, l.box.reduce((o, v, i) => (o[["left", "top", "width", "height"][i]] = v + "px", o), {})); }
-    Promise.resolve(send({ key: r._n.key, fence: f }, l.act.line, undefined, { carried: c.n.fence, receiver: f })).finally(() => {
-      if (!box) return;
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return box.remove();
-      box.style.transition = "opacity 160ms ease-out"; box.style.opacity = "0"; setTimeout(() => box.remove(), 200);
-    });
+    Promise.resolve(CarryTargets.submit(send, l, c.n.fence)).finally(() => { if (box) box.remove(); });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
@@ -1257,10 +1256,12 @@
       // card, and a press on a control was never a carry. Now a press becomes a carry only once it moves a few pixels,
       // from anywhere on the card, the title included; a press that doesn't move stays that control's click. The right
       // button opens the menu, and a press in text being typed stays typing.
+      if (partitions?.carry(el, e)) return;
       if (e.target.isContentEditable || e.button !== 0) return;
       const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
       let c = null;
-      const at = m => document.elementsFromPoint(m.clientX, m.clientY).find(x => x.dataset && x.dataset.drop === n.part) || null;
+      const at = m => carrying ? CarryTargets.at(document.elementsFromPoint(m.clientX, m.clientY),
+        { el, part: n.part }, carrying.seen, m)?.receiver || null : null;
       const move = m => {
         if (m.pointerId !== pid) return;
         if (!c) {
@@ -1284,14 +1285,17 @@
       document.addEventListener("pointermove", move); document.addEventListener("pointerup", up);
       document.addEventListener("pointercancel", up);
     });
-    el.addEventListener("keydown", e => { if (e.key === " " && e.target === el && !carrying) { e.preventDefault(); take(el); } });
+    el.addEventListener("keydown", e => {
+      if (partitions?.key(el, e)) return;
+      if (e.key === " " && e.target === el && !carrying) { e.preventDefault(); take(el); }
+    });
   }
   document.addEventListener("keydown", e => {
     if (!carrying) return;
-    const r = document.activeElement && document.activeElement.dataset.drop === carrying.n.part ? document.activeElement : null;
+    const r = CarryTargets.accepts(document.activeElement, carrying.n.part) ? document.activeElement : null;
     if (e.key === "Escape") { e.preventDefault(); put(null); }
     else if (e.key === "Enter" && r) { e.preventDefault(); put(r); }
-    else if (e.key === "Tab") setTimeout(() => over(document.activeElement.dataset.drop === carrying?.n.part ? document.activeElement : null));
+    else if (e.key === "Tab") setTimeout(() => { if (carrying) over(CarryTargets.accepts(document.activeElement, carrying.n.part) ? document.activeElement : null); });
   });
 
   let held = null;                               // the last scene answer painted, carried over a reload for new painter code
@@ -1349,6 +1353,7 @@
     return paintAnswer(r, force);
   }
   async function paintAnswer(r, force) {
+    if (resizing) return;   // a divider owns both neighbours until its fenced answer
     const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene by its content (a1505); comparing 700 KB was the fallback
     if (key === last && !force) return;
     last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null; if (r.scene) held = r;
@@ -1359,6 +1364,8 @@
     V.recoverLayout(r.scene);
     const was = glideRects();
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
+    dividers?.sync();
+    partitions?.sync();
     settle(); glideFrom(was); followEnds(); placeMenuDrafts(); V.show(r.text); report();
   }
   // a5504 (Alex: 'smooth movement when a card changes lane'): a part whose role says `glide` is known by its thing, not its
@@ -1368,7 +1375,8 @@
   const thingOf = el => (el._n && el._n.fence && el._n.fence.item) || (el.dataset.key || "").split("/").pop();
   function glideRects() {
     const sel = (Style.glide || []).join(","); if (!sel) return null;
-    const m = new Map(); for (const el of paint.querySelectorAll(sel)) if (!el.hidden && el.offsetParent) m.set(thingOf(el), el.getBoundingClientRect());
+    const m = new Map(); for (const el of paint.querySelectorAll(sel)) if (!el.hidden && el.offsetParent
+      && !el.closest("[data-partition]")) m.set(thingOf(el), el.getBoundingClientRect());
     return m;
   }
   function glideFrom(was) {
@@ -1557,7 +1565,7 @@
     const a = document.activeElement, idle = a && a.matches(".explicit-composer textarea") && empty(a.closest(".explicit-composer").dataset.key);
     const typing = a && !idle && (a.isContentEditable && paint.contains(a) || a.matches("input,textarea"));
     const composing = [...openComposers].some(k => !empty(k)), holding = V.hold && !empty(V.hold);
-    if (carrying || holding || typing || imageCommentsBusy() || menuDrafts.size || composing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
+    if (resizing || carrying || holding || typing || imageCommentsBusy() || menuDrafts.size || composing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
     if (leaving) return; leaving = true;
     if (window.DoorLine) DoorLine.note("new screen code: loading it, keeping your view");
     setTimeout(reloadKeeping, 200);

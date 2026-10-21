@@ -36,6 +36,13 @@
   body[data-inspector="on"] #status { clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
   #said { white-space: pre; margin: 0; }
   .l-column { display: flex; flex-direction: column; }
+  .l-divider { position: absolute; z-index: 8; touch-action: none; user-select: none; }
+  .l-divider[data-axis="x"] { cursor: col-resize; }
+  .l-divider[data-axis="y"] { cursor: row-resize; }
+  .l-divider:focus-visible { outline: 2px solid var(--t-focus, currentColor); outline-offset: -4px; }
+  .partition-tool { z-index: 9; cursor: pointer; font: inherit; color: inherit; background: var(--t-paper, #f7f7f7); border: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-resizing="x"], html[data-resizing="x"] * { cursor: col-resize !important; user-select: none !important; }
+  html[data-resizing="y"], html[data-resizing="y"] * { cursor: row-resize !important; user-select: none !important; }
   .l-row { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; }
   .l-row > [data-share] { align-self: stretch; }   /* a part given a share of a row fills its height (lens.js) */
   .l-grid { display: grid; align-items: start; }
@@ -213,6 +220,10 @@
 <script src="textedit.js"></script>
 <script src="media.js"></script>
 <script src="page.js"></script>
+<script src="carry-targets.js"></script>
+<script src="dividers.js"></script>
+<script src="partition.js"></script>
+<script src="partition-ui.js"></script>
 <script src="lens.js"></script>
 <script src="term.js"></script>
 </body>

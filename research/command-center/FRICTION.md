@@ -1233,7 +1233,13 @@ a6970 · family=host · status=activation-pending
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (1)
+## source-pending (2)
+
+### Shared panel boundaries lacked a world-declared resize gesture (a7045)
+
+a7107 · family=missing-word · status=source-pending
+
+The painter could carry a thing or drag a free-positioned box, but could not redistribute neighbouring shares or express a full-width bottom region with its column model. a7045 adds generic `resize <prop> min <pixels>`, `partition <prop> min <width> <height> gap <pixels> [focus <prop>]`, `companion <expression>`, `sizing <expression>` and `chrome <expression>` vocabulary. A partition renders direct bound children from one world JSON split/tab tree: whole-child threshold carry, one geometric plan for preview/drop, global/local splits, tabs, content/stretch policies, manual content extents, focus/companions and persistent divider weights. Ordinary fenced prop writes remain layout truth. Share/tree/policy reads enter repeat fingerprints; otherwise persisted writes left reused geometry stale. JEFF's bare app regions stay lens-defined, separate from embedded controls. Necessary copy compatibility (c7177) adds opt-in `copy_json` props: only version-1 typed reference objects remap, never literal strings/keys; malformed/version errors refuse before creation. Source and exact world/documentation hunks are staged, not live. Guarded browser review a7784 accepted the exact c7682 bytes at both sizes (e938f74, round 6); small-screen composer access, timing and real-workspace coverage limits remain explicit. See hud-dividers/NAVIGATION.md and EVIDENCE.md for source landing and JEFF-owned world migration prerequisites; HANDOFF.md retains the superseded divider checkpoint.
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 

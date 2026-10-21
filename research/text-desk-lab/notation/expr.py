@@ -389,7 +389,16 @@ def _f_read_minutes(args):
     return Value("number", max(1, round(n / 220)))
 
 
-FUNCS = {"weekday": (("date",), _f_weekday), "week-of": (("date",), _f_week_of), "day-n": (("date", "n"), _f_day_n),
+def _f_tree_activate(args):
+    import partition_data
+    try:
+        return Value("text", partition_data.activate(fmt(args[0], reach=False), fmt(args[1], reach=False)))
+    except (ValueError, TypeError, RecursionError) as e:
+        return none(str(e))
+
+
+FUNCS = {"tree-activate": (("tree", "panel"), _f_tree_activate),
+         "weekday": (("date",), _f_weekday), "week-of": (("date",), _f_week_of), "day-n": (("date", "n"), _f_day_n),
          "days-from": (("start", "end"), _f_days_from), "day-or-time": (("when", "today"), _f_day_or_time),
          "time": (("when",), _f_time), "date": (("when",), _f_date), "words-of": (("text",), _f_words_of),
          "section-of": (("text", "words"), _f_section_of), "words-before": (("text", "words"), _f_words_before),

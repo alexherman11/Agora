@@ -313,7 +313,9 @@ def compute(desk, value, ctx=None, soft=False):
         val, inputs = X.run(inner, expr_env(desk, ctx))
         if val.is_none() and not soft:
             raise Refusal(f"$( {inner} ): {val.why}" + (f" ({inputs})" if inputs else ""))
-        out += value[i:j] + (value[j:k + 1].replace(SP, " ") if val.is_none() else X.fmt(val, reach=False))
+        # A computed value is data, just like a filled blank. Do not interpret
+        # dollars in its result as a second template (JSON can contain $ref).
+        out += value[i:j] + (value[j:k + 1].replace(SP, " ") if val.is_none() else X.fmt(val, reach=False).replace("$", LIT))
         i = k + 1
 
 
