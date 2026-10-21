@@ -57,6 +57,59 @@ class Refused(Exception):
     pass
 
 
+# Only these authored messages may leave the connection flow. Never stringify
+# browser/network/store exceptions or OAuth response fields for the panel/CLI.
+CONNECT_RECOVERY = " Press Connect Spotify for a fresh attempt; old local tabs may have expired."
+CONNECT_ERRORS = {
+    "setup_bind": "Spotify's local setup page could not start.",
+    "setup_expired": "Spotify's Client ID setup page expired. Finish creating the app first.",
+    "setup_browser": "The browser could not open Spotify's Client ID setup page.",
+    "setup_wait": "Spotify's local setup page stopped before receiving the Client ID.",
+    "client_id": "That is not a valid Spotify Client ID. Use the app's ID, never its secret.",
+    "callback_bind": "Spotify's local return listener could not start. Consent was not opened.",
+    "callback_expired": "Spotify's local return listener expired before a matching answer arrived.",
+    "callback_browser": "The browser could not open Spotify's consent page.",
+    "callback_wait": "Spotify's local return listener stopped before a matching answer arrived.",
+    "consent": "Spotify consent was declined or did not return an authorization code.",
+    "exchange": "Spotify's authorization answer could not be exchanged for a sign-in.",
+    "persistence": "Spotify's connection details could not be saved. Connection was not confirmed.",
+    "unexpected": "Spotify did not connect because setup could not finish.",
+}
+
+
+class ConnectionFailure(Refused):
+    def __init__(self, reason):
+        self.reason = (reason if isinstance(reason, str) and reason in CONNECT_ERRORS
+                       else "unexpected")
+        super().__init__(CONNECT_ERRORS[self.reason] + CONNECT_RECOVERY)
+
+
+def connection_message(error):
+    """Public allowlist boundary, including when an unexpected exception occurs."""
+    reason = error.reason if type(error) is ConnectionFailure else "unexpected"
+    if not isinstance(reason, str):
+        reason = "unexpected"
+    return CONNECT_ERRORS.get(reason, CONNECT_ERRORS["unexpected"]) + CONNECT_RECOVERY
+
+
+def open_connection_page(open_page, url, stage):
+    """Keep browser launch asynchronous, but observe False/errors without leaking them."""
+    failed = threading.Event()
+
+    def run():
+        try:
+            if open_page(url) is False:
+                failed.set()
+        except Exception:
+            failed.set()
+
+    try:
+        threading.Thread(target=run, daemon=True).start()
+    except Exception:
+        raise ConnectionFailure(stage + "_browser") from None
+    return failed
+
+
 def _norm(s):
     """Case/spacing only: distinct live/remastered versions must not match."""
     return " ".join((s or "").casefold().split())
@@ -226,7 +279,7 @@ class Library:
         the browser back to 127.0.0.1:<port>/callback with a code, which is traded for tokens. -> words said."""
         cid = (client_id or self.client_id()).strip()
         if not re.fullmatch(r"[0-9a-zA-Z]{16,64}", cid):
-            raise Refused("that is not a Spotify client id (32 letters and digits, from the app's page)")
+            raise ConnectionFailure("client_id")
         verifier = secrets.token_urlsafe(64)[:96]
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
         state = secrets.token_urlsafe(16)
@@ -254,30 +307,49 @@ class Library:
             def log_message(self, *a):
                 pass
 
-        srv = HTTPServer(("127.0.0.1", port), H)
-        redirect = f"http://127.0.0.1:{srv.server_port}/callback"
-        srv.timeout = 1
-        url = self.accounts + "/authorize?" + urllib.parse.urlencode({
-            "client_id": cid, "response_type": "code", "redirect_uri": redirect, "scope": SCOPES, "state": state,
-            "code_challenge_method": "S256", "code_challenge": challenge})
-        threading.Thread(target=open_page, args=(url,), daemon=True).start()
-        end = time.time() + wait
         try:
-            while not got and time.time() < end:
-                srv.handle_request()
+            srv = HTTPServer(("127.0.0.1", port), H)
+        except Exception:
+            raise ConnectionFailure("callback_bind") from None
+        redirect = f"http://127.0.0.1:{srv.server_port}/callback"
+        try:
+            srv.timeout = 1
+            url = self.accounts + "/authorize?" + urllib.parse.urlencode({
+                "client_id": cid, "response_type": "code", "redirect_uri": redirect,
+                "scope": SCOPES, "state": state,
+                "code_challenge_method": "S256", "code_challenge": challenge})
+            failed = open_connection_page(open_page, url, "callback")
+            end = time.monotonic() + wait
+            while not got:
+                if failed.is_set():
+                    raise ConnectionFailure("callback_browser")
+                if time.monotonic() >= end:
+                    break
+                try:
+                    srv.handle_request()
+                except Exception:
+                    raise ConnectionFailure("callback_wait") from None
+            if failed.is_set():
+                raise ConnectionFailure("callback_browser")
         finally:
             srv.server_close()
         if not got:
-            raise Refused("no answer from Spotify's page in time; press Connect Spotify again")
+            raise ConnectionFailure("callback_expired")
         if "error" in got:
-            raise Refused("Spotify did not connect: " + got["error"])
+            raise ConnectionFailure("consent")
         try:
             tok = self._post_form(self.accounts + "/api/token", {"grant_type": "authorization_code", "code": got["code"],
                                   "redirect_uri": redirect, "client_id": cid, "code_verifier": verifier})
-        except (urllib.error.HTTPError, OSError) as e:
-            raise Refused(f"Spotify did not trade the code for a sign-in: {e}")
-        self._keep(tok)
-        self._write("app.json", {"client_id": cid})
+            if (not isinstance(tok, dict) or not tok.get("access_token")
+                    or not tok.get("refresh_token")):
+                raise ValueError("missing sign-in fields")
+        except Exception:
+            raise ConnectionFailure("exchange") from None
+        try:
+            self._keep(tok)
+            self._write("app.json", {"client_id": cid})
+        except Exception:
+            raise ConnectionFailure("persistence") from None
         return "connected: the house can now read and change Liked Songs"
 
     def forget(self):
