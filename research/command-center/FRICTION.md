@@ -1313,7 +1313,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (6)
+## source-pending (7)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1354,3 +1354,9 @@ Legacy worker_model/provider are overwritten by mixed-pool selection and cannot 
 a8284 · family=missing-word · status=source-pending
 
 A resident has no host shell, and a > line cannot carry pixels: only the painter can send image_context. The missing world word is a resident-invocable 'show this guarded public test screenshot to <resident>'. The source half is artifact_view.py plus one artifact-view action in host_route_parent.ParentDispatcher (house.py builds it with the house), and its affordance is JEFF's to make in the world: a verb or recipe that writes the one '> host-route' line. It also shows that guarded artifacts have one producer only, combined-review: research/map-lab/ground/results/measure.json neither lists nor hashes its shots and keeps the Guard verdict without its success code, so a map shot can never be selected until its producer records both (worker-a8191, 21 Oct).
+
+### Source edit (a7950): a part could not hold an isolated frame and speak a checked message seam
+
+a8537 · family=missing-word · status=source-pending
+
+The living map's seam is source: deskd (GET and POST /api/map, and serving ground's four frame files under /map/ground/) and a host page (desk-shell/map-host.html, map-host.js). The missing world word: a lens part that holds a page in a sandboxed frame and names the one message contract it speaks (here agora-map/1: draw in; press, drop, move out). The host would then give it a fresh port on each load, refuse anything off that port, and turn each message into one fenced line. Today that is all in map-host.js, so a second isolated app (a web tab, a game) would copy the whole page. Also found by running Pike's real pins: how a pin LOOKS (icon, colour) had no agreed form, and the real frame refused all three pins over icon=museum. A redraw that changed nothing still rebuilt the frame's pins, and a press could fall between pointer down and up (2 of 20 lost). Both are fixed in the frame and the host; the first wants one line in the contract a7875.
