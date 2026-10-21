@@ -136,6 +136,7 @@ async def main():
     ap.add_argument("--small", action="store_true")
     ap.add_argument("--only", type=lambda s: s.split(","), default=None)
     ap.add_argument("--probe", action="store_true")
+    ap.add_argument("--glance-fix", action="store_true", help="c7532: JEFF's staged a7531 style line, in the disposable copy only")
     a = ap.parse_args()
     size = (1280, 800) if a.small else (2560, 1440)
     pt.SIZE = size
@@ -146,6 +147,14 @@ async def main():
     j = None
     try:
         review_copy.stage_copy(copy)
+        if a.glance_fix:
+            # a7531, exactly: a transparent token and `edge glanceclear` on role lgstat; lgstat.on unchanged. The copy only.
+            old = "role lgstat : between gap, align center, corner gap, pad gap /2, pad left gap, pad right gap"
+            copy.do("look a5206", "hud-playtest")
+            said = copy.do(f"do replace a5206 old={pt.q(old + chr(10))} new={pt.q('token glanceclear = #00000000' + chr(10) + old + ', edge glanceclear' + chr(10))}", "hud-playtest")
+            print("glance fix (copy only):", said.splitlines()[0][:200] if said else said)
+            if "ERR" in said:
+                raise SystemExit("the staged glance fix did not apply to the copy: " + said[:300])
         win = pt.Window(False)
         await win.open(copy.url())
         for _ in range(100):
