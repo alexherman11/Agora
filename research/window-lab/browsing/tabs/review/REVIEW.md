@@ -121,7 +121,7 @@ worker-a7544 (builder-1), after the source repair 319b57d (a7319) and JEFF's c77
 
 ### Verdict
 
-**JEFF may apply the menu, search, notice and the eleven `do view` route hunks of a7761 with a7439/a7693, once this branch's `placeFloat` lands.** Four route clauses must change first:
+**JEFF may apply the menu, search, notice and the eleven `do view` route hunks of a7761 with a7439/a7693, once this branch's `placeFloat` lands.** Six route clauses must change first (corrected 21 Oct: this line said four, wrongly; a live read found 2 + 2 + 2):
 
 - a5544 home-work: 2 clauses
 - a6352 home-house: 2 clauses
@@ -205,6 +205,22 @@ Shot looked at: `22-overflow-menu.png` (1280). The menu is white, above the Tabs
 
 - At 1280x496 the HUD gives the viewer tile no room at all. At 1280x720 the dock covers the viewer's Tabs handle. Both are the HUD's layout, not the float.
 - The landing gate's test_landing_queue case 14 passed here every time (20 of 20 cases). This branch changes no queue code, so treat it as a room transient (c7755).
+
+## Round 3 (builder-1, 21 Oct): JEFF's a7937 view-with-lens, copy only (c7956)
+
+`python research/window-lab/browsing/tabs/review/repro.py helper` (ran) on a copy of frontier-try at e17553. It applies a7439/a7693/a7761, adds a7937's verb to f5204, and routes the six lens clauses through `do view-with-lens $x <lens>`. All nine rows passed:
+
+1. Shelved Viewer: opens with the lens and comes out (shelf=no).
+2. Already visible, another target: the guard is skipped, no refusal.
+3. Same target and lens again: no new entry, no event.
+4. Same target, another lens: gets its own entry, and Back returns to the first lens.
+5. Another actor (pike): "nothing matches prop:role=home-view,prop:actor=pike", and alex's viewer is untouched. This is weak, because pike has no viewer on the copy.
+6. `"home-feed; do remove a5082"` as the lens: refused as "Invalid lens; earlier steps undone", and a5082 stays.
+7. Unknown lens: "That lens is unavailable; earlier steps undone", and the viewer is unchanged.
+8. Stale press: "refused: a6866 changed since this was painted … nothing was done."
+9. The draft a5082 and its About are unchanged.
+
+Not checked: how this looks in a painted browser (no screen run, per e17636); a second actor that does have a viewer. Side note: after (4), the legacy `back=` field equals the current target, because both entries are a6868.
 
 ## Not run
 
