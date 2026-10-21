@@ -339,7 +339,7 @@ a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
 
-## curing (43)
+## curing (44)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -665,6 +665,12 @@ Source staged on viewer tabs commission: the world lacked an undoable multi-proj
 a7613 · family=painter · status=curing
 
 Source a7557, pending landing and guarded acceptance. The existing markdown word already composes with media, but read-only links lacked Tab/Enter access and an approved inline picture lost media Pop out after deduplication. Generic TextEdit read semantics, Media.inline and narrow lens action routing supply these without chat-specific source, edit actions or new privilege; read code/table width rules constrain content. Five actual-module DOM stand-in tests and three in-memory actual-lens/dispatch checks pass; no browser/layout/clipboard acceptance. Exact body-only patches/reversal are staged in Richer chat — exact staged body passages and reversal. No live Conversation edits or sends.
+
+### A float could not be sized to the room beside its handle (a7544)
+
+a7781 · family=lens-words · status=curing
+
+Source edit (a7544, desk-shell/lens.js placeFloat, approved by JEFF e15996). The Tabs menu, a float, ran off an 800 px page: a lifted float was placed fixed under its handle and capped only at 70vh (lens.html), whatever room was left below the handle (measured: a 560 px menu from y 410, ending at 970 on an 800 px page). No world word says how tall a float may be relative to where its handle sits: measure and scroll give width and scrolling, a role gives looks, and 70vh ignores the handle. The missing word was 'placed in the room beside its handle'. The painter now does it for every float: it opens below, or above when it does not fit below and above has more room, and is no taller than that room (it scrolls inside it). A lens can still say nothing about the side or the gap; if one needs to, that is a paint word (float above|below), not more painter policy.
 
 ## unchecked (7)
 
@@ -1282,7 +1288,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (2)
+## source-pending (3)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1298,3 +1304,9 @@ Updated 20 Oct, source staged only: missing generic words resize, partition, com
 
 
 20 Oct round5 source candidate: generic authored grip default ownership and action-control drag guard repaired per JEFF, with no geometry/containment redesign. Passive nested summaries may carry; editors stay native; control clicks remain, returning/cancelled drags do not activate. 281 DOM stand-in checks pass; no fresh browser claim. Targeted guarded recheck still gates readiness/live use; EVIDENCE.md/current staged a7180 distinguish source tests from the reviewer's world-border proof.
+
+### Item promotion needs atomic data admission, not a batch of commands
+
+a7801 · family=missing-word · status=source-pending
+
+Source prerequisite for item pickup (worker-a7666, 20 Oct). Missing world-level word: one all-or-nothing create-or-restore plus placement, including subject and appearance identities. Ordinary independent lines intentionally keep successful earlier writes; compensation cannot prevent observers seeing an orphan. Staged internal Session.atomic/atomic_status/atomic_undo uses actual isolated Desk native checks, existing writer serialization, strict fsynced one-record facts/events/rule-state/receipt admission, whole undo and unknown-reply reconciliation. No public word/endpoint, carry affordance or live migration. Unsupported custom hooks, world-verb/effect rules and unsettled chains refuse atomically. Real panel notes supported with immutable actor/role and restricted data props. Accepted partition adapter, eligibility/receiver fences, preview agreement and observer/runtime compatibility remain integration gates. Tests use actual in-memory engine and disposable journals, not a stand-in backend. Architecture: research/text-desk-lab/notation/atomic-world/ARCHITECTURE.md.
