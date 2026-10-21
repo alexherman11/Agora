@@ -173,3 +173,71 @@ that the running HUD uses it. No activation/restart command is authorized here.
 Only a separately authorized explicit Connect attempt can establish the next
 real failure boundary. No claim is made that the historical cause is fixed or
 that Spotify is connected.
+
+## Host loading checkpoint (c8238; 21 October)
+
+**Read:** the production repair landed as `536aa73`, dated
+`2026-10-21 11:45:44 -0700`. Landing updates source, not an already-running
+Python interpreter. `hud.py` imports `host_verbs` and `media` at startup;
+`Api.host` dispatches through the imported module's registered function.
+There is no module-reload path in these files. The function-local imports in
+`_connect` are ordinary cached Python imports, and `media.likes()` retains a
+`Library` singleton. A fresh Connect in a pre-repair host therefore still uses
+the old host handler; lazily importing a previously unused module can produce
+a mixed generation, not reliable activation of the complete repair.
+
+Painter autoreload (`lens.js` / `reloadKeeping`) reloads the page, not Python.
+World lens edits likewise do not load these Python changes. Host capability
+rows expose names/descriptions/argument forms, not loaded source hashes.
+
+**Ran:** the existing read-only `hud_probe.py`, once, printed:
+
+```text
+now 2026-10-21T11:55:15-07:00
+no home base window
+```
+
+It enumerates exact-title home-base windows and reads process start time and
+geometry without input, capture or activation. Its result is limited to this
+execution context: it does not prove that Alex has no HUD, or establish the
+actual running host version. No alternate host query or private-state read was
+attempted. The commit timestamp above came from `git show`, not a host
+attestation.
+
+**Smallest supported future loading action:** a host maintainer coordinates
+one hidden HUD restart from the main checkout, using the existing helper:
+
+```text
+C:/Projects/Agora4/.venv/Scripts/python.exe C:/Projects/Agora4/research/window-lab/hud_restart.py
+```
+
+This is an unexecuted activation recipe, not authorization. Do not run it from
+the worker checkout, add `--show` or a debug port, or restart Spotify, the house,
+keeper or supervisor for this repair. The helper invokes `hud.py --stop`,
+refuses launch when stopping is not confirmed, then launches its checkout's
+HUD hidden. The current stop path requires known process inventory and
+identity-checked termination. A host maintainer must verify the current target
+and ordinary awake/no-game/authorization conditions before activation; this
+probe did not establish them.
+
+**Draft/window consequences, read rather than restart-tested:** the HUD's
+WebView and in-memory Python state are replaced. Its stop/close lifecycle also
+affects capture, key hooks, media-reader state and owned window-management
+state; the normal close path restores managed windows. Exact cleanup on a
+forced stop is not equivalent to a graceful close. World layout is not reset
+by this recipe, but visual/window continuity is not certified here.
+
+The viewer stores unsent words and their origin in `localStorage`; the HUD uses
+a persistent WebView profile. Recovery is expected only if those writes
+succeeded and the origin/profile/world/actor/lens keys remain the same.
+Window identity, caret/selection and page-reload carry state use
+`sessionStorage` or memory and must not be promised across a new process.
+No actual draft, browser profile or account store was inspected; no restart
+draft-preservation proof or standalone music-window continuity proof was run.
+
+No product code changed in this checkpoint and no broad test round was run.
+The earlier 23-test mock result above remains source-repair evidence only.
+No reload, process stop/start, listener, browser, Connect press, OAuth exchange
+or account/media action ran. Historical failure and real connection status
+remain unproved. After separately authorized activation, only a separately
+authorized explicit Connect attempt can establish the next real boundary.
