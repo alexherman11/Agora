@@ -546,6 +546,11 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True):
         pid = start(name, [EDGE, f"--user-data-dir={prof}", f"--remote-debugging-port={port}",
                            "--inprivate",
                            "--no-first-run", "--no-default-browser-check", "--disable-sync", "--disable-extensions",
+                           # a7466: with Alex's display asleep (39 min idle, 20 Oct) Edge judged every window occluded:
+                           # the page went visibilityState hidden, stopped painting (blank PrintWindow) and its carries
+                           # never started. A window on a desktop no one sees must not depend on his monitor
+                           "--disable-features=CalculateNativeWinOcclusion", "--disable-backgrounding-occluded-windows",
+                           "--disable-renderer-backgrounding",
                            f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"])
         st = {"pid": pid, "port": port, "url": url, "pids": [pid], "profile": str(prof), "at": time.time()}
         state_file(name).write_text(json.dumps(st), encoding="utf-8")
