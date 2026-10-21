@@ -1,11 +1,11 @@
 {
  "base": "c5c988c",
- "main": "c3ad04e",
+ "main": "a981e1a",
  "theirs": "C:\\Projects\\Agora4\\.worktrees\\a7045",
  "files": [
   {
    "path": "research/command-center/FRICTION.md",
-   "how": "resolved by hand (1 blocks; resolved/research/command-center/FRICTION.md)",
+   "how": "resolved by hand (1 block; resolved/research/command-center/FRICTION.md.block)",
    "theirs_sha256": "8C5A6A2FEBBB21B0645C57BB3DBF88F2F882F398C0F8C9D69AF9B3B83EDAF427",
    "base_sha256": "F6E992533DE631CEC2E3F644611981EADAF2B8C541C4E45B13D5FCEF97ECB66B",
    "main_sha256": "993CCD7B3FDA5944CADD798BD7D63CD7DDDF4AEAEF9B343DC02BAEBB6CC14A3A",
@@ -37,7 +37,7 @@
   },
   {
    "path": "research/text-desk-lab/notation/desk-shell/lens.html",
-   "how": "resolved by hand (1 blocks; resolved/research/text-desk-lab/notation/desk-shell/lens.html)",
+   "how": "resolved by hand (1 block; resolved/research/text-desk-lab/notation/desk-shell/lens.html.block)",
    "theirs_sha256": "9973299A3B73A86675B25A9DF7AD591F958C5DB7D83CBE447E45326BB035A8FF",
    "base_sha256": "96E66ECAEE0BA8A80CE38E4A118D60239D186167D1314E283DB5E96F2F6B1779",
    "main_sha256": "FDA39657FA59A3A8A94DF82906F3BF37133A057C38A0C7819BAB1A2C086B53C5",
@@ -54,10 +54,10 @@
   {
    "path": "research/text-desk-lab/notation/desk-shell/partition-ui.js",
    "how": "new",
-   "theirs_sha256": "89769A67AFFAF5FA4783FB1F318E5BEA233AFFC6D10EC557174A7AFDC904E332",
+   "theirs_sha256": "2CD497F27AE22C621CB7B4140BC938564E7293178563DF0878F30ADA6168B535",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "89769A67AFFAF5FA4783FB1F318E5BEA233AFFC6D10EC557174A7AFDC904E332"
+   "composed_sha256": "2CD497F27AE22C621CB7B4140BC938564E7293178563DF0878F30ADA6168B535"
   },
   {
    "path": "research/text-desk-lab/notation/desk-shell/partition.js",
@@ -77,7 +77,7 @@
   },
   {
    "path": "research/text-desk-lab/notation/lens_ir.py",
-   "how": "resolved by hand (1 blocks; resolved/research/text-desk-lab/notation/lens_ir.py)",
+   "how": "resolved by hand (1 block; resolved/research/text-desk-lab/notation/lens_ir.py.block)",
    "theirs_sha256": "792D29561835722ADA25BAB553888AC584540427074E3BAFECCF276B760CF2EC",
    "base_sha256": "298370795C7ECD99356D50AB6E6C2055397D263914F6C35AF0F776E3EE38A684",
    "main_sha256": "48D08EAA6AECBA727E25439B915E4FE780A11A8A5FEC5C50BAA3DF38AB34649C",
@@ -141,7 +141,7 @@
   },
   {
    "path": "research/text-desk-lab/notation/scene.py",
-   "how": "resolved by hand (1 blocks; resolved/research/text-desk-lab/notation/scene.py)",
+   "how": "resolved by hand (1 block; resolved/research/text-desk-lab/notation/scene.py.block)",
    "theirs_sha256": "F5702B9F9BAC8E0625AAFB4468015BB1E92048B9E50E1D1E3DE14682438E0F66",
    "base_sha256": "9DE75F114E9A3E59C5AF84AB7D3A8495B4B2E526AF767CB01FEF646441EF9877",
    "main_sha256": "35A89CECD28BDA6C65AC74D8AFAB60054F959EA52BF26F4204E42FD733F453AD",
@@ -158,10 +158,10 @@
   {
    "path": "research/window-lab/hud-dividers/EVIDENCE.md",
    "how": "new",
-   "theirs_sha256": "BC5069DBB1D930F6E68D2777BD643FA1F3EB6A8C7982D538021B02EF60CF2252",
+   "theirs_sha256": "71F05283E1C6F8BC09B951826070AC71ABBAF4BE16CCFDDC8595BE066C3F61E5",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "BC5069DBB1D930F6E68D2777BD643FA1F3EB6A8C7982D538021B02EF60CF2252"
+   "composed_sha256": "71F05283E1C6F8BC09B951826070AC71ABBAF4BE16CCFDDC8595BE066C3F61E5"
   },
   {
    "path": "research/window-lab/hud-dividers/HANDOFF.md",
@@ -174,10 +174,10 @@
   {
    "path": "research/window-lab/hud-dividers/NAVIGATION.md",
    "how": "new",
-   "theirs_sha256": "839E28097B6EA08C0F46F9D53765BAEF398DBB6CB31170FFAB3EEDC7AD03890F",
+   "theirs_sha256": "81DC2B4E1A2817B572F577D92FA5EBCF16D02EAB00EA8AEADA4EDE4B2921EF46",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "839E28097B6EA08C0F46F9D53765BAEF398DBB6CB31170FFAB3EEDC7AD03890F"
+   "composed_sha256": "81DC2B4E1A2817B572F577D92FA5EBCF16D02EAB00EA8AEADA4EDE4B2921EF46"
   },
   {
    "path": "research/window-lab/hud-dividers/bundle.py",
@@ -278,10 +278,10 @@
   {
    "path": "research/window-lab/hud-dividers/test_partition_ui.js",
    "how": "new",
-   "theirs_sha256": "0487EA6822FB4BCAE99F686DA8D73C1C150D58C5F8C30C168EE63EA63FFEA26F",
+   "theirs_sha256": "44D7F9040B7E36235FC1F867DC216AFC02060869305B0D5ADAEF97E073744749",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "0487EA6822FB4BCAE99F686DA8D73C1C150D58C5F8C30C168EE63EA63FFEA26F"
+   "composed_sha256": "44D7F9040B7E36235FC1F867DC216AFC02060869305B0D5ADAEF97E073744749"
   },
   {
    "path": "research/window-lab/hud-dividers/test_pointer.js",
