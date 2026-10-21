@@ -14,6 +14,8 @@ import json
 import sys
 import time
 import traceback
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -130,6 +132,26 @@ class Journeys:
         return self.record("probe", "what the staged copy paints", "ran", "facts printed", facts, [await self.shot("probe")])
 
 
+def deployed_identity(copy):
+    """a7925: what the copy holds as deployed, before anything is pressed: the home-tiling lens text, Alex's layout's
+    tree, its members and shelves, and the event the copy starts at (SHA-256 of exact bodies/values; reads only)."""
+    import hashlib
+    import re as _re
+    h = lambda s: hashlib.sha256(s.encode("utf-8")).hexdigest().upper()  # noqa: E731
+    said = copy.do("read a5692 :3", "hud-playtest").splitlines()
+    i = said.index("---")
+    lens = "\n".join(said[i + 1:said.index("---", i + 1)])
+    snap = json.load(urllib.request.urlopen(copy.base + "/api/snapshot?" + urllib.parse.urlencode({"session": copy.session, "as": "hud-playtest"}), timeout=60))
+    f = next((n for n in snap["nodes"].values() if n.get("id") == "f5664" or n.get("appears") == "f5664"), None) or snap["nodes"].get("f5664") or {}
+    props = f.get("props") or {}
+    panels = copy.do("find prop:role=home-panel,prop:actor=alex", "hud-playtest")
+    rows = [l.strip() for l in panels.splitlines() if _re.match(r"\s+a\d+ note ", l)]
+    return {"events": copy.at(), "home-tiling a5692": {"sha256": h(lens), "lines": len(lens.splitlines()),
+                                                       "has partition": "partition" in lens},
+            "f5664 props": sorted(props), "f5664 tree sha256": h(str(props.get("tree", ""))), "f5664 tree": str(props.get("tree", ""))[:600],
+            "panels": [_re.sub(r"\s+·\s+\d+w.*$", "", r) for r in rows]}
+
+
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--world", default="frontier-try")
@@ -137,16 +159,33 @@ async def main():
     ap.add_argument("--only", type=lambda s: s.split(","), default=None)
     ap.add_argument("--probe", action="store_true")
     ap.add_argument("--glance-fix", action="store_true", help="c7532: JEFF's staged a7531 style line, in the disposable copy only")
+    ap.add_argument("--deployed", action="store_true",
+                    help="a7925: the world is already migrated (JEFF e16654/e16658): stage nothing, keep Alex's shelves, record what is deployed")
+    ap.add_argument("--live-tree", action="store_true", help="with --deployed: Alex's current live f5664 tree (read only) onto the copy")
     a = ap.parse_args()
     size = (1280, 800) if a.small else (2560, 1440)
     pt.SIZE = size
-    out = DEMOS / f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{size[0]}x{size[1]}"
+    out = DEMOS / f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{size[0]}x{size[1]}{'-deployed' if a.deployed else ''}"
     out.mkdir(parents=True, exist_ok=True)
     copy = pt.Copy(a.world)
     win, guard = None, None
     j = None
+    deployed = None
     try:
-        review_copy.stage_copy(copy)
+        if a.deployed:
+            if a.live_tree:
+                # the live arrangement as Alex left it (read-only GET from the live door), put on the COPY only
+                snap = json.load(urllib.request.urlopen(pt.LIVE + "/api/snapshot?" + urllib.parse.urlencode({"session": "frontier", "as": "worker-a7925"}), timeout=60))
+                live = (snap["nodes"].get("f5664") or {}).get("props") or {}
+                copy.do("look f5664", "alex")
+                said = copy.do(f"do prop f5664 tree={pt.q(live['tree'])}", "alex")
+                print("live tree on the copy:", (said.strip().splitlines() or [""])[0][:160])
+                if "ERR" in said and "already has that" not in said:
+                    raise SystemExit("the live tree did not go onto the copy: " + said[:300])
+            deployed = deployed_identity(copy)
+            print(json.dumps(deployed, indent=1, ensure_ascii=False))
+        else:
+            review_copy.stage_copy(copy)
         if a.glance_fix:
             # a7531, exactly: a transparent token and `edge glanceclear` on role lgstat; lgstat.on unchanged. The copy only.
             old = "role lgstat : between gap, align center, corner gap, pad gap /2, pad left gap, pad right gap"
@@ -159,7 +198,7 @@ async def main():
         # opens The lowdown in it, as a press on a name does (the view verb brings the Viewer panel out)
         import re as _re
         vline = copy.do("find prop:role=home-panel,prop:actor=alex,prop:lens=home-viewer", "hud-playtest")
-        if "shelf=yes" in vline:
+        if "shelf=yes" in vline and not a.deployed:
             vid = _re.search(r"^\s+(a\d+) note", copy.do("find prop:role=home-view,prop:actor=alex", "hud-playtest"), _re.M).group(1)
             copy.do(f"read {vid}", "alex")
             said = copy.do("do view a5202", "alex")
@@ -199,7 +238,7 @@ async def main():
             guard = await win.close()
         copy.close()
     rows = j.rows if j else []
-    rep = {"size": size, "world_at": None, "guard": guard, "page_errors": errors if win else None, "rows": rows,
+    rep = {"size": size, "world_at": None, "deployed": deployed, "guard": guard, "page_errors": errors if win else None, "rows": rows,
            "selection_left_before_presses": j.selection_left if j else [],
            "stale_chrome_ms_after_release": getattr(j, "stale_ms", []) if j else []}
     (out / "report.json").write_text(json.dumps(rep, indent=1, ensure_ascii=False, default=str), encoding="utf-8")
