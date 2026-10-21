@@ -180,7 +180,7 @@ async def main():
                 copy.do("look f5664", "alex")
                 said = copy.do(f"do prop f5664 tree={pt.q(live['tree'])}", "alex")
                 print("live tree on the copy:", (said.strip().splitlines() or [""])[0][:160])
-                if "ERR" in said:
+                if "ERR" in said and "already has that" not in said:
                     raise SystemExit("the live tree did not go onto the copy: " + said[:300])
             deployed = deployed_identity(copy)
             print(json.dumps(deployed, indent=1, ensure_ascii=False))
