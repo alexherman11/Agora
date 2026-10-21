@@ -2,6 +2,65 @@
 
 worker-a7466 (builder-1), 20 Oct 2026. Acceptance only: no source fix to the reviewed code, no live apply.
 
+## Round 6 (a7784, c7684): the owner's grip repair c7682 — ACCEPTED
+
+worker-a7784 (builder-2), 20 Oct 2026, taking over from a7466.
+- a7466 was waiting, with nothing running; its stopped 22:30 run left no report.
+- Every run here was in the foreground, and each result was collected before the next.
+
+**Bytes reviewed (ran; composed copy-only by the landed overlay.py over main 229b24a):**
+- 58 files, the same 4 block-only unions, 0 conflicts; restored afterwards.
+- Exact matches with c7682:
+  - partition-ui.js 025577AC51147D3F81158C29E45AF0F2A5E58090835956830C4C045D01BC7E3C
+  - test_partition_ui.js 17F0F0856FD1B655D22BC0B87C1283BB15681C930FB5923806DD97F06AFE6946
+  - partition_navigation.py E09828CB00D7267198A1A8BF407A18EEFB63327B4FCA792801384ADADC929F4C
+  - test_navigation_step.py B88EA3355398E3294DB71FBD05B9DF4C727AC4505E734DD727FFF7632F83CFE5
+- Composed lens.js EBE70534…CEAB3:
+  - its delta from main is additive partition hooks only;
+  - main's `remember` line is kept;
+  - textedit.js and markdown.js are untouched.
+
+**World:**
+- The try world was at e16176; the copies reached e16273 and e16321.
+- The reserved lgstat border is already in the copy's home-style (a5206, `glanceclear`), so nothing was added.
+- Alex's layout now has the Viewer shelved. The copy only opens The lowdown (`do view`, which brings the Viewer panel out), so the earlier four-panel journeys still stand.
+
+**Health:** whole on the composed tree, except help note a1853 "lens|lenses": it does not name the partition lens words resize, partition, companion, sizing and chrome. That note must gain them when the source lands.
+
+**Guard:** "alex: untouched by the sandbox" on every run. DPR 1.5 at both sizes. Page errors: none reported.
+
+| journey | 2560x1440 | 1280x800 |
+|---|---|---|
+| counts5: title + each nested count ('4 need you', '7 moving', '2/1 wait on JEFF') carried 5 of 5, 0 selected, no workaround; 3 px press: no carry, no selection, tree same | pass | pass |
+| controls: pin and away act on a stationary click (1 send each); a drag returned to the control, or released away, sends nothing, carries nothing, selects nothing (0 links in the grip) | pass | pass |
+| cancelrelease: Escape (real key), blur, resize, pointercancel (dispatched) mid-carry, then 5 moves with the button down: no ghost; physical release commits/sends/selects nothing; the next carry starts | pass | pass |
+| clicks (title, 4 px, text) | pass | pass |
+| busy (answer held 1.5 s, grab declined cleanly, next carry lands at preview) | pass | pass |
+| focusdiag Board focus → Chat bottom: preview = release = answer, difference 0, root spread 0 | pass | pass |
+| focus, tabs-focus, consecutive-paced, cancel-policy | pass | pass |
+| 12 desk edges (Board, Chat, Music × 4): preview = result, full span | pass | pass |
+| draft and composer: words, caret/range and context kept, nothing sent | pass | blocked: composer below the page (y 812 of 800), pre-existing |
+| dock-pin, dock-order, dock-look | pass | pass |
+| dock-colour | blocked: no pin has tint= | blocked |
+| owner's recipe partition_navigation (hud_playtest, owner bytes) | pass functionally, slow 849 ms; every press on the appgrip, 0 selected | pass functionally, slow 1171 ms; the same |
+
+Reports are in research/window-lab/demos/combined-review/ (main checkout):
+- 2560: 224240, 224527, 224638
+- 1280: 224950, 225210, 225335
+
+Recipe runs are in demos/hud-playtest/: 224921 (2560) and 225540 (1280).
+
+**Driver note:** the first controls run (in a7466's tree) missed the away control's stationary click. The cause was the test's stale coordinates after the pin repainted the header; re-found before each press, it acts. The diagnosis ran in a7466's 222931 run: on a fresh page, away sends `do prop … shelf=yes`.
+
+**Verdict:** no blocker. I recommend that the owner mark the c7682 bytes ready for the house merge, then that JEFF do the live world migration.
+
+**Limits kept explicit:**
+- 1280 composer and draft inaccessibility;
+- completion over 300 ms;
+- no real workspace switch, real touch or media.
+
+Earlier rounds' coverage stands as recorded below.
+
 ## Round 5 (c7532): JEFF's staged glance fix a7531, and the Board header press
 
 **Bytes (ran):**

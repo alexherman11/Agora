@@ -1543,6 +1543,179 @@ async def countpress(J):
     await restore(J)
 
 
+# ---- round 6 (c7684/a7784, owner candidate c7682): repeated presses on every grip piece, controls, cancel + release ----
+
+DOS = "(window.__pt && window.__pt.reqs || []).filter(q => q[0] === 'do').length"
+
+
+async def board_header(J):
+    """the Board carried to the bottom (its header then shows the nested summary lens, as in countpress) -> HEADPARTS"""
+    await J.reload()
+    await fixture(J)
+    fr = await frame(J)
+    await carry_to(J, "The board", fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)
+    await answered(J)
+    await J.settle(1)
+    return await J.js(HEADPARTS)
+
+
+async def counts5(J):
+    """the authored title and every nested summary count in the Board's grip, each pressed five times (out and back,
+    released at the press point): every press carries with nothing selected; a 3 px press neither carries, selects nor changes the tree"""
+    hp = await board_header(J)
+    if not hp:
+        return J.record("counts5", counts5.__doc__, "blocked", "no Board grip", {}, [await J.shot("counts5")])
+    rows, bad = [], []
+    for part in [p for p in hp["parts"] if not p["control"]]:
+        if not part["hitSelf"]:
+            rows.append({"text": part["text"], "result": "covered", "at": part["at"]})
+            bad.append(f"{part['text']!r}: covered by {part['at']}")
+            continue
+        got = []
+        for k in range(5):
+            st0 = await J.js("__cr.state()")
+            seen, _ = await J.hold(part["x"], part["y"], [(part["x"] + 30, part["y"] + 12), (part["x"] + 60, part["y"] + 40), (part["x"], part["y"])],
+                                   lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection()})"))
+            await answered(J)
+            await asyncio.sleep(0.3)
+            mid, left = seen[1], await J.js("__cr.selection()")
+            r = "carried" if mid["ghost"] and not mid["sel"] and not left else f"ghost {mid['ghost']} selected {mid['sel']}/{left}"
+            got.append(r)
+            if r != "carried":
+                bad.append(f"{part['text']!r} press {k + 1}: {r}")
+            if left:
+                J.reloads.append(("counts5", left))
+                await J.reload()
+                await answered(J)
+            if (await J.js("__cr.state()")) != st0:
+                await restore(J, {"tree": st0["tree"], "focus": st0["focus"]})
+        st0, n0 = await J.js("__cr.state()"), await J.js(DOS)
+        await J.hold(part["x"], part["y"], [(part["x"] + 3, part["y"])], steps=3)
+        await J.settle(0.8)
+        sub = {"tree same": (await J.js("__cr.state()")) == st0, "sel": await J.js("__cr.selection()"), "ghost": bool(await J.js("__cr.ghost()")), "dos": (await J.js(DOS)) - n0}
+        if not sub["tree same"] or sub["sel"] or sub["ghost"]:
+            bad.append(f"{part['text']!r} under the threshold: {sub}")
+        rows.append({"text": part["text"], "chain": part["chain"], "presses": got, "subthreshold": sub})
+    (J.out / "counts5.json").write_text(json.dumps({"grip": hp["grip"], "rows": rows}, indent=1, default=str), encoding="utf-8")
+    J.record("counts5", counts5.__doc__, "pass" if not bad else "fail",
+             "; ".join(f"{r['text']!r} {sum(1 for p in r.get('presses', []) if p == 'carried')}/5 carried" for r in rows)
+             + (f"; failures: {bad}" if bad else "; every sub-threshold press: no carry, no selection, tree unchanged"),
+             {"file": "counts5.json"}, [await J.shot("counts5")])
+    await restore(J)
+
+
+async def controls(J):
+    """the real controls in the Board's grip (pin, away, buttons, links): a drag that returns, or one released away,
+    neither acts, carries nor selects; a stationary click right after still acts (sends)"""
+    import re
+    hp = await board_header(J)
+    if not hp:
+        return J.record("controls", controls.__doc__, "blocked", "no Board grip", {}, [await J.shot("controls")])
+    pid = re.search(r"^\s+(a\d+) note", J.copy.do("find prop:role=home-panel,prop:actor=alex,prop:lens=home-board", "hud-playtest"), re.M).group(1)
+
+    def props():
+        line = next((l for l in J.copy.do(f"examine {pid}", "hud-playtest").splitlines() if l.startswith(pid + " ")), "")
+        return dict(re.findall(r"(\w+)=(\S*)", line))
+
+    async def fresh(text):
+        """where the control is now (a repaint may have moved it); None when it is not drawn"""
+        h = await J.js(HEADPARTS)
+        return next((p for p in (h or {}).get("parts", []) if p["control"] and p["text"] == text), None)
+    p0 = props()
+    rows, bad = [], []
+    ctls = [p for p in hp["parts"] if p["control"]]
+    links = await J.js("(() => { const p = __cr.byLabel('The board'), g = p && __cr.grip(p); return g ? g.querySelectorAll('a, [role=link]').length : null; })()")
+    for part0 in ctls:
+        part = await fresh(part0["text"]) or part0
+        row = {"text": part["text"], "chain": part["chain"]}
+        for how, pts in (("returned", [(part["x"] + 30, part["y"] + 12), (part["x"] + 50, part["y"] + 30), (part["x"], part["y"])]),
+                         ("released away", [(part["x"] + 30, part["y"] + 12), (part["x"] + 80, part["y"] + 60)])):
+            st0, n0 = await J.js("__cr.state()"), await J.js(DOS)
+            seen, _ = await J.hold(part["x"], part["y"], pts, lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection()})"))
+            await J.settle(1.0)
+            r = {"ghost": any(s["ghost"] for s in seen), "sel": max(s["sel"] for s in seen), "left": await J.js("__cr.selection()"),
+                 "sent": (await J.js(DOS)) - n0, "tree same": (await J.js("__cr.state()")) == st0}
+            row[how] = r
+            if r["ghost"] or r["sel"] or r["left"] or r["sent"] or not r["tree same"]:
+                bad.append(f"{part['text']!r} {how}: {r}")
+            if r["left"]:
+                await J.reload()
+                await answered(J)
+        part = await fresh(part0["text"]) or part
+        row["clicked at"] = [round(part["x"], 1), round(part["y"], 1)]
+        n0 = await J.js(DOS)
+        await J.w.click(part["x"], part["y"])
+        await J.settle(1.5)
+        row["stationary sent"] = (await J.js(DOS)) - n0
+        if not row["stationary sent"]:
+            bad.append(f"{part['text']!r}: a stationary click sent nothing")
+        await restore(J)
+        now = props()
+        fix = {k: p0.get(k, "") for k in ("pin", "shelf") if now.get(k, "") != p0.get(k, "")}
+        if fix:
+            J.copy.do(f"look {pid}", "hud-playtest")
+            J.copy.do(f"do prop {pid} " + " ".join(f'{k}="{v}"' for k, v in fix.items()), "hud-playtest")
+            await J.settle(1.0)
+        rows.append(row)
+        if not await J.js(HEADPARTS):
+            await board_header(J)
+    (J.out / "controls.json").write_text(json.dumps({"rows": rows, "links in grip": links}, indent=1, default=str), encoding="utf-8")
+    J.record("controls", controls.__doc__, "pass" if ctls and not bad else ("blocked" if not ctls else "fail"),
+             f"{len(ctls)} controls ({links} links in the grip): " + "; ".join(f"{r['text']!r} stationary sent {r['stationary sent']}" for r in rows)
+             + (f"; failures: {bad}" if bad else "; returned and released-away drags: no carry, no selection, nothing sent"),
+             {"file": "controls.json"}, [await J.shot("controls")])
+    await restore(J)
+
+
+async def cancelrelease(J):
+    """a carry cancelled by Escape (real key), blur, resize or pointercancel (dispatched) stays cancelled through the physical
+    release (no ghost on later moves, nothing committed, sent or selected); the next carry after it works"""
+    await J.reload()
+    await fixture(J)
+    fr = await frame(J)
+    rows, bad = [], []
+    for how in ("escape", "blur", "resize", "pointercancel"):
+        st0, n0 = await J.js("__cr.state()"), await J.js(DOS)
+        gx, gy = await grip(J, "The board")
+        seen, handle = await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)],
+                                    lambda a, b: J.js("({ghost: !!__cr.ghost()})"), release=False)
+        if how == "escape":
+            J.w.SB.press_key(J.w.SB.focused(J.w.win), "Escape")
+        elif how == "pointercancel":
+            await J.js("(() => { const e = document.elementFromPoint(innerWidth / 2, innerHeight / 2) || document.body; e.dispatchEvent(new PointerEvent('pointercancel', {pointerId: 1, bubbles: true, isPrimary: true, pointerType: 'mouse'})); })()")
+        else:
+            await J.js(f"window.dispatchEvent(new Event({json.dumps(how)}))")
+        await asyncio.sleep(0.3)
+        t, at, px, py = handle
+        after_cancel = bool(await J.js("__cr.ghost()"))
+        moved = []
+        for k in range(1, 6):
+            J.w.SB.post(t, J.w.SB.WM_MOUSEMOVE, 1, at(px - 12 * k, py - 15 * k))
+            await asyncio.sleep(0.06)
+            moved.append(bool(await J.js("__cr.ghost()")))
+        J.w.SB.post(t, J.w.SB.WM_LBUTTONUP, 0, at(px - 60, py - 75))
+        await J.settle(1.5)
+        r = {"carried before": seen[1]["ghost"], "ghost after cancel": after_cancel, "ghost on later moves": any(moved),
+             "sel": await J.js("__cr.selection()"), "sent": (await J.js(DOS)) - n0, "tree same": (await J.js("__cr.state()")) == st0,
+             "userSelect": await J.js("document.body.style.userSelect")}
+        # the next action: a fresh carry starts (ghost, nothing selected) and, brought back, changes nothing
+        gx, gy = await grip(J, "The board")
+        nxt, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (gx + 80, gy + 60), (gx, gy)], lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection()})"))
+        await answered(J)
+        r["next carry"] = nxt[1]
+        rows.append([how, r])
+        if (not r["carried before"] or r["ghost after cancel"] or r["ghost on later moves"] or r["sel"] or r["sent"] or not r["tree same"]
+                or r["userSelect"] or not nxt[1]["ghost"] or nxt[1]["sel"]):
+            bad.append(f"{how}: {r}")
+        if (await J.js("__cr.state()")) != st0:
+            await restore(J)
+    J.record("cancelrelease", cancelrelease.__doc__, "pass" if not bad else "fail",
+             "; ".join(bad) or "Escape, blur, resize, pointercancel: carry ended at the cancel, no ghost on 5 later moves, the physical release committed and sent nothing, 0 selected, userSelect back; the next carry started each time",
+             {"rows": rows}, [await J.shot("cancelrelease")])
+
+
+ROUND6 = [("counts5", counts5), ("controls", controls), ("cancelrelease", cancelrelease)]
+
 ROUND3 = [("busy", busy), ("focusdiag", focusdiag), ("containment", containment), ("countpress", countpress)]
 
 ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive),("immediate", immediate), ("refusal", refusal), ("cancel-policy", cancel_policy),
@@ -1552,6 +1725,6 @@ ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive)
 ALL = [("facts", facts), ("clicks", clicks), ("ghost", ghost), ("edges", edges), ("local", local), ("fit", fit),
        ("dividers", dividers), ("focus", focus), ("shelf", shelf), ("cancel", cancel), ("stale", stale), ("draft", draft),
        ("bare", bare), ("dock-pin", dock_pins), ("dock-order", dock_order), ("dock-look", dock_look), ("reload", reload_keeps)]
-ALL = ALL[:3] + ROUND3 + ROUND2[:4] + ALL[3:] + ROUND2[4:]     # the workspace emulation replaces the layout: always last
+ALL = ALL[:3] + ROUND6 + ROUND3 + ROUND2[:4] + ALL[3:] + ROUND2[4:]     # the workspace emulation replaces the layout: always last
 DIAGNOSES = [("escdiag", escdiag), ("debug", debug), ("syncdiag", syncdiag)]      # --only escdiag / debug runs these
 ALL += DIAGNOSES
