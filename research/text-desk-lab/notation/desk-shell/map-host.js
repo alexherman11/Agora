@@ -65,32 +65,48 @@
       state.refused.push({ why, data: (raw || "").slice(0, 2000) });
       say(`refused: ${why}`);
     };
-    let port = null, pending = null;
-    async function refresh() {
+    let port = null, pending = null, posted = "";
+    // the frame rebuilds its pins on every draw, so a draw that changes nothing is not sent: in the live world other
+    // things change every few seconds, and each redraw can land between a pointer's down and up and lose the press
+    // (ran: 2 of 20 real presses lost so, real_frame.py). After an answer the draw is always sent (force): a refused
+    // move's pin must go back to where the world has it
+    async function refresh(force) {
       if (!port) return;
       const q = new URLSearchParams({ session, as, scope });
       const r = await (await fetch(`/api/map?${q}`)).json();
       if (r.error) return say(r.error);
+      const text = JSON.stringify(r.draw);
+      if (!force && text === posted) return;
+      posted = text;
       state.last = r.draw; state.problems = r.problems || [];
       state.draws += 1;
       port.postMessage(r.draw);
       if (state.problems.length) say(`${state.problems.length} not drawn: ` + state.problems.map(([id, why]) => `${id}: ${why}`).join("; "));
     }
     const soon = () => { clearTimeout(pending); pending = setTimeout(() => refresh().catch(() => {}), 80); };
+    // an answer is drawn back at once, not after the 80 ms gather (Rowan, c8181: press to answer drawn, against 100 ms)
+    const now = () => { clearTimeout(pending); return refresh(true).catch(() => {}); };
     async function heard(d) {
+      const t = { heard: Date.now() };
+      state.timings = state.timings || [];
+      if (state.timings.length > 200) state.timings.shift();
+      state.timings.push(t);
       const why = judgePort(d);
       if (why) return refuse(why, d);
       const r = await (await fetch("/api/map", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session, as, scope, message: d }) })).json();
-      if (r.refused || r.error) { refuse(r.refused || r.error, d); return soon(); }
+      t.checked = Date.now();
+      if (r.refused || r.error) { refuse(r.refused || r.error, d); await now(); t.drawn = Date.now(); return; }
       const gesture = (crypto.randomUUID && crypto.randomUUID()) || String(Math.random()).slice(2);
       const body = { session, as, line: r.line, whole: true, gesture };
       if (r.observed) body.observed = r.observed;
       state.sent.push(r.line);
       const out = await (await fetch("/api/do", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+      t.done = Date.now();
       if (out.error) refuse(out.error, d);
       else { state.answered.push({ op: r.op, id: r.id, line: r.line, events: out.events || [], created: out.created || [] }); say(""); }
-      soon();                                              // a refused move gets a fresh draw (a7875)
+      await now();                                         // a refused move gets a fresh draw (a7875)
+      t.drawn = Date.now(); t.op = r.op;
     }
     // a new port for each load of the frame: whatever loaded before it keeps nothing. JEFF via Pike (e17339): the old
     // port is dead, and anything still sent on it is refused out loud, never acted on (a frame can fire a new load and
@@ -106,6 +122,7 @@
       port.onmessage = e => { heard(e.data).catch(err => refuse(String(err), e.data)); };
       iframe.contentWindow.postMessage({ channel: CHANNEL, op: "hello" }, "*", [ch.port2]);   // an opaque origin has no name to target
       state.hellos += 1;
+      posted = "";                                         // a new load has drawn nothing yet
       soon();
     });
     host.addEventListener("message", e => refuse(judge(e, iframe.contentWindow), e.data));

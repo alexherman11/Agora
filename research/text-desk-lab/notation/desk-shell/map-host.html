@@ -18,10 +18,12 @@
 <script>
   (function () {
     const p = new URLSearchParams(location.search);
+    // frame=ground is ground's real frame (a7946, served from research/map-lab/ground); the stand-in stays the default
     const frame = p.get("frame") || "standin.html";
-    if (!/^[a-z0-9][a-z0-9-]{0,40}\.html$/.test(frame)) { document.getElementById("status").textContent = "frame= names a page under /map/"; return; }
+    const src = frame === "ground" ? "map/ground/map.html" : /^[a-z0-9][a-z0-9-]{0,40}\.html$/.test(frame) ? "map/" + frame : null;
+    if (!src) { document.getElementById("status").textContent = "frame= names a page under /map/, or ground"; return; }
     MapHost.start({ session: p.get("session") || "desktop", as: p.get("as") || "alex", scope: p.get("scope") || "",
-                    frameSrc: "map/" + frame + (location.hash || ""), status: document.getElementById("status") });
+                    frameSrc: src + (location.hash || ""), status: document.getElementById("status") });
   })();
 </script>
 </body>

@@ -503,9 +503,23 @@
     if (!fin(p.lon, -180, 180)) return 'lon not a finite number in -180..180';
     if (p.height !== undefined && p.height !== null && !fin(p.height, 0, 10000)) return 'height not a finite number in 0..10000';
     if (p.label !== undefined && (typeof p.label !== 'string' || p.label.length > 200)) return 'bad label';
-    if (p.icon !== undefined && p.icon !== null && p.icon !== '' && (typeof p.icon !== 'string' || [...p.icon].length > 4)) return 'bad icon';
-    if (p.colour !== undefined && p.colour !== null && p.colour !== '' && !(typeof p.colour === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.colour))) return 'bad colour';
     return null;
+  }
+  // a7950 (the seam, with Pike's real pins: icon=museum): icon and colour are how a pin looks, so one this frame cannot
+  // draw is left off and said, and the pin is still drawn. An icon is up to 4 characters as given (a glyph), or a word,
+  // drawn as its first letter; a colour is #rrggbb or a colour's name
+  function looks(p, bad) {
+    let icon = '', colour = '';
+    if (typeof p.icon === 'string' && p.icon) {
+      if ([...p.icon].length <= 4) icon = p.icon;
+      else if (/^[A-Za-z][A-Za-z_-]{0,39}$/.test(p.icon)) icon = p.icon[0].toUpperCase();
+      else bad.push(`pin ${p.id}: icon not drawn`);
+    } else if (p.icon !== undefined && p.icon !== null && p.icon !== '') bad.push(`pin ${p.id}: icon not drawn`);
+    if (typeof p.colour === 'string' && p.colour) {
+      if (/^#[0-9a-fA-F]{6}$/.test(p.colour) || (/^[a-z]{3,20}$/.test(p.colour) && window.CSS && CSS.supports('color', p.colour))) colour = p.colour;
+      else bad.push(`pin ${p.id}: colour not drawn`);
+    } else if (p.colour !== undefined && p.colour !== null && p.colour !== '') bad.push(`pin ${p.id}: colour not drawn`);
+    return {icon, colour};
   }
   function checkRoute(r) {
     if (!r || typeof r !== 'object' || Array.isArray(r)) return 'not an object';
@@ -528,7 +542,7 @@
       if (why) { bad.push(`pin ${typeof p?.id === 'string' ? p.id.slice(0, 40) : '?'}: ${why}`); continue; }
       seen.add(p.id);
       pins.push({id: p.id, rev: p.rev, lat: p.lat, lon: p.lon, height: p.height || 0, label: p.label || p.id,
-                 icon: p.icon || '', colour: p.colour || ''});          // only the named fields are kept
+                 ...looks(p, bad)});          // only the named fields are kept
     }
     for (const r of d.routes || []) {
       const why = checkRoute(r);

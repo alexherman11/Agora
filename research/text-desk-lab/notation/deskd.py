@@ -47,6 +47,8 @@ import worktree
 HERE = Path(__file__).resolve().parent
 SESSIONS = HERE / "sessions"
 STATIC = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else HERE / "desk-shell"
+MAP_GROUND = HERE.parents[1] / "map-lab" / "ground"          # a7950: the map frame, ground's (a7946)
+MAP_GROUND_FILES = ("map.html", "map.js", "geo.js", "fixture.js")
 
 
 def _brief(answer, top=6):
@@ -655,6 +657,14 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, *a):
         pass
+
+    def translate_path(self, path):
+        # a7950 (Pike c8178): the living map's real frame is ground's (research/map-lab/ground, a7946), served under
+        # /map/ground/ for the map host to hold sandboxed. These four files only; nothing else of that folder
+        p = urlparse(path).path
+        if p.startswith("/map/ground/") and p[len("/map/ground/"):] in MAP_GROUND_FILES:
+            return str(MAP_GROUND / p[len("/map/ground/"):])
+        return super().translate_path(path)
 
     def end_headers(self):
         # the painter's files change under live building: a browser must ask again each time (a 304 is cheap), or a
