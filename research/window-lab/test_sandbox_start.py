@@ -62,17 +62,22 @@ def stage(cdp_factory, cdp_page=True):
     def start(name, argv, env=None):
         rec["starts"] += 1
         rec["argv"] = argv
+        SB.state_file(name).write_text(json.dumps({"pid": 4242, "pids": [4242]}), encoding="utf-8")
         return 4242
 
     def close(name, quiet=False):
         rec["closes"].append(name)
         SB.state_file(name).unlink(missing_ok=True)
+        return {"ok": True}
 
     SB.start, SB.close, SB.free_port = start, close, lambda: 5555
     SB.wait_cdp = lambda port, secs=30: cdp_page
     SB.top_windows = lambda name: [(1, 4242, "Chrome_WidgetWin_1", "Lens", True, (0, 0, 2560, 1440))]
     SB.Cdp = cdp_factory
     SB.exe = lambda pid: "?"                   # Edge is gone by the time the failure is described
+    def offline_status(*args, **kwargs):
+        raise ConnectionError("fixture: no status endpoint")
+    SB.urllib.request.urlopen = offline_status
     SB.time.sleep = lambda s: None
     return rec
 
@@ -88,6 +93,7 @@ def expect_exit(fn):
 def main():
     real = {k: getattr(SB, k) for k in ("STATE", "start", "close", "free_port", "wait_cdp", "top_windows", "Cdp", "exe")}
     sleep = SB.time.sleep
+    urlopen = SB.urllib.request.urlopen
     made = []
     try:
         # 1. the page websocket resets at readyState: closed once, not retried, the stage named, no state left
@@ -96,7 +102,7 @@ def main():
         why = expect_exit(lambda: SB.open_edge("t1", "http://x/", "2560x1440"))
         assert rec["starts"] == 1, rec
         assert rec["closes"] == ["t1"], rec
-        assert "document.readyState" in why and "ConnectionResetError" in why and "pid 4242 gone" in why, why
+        assert "document.readyState" in why and "ConnectionResetError" in why and "pid 4242 presence unknown" in why, why
         assert "not a tested page" in why, why
         assert not SB.state_file("t1").exists()
         print("reset at readyState: one start, its own sandbox closed once, stage and error named: ok")
@@ -116,6 +122,14 @@ def main():
         why = expect_exit(lambda: SB.open_edge("t3", "http://x/", "1280x800"))
         assert rec["starts"] == 2 and rec["closes"] == ["t3", "t3"], rec
         print("no DevTools port: two bounded starts, each closed: ok")
+
+        rec = stage(lambda port: FakeCdp(port), cdp_page=False)
+        made.append(SB.STATE)
+        SB.close = lambda *a, **kw: {"ok": False}
+        why = expect_exit(lambda: SB.open_edge("t3-unknown", "http://x/", "1280x800"))
+        assert rec["starts"] == 1 and SB.state_file("t3-unknown").exists()
+        assert "no retry" in why and "ownership state retained" in why
+        print("unknown cleanup: receipt/state kept, no second launch: ok")
 
         # 4. a good start at Alex's size (the whole screen): fullscreen on its desktop, the page 2560x1440 at 1.5
         FakeCdp.calls = []
@@ -166,6 +180,7 @@ def main():
         for k, v in real.items():
             setattr(SB, k, v)
         SB.time.sleep = sleep
+        SB.urllib.request.urlopen = urlopen
         for d in made:
             shutil.rmtree(d, ignore_errors=True)
 

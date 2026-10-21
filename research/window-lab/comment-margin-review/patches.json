@@ -1,0 +1,26 @@
+{
+  "copy": "frontier-try-playtest-86136",
+  "event_total": 17238,
+  "lens": "a6079",
+  "before_sha256": "74cdb629ed55b362503d838f878d175cf4175cb9eb4ad070c0f530b46015b00e",
+  "hunks": [
+    {
+      "old": "          margin : column\n            share 1\n            role aside\n            talked : column\n              only when talk != \"\"\n              list : column\n                of lines:$d.talk about=$d.item as c\n                each remark\n            older : column\n              of comments:$d.item as oc\n              each oldremark",
+      "new": "          margin : column\n            share 1\n            role aside\n            notes : column\n              role beside\n              talked : column\n                only when talk != \"\"\n                list : column\n                  of lines:$d.talk about=$d.item as c\n                  each remark\n              older : column\n                of comments:$d.item as oc\n                each oldremark"
+    },
+    {
+      "old": "  margin : column\n    share 1\n    role aside\n    talked : column\n      only when ($d.talk or \"\") != \"\"\n      list : column\n        of lines:$d.talk about=$p.item as c\n        each premark\n    older : column\n      of comments:$p.item as oc\n      each oldremark",
+      "new": "  margin : column\n    share 1\n    role aside\n    notes : column\n      role beside\n      talked : column\n        only when ($d.talk or \"\") != \"\"\n        list : column\n          of lines:$d.talk about=$p.item as c\n          each premark\n      older : column\n        of comments:$p.item as oc\n        each oldremark"
+    }
+  ],
+  "reverse": [
+    {
+      "old": "          margin : column\n            share 1\n            role aside\n            notes : column\n              role beside\n              talked : column\n                only when talk != \"\"\n                list : column\n                  of lines:$d.talk about=$d.item as c\n                  each remark\n              older : column\n                of comments:$d.item as oc\n                each oldremark",
+      "new": "          margin : column\n            share 1\n            role aside\n            talked : column\n              only when talk != \"\"\n              list : column\n                of lines:$d.talk about=$d.item as c\n                each remark\n            older : column\n              of comments:$d.item as oc\n              each oldremark"
+    },
+    {
+      "old": "  margin : column\n    share 1\n    role aside\n    notes : column\n      role beside\n      talked : column\n        only when ($d.talk or \"\") != \"\"\n        list : column\n          of lines:$d.talk about=$p.item as c\n          each premark\n      older : column\n        of comments:$p.item as oc\n        each oldremark",
+      "new": "  margin : column\n    share 1\n    role aside\n    talked : column\n      only when ($d.talk or \"\") != \"\"\n      list : column\n        of lines:$d.talk about=$p.item as c\n        each premark\n    older : column\n      of comments:$p.item as oc\n      each oldremark"
+    }
+  ]
+}

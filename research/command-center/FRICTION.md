@@ -339,7 +339,7 @@ a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
 
-## curing (45)
+## curing (46)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -678,7 +678,13 @@ a7843 · family=code · status=curing
 
 a7816: the missing engine boundary was under-lock writer admission before detached command execution and store.begin/commit. Retaining only save_desk's writer guard allowed a refused foreign request to append a journal record. Provider compaction helpers also needed a read-result handoff to the parent, rather than writing a receipt from DESKD=off. Source prepared with real explore/Session/store copy tests; historical divergence and log records are deliberately untouched.
 
-## unchecked (7)
+### Sandbox cleanup needs a truthful closed/unknown receipt
+
+a8394 · family=refusal · status=curing
+
+a8333 source repair (staged, not runtime activation). Missing world-level capability: none; this is the hidden test harness's close operation, not authored world behavior. Prior close discarded taskkill failures/ownership and could claim cleanup from window absence. Source now keeps durable identity/error/intent evidence, verifies exact handles, refuses unknown profile/ownership, and blocks automatic retry while headless-child closure is unknown. Native engine owner retains the reviewed-runtime boundary; no trusted containment was fabricated. Deterministic offline tests and exact hook hunks: research/window-lab/browsing/diagnostics/HANDOFF.md. No browser run or process effect on this card; real engine isolation/cleanup remain unverified.
+
+## unchecked (8)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -728,7 +734,13 @@ a7374 · family=privacy · status=unchecked
 
 Source foundation for Gmail is necessary because world notes/lenses and public actor claims cannot hold private account data or authorize fetching. Existing same-user DPAPI/ignored files are not containment. This commission adds only offline metadata/OAuth state-machine tests and a disabled refusal helper; no secure storage/caller bridge is claimed. Missing primitive: host-maintainer-reviewed isolated reader principal/storage plus authenticated human-only IPC, with count-only output. Deployment and private preview review remain outside this change. No runtime or account access was enabled. (worker-a7295, 20 Oct)
 
-## cured (66)
+### Follow-up receipts: a pipe write is not acknowledgment
+
+a8490 · family=silence · status=unchecked
+
+Missing world word: explicit followups attach/ack/pending/receipts. Read: current House.news preserves pending calls, but Resident.send's delivered flag attests only successful pipe flush; listeners' handed-on ids are not recipient acknowledgment. Source-only preparation on Keep JEFF moving adds an isolated obligation journal and exact staged Desk/House hunks; no live imports, timers, retries, process launches or new host authority. A deployment-blocked comment/prop is not an executable landing gate: refusal must precede serialized landing mutation, not only the post-land restart flag. This separate lifecycle repair remains unimplemented. (worker-a8438, 21 Oct)
+
+## cured (67)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1286,6 +1298,13 @@ a7766 · family=source · status=cured
 
 a7731 source correction: no missing new world word; the existing witnessed: source is the right boundary for moving observer counters. The checker had embedded record totals, epochs and evidence in every status projection, generating its own next observation. Verdict-only status plus full/divergence-only evidence and external witnessed counters remove that feedback; old receipt totals are reconciled once against self-record metadata. Copy tests pass; live activation/history proof remains pending house landing. No ordinary logger schema or world command semantics changed.
 
+### JEFF restart failure: parked Codex adapter compatibility
+
+a7922 · family=missing-word · status=cured
+
+21 Oct: Alex reported JEFF and agents not responding after restart. Live house heartbeat was fresh; other enabled residents rested normally. JEFF had seven process failures, gpt-6.1-sol unavailable, and worker-a7877 failed importing require_subscription. Root cause: a7816 landing preserved conflicting uncommitted adapter changes only on parked/20261020-230555; the active adapter reverted to Astra-only catalog and lost the subscription guard. Outside Codex three-way merged those additions with the new parent-owned charter code, tested before atomic application, then used native call to retry JEFF. Same saved thread retained, turns 655 to 658, zero failures, real Conversation reply confirmed. No house/HUD restart, provider switch, credentials or pin changes. Ran: 8 focused auth/model checks, pinned Sol mock-runtime zero-tools probe, read-only ChatGPT Sol/medium preflight, 24 transport/charter tests, Ruff F/E9, diff checks. Added adapter import/catalog regression coverage. Two broader old tests reproduced failures before repair; empty charter receipt fixture corrected, unrelated worker-routing expectation left unchanged. Repair commit awaiting Alex approval; uncommitted repair can be parked by another overlapping landing. Separate house portable-handover/relay/lease changes remain preserved on parked/20261020-155934, not restored here. Evidence: local/jeff-recovery-20261021/; research/codex-residents/resident-provider-handoff.md has the current caveat.
+Additional verification: required default repository pytest 201 passed, 2 skipped in 27.43s. Documentation checker still reports the pre-existing missing Dynamic Desk image. JEFF advanced to turn 662 on the same saved thread, zero failures; the affected Codex worker restarted automatically and is working. No manual worker wake or task alteration. Repair consists of codex_resident.py and test_transport.py, 85 additions/10 removals; commit approval requested from Alex under AGENTS.md, no push requested.
+
 ## active (1)
 
 ### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
@@ -1294,7 +1313,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (3)
+## source-pending (6)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1317,3 +1336,21 @@ Updated 20 Oct, source staged only: missing generic words resize, partition, com
 a7801 · family=missing-word · status=source-pending
 
 Source prerequisite for item pickup (worker-a7666, 20 Oct). Missing world-level word: one all-or-nothing create-or-restore plus placement, including subject and appearance identities. Ordinary independent lines intentionally keep successful earlier writes; compensation cannot prevent observers seeing an orphan. Staged internal Session.atomic/atomic_status/atomic_undo uses actual isolated Desk native checks, existing writer serialization, strict fsynced one-record facts/events/rule-state/receipt admission, whole undo and unknown-reply reconciliation. No public word/endpoint, carry affordance or live migration. Unsupported custom hooks, world-verb/effect rules and unsettled chains refuse atomically. Real panel notes supported with immutable actor/role and restricted data props. Accepted partition adapter, eligibility/receiver fences, preview agreement and observer/runtime compatibility remain integration gates. Tests use actual in-memory engine and disposable journals, not a stand-in backend. Architecture: research/text-desk-lab/notation/atomic-world/ARCHITECTURE.md.
+
+### Named guarded artifacts lacked selection preflight
+
+a8051 · family=missing-capability · status=source-pending
+
+a7940: resident image-comment transport already exists, but choosing an existing guarded screenshot lacked a narrow safe host interface. guarded_artifacts.prepare validates a named report-listed immutable PNG, Guard success, explicit hash, limits and reviewed recipient image support; returns the existing image-comment sidecar plus source/recipient revision fences. No capture/file-browsing resident tool or new host executor. Source staged, host delivery and actual resident vision pending; JEFF owns world affordances.
+
+### Source edit (a8005): commissions lacked validated model and effort requests distinct from runtime receipts
+
+a8261 · family=missing-word · status=source-pending
+
+Legacy worker_model/provider are overwritten by mixed-pool selection and cannot express a validated request. worker_selection.py and the existing workshop/adapter admit requested_model/requested_effort against authenticated CLI metadata, keep separate resolved/actual evidence, refuse incompatible saved context and unsupported effort, and preserve the same total-four admission. requested_retry is an explicit retry token, not a validation bypass. No nested delegation, catalog expansion, settings change or paid benchmark. Resident usage and evidence: research/worker-models/README.md; source pending a8005.
+
+### Source edit (a8191): a resident had no word to show a guarded test picture to another resident
+
+a8284 · family=missing-word · status=source-pending
+
+A resident has no host shell, and a > line cannot carry pixels: only the painter can send image_context. The missing world word is a resident-invocable 'show this guarded public test screenshot to <resident>'. The source half is artifact_view.py plus one artifact-view action in host_route_parent.ParentDispatcher (house.py builds it with the house), and its affordance is JEFF's to make in the world: a verb or recipe that writes the one '> host-route' line. It also shows that guarded artifacts have one producer only, combined-review: research/map-lab/ground/results/measure.json neither lists nor hashes its shots and keeps the Guard verdict without its success code, so a map shot can never be selected until its producer records both (worker-a8191, 21 Oct).

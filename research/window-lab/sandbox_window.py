@@ -10,7 +10,7 @@ able to test in a window that is not mine ... Taking over my screen for interact
     python research/window-lab/sandbox_window.py js <expression> [--name sb]
     python research/window-lab/sandbox_window.py shot out.png [--name sb] [--page]
     python research/window-lab/sandbox_window.py film <seconds> out.mp4 [--name sb] [--fps 10] [--page]
-    python research/window-lab/sandbox_window.py close [--name sb]         the off switch: ends what it started
+    python research/window-lab/sandbox_window.py close [--name sb]         verified recorded owners only; retains receipts
     python research/window-lab/sandbox_window.py test [webview]            proves it on a harmless page (and WebView2)
 
 screen.py --visible uses it: the painter of a world copy in a real Edge window here, driven by its steps.
@@ -43,6 +43,8 @@ with PW_RENDERFULLCONTENT does draw them, GPU pages included (ran 16 Oct: WebGL 
 Edge runs InPrivate: a fresh Edge profile signs itself into Alex's Microsoft account and syncs (seen 16 Oct).
 AGORA_TMP chooses scratch space inside this worktree (relative paths start at its root); by default it is
 research/window-lab/.tmp-agora. State, profiles, film frames and child TMP/TEMP use that same directory.
+Cleanup cannot certify unregistered/headless browser children. It retains state/profiles and refuses automatic
+retry while their ownership is unknown. Legacy PID-only manifests need explicit host-owner reconciliation.
 """
 import base64
 import ctypes
@@ -229,7 +231,32 @@ def join(name):
 
 
 def start(name, argv, env=None):
+    """Serialize launches with cleanup; an abandoned lock needs reconciliation."""
+    f = state_file(name)
+    lock = f.with_suffix(".cleanup-lock")
+    fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    try:
+        return _start_locked(name, argv, env)
+    finally:
+        os.close(fd)
+        lock.unlink(missing_ok=True)
+
+
+def _start_locked(name, argv, env=None):
     """CreateProcess on the sandbox desktop; -> pid. The handle of the desktop is held by the process from then on."""
+    from sandbox_owned import OwnedProcesses
+    from sandbox_receipts import complete, error, write
+    f = state_file(name)
+    st = {"pids": [], "owners": [], "at": time.time()}
+    if f.exists():
+        st = json.loads(f.read_text(encoding="utf-8"))
+        if st.get("cleanup") or any(r.get("status") == "pending" for r in st.get("launches", [])):
+            raise RuntimeError("previous cleanup receipt needs reconciliation; no launch")
+        if set(st.get("pids", [])) - {p["pid"] for p in st.get("owners", []) if complete(p)}:
+            raise RuntimeError("previous ownership incomplete; no launch")
+    launch = {"status": "pending", "at": time.time()}
+    st.setdefault("launches", []).append(launch)
+    write(f, st)  # unknown crash outcome blocks another launch, even before PID capture
     h, full = desktop(name, create=True)
     si = STARTUPINFOW(cb=ctypes.sizeof(STARTUPINFOW), lpDesktop=f"WinSta0\\{full}")
     si.dwFlags, si.wShowWindow = 0x1, 4        # STARTF_USESHOWWINDOW, SW_SHOWNOACTIVATE (on its own desktop anyway)
@@ -242,9 +269,26 @@ def start(name, argv, env=None):
     flags = 0x00000200 | 0x08000000 | (0x400 if block else 0)  # NEW_PROCESS_GROUP, NO_WINDOW, UNICODE_ENVIRONMENT
     ok = k32.CreateProcessW(None, line, None, None, False, flags, block, None, ctypes.byref(si), ctypes.byref(pi))
     if not ok:
-        sys.exit(f"CreateProcess failed (error {k32.GetLastError()})")
-    k32.CloseHandle(pi.hThread)
-    k32.CloseHandle(pi.hProcess)
+        launch.update(status="failed", winerror=int(k32.GetLastError()))
+        write(f, st)
+        sys.exit(f"CreateProcess failed (error {launch['winerror']})")
+    # Preserve launch identity before callers add their own state fields.
+    # A missing/denied metadata read retains an UNKNOWN owner; never adopt a
+    # window's PID as a replacement. This does not grant host/WMI access.
+    st.setdefault("pid", pi.dwProcessId)
+    launch.update(status="created", pid=pi.dwProcessId)
+    st.setdefault("pids", []).append(pi.dwProcessId)
+    try:
+        st.setdefault("owners", []).append(OwnedProcesses().on_handle(pi.dwProcessId, pi.hProcess))
+    except Exception as exc:
+        st.setdefault("ownership_errors", []).append({"pid": pi.dwProcessId, "error": error(exc)})
+    finally:
+        # Persist even partial ownership; failure is not permission to kill.
+        try:
+            write(f, st)
+        finally:
+            k32.CloseHandle(pi.hThread)
+            k32.CloseHandle(pi.hProcess)
     # the desktop handle stays open until this process ends: closed at once, the desktop can vanish before the new
     # process has joined it, and the process then exits with no window (ran 16 Oct: 3 of 5 Edge starts died so)
     return pi.dwProcessId
@@ -536,6 +580,7 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True):
     account and starts syncing his data into it: seen 16 Oct, a5932), on a DevTools port of its own. size is the page's
     CSS viewport (viewport=False: the outer window, as before a7413). -> the state; st["viewport"] is the page's
     [innerWidth, innerHeight, devicePixelRatio] as measured. A failed start closes its own sandbox and exits."""
+    from sandbox_receipts import update_manifest
     if state_file(name).exists():
         sys.exit(f"sandbox {name!r} is open already (close it, or use --name)")
     STATE.mkdir(parents=True, exist_ok=True)
@@ -552,13 +597,15 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True):
                            "--disable-features=CalculateNativeWinOcclusion", "--disable-backgrounding-occluded-windows",
                            "--disable-renderer-backgrounding",
                            f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"])
-        st = {"pid": pid, "port": port, "url": url, "pids": [pid], "profile": str(prof), "at": time.time()}
-        state_file(name).write_text(json.dumps(st), encoding="utf-8")
+        st = update_manifest(state_file(name), {
+            "pid": pid, "port": port, "url": url, "profile": str(prof), "at": time.time()})
         if wait_cdp(port, 30):
             break
         # ran 16 Oct: with a profile folder Edge has not seen, the first start exits without a window; the second runs
         print(f"edge (pid {pid}) gave no DevTools port; {'again' if attempt + 1 < tries else 'giving up'}")
-        close(name, quiet=True)
+        receipt = close(name, quiet=True)
+        if not receipt or not receipt.get("ok"):
+            sys.exit("edge start failed; cleanup not confirmed; ownership state retained, no retry")
     else:
         sys.exit("edge did not start on the sandbox desktop")
     # a7413: from here a failure (the page's websocket reset at readyState, WinError 10054, as seen only in Codex
@@ -580,8 +627,7 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True):
                 time.sleep(0.2)
             if viewport:
                 stage = "fitting the page to " + size
-                st["viewport"] = fit_viewport(c, int(w), int(h))
-                state_file(name).write_text(json.dumps(st), encoding="utf-8")
+                st = update_manifest(state_file(name), {"viewport": fit_viewport(c, int(w), int(h))})
         finally:
             c.close()
     except BaseException as e:
@@ -614,68 +660,94 @@ def fit_viewport(c, w, h):
 
 
 def start_failure(st, stage, e):
-    """Words for a start that failed after Edge was launched: the stage, the error, and whether Edge and its DevTools
-    port were still there (a reset with both gone means the browser ended, not that the harness raced it)."""
+    """Name the failed stage; a failed executable query cannot establish exit."""
     try:
         urllib.request.urlopen(f"http://127.0.0.1:{st['port']}/json/version", timeout=2).read()
         port = "still answered"
     except Exception as pe:
         port = f"no longer answered ({type(pe).__name__})"
-    pid = "running" if exe(st["pid"]) != "?" else "gone"
-    return (f"edge started on the sandbox desktop but failed at {stage}: {type(e).__name__}: {e}; edge pid {st['pid']} "
-            f"{pid}, its DevTools port {port}; this sandbox was closed (a cleanup, not a tested page)")
+    pid = "presence unknown (see ownership receipt)"
+    from sandbox_receipts import error
+    safe = error(e)
+    return (f"edge started on the sandbox desktop but failed at {stage}: {safe['type']}: {safe['message']}; edge pid {st['pid']} "
+            f"{pid}, its DevTools port {port}; cleanup requested, see its receipt (not a tested page)")
 
 
 def run_hidden(name, argv, cdp=False, env=None):
     """Any program on the sandbox desktop. --cdp gives a WebView2 in it a DevTools port (its environment variable);
     env adds to its environment (a6113: AGORA_WM_KEYS=off, so a window manager there takes no global key)."""
+    from sandbox_receipts import update_manifest
     STATE.mkdir(parents=True, exist_ok=True)
     port = free_port() if cdp else None
     env = {**(env or {}), **({"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS":
                             f"--remote-debugging-port={port}"} if cdp else {})} or None
     argv = [sys.executable if a == "python" else a for a in argv]
     pid = start(name, argv, env)
-    st = json.loads(state_file(name).read_text(encoding="utf-8")) if state_file(name).exists() else \
-        {"pid": pid, "pids": [], "at": time.time()}
-    st["pids"].append(pid)
-    if port:
-        st["port"] = port
-    state_file(name).write_text(json.dumps(st), encoding="utf-8")
+    st = update_manifest(state_file(name), {"port": port} if port else {})
     if port:
         print(f"devtools {'up' if wait_cdp(port, 60) else 'NOT up (no WebView2 page yet?)'} on {port}")
     return st
 
 
 def close(name, quiet=False):
-    """End every process this sandbox started (and what they started), then the desktop goes with them."""
+    """Cleanup only recorded identities; preserve failed/unknown ownership.
+
+    No taskkill /T, PID adoption from a desktop, profile sweep or ignored error.
+    Children need their own parent/creation/exe/profile records before cleanup.
+    """
+    import os
+    from sandbox_owned import OwnedProcesses
+    from sandbox_receipts import cleanup, error, write
     f = state_file(name)
     if not f.exists():
         if not quiet:
-            print(f"no sandbox {name!r} is open")
-        return
-    st = json.loads(f.read_text(encoding="utf-8"))
-    for pid in st.get("pids", []):
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
-    # what is still on the desktop (a process the first one handed its window to) goes too, by its window
-    for _ in range(20):
-        left = {x[1] for x in (top_windows_quiet(name) or [])}
-        if not left:
-            break
-        for pid in left:
-            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
-        time.sleep(0.3)
-    f.unlink(missing_ok=True)
-    if st.get("profile"):                          # the InPrivate window's profile folder, made by open
-        import shutil
-        for _ in range(10):
-            shutil.rmtree(st["profile"], ignore_errors=True)
-            if not Path(st["profile"]).exists():
-                break
-            time.sleep(0.3)
-    if not quiet:
-        left = top_windows_quiet(name)
-        print(f"closed sandbox {name}: " + ("its desktop is gone" if left is None else
-              "no window is left on its desktop" if not left else f"{len(left)} windows are STILL on its desktop"))
+            print(f"sandbox {name}: ownership state missing; cleanup not admitted")
+        return {"ok": False, "reason": "ownership state missing"}
+    lock = f.with_suffix(".cleanup-lock")
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return {"ok": False, "reason": "cleanup already pending; reconcile receipt"}
+    try:
+        try:
+            st = json.loads(f.read_text(encoding="utf-8"))
+        except Exception as exc:
+            result = {"ok": False, "reason": "ownership unreadable; no effects", "error": error(exc)}
+            write(f.with_suffix(".cleanup-failed.json"), result)
+            return result
+
+        def remaining():
+            # None historically meant either absent desktop or OpenDesktop
+            # denial. It is UNKNOWN until a host-capable verifier establishes
+            # absence; never turn it into [] here.
+            windows = top_windows_quiet(name)
+            st["remaining_window_pids"] = None if windows is None else sorted({w[1] for w in windows})
+            # Window enumeration cannot establish that headless/unregistered
+            # engine children exited. Until the engine owner supplies a
+            # reviewed runtime boundary, preserve UNKNOWN even with no windows.
+            # Never archive state or admit an automatic retry from this signal.
+            st["runtime_closure"] = "unknown: no reconciled child ownership boundary"
+            return None
+
+        try:
+            result = cleanup(st, OwnedProcesses(), lambda data: write(f, data), remaining)
+        except Exception as exc:
+            result = {"ok": False, "reason": "cleanup failed; ownership retained", "error": error(exc)}
+            # If writing the primary receipt failed, do not overwrite its
+            # last durable intent. Preserve a separate failure if possible.
+            try:
+                write(f.with_suffix(".cleanup-failed.json"), result)
+            except OSError:
+                pass
+        if result["ok"]:
+            # Retain receipts even on success; never delete a profile here.
+            f.replace(f.with_name(f.stem + f".closed-{time.time_ns()}.json"))
+        if not quiet:
+            print(f"sandbox {name}: {result['reason']}; receipts retained")
+        return result
+    finally:
+        os.close(fd)
+        lock.unlink(missing_ok=True)
 
 
 def top_windows_quiet(name):

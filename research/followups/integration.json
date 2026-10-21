@@ -1,0 +1,7 @@
+{
+  "deployment": "BLOCKED: review only; never applied by landing or tests",
+  "bases": {
+    "research/text-desk-lab/notation/house.py": "40b9a40364d3f4777226945e4469417336853b2bb4498033f1376034c8f36bd2",
+    "research/text-desk-lab/notation/desk.py": "f41cf491cb8296f02fc5905582476c96fb00616715c5bd0ff3e218fff713e561"
+  }
+}

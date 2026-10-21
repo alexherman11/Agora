@@ -21,6 +21,7 @@ from codex_resident import (
     output,
     receive,
     refresh_charter,
+    require_subscription,
 )
 from openai_codex.client import CodexClient, CodexConfig
 from worker_job import child_job
@@ -28,6 +29,10 @@ from worker_lease import worker_leases
 
 HERE = Path(__file__).resolve().parent
 MODEL = "gpt-6.1-sol"
+
+
+class SelectionRefused(RuntimeError):
+    """A request/capability mismatch is not a transient runtime failure."""
 
 
 def pinned_catalog(model):
@@ -46,7 +51,7 @@ def pinned_catalog(model):
         if model in slugs:
             lock = json.loads((HERE / lock_name).read_text(encoding="utf-8"))
             return path, lock["catalog_sha256"]
-    raise RuntimeError(
+    raise SelectionRefused(
         f"Requested model unavailable: {model} is in no pinned catalog; no substitution"
     )
 
@@ -54,9 +59,9 @@ def pinned_catalog(model):
 def runtime_config(directory, model=MODEL, *, mcp=None):
     from runtime_pin import catalog_matches, ensure_runtime, worker_record_url
 
+    catalog, catalog_sha = pinned_catalog(model)
     ensure_runtime(record_url=worker_record_url(mcp) if mcp else None)
     lock = json.loads((HERE / "worker-runtime-lock.json").read_text(encoding="utf-8"))
-    catalog, catalog_sha = pinned_catalog(model)
     binary = os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
     if (
         not Path(binary).is_file()
@@ -179,8 +184,8 @@ def serve(args):
         child_job(client._proc),
     ):
         client.initialize()
-        if args.model not in {m.model for m in client.model_list(True).data}:
-            raise RuntimeError(f"Requested model unavailable: {args.model}; no substitution")
+        require_subscription(client)
+        validate_selection(client.model_list(True).data, args.model, args.reasoning)
         params = thread_parameters(directory, args.model, prompt, args.mcp_config)
         if args.resume:
             params.pop("dynamicTools")
@@ -245,6 +250,19 @@ def serve(args):
                 finished.set()
                 watcher.join(timeout=6)
     return 0
+
+
+def validate_selection(models, model, effort):
+    """Validate before thread creation or any turn, using runtime capabilities."""
+    available = {m.model: m for m in models}
+    if model not in available:
+        raise SelectionRefused(f"Requested model unavailable: {model}; no substitution")
+    metadata = available[model].model_dump(by_alias=True, mode="json")
+    levels = {v["reasoningEffort"] for v in metadata.get("supportedReasoningEfforts", [])}
+    if effort == "ultra" or effort not in levels:
+        raise SelectionRefused(
+            f"Requested effort unavailable: {effort}; no substitution or delegation"
+        )
 
 
 def main():

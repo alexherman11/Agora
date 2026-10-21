@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "activation": "staged only; not permission to run",
+  "documents": [
+    {
+      "path": "native_engine_probe.py",
+      "sha256": "182327deeb01e6788c02ddaa11146334dfd5009bb15a162e4dced0afa3a18ad6",
+      "edits": [
+        {
+          "old": "import json\n",
+          "new": "import json\nimport html\n"
+        },
+        {
+          "old": "import agora_tmp\n",
+          "new": "import agora_tmp\nfrom sandbox_receipts import Diagnostics, write\n"
+        },
+        {
+          "old": "        out.write_text(json.dumps(result, indent=2), encoding=\"utf-8\")",
+          "new": "        write(out, result)"
+        },
+        {
+          "old": "    record()\n    import clr",
+          "new": "    def save_diagnostics(data):\n        result[\"diagnostics\"] = data\n        record()\n\n    diagnostics = Diagnostics(save_diagnostics)\n    diagnostics.event(\"import\")\n    result[\"process_hooks_registered\"] = False  # unavailable before core initialization\n    record()\n    import clr"
+        },
+        {
+          "old": "            deadline.Tick += lambda *_: form.Close()",
+          "new": "            def close_probe():\n                try:\n                    diagnostics.event(\"disposing\")\n                finally:\n                    form.Close()\n\n            def expired(*_):\n                try:\n                    diagnostics.deadline()  # record BEFORE closing if storage works\n                    result[\"stage\"] = \"deadline_fired\"\n                    record()\n                finally:\n                    close_probe()  # failed receipt I/O must not remove the bound\n\n            deadline.Tick += expired"
+        },
+        {
+          "old": "                if not args.IsSuccess:\n",
+          "new": "                if not args.IsSuccess:\n                    diagnostics.exception(\"initialization_failed\", args.InitializationException)\n"
+        },
+        {
+          "old": "                    record()\n                    form.Close()\n                    return",
+          "new": "                    record()\n                    close_probe()\n                    return"
+        },
+        {
+          "old": "                core = view.CoreWebView2\n",
+          "new": "                core = view.CoreWebView2\n\n                def browser_exited(_, event):\n                    diagnostics.event(\"browser_process_exited\",\n                                      kind=str(event.BrowserProcessExitKind))\n\n                def process_failed(_, event):\n                    diagnostics.event(\"process_failed\", kind=str(event.ProcessFailedKind),\n                                      exit_code=int(event.ExitCode))\n\n                core.Environment.BrowserProcessExited += browser_exited\n                core.ProcessFailed += process_failed\n                result[\"process_hooks_registered\"] = True\n"
+        },
+        {
+          "old": "                record()\n\n                def loaded(*_):",
+          "new": "                diagnostics.event(\"initialized\")\n                record()\n\n                # Native completion is not evidence that the child fixture ran.\n                poll = Timer()\n                poll.Interval = 50\n                in_flight = [False]\n                navigation = [None]\n\n                def loaded(_, event):\n                    navigation[0] = int(event.NavigationId)\n                    diagnostics.navigation(navigation[0], bool(event.IsSuccess))\n                    if not event.IsSuccess:\n                        result[\"stage\"] = \"navigation_failed\"\n                        record()\n                        close_probe()\n                        return\n                    poll.Start()\n\n                def inspect_child(*_):\n                    if in_flight[0]:\n                        return\n                    in_flight[0] = True"
+        },
+        {
+          "old": "                        \"child:typeof document.querySelector('iframe').contentWindow.chrome?.webview})\")",
+          "new": "                        \"childReady:window.__agoraChildReady||null})\")"
+        },
+        {
+          "old": "                            result.update(stage=\"evaluated\", probe=json.loads(json.loads(str(answer.Result))))\n                            record()",
+          "new": "                            probe = json.loads(json.loads(str(answer.Result)))\n                            child = probe.get(\"childReady\")\n                            if not isinstance(child, dict):\n                                diagnostics.event(\"handshake_wait\")\n                                return\n                            passed = diagnostics.child_ready(\n                                child.get(\"token\"), navigation[0],\n                                top_channel=(probe.get(\"top\") != \"undefined\"\n                                             or probe.get(\"channel\") != \"undefined\"),\n                                child_channel=(child.get(\"channel\") != \"undefined\"\n                                               or child.get(\"bridge\") != \"undefined\"),\n                                messages_enabled=bool(settings.IsWebMessageEnabled),\n                                host_objects_allowed=bool(settings.AreHostObjectsAllowed))\n                            result.update(stage=\"evaluated\" if passed else \"isolation_failed\",\n                                          probe={\"top\": probe.get(\"top\"), \"channel\": probe.get(\"channel\"),\n                                                 \"child\": child.get(\"channel\")})\n                            poll.Stop()\n                            record()\n                            close_probe()"
+        },
+        {
+          "old": "                            result.update(stage=\"evaluation_failed\", error_type=type(exc).__name__)\n                            record()\n                        form.Close()",
+          "new": "                            diagnostics.exception(\"evaluation_failed\", exc)\n                            result.update(stage=\"evaluation_failed\", error_type=type(exc).__name__)\n                            record()\n                            poll.Stop()\n                            close_probe()\n                        finally:\n                            in_flight[0] = False"
+        },
+        {
+          "old": "                core.NavigationCompleted += loaded\n                core.NavigateToString(\n                    \"<!doctype html><title>Offline engine probe</title>\"\n                    \"<h1>Isolated offline fixture</h1><iframe srcdoc='<p>Child fixture</p>'></iframe>\")",
+          "new": "                poll.Tick += inspect_child\n                core.NavigationCompleted += loaded\n                # Correlation token is not authentication. It proves only that\n                # this fixed child fixture ran after our listener was installed.\n                token = json.dumps(diagnostics.child_id)\n                child = (\"<script>parent.postMessage({kind:'agora-child-ready',token:\" + token\n                         + \",channel:typeof window.chrome?.webview,\"\n                         + \"bridge:typeof window.pywebview},'*')</script>\")\n                core.NavigateToString(\n                    \"<!doctype html><title>Offline engine probe</title>\"\n                    \"<h1>Isolated offline fixture</h1><script>\"\n                    \"window.__agoraChildReady=null;addEventListener('message',e=>{\"\n                    \"const f=document.querySelector('iframe'),d=e.data;\"\n                    \"if(f&&e.source===f.contentWindow&&d&&d.kind==='agora-child-ready'\"\n                    \"&&d.token===\" + token + \")window.__agoraChildReady=d;});</script>\"\n                    '<iframe srcdoc=\"' + html.escape(child, quote=True) + '\"></iframe>')"
+        },
+        {
+          "old": "            result[\"stage\"] = \"initializing\"\n            record()",
+          "new": "            result[\"stage\"] = \"initializing\"\n            diagnostics.event(\"initializing\")\n            record()"
+        },
+        {
+          "old": "            deadline.Stop()\n            view.Dispose()",
+          "new": "            deadline.Stop()\n            diagnostics.event(\"disposing\")\n            view.Dispose()\n            diagnostics.event(\"disposed\")"
+        },
+        {
+          "old": "        except Exception as exc:\n            result.update(stage=\"native_failed\"",
+          "new": "        except Exception as exc:\n            diagnostics.exception(\"native_failed\", exc)\n            result.update(stage=\"native_failed\""
+        }
+      ]
+    },
+    {
+      "path": "probe_hidden.py",
+      "sha256": "cfd5c66663c69d86d71a2207bc15c69467a8888fe74cd54c12f868c5233529d2",
+      "edits": [
+        {
+          "old": "    remaining = None\n",
+          "new": "    cleanup_receipt = None\n    remaining = None\n"
+        },
+        {
+          "old": "                                  and data.get(\"messages\") is False",
+          "new": "                                  and data.get(\"diagnostics\", {}).get(\"child_ready\") is True\n                                  and data.get(\"diagnostics\", {}).get(\"navigation_success\") is True\n                                  and data.get(\"diagnostics\", {}).get(\"deadline_fired\") is False\n                                  and not data.get(\"diagnostics\", {}).get(\"process_failure\")\n                                  and not data.get(\"diagnostics\", {}).get(\"truncated\")\n                                  and data.get(\"process_hooks_registered\") is True\n                                  and data.get(\"messages\") is False"
+        },
+        {
+          "old": "                print(\"probe timed out; receipt:\", result.read_text() if result.exists() else \"none\", flush=True)",
+          "new": "                print(\"parent deadline fired (25 seconds); child receipt retained\", flush=True)\n                # Parent timeout has its own durable receipt; do not clobber\n                # the child file concurrently or fabricate a child timer event.\n                from sandbox_receipts import write\n                write(HERE / \"engine-probe-parent.json\",\n                      {\"phase\": \"parent_deadline\", \"elapsed_limit_ms\": 25000,\n                       \"child_receipt_present\": result.exists()})"
+        },
+        {
+          "old": "            sandbox.close(name)\n",
+          "new": "            cleanup_receipt = sandbox.close(name)\n            print(\"cleanup receipt:\", json.dumps(cleanup_receipt), flush=True)\n"
+        },
+        {
+          "old": "    return code or (3 if remaining else 0 if passed else 2)",
+          "new": "    # None is unknown, never an empty desktop. Window absence alone\n    # also cannot certify unregistered/headless runtime children.\n    return code or (3 if not cleanup_receipt or not cleanup_receipt.get(\"ok\")\n                    or remaining is None or remaining else 0 if passed else 2)"
+        }
+      ]
+    }
+  ]
+}
