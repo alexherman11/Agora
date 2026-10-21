@@ -1418,6 +1418,8 @@ class World:
             raise Refusal(f"no event {event_id}")
         if ev.get("undone") or ev["verb"] == "undo":
             raise Refusal(f"{event_id} cannot be undone (already undone or is an undo)")
+        if ev.get("atomic_world"):
+            raise Refusal("atomic changes need whole-record journal undo; no primitive fallback")
         if (ev.get("undo") or {}).get("refuse"):      # a678: a go is kept in the journal but out of undo's reach
             raise Refusal(ev["undo"]["refuse"].format(eid=event_id))
         # a1069: `place above=` changes several subjects in one event (the card, and the ranks it renumbered); a later
