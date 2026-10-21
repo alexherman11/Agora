@@ -147,13 +147,23 @@ def run(w, viewer, args, world="current"):
             desired["find"] = ""
         # Tab chrome uses ordinary named notes; keys refer to controller tabs,
         # never treat the notes as a second source of history or authority.
-        notes = {}
+        notes, containers = {}, []
         for i, n in w.nodes.items():
-            if n.get("subject"):
-                pp = props(w, i)
-                if pp.get("role") == "viewer-tab" and pp.get("viewer") == viewer:
-                    need(pp.get("tab") not in notes, "Duplicate tab projection; repair before navigating")
-                    notes[pp.get("tab")] = i
+            pp = props(w, i)
+            if pp.get("viewer") != viewer or pp.get("role") not in ("viewer-tab", "viewer-tabs"):
+                continue
+            need(pp.get("actor") == w.me, "Tab projection belongs to another actor")
+            if pp["role"] == "viewer-tabs":
+                need(n["type"] == "surface" and n["parent"] == w.nodes[viewer]["parent"],
+                     "Tab projection container moved; repair before navigating")
+                containers.append(i)
+            else:
+                need(n.get("subject") is not None, "Invalid tab projection")
+                need(pp.get("tab") not in notes, "Duplicate tab projection; repair before navigating")
+                need(len(w.appearances_of(n["subject"])) == 1,
+                     "Shared tab projection; repair before navigating")
+                notes[pp.get("tab")] = i
+        need(len(containers) <= 1, "Duplicate tab containers; repair before navigating")
         events, changed = [], []
 
         def collect(r):
@@ -168,19 +178,39 @@ def run(w, viewer, args, world="current"):
 
         # All fallible target/snapshot checks above precede these projections.
         try:
+            if containers:
+                container = containers[0]
+            else:
+                container = collect(moo.v_create(w, w.nodes[viewer]["parent"],
+                                                {"kind": "surface", "title": "Viewer tabs"}))["created"]
+                update(container, {"role": "viewer-tabs", "viewer": viewer, "actor": w.me})
+            # Reuse inactive slots. History lives in the snapshot, not these
+            # chrome appearances; repeated close/new cycles must not grow notes.
+            spare = [notes[tk] for tk in notes if tk not in b.tabs]
+            assigned = set()
             for order, (tk, tab) in enumerate(b.tabs.items(), 1):
                 label = tab.entries[tab.index].title if tab.index >= 0 else "New tab"
                 values = {"role": "viewer-tab", "viewer": viewer, "actor": w.me, "tab": tk,
                           "label": label, "active": "yes" if tk == b.active else "no",
                           "order": str(order), "closed": "no"}
                 if tk not in notes:
-                    r = collect(moo.v_create(w, w.nodes[viewer]["parent"],
-                                            dict(values, kind="note", title=label)))
-                    notes[tk] = r["created"]
+                    if spare:
+                        notes[tk] = spare.pop(0)
+                        update(notes[tk], values)
+                    else:
+                        notes[tk] = collect(moo.v_create(
+                            w, container, dict(values, kind="note", title=label)))["created"]
                 else:
                     update(notes[tk], values)
-            for tk in notes.keys() - b.tabs.keys():
-                update(notes[tk], {"closed": "yes", "active": "no"})
+                assigned.add(notes[tk])
+            for i in set(notes.values()):
+                if i not in assigned:
+                    update(i, {"closed": "yes", "active": "no", "label": ""})
+                label = props(w, i)["label"] if i in assigned else "Closed tab"
+                if w.subjects[w.nodes[i]["subject"]]["title"] != label:
+                    collect(moo.v_retitle(w, i, {"title": label}))
+                if w.nodes[i]["parent"] != container:
+                    collect(moo.v_move(w, i, {"into": container}))
             update(viewer, desired)
         except Refusal:
             for ev in reversed(events):
