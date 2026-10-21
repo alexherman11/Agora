@@ -285,6 +285,26 @@ async def edge(R, copy, fx):
                      {"refused": [(r['why'], r['data'][:120]) for r in others], "frame says": res}, [await shot("4-probe")])
         except Exception as e:
             R.record("4 probe battery", "error", f"{type(e).__name__}: {e}", {"trace": traceback.format_exc()[-800:]})
+        # (JEFF via Pike e17339) a frame that loads again but keeps its scripts: its old port is dead and refused out loud
+        try:
+            n0 = copy.at()
+            await win.js("location.hash = 'reopen'; location.reload()")
+            await asyncio.sleep(1.0)
+            # the report is refused in one trip, the control press answers in two (/api/map, then /api/do): wait for both
+            h = await until(lambda h: any('"op":"report"' in r["data"] for r in h["refused"]) and any(a["op"] == "press" for a in h["answered"]), 20)
+            rep = next((json.loads(r["data"]) for r in h["refused"] if '"op":"report"' in r["data"]), {}).get("reopen", {})
+            dead = [r for r in h["refused"] if "earlier load" in r["why"]]
+            fresh = [a for a in h["answered"] if a["op"] == "press"]
+            # the two presses name the same pin: exactly one is answered (the new port's), the old port's is refused
+            # (the view itself may add no event: the viewer may already be on that pin)
+            ok = h["hellos"] >= 2 and rep.get("kept_old") and rep.get("got_new") and not rep.get("same") and len(dead) == 1 \
+                and '"op":"press"' in dead[0]["data"] and len(fresh) == 1 and len(h["answered"]) == 1
+            R.record("old port after a reload", "pass" if ok else ("blocked" if h["hellos"] < 2 else "fail"),
+                     f"hellos {h['hellos']} (the rewrite fired a load: {h['hellos'] >= 2}); the frame kept its old port {rep.get('kept_old')} and took a new one {rep.get('got_new')}; "
+                     f"on the old port: {[d['why'] for d in dead]}; on the new port: {[a['line'] for a in fresh]}; events {n0} -> {copy.at()}",
+                     {"refused": h["refused"], "answered": h["answered"], "frame says": rep}, [await shot("reopen")])
+        except Exception as e:
+            R.record("old port after a reload", "error", f"{type(e).__name__}: {e}", {"trace": traceback.format_exc()[-800:]})
         R.page_errors = await win.js("(window.__pt && window.__pt.errors) || []")
     finally:
         guard = await win.close()

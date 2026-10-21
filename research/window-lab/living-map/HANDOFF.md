@@ -29,8 +29,25 @@ c8085; Rowan's frame must take its port from the `hello`).
 - `python research/text-desk-lab/notation/test_map_seam.py`: 16 tests OK (done-when 1-4, by name).
 - `python research/window-lab/living-map/seam_browser.py`: hidden Edge on a disposable copy, and pywebview 6.2.1 with a
   js_api bridge on the sandbox desktop; every row passes, all three guards clean. Report:
-  `research/window-lab/demos/living-map/2026-10-21-112911-seam/report.json`. Row 5b (Pike c8089): bridge_page.py's
+  `research/window-lab/demos/living-map/2026-10-21-113259-seam/report.json`. Row 5b (Pike c8089): bridge_page.py's
   wrap of pywebview's handler refuses a bridge message whose source isn't the desk's origin (proven; not in hud.py).
+  Row 'old port after a reload' (JEFF via Pike, e17339): a frame that rewrites itself (document.open/write/close)
+  fires a new load but keeps its scripts, so it holds the old port and the new one; the host's old port is dead,
+  its press refused out loud ('on a port from an earlier load of the frame: that port is dead'), and only the new
+  port's press is answered.
+
+## The tripwire and the Python-source question (for JEFF)
+
+- Tripwire: rerun `python research/window-lab/living-map/seam_browser.py` after any change to pywebview, WebView2,
+  map-host.js or the frame. In WebView2 a sandboxed frame still has `window.chrome.webview`, whose postMessage goes
+  out without error; it reaches no Python only because pywebview 6.2.1 listens on the top document alone. Rows 5 and
+  5b turn red the day that changes.
+- Python source: pywebview gives no caller to a js_api method, but its handler sees `args.Source` (the posting
+  document). Wrapping `EdgeChrome.on_script_notify` from the caller, before the window exists, refuses any message
+  whose source isn't the desk's origin (row 5b; bridge_page.py, about ten lines, no package change). The home base
+  (hud.py) does not do this today, and pywebview injects its bridge into whatever top document loads: every HUD frame,
+  web tabs included, sits behind that one thin boundary. Adding the wrap to hud.py is a change to Alex's home base,
+  for JEFF to stage.
 - `sandbox_window.Guard` now takes its first reading from a fresh thread: guarding two sandboxes in one process gave
   a false FAIL before (foreground 0, cursor (0, 0)).
 - `test_scene.py`: 58 passed.

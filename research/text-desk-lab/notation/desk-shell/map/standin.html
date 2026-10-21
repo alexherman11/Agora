@@ -52,6 +52,24 @@
   }
   document.getElementById("drop").onclick = () => send({ channel: CH, op: "drop", lat: 51.519, lon: -0.1265 });
 
+  // #reopen (JEFF via Pike, e17339): a frame that loads again but keeps its scripts, and so its old port. It rewrites
+  // itself (document.open/write/close), which fires the iframe's load in the host; it takes the new port from the new
+  // hello, then sends one press on the OLD port and one on the new port (the control).
+  if (location.hash === "#reopen") setTimeout(() => {
+    const old = port, id = draw && draw.pins[0] ? draw.pins[0].id : "a1";
+    let fresh = null;
+    const take = e => { if (e.source === parent && e.data && e.data.op === "hello" && e.ports[0]) fresh = e.ports[0]; };
+    document.open();
+    document.write("<!doctype html><p>Stand-in map, rewritten in place: the same scripts, a new document.</p>");
+    document.close();
+    addEventListener("message", take);
+    setTimeout(() => {
+      if (old) old.postMessage({ channel: CH, op: "press", id });
+      if (fresh) fresh.postMessage({ channel: CH, op: "press", id });
+      (fresh || old) && (fresh || old).postMessage({ channel: CH, op: "report", reopen: { kept_old: !!old, got_new: !!fresh, same: old === fresh } });
+    }, 1500);
+  }, 1500);
+
   if (location.hash === "#probe") setTimeout(() => {
     const out = {}, t = (k, f) => { try { out[k] = f(); } catch (e) { out[k] = "threw " + e.name; } };
     // the bridge, as a page in the HUD would reach it

@@ -92,9 +92,15 @@
       else { state.answered.push({ op: r.op, id: r.id, line: r.line, events: out.events || [], created: out.created || [] }); say(""); }
       soon();                                              // a refused move gets a fresh draw (a7875)
     }
-    // a new port for each load of the frame: whatever loaded before it keeps nothing
+    // a new port for each load of the frame: whatever loaded before it keeps nothing. JEFF via Pike (e17339): the old
+    // port is dead, and anything still sent on it is refused out loud, never acted on (a frame can fire a new load and
+    // keep its scripts, so the same frame may still hold its old port)
     iframe.addEventListener("load", () => {
-      if (port) port.close();
+      if (port) {
+        const dead = port;
+        dead.onmessage = e => refuse("on a port from an earlier load of the frame: that port is dead", e.data);
+        state.deadPorts = (state.deadPorts || 0) + 1;
+      }
       const ch = new MessageChannel();
       port = ch.port1;
       port.onmessage = e => { heard(e.data).catch(err => refuse(String(err), e.data)); };
