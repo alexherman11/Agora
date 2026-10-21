@@ -1,0 +1,140 @@
+"""tabs_world.py (a7544): the staged tabs world half (a7439/a7441, patches.json) read against a world and applied to a
+DISPOSABLE COPY only, through its door's public /api/do, refusing drift. Nothing here writes the live world: `drift`
+only reads it (`read <id> :3`, `find`).
+
+    python research/window-lab/browsing/tabs/review/tabs_world.py drift|hashes [--port 8794] [--world frontier]
+
+prints, for each staged note, whether the live text equals originals.json and whether every old passage stands there
+exactly once (stage.prepare), and the SHA-256 of every payload this review stands on.
+"""
+import argparse
+import hashlib
+import json
+import re
+import sys
+import urllib.request
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+TABS = HERE.parent
+ROOT = HERE.parents[4]
+NOTATION = ROOT / "research" / "text-desk-lab" / "notation"
+sys.path.insert(0, str(TABS))
+import stage  # noqa: E402
+
+NOTES = ("a5486", "a6194", "a6782", "a6790")          # home-viewer, view, open-found, unview (unview is read, never changed)
+PAYLOAD = [TABS / f for f in ("patches.json", "originals.json", "stage.py", "home-viewer.lens", "view.verb",
+                              "open-found.verb", "HANDOFF.md")]
+SOURCE = [NOTATION / f for f in ("tab_history.py", "viewer_tabs.py", "moo.py", "desk_moo.py", "desk_knife.py", "scene.py",
+                                 "lens_ir.py", "desk-shell/viewer.js", "desk-shell/lens.js", "desk-shell/textedit.js")]
+
+
+def sha(b):
+    return hashlib.sha256(b if isinstance(b, bytes) else b.encode("utf-8")).hexdigest().upper()
+
+
+def hashes():
+    return {str(p.relative_to(ROOT)).replace("\\", "/"): sha(p.read_bytes()) for p in PAYLOAD + SOURCE}
+
+
+def door(base, session, who, line):
+    body = json.dumps({"session": session, "as": who, "line": line, "whole": True}).encode()
+    req = urllib.request.Request(f"{base}/api/do", body, {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        out = json.loads(r.read())
+    return (("ERR " + out["error"] + "\n") if out.get("error") else "") + (out.get("text") or "")
+
+
+def body(said):
+    ls = said.splitlines()
+    i = ls.index("---")
+    return "\n".join(ls[i + 1:ls.index("---", i + 1)])
+
+
+def texts(do):
+    return {n: body(do(f"read {n} :3")) for n in NOTES}
+
+
+def viewer_line(do, who="alex"):
+    out = do(f"find prop:role=home-view,prop:actor={who}")
+    return [l.strip() for l in out.splitlines() if re.match(r"\s+a\d+ note ", l)]
+
+
+def check(do):
+    """-> (report lines, texts read, prepared replacements or None). Reads only."""
+    have, orig = texts(do), json.loads((TABS / "originals.json").read_text(encoding="utf-8"))
+    patches = json.loads((TABS / "patches.json").read_text(encoding="utf-8"))
+    rep = []
+    for n in NOTES:
+        rep.append(f"{n}: {'equals originals.json' if have[n].rstrip() == orig[n].rstrip() else 'DIFFERS from originals.json'}"
+                   f" · live text sha {sha(have[n])[:16]}")
+        for k, h in enumerate(patches.get(n, [])):
+            c = have[n].count(h["old"])
+            rep.append(f"  hunk {k + 1}: old stands {c} time(s){'' if c == 1 else '  <- REFUSE'}")
+    try:
+        ready = stage.prepare({n: have[n] for n in patches}, patches)
+        rep.append("stage.prepare: every hunk stands exactly once; replacements ready")
+    except ValueError as e:
+        ready = None
+        rep.append(f"stage.prepare REFUSED: {e}")
+    if ready:
+        staged = {n: (TABS / f).read_text(encoding="utf-8").rstrip("\n") for n, f in stage.FILES.items()}
+        for n in staged:
+            same = ready[n].rstrip("\n") == staged[n]
+            rep.append(f"{n}: prepared text {'equals' if same else 'DIFFERS from'} the staged file {stage.FILES[n]}")
+    return rep, have, ready
+
+
+def q(s):
+    return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("\n", "\\n") + '"'
+
+
+def apply_copy(do_as):
+    """Apply the scoped hunks to a COPY through `do replace` (old -> new, one passage each), as alex for nothing but
+    the init. do_as(who, line). -> (log, saved texts, viewer props line before)."""
+    do = lambda line: do_as("worker-a7544", line)  # noqa: E731
+    rep, have, ready = check(do)
+    if ready is None:
+        raise SystemExit("copy apply refused: drift\n" + "\n".join(rep))
+    log = list(rep)
+    before = viewer_line(do)
+    patches = json.loads((TABS / "patches.json").read_text(encoding="utf-8"))
+    for n, hs in patches.items():
+        do(f"read {n} :3")
+        for h in hs:
+            said = do(f"do replace {n} old={q(h['old'])} new={q(h['new'])}")
+            ok = not said.startswith("ERR") and "refused" not in said.split("\n")[0]
+            log.append(f"replace {n}: {said.strip().splitlines()[-1][:160] if said.strip() else '(nothing said)'}")
+            if not ok:
+                raise SystemExit("copy apply refused at a hunk:\n" + said[:1500])
+    now = texts(do)
+    for n in patches:
+        log.append(f"{n}: after apply {'equals' if now[n] == ready[n] else 'DIFFERS from'} the prepared text")
+    vid = before[0].split()[0]
+    do_as("alex", f"read {vid}")
+    said = do_as("alex", f"do browse {vid} action=init")
+    log.append("init as alex: " + said.strip().splitlines()[-1][:200])
+    return log, have, before, vid
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("mode", choices=["drift", "hashes"])
+    ap.add_argument("--port", type=int, default=8794)
+    ap.add_argument("--world", default="frontier")
+    a = ap.parse_args()
+    if a.mode == "hashes":
+        print(json.dumps(hashes(), indent=1))
+        return
+    do = lambda line: door(f"http://127.0.0.1:{a.port}", a.world, "worker-a7544", line)  # noqa: E731
+    at = do("history")
+    m = re.search(r"\be(\d+)\b", at)
+    rep, have, _ = check(do)
+    print(f"world {a.world} (read-only; latest event seen e{m.group(1) if m else '?'})")
+    print("\n".join(rep))
+    print("viewer:", viewer_line(do))
+    print(json.dumps({n: sha(t) for n, t in have.items()}, indent=1))
+
+
+if __name__ == "__main__":
+    main()
