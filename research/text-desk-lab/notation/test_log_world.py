@@ -310,6 +310,197 @@ class LogWorldTests(unittest.TestCase):
         self.assertEqual(event_count, len(self.w.events))
         self.assertEqual(checker.replay.report()["state"], "in-step", checker.replay.report())
 
+    def status_fixture(self):
+        self.w.apply("create", self.w.root, None, {"kind": "note", "title": lw.STATUS_TITLE}, "jeff")
+        nid = self.w.last_created
+        self.w.apply("create", self.w.root, None, {"kind": "note", "title": "Evidence",
+                                                "role": "log-world-evidence"}, "jeff")
+        evidence = self.w.last_created
+        self.log.path.unlink()
+        store._HEADS.pop(str(self.log.path), None)
+        store.genesis(self.d, self.path)
+        return nid, evidence, self.checker()
+
+    def test_ordinary_records_and_checks_never_rewrite_unchanged_status(self):
+        nid, evidence, checker = self.status_fixture()
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        status = self.w.subjects[self.w.nodes[nid]["subject"]]
+        detail = self.w.subjects[self.w.nodes[evidence]["subject"]]
+        self.assertEqual(status["props"]["evidence"], evidence)
+        initial = copy.deepcopy(status)
+        evidence_text = detail["text"]
+        observed = checker.covered_records
+        for n in range(12):
+            self.change(f"ordinary {n}")
+            checker.jobs.join()
+            lw.project(self.d, self.path)
+            checker.jobs.join()
+            self.assertEqual(status, initial)
+            self.assertEqual(detail["text"], evidence_text)
+        self.assertEqual(checker.covered_records, observed + 12)
+        for _ in range(3):
+            lw.checkpoint(self.d, self.path, full=True)
+            checker.jobs.join()
+            lw.project(self.d, self.path)
+            checker.jobs.join()
+            self.assertEqual(status, initial)
+        self.assertEqual(checker.covered_records, observed + 12)
+        self.assertEqual(store.flatten(checker.replay.world), store.flatten(self.w))
+        for key in ("observed", "unavailable", "at", "capture_ms", "max_capture_ms"):
+            self.assertNotIn(key, status["props"])
+        self.assertLess(len(status["text"].splitlines()), 8)
+
+    def test_self_records_cannot_advance_time_or_bridge_idle_gaps(self):
+        nid, _, checker = self.status_fixture()
+        start = checker.last_observation
+        count = checker.covered_records
+        for seconds in (30, 60, 90):
+            checker.clock = lambda seconds=seconds: start[0] + seconds
+            checker.monotonic = lambda seconds=seconds: start[1] + seconds
+            ctx = store.safe_begin(self.d, self.path)
+            self.w.apply("edit", self.w.nodes[nid]["subject"], None, {"text": str(seconds)}, "house")
+            store.safe_commit(ctx, self.d, lw.REPORT_WORDS, "house")
+            checker.jobs.join()
+        self.assertEqual(checker.covered_records, count)
+        self.assertEqual(checker.covered_seconds, 0)
+        self.change("independent endpoint after idle")
+        checker.jobs.join()
+        self.assertEqual(checker.covered_records, count + 1)
+        self.assertEqual(checker.covered_seconds, 0)
+        self.assertTrue(checker.gaps)
+
+    def test_first_divergence_writes_status_once_later_evidence_only(self):
+        nid, evidence, checker = self.status_fixture()
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        sid = self.w.nodes[self.r.CARDS[0]]["subject"]
+        self.w.subjects[sid]["props"]["bypass"] = "first"
+        self.change("first divergence")
+        checker.jobs.join()
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        status = copy.deepcopy(self.w.subjects[self.w.nodes[nid]["subject"]])
+        detail = self.w.subjects[self.w.nodes[evidence]["subject"]]["text"]
+        self.w.subjects[sid]["props"]["another"] = "later"
+        self.change("first divergence")
+        checker.jobs.join()
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        self.assertEqual(self.w.subjects[self.w.nodes[nid]["subject"]], status)
+        self.assertNotEqual(self.w.subjects[self.w.nodes[evidence]["subject"]]["text"], detail)
+        events = len(self.w.events)
+        lw.project(self.d, self.path)
+        self.assertEqual(len(self.w.events), events)
+
+    def test_witness_is_readable_dated_and_never_a_world_fact(self):
+        import witnessed
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("witness_source", Path(lw.__file__).parent / "sources/witnessed.py")
+        source = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(source)
+        checker = self.checker()
+        checker.witness_world = "copy-only"
+        with patch.object(witnessed, "ROOT", Path(self.tmp.name) / "witnessed-root"):
+            before = store.flatten(self.w)
+            checker.witness()
+            rows = witnessed.read("copy-only", "log-world")["rows"]
+            self.assertTrue(rows)
+            self.assertEqual(rows[0]["observed_records"], checker.covered_records)
+            self.assertIsInstance(rows[0]["at"], str)
+            self.assertIn("T", rows[0]["at"])
+            self.assertIsInstance(rows[0]["unavailable"][0]["from"], str)
+            projected = source.rows(self.d, "log-world", "copy-only")
+            self.assertEqual(projected[0]["observed_records"], checker.covered_records)
+            self.assertEqual(projected[0]["state"], "in-step")
+            self.assertEqual(store.flatten(self.w), before)
+            with patch.object(witnessed, "write", side_effect=PermissionError("synthetic")):
+                checker.witness()
+                self.change("comparison survives witness output failure")
+                checker.jobs.join()
+            self.assertFalse(checker.stopped)
+            self.assertEqual(checker.snapshot()["state"], "in-step")
+            self.assertIn("synthetic", checker.snapshot()["witness_error"])
+            checker.unavailable("copy release")
+            self.assertEqual(witnessed.read("copy-only", "log-world")["rows"][0]["state"], "unavailable")
+            checker.witness_world = None
+
+    def test_moving_props_removed_once_and_unavailable_verdict_is_quiet(self):
+        import moo
+        nid, _, checker = self.status_fixture()
+        ctx = store.safe_begin(self.d, self.path)
+        moo.REGISTRY["prop"].run(self.w, nid, dict(observed="old counter", unavailable="old gaps",
+                                                 at="1770000000", capture_ms="5", _by="house"))
+        store.safe_commit(ctx, self.d, lw.REPORT_WORDS, "house")
+        checker.jobs.join()
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        props = self.w.subjects[self.w.nodes[nid]["subject"]]["props"]
+        for key in ("observed", "unavailable", "at", "capture_ms"):
+            self.assertNotIn(key, props)
+        checker.stopped = True
+        checker.unavailable("copy-only unavailable")
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        boundary = self.log.head()[0]
+        events = len(self.w.events)
+        for _ in range(5):
+            lw.project(self.d, self.path)
+        self.assertEqual(self.log.head()[0], boundary)
+        self.assertEqual(len(self.w.events), events)
+
+    def test_unclassifiable_old_totals_freeze_without_stopping_comparison(self):
+        journal = Path(self.tmp.name) / "incomplete.jsonl"
+        journal.write_text(json.dumps(dict(kind="report", at=10, records=1,
+                                          observed_seconds=300, observed_records=20,
+                                          unavailable=[], state="in-step")) + "\n", encoding="utf-8")
+        checker = lw.Checker(self.log.path, journal)
+        self.checkers.append(checker)
+        lw._CHECKERS[str(self.path)] = checker
+        lw.checkpoint(self.d, self.path, full=True)
+        checker.jobs.join()
+        self.change("new record still compared")
+        checker.jobs.join()
+        self.assertEqual(checker.snapshot()["state"], "in-step")
+        self.assertEqual(checker.snapshot()["accounting_state"], "unavailable")
+        self.assertEqual((checker.covered_seconds, checker.covered_records), (300, 20))
+        self.assertEqual(checker.replay.seq, self.log.head()[0])
+
+    def test_historical_self_correction_survives_restart_exactly_once(self):
+        checker = self.checker()
+        self.change("independent")
+        checker.jobs.join()
+        # Use actual log sequence metadata with old-format receipt rows.
+        ctx = store.safe_begin(self.d, self.path)
+        self.w.apply("edit", self.w.nodes[self.r.CARDS[0]]["subject"], None,
+                     {"title": "observer output"}, "house")
+        store.safe_commit(ctx, self.d, lw.REPORT_WORDS, "house")
+        checker.jobs.join()
+        checker.close()
+        self.checkers.remove(checker)
+        with checker.journal.open("w", encoding="utf-8") as f:
+            for seq in (1, 2, 3):
+                f.write(json.dumps(dict(kind="report", at=seq * 10, records=seq,
+                                       observed_records=seq, observed_seconds=(seq - 1) * 10,
+                                       unavailable=[], state="in-step")) + "\n")
+        other = lw.Checker(self.log.path, checker.journal)
+        self.checkers.append(other)
+        other.submit(store.flatten(self.w), self.log.path.stat().st_size, f"e{self.w._eseq}", full=True)
+        other.jobs.join()
+        self.assertEqual(other.covered_records, 2)
+        self.assertEqual(other.covered_seconds, 10)
+        self.assertEqual(other.accounting_correction["removed_self_records"], 1)
+        self.assertEqual(other.accounting_correction["removed_seconds"], 10)
+        other.close()
+        self.checkers.remove(other)
+        restarted = lw.Checker(self.log.path, checker.journal)
+        self.checkers.append(restarted)
+        restarted.submit(store.flatten(self.w), self.log.path.stat().st_size, f"e{self.w._eseq}", full=True)
+        restarted.jobs.join()
+        self.assertEqual(restarted.covered_records, 2)
+        self.assertEqual(restarted.covered_seconds, 10)
+        self.assertEqual(restarted.accounting_correction, other.accounting_correction)
+
     def test_paired_export_same_event_detached_prefix_and_hashes(self):
         import log_world_fixture as fixture
         frozen = fixture.freeze(self.d, self.path)
@@ -326,7 +517,7 @@ class LogWorldTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hash"):
             fixture.load(target)
 
-    def test_requested_full_check_has_one_outer_record_and_valid_hash_chain(self):
+    def test_requested_full_check_has_no_outer_record_and_valid_hash_chain(self):
         self.w.apply("create", self.w.root, None, {"kind": "note", "title": lw.STATUS_TITLE}, "jeff")
         self.log.path.unlink()
         store._HEADS.pop(str(self.log.path), None)
@@ -339,7 +530,7 @@ class LogWorldTests(unittest.TestCase):
         self.assertIn("queued", answer)
         store.safe_commit(ctx, self.d, "log-world check", "jeff")
         checker.jobs.join()
-        self.assertEqual(self.log.head()[0], seq + 1)
+        self.assertEqual(self.log.head()[0], seq)
         self.assertEqual(checker.snapshot()["state"], "in-step", checker.snapshot())
         self.assertEqual(store.flatten(checker.replay.world), store.flatten(self.w))
         replay = lw.Replay()
