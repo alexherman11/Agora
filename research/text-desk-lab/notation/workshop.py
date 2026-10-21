@@ -258,6 +258,36 @@ def atomic_state(path, value):
     os.replace(tmp, path)
 
 
+def lease_free(path):
+    """a9031: whether no process holds this worker lease (codex-residents/worker_lease.py's OS lock on its first byte).
+    Taken and let go at once; a missing file is free. An unreadable one is not: never guess that a card is unowned."""
+    if not Path(path).exists():
+        return True
+    try:
+        with open(path, "a+b") as f:
+            f.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                except OSError:
+                    return False
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError:
+                    return False
+                fcntl.flock(f, fcntl.LOCK_UN)
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+
+
 def health(world, cwd=HERE):
     r = subprocess.run([str(PY), "health.py", world, "--json"], cwd=cwd, capture_output=True, text=True, timeout=900,
                        env={**os.environ, "DESKD": "off"})
@@ -842,19 +872,48 @@ class Workshop:
         return max(self.provider_limits().get(provider, {}).get("retry_at", 0),
                    plans.wait_until(provider) if plans else 0)
 
+    @staticmethod
+    def fallbacks(cfg):
+        """The house note's limit_fallback: the providers a quota-held card may move TO. "codex" (a6570): a Claude card
+        held by Claude's usage limit goes on with a Codex builder. "claude" (a9031): a Codex card held by Codex's limit
+        goes on with a Claude builder. "codex, claude": both. Anything else: none."""
+        return {p for p in re.split(r"[,\s]+", str(cfg.get("limit_fallback") or "").lower()) if p in ("claude", "codex")}
+
     def limit_handoffs(self, w, cfg):
-        """Transfer a stopped, quota-held Claude card without reusing its conversation or losing its files.
+        """Transfer a stopped, quota-held card to the other provider's standing builders without reusing its
+        conversation or losing its files: Claude to Codex (a6570), and Codex to Claude (a9031). The card keeps its
+        worktree, branch, edits and desk name; the held provider's state is archived under handoffs/.
 
         The saved handoff marker is a recovery journal: if the house dies between saving local state and changing
-        the native card, the next pass completes that same handoff before any worker can be resumed.
+        the native card, the next pass completes that same handoff before any worker can be resumed. A card moved once
+        stays with its new provider when the old one's limit resets: nothing moves it back (its saved provider is the
+        new one); it moves again only if the new provider is limited in turn and the fallback names the way back.
         """
-        if cfg.get("limit_fallback") != "codex":
+        targets = self.fallbacks(cfg)
+        if not targets:
             return False
-        lanes = [ln for ln in self.pool(cfg) if ln["provider"] == "codex" and ln["n"] > 0]
-        if not lanes:
+        lanes = {p: [ln for ln in self.pool(cfg) if ln["provider"] == p and ln["n"] > 0] for p in targets}
+        if not any(lanes.values()):
             return False
         changed = False
-        for cid, (s, state) in self.commissions(w).items():
+        cs = self.commissions(w)
+        # a9031 (JEFF c9079: 'one at a time within the cap'): the house note may say the order cards move in
+        # (handoff_order=a1,a2,...: those first, in that order; the rest after, oldest first) and how many moved cards may
+        # be underway at once (handoff_at_once=1: a moved card still working holds the next back). Unset: as a6570 was.
+        order = [c for c in re.split(r"[,\s]+", str(cfg.get("handoff_order") or "")) if c]
+        try:
+            at_once = int(cfg.get("handoff_at_once") or 0)
+        except ValueError:
+            at_once = 0
+        rank = lambda c: (order.index(c) if c in order else len(order), int(c[1:]) if c[1:].isdigit() else 0)  # noqa: E731
+        underway = {p: set() for p in ("claude", "codex")}     # moved cards still working, by the provider they went to
+        for c, (_, state) in cs.items():
+            moved = self.card_state(c)
+            to = (moved.get("handoff_pending") or moved.get("last_handoff") or {}).get("to")
+            if to in underway and state in ("working", "reverted"):
+                underway[to].add(c)
+        for cid in sorted(cs, key=rank):
+            s, state = cs[cid]
             if worker_selection.requested(s.get("props") or {}):
                 continue  # an explicit request never silently switches on exhaustion
             # Fresh asked cards already share all available lanes. Quota fallback
@@ -863,49 +922,69 @@ class Workshop:
                 continue
             st = self.card_state(cid)
             transfer = st.get("handoff_pending")
+            source = st.get("session_provider", "claude")
+            target = (transfer or {}).get("to") or ("codex" if source == "claude" else "claude")
             # Old versions stored retry_at only for a known provider limit. New retryable crashes use retry_kind.
-            limited = st.get("retry_at") and st.get("retry_kind", "limit") == "limit"
-            if not transfer and not (limited and st.get("session_provider", "claude") == "claude"):
+            # a9031: also a card on a provider held now that never met the limit itself (paused before it, then
+            # resumed by a lead): its own conversation is on a provider that will not answer until the reset. Codex
+            # cards only: a6570's Claude direction stays as it was (Claude's plan pacing also holds it, briefly)
+            limited = ((st.get("retry_at") and st.get("retry_kind", "limit") == "limit")
+                       or (source == "codex" and st.get("session") and self.provider_wait(source) > time.time()))
+            if not transfer and not (limited and target in targets and lanes.get(target)):
                 continue
+            if not transfer and self.provider_wait(target) > time.time():
+                continue  # both providers are held: it waits for whichever comes back, on its own provider
+            if not transfer and at_once and len(underway[target]) >= at_once:
+                continue  # a card moved before is still underway: the next waits its turn (handoff_order)
             wk = self.workers.get(cid)
             if wk and (wk.busy or wk.alive()):
                 continue
             if not self.real_tree(TREES / cid):
                 continue
             path = self.house.dir / f"worker-{cid}" / "state.json"
+            if not lease_free(path.parent / "worker.lock"):
+                continue  # a Codex adapter (even one a former house left) still owns the card: never two at once
+            name = {"claude": "Claude", "codex": "Codex"}
             if not transfer:
-                archive = path.parent / "handoffs" / f"claude-{time.time_ns()}.json"
+                archive = path.parent / "handoffs" / f"{source}-{time.time_ns()}.json"
                 atomic_state(archive, st)
                 limits = self.provider_limits()
-                limits["claude"] = {"retry_at": max(st.get("retry_at", 0), self.provider_wait("claude")),
-                                    "detail": st.get("last_error", "Claude usage-limit handoff")}
+                limits[source] = {"retry_at": max(st.get("retry_at", 0), self.provider_wait(source)),
+                                  "detail": st.get("last_error", f"{name[source]} usage-limit handoff")}
                 atomic_state(self.house.dir / "provider-limits.json", limits)
-                transfer = {"from": "claude", "to": "codex", "archive": str(archive),
-                            "model": lanes[0]["model"] or CODEX_MODEL}
+                lane = (lanes.get(target) or [{"model": ""}])[0]
+                model = lane["model"] or (CODEX_MODEL if target == "codex" else cfg.get("worker_model") or cfg.get("model"))
+                transfer = {"from": source, "to": target, "archive": str(archive), "model": model}
                 carry = (st.get("pending") or {}).get("carry", "")
+                before = st.get("builder")
                 for key in ("session", "builder", "retry_at", "retry_kind", "failures", "unanswered",
-                            "unanswered_why", "last_error"):
+                            "unanswered_why", "last_error", "model", "effort"):
                     st.pop(key, None)
-                st.update(session_provider="codex", handoff_pending=transfer)
+                st.update(session_provider=target, handoff_pending=transfer)
+                if before:
+                    st["handed_from"] = before       # take() says whose card it was
                 st["pending"] = {"delivered": False, "carry":
-                    f"Claude hit its usage limit. You now own commission {cid}; its old process is stopped. "
-                    f"The existing worktree and all edits are preserved. Read the card and comments, git status "
-                    f"and git diff before acting; verify what the last command did before repeating an effect. "
-                    f"Do not assume you have Claude's conversation.\n\n{s.get('title', '')}\n{s.get('text', '')}"
-                    f"\n\nLast pending instruction (may refer to Claude's prior context):\n{carry}"}
+                    f"{name[source]} hit its usage limit. You now own commission {cid}; its old process is stopped. "
+                    f"The existing worktree and all edits are preserved. Read the card and comments, git log, "
+                    f"git status and git diff before acting: its last checkpoint comment and commits are where it "
+                    f"stands. Verify what the last command did before repeating an effect. "
+                    f"Do not assume you have {name[source]}'s conversation.\n\n{s.get('title', '')}\n{s.get('text', '')}"
+                    f"\n\nLast pending instruction (may refer to {name[source]}'s prior context):\n{carry}"}
                 atomic_state(path, st)
-            self.set_state(cid, "working", worker_provider="codex", worker_model=transfer["model"])
+            self.set_state(cid, "working", worker_provider=transfer["to"], worker_model=transfer["model"])
             # set_state is a native gateway operation, not a projection edit. Verify it before clearing the journal.
             current = self.commissions(self.house.load()).get(cid)
-            if not current or current[0].get("props", {}).get("worker_provider") != "codex":
+            if not current or current[0].get("props", {}).get("worker_provider") != transfer["to"]:
                 continue
             st.pop("handoff_pending", None)
             st["last_handoff"] = transfer
             atomic_state(path, st)
+            underway[transfer["to"]].add(cid)
             self.workers.pop(cid, None)
-            self.say(cid, "Claude reached its usage limit. A persistent Codex builder will continue this card in "
-                          "the same worktree; edits and Claude's saved conversation are preserved. "
-                          "Claude will not resume this card automatically.")
+            frm, to = name[transfer["from"]], name[transfer["to"]]
+            self.say(cid, f"{frm} reached its usage limit. A persistent {to} builder will continue this card in "
+                          f"the same worktree; edits and {frm}'s saved conversation are preserved. "
+                          f"{frm} will not resume this card automatically.")
             changed = True
         return changed
 
@@ -966,7 +1045,8 @@ class Workshop:
             held.set_down(f"{name} went to {cid}")
         wk.runtime_cfg = cfg
         b = Builder(self.house, name)
-        before, last = wk.state.get("builder"), b.state.get("on")
+        # a9031: a card moved by a usage limit names the other provider's builder that began it
+        before, last = wk.state.pop("handed_from", None) or wk.state.get("builder"), b.state.get("on")
         handed = (s.get("props") or {}).get("hand_to") is not None      # read before the act below clears it
         if wk.alive() and before != name:
             wk.set_down(f"{name} takes it over")
@@ -1197,8 +1277,13 @@ class Workshop:
             return None
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))     # a1590: the name, never p2919
         wk.runtime_cfg = cfg
-        if not getattr(wk, "builder", None) and self.provider_of(cid, s) == "codex" and self.builders(cfg, "codex"):
-            name = self.free_builder(w, cfg, provider="codex")
+        provider = self.provider_of(cid, s)
+        # a Codex card goes to a Codex builder; a card handed to Claude by a usage limit (a9031) to a Claude builder:
+        # it has no Claude conversation of its own to resume
+        handed = (wk.state.get("last_handoff") or {}).get("to") == "claude" and not wk.state.get("session")
+        if not getattr(wk, "builder", None) and (provider == "codex" or (provider == "claude" and handed)) \
+                and self.builders(cfg, provider):
+            name = self.free_builder(w, cfg, provider=provider)
             if not name:
                 return None
             wk.builder = name
