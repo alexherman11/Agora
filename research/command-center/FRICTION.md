@@ -333,7 +333,7 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-## curing (42)
+## curing (43)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -652,6 +652,12 @@ Read: named on-drop parts were required to carry inside the same lens, and the b
 a7443 · family=lens-words · status=curing
 
 Source staged on viewer tabs commission: the world lacked an undoable multi-projection Agora history operation and a way to name a frame reading scope independently of reused DOM keys. Adds narrow current-world browse and generic remember word; chrome remains staged world text. Native selector composition now preserves every composite event for undo, not just its final prop, and omits None for a no-op. No live tabs migration or painter activation. In-memory controller/commands/repaint and fake DOM pass; real guarded browser remains blocked at initial websocket read.
+
+### Read-only Markdown lacked keyboard links and inline native media controls
+
+a7613 · family=painter · status=curing
+
+Source a7557, pending landing and guarded acceptance. The existing markdown word already composes with media, but read-only links lacked Tab/Enter access and an approved inline picture lost media Pop out after deduplication. Generic TextEdit read semantics, Media.inline and narrow lens action routing supply these without chat-specific source, edit actions or new privilege; read code/table width rules constrain content. Five actual-module DOM stand-in tests and three in-memory actual-lens/dispatch checks pass; no browser/layout/clipboard acceptance. Exact body-only patches/reversal are staged in Richer chat — exact staged body passages and reversal. No live Conversation edits or sends.
 
 ## unchecked (7)
 
