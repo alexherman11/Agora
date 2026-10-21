@@ -8,11 +8,11 @@ test('actual read-only text listener routes Agora deep links through the lens ho
   const elements = [], followed = [], external = [];
   const document = { head: { append() {} }, createElement() {
     const el = { dataset: {}, children: [], classList: { add() {} }, handlers: {},
-      append(k) { this.children.push(k); },
+      append(k) { this.children.push(k); }, querySelectorAll() { return []; },
       addEventListener(k, f) { this.handlers[k] = f; } };
     elements.push(el); return el;
   } };
-  const ctx = vm.createContext({ document, window: { open: (...a) => external.push(a) },
+  const ctx = vm.createContext({ document, getSelection: () => ({ isCollapsed: true }), window: { open: (...a) => external.push(a) },
     Markdown: { draw() {}, lightUp() {}, lineOf: () => null } });
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'desk-shell/textedit.js'), 'utf8'), ctx);
   ctx.TextEdit.create({ text: '[First](agora://current/item/a1)', editable: false,
