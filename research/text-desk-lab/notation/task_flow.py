@@ -5,6 +5,7 @@ receipts. A knock means queued for the resident, never proof of model receipt or
 acceptance. Only an owner's own accepted_by/status event counts as acceptance.
 """
 
+import kept
 import persons
 
 BLOCK_FIELDS = ("blocked_on", "blocker_owner", "resume_when")
@@ -40,7 +41,9 @@ def _card(w, event):
     node = w.nodes.get(target, {})
     sid = node.get("subject", target)
     undo = event.get("undo") or {}
-    before = undo.get("restore_subject")
+    # Production worlds externalize these snapshots into their undo archive at
+    # save time. Use the same durable reader as membership/history attribution.
+    before = kept.copy_of(event)
     if before is None:
         before = next((s for s in undo.get("restore_subjects", []) if s.get("id") == sid), None)
     # Existing event snapshots protect attribution from a later reassignment.
