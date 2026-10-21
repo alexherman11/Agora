@@ -716,7 +716,7 @@ a7374 · family=privacy · status=unchecked
 
 Source foundation for Gmail is necessary because world notes/lenses and public actor claims cannot hold private account data or authorize fetching. Existing same-user DPAPI/ignored files are not containment. This commission adds only offline metadata/OAuth state-machine tests and a disabled refusal helper; no secure storage/caller bridge is claimed. Missing primitive: host-maintainer-reviewed isolated reader principal/storage plus authenticated human-only IPC, with count-only output. Deployment and private preview review remain outside this change. No runtime or account access was enabled. (worker-a7295, 20 Oct)
 
-## cured (65)
+## cured (66)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1267,6 +1267,12 @@ a6631 · family=missing-word · status=cured
 
 Alex, 20 Oct, requested current worker status and automatic Desk/worker recovery at Windows sign-in. Missing lifecycle behavior: the Startup shortcut launches agora_start.py but has no external recovery if that process exits; AgoraHouseRecovery separately launches backend components, creating two startup owners. Codex is connecting the existing scheduled watchdog to the existing full Desk launcher, preserving live services, strengthening single-instance startup and testing restart restoration. Incomplete working tasks resume from saved house state; waiting tasks remain waiting for answers or new work.
 Ran 20 Oct: 6 focused startup tests passed (cold start, adoption, orphan recovery, inspection failure, checkout matching, real OS-lease contention/crash release). Existing builder restart/resume checks passed. Repository pytest: 201 passed, 2 skipped; changed Python Ruff and PowerShell parsing passed. Sign-in task is running. New launcher 20572 adopted the original live services; deliberately terminating only it led to watchdog replacement 91248 within the configured 60-second backoff. Keeper 62740, house 82160, door wrapper 28432, HUD 87440 and capture 33540 remained running unchanged; duplicate launcher exited without starting services. No Windows reboot/sign-out was performed. Docs checker still reports the pre-existing missing Dynamic Desk image. Source: agora_start.py, test_agora_start.py, house_supervisor.ps1; operational instructions updated in a639 and codex-residents/README.md.
+
+### Observer bookkeeping must not log its own heartbeat
+
+a7766 · family=source · status=cured
+
+a7731 source correction: no missing new world word; the existing witnessed: source is the right boundary for moving observer counters. The checker had embedded record totals, epochs and evidence in every status projection, generating its own next observation. Verdict-only status plus full/divergence-only evidence and external witnessed counters remove that feedback; old receipt totals are reconciled once against self-record metadata. Copy tests pass; live activation/history proof remains pending house landing. No ordinary logger schema or world command semantics changed.
 
 ## active (1)
 
