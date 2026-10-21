@@ -92,15 +92,19 @@ def release_lock(lock, anyone=False):
             time.sleep(0.01)
 
 
-def save_desk(path, desk, data=None):
-    """Write the session atomically: to a temp file, then rename over the old one. Sable's baseline (1): a write killed
-    halfway left a pickle that would not load, and the whole session was lost. `data`: the pickled desk, if in hand."""
+def admit_writer(path):
+    """Call under the session lock, before loading or executing a writable request."""
     writer = holder_of(path)
     if writer is not None and writer != os.getpid():
         # 14 Oct (Snappy Desk; Alex: one writer): a world server keeps this world in memory and saves it itself; a
         # second writer would put an older world over its newer one. Send the line through the door instead.
         raise RuntimeError(f"{path.stem} is held by its world server (pid {writer}), which saves it itself; "
                            f"send the line through the door (DESKD), not to the file")
+
+
+def save_desk(path, desk, data=None):
+    """Write the session atomically; retain the final writer guard as defence in depth."""
+    admit_writer(path)
     tmp = path.with_name(path.name + ".tmp")
     if data is None:
         import kept
@@ -237,6 +241,10 @@ def main():
     lock = SESSIONS / f"{name}.lock"
     take_lock(lock)
     atexit.register(lambda: release_lock(lock))
+    # A detached desk must not even begin a journal record before admission.
+    # Dump/shape are read-only; ordinary CLI reads retain seen marks and save.
+    if "--dump" not in sys.argv and "--shape" not in sys.argv:
+        admit_writer(path)
     if "--reset" in sys.argv or not path.exists():
         desk = fresh()
     else:

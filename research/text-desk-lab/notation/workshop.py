@@ -1646,7 +1646,8 @@ class Worker:
                            "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
                            "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
                            "--append-system-prompt", prompt,
-                           "--settings", json.dumps(charter.claude_hook(PY, world, self.cid, self.actor))]
+                           "--settings", json.dumps(charter.claude_hook(
+                               PY, world, self.cid, self.actor, self._charter_channel()))]
                     cmd += claude_worker_runtime.arguments(getattr(self, "runtime_cfg", {}))
                 else:
                     raise ValueError(f"{self.cid}: unknown worker provider {provider}")

@@ -437,6 +437,11 @@ class Session:
             raise
 
     def _enter_locked(self, hold):
+        if not self.read:
+            try:
+                explore.admit_writer(self.path)
+            except RuntimeError as exc:
+                raise BadRequest(str(exc)) from None
         self.hold = _take_lease(self.name) if hold is None else hold
         # 7 Oct: the desk this process last saved or loaded is kept in memory, and used again while the file is still
         # that one (same time and size: nobody else wrote it). Reading and unpickling 13 MB was 80 to 110 ms a request.

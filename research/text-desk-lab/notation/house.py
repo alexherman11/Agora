@@ -459,11 +459,13 @@ class Resident:
                    "--charter-file", str(charter_file), "--world", self.house.world,
                    "--target", self.rid, "--actor", props.get("actor", self.rid)]
         elif provider == "claude":
+            self._charter_channel()
             cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                    "--system-prompt", self.state.get("charter_text", ""), "--tools", "",
                    "--strict-mcp-config", "--setting-sources", "", "--model", model,
                    "--settings", json.dumps(charter.claude_hook(
-                       sys.executable, self.house.world, self.rid, props.get("actor", self.rid)))]
+                       sys.executable, self.house.world, self.rid, props.get("actor", self.rid),
+                       self.charter_channel))]
         else:
             raise ValueError(f"{self.rid}: unknown resident provider {provider}")
         self.state["session_provider"] = provider
@@ -499,6 +501,13 @@ class Resident:
         self.reply, self.reply_source = [], None
         route = getattr(self.house, "host_route", None)
         return route.bind(self, proc) if route else None
+
+    def _charter_channel(self):
+        charter.drain_channel(self)
+        self.charter_channel = charter.prepare_channel(self.dir)
+        self.state["charter_channel"] = self.charter_channel.name
+        self.save()
+        return self.charter_channel
 
     def _read(self, proc, source=None):
         for raw in proc.stdout:
@@ -579,6 +588,7 @@ class Resident:
     def turns_ended(self):
         """Drain stream events; return the text of each turn that ended."""
         ended = []
+        charter.drain_channel(self)
         while True:
             try:
                 ev = self.events.get_nowait()
@@ -610,15 +620,9 @@ class Resident:
                 # begins with the welcome again (Alex, 29 Sep: on compaction, or a full reset)
                 self.state["welcome_due"] = "the conversation was compacted"
                 self.state["compactions"] = self.state.get("compactions", 0) + 1
-                if self.state.get("session_provider", "claude") == "claude":
-                    # The SessionStart(compact) hook reads/injects the live charter.
-                    # Keep the resume-time system block current as well.
-                    self.state["charter_text"] = charter.read(self.house.load()).text
                 self.save()
-            elif t == "system" and ev.get("subtype") == "charter_read":
-                # Codex refreshes developer history at the actual boundary, before continuing.
-                self.state["charter_text"] = ev.get("text", "")
-                self.save()
+            elif t == "system" and ev.get("subtype") in ("charter_read", "charter_unavailable"):
+                charter.parent_receipt(self, ev)
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):
                     if c.get("type") == "text":
