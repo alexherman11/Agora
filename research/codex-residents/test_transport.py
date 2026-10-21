@@ -72,7 +72,7 @@ def test_house_hook_routes_only_new_provider_and_preserves_claude():
         fake=None,
         claude="claude.exe",
         load=lambda: world,
-        act=lambda *a, **k: "",  # charter receipt only; no native world act under test here
+        act=lambda *a, **k: "fixture charter receipt",  # no native world act under test
     )
     world.nodes["f_test"] = {"props": props}
     resident = module.Resident(host, "f_test")
@@ -99,3 +99,36 @@ def test_house_hook_routes_only_new_provider_and_preserves_claude():
         assert cmd[0] == "claude.exe" and cmd[-2:] == ["--resume", "claude-session"]
         assert "charter: not read: note missing" in cmd[cmd.index("--system-prompt") + 1]
         assert cmd[cmd.index("--tools") + 1] == ""
+
+
+@pytest.mark.parametrize(
+    "model,catalog", [("gpt-6.1-sol", "worker-model-catalog.json"),
+                      ("gpt-6-astra", "model-catalog.json")],
+)
+def test_resident_model_selection_keeps_the_no_tools_boundary(tmp_path, model, catalog):
+    """A charter landing must not drop the running resident's Sol support."""
+    import json
+    from codex_resident import build_config
+
+    config = build_config(tmp_path, "fixture.exe", tmp_path, model=model)
+    selected = next(x.split("=", 1)[1] for x in config.config_overrides
+                    if x.startswith("model_catalog_json="))
+    assert Path(json.loads(selected)).name == catalog
+    assert "features.shell_tool=false" in config.config_overrides
+    assert "features.multi_agent=false" in config.config_overrides
+    assert config.env["OPENAI_API_KEY"] == config.env["CODEX_API_KEY"] == ""
+
+
+def test_worker_and_resident_share_a_fail_closed_subscription_guard():
+    """Exercise the real import edge that broke when only one adapter was parked."""
+    import codex_worker
+    from codex_resident import require_subscription
+
+    assert codex_worker.require_subscription is require_subscription
+    client = Mock()
+    client.account_read.return_value.model_dump.return_value = {"account": {"type": "apiKey"}}
+    with pytest.raises(RuntimeError, match="subscription"):
+        require_subscription(client)
+    client.account_read.assert_called_once_with({"refreshToken": False})
+    client.turn_start.assert_not_called()
+    client.account_login_start.assert_not_called()
