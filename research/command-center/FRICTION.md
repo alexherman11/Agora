@@ -339,7 +339,7 @@ a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
 
-## curing (44)
+## curing (45)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -671,6 +671,12 @@ Source a7557, pending landing and guarded acceptance. The existing markdown word
 a7781 · family=lens-words · status=curing
 
 Source edit (a7544, desk-shell/lens.js placeFloat, approved by JEFF e15996). The Tabs menu, a float, ran off an 800 px page: a lifted float was placed fixed under its handle and capped only at 70vh (lens.html), whatever room was left below the handle (measured: a 560 px menu from y 410, ending at 970 on an 800 px page). No world word says how tall a float may be relative to where its handle sits: measure and scroll give width and scrolling, a role gives looks, and 70vh ignores the handle. The missing word was 'placed in the room beside its handle'. The painter now does it for every float: it opens below, or above when it does not fit below and above has more room, and is no taller than that room (it scrolls inside it). A lens can still say nothing about the side or the gap; if one needs to, that is a paint word (float above|below), not more painter policy.
+
+### Writer refusal needed admission before execution, not only before save
+
+a7843 · family=code · status=curing
+
+a7816: the missing engine boundary was under-lock writer admission before detached command execution and store.begin/commit. Retaining only save_desk's writer guard allowed a refused foreign request to append a journal record. Provider compaction helpers also needed a read-result handoff to the parent, rather than writing a receipt from DESKD=off. Source prepared with real explore/Session/store copy tests; historical divergence and log records are deliberately untouched.
 
 ## unchecked (7)
 
@@ -1304,6 +1310,7 @@ Updated 20 Oct, source staged only: missing generic words resize, partition, com
 
 
 20 Oct round5 source candidate: generic authored grip default ownership and action-control drag guard repaired per JEFF, with no geometry/containment redesign. Passive nested summaries may carry; editors stay native; control clicks remain, returning/cancelled drags do not activate. 281 DOM stand-in checks pass; no fresh browser claim. Targeted guarded recheck still gates readiness/live use; EVIDENCE.md/current staged a7180 distinguish source tests from the reviewer's world-border proof.
+20 Oct final receipt: exact c7682 bytes accepted by guarded browser reviewer a7784/c7831, source ready for house landing per JEFF c7840; no live migration. Browser limits and actual timings retained in EVIDENCE.md. Help vocabulary/detail added e16351/e16358; Handbook table insertion remains staged until source lands.
 
 ### Item promotion needs atomic data admission, not a batch of commands
 
