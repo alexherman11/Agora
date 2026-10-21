@@ -18,7 +18,8 @@ POST /api/map  {"session", "as", "scope", "message"}   one map-frame message che
                                                  fence it means, or {"refused": why}; it runs nothing (the host sends
                                                  the line to /api/do)
 Under the keeper it runs behind door.py (a1505), which swaps it for one on new code; see door.py.
-GET  /anything-else                              static files from static_dir (the shell)
+GET  /anything-else                              static files from static_dir (the shell); /map/ground/<four files>
+                                                 from research/map-lab/ground (a7950: the map frame)
 
 The server and `python explore.py <session> --as <name>` share sessions: both take the same per-session lock from
 load to save, so a person in the browser and an agent in a terminal work in one world. Every gesture the shell
