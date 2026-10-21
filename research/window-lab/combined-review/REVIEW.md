@@ -2,7 +2,53 @@
 
 worker-a7466 (builder-1), 20 Oct 2026. Acceptance only: no source fix to the reviewed code, no live apply.
 
-## Round 2 (c7492): the owner's repair c7487, reviewed by its bytes
+## Round 3 (c7505): the owner's repair c7502
+
+**Bytes reviewed (ran, all match c7502):**
+- partition-ui.js 59313EC1C0A6774362B60A4208530467FD89CD4FD6FB6DE30AC803CB4FEDDAE6
+- test_partition_ui.js 40D80DC066B36FADB0BA7CC1400525198CB52B6D8423194EC04CCB39194A4BBC
+- partition_navigation.py 11568A7DD155DF755441032A160AE6DE35FB9AD84437CA50CBDA93AE41C912C6
+- test_navigation_step.py A4B0F26797A0DEF4E9476C54E776D8B5AAC67E6ED0963716CB523BB8CBCED0E7
+
+Composed copy-only over main fda965e: 58 files, the same 4 block unions, 0 conflicts. Restored afterwards.
+Every run's guard verdict: "alex: untouched by the sandbox". DPR 1.5 at both sizes. The world copy was at e14869.
+
+**Busy press (new journey `busy`) — PASS at both sizes (ran).**
+- Setup: answer delayed 1500 ms. Drop the Board at the bottom, then grab again at once.
+- Result: declined cleanly. No ghost, 0 characters selected, userSelect unchanged, only a pointerdown event, layout held.
+- The answer then painted after 594 / 703 ms (1280) and 609 ms (2560).
+- The next carry after the answer landed at its preview, e.g. [16, 326.4, 480, 383] at 1280.
+- No selection workaround is used: leftover selection is only counted.
+
+**consecutive / consecutive-paced / cancel — PASS at both sizes.** Example: 2 carried, 1 declined cleanly.
+
+**Full regression runs** (shots and facts in `demos/combined-review/`):
+- `2026-10-20-190202-2560x1440`: every journey passes. dock-colour is blocked because this world has no tints; the tints journey passes.
+- `2026-10-20-190856-1280x800`: every journey passes except:
+  - focusdiag and tabs-focus: the focus mismatch below;
+  - fit: n/a by design (bounded by the 300 px allocation);
+  - draft and composer: blocked, the composer is cut off at 1280 (pre-existing);
+  - doc-pins document: blocked, the viewer scrolls its title out of reach.
+
+**Remaining product defect: focus-exit preview at 1280** (ran, `demos/combined-review/2026-10-20-191538-1280x800/focusdiag.json`).
+- Carry Chat to the bottom edge while the Board is in focus:
+  - preview [16, 527.1, 1248, 182], which equals the rect right after release;
+  - after the answer [16, 525.9, 1248, 183.5];
+  - difference [0, -1.2, 0, +1.5].
+- The trees are identical. `P.plan` got bounds {w: 1248, h: 380}: the partition root in focus is client 1248x380 at y 329.1.
+- After focus exits, `P.geometry` gets h 383 (root 1248x382.8 at y 326.4).
+- Cause: the layout's top row (`f5664/top`) is 297.1 px tall in focus and 294.4 px after. So the preview is planned in a frame 2.7 px shorter than the one it lands in.
+- Plan options: minimum [240, 140], gap 16, visible [a5676, a5674, a6799, a6802], intrinsic {a5676: [401.25, 179.5]}. Split minimums after the answer: [140, 140].
+- At 2560 the top row does not change, so the difference is 0.
+- No tolerance was widened.
+
+**partition_navigation (the owner's corrected recipe) — not acceptable as a gate yet (ran).**
+- **2560, owner bytes** (`demos/hud-playtest/2026-10-20-191614`): FAIL inside `restore_fixture`. Message: "copy navigation fixture restore refused: ERR stale: f5664 changed since you last saw it (e14878 prop by alex); look at it again before acting". All 3 read+prop attempts stayed stale, and because the error is raised in `finally` it hides the step's own result.
+- **2560, with a review-only probe** (`read <layout> :3` replaced by `look <layout>`; not the owner's bytes; `2026-10-20-191700`): the restore succeeds and the step passes functionally: "title click unchanged; four global edge spans; one divider persisted; copy fixture restored". It is marked slow at 482 ms. So `read` does not refresh the fence, and `look` does.
+- **1280, probe on, 6 runs** (`191835`, `191912`, `191946`, `192018`, `192054`, `192124`): every run failed, at different points:
+  - right edge drop, twice. In `192018`: before the drag, nothing was sending and 0 characters were selected. The press was at (256, 330.4), 4 px below the carried panel's top (panel [16, 326.4, 480, 383]), and was dragged to (1262, 517.8). After it, 32637 characters were selected and there was no ghost. The press started a text selection instead of a carry. Whether that point is outside the title (a test defect) or inside it (a product defect) was not captured; the hit-test probe ran only on runs that failed elsewhere.
+  - top edge drop, once (`191912`).
+  - divider, three times (`191946`, `192054`, `192124`): "refused: f5664 already has that". The 40 px divider drag produced the same weights at 1280.
 
 **Bytes reviewed:** partition-ui.js 2CD497F27AE22C621CB7B4140BC938564E7293178563DF0878F30ADA6168B535 and
 test_partition_ui.js 44D7F9040B7E36235FC1F867DC216AFC02060869305B0D5ADAEF97E073744749. Both match c7487.
