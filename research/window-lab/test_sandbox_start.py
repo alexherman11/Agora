@@ -61,6 +61,7 @@ def stage(cdp_factory, cdp_page=True):
 
     def start(name, argv, env=None):
         rec["starts"] += 1
+        rec["argv"] = argv
         return 4242
 
     def close(name, quiet=False):
@@ -127,6 +128,10 @@ def main():
         assert json.loads(SB.state_file("t4").read_text(encoding="utf-8"))["viewport"] == [2560, 1440, 1.5]
         assert ("close", {}) in FakeCdp.calls
         print("good start at the screen's size: fullscreen, page 2560x1440 measured and kept, not closed: ok")
+        # a7466: the hidden window must not stop painting when Alex's display sleeps (Edge's occlusion tracking)
+        assert "--disable-features=CalculateNativeWinOcclusion" in rec["argv"], rec["argv"]
+        assert "--disable-backgrounding-occluded-windows" in rec["argv"] and "--disable-renderer-backgrounding" in rec["argv"]
+        print("edge is started with occlusion tracking and backgrounding off: ok")
 
         # 4b. smaller than the screen: the framed window grows by its own frame
         FakeCdp.calls = []

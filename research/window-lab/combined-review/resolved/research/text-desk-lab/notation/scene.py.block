@@ -1,0 +1,3 @@
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "resize", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS += ("remember",)  # reading scope, viewer hands only; never drafts or permissions
+PAINT_WORDS += ("partition", "companion", "sizing", "chrome")

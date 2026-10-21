@@ -1,0 +1,7 @@
+    words = [em.get("text"), em.get("light"), em.get("remember"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
+             *(em.get("tip") or ()), em.get("share"),
+             "$" + em["resize"][0] if em.get("resize") else None]
+    if em.get("partition"):
+        words += ["$" + em["partition"]["prop"]]
+        if em["partition"].get("focus_prop"):
+            words += ["$" + em["partition"]["focus_prop"]]
