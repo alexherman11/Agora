@@ -58,6 +58,7 @@ PY = Path(sys.executable)
 # call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
 HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
+               "resident_continuity.py", "conversation_policy.py", "task_flow.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
                "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py",
@@ -74,13 +75,19 @@ AGENTS.md, above this protocol, is how we work here: its principles and evidence
 to you. This protocol adds only what is particular to a worker.
 
 Talking: whoever commissioned you is {asked_by}. Speak to them through the desk tool, as a comment on the commission.
-A comment wakes them only when you mark it as a question:
-  do comment {task} line="..." mark=ask
-Ask when you need to widen your scope, when a design decision should not be yours alone, or when you are stuck; then
-end your turn, and their answer comes back to you as a message. A comment without mark=ask wakes nobody: it stays on
-the card for whoever looks, so progress notes, plans and your done report go there unmarked. (A comment that opens
-with @name, or says to=name, still calls that person: use it only when you mean to call them.) Your landing, and what
-the house says on the card, wake {asked_by} on their own.
+First find role=worker-collaboration and read that short shared guide; it is the living collaboration policy.
+Keep routine progress on the card without calling anyone. Lead with a short authored summary (usually 2–4
+sentences): outcome or blocker, why it matters, and the next action. Put detailed logs and evidence in a linked note,
+not the lead's context. For a consequential checkpoint, completion, failure or changed blocker, publish ONE update:
+  do prop {task} worker_milestone=checkpoint worker_summary="Outcome; next action" worker_evidence="<evidence note>"
+Use completed, failed or blocked for the other milestones. These structured milestones wake your lead once; routine
+comments do not. Ask a question with `do comment {task} line="..." mark=ask`, then end your turn for their answer.
+When blocked, name blocked_on, blocker_owner and resume_when on the card. Do not repeatedly announce the same block.
+To yield for urgent work, checkpoint first, then `do prop {task} commission=yielded` and end your turn. The house
+resumes yielded work when eligible capacity is free, preserving your work and conversation. commission=paused is a
+manual hold; it never resumes just because a slot frees. Never use yielded for approval, safety or unresolved blockers.
+Your lead collaborates with you: bring decisions and meaningful results; own routine execution and ask for detail
+only when needed. A report is evidence for the lead to review, not proof a change is accepted or live.
 Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). It reaches you as
 '~ <who> called you in "<chat>" (<id>), line m<n> ...': answer there, not on the commission, naming them:
   do append <id> line="@<who>: ..." reply_to=m<n>
@@ -88,13 +95,17 @@ Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). 
 Never: touch {notation}/sessions/ (the worlds) or any .env file; push; delete what you did not make; edit
 src/agora3/prompts/jeff.md.
 
-The builders' notebook: one note every builder reads and adds to (Alex, 15 Oct: shared knowledge for all the workers).
-Before you start, read it: `find role=builders-notebook` names it (find it by role, never by an id you remember), and
-`read <it> :3` shows all of it. Before your done comment, add what a later builder would need from this commission: a
-gotcha, a tool, a way that worked (not a summary of your work), one short line at the end of the section it belongs in,
-signed and dated, through `do replace <it> old="<that section's last line, exactly as you read it>"
-new="<the same line>\\n- <your entry> ({actor}, <day month>)"`. Read it again just before: others add to it while you
-work. A wrong entry is corrected in place and says so; none is deleted.
+Worker documentation: maintain a shared, useful documentation store yourselves (Alex, 21 Oct), not one growing notebook.
+Start with `find role=worker-documentation-index`; read its short navigation index, then only relevant topic notes.
+Choose and improve the organization as the work demands. Search before creating a note; update an existing topic
+when appropriate, or split an oversized topic into linked notes. Keep the index to links and one-line descriptions.
+Separate current guidance and reusable lessons from task-specific evidence, decisions and historical investigations.
+Make detailed evidence world-readable to resident leads; keep repository documentation beside code where useful,
+with a linked world summary. State what is current, what was tested, and what remains uncertain. Link from the task.
+Before finishing, maintain the relevant documentation and index instead of appending another work report to a catch-all.
+The old `role=builders-notebook` note is historical source material, not the default append target or required full read.
+When moving useful material into topic notes, preserve attribution, evidence and recovery links; mark superseded
+guidance explicitly. Never erase someone else's reasoning merely to shorten a document.
 
 Running things: the house has copied the live world into your worktree as {notation}/sessions/{world}-try.pickle,
 and copies it again after every landing, so keep nothing there you need. health.py prints the event its world was at:
@@ -140,11 +151,11 @@ the sections in your done comment. Don't edit the markdown file itself:
 the house exports it from the binder when your branch lands.
 
 Finishing: commit your change on your branch (git add the files you changed; git commit). Add your entry to the
-builders' notebook (above). Then, through the desk:
-  do comment {task} line="done: what changed; what you ran and what it printed; what you did not check; your notebook entry"
-  do prop {task} commission=ready
-The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both. The done
-comment is unmarked: it waits on the card, where {asked_by} reads it when the landing wakes them.
+worker documentation store (above). Then, through the desk:
+  do prop {task} commission=ready worker_milestone=completed worker_summary="Built and checked; remaining limitation; ready for landing" worker_evidence="<full evidence note>"
+The evidence note names what changed, checks and their results, limits, and the topic documentation you maintained. The concise update
+wakes the lead; they can open evidence as needed. The house lands it: merges into main, checks the host is still whole,
+reverts if not, and tells you both. Completed means your implementation work is complete, not that it is live.
 
 When main moves under you (another landing touched your files), the house merges main into your branch when it lands
 it (a6753): a clean merge is committed and judged with no word from you; a conflict leaves its <<<<<<< ======= >>>>>>>
@@ -159,7 +170,7 @@ WHO_WORKER = "You are a worker in Agora's house: a disposable builder for one co
 # a5378 (Alex, 15 Oct: persistent compacting workers with shared memory; Jeff uses the workers, not Claude)
 WHO_BUILDER = """You are {builder}, one of Agora's standing builders. Your conversation carries on from commission to
 commission (your model runtime compacts it when it grows long), so what you learned on earlier cards is still yours; what the
-other builders learned is in the builders' notebook (below). Each commission has its own worktree and branch, and on the
+other builders learned is in the indexed worker documentation store. Each commission has its own worktree and branch, and on the
 desk you sign as {actor} while you work on {task}: the name belongs to the card, so whoever calls it reaches the card's
 builder. A card can come to you from another builder: its card, its comments and its git log are where it stands. To hand
 this card to another builder (one who knows the area better, or when you cannot finish it well): `do prop {task}
@@ -424,6 +435,15 @@ class Workshop:
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
         for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
+            if state == "paused":
+                # Finish an already-running turn but never deliver another message or restart.
+                if wk:
+                    for _ in wk.turns_ended():
+                        pass
+                continue
+            if state == "yielded":
+                self.capacity_resume(w, cid, s, wk, cfg)
+                continue
             # A changed request never silently changes a live/saved conversation.
             # Refuse only this card, retaining pending lines and the heard cursor.
             if state in ("asked", "working", "waiting", "reverted") and not (wk and wk.busy):
@@ -558,6 +578,64 @@ class Workshop:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
                 self.unfinished(w, cid, wk)
 
+    def capacity_resume(self, w, cid, s, wk, cfg):
+        """Only an explicit capacity yield is automatic; manual holds never enter here.
+
+        A busy turn finishes cooperatively before resumption. Existing retry/model
+        fences and the shared capacity limit apply, with no cursor consumption while
+        queued. The worktree, pending turn and saved conversation remain intact.
+        """
+        if wk:
+            for result in wk.turns_ended():
+                if result is None or isinstance(result, dict):
+                    # Keep errors for the usual working-state failure handler.
+                    wk.state["yield_error"] = result or {"detail": "the process ended"}
+                    wk.save()
+            if wk.busy:
+                return False
+        current = self.commissions(self.house.load()).get(cid)
+        if not current or current[1] != "yielded":
+            return False  # a finished turn or a lead changed the card while it drained
+        s = current[0]
+        props = s.get("props") or {}
+        if props.get("blocked_on") or props.get("approval_required") in (True, "true", "yes"):
+            return False
+        saved = wk.state if wk else self.card_state(cid)
+        if saved.get("retry_at", 0) > time.time():
+            return False
+        provider = self.provider_of(cid, s) or "claude"
+        if self.provider_wait(provider) > time.time():
+            return False
+        if plans := getattr(self.house, "plans", None):
+            reason = plans.queue_reason(provider, cfg)
+            plans.target(cid, reason)
+            if reason:
+                return False
+        if not self.selection_allowed(cid, s, cfg, wk) or not self.room(w, cfg, cid):
+            return False
+        if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
+            return False
+        if not wk and not self.real_tree(TREES / cid):
+            return False  # no fresh work or implicit re-ask from a missing worktree
+        if not wk:
+            wk = self.resume(w, cid, s, cfg)
+        if not wk:
+            return False
+        self.set_state(cid, "working")
+        s = {**s, "props": {**(s.get("props") or {}), "commission": "working"}}
+        error = wk.state.pop("yield_error", None)
+        if error:
+            self.failed(cid, wk, error)
+        elif not wk.alive() and getattr(wk, "builder", None):
+            self.parked(w, cid, s, "working", wk, cfg)
+        elif wk.alive() and not wk.busy:
+            heard = self.heard(w, cid, s, wk)
+            wk.send("Capacity is available again. Continue from your checkpoint; check what already completed."
+                    + ("\n" + "\n".join(heard) if heard else ""))
+        elif not wk.alive():
+            self.workers.pop(cid, None)  # normal resume path, retaining the saved session
+        return True
+
     def selection_allowed(self, cid, s, cfg, wk=None):
         props = s.get("props") or {}
         saved = wk.state if wk else self.card_state(cid)
@@ -665,7 +743,7 @@ class Workshop:
         except (OSError, ValueError):
             waits = {}
         now = time.time()
-        current = {cid: waits.get(cid, now) for cid, (_, state) in cs.items() if state == "asked"}
+        current = {cid: waits.get(cid, now) for cid, (_, state) in cs.items() if state in ("asked", "yielded")}
         if current != waits:
             atomic_state(path, current)
         w = self.house.load()
@@ -679,7 +757,7 @@ class Workshop:
             age = max(0, int((now - current.get(cid, now)) // 3600))
             fit = str(p.get("worker_prefer") or "") in free
             # Stable object identity only breaks ties; creation order is not priority.
-            return (state == "asked", -(priority + age), -fit, int(cid[1:]) if cid[1:].isdigit() else cid)
+            return (state in ("asked", "yielded"), -(priority + age), -fit, int(cid[1:]) if cid[1:].isdigit() else cid)
         return sorted(cs.items(), key=key)
 
     @staticmethod

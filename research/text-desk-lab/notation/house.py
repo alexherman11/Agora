@@ -73,6 +73,8 @@ sys.path.insert(0, str(HERE))
 import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
 import charter
+import conversation_policy
+import resident_continuity
 import host_route_parent
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
@@ -80,6 +82,7 @@ import usage         # noqa: E402  a6265: how full each agent's context is, and 
 import plan_usage    # noqa: E402  a6646: provider plan windows and durable pause episodes
 import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
+import task_flow
 
 STATE = HERE / "house-state"
 # a916, use versus mention: words inside backticks or quotes are talked about, never addressed (the rule lives in
@@ -428,6 +431,15 @@ class Resident:
         if pending.get("delivered") and self.state.get("session"):
             self.state["unanswered"] = self.state.get("unanswered", 0) + 1
             self.state["unanswered_why"] = why
+            # Same-provider resume already has this input; a different provider
+            # does not. Keep the complete unresolved text/refs separately from
+            # bounded historical excerpts until a turn completes successfully.
+            if pending.get("carry"):
+                self.state["unanswered_inputs"] = list(dict.fromkeys(
+                    self.state.get("unanswered_inputs", []) + [pending["carry"]]))
+            for key in ("image_comments", "message_contexts"):
+                self.state["unanswered_" + key] = list(dict.fromkeys(
+                    self.state.get("unanswered_" + key, []) + pending.get(key, [])))
         elif pending.get("carry"):
             self.state["undelivered"] = (self.state.get("undelivered", "") + "\n" + pending["carry"]).strip("\n")
         if not (pending.get("delivered") and self.state.get("session")):
@@ -436,16 +448,26 @@ class Resident:
                 pending.get("message_contexts") or [])
         self.save()
 
+    def recover_delivery(self):
+        """Recover a staged inbox batch or unfinished pipe write after restart.
+
+        Pipe flush is only a local delivery boundary, not a model acknowledgement.
+        A crash between flush and its saved marker can replay; never promise exactly once.
+        """
+        for key in ("pending", "handoff"):
+            pending = self.state.pop(key, None)
+            if pending:
+                self.hold_unanswered(pending, "the house restarted while delivering or answering")
+
     def start(self, model):
         # 30 Sep: a turn the last process never finished (a restart cut it) is said at the next wake, with why
-        pending = self.state.pop("pending", None)
-        if pending:
-            self.hold_unanswered(pending, "the house restarted for new code while you were answering")
         props = (self.house.load().nodes.get(self.rid) or {}).get("props") or {}
+        # Reject a mismatched/non-opted-in configuration before consuming pending
+        # input. A portable switch archives that intact state and never reuses its token.
+        resident_continuity.validate(self.state, props, model)
+        resident_continuity.prepare(self, props, model)
+        self.recover_delivery()
         provider = props.get("provider", "claude")
-        bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
-        if bound != provider:
-            raise ValueError(f"{self.rid}: saved conversation belongs to {bound}, not {provider}; preserved")
         # A plain process resume retains the charter. Fresh memory reads start= once.
         if not self.state.get("session") or "charter_text" not in self.state:
             self.state["charter_text"] = charter.collect(
@@ -469,6 +491,7 @@ class Resident:
         else:
             raise ValueError(f"{self.rid}: unknown resident provider {provider}")
         self.state["session_provider"] = provider
+        self.state["session_model"] = model
         if self.state.get("session"):
             cmd += ["--resume", self.state["session"]]
         else:                                  # a fresh memory: first arrival, or the conversation was lost
@@ -527,9 +550,28 @@ class Resident:
         receipts: all of it; a wake: only the news it brought, since the wake itself is simply done again). What is
         out is recorded before it is written, so a process that died under us (its failure may already be in the
         queue) loses nothing: the pipe error is logged and the failure is judged from the process's own events."""
+        props = (self.house.load().nodes.get(self.rid) or {}).get("props") or {}
+        if props.get("role") == "resident" and resident_continuity.switching(self.state, props):
+            # The current turn may finish, but no receipt/news starts an extra
+            # turn on the old provider. Preserve the complete packet for the new
+            # conversation (or for operator repair if portable handover is absent).
+            self.state["undelivered"] = "\n\n".join(
+                part for part in (self.state.get("undelivered", ""), text) if part)
+            self.state.pop("at_rest", None)
+            self.save()
+            self.busy = False
+            self.log("provider_deferred", {"from": resident_continuity.provider_of(self.state),
+                                           "to": props.get("provider", "claude"), "kind": kind})
+            return
         self.state.pop("at_rest", None)        # anything said to a resident ends its rest (house.rest begins one)
         if carry is None and kind in ("news", "receipt"):
             carry = text
+        previous = self.state.get("pending") or {}
+        if previous.get("delivered"):
+            previous = {}
+        if previous.get("carry"):
+            text = previous["carry"] + "\n\n" + text
+            carry = "\n".join(part for part in (previous["carry"], carry) if part)
         if self.state.get("welcome_due"):      # entering the desk with a fresh memory: the welcome comes first
             welcome = self.house.welcome_for(self)
             if welcome:
@@ -537,10 +579,19 @@ class Resident:
                 text = welcome + "\n\n---\n" + text
             self.state.pop("welcome_due", None)
         self.state["last_sent"] = now()
-        refs = self.state.pop("image_comments", [])
-        contexts = self.state.pop("message_contexts", [])
-        self.state["pending"] = {"kind": kind, "carry": carry or "",
+        handoff = self.state.pop("handoff", {})
+        refs = list(dict.fromkeys(previous.get("image_comments", [])
+                                  + handoff.get("image_comments", [])
+                                  + self.state.pop("image_comments", [])))
+        contexts = list(dict.fromkeys(previous.get("message_contexts", [])
+                                      + handoff.get("message_contexts", [])
+                                      + self.state.pop("message_contexts", [])))
+        self.state["pending"] = {"kind": kind, "carry": carry or handoff.get("carry", ""),
                                  "image_comments": refs, "message_contexts": contexts}
+        resident_continuity.remember(self.state, kind, text)
+        if self.state.get("handover_due"):
+            text = self.state["handover_due"] + "\n\n---\n" + text
+            self.state["pending"]["handover_generation"] = self.state.get("provider_generation")
         self.save()
         from image_comments import content
         blocks = [{"type": "text", "text": text}] + (content(self.house.load(), refs) if refs else [])
@@ -638,6 +689,14 @@ class Resident:
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
                 self.state["last_turn"] = now()
+                pending = self.state.get("pending") or {}
+                if (pending.get("handover_generation") is not None
+                        and pending["handover_generation"] == self.state.get("provider_generation")):
+                    self.state.pop("handover_due", None)
+                    self.state.pop("handover_unanswered", None)
+                for key in ("unanswered_inputs", "unanswered_image_comments", "unanswered_message_contexts"):
+                    self.state.pop(key, None)
+                resident_continuity.remember(self.state, "completed reply", "\n".join(self.reply))
                 for k in ("pending", "failures", "retry_at", "retry_kind"):
                     self.state.pop(k, None)
                 # what it wrote, the last few turns, for Alex's view (the `turns` row source; Alex, 29 Sep)
@@ -646,7 +705,12 @@ class Resident:
                 del said[:-SAID_KEEP]
                 self.save()
                 text = "\n".join(self.reply)
-                if route := getattr(self.house, "host_route", None):
+                # A queued human stop/correction invalidates this turn's effects,
+                # including host intents, before the ordinary command batch runs.
+                world = self.house.load()
+                actor = (world.nodes.get(self.rid, {}).get("props") or {}).get("actor", "")
+                interrupted = conversation_policy.queued_interrupts(world, actor, self.state.get("cursor"))
+                if not interrupted and (route := getattr(self.house, "host_route", None)):
                     text = route.intercept(source if source is getattr(self, "reply_source", None) else None, text)
                 ended.append(text)
                 self.reply = []
@@ -859,6 +923,16 @@ class House:
                 sid = w.nodes[sid]["subject"]
             s = w.subjects.get(sid)
             args = e.get("args") or {}
+            # Ownership and material task transitions are addressed facts, not
+            # prose @mentions. The same routing also produces native knock receipts.
+            notices = task_flow.notices(w, e)
+            if notices:
+                for notice in notices:
+                    if rooms.same_person(w, notice["recipient"], actor):
+                        inbox.append(task_flow.delivery_text(notice))
+                        urgent = True
+                        self._knocked(r, e, s, resting)
+                continue
             if e.get("by") == "house":
                 # Alex, 30 Sep ("make it so they get woken when something is there for them"): the house's own word on
                 # your commission (landed, landed then reverted, the worker stopped, failed) reaches you as the worker's
@@ -884,6 +958,12 @@ class House:
                 # with none (from before lines) is read once by the same rule. The receipt asks the same question.
                 to, _ = rooms.line_to(e)
                 now_ = rooms.calls(w, s, to, actor)
+                # Ordinary follow-ups in a queued conversation are addressed work
+                # even without @ syntax. Otherwise reply + rest can strand them in
+                # the inbox forever when timed wakes are disabled.
+                now_ = now_ or (conversation_policy.queue_enabled(s)
+                               and conversation_policy.human_event(w, e)
+                               and conversation_policy.receives(w, s, e, actor))
                 words = f"{args.get('append')}{points_at(w, e, s)}"      # a6638: and what it points at
                 if sid in mine:                                    # a chat in its own corner is its own
                     if waits:                                      # a1062 (5): a book line is a note at the door,
@@ -944,11 +1024,27 @@ class House:
         r.save()
         return urgent
 
-    def take(self, r, at=""):
-        """-> everything in the resident's inbox, in order, and empties it: first() before the rest."""
-        lines = self.first(r, at) + (r.state.pop("inbox", None) or [])
+    @staticmethod
+    def stage_delivery(r, lines):
+        """Move consumed input and attachment references into a durable send handoff.
+
+        send replaces this journal with pending in the same state save. A crash
+        before send therefore recovers the consumed batch through undelivered.
+        """
+        if not lines:
+            return
+        draft = r.state.setdefault("handoff", {"kind": "news", "carry": ""})
+        draft["carry"] = "\n".join(([draft["carry"]] if draft["carry"] else []) + list(lines))
+        for key in ("image_comments", "message_contexts"):
+            draft[key] = list(dict.fromkeys(draft.get(key, []) + r.state.pop(key, [])))
         r.save()
-        return lines
+
+    def take(self, r, at=""):
+        """Return the ordered inbox, durably staged until send records pending."""
+        first = self.first(r, at)
+        lines = r.state.pop("inbox", None) or []
+        self.stage_delivery(r, lines)
+        return first + lines
 
     def first(self, r, at=""):
         """a1062: what is said first when a resident is reached, and empties it: who woke it (and why: the last line
@@ -964,6 +1060,7 @@ class House:
             head.append(c["text"] + ("" if head else at) + (", for the line they left you:\n  " + why["text"] if why else ""))
         if held:
             head.append(f"for you while you rested ({len(held)}):\n" + "\n".join("  " + h["text"] for h in held))
+        self.stage_delivery(r, head)
         return head
 
     def _hold(self, r, e, text):
@@ -1118,6 +1215,8 @@ class House:
                 w = self.load()
                 corner = w.nodes.get(rid, corner)
                 actor = (corner.get("props") or {}).get("actor")
+            props = corner.get("props") or {}
+            actor, want = props.get("actor"), props.get("want", "awake")
             if want != "awake" or not actor:               # a resident is given its name (Alex, 29 Sep); none, no start
                 if r.alive() and not r.busy:
                     r.stop()
@@ -1125,6 +1224,23 @@ class House:
                     r.save()
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
+            if resident_continuity.switching(r.state, props):
+                if r.busy:
+                    continue  # let the in-flight turn finish; send() parks its follow-up
+                model = props.get("model") or cfg["model"]
+                try:
+                    resident_continuity.validate(r.state, props, model)
+                    if r.alive():
+                        r.stop()
+                    resident_continuity.prepare(r, props, model)
+                except ValueError as exc:
+                    detail = str(exc)
+                    if r.state.get("provider_error") != detail:
+                        r.state["provider_error"] = detail
+                        r.save()
+                        r.log("provider_error", detail)
+                    self.set_status(r, corner, "error")
+                    continue
             if not r.alive():
                 provider = props.get("provider", "claude")
                 held = self.plans.wait_until(provider)
@@ -1233,6 +1349,7 @@ class House:
         # Alex (29 Sep): who they are, one line at the top of every arrival, so a name outlives a fading memory
         lead = f"You are {actor}. Your corner is {r.rid}.\n" + lead
         undelivered = r.state.pop("undelivered", "")
+        self.stage_delivery(r, [undelivered] if undelivered else [])
         r.state.pop("cut_by_restart", None)              # older state: now said through unanswered
         if undelivered:                                  # it never reached this conversation: said in full, once
             lead += "(a message I had for you never reached you; here it is:)\n" + undelivered + "\n(and your wake:)\n"
@@ -1315,6 +1432,19 @@ class House:
             self.failed(r, corner, text)
             return
         if not actor:                          # its name was taken away mid-turn: nothing is done in the world unsigned
+            return
+        interrupts = conversation_policy.queued_interrupts(self.load(), actor, r.state.get("cursor"))
+        if interrupts:
+            # Do not replay stale actions after a stop/correction. The original
+            # output remains in the transcript; the next turn receives all queued
+            # messages and decides afresh with the person's current direction.
+            r.log("turn_interrupted", {"messages": [x["message"] for x in interrupts],
+                                       "events": [x["event"] for x in interrupts]})
+            self.news(self.load(), r, actor)
+            heard = self.take(r)
+            r.send("Your previous turn's pending commands were not executed because a new human "
+                   "stop/cancellation/correction arrived. Follow the latest direction below; do not "
+                   "automatically repeat the held commands.\n" + "\n".join(heard), "news")
             return
         attempts, rest = rest_in(commands_in(text))
         n0 = len(w.events)
@@ -1405,6 +1535,8 @@ class House:
             r.state["lost"] = True
             if carry:                                      # a fresh conversation has none of it: said again in full
                 r.state["undelivered"] = (r.state.get("undelivered", "") + "\n" + carry).strip("\n")
+            for key in ("image_comments", "message_contexts"):
+                r.state[key] = list(dict.fromkeys(r.state.get(key, []) + pending.get(key, [])))
             r.save()
             return
         r.hold_unanswered(pending, (why or {}).get("detail") if isinstance(why, dict) else "the process ended")

@@ -211,6 +211,20 @@ class Desk:
     read_cap = None # round 11 (lean): at most this many read/examine commands per call; the rest are folded, visibly
 
     def dispatch(self, name, args):
+        # Session callers hold the world lock here. Recheck after the house's
+        # snapshot so a stop committed before this batch cannot race its effects.
+        # This rejects the old turn, not just its eventual chat reply; aliases and
+        # authored verbs must not execute first. A fresh turn has a new cursor.
+        if getattr(self, "_as_of", None) is not None:
+            import conversation_policy
+            interrupted = conversation_policy.queued_interrupts(
+                self.world, self.world.me, self._as_of)
+            if interrupted:
+                return {"error": "held, not sent: this turn was interrupted by a human "
+                        "stop/cancellation/correction. No command in this call ran. "
+                        "Read the new direction on the next turn; do not replay old actions.\n"
+                        + "\n".join(f"{x['message']} ({x['event']}): {x['text']}"
+                                    for x in interrupted)}
         # Worktree recording happens once per call, after a batch may have stopped.
         # Keep the actual steps and their event ranges, including read-only steps;
         # matching appends by target alone would confuse two sends to one chat.
@@ -1341,6 +1355,7 @@ class Desk:
     def _chat_moved(self, nid, kv):
         import hashlib
         import rooms
+        import conversation_policy
         w = self.world
         n = w.nodes.get(nid)
         s = w.subjects.get(n.get("subject") if n else nid)
@@ -1372,6 +1387,18 @@ class Desk:
             by = str((e or {}).get("by") or "").split("/")[0]
             if not e or not by or by == "house" or rooms.same_person(w, by, me):
                 continue
+            # Opted-in conversations finish the current answer before ordinary human
+            # follow-ups are delivered. Do not mark these lines read: the house's next
+            # news pass must still deliver them. Corrections retain the hold.
+            if (at is not None and not self._before_turn(e, at)
+                    and conversation_policy.queued_line(w, s, e, l["text"], me)):
+                continue
+            if (at is not None and not self._before_turn(e, at)
+                    and conversation_policy.queue_enabled(s)
+                    and conversation_policy.human_event(w, e)
+                    and conversation_policy.is_interrupt(e, l["text"])):
+                new.append((l, e))
+                continue          # reply_to cannot acknowledge a correction the turn never saw
             if rk is not None and i <= rk:
                 continue          # the line you answer you were shown, and what came before it was there
             # a line inside the run was there when you read, even one a look skipped past or cut (a951, a986): the
@@ -1451,9 +1478,23 @@ class Desk:
     def _chat_waits(self, nid, kv):
         """a1062, a1566: what a chat line's receipt says about whom it took and what happened to each (rooms)."""
         import rooms
+        import conversation_policy
         text = str((kv or {}).get("line", (kv or {}).get("append", "")))
         try:
-            return rooms.waiting_note(self, nid, text)
+            note = rooms.waiting_note(self, nid, text)
+            w, at = self.world, self._turn_at()
+            n = w.nodes.get(nid)
+            s = w.subjects.get(n.get("subject") if n else nid)
+            if at is not None and s and conversation_policy.queue_enabled(s):
+                queued = sum(
+                    1 for line in s.get("lines") or []
+                    if (e := w.event_by_id(line.get("ev"))) and not self._before_turn(e, at)
+                    and conversation_policy.queued_line(w, s, e, line["text"], w.me)
+                )
+                if queued:
+                    note += (f"\n({queued} human follow-up message(s) queued for your next turn; "
+                             "this answer was sent for the earlier messages.)")
+            return note
         except Exception as e:      # a receipt's aside must never cost the line that already landed
             return f"(who this line reaches could not be told: {type(e).__name__})"
 
