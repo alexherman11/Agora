@@ -1,5 +1,9 @@
 # Spotify connection diagnosis — 21 October
 
+**Source-repair follow-up:** the original diagnosis below is retained as the
+record of source bb5be76. The approved implementation on top of landed 7dc294b
+is described at the end. No real Spotify retry or host activation occurred.
+
 Worker-a8009; source base bb5be76. **The reported boundary is an unreachable
 local page after entering the ID; the historical cause is not established.**
 No production status/store/profile, account, device or session-file query was
@@ -118,3 +122,54 @@ automatically retry, exchange a code, start a listener or restart the host.
 JEFF must obtain narrow approval for a real retry. No further fact from Alex
 is requested here. No production source change, live UI patch or activation
 is included; the black standalone panel and layout are untouched.
+
+## Approved diagnostic repair (c8159; source prepared, not activated)
+
+Three production files change:
+
+- `spotify_like.py`: a closed `ConnectionFailure` reason/message allowlist;
+  a browser-launch worker observes explicit False results and exceptions without
+  publishing their text; callback bind, expiry, wait, consent, exchange and
+  persistence have distinct fixed messages. Callback expiry uses a monotonic
+  clock. Incomplete sign-in responses refuse before persistence.
+- `spotify_connect.py`: setup bind/expiry/wait/browser failures use the same
+  allowlist. The setup page explains that it is temporary and a fresh Connect
+  press is needed after expiry.
+- `host_verbs.py`: the existing explicit `media.connect` action publishes only
+  allowlisted messages. Unexpected exceptions use one fixed fallback, never
+  exception text. Initialization/worker-launch failures release the duplicate
+  guard; refresh failures do not emit a private connection traceback.
+
+Every failure ends with: “Press Connect Spotify for a fresh attempt; old local
+tabs may have expired.” No automatic retry is added. Browser launch remains
+asynchronous; failure is observed during the existing finite listener wait.
+The loopback address/port, default five-minute limits, scopes, PKCE/state checks,
+and explicit-button admission are preserved. No renderer, lens, layout, media
+control or standalone-window change is included.
+
+Persistence errors do not claim connection succeeded. The pre-existing token
+and app-file writes remain separate: a failed second write can leave the first
+write on disk. This change does not promise atomic storage or silently delete
+anything to compensate.
+
+The expanded mock suite covers setup and callback failure/cleanup, immediate
+and delayed opener failure, consent refusal, malformed exchange result, both
+persistence failures, redaction, duplicate/failure guard release, setup guidance,
+and successful fixture flow with the original callback/scopes/S256/no-secret
+contract. Sockets, network and private store reads/writes are blocked; server,
+browser, exchange and persistence effects are in-memory doubles.
+
+Ran: final expanded suite printed **Ran 23 tests in 0.045s — OK**. Test-file
+Ruff printed **All checks passed!**; `git diff --check` passed. Full
+production-file Ruff still reports inherited issues. A source-line diagnostic
+comparison against HEAD found **0 introduced** in each of the three production
+files (baseline/current distinct findings: host 64/64, setup 3/3, library 52/49).
+No full-health, socket-based fake-server test, real browser/Guard, listener,
+OAuth/account call, token exchange, dashboard inspection or host restart ran.
+
+For JEFF: after house landing, a host maintainer must coordinate loading the new
+host source through the ordinary activation process; landing alone is not proof
+that the running HUD uses it. No activation/restart command is authorized here.
+Only a separately authorized explicit Connect attempt can establish the next
+real failure boundary. No claim is made that the historical cause is fixed or
+that Spotify is connected.
