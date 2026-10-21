@@ -181,22 +181,17 @@ def refresh_charter(client, thread_id, args, emit):
         sys.path.insert(0, str(notation))
     import charter
     try:
-        text = charter.live(args.world, args.target, args.actor, "compaction")
+        reading = charter.live_reading(args.world)
+        text = reading.text
         client.request("thread/inject_items",
                        {"threadId": thread_id, "items": [
                            {"type": "message", "role": "developer",
                             "content": [{"type": "input_text", "text": text}]}]},
                        response_model=ThreadInjectItemsResponse)
-        emit({"type": "system", "subtype": "charter_read", "text": text})
+        emit(charter.read_event(reading))
     except Exception as exc:
         # The current turn/pending messages must survive an unavailable charter.
-        try:
-            charter.report(lambda who, line: __import__("desk_mcp").run_desk(
-                {"session": args.world, "as": who, "line": line})[0], args.target,
-                f"Charter reinjection unavailable ({type(exc).__name__}); tell JEFF.")
-        except Exception:
-            pass
-        emit({"type": "system", "subtype": "charter_unavailable", "why": type(exc).__name__})
+        emit(charter.read_event(error=type(exc).__name__))
 
 
 def emit_plan_usage(client, emit, timeout=2):

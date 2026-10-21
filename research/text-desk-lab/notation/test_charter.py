@@ -263,8 +263,8 @@ class CharterTests(unittest.TestCase):
             patch.object(sys, "argv", args),
             patch.object(
                 charter,
-                "live",
-                side_effect=lambda *a: charter.collect(self.w, self.act, a[1], a[2], a[3]),
+                "live_reading",
+                side_effect=lambda *a: charter.read(self.w),
             ),
             patch("sys.stdout", new_callable=io.StringIO) as out,
         ):
@@ -293,8 +293,8 @@ class CharterTests(unittest.TestCase):
         ]
         with patch.object(
             charter,
-            "live",
-            side_effect=lambda *a: charter.collect(self.w, self.act, a[1], a[2], a[3]),
+            "live_reading",
+            side_effect=lambda *a: charter.read(self.w),
         ):
             ok = codex_resident.receive(
                 client,
@@ -439,7 +439,7 @@ class CharterTests(unittest.TestCase):
         args = SimpleNamespace(world="roomworld", target=self.card, actor="worker")
         output = []
         with (
-            patch.object(charter, "live", return_value="Current charter"),
+            patch.object(charter, "live_reading", return_value=charter.read(self.w)),
             patch.object(charter, "report"),
         ):
             codex_resident.refresh_charter(client, "t1", args, output.append)

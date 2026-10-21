@@ -8,7 +8,9 @@ import argparse
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+import sys
+import uuid
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -152,8 +154,13 @@ def report(act, target, words):
     # Corners are surfaces, which have no native comments. Keep their last
     # receipt as a world fact; the house also keeps the process event log.
     if target.startswith("f"):
-        return act("house", f"look {target} :1; do prop {target} charter_read={q(words)}")
-    return act("house", f"look {target} :1; do comment {target} line={q(words)} to=nobody")
+        result = act("house", f"look {target} :1; do prop {target} charter_read={q(words)}")
+    else:
+        result = act("house", f"look {target} :1; do comment {target} line={q(words)} to=nobody")
+    if (not isinstance(result, str) or not result.strip()
+            or re.search(r"(?m)^(?:ERR\b|MISS\b|refused\b)", result, re.I)):
+        raise RuntimeError("charter receipt refused")
+    return result
 
 
 def collect(world, act, target, actor, reason, *, commands=True):
@@ -189,17 +196,96 @@ def collect(world, act, target, actor, reason, *, commands=True):
     return text
 
 
-def live(world_name, target, actor, reason):
-    import desk_mcp
+def live_reading(world_name):
+    """Provider-side read only. Never dispatch a command or write a world receipt."""
     import export_docs
 
-    world = export_docs.load(world_name).world
+    return read(export_docs.load(world_name).world)
 
-    def act(who, line):
-        text, _ = desk_mcp.run_desk({"session": world_name, "as": who, "line": line})
-        return text
 
-    return collect(world, act, target, actor, reason)
+def live(world_name, target, actor, reason):
+    # Retain callers' text API, but reporting belongs exclusively to the parent.
+    return live_reading(world_name).text
+
+
+def read_event(reading=None, error=None):
+    event = {"type": "system", "subtype": "charter_read" if reading else "charter_unavailable",
+             "receipt_id": uuid.uuid4().hex}
+    if reading:
+        event.update(text=reading.text, reading=asdict(reading))
+    else:
+        event["why"] = error or "source unavailable"
+    return event
+
+
+def prepare_channel(directory):
+    """Per-child bookkeeping, not authority: no caller/world grants come from this channel."""
+    path = Path(directory) / ("charter-" + uuid.uuid4().hex)
+    path.mkdir()
+    return path
+
+
+def write_read_event(channel, event):
+    # Each invocation has its own filename; readers only see complete JSON.
+    path = Path(channel) / (event["receipt_id"] + ".json")
+    pending = path.with_suffix(".pending")
+    pending.write_text(json.dumps(event, ensure_ascii=False), encoding="utf-8")
+    pending.replace(path)
+
+
+def parent_receipt(parent, event):
+    """One owner-route attempt. Persist 'unknown' before I/O; never replay an ambiguous write."""
+    key = event.get("receipt_id")
+    if not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{32}", key):
+        parent.log("charter_receipt_failed", {"reason": "missing read identity"})
+        return
+    receipts = parent.state.setdefault("charter_receipts", {})
+    if key in receipts:
+        return
+    receipts[key] = "unknown"
+    parent.save()
+    try:
+        if event.get("subtype") == "charter_read":
+            reading = Reading(**event["reading"])
+            if event.get("text") != reading.text:
+                raise ValueError("read provenance does not match context")
+            words = (f"charter read (reason: compaction); {reading.words} words, "
+                     f"as of event {reading.event}; source {reading.ref}; read {key}"
+                     + (f"; {reading.warning}" if reading.warning else ""))
+            parent.state["charter_text"] = reading.text
+        else:
+            words = f"Charter reinjection unavailable ({event.get('why', 'unknown')}); read {key}."
+        report(parent.house.act, getattr(parent, "cid", parent.rid), words)
+    except Exception as exc:
+        receipts[key] = "failed"
+        parent.log("charter_receipt_failed", {"read": key, "reason": type(exc).__name__})
+    else:
+        receipts[key] = "written"
+    parent.save()
+
+
+def drain_channel(parent):
+    channel = getattr(parent, "charter_channel", None)
+    if not channel:
+        name = parent.state.get("charter_channel", "")
+        if re.fullmatch(r"charter-[0-9a-f]{32}", name):
+            channel = parent.dir / name
+    if not channel:
+        return
+    for path in sorted(channel.glob("*.json")):
+        if path.stem in parent.state.get("charter_receipts", {}):
+            continue
+        try:
+            if path.stat().st_size > 32_000:
+                raise ValueError("oversized charter read report")
+            event = json.loads(path.read_text(encoding="utf-8"))
+            if event.get("receipt_id") != path.stem:
+                raise ValueError("read identity mismatch")
+            parent_receipt(parent, event)
+        except Exception as exc:
+            parent.state.setdefault("charter_receipts", {})[path.stem] = "failed"
+            parent.log("charter_receipt_failed", {"read": path.stem, "reason": type(exc).__name__})
+            parent.save()
 
 
 def sync(world, act, path, state):
@@ -263,11 +349,13 @@ def sync(world, act, path, state):
     state["charter_mirror"] = key
 
 
-def claude_hook(python, world, target, actor):
+def claude_hook(python, world, target, actor, channel=None):
     command = (
         f'"{python}" "{Path(__file__).resolve()}" --world "{world}" '
         f'--target "{target}" --actor "{actor}" --hook'
     )
+    if channel:
+        command += f' --receipt-channel "{channel}"'
     return {
         "hooks": {
             "SessionStart": [
@@ -283,15 +371,25 @@ def main():
     parser.add_argument("--target", required=True)
     parser.add_argument("--actor", required=True)
     parser.add_argument("--hook", action="store_true")
+    parser.add_argument("--receipt-channel")
     args = parser.parse_args()
     try:
-        text = live(args.world, args.target, args.actor, "compaction")
+        reading = live_reading(args.world)
+        text = reading.text
+        event = read_event(reading)
     except Exception as exc:
         # A missing note/service must not break the provider's compaction.
         text = (
             f"charter: not read: source unavailable after compaction ({type(exc).__name__}); "
             "tell JEFF."
         )
+        event = read_event(error=type(exc).__name__)
+    if args.receipt_channel:
+        try:
+            write_read_event(args.receipt_channel, event)
+        except Exception as exc:
+            # No world fallback. The provider exposes hook stderr; report failure honestly.
+            print(f"charter receipt handoff failed ({type(exc).__name__})", file=sys.stderr)
     print(
         json.dumps(
             {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}},
