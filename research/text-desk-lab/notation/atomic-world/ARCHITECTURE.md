@@ -28,6 +28,9 @@ partition plan. A successful kernel call does not establish those policies.
 this thread's active ordinary writer Session. `atomic_status(operation_id)`
 reconciles without creating. `atomic_undo(new_id, observed, original_id)` admits
 whole-record undo through the same boundary.
+Observer-only Sessions cannot invoke these methods. Their existing lease-ended
+refusal and publication-lock timing remain intact; Session exit clears atomic
+thread ownership and releases the lock even during observer cleanup.
 
 These are internal Python entry points, not caller authentication. There is no
 new Desk word or `/api/do` dispatch branch. Object handles, hashes, actor props,
@@ -128,7 +131,7 @@ itself an admitted event, and eligible rules may react on the final undone state
 
 ## Evidence and remaining integration
 
-**Ran:** `test_atomic_world.py`: 36 tests, real Desk/World, real Log, real
+**Ran:** `test_atomic_world.py`: 38 tests, real Desk/World, real Log, real
 Session admission and writer locks. Only the Session loader is replaced by an
 in-memory loader. Fixtures use fresh inherited-ACL directories below the
 worktree, outside supplied sessions. Cases cover real note-panel and surface
@@ -144,6 +147,12 @@ disposable CLI/server/concurrent-writer/crash-recovery fixtures. The latter two
 used an inherited-ACL temporary-directory shim (`agora_tmp.directory`) because
 Windows tempfile mode 0700 excludes this sandbox token. No production process
 was queried, started or stopped. `git diff --check` passed.
+After the observer merge, `test_log_world.py` passed 29 tests,
+`test_log_world_accounting.py` passed 5, and Session-read regressions printed
+`all ok`. The atomic suite includes refusal from an observer-only Session.
+Exception-path tests wrap the real lock release: body failure, unknown outcome
+and observer-timing failure each clear writer-thread ownership, release exactly
+once, and allow reacquisition of the actual lock.
 
 **Read:** real mutation, rules, Session, journal, undo implementations; live
 home-tiling/drop-panel; item-carry architecture/checkpoints. No private world

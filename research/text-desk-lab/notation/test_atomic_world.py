@@ -5,6 +5,7 @@ Only the Session loader is in-memory. Journal and lock fixtures are newly made
 below this worktree, outside sessions/. There is no server, host or painter.
 """
 from copy import deepcopy
+from contextlib import nullcontext
 import os
 from pathlib import Path
 import shutil
@@ -458,6 +459,51 @@ class AtomicWorldTests(unittest.TestCase):
             s._atomic_unknown = True
             with self.assertRaises(deskd.BadRequest):
                 s.atomic(self.operation, self.observed, self.steps)
+
+    def test_observer_session_cannot_admit_undo_or_reconcile(self):
+        s = self.session()
+        with s:
+            s.observer = True
+            try:
+                for act in (
+                        lambda: s.atomic(self.operation, self.observed, self.steps),
+                        lambda: s.atomic_undo(uuid.uuid4().hex, self.observed, self.operation),
+                        lambda: s.atomic_status(self.operation)):
+                    with self.assertRaises(deskd.BadRequest):
+                        act()
+            finally:
+                s.observer = False
+        self.assertEqual(atomic.capture(self.desk), self.observed)
+        self.assertEqual(len(list(self.log.records())), 1)
+
+    def test_exit_exception_and_unknown_paths_clear_thread_and_release_once(self):
+        import log_world
+
+        class BrokenTiming:
+            @property
+            def publish_lock_ms(self):
+                raise RuntimeError("fixture timing failure")
+
+        for path in ("body", "unknown", "observer"):
+            with self.subTest(path=path):
+                s = self.session()
+                expected = (nullcontext() if path == "unknown" else
+                            self.assertRaisesRegex(RuntimeError, "fixture"))
+                with patch.dict(log_world._CHECKERS, {str(self.path): BrokenTiming()}):
+                    with patch.object(deskd, "_give", wraps=deskd._give) as release:
+                        with expected:
+                            with s:
+                                if path == "body":
+                                    raise RuntimeError("fixture body failure")
+                                if path == "unknown":
+                                    s._atomic_unknown = True
+                                if path == "observer":
+                                    s.observer = True
+                        release.assert_called_once_with(s.name, s.lock)
+                self.assertIsNone(s._writer_thread)
+                # Reacquire the actual lock after each exceptional cleanup.
+                with self.session():
+                    pass
 
     def test_whole_undo_and_retry_after_undo_never_recreates(self):
         before = store.flatten(self.desk.world)

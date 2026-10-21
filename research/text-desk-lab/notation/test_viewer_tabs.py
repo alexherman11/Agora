@@ -139,6 +139,150 @@ class TabsTests(unittest.TestCase):
         self.assertEqual("First", viewer_tabs.props(self.w, note)["label"])
         self.unchanged_draft()
 
+    def chrome(self, viewer=None):
+        return {i for i in self.w.nodes
+                if viewer_tabs.props(self.w, i).get("viewer") == (viewer or self.v)
+                and viewer_tabs.props(self.w, i).get("role") == "viewer-tab"}
+
+    def test_projection_titles_and_legacy_placement_reconcile(self):
+        self.act("init")
+        note = next(iter(self.chrome()))
+        # Emulate the old landed layout (a direct Home child).
+        self.line(f"read {note}")
+        self.line(f"do move {note} into={self.home}")
+        self.act("open", f"target={self.b}")
+        self.assertEqual("Second", self.w.subjects[self.w.nodes[note]["subject"]]["title"])
+        self.assertEqual("Second", viewer_tabs.props(self.w, note)["label"])
+        parent = self.w.nodes[note]["parent"]
+        self.assertEqual("viewer-tabs", viewer_tabs.props(self.w, parent)["role"])
+        self.assertEqual(self.v, viewer_tabs.props(self.w, parent)["viewer"])
+        self.act("back")
+        self.assertEqual("First", self.w.subjects[self.w.nodes[note]["subject"]]["title"])
+        self.unchanged_draft()
+
+    def test_projection_slots_bounded_over_close_reopen_and_restore(self):
+        self.act("init")
+        first = self.props()["active_tab"]
+        self.act("new", f"target={self.b}")
+        expected_nodes, expected_subjects = len(self.w.nodes), len(self.w.subjects)
+        for _ in range(25):
+            self.act("close")
+            self.act("init")
+            self.act("reload")
+            self.act("new", f"target={self.c}")
+        self.assertEqual(expected_nodes, len(self.w.nodes))
+        self.assertEqual(expected_subjects, len(self.w.subjects))
+        self.assertEqual(2, len(self.chrome()))
+        self.d = pickle.loads(pickle.dumps(self.d))
+        self.w = self.d.world
+        self.act("select", f"tab={first}")
+        self.act("close")
+        self.act("close")
+        self.assertEqual(expected_nodes, len(self.w.nodes))
+        closed = [i for i in self.chrome() if viewer_tabs.props(self.w, i)["closed"] == "yes"]
+        self.assertEqual(1, len(closed))
+        self.assertEqual("Closed tab", self.w.subjects[self.w.nodes[closed[0]]["subject"]]["title"])
+        self.assertEqual("", viewer_tabs.props(self.w, closed[0])["label"])
+        self.unchanged_draft()
+
+    def test_projection_actor_isolation_and_forgery_refusal(self):
+        self.act("init")
+        other = self.make(self.home, f"kind=note title=Other role=home-view actor=other viewing={self.b}")
+        self.w.me = "other"
+        self.d.dispatch("desk", {"line": "look", "whole": True, "reply": uuid.uuid4().hex})
+        self.line(f"read {other}")
+        self.line(f"do browse {other} action=init")
+        other_before = copy.deepcopy([(i, self.w.nodes[i],
+                                       self.w.subjects[self.w.nodes[i]["subject"]])
+                                      for i in self.chrome(other)])
+        self.w.me = "alex"
+        self.d.dispatch("desk", {"line": "look", "whole": True, "reply": uuid.uuid4().hex})
+        self.act("new", f"target={self.c}")
+        self.assertEqual(other_before, [(i, self.w.nodes[i], self.w.subjects[self.w.nodes[i]["subject"]])
+                                        for i in self.chrome(other)])
+        # A claimed role/viewer from another actor grants no reconciliation authority.
+        self.make(self.home, f"kind=note title=Foreign role=viewer-tab viewer={self.v} actor=other tab=forged")
+        before = copy.deepcopy((self.w.nodes, self.w.subjects, self.w.events))
+        self.act("reload", ok=False)
+        self.assertEqual(before, (self.w.nodes, self.w.subjects, self.w.events))
+
+    def test_search_excludes_chrome_only_when_explicitly_requested(self):
+        import knife
+        self.act("init")
+        self.act("new", f"target={self.a}")
+        plain = knife.parse_selection(self.w, "title:First")[0]
+        self.assertIn(self.a, plain)
+        self.assertTrue(self.chrome() & set(plain))
+        exclusion = ",-prop:role=viewer-tab,-prop:role=viewer-tabs"
+        # Native selectors remain general: exclusion belongs to the staged
+        # search lens, not a global note-hiding rule.
+        for query in ("title:First", "?First"):
+            selected = knife.parse_selection(self.w, query + exclusion)[0]
+            self.assertIn(self.a, selected)
+            self.assertFalse(self.chrome() & set(selected))
+        self.assertIn(self.b, knife.parse_selection(self.w, "title:Second" + exclusion)[0])
+
+    def test_search_staged_hunks_roundtrip_and_repaint(self):
+        stage = HERE.parents[1] / "window-lab/browsing/tabs"
+        original = (HERE.parents[1] / "window-lab/home-search/home-search.lens").read_text(encoding="utf-8")
+        text = original
+        hunks = json.loads((stage / "search-exclusions.json").read_text(encoding="utf-8"))["a6788"]
+        for hunk in hunks:
+            self.assertEqual(1, text.count(hunk["old"]))
+            text = text.replace(hunk["old"], hunk["new"])
+        restored = text
+        for hunk in reversed(hunks):
+            self.assertEqual(1, restored.count(hunk["new"]))
+            restored = restored.replace(hunk["new"], hunk["old"])
+        self.assertEqual(original, restored)
+        for path in (stage / "view.verb", stage / "open-found.verb"):
+            self.make(self.home, f"kind=note title={path.stem} tags=verb on=house text=" +
+                      q(path.read_text(encoding="utf-8")))
+        self.make(self.home, "kind=note title=Layout role=home-layout actor=alex")
+        base_style = (HERE / "desk-shell/style/calm.style").read_text(encoding="utf-8")
+        roles = sorted(set(re.findall(r"^\s+role ([\w.]+)", text, re.M)))
+        self.make(self.home, "kind=note title=search-style tags=style text=" +
+                  q(base_style + "\n" + "\n".join("role " + r + " : ink" for r in roles)))
+        self.make(self.home, "kind=note title=home-search tags=lens style=search-style text=" + q(text))
+        self.act("init")
+        self.act("new", f"target={self.a}")
+        self.line(f"read {self.v}")
+        self.line(f'do prop {self.v} find=First')
+        painted, _ = scene.scene_for(self.d, "home-search")
+        self.assertNotIn("refused", str(painted).lower())
+        def commands(value):
+            if isinstance(value, dict):
+                if value.get("on") == "click":
+                    yield value.get("line", "")
+                for x in value.values():
+                    yield from commands(x)
+            elif isinstance(value, list):
+                for x in value:
+                    yield from commands(x)
+        opened = [line for line in commands(painted) if "open-found" in line]
+        self.assertTrue(any(f"open-found {self.a} " in line for line in opened))
+        self.assertFalse(any(f"open-found {i} " in line for i in self.chrome() for line in opened))
+        self.unchanged_draft()
+
+    def test_reusing_projection_slot_is_fully_undoable(self):
+        self.act("init")
+        self.act("new", f"target={self.b}")
+        self.act("close")
+        before = copy.deepcopy({i: (viewer_tabs.props(self.w, i),
+                                   self.w.subjects[self.w.nodes[i]["subject"]]["title"],
+                                   self.w.nodes[i]["parent"]) for i in self.chrome() | {self.v}})
+        offset = len(self.w.events)
+        self.act("new", f"target={self.c}")
+        events = [e["id"] for e in self.w.events[offset:]]
+        self.assertEqual(2, len(self.chrome()))
+        for event in reversed(events):
+            self.w.undo(event)
+        after = {i: (viewer_tabs.props(self.w, i),
+                     self.w.subjects[self.w.nodes[i]["subject"]]["title"],
+                     self.w.nodes[i]["parent"]) for i in self.chrome() | {self.v}}
+        self.assertEqual(before, after)
+        self.unchanged_draft()
+
     def test_selection_composition_tracks_all_events_and_noops(self):
         self.act("init")
         self.line(f"read {self.v}")

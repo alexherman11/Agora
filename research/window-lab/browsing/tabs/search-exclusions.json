@@ -1,0 +1,28 @@
+{
+  "a6788": [
+    {
+      "old": "      let nt = count(title:$q)",
+      "new": "      let nt = count(title:$q,-prop:role=viewer-tab,-prop:role=viewer-tabs)"
+    },
+    {
+      "old": "        only when count(?$q) = 0",
+      "new": "        only when count(?$q,-prop:role=viewer-tab,-prop:role=viewer-tabs) = 0"
+    },
+    {
+      "old": "        of title:$q as f",
+      "new": "        of title:$q,-prop:role=viewer-tab,-prop:role=viewer-tabs as f"
+    },
+    {
+      "old": "          of ?$q,-title:$q as f",
+      "new": "          of ?$q,-title:$q,-prop:role=viewer-tab,-prop:role=viewer-tabs as f"
+    },
+    {
+      "old": "      more : text \"$(count(?$q) - 8) more hold these words: add a word to narrow them\"",
+      "new": "      more : text \"$(count(?$q,-prop:role=viewer-tab,-prop:role=viewer-tabs) - 8) more hold these words: add a word to narrow them\""
+    },
+    {
+      "old": "        only when count(?$q) > 8",
+      "new": "        only when count(?$q,-prop:role=viewer-tab,-prop:role=viewer-tabs) > 8"
+    }
+  ]
+}
