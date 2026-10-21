@@ -12,6 +12,8 @@ import queue
 import threading
 import time
 from pathlib import Path
+from datetime import datetime
+import log_world_accounting as accounting
 
 import store
 
@@ -22,7 +24,29 @@ EXCLUSIONS = (
     "undo revisions and indexes; joined chat text when derived from its lines; "
     "boxes and z-order inside a non-free flow (their stated order is checked). "
     "Free-surface boxes, definitions, links, comments, lines and all stated props ARE checked."
+    " Checker-owned status/evidence records are replayed but never count as observations or advance observed time."
 )
+
+def dated(value):
+    return datetime.fromtimestamp(value).astimezone().isoformat(timespec="seconds") if value is not None else None
+
+
+def display_report(report):
+    """Human-facing dates; internal numeric clocks stay outside world facts."""
+    result = copy.deepcopy(report)
+    if "at" in result:
+        result["at"] = dated(result["at"])
+    for gap in result.get("unavailable", []):
+        for key in ("from", "to"):
+            gap[key] = dated(gap.get(key))
+    if "paired_fixture" in result and isinstance(result["paired_fixture"].get("at"), (int, float)):
+        result["paired_fixture"]["at"] = dated(result["paired_fixture"]["at"])
+    return result
+
+
+def answer_key(report):
+    return (report["state"], report["line"],
+            json.dumps(report.get("divergences", [])[:1], sort_keys=True, ensure_ascii=False))
 
 
 def freeze_world(w):
@@ -174,8 +198,7 @@ class Replay:
             line = (f'diverged at {d["event"]}: {title} {d["aspect"]} is {d["live"]!r} live '
                     f'and {d["log"]!r} from the log; the record was {d["command"]!r} by {d["by"]}')
         else:
-            line = (f"in step since {self.first_checked} ({self.records} records, "
-                    f"last full check {self.full_event})")
+            line = f"in step since {self.first_checked}"
         return {"state": state, "checked_event": self.event if self.first_checked else "none",
                 "line": line, "records": self.records, "checked_records": self.checked_records,
                 "last_full": self.full_event, "divergences": copy.deepcopy(self.divergences),
@@ -185,9 +208,13 @@ class Replay:
 class Checker:
     """One consumer per live writer. Queue never waits while the live lock is held."""
 
-    def __init__(self, path, journal, publish=None, clock=time.time, monotonic=time.monotonic):
+    def __init__(self, path, journal, publish=None, clock=time.time, monotonic=time.monotonic, world=None):
         self.path, self.journal = Path(path), Path(journal)
         self.publish, self.clock, self.monotonic = publish, clock, monotonic
+        self.witness_world = world
+        self.accounting_correction = None
+        self.evidence_revision = 0
+        self.evidence = None
         self.replay = Replay()
         self.offset = 0
         self.jobs = queue.Queue(maxsize=8)
@@ -214,17 +241,26 @@ class Checker:
         if not self.journal.exists():
             return
         # Only our small checker receipts, never session transcripts.
+        reports = []
         with self.journal.open(encoding="utf-8") as f:
             for line in f:
                 rec = json.loads(line)
                 if rec.get("kind") == "report":
-                    self.covered_seconds = rec.get("observed_seconds", 0.0)
-                    self.covered_records = rec.get("observed_records", 0)
+                    reports.append(rec)
                     self.gaps = rec.get("unavailable", [])
                     self.previous_at = rec["at"]
                     self.covered_seq = rec.get("records", 0)
                 elif rec.get("kind") == "divergence":
                     self.replay.divergences.append(rec["detail"])
+        own = set()
+        if reports and reports[-1].get("counting_version") != accounting.VERSION:
+            # House-internal metadata reconciliation, off-lock. No raw log output.
+            metadata = {rec["seq"]: accounting.self_record(rec) for rec, _ in store.Log(self.path).records()}
+            own = {seq for seq, is_own in metadata.items() if is_own}
+        else:
+            metadata = None
+        self.covered_seconds, self.covered_records, self.accounting_correction = accounting.reconcile(
+            reports, own, set(metadata) if metadata is not None else None)
         if self.previous_at is not None:
             self.gap_start = self.previous_at
             self.gap_reason = "checker restart; no comparison coverage claimed"
@@ -256,18 +292,36 @@ class Checker:
                 self.gap_start = self.current.get("at", self.clock())
             self.gap_reason = why
         self.last_observation = None
+        self.witness()
 
     def snapshot(self):
         with self.report_lock:
             report = copy.deepcopy(self.current)
-        if self.full_completed < self.full_generation and not self.stopped:
+        if self.needs_full or (self.full_completed == 0 and self.full_completed < self.full_generation and not self.stopped):
             report.update(state="unavailable", line="unavailable: full comparison has not completed")
         if report["state"] == "unavailable":
             report["unavailable"] = copy.deepcopy(self.gaps) + [
                 {"from": self.gap_start or self.clock(), "to": None, "why": report["line"]}]
         if self.fixture_receipt:
             report["paired_fixture"] = copy.deepcopy(self.fixture_receipt)
+        report["accounting_correction"] = copy.deepcopy(self.accounting_correction)
+        report["accounting_state"] = (self.accounting_correction or {}).get("status", "current")
+        report["full_check_pending"] = self.full_completed < self.full_generation
+        report["witness_error"] = getattr(self, "witness_error", None)
         return report
+
+    def witness(self):
+        if self.witness_world:
+            import witnessed
+            report = display_report(self.snapshot())
+            # Large evidence lives in its note/receipt, never in the moving row.
+            row = {k: v for k, v in report.items() if k not in ("boxes", "divergences", "exclusions", "paired_fixture")}
+            try:
+                witnessed.write(self.witness_world, "log-world", [row], by="house", changed_only=True)
+                self.witness_error = None
+            except OSError as e:
+                # A failed output file cannot stop the independent comparison.
+                self.witness_error = f"{type(e).__name__}: {e}"
 
     def _write(self, row):
         self.journal.parent.mkdir(parents=True, exist_ok=True)
@@ -341,7 +395,10 @@ class Checker:
                 if self.gap_start is not None and report["state"] != "unavailable":
                     self.gaps.append({"from": self.gap_start, "to": now, "why": self.gap_reason})
                     self.gap_start = None
-                if report["state"] == "in-step":
+                eligible = (compared > 0 and not accounting.self_record(last)
+                            and self.replay.seq > self.covered_seq)
+                accounting_ok = (self.accounting_correction or {}).get("status") != "unavailable"
+                if report["state"] == "in-step" and eligible and accounting_ok:
                     if self.last_observation is not None:
                         old_at, old_mono = self.last_observation
                         delta = mono - old_mono
@@ -357,8 +414,9 @@ class Checker:
                         self.covered_records += 1
                         self.covered_seq = self.replay.seq
                     self.last_observation = (now, mono)
-                else:
+                elif report["state"] != "in-step":
                     self.last_observation = None
+                self.covered_seq = max(self.covered_seq, self.replay.seq)
                 self.max_capture_ms = max(self.max_capture_ms, job["capture_ms"])
                 report.update(observed_seconds=self.covered_seconds, observed_records=self.covered_records,
                               unavailable=self.gaps, capture_ms=job["capture_ms"],
@@ -369,20 +427,32 @@ class Checker:
                 receipt = {k: report[k] for k in ("at", "state", "checked_event", "records", "last_full",
                                                   "observed_seconds", "observed_records", "unavailable",
                                                   "capture_ms", "max_capture_ms")}
+                receipt.update(counting_version=accounting.VERSION,
+                               accounting_correction=self.accounting_correction)
                 self._write(dict(receipt, kind="report"))
                 if job["full"]:
                     self._write({"kind": "full-check", "at": now, "event": self.replay.event,
                                  "seq": self.replay.seq, "facts": len(self.replay.flat),
                                  "boxes": self.replay.boxes})
                 new_divergence = len(self.replay.divergences) > before
-                if not job["quiet"] or new_divergence:
-                    with self.report_lock:
-                        self.current = report
-                if self.publish and (not job["quiet"] or new_divergence):
+                changed_answer = answer_key(self.current) != answer_key(report)
+                with self.report_lock:
+                    if job["full"] or new_divergence:
+                        self.evidence_revision += 1
+                        self.evidence = {
+                            "checked_event": report["checked_event"], "last_full": report["last_full"],
+                            "boxes": report["boxes"], "divergences": report["divergences"],
+                            "exclusions": EXCLUSIONS, "at": now,
+                            "accounting_correction": self.accounting_correction,
+                        }
+                    self.current = report
+                self.witness()
+                if self.publish and (changed_answer or job["full"] or new_divergence):
                     self.publish()
             except Exception as e:
                 self.unavailable(f"{type(e).__name__}: {e}")
                 self.stopped = True
+                self.witness()
                 if self.publish:
                     self.publish()
             finally:
@@ -445,7 +515,7 @@ def attach(desk, path, publish=None, journal=None):
     if not enabled() or not log.exists():
         return None
     journal = journal or Path(__file__).parent / "house-state" / Path(path).stem / "log-world.jsonl"
-    checker = Checker(log, journal, publish)
+    checker = Checker(log, journal, publish, world=Path(path).stem)
     _CHECKERS[key] = checker
     checkpoint(desk, path, full=True)
     # House-owned, fixed per-card grant, not an actor-authorized host command.
@@ -458,11 +528,7 @@ def attach(desk, path, publish=None, journal=None):
 
 
 def project(desk, path, record=True):
-    """The live bridge writes only the pre-existing status note, with ordinary log records.
-
-    No rules/verbs run from replay. These two house-owned note events are quiet:
-    no addressing, notifications, knock, or ready-for-review tag.
-    """
+    """Only changed answers reach the status note; evidence has a separate gate."""
     nid = status_node(desk.world)
     if not nid:
         return
@@ -479,22 +545,50 @@ def project(desk, path, record=True):
     else:
         report = {"state": "unavailable", "checked_event": "none",
                   "line": "unavailable: no running checker for this writer"}
-    props = {"state": report["state"], "checked_event": report["checked_event"], "evidence": nid,
-             "observed": f'{report.get("observed_seconds", 0):.3f}s; {report.get("observed_records", 0)} checked records',
-             "unavailable": json.dumps(report.get("unavailable", []), ensure_ascii=False)}
+    evidence_node = next((n["id"] for n in desk.world.nodes.values()
+                          if n.get("type") == "appearance" and
+                          desk.world.subjects.get(n.get("subject"), {}).get("props", {}).get("role")
+                          == "log-world-evidence"), None)
+    first = report.get("divergences", [])[:1]
+    props = {"state": report["state"], "line": report["line"],
+             "first_divergence": store.h(first), "evidence": evidence_node or ""}
     text = report["line"] + "\n\n" + EXCLUSIONS
-    text += ("\n\nObservation counts only consecutive checked record intervals up to 60 seconds within one checker "
-             "run. Longer idle/sleep gaps, restarts and failures do not count. No elapsed-time acceptance.")
-    text += "\n\nEvidence (record numbers are log sequence numbers):\n" + json.dumps(report, ensure_ascii=False, indent=2)
+    text += "\n\nLive observation counts and dated gaps: witnessed:log-world. Full-check/divergence detail: Evidence."
     subject = desk.world.subjects[desk.world.nodes[nid]["subject"]]
-    if subject.get("text") == text and all(subject.get("props", {}).get(k) == v for k, v in props.items()):
+    old_props = subject.get("props", {})
+    remove = [k for k in ("observed", "unavailable", "at", "capture_ms", "max_capture_ms") if k in old_props]
+    status_changed = (subject.get("text") != text or bool(remove) or
+                      any(old_props.get(k, "") != v for k, v in props.items()))
+    evidence_text = None
+    evidence, evidence_revision = None, None
+    if evidence_node and checker:
+        with checker.report_lock:
+            if checker.evidence_revision != getattr(checker, "projected_evidence_revision", 0):
+                evidence = copy.deepcopy(checker.evidence)
+                evidence_revision = checker.evidence_revision
+    if evidence is not None:
+        detail = display_report(evidence)
+        if checker.fixture_receipt:
+            detail["paired_fixture"] = display_report({"paired_fixture": checker.fixture_receipt})["paired_fixture"]
+        evidence_text = ("Last full comparison / retained divergences\n\n"
+                         + json.dumps(detail, ensure_ascii=False, indent=2))
+    if not status_changed and evidence_text is None:
         return
     ctx = store.safe_begin(desk, path) if record else None
-    desk.world.apply("edit", subject["id"], None, {"text": text}, "house")
     import moo
-    changes = {k: v for k, v in props.items() if subject.get("props", {}).get(k) != v}
-    if changes:
+    if status_changed:
+        if subject.get("text") != text:
+            desk.world.apply("edit", subject["id"], None, {"text": text}, "house")
+        changes = {k: v for k, v in props.items() if old_props.get(k, "") != v}
+        changes["checked_event"] = report["checked_event"]  # event of this verdict, not a running counter
+        if remove:
+            changes["remove"] = ",".join(remove)
         moo.REGISTRY["prop"].run(desk.world, nid, dict(changes, _by="house"))
+    if evidence_text is not None:
+        evidence_subject = desk.world.subjects[desk.world.nodes[evidence_node]["subject"]]
+        if evidence_subject.get("text") != evidence_text:
+            desk.world.apply("edit", evidence_subject["id"], None, {"text": evidence_text}, "house")
+        checker.projected_evidence_revision = evidence_revision
     if record:
         store.safe_commit(ctx, desk, REPORT_WORDS, "house")
 
@@ -515,9 +609,12 @@ def command(desk, argv):
     if argv == ["check"]:
         snapshot_path = next(k for k, c in _CHECKERS.items() if c is checker)
         checkpoint(desk, snapshot_path, full=True)
-        project(desk, snapshot_path, record=False)  # outer command logs this unavailable state, never a nested record
         return "Full log-world comparison queued; the Log world status note will show the result."
-    return checker.snapshot()["line"]
+    report = display_report(checker.snapshot())
+    return (report["line"] + "\n" + json.dumps(
+        {k: report.get(k) for k in ("checked_event", "observed_seconds", "observed_records",
+                                   "at", "unavailable", "accounting_correction",
+                                   "accounting_state", "witness_error")}, ensure_ascii=False))
 
 
 def committed(ctx, desk, words, by=None):

@@ -24,8 +24,9 @@ are not misrepresented as newly observed failures.
 
 A full comparison runs at writer attachment and house startup. Anyone can
 request another with `log-world check`; `log-world status` returns the current
-answer. A request immediately makes the answer unavailable until its full
-check completes. No timer, polling or resident wake is added.
+answer and dated external observation counters. A repeat full check preserves
+the previous verdict while pending; startup and lost coverage remain unavailable
+until a full check completes. No timer, polling or resident wake is added.
 
 Incremental checks cover the touched entities, their expanded placement groups,
 links and world facts. An unrelated bypass edit outside that scope needs a
@@ -52,12 +53,28 @@ classification after landing and report any free-box or fact discrepancy.
 
 ## Quiet status and retained evidence
 
-The bridge edits only the existing status note, as house-owned bookkeeping,
-through the ordinary logger. It sets `state`, `checked_event`, `evidence`,
-`observed` and `unavailable`. Its text begins with the plain status line;
-details preserve the first and every later discrepancy, including the
-triggering command/author. Its own report records are replayed and checked
-without recursively producing another report.
+The bridge edits the existing status note through the ordinary logger only
+when its verdict (state, line or first divergence) changes. One initial
+migration removes the old counter props and attaches the evidence note.
+The stable in-step line is `in step since e<n>`; `checked_event` records the
+verdict's event, not a moving endpoint. The `evidence` reference names the
+existing note with `role=log-world-evidence`. That separate note preserves box
+classification, all divergences and the paired fixture manifest, rewritten
+only on a full check or new divergence. Its dates use ISO local date/time
+with timezone. No observer creates world content.
+
+Moving counters, latest checked event, capture/publication timings and dated
+gaps are rows in `witnessed:log-world`, never world facts. JEFF can read
+`observed_records`, `observed_seconds`, `at`, `last_full`, `accounting_state`,
+`accounting_correction` and `full_check_pending` through the ordinary generic
+witnessed lens source. `log-world status` also prints these counters, dates
+and accounting diagnostics. A dead producer has no witnessed rows; graceful
+release publishes unavailable. No tick is added to refresh an age.
+
+Checker-owned `house` / `log-world report` records (and historical house-start
+`log-world check` status writes) are still replayed and
+compared, but advance neither observation count nor time. Rechecking the same
+log endpoint does not count either. Self endpoints cannot bridge an idle gap.
 
 JEFF owns the HUD projection. This implementation adds no waiting tag, knock,
 notification or addressing. The comparison worker cannot reclaim a writer
@@ -80,6 +97,16 @@ at most 60 seconds apart, with consistent monotonic/wall clocks. Longer
 idle/sleep intervals, unavailable spans and restart gaps do not count.
 This is deliberately conservative and may need more than two elapsed days.
 No heartbeat is added merely to accumulate acceptance time.
+
+On the first a7731 start, the checker reconciles its own receipt history
+against log record sequence/author/command metadata, off the live lock. It
+subtracts self endpoints and time sustained only by them, retaining already
+credited intervals between independent endpoints within 60 seconds. The
+`accounting_correction` reports prior totals, removed self records and removed
+seconds; receipt version 2 prevents subtracting twice after restart. Missing
+receipt prefixes or endpoint metadata retain the old totals explicitly as
+accounting-unavailable and freeze them, while comparison continues. They
+cannot prove the two-day gate.
 
 ## Lock cost and switch
 
@@ -112,8 +139,9 @@ to this existing commission worktree's ignored
 It captures a live image and exact whole-record log boundary under one lock,
 then copies the immutable prefix and hashes it off-lock. Manifest publication
 is last. Failed/truncated/unsupported/event-mismatched copies have no usable
-manifest. No raw log is put in a note or source control. The status note's
-`paired_fixture` evidence supplies its event and manifest path.
+manifest. No raw log is put in a note or source control. The separate evidence
+note's `paired_fixture` supplies its event and manifest path at the next full
+check or divergence.
 
 After normal source landing/house activation, the builder should:
 
@@ -141,6 +169,38 @@ After normal source landing/house activation, the builder should:
    divergence. No timer, synthetic live traffic or wake is needed.
 
 ## Ran versus read
+
+### a7731 correction, 20 October
+
+Ran: `test_log_world.py` (29 tests) and `test_log_world_accounting.py`
+(5 tests), on synthetic in-memory worlds with disposable logs. Twelve
+ordinary changes and three repeat full checks leave the status subject
+identical; full checks can update only the evidence note. Self records
+advance neither observed records nor time, and cannot bridge a 90-second
+idle. A real synthetic log/old receipt migration removes one self record
+and 10 seconds, keeps two independent records and 10 seconds, and subtracts
+nothing further on restart. Missing historical coverage preserves old totals
+as accounting-unavailable while new records continue to be compared.
+Tests also read the dated counters through the real generic witnessed
+source, prove they are absent from world facts, verify one-time removal of
+old counter props and quiet unavailable projection, and retain all earlier
+isolation, hash-chain, bypass, fixture and no-wake checks.
+
+Selected health on `frontier-try` e15758 passed Python syntax, script check
+and each of `test_log_world` / `test_log_world_accounting` in separate selected
+runs; these are partial health judgments, not the full suite.
+Live correction amounts and unchanged-status history remain **pending
+landing/house activation**. Read `log-world status` after activation for
+`accounting_correction.removed_self_records`, `removed_seconds` and
+`accounting_state`; inspect status history across naturally occurring
+ordinary records. Do not generate synthetic live traffic or reset totals.
+No worker restart, live raw-log read, browser or host action was used here.
+
+Read: the prior observer/receipt implementation, generic witnessed writer
+and lens row adapter, house-start full-check path, live charter, commission
+comments, evidence note, notebook and Handbook log entry.
+
+### Original a7573 source checkpoint (historical)
 
 Ran: targeted `test_log_world.py` (22 tests, including quiet house routing,
 outer-check hash chain, replay isolation, bypass/repair, retained history,
