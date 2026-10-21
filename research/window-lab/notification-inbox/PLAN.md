@@ -1,5 +1,11 @@
 # Notification inbox — proposal, not connected
 
+Follow-up, 20 Oct: Alex chose Gmail, Android and Google Messages. The provider
+question below is historical. See [Gmail foundation](GMAIL-FOUNDATION.md) for the
+fake-only protocol implementation, accepted architecture checkpoint, staged
+status contract and missing isolated-reader boundary. No account connection or
+phone bridge is implemented or enabled.
+
 20 Oct 2026 · worker-a7227 · for JEFF to take to Alex. All examples are invented.
 No connector is enabled, implemented or account-tested by this commission.
 
