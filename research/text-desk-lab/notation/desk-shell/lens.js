@@ -123,6 +123,15 @@
     return r;
   }
   let imageCommentsBusy = () => false;
+  let resizing = false;
+  const dividers = window.Dividers?.install(paint, {
+    send, refresh: () => refresh(true), busy: () => !!carrying || resizing,
+    hold: held => { resizing = held; }
+  });
+  const partitions = window.PartitionUI?.install(paint, {
+    send, refresh: () => refresh(true), busy: () => !!carrying || resizing,
+    hold: held => { resizing = held; }
+  });
   async function startImageComments() {
     try {
       // A retained HTML page can meet newer JS during a live update. An optional
@@ -163,6 +172,9 @@
     }
     if (old && old.sig === sig) { old.el._n = n; if (V.reuse(old.el, n.kids.map(make), p.text != null)) { tracks(old.el); next.set(n.key, old); return old.el; } }
     const el = document.createElement("div");
+    // A bounded partition's changing children must not change its ancestors'
+    // intrinsic size/baseline (and therefore the desk frame) on focus exit.
+    if (p.partition) el.style.contain = "size layout";
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
     el.id = "part:" + n.key;  // stable native part identity for platform accessibility clients
     next.set(n.key, { el, sig }); if (p.why) el.dataset.why = p.why;
@@ -1247,6 +1259,7 @@
       // card, and a press on a control was never a carry. Now a press becomes a carry only once it moves a few pixels,
       // from anywhere on the card, the title included; a press that doesn't move stays that control's click. The right
       // button opens the menu, and a press in text being typed stays typing.
+      if (partitions?.carry(el, e)) return;
       if (e.target.isContentEditable || e.button !== 0) return;
       const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
       let c = null;
@@ -1275,7 +1288,10 @@
       document.addEventListener("pointermove", move); document.addEventListener("pointerup", up);
       document.addEventListener("pointercancel", up);
     });
-    el.addEventListener("keydown", e => { if (e.key === " " && e.target === el && !carrying) { e.preventDefault(); take(el); } });
+    el.addEventListener("keydown", e => {
+      if (partitions?.key(el, e)) return;
+      if (e.key === " " && e.target === el && !carrying) { e.preventDefault(); take(el); }
+    });
   }
   document.addEventListener("keydown", e => {
     if (!carrying) return;
@@ -1340,6 +1356,7 @@
     return paintAnswer(r, force);
   }
   async function paintAnswer(r, force) {
+    if (resizing) return;   // a divider owns both neighbours until its fenced answer
     const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene by its content (a1505); comparing 700 KB was the fallback
     if (key === last && !force) return;
     last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null; if (r.scene) held = r;
@@ -1350,6 +1367,8 @@
     V.recoverLayout(r.scene);
     const was = glideRects();
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
+    dividers?.sync();
+    partitions?.sync();
     settle(); glideFrom(was); followEnds(); placeMenuDrafts(); V.show(r.text); report();
   }
   // a5504 (Alex: 'smooth movement when a card changes lane'): a part whose role says `glide` is known by its thing, not its
@@ -1359,7 +1378,8 @@
   const thingOf = el => (el._n && el._n.fence && el._n.fence.item) || (el.dataset.key || "").split("/").pop();
   function glideRects() {
     const sel = (Style.glide || []).join(","); if (!sel) return null;
-    const m = new Map(); for (const el of paint.querySelectorAll(sel)) if (!el.hidden && el.offsetParent) m.set(thingOf(el), el.getBoundingClientRect());
+    const m = new Map(); for (const el of paint.querySelectorAll(sel)) if (!el.hidden && el.offsetParent
+      && !el.closest("[data-partition]")) m.set(thingOf(el), el.getBoundingClientRect());
     return m;
   }
   function glideFrom(was) {
@@ -1548,7 +1568,7 @@
     const a = document.activeElement, idle = a && a.matches(".explicit-composer textarea") && empty(a.closest(".explicit-composer").dataset.key);
     const typing = a && !idle && (a.isContentEditable && paint.contains(a) || a.matches("input,textarea"));
     const composing = [...openComposers].some(k => !empty(k)), holding = V.hold && !empty(V.hold);
-    if (carrying || holding || typing || imageCommentsBusy() || menuDrafts.size || composing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
+    if (resizing || carrying || holding || typing || imageCommentsBusy() || menuDrafts.size || composing) { if (window.DoorLine) DoorLine.note("new screen code: it will load when your hands are free"); return; }
     if (leaving) return; leaving = true;
     if (window.DoorLine) DoorLine.note("new screen code: loading it, keeping your view");
     setTimeout(reloadKeeping, 200);

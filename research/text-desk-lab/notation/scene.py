@@ -109,6 +109,14 @@ the one form. The words:
     capture <field>=<value>      use this value instead of following the frame's; prints (now X: differs) when the
                                  world has moved on. Following is the default and is never written down
     carry                        this part's thing can be picked up (pointer or keys) and put down on a part that says `on drop`
+    resize <prop> min <pixels>    shared repeated frames: drag the gap between neighbours, save both weights as this prop;
+                                 arrows adjust, Enter saves, Escape cancels. Minimum outer sizes scale if the viewport is too small.
+    partition <prop> min <w> <h> gap <pixels> [focus <prop>]
+                                 bounded split/tab tree stored as JSON in that world prop; direct bound children are
+                                 leaves, ordinary fenced prop writes save drops, tabs, content sizes and divider weights.
+    companion <expression>       a partition child stays beside the focused child when this expression holds.
+    sizing <expression>          partition child content/stretch preference; explicit tree choice wins.
+    chrome <expression>          "none" suppresses generated sizing tools; the lens still defines carry regions.
     on key <key> do <command>    on a text with `on edit`: Enter, Tab, Shift+Tab or Backspace (only with the caret at the
                                  very start) runs the command instead of its usual work. $head and $tail are the words
                                  before and after the caret. After it the caret follows the text: into a paragraph
@@ -149,7 +157,8 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "resize", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS += ("partition", "companion", "sizing", "chrome")
 PAINT_WORDS += ("remember",)  # reading scope, viewer hands only; never drafts or permissions
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
@@ -1640,6 +1649,31 @@ def _w_carry(node, p, val, n, env):
     node["carry"] = True          # Pike a361/c368: carry on the thing, `on drop <part>` on the receiver
 
 
+def _w_resize(node, p, val, n, env):
+    m = re.fullmatch(r"([a-zA-Z_][\w-]*) min ([1-9]\d*)", val)
+    if not m:
+        raise LensRefusal(f"line {n}: `resize <prop> min <pixels>` on a shared repeated frame; got {p!r}")
+    node["resize"] = [m[1], int(m[2])]
+
+
+def _w_partition(node, p, val, n, env):
+    m = re.fullmatch(r"([a-zA-Z_][\w-]*) min ([1-9]\d*) ([1-9]\d*) gap (\d+)(?: focus ([a-zA-Z_][\w-]*))?", val.strip())
+    if not m:
+        raise LensRefusal(f"line {n}: `partition <prop> min <width> <height> gap <pixels> [focus <prop>]`; got {p!r}")
+    node["partition"] = dict(prop=m[1], minimum=[int(m[2]), int(m[3])], gap=int(m[4]), focus_prop=m[5])
+
+
+def _w_companion(node, p, val, n, env):
+    word = p.split()[0]
+    if not val.strip():
+        raise LensRefusal(f"line {n}: `{word} <expression>`")
+    try:
+        X.parse(val.strip())
+    except X.ExprError as e:
+        raise LensRefusal(f"line {n}: `{word}`: {e}") from e
+    node[word] = val.strip()
+
+
 def _w_role(node, p, val, n, env):
     # a1105 (Alex: 'objectives should have a light highlight on the whole card'): `role <name> when <selection>` lets a
     # part's look follow its thing's state. Several may follow the plain role; the first that holds wins, the scene
@@ -1956,6 +1990,7 @@ WORDS = {
     "lines": ("lines <min>..<max>", _w_lines),
     "commit": ("commit explicit|enter|ctrl-enter [only]", _w_commit),
     "share": ("share <weight> | share $(<expr>)", _w_share),
+    "resize": ("resize <prop> min <pixels>", _w_resize),
     "hint": ('hint "..."', _w_hint),
     "tip": ('tip "<name>" ["<what it does>"]', _w_tip),
     "plain": ("plain", _w_plain),
@@ -1971,6 +2006,10 @@ WORDS = {
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
+    "partition": ("partition <prop> min <width> <height> gap <pixels> [focus <prop>]", _w_partition),
+    "companion": ("companion <expression>", _w_companion),
+    "sizing": ("sizing <expression>", _w_companion),
+    "chrome": ("chrome <expression>", _w_companion),
     "role": ("role <name> [when <selection | expr>]", _w_role),
     "text": ('text "..."', _w_text),
     "clamp": ("clamp [last] <n>", _w_clamp),
@@ -2679,9 +2718,18 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append(f"[{r}, since {n['since']}]" if n.get("since") else f"[{r}]")
         if n["layout"]:
             bits.append(n["layout"] + (" " + " ".join(n["tracks"]) if n.get("tracks") else ""))
-        for wd in ("gap", "scroll", "measure", "share"):
+        for wd in ("gap", "scroll", "measure", "share", "resize"):
             if n.get(wd) is not None:
                 bits.append(f"{wd} {n[wd]}")
+        if n.get("partition"):
+            spec = n["partition"]
+            bits.append(f"partition {spec['prop']} min {spec['minimum']} gap {spec['gap']}"
+                        + (f" focus {spec['focus_prop']}={spec.get('focus') or '(none)'}" if spec.get("focus_prop") else ""))
+        if n.get("companion") is not None:
+            bits.append(f"companion {n['companion']}")
+        for word in ("sizing", "chrome"):
+            if n.get(word) is not None:
+                bits.append(f"{word} {n[word]}")
         if n.get("fold"):
             bits.append(("unfolded" if n.get("fold_open") else "folded") + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else "")
                         + (" float" if n.get("fold_float") else "") + (" inline" if n.get("fold_inline") else "")
@@ -2975,6 +3023,13 @@ def emit(node):
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:
         paint["share"] = node["share"]
+    if node.get("resize") is not None:
+        paint["resize"] = node["resize"]
+    for word in ("partition", "companion", "sizing", "chrome"):
+        if node.get(word) is not None:
+            paint[word] = node[word]
+    if node.get("partition_item"):
+        paint["partition_item"] = node["partition_item"]
     if node.get("peek") and not paint.get("absent"):
         paint["peek"] = node["peek"]
     if node.get("tip") and not paint.get("absent"):        # a6271: on a frame or a text alike
@@ -2986,10 +3041,14 @@ def emit(node):
         node["acts"] = acts
     if [a for a in acts if a.get("on") != "fold"]:
         fence = {k: node[k] for k in ("item", "rev", "reads", "defpart", "bind") if k in node}
+        if node.get("partition_reads"):
+            fence["reads"] = list(fence.get("reads") or []) + node["partition_reads"]
         if any(a.get("on") == "drop" for a in node["acts"]):
             fence["key"] = node["key"]           # c368: a drop receiver's occurrence is part of what the drop means
         node["fence"] = fence
     for k in node.get("kids") or []:
+        if node.get("partition") and k.get("item"):
+            k["partition_item"] = k["item"]
         emit(k)
     return node
 

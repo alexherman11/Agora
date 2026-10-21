@@ -502,7 +502,9 @@ COPY_REFUSED = ("chat", "image")     # a chat is lines, an image bytes: not text
 @verb("copy", ["surface"], "Make a copy of this surface and everything inside it, in another surface: each surface, view, "
       "note, task, doc and other thing of text anew, in the same order, with its title, text, tags and props (a chat's lines, an image's "
       "bytes, comments and links are not copied: a chat or image inside is refused). A prop that names something inside "
-      "the copied surface names its copy. Each part is its own create or prop event, all in one receipt; $new is the copy.",
+      "the copied surface names its copy. copy_json=<prop list> opts version-1 JSON props into typed {$ref:identity} "
+      "reference remapping; plain strings/keys stay literal, invalid data refuses before creation. "
+      "Each part is its own create or prop event, all in one receipt; $new is the copy.",
       "into=<surface> [title=<str>]", 'do copy f04 into=f02 title="Harbor, again"', level=2)
 def v_copy(w, nid, a):
     # a6427 (Workspaces): a saved arrangement of the home base is a surface tree, and the desk had no word to copy one
@@ -528,6 +530,19 @@ def v_copy(w, nid, a):
                                   f"not a {kind} (move it, or place its subject: do place {k['subject']} into=<surface>)")
                 yield k
     parts = list(walk(nid))
+    # Validate declared structured props before creating anything: malformed
+    # data must leave no partially copied surface or event trail.
+    import structured_refs
+    structured = {}
+    for old in [nid] + [k["id"] for k in parts]:
+        node = w.nodes[old]
+        props = ((node.get("props") if node["type"] == "surface"
+                  else w.subjects[node["subject"]].get("props")) or {})
+        for prop in filter(None, (p.strip() for p in props.get("copy_json", "").split(","))):
+            try:
+                structured[old, prop] = structured_refs.read(props[prop])
+            except (KeyError, ValueError, TypeError, RecursionError) as error:
+                raise Refusal(f"copy stopped: {old} structured property {prop}: {error}") from error
     made, events, changed = {nid: None}, [], []
 
     def run(verb, target, args):
@@ -562,7 +577,10 @@ def v_copy(w, nid, a):
             n = w.nodes[old]
             props = dict((n.get("props") if n["type"] == "surface" else w.subjects[n["subject"]].get("props")) or {})
             if props:
-                run("prop", made[old], {p: made.get(v) or v for p, v in props.items()})
+                run("prop", made[old], {
+                    p: structured_refs.write(structured[old, p], made) if (old, p) in structured
+                    else made.get(v) or v for p, v in props.items()
+                })
     except Refusal as e:
         for ev in reversed(events):
             try:
