@@ -333,7 +333,7 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-## curing (41)
+## curing (42)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -646,6 +646,12 @@ Missing world-level behavior: task priority and worker_prefer did not affect dis
 a7348 · family=shape · status=curing
 
 Read: named on-drop parts were required to carry inside the same lens, and the browser receiver lookup used one part name; a dock could not accept a meaningful thing from another lens. Source a7223 adds on drop any with pickup-time act and revision snapshots, shared CarryTargets planning/submit for specialised drag adapters, guarded host menus/clicks through the existing closed host table, command identity fields, literal computed-value preservation, and typed tree-activate for restoring hidden tabs. Pin/open/reorder/remove policy, icon colours and chrome stay in staged world verbs/lenses. Source tests ran; real browser acceptance is blocked by the hidden Edge connection closing before page ready. World apply and the a7045 adapter hook are staged, not active. Missing arbitrary native-app stable identity/launch is intentionally separate (JEFF c7264).
+
+### Viewer tabs needed undoable history and scoped reader continuity
+
+a7443 · family=lens-words · status=curing
+
+Source staged on viewer tabs commission: the world lacked an undoable multi-projection Agora history operation and a way to name a frame reading scope independently of reused DOM keys. Adds narrow current-world browse and generic remember word; chrome remains staged world text. Native selector composition now preserves every composite event for undo, not just its final prop, and omits None for a no-op. No live tabs migration or painter activation. In-memory controller/commands/repaint and fake DOM pass; real guarded browser remains blocked at initial websocket read.
 
 ## unchecked (7)
 
