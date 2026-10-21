@@ -84,7 +84,7 @@ def deny(method, params):
     return {"decision": "decline"}
 
 
-def runtime_config(directory, binary=None):
+def runtime_config(directory, binary=None, model=MODEL):
     from runtime_pin import catalog_matches, ensure_runtime
 
     lock = ensure_runtime()
@@ -97,10 +97,43 @@ def runtime_config(directory, binary=None):
     catalog = Path(__file__).with_name("model-catalog.json")
     if not catalog_matches(catalog, lock["catalog_sha256"]):
         raise RuntimeError("Pinned resident catalog changed")
-    return build_config(directory, binary, PROFILE)
+    return build_config(directory, binary, PROFILE, model=model)
 
 
-def build_config(directory, binary, profile):
+def model_catalog(model):
+    """Use reviewed model metadata; resident permissions/instructions stay empty.
+
+    The original resident catalog contains Astra only. Sol's exact metadata is
+    already pinned for builders; using it does not grant builder capabilities.
+    """
+    from runtime_pin import catalog_matches
+
+    for name, pin in (("model-catalog.json", "runtime-lock.json"),
+                      ("worker-model-catalog.json", "worker-runtime-lock.json")):
+        path = Path(__file__).with_name(name)
+        lock = json.loads(Path(__file__).with_name(pin).read_text(encoding="utf-8"))
+        if not catalog_matches(path, lock["catalog_sha256"]):
+            raise RuntimeError("Pinned model catalog changed")
+        if model in {m["slug"] for m in json.loads(path.read_text(encoding="utf-8"))["models"]}:
+            return path
+    raise ValueError(f"{model} has no reviewed resident metadata; no model was substituted")
+
+
+def require_subscription(client):
+    """Read metadata only. Never log in/out, read tokens, or fall back to an API key."""
+    result = client.account_read({"refreshToken": False})
+    account = result.model_dump(by_alias=True, mode="json").get("account") or {}
+    if account.get("type") != "chatgpt":
+        raise RuntimeError("A ChatGPT subscription sign-in is required; no model turn was sent")
+    config = client.request("config/read", {}, response_model=ConfigEnvelope).config
+    custom = (config.get("model_providers") or {}).get("openai") or {}
+    if any(custom.get(k) for k in ("base_url", "env_key", "experimental_bearer_token",
+                                   "http_headers", "env_http_headers")):
+        raise RuntimeError("Custom OpenAI authentication/routing is not allowed")
+    return "chatgpt"
+
+
+def build_config(directory, binary, profile, model=MODEL):
     """Configuration only; candidate probes use their own empty profile."""
     if importlib.metadata.version("openai-codex") != SDK_VERSION:
         raise RuntimeError(
@@ -130,10 +163,12 @@ def build_config(directory, binary, profile):
         'instructions=""',
         "agents.enabled=false",
         "notify=[]",
-        "model_catalog_json=" + json.dumps(str(Path(__file__).with_name("model-catalog.json"))),
+        "model_catalog_json=" + json.dumps(str(model_catalog(model))),
     ]
     env = {k: "" for k in os.environ if k.startswith("CODEX_") and k != "CODEX_HOME"}
     env["CODEX_HOME"] = str(profile)
+    env["OPENAI_API_KEY"] = ""
+    env["CODEX_API_KEY"] = ""
     return CodexConfig(
         codex_bin=binary,
         cwd=str(directory),
@@ -289,7 +324,7 @@ def receive(client, turn_id, emit, on_compact=None):
                         },
                     }
                 )
-                emit({"type": "result", "is_error": False, "result": text})
+                emit({"type": "result", "is_error": False, "result": text, "turn_id": turn_id})
                 return True
     finally:
         client.unregister_turn_notifications(turn_id)
@@ -319,11 +354,16 @@ def serve(args):
     # A house closes stdin to stop a resident. Interrupt an in-flight model turn,
     # including when EOF arrives while the main thread waits for runtime events.
     threading.Thread(target=read_input, daemon=True).start()
-    with CodexClient(runtime_config(directory), approval_handler=deny) as client:
+    with CodexClient(runtime_config(directory, model=args.model), approval_handler=deny) as client:
         client.initialize()
-        available = {m.model for m in client.model_list(True).data}
+        require_subscription(client)
+        available = {m.model: m for m in client.model_list(True).data}
         if args.model not in available:
             raise RuntimeError(f"{args.model} is unavailable; no model was substituted")
+        metadata = available[args.model].model_dump(by_alias=True, mode="json")
+        efforts = {x["reasoningEffort"] for x in metadata.get("supportedReasoningEfforts", [])}
+        if args.reasoning not in efforts:
+            raise RuntimeError(f"Reasoning effort {args.reasoning} is unavailable; no substitution")
         parameters = thread_parameters(client, directory, args.model)
         if getattr(args, "charter_file", None):
             parameters["developerInstructions"] = Path(args.charter_file).read_text(
@@ -350,6 +390,7 @@ def serve(args):
                 "model": started.model,
                 "sdk": SDK_VERSION,
                 "tools": [],
+                "authentication": "chatgpt",
                 "system_prompt": parameters["developerInstructions"],
             }
         )
@@ -361,6 +402,7 @@ def serve(args):
                 raise ValueError("Expected a house user message")
             content = message["message"]["content"]
             text = resident_inputs(content)
+            require_subscription(client)
             turn_id = client.turn_start(
                 started.thread.id, text, {"effort": args.reasoning, "environments": []}
             ).turn.id

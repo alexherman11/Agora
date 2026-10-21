@@ -728,7 +728,7 @@ a7374 · family=privacy · status=unchecked
 
 Source foundation for Gmail is necessary because world notes/lenses and public actor claims cannot hold private account data or authorize fetching. Existing same-user DPAPI/ignored files are not containment. This commission adds only offline metadata/OAuth state-machine tests and a disabled refusal helper; no secure storage/caller bridge is claimed. Missing primitive: host-maintainer-reviewed isolated reader principal/storage plus authenticated human-only IPC, with count-only output. Deployment and private preview review remain outside this change. No runtime or account access was enabled. (worker-a7295, 20 Oct)
 
-## cured (66)
+## cured (67)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1286,6 +1286,13 @@ a7766 · family=source · status=cured
 
 a7731 source correction: no missing new world word; the existing witnessed: source is the right boundary for moving observer counters. The checker had embedded record totals, epochs and evidence in every status projection, generating its own next observation. Verdict-only status plus full/divergence-only evidence and external witnessed counters remove that feedback; old receipt totals are reconciled once against self-record metadata. Copy tests pass; live activation/history proof remains pending house landing. No ordinary logger schema or world command semantics changed.
 
+### JEFF restart failure: parked Codex adapter compatibility
+
+a7922 · family=missing-word · status=cured
+
+21 Oct: Alex reported JEFF and agents not responding after restart. Live house heartbeat was fresh; other enabled residents rested normally. JEFF had seven process failures, gpt-6.1-sol unavailable, and worker-a7877 failed importing require_subscription. Root cause: a7816 landing preserved conflicting uncommitted adapter changes only on parked/20261020-230555; the active adapter reverted to Astra-only catalog and lost the subscription guard. Outside Codex three-way merged those additions with the new parent-owned charter code, tested before atomic application, then used native call to retry JEFF. Same saved thread retained, turns 655 to 658, zero failures, real Conversation reply confirmed. No house/HUD restart, provider switch, credentials or pin changes. Ran: 8 focused auth/model checks, pinned Sol mock-runtime zero-tools probe, read-only ChatGPT Sol/medium preflight, 24 transport/charter tests, Ruff F/E9, diff checks. Added adapter import/catalog regression coverage. Two broader old tests reproduced failures before repair; empty charter receipt fixture corrected, unrelated worker-routing expectation left unchanged. Repair commit awaiting Alex approval; uncommitted repair can be parked by another overlapping landing. Separate house portable-handover/relay/lease changes remain preserved on parked/20261020-155934, not restored here. Evidence: local/jeff-recovery-20261021/; research/codex-residents/resident-provider-handoff.md has the current caveat.
+Additional verification: required default repository pytest 201 passed, 2 skipped in 27.43s. Documentation checker still reports the pre-existing missing Dynamic Desk image. JEFF advanced to turn 662 on the same saved thread, zero failures; the affected Codex worker restarted automatically and is working. No manual worker wake or task alteration. Repair consists of codex_resident.py and test_transport.py, 85 additions/10 removals; commit approval requested from Alex under AGENTS.md, no push requested.
+
 ## active (1)
 
 ### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
@@ -1294,7 +1301,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (3)
+## source-pending (4)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1317,3 +1324,9 @@ Updated 20 Oct, source staged only: missing generic words resize, partition, com
 a7801 · family=missing-word · status=source-pending
 
 Source prerequisite for item pickup (worker-a7666, 20 Oct). Missing world-level word: one all-or-nothing create-or-restore plus placement, including subject and appearance identities. Ordinary independent lines intentionally keep successful earlier writes; compensation cannot prevent observers seeing an orphan. Staged internal Session.atomic/atomic_status/atomic_undo uses actual isolated Desk native checks, existing writer serialization, strict fsynced one-record facts/events/rule-state/receipt admission, whole undo and unknown-reply reconciliation. No public word/endpoint, carry affordance or live migration. Unsupported custom hooks, world-verb/effect rules and unsettled chains refuse atomically. Real panel notes supported with immutable actor/role and restricted data props. Accepted partition adapter, eligibility/receiver fences, preview agreement and observer/runtime compatibility remain integration gates. Tests use actual in-memory engine and disposable journals, not a stand-in backend. Architecture: research/text-desk-lab/notation/atomic-world/ARCHITECTURE.md.
+
+### Named guarded artifacts lacked selection preflight
+
+a8051 · family=missing-capability · status=source-pending
+
+a7940: resident image-comment transport already exists, but choosing an existing guarded screenshot lacked a narrow safe host interface. guarded_artifacts.prepare validates a named report-listed immutable PNG, Guard success, explicit hash, limits and reviewed recipient image support; returns the existing image-comment sidecar plus source/recipient revision fences. No capture/file-browsing resident tool or new host executor. Source staged, host delivery and actual resident vision pending; JEFF owns world affordances.
