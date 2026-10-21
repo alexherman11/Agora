@@ -531,9 +531,11 @@ for (const t of ['keydown', 'input', 'mousedown', 'click', 'contextmenu'])
     + log.textContent).slice(0, 600); }, true);</script>"""
 TEST_URL = "data:text/html;base64," + base64.b64encode(TEST_HTML.encode()).decode()
 
-def open_edge(name, url, size="1500x900", tries=2):
+def open_edge(name, url, size="1500x900", tries=2, viewport=True):
     """Edge as an app window on the sandbox desktop, InPrivate (a fresh Edge profile signs itself into Alex's Microsoft
-    account and starts syncing his data into it: seen 16 Oct, a5932), on a DevTools port of its own. -> the state."""
+    account and starts syncing his data into it: seen 16 Oct, a5932), on a DevTools port of its own. size is the page's
+    CSS viewport (viewport=False: the outer window, as before a7413). -> the state; st["viewport"] is the page's
+    [innerWidth, innerHeight, devicePixelRatio] as measured. A failed start closes its own sandbox and exits."""
     if state_file(name).exists():
         sys.exit(f"sandbox {name!r} is open already (close it, or use --name)")
     STATE.mkdir(parents=True, exist_ok=True)
@@ -554,17 +556,69 @@ def open_edge(name, url, size="1500x900", tries=2):
         close(name, quiet=True)
     else:
         sys.exit("edge did not start on the sandbox desktop")
-    for _ in range(50):                            # the window, and the page drawn
-        if [x for x in top_windows(name) if x[4] and x[3] and x[5][2] > 50]:
-            break
-        time.sleep(0.2)
-    c = Cdp(port)
-    for _ in range(50):
-        if c.js("document.readyState") == "complete":
-            break
-        time.sleep(0.2)
-    c.close()
+    # a7413: from here a failure (the page's websocket reset at readyState, WinError 10054, as seen only in Codex
+    # workers' sandboxes) left this desktop and its Edge running, and screen.py's guard with no verdict; now the start
+    # closes what it opened and says how far it got. Nothing is retried.
+    stage = "the window"
+    try:
+        for _ in range(50):                        # the window, and the page drawn
+            if [x for x in top_windows(name) if x[4] and x[3] and x[5][2] > 50]:
+                break
+            time.sleep(0.2)
+        stage = "the page's DevTools websocket"
+        c = Cdp(port)
+        try:
+            stage = "document.readyState"
+            for _ in range(50):
+                if c.js("document.readyState") == "complete":
+                    break
+                time.sleep(0.2)
+            if viewport:
+                stage = "fitting the page to " + size
+                st["viewport"] = fit_viewport(c, int(w), int(h))
+                state_file(name).write_text(json.dumps(st), encoding="utf-8")
+        finally:
+            c.close()
+    except BaseException as e:
+        why = start_failure(st, stage, e)
+        close(name, quiet=True)
+        raise SystemExit(why) from e
     return st
+
+
+def fit_viewport(c, w, h):
+    """--size names the PAGE (CSS px, innerWidth x innerHeight), as headless does: Edge's --window-size is the outer
+    window, so at 2560x1440 the page was 2546x1403 (ran 20 Oct, a7413). Grow the window by its own frame; -> the page's
+    [innerWidth, innerHeight, devicePixelRatio] as they are after (Windows caps a window near the screen: then less).
+    A page the size of the whole screen (Alex's 2560x1440 at 150%) cannot fit inside a framed window (ran: capped at
+    2560x1420), so that one is the window made fullscreen, on the hidden desktop like everything else here."""
+    iw, ih, ow, oh, sw, sh = c.js("[innerWidth, innerHeight, outerWidth, outerHeight, screen.width, screen.height]")
+    if (iw, ih) != (w, h):
+        win = c.call("Browser.getWindowForTarget")["windowId"]
+        if (w, h) == (sw, sh):
+            c.call("Browser.setWindowBounds", windowId=win, bounds={"windowState": "fullscreen"})
+        else:
+            c.call("Browser.setWindowBounds", windowId=win, bounds={"left": 0, "top": 0, "width": w + ow - iw,
+                                                                    "height": h + oh - ih})
+        for _ in range(25):
+            time.sleep(0.1)
+            if c.js("[innerWidth, innerHeight]") != [iw, ih]:
+                break
+        time.sleep(0.2)
+    return c.js("[innerWidth, innerHeight, devicePixelRatio]")
+
+
+def start_failure(st, stage, e):
+    """Words for a start that failed after Edge was launched: the stage, the error, and whether Edge and its DevTools
+    port were still there (a reset with both gone means the browser ended, not that the harness raced it)."""
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{st['port']}/json/version", timeout=2).read()
+        port = "still answered"
+    except Exception as pe:
+        port = f"no longer answered ({type(pe).__name__})"
+    pid = "running" if exe(st["pid"]) != "?" else "gone"
+    return (f"edge started on the sandbox desktop but failed at {stage}: {type(e).__name__}: {e}; edge pid {st['pid']} "
+            f"{pid}, its DevTools port {port}; this sandbox was closed (a cleanup, not a tested page)")
 
 
 def run_hidden(name, argv, cdp=False, env=None):
