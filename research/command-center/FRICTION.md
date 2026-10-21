@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (50)
+## open (51)
 
 ### F2. Scripts cannot say who is running them
 
@@ -230,7 +230,7 @@ A cure would be small: to_text already knows each cut it makes; a cut node shoul
 
 a5113 · family=house · status=open
 
-Source edit by Claude, 14 Oct (4113eae, landed as 28e1b05 through itself): landing.py is new; workshop.land() now calls it; health runs test_landing_queue. Before this there was one way into main, the house's merge in the live checkout, and it waited while anyone had uncommitted edits (a4644). Two people working at once blocked each other (Alex, 14 Oct). WORLD-LEVEL WORD MISSING: none at the desk. This is the repository's own door, and it belongs in source. What was missing was a room of its own to judge code in, a cache of what was judged (house-state/landing.json, per commit), and parking for edits in the way (parked/<stamp> branches). ROUGH STILL: the commission state `reverted` now means 'judged and not landed', because main never had it; the word is a misnomer, and renaming it touches the board lenses. Health takes about 2 minutes per judgement, so a landing takes 4-5. The landing room's world copy is taken under the world's lock. AGENTS.md still says one checkout and no worktrees for builders; Alex said 'work in worktrees if you need', and new wording is his to give.
+Source edit by Claude, 14 Oct (4113eae, landed as 28e1b05 through itself): landing.py is new; workshop.land() now calls it; health runs test_landing_queue. Before this there was one way into main, the house's merge in the live checkout, and it waited while anyone had uncommitted edits (a4644). Two people working at once blocked each other (Alex, 14 Oct). WORLD-LEVEL WORD MISSING: none at the desk. This is the repository's own door, and it belongs in source. What was missing was a room of its own to judge code in, a cache of what was judged (house-state/landing.json, per commit), and parking for edits in the way (parked/<stamp> branches). ROUGH STILL: the commission state `reverted` now means 'judged and not landed', because main never had it; the word is a misnomer, and renaming it touches the board lenses. Historical measurement (14 Oct): health took about 2 minutes per judgment, so a landing took 4-5. Follow-up source pending house landing (a5288, 20 Oct): batch queued branches under one complete judgment, prioritize affected checks without dropping any, isolate failing branches with diagnostic partial runs, and preserve dynamic room-test discovery. Repository judgment policy has no world-level substitute. Full-world timing acceptance remains blocked by sandbox tempfile permissions; stand-in timings are not a full-health pass. The landing room's world copy is taken under the world's lock. AGENTS.md still says one checkout and no worktrees for builders; Alex said 'work in worktrees if you need', and new wording is his to give.
 
 ### A person's unsent capture had nowhere to live but outside the world
 
@@ -333,7 +333,13 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-## curing (39)
+### Item pickup needs explicit carry and atomic promotion words
+
+a7659 · family=language · status=open
+
+Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
+
+## curing (44)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -635,7 +641,38 @@ a6988 · family=lens-words · status=curing
 
 Music needs Windows-session album art as a rounded picture with no filename, caption or pop-out controls. The missing world word is media picture: compiler admission and the shared media painter gain this read-only mode; generated art tests compile both music forms. No new timer word is needed: progress is ordinary static row shares updated from reported playback state. The earlier live until bar/since draft was withdrawn under Alex's charter. Source is in worker-a6443; browser checks are blocked before launch by the old branch's system-temp ACL error. PKCE library access and the explicit Connect host verb also need host code; lens/style behavior remains world text.
 
-## unchecked (5)
+### Worker priority and runtime policy were unread by the scheduler
+
+a7344 · family=house · status=curing
+
+Missing world-level behavior: task priority and worker_prefer did not affect dispatch; fresh worker_provider labels split eligibility; Claude worker medium effort and numeric compaction window had no launch binding. a7249 adds those policy bindings in workshop.py and claude_worker_runtime.py, plus regression tests and an isolated installed-runtime fake probe. No world app, host tool bypass or live settings change. Source pending landing; exact proactive 600k timing and production reset remain unverified.
+
+### Cross-lens pinning needed a generic fenced drop receiver
+
+a7348 · family=shape · status=curing
+
+Read: named on-drop parts were required to carry inside the same lens, and the browser receiver lookup used one part name; a dock could not accept a meaningful thing from another lens. Source a7223 adds on drop any with pickup-time act and revision snapshots, shared CarryTargets planning/submit for specialised drag adapters, guarded host menus/clicks through the existing closed host table, command identity fields, literal computed-value preservation, and typed tree-activate for restoring hidden tabs. Pin/open/reorder/remove policy, icon colours and chrome stay in staged world verbs/lenses. Source tests ran; real browser acceptance is blocked by the hidden Edge connection closing before page ready. World apply and the a7045 adapter hook are staged, not active. Missing arbitrary native-app stable identity/launch is intentionally separate (JEFF c7264).
+
+### Viewer tabs needed undoable history and scoped reader continuity
+
+a7443 · family=lens-words · status=curing
+
+Source staged on viewer tabs commission: the world lacked an undoable multi-projection Agora history operation and a way to name a frame reading scope independently of reused DOM keys. Adds narrow current-world browse and generic remember word; chrome remains staged world text. Native selector composition now preserves every composite event for undo, not just its final prop, and omits None for a no-op. No live tabs migration or painter activation. In-memory controller/commands/repaint and fake DOM pass; real guarded browser remains blocked at initial websocket read.
+20 October source repair after guarded review: named tab projections need ownership/lifecycle reconciliation, not a second history. Pending source groups only matching viewer/actor chrome under one surface, updates subject titles as well as labels, and reuses closed slots. Six staged Home search exclusions cover rows and counts; no global hiding rule. Real in-memory tests cover 25 reuse cycles, actor isolation, undo and actual search repaint; guarded repaired-byte review and JEFF menu/routes remain outstanding. Earlier initial websocket failure is historical, not a claim of current browser inability.
+
+### Read-only Markdown lacked keyboard links and inline native media controls
+
+a7613 · family=painter · status=curing
+
+Source a7557, pending landing and guarded acceptance. The existing markdown word already composes with media, but read-only links lacked Tab/Enter access and an approved inline picture lost media Pop out after deduplication. Generic TextEdit read semantics, Media.inline and narrow lens action routing supply these without chat-specific source, edit actions or new privilege; read code/table width rules constrain content. Five actual-module DOM stand-in tests and three in-memory actual-lens/dispatch checks pass; no browser/layout/clipboard acceptance. Exact body-only patches/reversal are staged in Richer chat — exact staged body passages and reversal. No live Conversation edits or sends.
+
+### A float could not be sized to the room beside its handle (a7544)
+
+a7781 · family=lens-words · status=curing
+
+Source edit (a7544, desk-shell/lens.js placeFloat, approved by JEFF e15996). The Tabs menu, a float, ran off an 800 px page: a lifted float was placed fixed under its handle and capped only at 70vh (lens.html), whatever room was left below the handle (measured: a 560 px menu from y 410, ending at 970 on an 800 px page). No world word says how tall a float may be relative to where its handle sits: measure and scroll give width and scrolling, a role gives looks, and 70vh ignores the handle. The missing word was 'placed in the room beside its handle'. The painter now does it for every float: it opens below, or above when it does not fit below and above has more room, and is no taller than that room (it scrolls inside it). A lens can still say nothing about the side or the gap; if one needs to, that is a paint word (float above|below), not more painter policy.
+
+## unchecked (7)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -673,7 +710,19 @@ Missing world word: check runtime. The world cannot hash a host executable, run 
 Final source checks in this builder: 39 focused tests passed in 7.46s; changed-file Ruff All checks passed; git diff --check exit 0. Tests include fake binaries/inventories, a real cross-process lease, and fake-house receipt/notice delivery. Final resident mock source passed with -E and empty CODEX_HOME. Source uses the worker's existing MCP door route without changing DESKD=off in shells. Source and precise rerun instructions are preserved in research/codex-residents/runtime-pin-handoff.md. Not landed; worker-capable environment and live acceptance are still needed.
 20 Oct source-ready update under JEFF c6757/c6760: 48 focused tests passed in 6.70s; changed-file Ruff passed and diff check exit 0. Source now checks updater provenance and valid OpenAI OpCo, LLC Authenticode before candidate execution; Windows read-only inspection confirms that publisher on the installed candidate. Python-open guards with the real home present and fake credentials prove empty-home launch routing, not native IO containment. Both locks and inventories remain unchanged. Host-side --recheck, full worker mock matrix, real harmless resident/Astra turns and live notice/no-wake observation remain unverified. A healthy ordinary startup skips probes, so JEFF must explicitly --recheck after landing. No account or profile settings changed.
 
-## cured (65)
+### Browsing lacks a typed private navigation and selected-file boundary
+
+a7309 · family=missing-word · status=unchecked
+
+The staged browsing controller and request-policy experiment live only under research/window-lab/browsing. Missing world word: intentional typed navigation with per-tab history and an authenticated, unprivileged renderer/file-selection boundary. A lens can arrange chrome but cannot enforce native request isolation or authorize local file handles. Existing page embeds are trusted previews; scripts_mirror is an explicitly commissioned write-through script integration, not a general file browser or file-selection permission. This stage activates neither. See [[Browsing — architecture and acceptance]] for the staged source and unresolved security gates.
+
+### Account inbox lacks an isolated private-reader word
+
+a7374 · family=privacy · status=unchecked
+
+Source foundation for Gmail is necessary because world notes/lenses and public actor claims cannot hold private account data or authorize fetching. Existing same-user DPAPI/ignored files are not containment. This commission adds only offline metadata/OAuth state-machine tests and a disabled refusal helper; no secure storage/caller bridge is claimed. Missing primitive: host-maintainer-reviewed isolated reader principal/storage plus authenticated human-only IPC, with count-only output. Deployment and private preview review remain outside this change. No runtime or account access was enabled. (worker-a7295, 20 Oct)
+
+## cured (66)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1184,7 +1233,7 @@ Source edits by Claude, 14 Oct (e0ac4f9, 9f27357, 8d0438a), Snappy Desk stages 3
 
 a5315 · family=house · status=cured
 
-landing.hand named its branch hand/<who>-<YYYYmmdd-HHMMSS>, to the second. test_landing_queue steps 11 and 12 each make a hand landing by codex; on a fast run they fell in the same second, the second `git branch` failed ('a branch named hand/codex-... already exists'), and the landing room refused every branch (a5245 met it 15 Oct; ran it in the worktree and it failed the same way, with landing.py exactly as main has it). The same can happen live when one builder hand-lands twice quickly. Fixed (landing.py, a5245, commit 876c2b6): a taken name gets -2, -3 ... after it, and its temporary index file is named to match. Ran: test_landing_queue all passed; health.py frontier-try all green. Source edit, not world: the missing word was none at the world level; this is the house's own landing code.
+landing.hand named its branch hand/<who>-<YYYYmmdd-HHMMSS>, to the second. test_landing_queue steps 11 and 12 each make a hand landing by codex; on a fast run they fell in the same second, the second `git branch` failed ('a branch named hand/codex-... already exists'), and the landing room refused every branch (a5245 met it 15 Oct; ran it in the worktree and it failed the same way, with landing.py exactly as main has it). The same can happen live when one builder hand-lands twice quickly. Fixed (landing.py, a5245, commit 876c2b6): a taken name gets -2, -3 ... after it, and its temporary index file is named to match. Ran: test_landing_queue all passed; health.py frontier-try all green. Source edit, not world: the missing word was none at the world level; this is the house's own landing code. Follow-up read/ran (worker-a5288, 20 Oct): current main d615f29 checks for a free suffix before creating it, which does not reserve it against concurrent callers. Pending a5288 source reserves by atomic git branch creation, retries collisions, and gives every temporary index a unique process/thread/time suffix. The same reservation covers parked branches. On an isolated repository, forced same-second sequential and concurrent hand cases passed; no live hand landing was run.
 
 ### A button could not ask the program its page is painted in
 
@@ -1225,24 +1274,39 @@ a6631 · family=missing-word · status=cured
 Alex, 20 Oct, requested current worker status and automatic Desk/worker recovery at Windows sign-in. Missing lifecycle behavior: the Startup shortcut launches agora_start.py but has no external recovery if that process exits; AgoraHouseRecovery separately launches backend components, creating two startup owners. Codex is connecting the existing scheduled watchdog to the existing full Desk launcher, preserving live services, strengthening single-instance startup and testing restart restoration. Incomplete working tasks resume from saved house state; waiting tasks remain waiting for answers or new work.
 Ran 20 Oct: 6 focused startup tests passed (cold start, adoption, orphan recovery, inspection failure, checkout matching, real OS-lease contention/crash release). Existing builder restart/resume checks passed. Repository pytest: 201 passed, 2 skipped; changed Python Ruff and PowerShell parsing passed. Sign-in task is running. New launcher 20572 adopted the original live services; deliberately terminating only it led to watchdog replacement 91248 within the configured 60-second backoff. Keeper 62740, house 82160, door wrapper 28432, HUD 87440 and capture 33540 remained running unchanged; duplicate launcher exited without starting services. No Windows reboot/sign-out was performed. Docs checker still reports the pre-existing missing Dynamic Desk image. Source: agora_start.py, test_agora_start.py, house_supervisor.ps1; operational instructions updated in a639 and codex-residents/README.md.
 
-## activation-pending (1)
+### Observer bookkeeping must not log its own heartbeat
+
+a7766 · family=source · status=cured
+
+a7731 source correction: no missing new world word; the existing witnessed: source is the right boundary for moving observer counters. The checker had embedded record totals, epochs and evidence in every status projection, generating its own next observation. Verdict-only status plus full/divergence-only evidence and external witnessed counters remove that feedback; old receipt totals are reconciled once against self-record metadata. Copy tests pass; live activation/history proof remains pending house landing. No ordinary logger schema or world command semantics changed.
+
+## active (1)
 
 ### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
 
-a6970 · family=host · status=activation-pending
+a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (2)
-
-### Shared panel boundaries lacked a world-declared resize gesture (a7045)
-
-a7107 · family=missing-word · status=source-pending
-
-The painter could carry a thing or drag a free-positioned box, but could not redistribute neighbouring shares or express a full-width bottom region with its column model. a7045 adds generic `resize <prop> min <pixels>`, `partition <prop> min <width> <height> gap <pixels> [focus <prop>]`, `companion <expression>`, `sizing <expression>` and `chrome <expression>` vocabulary. A partition renders direct bound children from one world JSON split/tab tree: whole-child threshold carry, one geometric plan for preview/drop, global/local splits, tabs, content/stretch policies, manual content extents, focus/companions and persistent divider weights. Ordinary fenced prop writes remain layout truth. Share/tree/policy reads enter repeat fingerprints; otherwise persisted writes left reused geometry stale. JEFF's bare app regions stay lens-defined, separate from embedded controls. Necessary copy compatibility (c7177) adds opt-in `copy_json` props: only version-1 typed reference objects remap, never literal strings/keys; malformed/version errors refuse before creation. Source and exact world/documentation hunks are staged, not live. Guarded browser review a7784 accepted the exact c7682 bytes at both sizes (e938f74, round 6); small-screen composer access, timing and real-workspace coverage limits remain explicit. See hud-dividers/NAVIGATION.md and EVIDENCE.md for source landing and JEFF-owned world migration prerequisites; HANDOFF.md retains the superseded divider checkpoint.
+## source-pending (3)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
 a6838 · family=host · status=source-pending
 
 Host friction: independently added HUD playtest coverage required editing the same runner callbacks and order list, causing repeated landing conflicts. The missing extension point was discovery of one step per file. a6749 adds playtest_steps/*.py Step records (order, feature needs, press script with its existing assertions, budgets), scanned by hud_playtest.py. Existing bodies and numbers are preserved, including equal-footing from main. This is test-host structure, not new world behavior. Ran: 13 extraction/discovery/fixture-merge tests and 5 existing wheel-verdict tests pass; real browser acceptance is not run in the Codex sandbox.
+
+### Shared divider gestures need a world paint word
+
+a7107 · family=missing-word · status=source-pending
+
+Updated 20 Oct, source staged only: missing generic words resize, partition, companion, sizing and chrome provide world-declared shared weights, split/tab geometry, focused companions, natural size and bare-app tool policy. Whole-panel threshold carry and one preview/drop plan handle global/local edges; content leaves have manual edge extents and shared dividers persist weights. Repeat fingerprints include their expression/prop dependencies. Partition gesture fences include exact membership and direct-panel appearance/subject revisions (guarded shelves too), refreshed after reuse; concurrent panel policy/membership changes refuse. Necessary copy capability approved c7177: copy_json opts props into version-1 typed {$ref:identity} remapping; literal strings/keys and external refs remain unchanged; malformed/version errors refuse before creation. Ran 167 model checks,45 DOM stand-in checks,10 scene/world tests,3 copy-review recipe tests,4 typed-copy tests including actual workspace save/use. Browser remains blocked; no live acceptance/apply. Latest c7201 pane.bare/appgrip and music filled/scroll treatment preserved in staged lens a7167; scoped apply/docs/restore/checklist a7180. Source/acceptance details: hud-dividers/NAVIGATION.md.
+
+
+20 Oct round5 source candidate: generic authored grip default ownership and action-control drag guard repaired per JEFF, with no geometry/containment redesign. Passive nested summaries may carry; editors stay native; control clicks remain, returning/cancelled drags do not activate. 281 DOM stand-in checks pass; no fresh browser claim. Targeted guarded recheck still gates readiness/live use; EVIDENCE.md/current staged a7180 distinguish source tests from the reviewer's world-border proof.
+
+### Item promotion needs atomic data admission, not a batch of commands
+
+a7801 · family=missing-word · status=source-pending
+
+Source prerequisite for item pickup (worker-a7666, 20 Oct). Missing world-level word: one all-or-nothing create-or-restore plus placement, including subject and appearance identities. Ordinary independent lines intentionally keep successful earlier writes; compensation cannot prevent observers seeing an orphan. Staged internal Session.atomic/atomic_status/atomic_undo uses actual isolated Desk native checks, existing writer serialization, strict fsynced one-record facts/events/rule-state/receipt admission, whole undo and unknown-reply reconciliation. No public word/endpoint, carry affordance or live migration. Unsupported custom hooks, world-verb/effect rules and unsettled chains refuse atomically. Real panel notes supported with immutable actor/role and restricted data props. Accepted partition adapter, eligibility/receiver fences, preview agreement and observer/runtime compatibility remain integration gates. Tests use actual in-memory engine and disposable journals, not a stand-in backend. Architecture: research/text-desk-lab/notation/atomic-world/ARCHITECTURE.md.

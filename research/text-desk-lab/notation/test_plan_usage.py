@@ -256,7 +256,7 @@ class Quotas(unittest.TestCase):
         self.p.observe(claude(91))
         cfg = {"worker_pool": "2 claude, 2 codex", "claude_start_threshold": "90"}
         self.assertEqual(shop.lane(self.card, {}, cfg, [])["provider"], "codex")
-        shop.provider_of = lambda *args: "claude"
+        shop.saved_provider = lambda *args: "claude"
         self.assertIs(shop.lane(self.card, {}, cfg, []), False)
 
     def test_gauge_scene_and_threshold_settings(self):

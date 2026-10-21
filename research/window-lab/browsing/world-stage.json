@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "status": "STAGED ONLY; no live viewer or host edits",
+  "instructions": [
+    "JEFF: look at Study; check titles/roles for absence before each create.",
+    "Create only these new things, in order; bind returned identities to local handles below.",
+    "For text_file, use exactly the UTF-8 file text from this reviewed revision.",
+    "Do not add a dock/pin/tiling link, open a window, or replace home-viewer.",
+    "The preview is staged-lens, not lens. On a guarded COPY only, JEFF may add lens tag and inspect it.",
+    "No executable 'browser navigate' word is claimed. Fake tab presses only change active on the new fixture note."
+  ],
+  "create": [
+    {
+      "handle": "stage",
+      "parent": "Study",
+      "args": {
+        "kind": "surface",
+        "title": "Browsing inside Agora — inactive review"
+      }
+    },
+    {
+      "handle": "recommendation",
+      "parent": "@stage",
+      "args": {
+        "kind": "note",
+        "title": "Browsing — For Alex",
+        "stage": "draft-a7234",
+        "text": "One viewer with tabs for your desk, websites and files you choose. Back stays inside its tab. Opening a page never attaches it to chat.\n\nUse a separate web surface behind the same controls, not websites inside the privileged desk preview. Unsupported sites offer Open in browser.\n\nThis is an inactive design. No accounts, cookies or device files were accessed. See [[Browsing — architecture and acceptance]] and [[Browsing — staged chrome]]."
+      }
+    },
+    {
+      "handle": "architecture",
+      "parent": "@stage",
+      "args": {
+        "kind": "note",
+        "title": "Browsing — architecture and acceptance",
+        "stage": "draft-a7234"
+      },
+      "text_file": "DESIGN.md"
+    },
+    {
+      "handle": "fixture",
+      "parent": "@stage",
+      "args": {
+        "kind": "note",
+        "title": "Browsing — fake selected tabs",
+        "role": "browser-fixture-a7234",
+        "active": "desk",
+        "stage": "draft-a7234",
+        "text": "Layout-only fake state. No selected device file, live website or account. Tab buttons only set this note's active property."
+      }
+    },
+    {
+      "handle": "preview",
+      "parent": "@stage",
+      "args": {
+        "kind": "note",
+        "title": "Browsing — staged chrome",
+        "tags": "staged-lens",
+        "style": "home-style",
+        "stage": "draft-a7234"
+      },
+      "text_file": "browser-preview.lens"
+    }
+  ],
+  "reversal": [
+    {
+      "handle": "preview",
+      "operation": "prop",
+      "args": {
+        "tags": "staged-lens",
+        "stage": "withdrawn"
+      },
+      "precondition": "Only this newly created preview; if lens was added on a copy, remove it by restoring these exact tags."
+    },
+    {
+      "handles": ["recommendation", "architecture", "fixture"],
+      "operation": "prop",
+      "args": {"stage": "withdrawn"}
+    }
+  ],
+  "active_replacements": [],
+  "host_changes": [],
+  "private_store_changes": []
+}

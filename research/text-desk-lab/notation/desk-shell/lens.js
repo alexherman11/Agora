@@ -223,12 +223,7 @@
     // a6452: in a Markdown text, a picture the document drew in its place is not drawn again under the words
     const inline = p.media && el._te ? new Set([...el.querySelectorAll("img.md-img[data-media]")].map(i => i.dataset.media)) : null;
     const media = inline && inline.size ? { ...p.media, items: p.media.items.filter(i => !inline.has(i.src)) } : p.media;
-    if (media && window.Media) Media.draw(el, media, n.acts.some(a => a.on === "pop") ? async item => {
-      for (const a of el._n.acts.filter(a => a.on === "pop")) {
-        const line = a.line.replace(/\$value\b/g, () => TEXT.esc(item.path));
-        if (line.startsWith("host ")) await host(line.slice(5)); else await send(el._n, line);
-      }
-    } : null);
+    if (media && window.Media) Media.draw(el, media, n.acts.some(a => a.on === "pop") ? item => popMedia(el, item) : null);
     if (p.semantic) semantic(el, p.semantic);                 // before frames: a fold's own state wins over the default
     if (p.kind === "frame") frames(el, n, p);
     // a weight, as a track is; in a row, a share also fills the row's height (lens.html: .l-row > [data-share]). 1 Oct:
@@ -289,6 +284,7 @@
   // child's track shrinks to its handle; gap, scroll and measure on any frame; fold is the lens's default, overridden by
   // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
   function frames(el, n, p) {
+    if (p.remember) el.dataset.remember = p.remember;
     if (p.gap != null) el.style.gap = typeof p.gap === "number" ? p.gap + "px" : p.gap[0] === "/" ? `calc(var(--t-gap) / ${p.gap.slice(1)})` : `calc(${p.gap.slice(1)} * var(--t-gap))`;   // F10: steps of the style's gap
     if (p.scroll && p.scroll !== "none" && p.scroll !== "none end") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
     // a5496 (Alex, 15 Oct: 'I don't want the interface to scroll'): `scroll none` never scrolls; what does not fit is
@@ -732,6 +728,12 @@
     return { ok, error: ok ? null : t, event: ok ? (r.events || []).slice(-1)[0] : null };
   }
   // a6452: Markdown the drawing cannot take still shows its words, as plain text: never an empty part, never a stopped page
+  async function popMedia(el, item) {
+    for (const a of el._n.acts.filter(a => a.on === "pop")) {
+      const line = a.line.replace(/\$value\b/g, () => TEXT.esc(item.path));
+      if (line.startsWith("host ")) await host(line.slice(5)); else await send(el._n, line);
+    }
+  }
   function markdown(el, n, p) {
     try { document_(el, n, p); }
     catch (e) {
@@ -751,6 +753,7 @@
       seam: a ? { send: out => sendEdit(el, out) } : null,
       hooks: {
         notify: t => V.notify(t),
+        pop: n.acts.some(x => x.on === "pop") ? item => popMedia(el, item) : null,
         follow: async id => {
           const at = linkFor(el);                                   // a6109: its own `on link`, or the nearest above it
           if (!at) return V.show("this document's links open nowhere here (no `on link` on it or above it)");

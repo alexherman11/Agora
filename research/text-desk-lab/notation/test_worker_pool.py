@@ -10,7 +10,7 @@ the world copy and the worker's process stubbed: Popen is caught, so each start 
      codex_worker.py --model gpt-6-astra; each card says the provider it got; the fifth waits
   2. a ready card and a landing card hold no slot: the fifth starts in the lane they free; a busy ready worker (a landing
      sent it back to work) still holds one
-  3. a card that names worker_provider=codex waits while the codex lane is full, even with Claude room free
+  3. provider labels on fresh cards do not exclude any lane in the shared pool
   4. a re-asked card goes back to the provider its saved conversation belongs to, never the other lane
   5. no worker_pool: every card runs as it says, Claude unless it names codex, bounded by workers alone (as before)
   6. a codex card that names no model runs the adapter's own (gpt-6.1-sol), never the house's Claude model
@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import uuid
+from threading import Thread as RealThread
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -153,7 +154,7 @@ check("1. one pass starts four workers: two claude -p, two codex_worker.py on gp
       sorted(got) == [("claude", "claude-opus-5-5")] * 2 + [("codex", "gpt-6-astra")] * 2, got)
 check("1. each started card says the provider (and the Astra model) it got, and is working",
       sorted((props(c).get("worker_provider"), props(c).get("worker_model"), props(c).get("commission")) for c in cards[:4])
-      == [("claude", None, "working")] * 2 + [("codex", "gpt-6-astra", "working")] * 2,
+      == [("claude", "claude-opus-5-5", "working")] * 2 + [("codex", "gpt-6-astra", "working")] * 2,
       [(props(c).get("worker_provider"), props(c).get("worker_model"), props(c).get("commission")) for c in cards])
 check("1. the fifth waits, asked, with no provider chosen", props(cards[4]).get("commission") == "asked"
       and "worker_provider" not in props(cards[4]) and cards[4] not in WS.workers, props(cards[4]))
@@ -161,6 +162,9 @@ claude_cmd = next(c for c in commands() if c[0] == "claude.exe")
 check("1. a Claude worker is claude -p with stream-json, acceptEdits, its allowed tools and the desk MCP only",
       all(f in claude_cmd for f in ("-p", "--input-format", "--permission-mode", "acceptEdits", "--allowedTools",
                                     "--strict-mcp-config", "--append-system-prompt")), claude_cmd[:12])
+check("1. real Worker.start passes medium effort and the 600k compaction window to Claude",
+      claude_cmd[claude_cmd.index("--effort") + 1] == "medium"
+      and claude_cmd[claude_cmd.index("--autocompact") + 1] == "600k")
 
 # ---- 2. ready and landing hold no slot ------------------------------------------------------------------------------
 claude_cards = [c for c in cards[:4] if props(c).get("worker_provider") == "claude"]
@@ -197,28 +201,32 @@ reset()
 popen.reset_mock()
 a, b2, c3 = card("Sol one", worker_provider="codex"), card("Sol two", worker_provider="codex"), card("Sol three", worker_provider="codex")
 WS.step(W, POOL)
-check("3. three cards that name codex: two start (the codex lane), the third waits though Claude has room",
-      [provider_of_cmd(c)[0] for c in commands()] == ["codex", "codex"] and c3 not in WS.workers
-      and props(c3).get("commission") == "asked", commands())
-check("3. a card that named its provider keeps its own props: no worker_model written over it",
-      "worker_model" not in props(a), props(a))
+check("3. three fresh cards labelled codex are all eligible for the same mixed pool",
+      [provider_of_cmd(c)[0] for c in commands()] == ["claude", "codex", "claude"]
+      and props(c3).get("commission") == "working", [provider_of_cmd(c) for c in commands()])
+check("3. recorded provider/model describe the actual selected runtime",
+      props(a)["worker_provider"] == "claude" and props(a)["worker_model"] == "claude-opus-5-5", props(a))
 
 # ---- 4. a re-asked card goes back to its conversation's provider ------------------------------------------------------
 reset()
 back = card("Back again")
 d = H.dir / f"worker-{back}"
 d.mkdir(parents=True, exist_ok=True)
-(d / "state.json").write_text(json.dumps({"session": "s-1", "session_provider": "codex"}), encoding="utf-8")
+(d / "state.json").write_text(json.dumps({"session": "s-1", "session_provider": "codex",
+                                         "model": "gpt-6.1-sol"}), encoding="utf-8")
 fill = [card(f"Claude fill {i}") for i in range(2)]
 popen.reset_mock()
 WS.step(W, POOL)
 check("4. a card whose saved conversation is Codex's starts on codex, resuming it",
       props(back).get("worker_provider") == "codex" and WS.workers[back].state.get("session_provider") == "codex"
       and any(provider_of_cmd(c)[0] == "codex" and c[-2:] == ["--resume", "s-1"] for c in commands()), commands())
-check("4. the provider_of reading: explicit prop, then saved conversation, then none",
+check("4. saved conversation takes precedence over a conflicting task label",
       WS.provider_of(back, {"props": {}}) == "codex"
-      and WS.provider_of(back, {"props": {"worker_provider": "claude"}}) == "claude"
+      and WS.provider_of(back, {"props": {"worker_provider": "claude"}}) == "codex"
       and WS.provider_of("a0", {"props": {}}) is None)
+check("4. a pool model change does not replace a saved session's model",
+      props(back).get("worker_model") == "gpt-6.1-sol"
+      and any(provider_of_cmd(c) == ("codex", "gpt-6.1-sol") for c in commands()))
 
 # ---- 5. no pool: as before ------------------------------------------------------------------------------------------
 reset()
@@ -250,6 +258,103 @@ check("7. worker_pool readings", P({"worker_pool": "2 claude, 2 codex gpt-6-astr
       and P({"worker_pool": "1 codex gpt-6-astra, 3 codex gpt-6.1-sol"}) == [{"n": 1, "provider": "codex", "model": "gpt-6-astra"}],
       [P({"worker_pool": x}) for x in ("2 claude, 2 codex gpt-6-astra", "two claude")])
 reset()
+
+# ---- 9. shared priorities, soft fit, durable aging, reset and atomic claims ----------------------------------------
+low = card("Old low priority", priority="low")
+high = card("New high priority", priority="high")
+WS.step(W, {**POOL, "workers": "1"})
+check("9. explicit priority beats insertion order", high in WS.workers and low not in WS.workers)
+reset()
+ordinary = card("Ordinary")
+fit = card("Worker explicitly prefers this suitable task", worker_prefer="codex-builder-1")
+WS.step(W, {**POOL, "workers": "1"})
+check("9. a free named worker can prefer a suitable task in the unordered pool",
+      fit in WS.workers and ordinary not in WS.workers and WS.workers[fit].builder == "codex-builder-1")
+reset()
+old = card("Long waiting", priority="low")
+fresh = card("Fresh urgent", priority="urgent")
+workshop.atomic_state(H.dir / "pool-waits.json", {old: workshop.time.time() - 4 * 3600, fresh: workshop.time.time()})
+WS.step(W, {**POOL, "workers": "1"})
+check("9. durable wait credit eventually beats fresh urgent arrivals", old in WS.workers and fresh not in WS.workers)
+reset()
+
+now = [1000]
+pause = {"claude": 1060, "codex": 0}
+targets = {}
+class Plans:
+    def fuel_reason(self, provider, cfg):
+        return ""
+    def wait_until(self, provider):
+        return pause[provider]
+    def queue_reason(self, provider, cfg):
+        return "Queued: Claude paused until reset." if pause[provider] > now[0] else ""
+    def target(self, cid, reason):
+        targets[cid] = reason
+
+H.plans = Plans()
+available = [card(f"Shared after reset {i}", worker_provider="claude") for i in range(6)]
+with mock.patch.object(workshop.time, "time", side_effect=lambda: now[0]):
+    WS.step(W, POOL)
+    check("9. paused Claude does not exclude labelled tasks from Codex",
+          len(WS.running(W)) == 2 and all(x.state["session_provider"] == "codex" for x in WS.running(W)))
+    kept = {cid: wk for cid, wk in WS.workers.items()}
+    now[0] = 1060
+    WS.step(W, POOL)
+    check("9. first parent pass at reset automatically fills Claude slots with no model polling",
+          len(WS.running(W)) == 4 and sum(x.state["session_provider"] == "claude" for x in WS.running(W)) == 2)
+    check("9. reset preserves every in-flight worker and recomputes truthful queue status",
+          all(WS.workers[cid] is wk for cid, wk in kept.items())
+          and all("Claude paused" not in targets.get(cid, "") for cid in available))
+del H.plans
+reset()
+
+many = [card(f"Concurrent claim {i}") for i in range(7)]
+errors = []
+def pass_once():
+    try:
+        WS.step(W, {**POOL, "workers": "99", "worker_pool": "9 claude, 9 codex"})
+    except Exception as exc:
+        errors.append(str(exc))
+t1, t2 = RealThread(target=pass_once), RealThread(target=pass_once)
+t1.start()
+t2.start()
+t1.join()
+t2.join()
+check("9. serialized parent claims never duplicate a card or exceed four even with workers=99",
+      not errors and len(commands()) == 4 and len(WS.running(W)) == 4, errors)
+
+# A waiting disposable worker must retain its unheard cursor until capacity exists.
+waiting = next(c for c in many if c not in WS.workers)
+setp(waiting, commission="waiting")
+cursor = len(W.events)
+dummy = SimpleNamespace(cid=waiting, state={"cursor": cursor, "turns": 1}, alive=lambda: True, busy=False,
+                        builder=None, turns_ended=lambda: [], send=mock.Mock(), save=mock.Mock())
+WS.workers[waiting] = dummy
+say("pike", f"look {waiting} :1", f'do comment {waiting} line="A real answer must wait for a slot."')
+WS.step(W, POOL)
+check("9. answering a waiting card cannot create a fifth turn or consume its message",
+      not dummy.send.called and dummy.state["cursor"] == cursor)
+with mock.patch.object(workshop, "Worker") as construct:
+    check("9. a house-restart resume also waits at the four-worker boundary",
+          WS.resume(W, "a99999", {"props": {}}, POOL) is None and not construct.called)
+check("9. a parked card cannot take a fifth model slot",
+      not WS.parked(W, waiting, {"props": {}}, "working", dummy, POOL))
+reset()
+
+# Runtime flags were captured from real Worker.start above (no provider process ran).
+import claude_worker_runtime
+check("9. requested runtime settings are explicit CLI arguments",
+      claude_worker_runtime.arguments({}) == ["--effort", "medium", "--autocompact", "600k"])
+for boundary in ("100k", "600000", "1M"):
+    check("9. autocompact accepted boundary " + boundary,
+          claude_worker_runtime.arguments({"worker_claude_autocompact": boundary})[-1] == boundary)
+for outside in ("99999", "1000001", "auto", "600k garbage"):
+    try:
+        claude_worker_runtime.arguments({"worker_claude_autocompact": outside})
+        valid = True
+    except ValueError:
+        valid = False
+    check("9. invalid autocompact refused " + outside, not valid)
 mock.patch.stopall()          # workshop.subprocess is subprocess: git below must really run
 
 # ---- 8. the house commits a Codex worker's work at landing --------------------------------------------------------------

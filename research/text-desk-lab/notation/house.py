@@ -73,6 +73,7 @@ sys.path.insert(0, str(HERE))
 import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
 import charter
+import host_route_parent
 import explore       # noqa: E402  _alive(): is a pid still running
 import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
 import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
@@ -406,6 +407,7 @@ class Resident:
         self.failed = False        # this process has already been judged failed (a result error, then its exit)
         self.wakes_at = None       # a1062: when the house would next wake it on its own, while it rests
         self.started = False       # this house process has started it once (the first start after a restart is special)
+        self.reply_source = None   # parent pipe provenance; never taken from child JSON/world actor
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
@@ -473,7 +475,8 @@ class Resident:
         self.proc = subprocess.Popen(cmd, cwd=self.dir, env=clean_env(self.house.fake), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=open(self.dir / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1)
-        threading.Thread(target=self._read, args=(self.proc,), daemon=True).start()
+        source = self._bind_child(self.proc)
+        threading.Thread(target=self._read, args=(self.proc, source), daemon=True).start()
         self.busy, self.reply, self.failed = False, [], False
         self.log("start", {"cmd": cmd[1:], "pid": self.proc.pid})
 
@@ -485,22 +488,30 @@ class Resident:
             except Exception:
                 self.proc.kill()
         self.proc = None
+        if route := getattr(self.house, "host_route", None):
+            route.retire(self)
         self.log("stop", {})
 
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
 
-    def _read(self, proc):
+    def _bind_child(self, proc):
+        self.reply, self.reply_source = [], None
+        route = getattr(self.house, "host_route", None)
+        return route.bind(self, proc) if route else None
+
+    def _read(self, proc, source=None):
         for raw in proc.stdout:
             try:
                 ev = json.loads(raw)
             except json.JSONDecodeError:
                 continue
             self.log("event", ev)
-            self.events.put(ev)
+            self.events.put(host_route_parent.ChildEvent(source, ev) if source else ev)
         code = proc.wait()
         self.log("exit", {"code": code, "pid": proc.pid})
-        self.events.put({"type": "exit", "code": code})
+        event = {"type": "exit", "code": code}
+        self.events.put(host_route_parent.ChildEvent(source, event) if source else event)
 
     def send(self, text, kind="news", carry=None):
         """`kind` is door, wake, news or receipt; `carry` is the part that must survive a lost conversation (news and
@@ -573,6 +584,12 @@ class Resident:
                 ev = self.events.get_nowait()
             except queue.Empty:
                 return ended
+            source = None
+            if isinstance(ev, host_route_parent.ChildEvent):
+                route = getattr(self.house, "host_route", None)
+                if not route or not route.current(self, ev.source):
+                    continue  # old child's result/exit must not finish the new child's turn
+                source, ev = ev.source, ev.event
             t = ev.get("type")
             if plans := getattr(self.house, "plans", None):
                 try:
@@ -605,11 +622,14 @@ class Resident:
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):
                     if c.get("type") == "text":
+                        previous = getattr(self, "reply_source", None)
+                        self.reply_source = source if not self.reply else previous if previous is source else None
                         self.reply.append(c["text"])
             elif t == "result" and ev.get("is_error"):
                 self.busy = False
                 ended.append({"error": ev.get("subtype") or "error", "detail": str(ev.get("result") or "")[:300]})
                 self.reply = []
+                self.reply_source = None
             elif t == "result":
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
@@ -621,10 +641,16 @@ class Resident:
                 said.append({"n": self.state["turns"], "at": self.state["last_turn"], "text": "\n".join(self.reply)[:SAID_CHARS]})
                 del said[:-SAID_KEEP]
                 self.save()
-                ended.append("\n".join(self.reply))
+                text = "\n".join(self.reply)
+                if route := getattr(self.house, "host_route", None):
+                    text = route.intercept(source if source is getattr(self, "reply_source", None) else None, text)
+                ended.append(text)
                 self.reply = []
+                self.reply_source = None
             elif t == "exit":
                 self.busy = False
+                if route := getattr(self.house, "host_route", None):
+                    route.retire(self)
                 self.proc = None
                 ended.append(None)
 
@@ -654,6 +680,8 @@ class House:
         self.plans = plan_usage.Plans(self)
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
         self.charter_state = {}
+        # No setting/world property can enable this; no journal/backend opened.
+        self.host_route = host_route_parent.ParentDispatcher()
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -1288,6 +1316,9 @@ class House:
         n0 = len(w.events)
         # a5068: news runs only between turns, so the cursor is where this turn's input left off (a2870 Revision 2)
         receipt = self.act(actor, "\n".join(attempts), whole=True, as_of=r.state.get("cursor")) if attempts else ""
+        host_receipts = getattr(text, "host_receipts", ())
+        if host_receipts:
+            receipt = "\n".join(([receipt] if receipt else []) + list(host_receipts))
         if attempts and any(e.get("by") == actor and e.get("verb") != "go" for e in self.load().events[n0:]):
             r.state["idle_wakes"] = 0         # it changed something: an open objective asks again after `breather`
         # Sable c742: a > line nothing answers (a quote) says MISS and stops nothing after it; the desk decides, since
@@ -1440,6 +1471,11 @@ class House:
             return r.stdout.strip() if r.returncode == 0 else ""
         started_on, passes = head(), 0
         checked_on = started_on       # the HEAD-watch's baseline; started_on stays what this process imported
+        # No timer: startup requests one full comparison from the live writer.
+        try:
+            self.act("house", "log-world check", whole=True)
+        except Exception as e:
+            print(f"house: log-world startup request unavailable: {type(e).__name__}: {e}", flush=True)
         try:
             while True:
                 try:

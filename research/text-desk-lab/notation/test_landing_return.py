@@ -37,7 +37,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 NOTATION = "research/text-desk-lab/notation"
-tmp = tempfile.TemporaryDirectory()
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+from types import SimpleNamespace
+import atexit
+import shutil
+tmp = SimpleNamespace(name=agora_tmp.directory("landing-regression-"))
+atexit.register(shutil.rmtree, tmp.name, ignore_errors=True)
 TMP = Path(tmp.name)
 REPO = TMP / "live"
 os.environ["LANDING_LIVE"] = str(REPO)
@@ -179,7 +185,7 @@ workshop.TREES = TREES
 workshop.Worker = Wk
 workshop.REVERTS = TMP / "keeper" / "house-state" / "reverts.jsonl"
 door.copy_locked = lambda src, to: "not copied in this test"          # never a lock in the lab's own sessions/
-landing.health = lambda world, cwd: ({"ok": False, "lenses_ok": [], "failed": ["BROKEN is here"], "text": "broken"}
+landing.health = lambda world, cwd, **how: ({"ok": False, "lenses_ok": [], "failed": ["BROKEN is here"], "text": "broken"}
                                      if (Path(cwd) / "BROKEN").exists() else
                                      {"ok": True, "lenses_ok": [], "failed": [], "text": "all well"})
 

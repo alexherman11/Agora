@@ -45,6 +45,7 @@ import threading
 import time
 from pathlib import Path
 import charter
+import claude_worker_runtime
 
 HERE = Path(__file__).resolve().parent
 import shared                             # noqa: E402  (a5296: at import, before a test stubs the workers' Popen)
@@ -57,7 +58,8 @@ PY = Path(sys.executable)
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
 HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
-               "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py"}
+               "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
+               "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -293,6 +295,7 @@ def short_files(files, n=8):
 class Workshop:
     def __init__(self, house):
         self.house = house
+        self._dispatch_lock = threading.RLock()
         self.workers = {}              # commission appearance id -> Worker
         self.restart_wanted = False    # a landing changed code this process imported
         self.compared = set()          # (promise, lived commit) this house has said its comparison of, or tried to
@@ -403,6 +406,13 @@ class Workshop:
 
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self, w, cfg):
+        # One parent owns the pool. Serialize claims, including accidental concurrent
+        # passes; always reload inside the boundary rather than claiming a stale view.
+        with self._dispatch_lock:
+            return self._step(self.house.load(), cfg)
+
+    def _step(self, w, cfg):
+        self._dispatch_cfg = cfg
         self.compare_lived(w)
         if self.keeper_reverts(w):
             w = self.house.load()
@@ -410,7 +420,7 @@ class Workshop:
             w = self.house.load()
         cs = self.commissions(w)
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
-        for cid, (s, state) in sorted(cs.items(), key=lambda kv: kv[1][1] == "asked"):
+        for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
             if state == "cancelled":
                 if wk:
@@ -434,20 +444,23 @@ class Workshop:
                     continue
                 if self.uncommitted(w, cid, s):    # a5296: said at once, slot or no slot; held while a named file is new
                     continue
-                # Sable c3142, 30 Sep: nine asked, none started from 18:25 to 19:50, because three idle workers (two
-                # waiting on someone, one reported) held all three slots. Only a worker at work holds one now; a waiting
-                # one keeps its process, and when it is answered the house may briefly run one over the number.
+                # Idle waiting/ready processes hold no model slot. Answering one
+                # also waits for capacity: the four-worker limit has no resume exception.
                 # a5284 (a5261 point 1, 15 Oct): a card that is ready or landing held one too, and runs no model; its
                 # worker holds a slot again only while a turn is out (busy), as when a landing sends it back to work
-                running = [x for c, x in self.workers.items() if x.alive()
-                           and (x.busy or (cs.get(c) or (None, ""))[1] == "working")]
-                if len(running) >= int(cfg.get("workers", "1")):
+                running = self.running(w)
+                if len(running) >= self.capacity(cfg):
+                    if plans := getattr(self.house, "plans", None):
+                        plans.target(cid, "Queued: all worker slots are busy.")
                     continue
                 lane = self.lane(cid, s, cfg, running)
                 if lane is False:
                     if plans := getattr(self.house, "plans", None):
-                        provider = self.provider_of(cid, s) or "claude"
-                        reason = plans.queue_reason(provider, cfg)
+                        providers = ([self.saved_provider(cid)] if self.saved_provider(cid) else
+                                     [ln["provider"] for ln in self.pool(cfg)] or ["claude"])
+                        reasons = [plans.queue_reason(p, cfg) for p in providers]
+                        reason = (" ".join(dict.fromkeys(r for r in reasons if r))
+                                  if all(reasons) else "Queued: waiting for a free eligible worker.")
                         plans.target(cid, reason)
                     continue
                 if plans := getattr(self.house, "plans", None):
@@ -460,7 +473,8 @@ class Workshop:
                     # a5378: a Claude lane is its standing builders; the card waits until one is free
                     props, last = s.get("props") or {}, self.card_state(cid).get("builder")
                     hand = str(props.get("hand_to") or "").strip()
-                    name = self.free_builder(w, cfg, prefer=hand or last, strict=bool(hand), provider=lane["provider"])
+                    prefer = str(props.get("worker_prefer") or "").strip()
+                    name = self.free_builder(w, cfg, prefer=hand or last or prefer, strict=bool(hand), provider=lane["provider"])
                     if name:
                         self.begin(w, cid, s, cfg, lane, builder=name)
                     continue
@@ -506,6 +520,11 @@ class Workshop:
                 continue
             if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                 continue                 # draining for a restart: no new turn starts; what it would hear waits (house.step)
+            if not self.room(w, cfg, cid):
+                continue                 # do not consume the unheard cursor while all four models are occupied
+            if (wk.state.get("failure") or {}).get("told") is False:
+                self.tell_failure(wk)
+                continue
             heard = self.heard(w, cid, s2, wk)
             if heard:
                 if state == "waiting":
@@ -567,6 +586,48 @@ class Workshop:
 
     # ---- the pool ----------------------------------------------------------------------------------------------
     @staticmethod
+    def capacity(cfg):
+        return max(0, min(4, int(cfg.get("workers", "1"))))
+
+    def running(self, w):
+        cs = self.commissions(w)
+        return [wk for cid, wk in self.workers.items() if wk.alive()
+                and (wk.busy or (cs.get(cid) or (None, ""))[1] in ("working", "reverted"))]
+
+    def room(self, w, cfg, cid):
+        running = self.running(w)
+        return len([wk for wk in running if wk is not self.workers.get(cid)]) < self.capacity(cfg)
+
+    def ordered(self, cs, cfg):
+        """A shared set, not provider queues. One priority level per waiting hour
+        prevents repeated urgent arrivals starving a low-priority card forever.
+        worker_prefer is a soft named-builder preference, never a grant or reservation.
+        Wait credits survive parent restarts and disappear once the card is claimed.
+        """
+        path = self.house.dir / "pool-waits.json"
+        try:
+            waits = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            waits = {}
+        now = time.time()
+        current = {cid: waits.get(cid, now) for cid, (_, state) in cs.items() if state == "asked"}
+        if current != waits:
+            atomic_state(path, current)
+        w = self.house.load()
+        free = {name for lane in self.pool(cfg) for name in self.builders(cfg, lane["provider"])
+                if self.free_builder(w, cfg, prefer=name, strict=True, provider=lane["provider"]) == name}
+        def key(item):
+            cid, (s, state) = item
+            p = s.get("props") or {}
+            priority = {"low": 0, "normal": 1, "high": 2, "urgent": 3,
+                        "0": 3, "1": 2, "2": 1, "3": 0}.get(str(p.get("priority", "")).lower(), 1)
+            age = max(0, int((now - current.get(cid, now)) // 3600))
+            fit = str(p.get("worker_prefer") or "") in free
+            # Stable object identity only breaks ties; creation order is not priority.
+            return (state == "asked", -(priority + age), -fit, int(cid[1:]) if cid[1:].isdigit() else cid)
+        return sorted(cs.items(), key=key)
+
+    @staticmethod
     def pool(cfg):
         """The house note's worker_pool, e.g. "2 claude, 2 codex gpt-6-astra": lanes of <how many> <provider> [model],
         each a provider's share of the workers (a5284, Alex 15 Oct: two Claude and two Astra). -> [{n, provider, model}],
@@ -580,11 +641,12 @@ class Workshop:
         return lanes
 
     def provider_of(self, cid, s):
-        """The provider a card is held to: its own worker_provider, else the one its saved worker conversation belongs
-        to (a re-asked card resumes it, and a conversation never moves between providers), else None (the pool picks)."""
-        said = ((s.get("props") or {}).get("worker_provider") or "").strip()
-        if said:
-            return said
+        """Actual saved runtime first; a legacy provider label is only used
+        without a mixed pool. lane() does not bind fresh tasks to that label."""
+        return self.saved_provider(cid) or ((s.get("props") or {}).get("worker_provider") or "").strip() or None
+
+    def saved_provider(self, cid):
+        """Only a saved conversation binds a runtime; a task label does not."""
         try:
             st = json.loads((self.house.dir / f"worker-{cid}" / "state.json").read_text(encoding="utf-8"))
         except (OSError, ValueError, AttributeError):
@@ -605,7 +667,7 @@ class Workshop:
         for x in running:
             p = x.state.get("session_provider") or "claude"
             used[p] = used.get(p, 0) + 1
-        held = self.provider_of(cid, s)
+        held = self.saved_provider(cid)
         if held:
             mine = [ln for ln in lanes if ln["provider"] == held]
             if not mine:
@@ -613,8 +675,15 @@ class Workshop:
             if self.provider_wait(held) > time.time() or not allowed(held):
                 return False
             return mine[0] if used.get(held, 0) < sum(ln["n"] for ln in mine) else False
+        preferred = str((s.get("props") or {}).get("worker_prefer") or "")
         room = [(ln["n"] - used.get(ln["provider"], 0), -i, ln) for i, ln in enumerate(lanes)
                 if self.provider_wait(ln["provider"]) <= time.time() and allowed(ln["provider"])]
+        if preferred:
+            fitting = [r for r in room if r[0] > 0 and preferred in self.builders(cfg, r[2]["provider"])
+                       and self.free_builder(self.house.load(), cfg, prefer=preferred, strict=True,
+                                             provider=r[2]["provider"]) == preferred]
+            if fitting:
+                return fitting[0][2]
         if not room:
             return False
         free, _, best = max(room, key=lambda r: r[:2])
@@ -644,15 +713,8 @@ class Workshop:
             return False
         changed = False
         for cid, (s, state) in self.commissions(w).items():
-            if (state == "asked" and self.provider_of(cid, s) == "claude"
-                    and not self.card_state(cid).get("session")
-                    and self.provider_wait("claude") > time.time()):
-                wk = self.workers.get(cid)
-                if not wk or not (wk.alive() or wk.busy):
-                    self.set_state(cid, "asked", worker_provider="codex",
-                                   worker_model=lanes[0]["model"] or CODEX_MODEL)
-                    changed = True
-                continue
+            # Fresh asked cards already share all available lanes. Quota fallback
+            # below is only for a stopped in-flight session, with its recovery journal.
             if state not in ("working", "waiting", "reverted"):
                 continue
             st = self.card_state(cid)
@@ -757,6 +819,7 @@ class Workshop:
         held = self.holding(name)
         if held is not None and held is not wk:
             held.set_down(f"{name} went to {cid}")
+        wk.runtime_cfg = cfg
         b = Builder(self.house, name)
         before, last = wk.state.get("builder"), b.state.get("on")
         handed = (s.get("props") or {}).get("hand_to") is not None      # read before the act below clears it
@@ -798,7 +861,7 @@ class Workshop:
         It takes a builder only when it has something to do: a turn cut short, its landing's failure untold, a
         handover, words for it, or work underway; its own builder first, the one it was handed to only, else any free
         one. -> whether a builder took it."""
-        if state not in ("working", "waiting", "reverted"):
+        if state not in ("working", "waiting", "reverted") or not self.room(w, cfg, cid):
             return False
         if wk.state.get("retry_at", 0) > time.time():
             return False
@@ -879,9 +942,15 @@ class Workshop:
     def begin(self, w, cid, s, cfg, lane=None, builder=None):
         asked_by = self.asked_by(w, s)
         chosen = {}
-        if lane and not (s.get("props") or {}).get("worker_provider"):
+        if lane:
             # the pool chose: written on the card, so it shows, and a restart or resume runs the same provider and model
-            chosen = {"worker_provider": lane["provider"], **({"worker_model": lane["model"]} if lane["model"] else {})}
+            saved = self.card_state(cid)
+            props = s.get("props") or {}
+            model = ((saved.get("model") or
+                      (props.get("worker_model") if props.get("worker_provider") == lane["provider"] else None))
+                     if saved.get("session") else None)
+            model = model or lane["model"] or (CODEX_MODEL if lane["provider"] == "codex" else cfg.get("worker_model") or cfg["model"])
+            chosen = {"worker_provider": lane["provider"], "worker_model": model}
             s = {**s, "props": {**(s.get("props") or {}), **chosen}}
         branch, tree = f"worker/{cid}", TREES / cid
         TREES.mkdir(exist_ok=True)
@@ -916,6 +985,7 @@ class Workshop:
         except OSError as e:
             self.say(cid, f"(the house could not copy the world for trying things: {e})")
         wk = Worker(self.house, cid, tree, branch, asked_by)
+        wk.runtime_cfg = cfg
         self.workers[cid] = wk
         wk.state["cursor"] = len(w.events)
         wk.state.pop("retry_at", None)
@@ -953,6 +1023,8 @@ class Workshop:
         keeper's restart): start it again on its own saved session, in its own worktree. It hears only what it has not
         heard (the cursor was saved), and a turn the restart cut short is said to it again. Without a saved session it
         is left for a person to re-ask (commission=asked)."""
+        if not self.room(w, cfg, cid):
+            return None
         props = s.get("props") or {}
         if not self.real_tree(TREES / cid):
             if props.get("commission") == "reverted":
@@ -975,6 +1047,7 @@ class Workshop:
                           "a fresh worktree on the same branch.")
             return None
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))     # a1590: the name, never p2919
+        wk.runtime_cfg = cfg
         if not getattr(wk, "builder", None) and self.provider_of(cid, s) == "codex" and self.builders(cfg, "codex"):
             name = self.free_builder(w, cfg, provider="codex")
             if not name:
@@ -1020,6 +1093,8 @@ class Workshop:
 
     def tell_failure(self, wk, before=""):
         """Send the worker its landing's failure; it counts as told once the message is in its conversation."""
+        if not self.room(self.house.load(), getattr(self, "_dispatch_cfg", {"workers": "4"}), wk.cid):
+            return False
         f = wk.state["failure"]
         wk.send(before + f["text"])
         if (wk.state.get("pending") or {}).get("delivered"):
@@ -1104,6 +1179,10 @@ class Workshop:
             return self.hand_back(cid, wk, why)
         self.set_state(cid, state)
         self.say(cid, card)
+        if not self.room(self.house.load(), getattr(self, "_dispatch_cfg", {"workers": "4"}), cid):
+            if not wk.alive():
+                self.workers.pop(cid, None)    # resume discovers its durable failure when a slot is free
+            return False
         if not wk.alive() and getattr(wk, "builder", None):
             # a5378: a builder's card waits, parked, for a free builder (its own first), who is told the failure
             self.workers[cid] = wk
@@ -1500,10 +1579,11 @@ class Worker:
                 current = self.house.load()
                 task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
                 props = task.get("props") or {}
-                provider = props.get("worker_provider", "claude")
+                provider = (self.state.get("session_provider") if self.state.get("session") else None) or props.get("worker_provider", "claude")
                 # a5284: a codex card that names no model runs the adapter's own (codex_worker.MODEL), never the
                 # house's Claude model
-                model = props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL)
+                model = ((self.state.get("model") if self.state.get("session") else None)
+                         or props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL))
                 extra, cmds, ev, why = extra_tools(current, task) if task else ([], [], None, "")
                 if provider != "claude" and cmds:
                     extra, why = [], f"extra_tools is for claude workers; this one is {provider}"
@@ -1567,6 +1647,7 @@ class Worker:
                            "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
                            "--append-system-prompt", prompt,
                            "--settings", json.dumps(charter.claude_hook(PY, world, self.cid, self.actor))]
+                    cmd += claude_worker_runtime.arguments(getattr(self, "runtime_cfg", {}))
                 else:
                     raise ValueError(f"{self.cid}: unknown worker provider {provider}")
                 self.state["session_provider"] = provider
@@ -1584,22 +1665,24 @@ class Worker:
                 # a5378: each process has its own queue, so a process set down (its card waits for a builder) never
                 # says its exit into the next one's, where it would read as that worker failing
                 self.events = queue.Queue()
-                threading.Thread(target=self._read_into, args=(self.proc, self.events), daemon=True).start()
+                source = self._bind_child(self.proc)
+                threading.Thread(target=self._read_into, args=(self.proc, self.events, source), daemon=True).start()
                 self.busy, self.reply, self.failed = False, [], False
                 self.log("start", {"cmd": [c if len(c) < 200 else c[:200] + "…" for c in cmd[1:]], "pid": self.proc.pid,
                                    **({"builder": self.builder} if self.builder else {})})
 
-            def _read_into(self, proc, events):
+            def _read_into(self, proc, events, source=None):
                 for raw in proc.stdout:
                     try:
                         ev = json.loads(raw)
                     except json.JSONDecodeError:
                         continue
                     self.log("event", ev)
-                    events.put(ev)
+                    events.put(H.host_route_parent.ChildEvent(source, ev) if source else ev)
                 code = proc.wait()
                 self.log("exit", {"code": code, "pid": proc.pid})
-                events.put({"type": "exit", "code": code})
+                event = {"type": "exit", "code": code}
+                events.put(H.host_route_parent.ChildEvent(source, event) if source else event)
 
             def set_down(self, why):
                 """a5378: its builder leaves this card (for another card, or handed on): the process stops and what it
@@ -1612,6 +1695,10 @@ class Worker:
             def turns_ended(self):
                 had = self.state.get("session")
                 ended = super().turns_ended()
+                receipts = [line for text in ended for line in getattr(text, "host_receipts", ())]
+                if receipts:
+                    self.state.setdefault("inbox", []).extend(receipts)
+                    self.save()
                 if self.builder and self.state.get("session") and self.state["session"] != had:
                     b = Builder(self.house, self.builder)        # a5378: the builder's conversation, wherever it went
                     b.state["session"] = self.state["session"]

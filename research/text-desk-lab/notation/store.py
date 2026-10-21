@@ -51,6 +51,7 @@ import os
 import re
 import sys
 import time
+from copy import deepcopy
 from pathlib import Path
 
 SHAPE = 1
@@ -611,9 +612,14 @@ class Log:
                 f.seek(size - back)
                 tail = f.read(back)
                 if tail and not tail.endswith(b"\n"):
+                    # A large interrupted record can exceed the last 64 KiB.
+                    # Find its actual beginning before appending the next line.
+                    while b"\n" not in tail and back < size:
+                        back = min(size, back * 2)
+                        f.seek(size - back)
+                        tail = f.read(back)
                     cut = tail.rfind(b"\n") + 1
-                    if cut or back == size:
-                        f.truncate(size - back + cut)
+                    f.truncate(size - back + cut)
         with open(self.path, "ab") as f:
             f.write(line)
             f.flush()
@@ -662,6 +668,8 @@ class Ctx:
         self.log, self.flat0, self.state0, self.n0, self.seen0 = log, flat0, state0, n0, seen0
         self.t0 = time.time()
         self.quick = None             # (subject ids, node ids) at the start, when the command began from kept facts
+        self.touched = set()
+        self.recorded_outside = False
 
     def __reduce__(self):
         return (type(None), ())       # pickled with a desk by accident, it is nothing
@@ -713,6 +721,7 @@ def begin(desk, pickle_path):
         return desk._store
     flat0 = flatten(w)
     state0 = digest(flat0)
+    outside_touched = set()
     if head[1] != state0:
         said, _seq, _state = log.flat()
         facts = diff(said, flat0)
@@ -721,8 +730,10 @@ def begin(desk, pickle_path):
                         "parts": [{"cause": "outside", "facts": _enc(facts, said)}],
                         "note": "the world changed without a record; this is the difference, found at the next command"},
                        dict(flat0))
+            outside_touched = {tid for tid, _, _ in facts}
     seen0 = dict(getattr(desk, "_seen_idx", None) or {})
     desk._store = Ctx(log, flat0, state0, len(w.events), seen0)
+    desk._store.outside_touched = outside_touched
     return desk._store
 
 
@@ -754,6 +765,8 @@ def commit(ctx, desk, words, by, press=None, window=None):
                             "parts": [{"cause": "outside", "facts": _enc(outside, ctx.flat0)}],
                             "note": "the world changed without a record (or a command changed what its events do not name); "
                                     "found when a quick record was checked against the whole world"}, dict(mid))
+            ctx.recorded_outside = True
+            ctx.touched.update(tid for tid, _, _ in outside)
             ctx.flat0, ctx.state0 = mid, mid_state
     if flat1 is None:
         flat1 = flatten(w)
@@ -824,6 +837,7 @@ def commit(ctx, desk, words, by, press=None, window=None):
         rec["ids"] = w._ids
     rec["ms"] = int((time.time() - ctx.t0) * 1000)
     seq = ctx.log.append(rec, flat1)
+    ctx.touched.update(tid for tid, _, _ in facts)
     _MARKS[w] = (str(ctx.log.path), ctx.log.path.stat().st_size)
     return seq
 
@@ -867,13 +881,24 @@ def catch_up(desk, pickle_path):
             eid = str(p.get("e") or "")
             if not eid:
                 continue
-            w.events.append({"id": eid, "verb": p.get("verb"), "target": p.get("target"), "args": p.get("args") or {},
-                             "by": p.get("by") or rec.get("by"), "at": rec.get("at"), "cmd": rec.get("words", ""),
-                             "note": "put back from the log: the world's file was saved before it"})
+            if rec.get("atomic_world"):
+                # Keep metadata used by aspect fences, rules and whole undo.
+                w.events.append(deepcopy(p["event"]))
+            else:
+                w.events.append({"id": eid, "verb": p.get("verb"), "target": p.get("target"), "args": p.get("args") or {},
+                                 "by": p.get("by") or rec.get("by"), "at": rec.get("at"), "cmd": rec.get("words", ""),
+                                 "note": "put back from the log: the world's file was saved before it"})
             if eid[1:].isdigit():
                 w._eseq = max(getattr(w, "_eseq", 0) or 0, int(eid[1:]))
+            if p.get("verb") == "undo":
+                original = w.event_by_id(p.get("target"))
+                if original:
+                    original["undone"] = True
         if rec.get("ids") is not None:
             w._ids = max(getattr(w, "_ids", 0) or 0, rec["ids"])
+        if rec.get("atomic_world"):
+            import atomic_world
+            atomic_world.restore_metadata(desk, rec)
         desk._snap_at = (rec["seq"], end)
         n += 1
     if n:
@@ -957,21 +982,48 @@ def safe_begin(desk, pickle_path):
     if os.environ.get("DESK_LOG", "") == "off":
         return None
     try:
-        return begin(desk, pickle_path)
+        ctx = begin(desk, pickle_path)
     except Exception:      # noqa: BLE001
         _fault(log_path(pickle_path), "begin")
         return None
+    if ctx is not None:
+        if getattr(ctx, "outside_touched", None):
+            ctx.touched.update(ctx.outside_touched)
+            _observe(ctx, desk, "outside-log repair")
+        _observe(ctx, desk, before=True)
+    return ctx
 
 
 def safe_commit(ctx, desk, words, by, press=None, window=None):
     if ctx is None:
         return None
     try:
-        return commit(ctx, desk, words, by, press, window)
+        seq = commit(ctx, desk, words, by, press, window)
     except Exception:      # noqa: BLE001
         vars(desk).pop("_store", None)
         _fault(ctx.log.path, f"commit of {words[:200]!r} by {by}")
         return None
+    if seq is not None or ctx.recorded_outside:
+        _observe(ctx, desk, words, by)
+    return seq
+
+
+def _observe(ctx, desk, words="", by=None, before=False):
+    """An optional observer's import/capture/failure must never alter log success."""
+    try:
+        import log_world
+        if before:
+            log_world.before(ctx, desk)
+        else:
+            log_world.committed(ctx, desk, words, by)
+    except Exception:
+        _fault(ctx.log.path, "log-world observation failed")
+        try:
+            module = sys.modules.get("log_world")
+            if module:
+                module.failed(ctx, "log-world observation failed")
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------- undo: a record put back by its facts

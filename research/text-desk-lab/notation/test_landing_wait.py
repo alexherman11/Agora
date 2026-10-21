@@ -20,7 +20,9 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
+import atexit
+import shutil
+from types import SimpleNamespace
 import uuid
 from pathlib import Path
 
@@ -28,7 +30,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 NOTATION = "research/text-desk-lab/notation"
-tmp = tempfile.TemporaryDirectory()
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+tmp = SimpleNamespace(name=agora_tmp.directory("lw-"))
+atexit.register(shutil.rmtree, tmp.name, ignore_errors=True)
 REPO = Path(tmp.name) / "live"
 os.environ["LANDING_LIVE"] = str(REPO)
 os.environ["LANDING_ROOM"] = str(Path(tmp.name) / "room")
@@ -135,7 +140,7 @@ git("commit", "-q", "-m", "start")
 _git = workshop.git
 workshop.git = lambda *a, cwd=REPO, **k: _git(*a, cwd=cwd, **k)     # its default cwd is the real checkout
 workshop.REPO = REPO
-landing.health = lambda world, cwd: ({"ok": False, "lenses_ok": [], "failed": ["BROKEN is here"], "text": "broken"}
+landing.health = lambda world, cwd, **how: ({"ok": False, "lenses_ok": [], "failed": ["BROKEN is here"], "text": "broken"}
                                      if (Path(cwd) / "BROKEN").exists() else
                                      {"ok": True, "lenses_ok": [], "failed": [], "text": "all well"})
 WS = workshop.Workshop(House())
@@ -238,7 +243,7 @@ K6, S6, wk6 = commission("Slow", {"slow.py": "# slow\n"})
 wk6.busy, wk6.alive, wk6.turns_ended = False, (lambda: True), (lambda: [])
 WS.workers[K6] = wk6
 fast = landing.health
-landing.health = lambda world, cwd: (time.sleep(1.5), fast(world, cwd))[1]
+landing.health = lambda world, cwd, **how: (time.sleep(1.5), fast(world, cwd, **how))[1]
 try:
     mark = len(W.events)
     t0 = time.perf_counter()

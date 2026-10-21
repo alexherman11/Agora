@@ -1,5 +1,27 @@
 # Round 6 acceptance and landing handoff, 20 October
 
+## House merge conflict resolution
+
+The house committed the preserved source as ed56328, then merged main
+d7986836565d2bbe2dce14903f080b8795c6bd71 into this worktree. Resolved four
+text conflicts without git writes: keep the three divider/partition scripts;
+union remember with share/resize/tree dependencies in lens_ir._static;
+union remember with partition paint words; keep main's exported FRICTION
+section (three entries, including the existing a7107) rather than duplicate it.
+Main's Markdown/TextEdit, store and atomic_world files have no delta against
+MERGE_HEAD. lens.js's delta is only partition/divider integration.
+All four accepted hashes remain identical. No product gesture repair.
+
+Ran merged checks: 10 navigation, 16 viewer-tabs (including remember reuse),
+2 dock-integration tests; 8 viewer/draft JS tests pass. Selected health at
+frontier-try e16359, 16353 events: exit 0, 6.1s, partial=true; Python/scripts
+pass, 14 styles read, 94 Help notes true, 73 lenses compile, 0 unexpected /
+1 expected refusal. This is not full health or new browser acceptance.
+test_scene.py passed its first 31 tests then stopped on PermissionError writing
+a temporary base@walk.pickle; no whole-suite pass claimed. Conflict marker
+scan finds none in the four files; git diff --check exits 0.
+House still owns committing the merge and final landing judgment.
+
 Read: worker-a7784 c7831 and review commit e938f74, REVIEW.md round 6.
 The reviewer accepted the exact c7682 product/test bytes composed over main
 229b24a, using hidden Edge, disposable worlds and the guard. CSS viewports

@@ -375,6 +375,15 @@
     function paint(a, b) {
       active = ed && focused() && a != null ? linesOf(a, b) : new Set();
       M.draw(root, src(), ctx, active, raw);
+      if (!ed) {
+        // Read surfaces keep links reachable without making the document editable.
+        for (const link of root.querySelectorAll(".md-wl:not(.md-missing),.md-embed[data-id],a.md-a")) {
+          if (link.matches("a") && !/^(https?:\/\/|agora:\/\/)/i.test(link.dataset.href || "")) continue;
+          link.tabIndex = 0; link.setAttribute("role", "link");
+        }
+        for (const box of root.querySelectorAll(".md-check")) box.setAttribute("aria-disabled", "true");
+        if (globalThis.Media && typeof Media.inline === "function" && opts.hooks && opts.hooks.pop) Media.inline(root, ctx.media, opts.hooks.pop);
+      }
       if (!raw) M.lightUp(root, src(), lit, opts.lightClass);
       name(); bar && bar.show();
       if (a != null && focused()) place(a, b);
@@ -431,10 +440,16 @@
       const box = e.target.closest(".md-check");
       if (box && ed) { e.preventDefault(); change(M.toggle(src(), +box.dataset.check), "key"); E.flush(); return; }
       const wl = e.target.closest(".md-wl"), emb = e.target.closest(".md-embed[data-id]"), a = e.target.closest("a.md-a");
+      const selection = getSelection();
+      if (!ed && (wl || emb || a) && selection && !selection.isCollapsed && root.contains(selection.anchorNode)) return;
       const line = (wl || a) && M.lineOf(root, wl || a), shown = !line || !line.classList.contains("md-active");
       if (emb && (!ed || !e.altKey)) { e.preventDefault(); return follow(emb.closest(".md-widget").dataset.src.replace(/^\s*!\[\[|\]\]\s*$/g, "").split("|")[0].split("#")[0].trim()); }
       // a link whose marks are hidden is followed; on the line being written a click places the caret (Ctrl+click follows)
       if (wl && (shown || e.ctrlKey || e.metaKey)) { e.preventDefault(); return follow(wl.dataset.target); }
+      if (a && (shown || e.ctrlKey || e.metaKey) && /^agora:\/\//.test(a.dataset.href || "")) {
+        e.preventDefault();
+        return opts.hooks && opts.hooks.follow && opts.hooks.follow(a.dataset.href, a.textContent);
+      }
       if (a && (shown || e.ctrlKey || e.metaKey) && /^https?:/.test(a.dataset.href || "")) { e.preventDefault(); window.open(a.dataset.href, "_blank", "noopener"); return; }
       const w = e.target.closest(".md-widget");
       if (w && ed) { root.focus(); const at = M.starts(src())[+w.dataset.from] || 0; E.doc.sel = [at, at]; paint(at, at); }
@@ -458,7 +473,14 @@
         if (k === "z") return E.undo(false);
       },
     };
-    if (!ed) { paint(null); return api; }
+    if (!ed) {
+      root.addEventListener("keydown", e => {
+        if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+        const link = e.target.closest('[role="link"]');
+        if (link && root.contains(link)) { e.preventDefault(); e.stopPropagation(); link.click(); }
+      });
+      paint(null); return api;
+    }
 
     // a change the browser made with no beforeinput first (document.execCommand fires none in Chrome; the painter's key
     // queue uses it) is read back from the line it went into, as a composition's words are, so the drawing never

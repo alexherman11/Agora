@@ -29,7 +29,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 os.environ["DESKD"] = "off"
 NOTATION = "research/text-desk-lab/notation"
-tmp = tempfile.TemporaryDirectory()
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+from types import SimpleNamespace
+import atexit
+import shutil
+tmp = SimpleNamespace(name=agora_tmp.directory("landing-regression-"))
+atexit.register(shutil.rmtree, tmp.name, ignore_errors=True)
 REPO = Path(tmp.name) / "live"
 TREES = Path(tmp.name) / "trees"
 os.environ["LANDING_LIVE"] = str(REPO)
@@ -137,7 +143,7 @@ git("commit", "-q", "-m", "start")
 _git = workshop.git
 workshop.git = lambda *a, cwd=REPO, **k: _git(*a, cwd=cwd, **k)     # its default cwd is the real checkout
 workshop.REPO = REPO
-landing.health = lambda world, cwd: {"ok": True, "lenses_ok": [], "failed": [], "text": "all well"}
+landing.health = lambda world, cwd, **how: {"ok": True, "lenses_ok": [], "failed": [], "text": "all well"}
 WS = workshop.Workshop(House())
 WS.export_docs = lambda cid: ""
 WS.compare_lived = lambda w: None

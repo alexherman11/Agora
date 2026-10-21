@@ -231,7 +231,12 @@ class DeskMoo(Desk):
             raise Refusal(f"stale: {nid} changed since you last saw it{via} ({hit['id']} {hit['verb']} by {who}){hit.get('clash', '')}; {self._again(nid, mine)} before acting")
         kv = {k: self._resolve(v, allow_subject=False) if k in ("into", "before", "after") else v for k, v in kv.items()}
         v = moo.REGISTRY[name]
-        r = v.run(w, nid, kv)
+        if name == "browse":
+            from viewer_tabs import run
+            # Session provenance comes from the dispatcher, never a command arg.
+            r = run(w, nid, kv, world=(getattr(self, "_session", "") or "current").split("@")[0])
+        else:
+            r = v.run(w, nid, kv)
         for e in r.get("events", []) or ([r["event"]] if r.get("event") else []):
             ev = next((x for x in w.events if x["id"] == e), None)
             if ev is not None:

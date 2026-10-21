@@ -1,0 +1,171 @@
+# home-viewer: the home base's middle (a5398). Press a pin, or choose a result in the bar's search (home-search, a6642), and it opens here, on the left
+# of JEFF's chat (a5949, Alex 16 Oct: 'I want it open on the left side of this chat'); since a5994's equal footing it is
+# a panel of its own (lens home-viewer in a panel note) and the chat another (jeff-chat): × closes it (unview)
+# with controller-backed tabs and per-tab Back/Forward. The viewer's tabs_state is authoritative; viewing/with/back
+# project its active page for existing readers. find is bar search; pins remain the existing world bookmarks.
+# Any lens opens here (a5949; Sable's a4270, a lens stood on a thing): with=<lens> draws the thing with that lens (Open
+# with, or type a lens's name); a lens itself, opened here, runs (the dock's Writing opens the lens writing). Otherwise
+# a document is drawn by doc-page (its words, comments and Talk); each other kind by its own lens, home-<kind>
+# (home-note, home-chat, home-surface); anything else gets the plain card below.
+# JEFF may set viewing= only when Alex asked to be shown something.
+viewer : column
+  share 1
+  role viewer
+  mine : column
+    share 1
+    of prop:role=home-view,prop:actor=$me as v
+    each view
+  lost : text "No viewer of yours here: a note in Home base with role=home-view actor=<you>."
+    role hint
+    only when count(prop:role=home-view,prop:actor=$me) = 0
+view : column
+  share 1
+  role viewer
+  let open = "yes" when ($v.viewing or "") != "" and $v.viewing != "a5080"
+  let open = "no" otherwise
+  # Named menu bounds the number of controls at narrow widths; no horizontal tab strip.
+  bar : row
+    role pins
+    pins : row
+      role pins
+      share 1
+      only when ($v.pins or "") != ""
+      of $v.pins as p
+      each pin
+    gap : column
+      share 1
+      only when ($v.pins or "") = ""
+    back : text "Back"
+      role chip
+      only when ($v.can_back or "") = "yes"
+      on click do browse $v action=back
+    forward : text "Forward"
+      role chip
+      only when ($v.can_forward or "") = "yes"
+      on click do browse $v action=forward
+    reload : text "Reload"
+      role chip
+      only when open = "yes"
+      on click do browse $v action=reload
+    fresh : text "New tab"
+      role chip
+      on click do browse $v action=new
+    tabs : column
+      role pins
+      fold "Tabs" float
+      arrows
+      menu : column
+        measure 40ch
+        scroll scroll
+        of prop:role=viewer-tab,prop:viewer=$v,prop:closed=no as t
+        each tab
+  split : row
+    share 1
+    gap
+    left : column
+      share 3
+      only when open = "yes"
+      open : column
+        share 1
+        of $v.viewing as r
+        each shown
+    nothing : text "Nothing open. Find it at the top, press a pin, or a name anywhere."
+      role hint
+      only when open = "no"
+pin : text "$title"
+  role chip
+  role chip.on when $item = $v.viewing
+  clamp 1
+  on click do browse $v action=open target=$p
+  on menu "Open in new tab" do browse $v action=new target=$p
+tab : row
+  role pins
+  name : text "$t.label"
+    role chip
+    role chip.on when $t.active = "yes"
+    share 1
+    clamp 1
+    on click do browse $v action=select tab=$t.tab
+  close : text "Close"
+    role chip
+    on click do browse $v action=close tab=$t.tab
+shown : column
+  share 1
+  role shown
+  remember "$v.reading_key"
+  let islens = "yes" when ($tags or "") has "lens" and $kind = "note"
+  let islens = "no" otherwise
+  let isdoc = "yes" when ($role or "") = "doc"
+  let isdoc = "no" otherwise
+  let using = ($v.with or "")
+  head : row
+    role viewhead
+    title : text "$title"
+      role heading
+      clamp 2
+      share 1
+      on menu "Open in new tab" do browse $v action=new target=$v.location
+    kind : text "$kind"
+      role meta
+    pop : text "Pop out"
+      role chip
+      only when islens = "yes" and using = ""
+      on click host window $title
+    close : text "×"
+      role tool
+      on click do unview $v
+  openwith : row
+    role pins
+    only when islens = "no"
+    label : text "Open with"
+      role meta
+    page : text "page"
+      role chip
+      role chip.on when using = "doc-page" or (using = "" and isdoc = "yes")
+      on click when using != "doc-page" do browse $v action=lens lens=doc-page
+    review : text "design-review"
+      role chip
+      role chip.on when using = "design-review"
+      on click when using != "design-review" do browse $v action=lens lens=design-review
+    plain : text "its own look"
+      role chip
+      role chip.on when using = "" and isdoc = "no"
+      only when using != "" or isdoc = "yes"
+      on click when using != "" do browse $v action=lens lens=""
+    any : text "$v.with"
+      role find
+      hint "or a lens by name…"
+      lines 1..1
+      share 1
+      commit enter only
+      on edit do browse $v action=lens lens="$value"
+  with : column
+    share 1
+    only when using != ""
+    lens $v.with
+  run : column
+    share 1
+    only when using = "" and islens = "yes"
+    lens $title
+  doc : column
+    share 1
+    only when using = "" and islens = "no" and isdoc = "yes"
+    lens doc-page
+  known : column
+    share 1
+    only when using = "" and islens = "no" and isdoc = "no" and ($kind = "note" or $kind = "chat" or $kind = "surface")
+    lens home-$kind
+  plain : column
+    share 1
+    scroll scroll
+    only when using = "" and islens = "no" and isdoc = "no" and $kind != "note" and $kind != "chat" and $kind != "surface"
+    facts : text "status $status · owner $owner · asked by $asked_by"
+      role meta
+      only when ($status or "") != ""
+    next : text "Next: $next"
+      role meta
+      marks
+      only when ($next or "") != ""
+    words : text "$text"
+      role prose
+      marks

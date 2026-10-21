@@ -303,7 +303,7 @@ def _static(node, irs, memo):
     if got is not None:
         return got
     em, b = node["emit"], node["bind"]
-    words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
+    words = [em.get("text"), em.get("light"), em.get("remember"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
              *(em.get("tip") or ()), em.get("share"),
              "$" + em["resize"][0] if em.get("resize") else None]
     if em.get("partition"):
@@ -800,6 +800,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:
                 out["missing"] = missing
+        if em.get("remember"):
+            tc = {**(ctx.get("_props") or {}), **ctx}
+            out["remember"] = S._fill(em["remember"], tc, track)
         if em.get("tip"):                             # a6271: a tip's name and sentence are words, filled as text is
             tc = {**(ctx.get("_props") or {}), **ctx}
             out["tip"] = [S._fill_text(t, tc, track, lambda e: X.run(e, xenv()))[0] if "$(" in t else S._fill(t, tc, track)
