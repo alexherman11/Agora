@@ -338,6 +338,57 @@ def bridge(R, copy, fx):
     return guard.verdict()
 
 
+def source_guard(R, copy, fx):
+    """5b (Pike c8089): pywebview puts its bridge into whatever top document loads, so the Python side should refuse a
+    bridge message whose source is not the desk's own origin. bridge_page.py's wrap of pywebview's handler (in the
+    caller, not the package) is tried: the desk's page reaches the bridge; the same top page, moved to another origin
+    (localhost, not 127.0.0.1: the same server, a different origin), does not, and the refusal is written down."""
+    import sandbox_window as SB
+    name = f"mapg-{__import__('os').getpid()}"
+    log = Path(copy.state) / "bridge-guard-calls.jsonl"
+    log.write_text("", encoding="utf-8")
+    q = urllib.parse.urlencode({"session": copy.session, "as": "alex", "scope": fx["surface"]})
+    url = f"{copy.base}/map-host.html?{q}"
+    other = url.replace("127.0.0.1", "localhost")
+    guard = SB.Guard(name, "Agora map bridge check")
+    guard.__enter__()
+    call = ("(async () => { for (let i = 0; i < 40 && !(window.pywebview && window.pywebview.api && window.pywebview.api.touched); i++) await new Promise(r => setTimeout(r, 250));"
+            " if (!(window.pywebview && window.pywebview.api && window.pywebview.api.touched)) return 'no bridge here';"
+            " return await Promise.race([window.pywebview.api.touched(WORDS), new Promise(r => setTimeout(() => r('no answer in 4 s'), 4000))]); })()")
+    try:
+        st = SB.run_hidden(name, ["python", str(HERE / "bridge_page.py"), url, str(log), copy.base], cdp=True)
+        SB.join(name)
+        c = None
+        for _ in range(60):
+            try:
+                c = SB.Cdp(st["port"])
+                if c.js("!!(window.__mapHost && window.__mapHost.draws)"):
+                    break
+            except Exception:
+                pass
+            time.sleep(0.5)
+        own = c.js(call.replace("WORDS", json.dumps("the desk's own page")))
+        c.js(f"location.href = {json.dumps(other)}")
+        time.sleep(3.0)
+        at = c.js("location.origin")
+        moved = c.js(call.replace("WORDS", json.dumps("another origin")))
+        time.sleep(1.0)
+        calls = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
+        refused = [x for x in calls if x and x[0] == "refused"]
+        ok = own == "recorded" and ["the desk's own page"] in calls and ["another origin"] not in calls and refused \
+            and at.startswith("http://localhost")
+        R.record("5b bridge refuses others", "pass" if ok else "fail",
+                 f"desk page {own!r}; top moved to {at}: {moved!r}; written: {calls}",
+                 {"calls": calls, "allowed": copy.base, "moved to": at})
+        c.close()
+    except Exception as e:
+        R.record("5b bridge refuses others", "error", f"{type(e).__name__}: {e}", {"trace": traceback.format_exc()[-800:]})
+    finally:
+        SB.close(name, quiet=True)
+        guard.__exit__(None, None, None)
+    return guard.verdict()
+
+
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--edge-only", action="store_true")
@@ -357,6 +408,7 @@ async def main():
             guards["edge"] = await edge(R, copy, fx)
         if not a.edge_only:
             guards["pywebview"] = bridge(R, copy, fx)
+            guards["pywebview, source guard"] = source_guard(R, copy, fx)
     finally:
         copy.close()
     rep = {"fixture": getattr(R, "fixture", None), "guards": guards, "page_errors": getattr(R, "page_errors", None), "rows": R.rows}
