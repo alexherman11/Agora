@@ -36,6 +36,30 @@ the one form. The words:
                                  [label](address). Read, they are drawn; edited, they are their source, and Ctrl+B,
                                  Ctrl+I, Ctrl+K put one around what is selected or take it off. Not inside code runs;
                                  marks do not nest. The printer says `marks strong 2, link 1`
+    (names)                      every text that is only read (no `on edit`, `plain`, `picture` or `live`), and a
+                                 `markdown` text, draws an id in its words (a5143, f155, s9, c5957, e11454, m6012,
+                                 worker-a6010) as the NAME of what it names, a quiet link with the id on hover: a
+                                 thing its title, a comment 'comment by X on <title>', an event 'X's <verb> on
+                                 <title>', a chat line 'X's line in <chat>', a worker 'worker on <card>'. An id that
+                                 names nothing, or in a code run, stays as written. The words and printers keep ids.
+    ids                          on words: keep this text's ids as written (a Properties line, a command to copy)
+    arrows                       on a frame: Up and Down move the keyboard between the texts being written and the
+                                 presses inside it (a closed `fold float` inside opens on Down); Enter presses the one
+                                 in hand, and Enter in a text whose words are unchanged presses the first press after it
+    caret <key>|typing ...       on a text with `on edit`: Ctrl+K (Ctrl+L, Ctrl+F, /) pressed where no other text took
+                                 it, or `typing` a letter while no text has the caret, brings the caret here
+    on link do <command>         a name or [[wikilink]] pressed in this part or anywhere inside it (placed lenses too):
+                                 the nearest `on link` above it is sent, $value the id it opens. None above: the
+                                 press goes to the part it is in, as a press on its words would
+    media [player]              on words: a path in them to a film or picture the desk may show (media_links.py:
+                                 research/window-lab/demos or media/, mp4 webm m4v png jpg gif webp) is drawn under
+                                 the words, a film as a poster that plays where it is, with Pop out (`on pop`); any
+                                 other path stays words. `media player`: the first one fills the part, with play,
+                                 seek, speed and full window. `media picture` (a6443): the first picture fills the
+                                 part and nothing else is drawn (album art: no name, no buttons; the part's role gives
+                                 its corners). The printer says `media 1 video` (and what was not shown)
+    on pop do <command>          on a `media` text: Pop out was pressed on one of its films or pictures, $value its path
+                                 as written; `on pop host <verb> [words]` asks the host too (both run, in order)
     clamp <N>                    on words: at most N lines (printed as ~, the painter clamps wrapped lines).
                                  on a repeat: at most N instances; both printers say how many are left
     of <selection>               repeat over the things a desk selection finds (kind:note,in:Canvas), over ids named
@@ -94,8 +118,14 @@ the one form. The words:
                                  `marks`) of the same thing, in quotation marks with a space after; empty when none were. A comment box beside a paragraph
                                  can quote what was highlighted in it
     on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
+    on click host <verb> [words] the button asks the program the page is painted in (the home base) to do <verb>, one of
+                                 the rows it publishes as witnessed:host; $fields fill as in any command. Never a desk
+                                 line; a page with no host says so
     on drop <part> do <command>  the receiver of a carried thing; `$carried` fills with the carried thing at the drop; one command
-    on <gesture> do <command>    click | edit | drag | select. The command is a desk verb line (`do` is implied); the painter
+    on drop <part> at <side> do  side left|right|top|bottom: the act for a drop near that edge (the outer third) of the
+                                 receiver; the plain `on drop` is the middle. The painter draws the landing box (that
+                                 half of the receiver, or all of it) while the thing is in the air (a5994)
+    on <gesture> do <command>    click | edit | drag | select | double (a double-click). The command is a desk verb line (`do` is implied); the painter
                                  fills $x $y (drag, click) and $value (edit; select: the words highlighted) at the moment
                                  of the gesture. A gesture carries the item revision and the lens revision it was painted
                                  under; stale is refused.
@@ -119,14 +149,19 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "plain", "peek", "marks", "picture", "commit", "commit_only", "light")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select")
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+# end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
+# pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
+# double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
+# pick (a6431): a part of a `page` was pointed at (a long press, or a tap when `picks`), $value its name, $part its key
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop", "double", "capture", "pick")
+DROP_SIDES = ("left", "right", "top", "bottom")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
 # the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
 # kept is the lens's word (a prop on the viewer's own desk, a line, a thing), so it is world data anyone can read.
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace", "Delete")      # boundary deletion is authored in either direction
-PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K")                # the keys a button may press in the text the caret is in      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
+PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K", "Ctrl+E", "Ctrl+S")   # the keys a button may press in the text the caret is in (E, S: a `markdown` text's source and save, a5820)      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
 # painter opens on a right-click (or the menu key) anywhere on the part; a part with no entries keeps the browser's menu.
 NAMES = ("title", "text", "kind", "due", "tags", "id", "item", "it", "n", "count", "index", "run", "in", "before", "after")
@@ -188,10 +223,16 @@ def style_roles(desk, name, at=None):
     """The role names a lens may use under style `name`; None keeps the old behavior (calm.style, the file)."""
     if not name:
         return None
-    st = style_source(desk, name, at)
-    if st is None:
-        raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
-    return style_mod.role_names(st["text"])
+
+    def read():
+        st = style_source(desk, name, at)
+        if st is None:
+            raise LensRefusal(f"no style {name!r}: a style is a note tagged style titled {name!r} (or desk-shell/style/{name}.style)")
+        return style_mod.role_names(st["text"])
+    # a6153: once per build while the world holds still (still): the home base read its one style ~26 times a build,
+    # each a scan of every subject and a reading of the style's text. Each asker gets its own copy
+    got = _once(desk.world, ("style_roles", name, at), read)
+    return type(got)(got) if isinstance(got, (set, frozenset, list, dict, tuple)) else got
 
 
 def pulsing_roles(desk, name, at=None):
@@ -199,11 +240,19 @@ def pulsing_roles(desk, name, at=None):
     The painter moves them, so the print says so: a reader of the text must learn what the eye sees moving. A style
     the painter refuses paints nothing, so nothing pulses."""
     st = style_source(desk, name or "calm", at) or {}
-    try:
-        roles = style_mod.parse(st.get("text") or "")["roles"]
-    except style_mod.StyleRefusal:
-        return set()
-    return {n for n, r in roles.items() if "pulse" in r["props"]}
+    text = st.get("text") or ""
+    if text not in _PULSING:          # a6153: a function of the style's text alone, read once per text (~7 ms a build)
+        try:
+            roles = style_mod.parse(text)["roles"]
+            _PULSING[text] = frozenset(n for n, r in roles.items() if "pulse" in r["props"])
+        except style_mod.StyleRefusal:
+            _PULSING[text] = frozenset()
+        while len(_PULSING) > 32:
+            _PULSING.pop(next(iter(_PULSING)))
+    return set(_PULSING[text])
+
+
+_PULSING = {}
 
 
 def mark_pulse(node, roles):
@@ -241,7 +290,7 @@ def _cmd_value(v):
 # somewhere; here it gets named fields. `rows <source>` prints the same rows in the desk, so a lens never sees
 # anything the terminal cannot.
 SOURCES = {
-    "captures": ("captures [cap-<id> ...]", ("cid", "label", "summary", "remaining")),
+    "captures": ("captures [cap-<id> ...]", ("cid", "label", "summary", "remaining", "thumb")),
     "sections": ("sections:<id>", ("item", "heading", "words", "text", "index")),
     "comments": ("comments:<id>", ("item", "cid", "by", "text", "state", "replies", "image", "awaiting", "to", "eid", "unread", "unread_count", "reply_count", "latest", "opening_awaiting")),
     "replies": ("replies:<id>", ("item", "rid", "thread", "by", "text", "index", "awaiting", "to", "eid", "unread")),
@@ -277,18 +326,31 @@ SOURCES = {
     "words": ("words [host=verb|command|lens|term|kind]", ("host", "word", "form", "slots", "doc")),
     "slots": ("slots [host=... word=...]", ("host", "word", "slot", "type", "needed", "doc")),
     "kinds": ("kinds", ("kind", "is", "shape", "things", "props", "declared")),
-    # 9 Oct (a3806): the lines the desk did not do, counted by shape, the most met first (verbs.record_reach): which
-    # refusal or missing word is worth curing shows itself, without anyone deciding whose fault each one was
-    "reaches": ("reaches", ("shape", "n", "who", "kind", "last", "line")),
-    # a5052 (14 Oct): the windows a host keeps on the screen (research/window-lab/wm.py), as it last said them, in its
-    # order: witnessed beside the house (witnessed.py), never in the world. name is the host's own for the window (a
-    # repeat keys each by it), kind agora or adopted, pinned/collapsed/focused yes or no, age the seconds since it said so
-    "windows": ("windows", ("name", "title", "lens", "kind", "pinned", "collapsed", "focused", "order", "age", "by")),
-    # 15 Oct (the home base, JEFF's HUD): rows any living program keeps beside the house under a name of its own, with the
-    # fields it wrote (read them through a frame, `of witnessed:desktop as w` and $w.title), and order, age and by. A
-    # program says what it sees without a source edit per program; `windows` is the first such source, kept by its name
-    "witnessed": ("witnessed:<name>", ("order", "age", "by")),
+    # reaches, windows and witnessed are files of their own in sources/ (a5296), read below
 }
+
+
+# a5296 (a5261 point 4: every new source was a line here and a branch in _rows_of, so two builders adding one conflicted):
+# a source may be one file in sources/, <name>.py, saying USAGE (as a refusal prints it), FIELDS, ARG ("none", "needed"
+# or "optional": whether `<name>:<arg>` takes one), OPEN (True: its rows may carry fields beyond FIELDS, printed after
+# them) and rows(desk, arg, session) -> [dict]. Adding a source is adding a file; nothing here changes.
+SOURCE_DIR = pathlib.Path(__file__).resolve().parent / "sources"
+SOURCE_FILES = {}        # name -> {"arg", "open", "rows"}
+
+
+def _load_sources(folder=SOURCE_DIR):
+    import importlib.util
+    for p in sorted(pathlib.Path(folder).glob("*.py")):
+        if p.stem.startswith("_") or p.stem in SOURCES:
+            continue             # a name the table above already has keeps it: a file never takes a source over
+        spec = importlib.util.spec_from_file_location(f"agora_source_{p.stem}", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        SOURCES[p.stem] = (mod.USAGE, tuple(mod.FIELDS))
+        SOURCE_FILES[p.stem] = {"arg": getattr(mod, "ARG", "none"), "open": bool(getattr(mod, "OPEN", False)), "rows": mod.rows}
+
+
+_load_sources()
 # a source's field names: read bare inside their own repeat ($who in `of messages:`); a text's $name that is one of them
 # is no prop of the thing, and no aspect for the fence. 8 Oct: they no longer take a name away from `let` or `as` in
 # every lens (`let shape` stopped compiling when a source gained a field shape): the nearer binding wins, as names.py says
@@ -381,7 +443,14 @@ def source_head(source):
     return first.partition(":")[0]
 
 
-def saying_rows(desk, terms=""):
+SAYING_EARLY = ("item", "what", "eid", "source", "chat", "in")      # a6153: a saying's fields known before it is read
+INVOLVING_EARLY = True      # a6638: involving:<name> passes over sayings no name of theirs is on (saying_rows)
+LINE_ROW_KEYS = {"item", "what", "saying", "by", "name", "at", "in", "to", "said", "answered", "edited", "before", "state",
+                 "eid", "chat", "who", "open", "index", "line", "_t", "source", "thread", "reply_to", "mark", "context",
+                 "context_summary"}      # a line's row before its own fields: those are never one of its own fields
+
+
+def saying_rows(desk, terms="", early=None):
     """a3319 (lines phase 2; Pike c3323: unify the reading first): the SAYINGS of the desk, chat lines and comments
     as they are stored, two kinds read through one showing, oldest first like a chat. Nothing is migrated and no id
     is new: `saying` is a line's m<n> or a comment's c<n>, `what` says which. `by`, `at`, `in` (the chat, or the thing
@@ -432,21 +501,86 @@ def saying_rows(desk, terms=""):
             where[n["subject"]] = nid
     made, closed = persons.comment_events(w), None
     flip = {"yes": "no", "no": "yes", "withdrawn": "no"}
+    # a6153 (rows): early = (terms over SAYING_EARLY fields, binds), asked of each saying before it is read. Not with
+    # involving:, whose own filter runs after the rows are made
+    early = early if early and not involving else None
+    # a6638 (the universal chat reads involving:alex at every build: 3042 sayings made to keep 556, ~65 ms): a saying
+    # can involve a person only if its writer or a name it is addressed to is a name that person has borne, so the
+    # others are passed over before their rows are made. The full test (`included`, below) still judges what is left.
+    # Only where persons are on (their names are known); INVOLVING_EARLY = False turns it off to compare
+    could = None
+    if involving and INVOLVING_EARLY and persons.on(w):
+        pid = persons.resolve(w, involving)[0]
+        could = {persons.norm(n) for n, _ in persons.index(w).people.get(pid, [])} | {involving, persons.norm(pid)} \
+            if pid else None
+
+        def might(writer, to):
+            return persons.norm(writer) in could or any(persons.norm(n) in could for n in to or ())
+    skipped_keys = set()
+    if early:
+        import knife
+        checks = [(t.startswith("-"), *knife.term_key(t)) for t in early[0]]
+        said_before = {}        # (term, value) -> held: knife.compares asked once per value
+        # an id against an id of the same letters (eid>e10993) is what knife.compares makes of it (expr._cmp: two texts,
+        # ordered by their numbers), done here without typing each saying's eid again (~10 us each, 2700 of them)
+        expr_id = X._ID
+        ids = {c: expr_id.fullmatch(c[3]) for c in checks if c[1] not in persons.PERSON_KEYS
+               and c[2] in ("=", "!=", "<", ">", "<=", ">=")}
+        ops = {"=": lambda a, b: a == b, "!=": lambda a, b: a != b, "<": lambda a, b: a < b, ">": lambda a, b: a > b,
+               "<=": lambda a, b: a <= b, ">=": lambda a, b: a >= b}
+
+        def early_ok(f):
+            for c in checks:
+                v = f.get(c[1])
+                mw = ids.get(c)
+                mv = expr_id.fullmatch(v) if mw is not None and isinstance(v, str) else None
+                if mv is not None and mv.group(1) == mw.group(1):
+                    hit = ops[c[2]](v, c[3]) if c[2] in ("=", "!=") else ops[c[2]](int(mv.group(2)), int(mw.group(2)))
+                    hit = hit != c[0]
+                else:
+                    hit = said_before.get((c, v))
+                    if hit is None:
+                        hit = said_before[(c, v)] = knife.compares(w, v, c[2], c[3], c[1], early[1]) != c[0]
+                if not hit:
+                    return False
+            return True
+        # the terms over a saying's thing (item, source, chat, in) are the same for every saying on it: judged once
+        per_thing = [c for c in checks if c[1] in ("item", "source", "chat", "in")]
+
+        def thing_ok(sid, s):
+            f = {"item": where[sid], "source": sid, "chat": s["title"], "in": s["title"]}
+            return all((said_before.get((c, f[c[1]])) if (c, f[c[1]]) in said_before else
+                        said_before.setdefault((c, f[c[1]]), knife.compares(w, f[c[1]], c[2], c[3], c[1], early[1]) != c[0]))
+                       for c in per_thing)
     out = []
     for sid, s in w.subjects.items():
         if sid not in where or (only and sid != only):
             continue
+        if early and per_thing and not thing_ok(sid, s):
+            # none of its sayings is kept, so none is read: only a line's own fields would still shape the rows
+            # (`extra`), so a thing with a line holding a field not met yet is read the long way, line by line
+            if not any({k2 for k2, v in line_fields(ln).items() if not k2.startswith("_") and isinstance(v, str)
+                        and k2 not in LINE_ROW_KEYS} - skipped_keys for ln in (s.get("lines") or [])):
+                continue
         if s["kind"] == "chat" and not (me and not rooms.is_member(w, s, me)):
+            # a6638 (Alex, 20 Oct: one universal chat, each line tagged with what it is about): a line that does not say
+            # what it is about is about what the line it answers is about, else what its chat is the Talk of
+            talk_of = str((s.get("props") or {}).get("talk_of") or "")
+            abouts = None
             tl = text_lines(w, sid)
             mine_after = False              # walking back from the end: has a line of mine come after this one?
             listed = set()
             for k in range(len(tl) - 1, -1, -1):
                 text, line, (at, eid) = tl[k]
-                if involving and line is not None:
+                # A stored message is one saying in every view. Splitting its paragraphs reused the
+                # same event key and treated a speaker-like phrase in its body as another writer.
+                if line is not None:
                     if line["id"] in listed:
                         continue
                     listed.add(line["id"])
                     text = line["text"]
+                    if line.get("edited") and not involving:
+                        text += f"  (edited, {line['id']})"
                 m = w.SPEAKER.match(text)
                 who = m.group(1).lower() if m else ""
                 if me and who == me:
@@ -454,10 +588,21 @@ def saying_rows(desk, terms=""):
                     continue
                 if me and not who:
                     continue
+                if early and not early_ok({"item": where[sid], "what": "line", "eid": eid or f"{where[sid]}-{k + 1}",
+                                           "source": sid, "chat": s["title"], "in": s["title"]}):
+                    # a line's own fields shape every row (`extra`, below) when it would have been listed: asked only for
+                    # a line with a field not met yet (rare), so the rows are as they were, field for field
+                    own = {k2 for k2, v in line_fields(line).items() if not k2.startswith("_") and isinstance(v, str)
+                           and k2 not in LINE_ROW_KEYS} - skipped_keys if line else set()
+                    if own and (not me or rooms.shown(w, s, line["to"], me)):
+                        skipped_keys.update(own)
+                    continue
                 said = text[m.end():] if m else text
                 # a1581: a line's address is its writer's stored word, never its words searched again; a chat from
                 # before lines is read by the rule it was written under (every @name outside quotes)
                 to = line["to"] if line is not None else addressed_before(said)
+                if could is not None and not might(who, to):
+                    continue
                 before = ""
                 if me:
                     if not rooms.shown(w, s, to, me):
@@ -489,6 +634,14 @@ def saying_rows(desk, terms=""):
                     for key in ("mark", "context"):
                         value = line_fields(line).get(key, "")
                         row[key] = value if isinstance(value, str) else ""
+                if not row.get("about"):
+                    said_about = ""
+                    if row["reply_to"]:
+                        if abouts is None:
+                            abouts = {ln["id"]: str(line_fields(ln).get("about") or "") for ln in s.get("lines") or ()}
+                        said_about = abouts.get(row["reply_to"], "")
+                    if said_about or talk_of:
+                        row["about"] = said_about or talk_of
                 row["context_summary"] = ""
                 if row["context"]:
                     from message_context import summary
@@ -497,8 +650,13 @@ def saying_rows(desk, terms=""):
         cs = s.get("comments") or []
         for i, c in enumerate(cs):
             e = made.get(c["id"])
+            if early and not early_ok({"item": where[sid], "what": "comment", "eid": e["id"] if e else c["id"],
+                                       "source": sid, "chat": s["title"], "in": s["title"]}):
+                continue
             writer = str(c.get("by") or "").split("/")[0].lower()
             to = (e or {}).get("to")
+            if could is not None and not might(writer, to):
+                continue
             if me and (rooms.same_person(w, writer, me) or to is None or not rooms.shown(w, s, to, me, comment=True)):
                 continue
             state = "open"
@@ -531,9 +689,14 @@ def saying_rows(desk, terms=""):
             replies = c.get("replies") or []
             events = rooms.reply_events(w).get(c["id"], [])
             for i, (reply, e) in enumerate(zip(replies, events), 1):
+                if early and not early_ok({"item": where[sid], "what": "reply", "eid": e["id"], "source": sid,
+                                           "chat": s["title"], "in": s["title"]}):
+                    continue
                 writer = str(reply.get("by") or "").split("/")[0].lower()
                 to = rooms.comment_to(e)
                 if e.get("args", {}).get("line") != reply.get("text"):
+                    continue
+                if could is not None and not might(writer, to):
                     continue
                 if me and (rooms.same_person(w, writer, me) or not rooms.shown(w, s, to, me, comment=True)):
                     continue
@@ -576,7 +739,7 @@ def saying_rows(desk, terms=""):
                 w, w.subjects[row["source"]], viewer)
 
         out = [row for row in out if included(row)]
-    extra = {key for row in out for key in row} - set(SOURCES["sayings"][1])
+    extra = ({key for row in out for key in row} | skipped_keys) - set(SOURCES["sayings"][1])
     for row in out:
         for key in extra:
             row.setdefault(key, "")
@@ -719,10 +882,24 @@ def house_rows(desk, corner=None):
     return out
 
 
-def rows(desk, source, session=None):
+def rows(desk, source, session=None, memo=None):
     """-> list of dicts, or None when `source` is not a row source (then it is an ordinary selection). 8 Oct (step 3):
     the source may be followed by terms over its fields, read by the one comparison (`house doing=awake`,
-    `messages:a12 who=alex`, `sayings for:claude answered=no`; knife.filter_rows)."""
+    `messages:a12 who=alex`, `sayings for:claude answered=no`; knife.filter_rows). memo (a6010): a dict kept for one
+    lens build, while the world holds still: a source's rows are made once and each set of terms filters them (a board
+    asked `house doing=working resident=<its worker>` once per card). Its keys are ("base", <source>)."""
+    if memo is not None:
+        import knife
+        src = source.strip()
+        first, _, rest = src.partition(" ")
+        if source_head(src) not in ("captures", "sayings"):
+            if ("base", first) not in memo:
+                memo[("base", first)] = _rows_of(desk, first, session)
+            rs = memo[("base", first)]
+            terms = [t for t in re.split(r"[,\s]+", rest) if t]
+            if rs is None or not terms:
+                return None if rs is None else list(rs)
+            return knife.filter_rows(desk.world, rs, terms, __import__("persons").active(desk), SOURCES[source_head(src)][0])
     import knife
     src = source.strip()
     first, _, rest = src.partition(" ")
@@ -737,26 +914,35 @@ def rows(desk, source, session=None):
         except ImportError:
             return [{"cid": cid, "label": "Attachment unavailable",
                      "summary": "Capture service unavailable; this attachment is kept.",
-                     "remaining": " ".join(other for other in ids if other != cid)}
+                     "remaining": " ".join(other for other in ids if other != cid), "thumb": ""}
                     for cid in ids]
         rows = []
         capture_session = session or getattr(desk, "_session", "")
         actor = str(desk.world.me).split("/")[0]
         for cid in ids:
+            thumb = ""
             try:
                 value = captures.load_capture(capture_session, actor, cid)
                 refs = value.get("refs") or []
                 label = f"{len(refs)} native item(s)" if refs else "Image selection"
                 summary = captures.preview(capture_session, actor, cid)
+                # a5834: the pixels, small, as a data address a `picture` text paints (the person's own scene only)
+                thumb = captures.thumb(capture_session, actor, cid) if hasattr(captures, "thumb") else ""
             except captures.CaptureError as exc:
                 label, summary = "Attachment unavailable", str(exc)
             rows.append({"cid": cid, "label": label, "summary": summary,
-                         "remaining": " ".join(other for other in ids if other != cid)})
+                         "remaining": " ".join(other for other in ids if other != cid), "thumb": thumb})
         return rows
     if source_head(src) == "sayings":
         own = [t for t in rest.split() if t.startswith(("for:", "involving:", "in:"))]
         terms = [t for t in rest.split() if t not in own]
-        rs = saying_rows(desk, " " + " ".join(own) if own else "")
+        # a6153: terms over the fields a saying has before its costly reading (who it is shown to, answered) are asked
+        # first, so a row they leave out is never read: the home base's `sayings for:alex ... eid>e<n>` read 512 rows
+        # to keep 1. The same terms filter the rows again below, so what is kept is the same
+        pre = [t for t in terms if knife.term_key(t)[0] in SAYING_EARLY and knife.term_key(t)[1] in
+               ("=", "!=", "<", ">", "<=", ">=", "has")]
+        rs = saying_rows(desk, " " + " ".join(own) if own else "",
+                         early=(pre, __import__("persons").active(desk)) if pre else None)
     else:
         terms = [t for t in re.split(r"[,\s]+", rest) if t]
         rs = _rows_of(desk, first, session)
@@ -768,7 +954,12 @@ def rows(desk, source, session=None):
 def _rows_of(desk, source, session=None):
     w = desk.world
     head, _, arg = source.strip().partition(":")
-    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days", "witnessed")) != bool(arg)):
+    own = SOURCE_FILES.get(head)
+    if own:                  # a5296: a source that is a file of its own (sources/)
+        if own["arg"] != "optional" and (own["arg"] == "needed") != bool(arg.strip()):
+            return None
+        return own["rows"](desk, arg.strip(), session or getattr(desk, "_session", "") or "")
+    if head not in SOURCES or (head not in ("house", "turns", "lines") and (head in ("sections", "comments", "replies", "messages", "inbox", "days")) != bool(arg)):
         return None      # sections, comments and messages need an id, inbox a name, days a span; house, turns and lines one or none; the rest none
     if head == "days":
         a, _, b = arg.partition("..")
@@ -791,21 +982,6 @@ def _rows_of(desk, source, session=None):
         return house_rows(desk, desk._resolve(arg) if arg else None)
     if head == "turns":
         return turn_rows(desk, desk._resolve(arg) if arg else None)
-    if head == "reaches":
-        import verbs
-        return verbs.reach_rows(desk)
-    if head == "windows":
-        import witnessed
-        doc = witnessed.read(session or getattr(desk, "_session", "") or "", "windows")
-        return [] if doc is None else [{**{f: "" for f in SOURCES["windows"][1]}, **{k: v for k, v in r.items() if k in SOURCES["windows"][1]},
-                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
-                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict) and r.get("name")]
-    if head == "witnessed":
-        import witnessed
-        doc = witnessed.read(session or getattr(desk, "_session", "") or "", arg.strip())
-        return [] if doc is None else [{**{k: v if isinstance(v, (str, int, float)) else __import__("json").dumps(v) for k, v in r.items()},
-                                        "order": k, "age": doc["age"], "by": doc.get("by") or ""}
-                                       for k, r in enumerate(doc["rows"], 1) if isinstance(r, dict)]
     if arg:
         nid = desk._resolve(arg)
         s = w.subjects.get((w.nodes.get(nid) or {}).get("subject")) or w.subjects.get(nid)
@@ -883,7 +1059,8 @@ def rows_text(desk, source):
     if rs is None:
         raise LensRefusal("rows <source> [k=v k<v ...]. Sources: " + ", ".join(v[0] for v in SOURCES.values()))
     fields = SOURCES[source_head(source)][1]
-    if source_head(source) in ("lines", "witnessed"):     # 14 Oct: and the fields the lines (15 Oct: or a program) gave them
+    if source_head(source) == "lines" or (SOURCE_FILES.get(source_head(source)) or {}).get("open"):
+        # 14 Oct: and the fields the lines (15 Oct: or a program, a source file saying OPEN) gave them
         fields = fields + tuple(sorted({k for r in rs for k in r} - set(fields)))
     lines = [f"rows {source}: {len(rs)}  (fields: {' '.join('$' + f for f in fields)})"]
     for r in rs:
@@ -931,8 +1108,10 @@ def _w_gap(node, p, val, n, env):
 
 
 def _w_scroll(node, p, val, n, env):
-    if val not in ("none", "scroll", "end"):
-        raise LensRefusal(f"line {n}: `scroll none|scroll|end` (end keeps the newest in view); got {p!r}")
+    # a5496 (Alex, 15 Oct: never scroll): `scroll none` never scrolls, cut at its foot; `scroll none end` never scrolls
+    # and keeps its end in view, cut at its head (a chat whose newest lines stay, the oldest fading out above)
+    if val not in ("none", "scroll", "end", "none end"):
+        raise LensRefusal(f"line {n}: `scroll none|scroll|end|none end` (end keeps the newest in view; none never scrolls: what does not fit is cut, and fades; none end is cut at its head instead); got {p!r}")
     node["scroll"] = val
 
 
@@ -963,10 +1142,16 @@ def _w_fold(node, p, val, n, env):
             raise LensRefusal(f'line {n}: `fold ... handle <role>`: the role the handle wears; got {p!r}')
         if env["roles"] is not None and handle not in env["roles"]:
             raise LensRefusal(f"line {n}: no role {handle!r} for the fold's handle in {'style ' + env['style'] if env.get('style') else 'calm.style'}. Roles: {' '.join(sorted(env['roles']))}")
-    if any(x not in ("open", "float") for x in mods) or len(set(mods)) != len(mods):
-        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [handle <role>] [group <name>]`; got {p!r}')
+    # a5359 (Alex c5367: a board card opens in place on a press on its title, and stays one line closed): `inline` draws
+    # the handle beside the part's peek, on one line, and a press anywhere on the peek opens and closes it. Opt-in, so
+    # the folds that peek today (a document's comments) keep their handle above.
+    if any(x not in ("open", "float", "inline") for x in mods) or len(set(mods)) != len(mods):
+        raise LensRefusal(f'line {n}: `fold ["<label for the handle>"] [open] [float] [inline] [handle <role>] [group <name>]`; got {p!r}')
+    # a6265 (a popover from a line of At work): `float inline` is both: the handle beside the peek, a press anywhere on the
+    # peek opens it, and what it hides is drawn over the page (was refused as one or the other)
     node["fold"] = m.group(1).strip('"') if m.group(1) else True
     node["fold_open"], node["fold_float"], node["fold_handle"], node["fold_group"] = "open" in mods, "float" in mods, handle, group
+    node["fold_inline"] = "inline" in mods
 
 
 def _w_measure(node, p, val, n, env):
@@ -1014,6 +1199,16 @@ def _w_hint(node, p, val, n, env):
     node["hint"] = m.group(1)
 
 
+def _w_tip(node, p, val, n, env):
+    # a6271 (Alex, 17 Oct: 'They should have good icons, no text. If I hover them it should say what they are'): what a
+    # part is, shown beside it while the pointer rests on it (or it has focus), over the page: it never moves the layout.
+    # A name, then one plain sentence of what it does; each a template filled as text is (`tip "$title" "$about"`)
+    parts = re.findall(r'"([^"]*)"', val)
+    if not parts or len(parts) > 2 or not parts[0] or re.sub(r'"[^"]*"', "", val).strip():
+        raise LensRefusal(f'line {n}: `tip "<name>" ["<one sentence of what it does>"]`; got {p!r}')
+    node["tip"] = parts
+
+
 def _w_plain(node, p, val, n, env):
     node["plain"] = True          # Juniper a559: no runs; backticks print as the characters they are
 
@@ -1024,10 +1219,148 @@ def _w_marks(node, p, val, n, env):
     node["marks"] = True
 
 
+def _w_ids(node, p, val, n, env):
+    # a6109: an id in words is drawn as the name of what it names (things_of), in every text that is only read. `ids`
+    # keeps this text's ids as written: a Properties line, a command to copy, a text about ids themselves
+    node["ids"] = True
+
+
+def _w_arrows(node, p, val, n, env):
+    # a6642 (Alex, 20 Oct: a search whose results are chosen with the arrow keys and Enter): on a frame, Up and Down move
+    # the keyboard between the texts being written and the presses inside it, in the order they are drawn, a closed
+    # menu (fold float) inside it opening on Down; Enter on a press presses it, and Enter in a text whose words are
+    # unchanged presses the first press after it. The viewer's hands only: no event until something is pressed
+    if (val or "").strip():
+        raise LensRefusal(f"line {n}: `arrows` takes no words (on a frame: Up and Down move between its texts and presses); got {p!r}")
+    node["arrows"] = True
+
+
+CARET_KEYS = ("Ctrl+K", "Ctrl+L", "Ctrl+F", "/")
+
+
+def _w_caret(node, p, val, n, env):
+    # a6642 (Alex, 20 Oct: the Win tap opens the HUD, then typing starts a search): on a text being written, what brings
+    # the caret to it from anywhere on the page: a key (Ctrl+K ...) pressed while no other text took it, and `typing`,
+    # a letter typed while no text has the caret, which then lands in this one. The first such text drawn wins
+    keys = (val or "").split()
+    if not keys or any(k not in CARET_KEYS + ("typing",) for k in keys) or len(set(keys)) != len(keys):
+        raise LensRefusal(f"line {n}: `caret <{'|'.join(CARET_KEYS)}|typing> ...` (what brings the caret to this text); got {p!r}")
+    node["caret"] = keys
+
+
 def _w_picture(node, p, val, n, env):
     # 13 Oct (Alex: the design-review window needs diagrams): the words are a drawing, written as SVG, and the painter
     # draws it. The text stays the drawing's source, so a reader of the print can read and write one as any other text.
     node["picture"] = True
+
+
+def _w_markdown(node, p, val, n, env):
+    # a5820 (Alex, 16 Oct: 'nice clean markdown formatting ... kinda like obsidian but better'): the words are a whole
+    # Markdown document (headings, lists, tasks, quotes, code, tables, links, [[wikilinks]], ![[embeds]]). The painter
+    # draws it; edited, the line the caret is on shows its marks and the rest stays drawn. The text is the source, so
+    # every printer, reader and quoting edit sees plain Markdown. The scene resolves each [[target]] to a thing's id.
+    # `markdown links <selection>`: what typing [[ offers (titles and ids), e.g. markdown links prop:role=doc
+    v = (val or "").strip()
+    if v and not v.startswith("links "):
+        raise LensRefusal(f"line {n}: `markdown` or `markdown links <selection>` (what typing [[ offers); got {p!r}")
+    node["markdown"] = v[6:].strip() if v else True
+
+
+def _w_media(node, p, val, n, env):
+    # a5941 (Alex, 16 Oct: 'can we get that video to be hyperlinked in chat and open in a native window here'): a path in
+    # the words to a film or picture the desk may show is drawn as one. The link stays words in the text; which paths
+    # are shown is media_links.py's, judged when the scene is built and again when the file is asked for
+    v = (val or "").strip()
+    # a6443 (Alex, 17 Oct: a music panel 'that looks like Spotify made it'): `media picture`, the first picture alone,
+    # filling the part, for album art from the system's media session (research/window-lab/media.py)
+    if v not in ("", "player", "picture"):
+        raise LensRefusal(f"line {n}: `media` (each film or picture the words name, under them), `media player` (the first, filling the part) or `media picture` (the first picture alone, filling the part); got {p!r}")
+    node["media"] = v or "embed"
+
+
+PAGE_CUTOUTS = ("island", "hole", "notch", "none")
+PAGE_WORDS = 'page <width> <height> [touch] [picks] [safe <top> <right> <bottom> <left>] [cutout island|hole|notch] [mark <part key>]'
+
+
+def _w_page(node, p, val, n, env):
+    # a6431 (Alex, 17 Oct: 'a webapp running in the middle the size of a phone'): the words name a page (a lens, or a
+    # path on this server) and the painter shows it, the real painter in a window of exactly that many CSS pixels,
+    # scaled to fit the part and never above 1:1. The page keeps itself current, as any painted page does. `touch`: a
+    # drag inside scrolls and a click is a tap; `picks`: a tap names the part under it (`on pick`; a long press always
+    # does); `safe`: the insets a device keeps clear, drawn over the page with its `cutout`; `mark`: a part of the page,
+    # by its scene key, drawn round, so what is pointed at is world data. Any value may be $name or $(expr), filled when
+    # the part is built; without one the words are judged now
+    v = (val or "").strip()
+    if not v:
+        raise LensRefusal(f"line {n}: `{PAGE_WORDS}`; got {p!r}")
+    if "$" not in v:
+        spec = page_of(v)
+        if "error" in spec:
+            raise LensRefusal(f"line {n}: {spec['error']}")
+    node["page"] = v
+
+
+def page_of(words):
+    """a6431: `page` words, filled -> {w, h, touch, picks, safe: [t, r, b, l] | None, cutout, mark} or {error}. A value
+    filled empty is left out (a let that says nothing), so `page $w $h $touch` reads as `page 393 852` when touch is ''."""
+    ws, out = [w for w in str(words).split() if w], {"touch": False, "picks": False, "safe": None, "cutout": None, "mark": None}
+    def num(x):
+        try:
+            f = float(x)
+        except (TypeError, ValueError):
+            return None
+        return int(f) if f == int(f) else f
+    if len(ws) < 2 or num(ws[0]) is None or num(ws[1]) is None or not (40 <= num(ws[0]) <= 4000 and 40 <= num(ws[1]) <= 4000):
+        return {"error": f"`{PAGE_WORDS}`: a width and a height in CSS pixels (40 to 4000) come first; got {' '.join(ws[:2]) or 'none'!r}"}
+    out["w"], out["h"] = num(ws[0]), num(ws[1])
+    i = 2
+    while i < len(ws):
+        w = ws[i]
+        if w in ("touch", "picks"):
+            out[w] = True
+            i += 1
+        elif w == "safe":
+            vals = [num(x) for x in ws[i + 1:i + 5]]
+            if len(vals) < 4 or any(x is None or x < 0 for x in vals):
+                return {"error": f"`safe <top> <right> <bottom> <left>`: four insets in CSS pixels; got {' '.join(ws[i:i + 5])!r}"}
+            out["safe"] = vals
+            i += 5
+        elif w == "cutout":
+            c = ws[i + 1] if i + 1 < len(ws) else ""
+            if c not in PAGE_CUTOUTS:
+                return {"error": f"`cutout <{'|'.join(PAGE_CUTOUTS)}>`; got {c!r}"}
+            out["cutout"] = None if c == "none" else c
+            i += 2
+        elif w == "mark":
+            out["mark"] = ws[i + 1] if i + 1 < len(ws) else None
+            i += 2
+        else:
+            return {"error": f"`{PAGE_WORDS}`: {w!r} is none of these"}
+    return out
+
+
+PAGE_SOURCE = re.compile(r"[a-z][a-z0-9-]*(\s+on\s+[afs]\d+)?|/[\w./?=&%-]*")
+
+
+def page_source(text):
+    """a6431: what a `page` text's words show: a lens by name (`notes`, or `notes on a12` to stand it on a thing) or a
+    path on this server (/lens.html?...). Anything else (an address elsewhere) is not shown: the page is this desk's."""
+    t = (text or "").strip()
+    return t if PAGE_SOURCE.fullmatch(t) else None
+
+
+LIVE =("clock", "date", "until", "until ring")
+
+
+def _w_live(node, p, val, n, env):
+    # a5530 (Alex: a clock top left and a pomodoro timer whose ring visibly counts down): words the painter keeps live
+    # from its own clock, redrawn each second with no scene built. `clock` the time, `date` the day; `until` reads the
+    # words as a moment (2026-10-15 17:05:12, or a number of seconds left when the count stands still) with `of <secs>`
+    # for the whole, and draws the time left, `ring` with a ring that empties. At zero it sends the part's `on end`.
+    # The words stay what the printers print, so a reader of the scene sees the moment, not a picture of it.
+    if (val or "").strip() not in LIVE:
+        raise LensRefusal(f"line {n}: `live <{'|'.join(LIVE)}>`; got {p!r}")
+    node["live"] = val.strip()
 
 
 def _w_peek(node, p, val, n, env):
@@ -1040,6 +1373,16 @@ _RUNS = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.S)
 
 
 _MARKS = re.compile(r"BS*BS*BS*(?=BSS)(?P<both>[^*BSn]+?)(?<=BSS)BS*BS*BS*|BS*BS*(?=BSS)(.+?)(?<=BSS)BS*BS*|BS*(?=BSS)([^*BSn]+?)(?<=BSS)BS*|BS[([^BS]BSn]+)BS]BS(([^)BSsBSn]+)BS)".replace("BS", chr(92)))
+
+
+def media_of(text):
+    """a5941: the films and pictures a `media` text's words name (media_links.find): shown ones carry src. A fault in
+    judging a path (a name the file system refuses) leaves the words as words; it never stops the lens around them"""
+    import media_links
+    try:
+        return media_links.find(text)
+    except (OSError, ValueError) as e:
+        return [{"path": "", "refused": f"the paths in these words could not be judged ({type(e).__name__}: {e})"}]
 
 
 def marks_of(text):
@@ -1063,9 +1406,199 @@ def marks_of(text):
     return out
 
 
-def runs_of(text, marks=False):
+_WIKI = re.compile(r"(!?)\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]*))?\]\]")
+
+
+def _titles(w):
+    """Every placed thing by its title, lower case -> appearance ids, a document (role=doc) first, then oldest first."""
+    out = {}
+    for nid, n in w.nodes.items():
+        s = w.subjects.get(n.get("subject")) or {}
+        title = (s.get("title") if s else n.get("title")) or n.get("title") or ""
+        props = s.get("props") or n.get("props") or {}
+        if not title or props.get("status") == "trashed":
+            continue
+        out.setdefault(title.strip().lower(), []).append((props.get("role") != "doc", int(nid[1:]) if nid[1:].isdigit() else 0, nid))
+    return {k: [x[2] for x in sorted(v)] for k, v in out.items()}
+
+
+def wikilinks_of(w, text, thing=None):
+    """a5820: each [[target]] or ![[target]] of a Markdown text -> {target: {id, title, kind, status, owner, inside,
+    excerpt}}. A target is an id (a4865, the form the editor writes, which a rename never breaks) or a title, matched
+    whole and in any case, a document first; `[[x#part]]` and `[[x|words]]` resolve x. A target that names nothing
+    has no id, and the painter draws it as a link to nothing. `thing` reads one thing (the scene records the read)."""
+    out = {}
+    for m in _WIKI.finditer(text or ""):
+        t = m.group(2).split("#")[0].strip()
+        if not t or t in out:
+            continue
+        if _ID.match(t) and (t in w.nodes or t in w.subjects):
+            nid = t
+        else:
+            hits = _once(w, ("titles",), lambda: _titles(w)).get(t.lower()) or []
+            nid = hits[0] if hits else None
+        if not nid:
+            out[t] = {"id": "", "title": t}
+            continue
+        c = thing(nid) if thing else _ctx_for(w, nid)
+        p = c.get("_props") or {}
+        body = " ".join((c.get("text") or "").split())
+        out[t] = {"id": c.get("item") or nid, "title": c.get("title") or t, "kind": c.get("kind") or "",
+                  **{k: str(p[k]) for k in ("status", "owner", "commission", "role") if p.get(k)},
+                  **({"excerpt": body[:280] + ("…" if len(body) > 280 else "")} if body else {}),
+                  **({"inside": len(w.children(nid))} if nid in w.nodes and w.nodes[nid].get("type") == "surface" else {})}
+    return out
+
+
+# a6109 (Alex, 16 Oct: 'I should never see id names, only actual names of things ... and names of things like notes,
+# tasks, workers etc. should ALL be clickable'): an id written in words (a5143, f155, s5948, c5957, e11454, m6012,
+# worker-a6010) is drawn as the name of what it names, a link; the words stay as written, so agents keep writing ids
+# and every printer and fence sees them. Only an id that names something is drawn so; any other stays words.
+# a6452: an id that is a folder or file name in a path (demos/a6109/names-demo.mp4) is part of the path, not a name
+_THING = re.compile(r"(?<![\w/\\-])(worker-)?([afscep]\d{2,}|m\d{2,})(?![\w/\\-])")
+# a6109, JEFF c6186: a person is printed by name, not id, so their name is the link: where a text is only a name, or
+# ends 'by|to|from <name>' (a card's owner, who is at work, a chat line's writer, 'by Juniper'). Never in prose, where
+# a name is also a word, and never in a text that is itself a button (the To chips)
+_PERSON_AT = re.compile(r"^\s*([A-Za-z][\w-]*)\s*$|\b(?:by|to|from)\s+([A-Za-z][\w-]*)\s*$")
+
+
+def _short(title, most=48):
+    t = " ".join((title or "").split())
+    if len(t) <= most:
+        return t
+    cut = t[:most].rsplit(" ", 1)[0].rstrip(" ,;:·-—(")
+    return (cut or t[:most]) + "…"
+
+
+def _who_named(w, by):
+    """A writer as a person reads them: a name with its capital; a worker as the card it works on."""
+    m = re.fullmatch(r"worker-(a\d+)", by or "")
+    if m:
+        c = _ctx_for(w, m.group(1))
+        return f"the worker on {_short(c.get('title'), 32)}" if c.get("title") else by
+    return (by or "someone")[:1].upper() + (by or "someone")[1:]
+
+
+def _thing_named(w, ref):
+    """One id -> {name, title, kind, open} or None when it names nothing. `open` is what a press shows: the thing
+    itself, a comment's thing, an event's target, a chat line's chat."""
+    worker = ref.startswith("worker-")
+    nid = ref[7:] if worker else ref
+    head = nid[0]
+    if worker:
+        c = _ctx_for(w, nid)
+        if not c.get("item") or not c.get("title"):
+            return None
+        return {"name": f"worker on {_short(c['title'], 40)}", "title": f"{ref}: the worker on “{c['title']}”", "kind": "worker", "open": c["item"]}
+    if head in "afs":
+        if nid not in w.nodes and nid not in w.subjects:
+            return None
+        c = _ctx_for(w, nid)
+        if not c.get("title"):
+            return None
+        return {"name": _short(c["title"]), "title": f"{c['title']} · {c.get('kind') or ''} {nid}".strip(), "kind": c.get("kind") or "", "open": c.get("item") or nid}
+    if head == "c":
+        s, cm = _once(w, ("comment-index",), lambda: {c["id"]: (s, c) for s in w.subjects.values() for c in s.get("comments") or []}).get(nid, (None, None))
+        if not s:
+            return None
+        apps = w.appearances_of(s["id"])
+        on = _short(s.get("title"), 36)
+        return {"name": f"comment by {_who_named(w, cm.get('by'))} on {on}", "title": f"{nid}: a comment by {cm.get('by')} on “{s.get('title')}”",
+                "kind": "comment", "open": apps[0] if apps else s["id"]}
+    if head == "e":
+        e = w.event_by_id(nid)
+        if not e:
+            return None
+        t = e.get("target") if isinstance(e.get("target"), str) else ""
+        c = _ctx_for(w, t) if t and (t in w.nodes or t in w.subjects) else {}
+        on = f" on {_short(c['title'], 36)}" if c.get("title") else ""
+        return {"name": f"{_who_named(w, e.get('by'))}'s {e.get('verb') or 'act'}{on}", "title": f"{nid}: {e.get('by')} {e.get('verb')} {t} at {e.get('at', '')}".strip(),
+                "kind": "event", "open": c.get("item") or ""}
+    if head == "m":
+        s = _once(w, ("line-index",), lambda: {l["id"]: s for s in w.subjects.values() if s.get("kind") == "chat" for l in s.get("lines") or []}).get(nid)
+        if not s:
+            return None
+        l = next(x for x in s["lines"] if x["id"] == nid)
+        e = w.event_by_id(l.get("ev"))
+        apps = w.appearances_of(s["id"])
+        return {"name": f"{_who_named(w, (e or {}).get('by'))}'s line in {_short(s.get('title'), 36)}", "title": f"{nid}: a line in “{s.get('title')}”",
+                "kind": "line", "open": apps[0] if apps else s["id"]}
+    if head == "p":
+        import persons
+        if not persons.is_person(w, nid):
+            return None
+        return _person(w, nid, persons.display(w, nid))
+    return None
+
+
+def _person(w, pid, shown):
+    """A person -> {name, title, kind, open}: open is their corner (a resident's room), else the person itself."""
+    import persons
+    corner = _once(w, ("person-corner", pid), lambda: persons.corner(w, pid))
+    return {"name": shown, "title": f"{persons.display(w, pid)} · person {pid}" + (f" · corner {corner}" if corner else ""),
+            "kind": "person", "open": corner or pid}
+
+
+def _person_word(w, word):
+    """A word that is a person's name today -> _person, or None (not a person, or a name the house keeps for itself)."""
+    import persons
+    if not persons.on(w) or persons.norm(word) in persons.NOT_PERSONS:
+        return None
+    pid = persons.today(w, word)
+    return _person(w, pid, word) if pid else None
+
+
+def things_of(w, text, people=False):
+    """a6109: each id in words that names something -> {name, title, kind, open}; ids in code spans stay code. Read
+    while the world holds still (still); a press reads the world again, so a renamed thing is at worst named late.
+    people: also a person's name where the text is only that name or ends 'by|to|from <name>' (kind person, word)."""
+    out = {}
+    if not text:
+        return out
+    if _THING.search(text):
+        plain = _RUNS.sub(lambda m: " " * len(m.group(0)), text)
+        for m in _THING.finditer(plain):
+            ref = m.group(0)
+            if ref in out:
+                continue
+            hit = _once(w, ("thing-named", ref), lambda: _thing_named(w, ref))
+            if hit:
+                out[ref] = hit
+    m = _PERSON_AT.search(text) if people and "`" not in text else None
+    if m:
+        word = m.group(1) or m.group(2)
+        hit = word not in out and _once(w, ("person-word", word), lambda: _person_word(w, word))
+        if hit:
+            out[word] = {**hit, "word": True}
+    return out
+
+
+def _named_runs(r, things):
+    """One plain run -> runs where each id `things` knows is its own run, mark=thing; a person's name (word) where
+    _PERSON_AT found it, at the run's end or as the whole run."""
+    out, at, t = [], 0, r["text"]
+    words = [k for k, v in things.items() if v.get("word")]
+    rx = re.compile(_THING.pattern + "".join(f"|(?<![\\w-]){re.escape(k)}\\s*$" for k in words)) if words else _THING
+    for m in rx.finditer(t):
+        ref = m.group(0).rstrip()                   # a name at the end may carry the words' trailing space
+        hit = things.get(ref)
+        if not hit:
+            continue
+        if m.start() > at:
+            out.append({**r, "text": t[at:m.start()]})
+        out.append({"text": hit["name"], "mark": "thing", "id": ref, "open": hit["open"], "title": hit["title"], "kind": hit["kind"]})
+        at = m.start() + len(ref)
+    if not out:
+        return [r]
+    if at < len(t):
+        out.append({**r, "text": t[at:]})
+    return out
+
+
+def runs_of(text, marks=False, things=None):
     """Juniper a559: code spans and fences become runs at print, from this closed grammar, with no world effect; the
-    words stay the part's source, so the printer's text and the fence are unchanged. -> [{text, role?, block?}] or None."""
+    words stay the part's source, so the printer's text and the fence are unchanged. -> [{text, role?, block?}] or None.
+    a6109: `things` (things_of) draws each id it knows as a run of its own, mark=thing, outside code."""
     out, at = [], 0
     for m in _RUNS.finditer(text or ""):
         if m.start() > at:
@@ -1076,14 +1609,22 @@ def runs_of(text, marks=False):
         out.append({"text": text[at:]})
     if marks:                              # marks are looked for in the plain stretches only: code keeps its stars
         out = [r2 for r in out for r2 in ([r] if r.get("role") else marks_of(r["text"]))]
+    if things:                             # a link keeps its own words; strong and stressed words may hold a name
+        out = [r2 for r in out for r2 in ([r] if r.get("role") or r.get("mark") == "link" else _named_runs(r, things))]
     if not any(r.get("role") or r.get("mark") for r in out):
         return None
     return out
 
 
 def _w_share(node, p, val, n, env):
+    # a5496 (Alex, 15 Oct: 'when one panel expands it pushes the others out'): the weight may follow data, `share
+    # $(expr)` or `share $name`, filled per instance as words are; a number above 0 is the weight, anything else
+    # (0, none) leaves the part its own size
+    if re.fullmatch(r"\$\(.+\)|\$[\w.]+", val):
+        node["share"] = val
+        return
     if not re.fullmatch(r"\d+(\.\d+)?", val) or float(val) <= 0:
-        raise LensRefusal(f"line {n}: `share <weight>` (this child's share of its column or row); got {p!r}")
+        raise LensRefusal(f"line {n}: `share <weight>` or `share $(<expr>)` (this child's share of its column or row); got {p!r}")
     node["share"] = float(val) if "." in val else int(val)
 
 
@@ -1144,9 +1685,10 @@ def _w_of(node, p, val, n, env):
 
 def _w_by(node, p, val, n, env):
     # a1069/a1078: a repeat in the order of props, numbers ascending, a missing value last, ties in the order the things
-    # were made. `by priority, rank`: the parts after the comma are more props (parse joins them), not words
-    if not re.fullmatch(r"[\w.-]+( [\w.-]+)*", val or ""):
-        raise LensRefusal(f"line {n}: `by <prop>[, <prop>]` on a repeat; got {p!r}")
+    # were made. `by priority, rank`: the parts after the comma are more props (parse joins them), not words.
+    # a5530: `by -at` puts the largest first (newest first); a missing value stays last
+    if not re.fullmatch(r"-?\w[\w.-]*( -?\w[\w.-]*)*", val or ""):
+        raise LensRefusal(f"line {n}: `by [-]<prop>[, [-]<prop>]` on a repeat (-: the largest first); got {p!r}")
     node["by"] = (node["by"] or []) + val.split()
 
 
@@ -1329,6 +1871,15 @@ def _w_on(node, p, val, n, env):
             raise LensRefusal(f"line {n}: `on click press <{'|'.join(PRESSES)}>`; got {p!r}")
         node["on"].append({"on": "click", "line": "press " + m.group(1)})
         return
+    # a5300 (15 Oct): a button asks the program the page is painted in (the home base, research/window-lab/hud.py) to do
+    # one of the things it says it can (its rows, witnessed:host). Like `press`, the painter's own act: never a desk line
+    # a5941: `on pop host ...` too (Pop out on a `media` film asks for a window)
+    m = re.fullmatch(r"(click|pop) host(?:\s(.*))?", val.strip())
+    if m:
+        if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", (m.group(2) or "").strip()):
+            raise LensRefusal(f"line {n}: `on {m.group(1)} host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")
+        node["on"].append({"on": m.group(1), "line": "host " + m.group(2).strip()})
+        return
     g, do, cmd = val.partition(" do ")
     drop_part = label = when = None
     # 14 Oct (Alex: comments from the right-click box 'go to the ether' on a design, whose margin is not shown; then
@@ -1341,15 +1892,24 @@ def _w_on(node, p, val, n, env):
         label, g = g[4:].strip(), "key"
         if label not in KEYS:
             raise LensRefusal(f"line {n}: `on key <{'|'.join(KEYS)}> do <desk command>` on a text that has `on edit`; got {p!r}")
+    side = None
     if g.startswith("drop "):
         drop_part, g = g[5:].strip(), "drop"
+        # a5994 (Alex: a panel dragged anywhere snaps, and the place is shown before he lets go): `on drop <part> at
+        # left|right|top|bottom` is the act for a drop near that edge of the receiver; the painter picks the side by
+        # where the pointer is and draws the landing box (that half of the receiver) while the thing is in the air
+        m = re.fullmatch(r"(\S+)\s+at\s+(\S+)", drop_part)
+        if m:
+            drop_part, side = m.group(1), m.group(2)
+            if side not in DROP_SIDES:
+                raise LensRefusal(f"line {n}: `on drop <part> at <{'|'.join(DROP_SIDES)}> do <desk command>`; got {p!r}")
     if g.startswith("menu "):
         m = re.fullmatch(r'"([^"]+)"', g[5:].strip())
         if not m:
             raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
         label, g = m.group(1), "menu"
     if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
-        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>` or `on drop <part> do <desk command>`; got {p!r}")
+        raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on end do <desk command>` (a `live until` at zero), `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>`, `on click host <verb> [words]` or `on drop <part> do <desk command>`; got {p!r}")
     if when:
         try:
             X.parse(when)
@@ -1362,7 +1922,8 @@ def _w_on(node, p, val, n, env):
     # unless it begins with one of the desk's own reading or session commands.
     if cmd.split(" ")[0] not in ACT_COMMANDS:
         cmd = "do " + cmd
-    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"label": label} if label else {}),
+    node["on"].append({"on": g, "line": cmd, **({"part": drop_part} if drop_part else {}), **({"side": side} if side else {}),
+                       **({"label": label} if label else {}),
                        **({"when": when.strip()} if when else {})})
 
 
@@ -1371,17 +1932,25 @@ WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
-    "scroll": ("scroll none|scroll|end", _w_scroll),
-    "fold": ('fold ["<handle label>"] [open] [float] [handle <role>] [group <name>]', _w_fold),
+    "scroll": ("scroll none|scroll|end|none end", _w_scroll),
+    "fold": ('fold ["<handle label>"] [open] [float] [inline] [handle <role>] [group <name>]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
     "lines": ("lines <min>..<max>", _w_lines),
     "commit": ("commit explicit|enter|ctrl-enter [only]", _w_commit),
-    "share": ("share <weight>", _w_share),
+    "share": ("share <weight> | share $(<expr>)", _w_share),
     "hint": ('hint "..."', _w_hint),
+    "tip": ('tip "<name>" ["<what it does>"]', _w_tip),
     "plain": ("plain", _w_plain),
     "marks": ("marks", _w_marks),
+    "ids": ("ids", _w_ids),
+    "arrows": ("arrows", _w_arrows),
+    "caret": ("caret <key>|typing ...", _w_caret),
     "picture": ("picture", _w_picture),
+    "markdown": ("markdown [links <selection>]", _w_markdown),
+    "media": ("media [player|picture]", _w_media),
+    "page": (PAGE_WORDS, _w_page),
+    "live": ("live clock|date|until [ring]", _w_live),
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
@@ -1391,7 +1960,7 @@ WORDS = {
     "the": ("the <selection> [as <frame>]", _w_the),
     "of": ("of <selection | row source> [as <frame>]", _w_of),
     "over": ("over $<list> [as <frame>]", _w_over),
-    "by": ("by <prop>[, <prop>]", _w_by),
+    "by": ("by [-]<prop>[, [-]<prop>]", _w_by),
     "run": ("run <prop>", _w_run),
     "count": ("count <selection>", _w_count),
     "as": ("as <frame>", _w_as),
@@ -1484,7 +2053,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "plain": False, "peek": False, "marks": False, "picture": False, "light": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "tip": None, "plain": False, "peek": False, "marks": False, "ids": False, "arrows": False, "caret": None, "picture": False, "markdown": False, "media": False, "page": None, "light": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -1515,22 +2084,47 @@ def parse(src, roles=None, style=None):
     for k in every:
         k["src"] = f"{k['name']} : " + ", ".join(k["words"])     # one spelling of the part's own words, whichever form it was written in
         _check_part(k, k["line"])          # after every line, since a part's words may follow its children
-        for wd in ("gap", "scroll", "fold", "measure"):
+        if k["caret"] and (k["text"] is None or not any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `caret` brings the caret to a text being written: this part has no `on edit`")
+        for wd in ("gap", "scroll", "fold", "measure", "arrows"):
             if k[wd] not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
-        for wd in ("wrap", "lines", "hint", "commit", "light"):
+        for wd in ("wrap", "lines", "hint", "commit", "light", "live"):
             if k.get(wd) is not None and k["text"] is None:
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
             raise LensRefusal(f"line {k['line']}: `picture` draws a text that is a drawing (SVG): this part " + ("prints no text" if k["text"] is None else "is edited, and a drawing is edited as its source, in a part without `picture`"))
+        if k["markdown"] and (k["text"] is None or k["picture"] or k["live"]):
+            raise LensRefusal(f"line {k['line']}: `markdown` draws a text that is a Markdown document: this part " + ("prints no text" if k["text"] is None else "is also a picture or a live count"))
+        # a6452: `media` and `markdown` together are a read Markdown message with its films and pictures (the chats): the
+        # document draws a ![picture](path) the scene showed in its place, and media draws the rest under the words
+        if k["media"] and (k["text"] is None or k["picture"] or k["live"] or any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `media` draws the films and pictures a text's words name, under them: this part " + ("prints no text" if k["text"] is None else "is edited (the words are written in a part without `media`)" if any(a["on"] == "edit" for a in k["on"]) else "is also a picture or a live count"))
+        if k["page"] and (k["text"] is None or k["picture"] or k["markdown"] or k["live"] or k["media"] or any(a["on"] == "edit" for a in k["on"])):
+            raise LensRefusal(f"line {k['line']}: `page` shows the page its words name (a lens, or a /path on this server): this part " + ("prints no text" if k["text"] is None else "is edited (write the words in a part without `page`)" if any(a["on"] == "edit" for a in k["on"]) else "is also a picture, a Markdown document, media or a live count"))
+        if any(a["on"] == "pick" for a in k["on"]) and not k["page"]:
+            raise LensRefusal(f"line {k['line']}: `on pick` is sent when a part of a page is pointed at: this part has no `page`")
+        if any(a["on"] == "pop" for a in k["on"]) and not k["media"]:
+            raise LensRefusal(f"line {k['line']}: `on pop` is sent when Pop out is pressed on a film or picture a `media` text draws; this part has no `media`")
+        # a6109: `on link` is no longer the Markdown text's alone: a name or a [[wikilink]] pressed in this part or any
+        # part inside it (inside a placed lens too) sends the nearest `on link` above it, $value the id it opens
+        if k["ids"] and k["text"] is None:
+            raise LensRefusal(f"line {k['line']}: `ids` keeps the ids in a text's words as written: this part prints no text")
         if k["layout"] == "grid" and not k["tracks"]:
             raise LensRefusal(f"line {k['line']}: `grid` names its tracks: grid 1 3 3 1")
         if k["clamp"] is not None and k["text"] is not None and any(a["on"] == "edit" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: `on edit` on a clamped text: the person would replace words the clamp hides; drop the clamp, or edit through a part that shows the whole value")
+        # a6067: a capture (the control screen's) dropped into a text being written asks the world what it means there
+        if any(a["on"] == "capture" for a in k["on"]) and not any(a["on"] == "edit" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: `on capture` is sent when a capture is dropped into a text being written: this part has no `on edit`")
         if any(a["on"] == "key" for a in k["on"]) and not any(a["on"] == "edit" for a in k["on"]):
             raise LensRefusal(f"line {k['line']}: `on key` is for a text being written: this part has no `on edit`")
         if any(a["on"] == "open" for a in k["on"]) and not k["fold"]:
             raise LensRefusal(f"line {k['line']}: `on open` needs a fold handle")
+        if any(a["on"] == "end" for a in k["on"]) and not (k.get("live") or "").startswith("until"):
+            raise LensRefusal(f"line {k['line']}: `on end` is sent when a count reaches zero: this part needs `live until`")
+        if k.get("live") and any(a["on"] == "edit" for a in k["on"]):
+            raise LensRefusal(f"line {k['line']}: `live` words are the painter's, redrawn each second; edit them in a part without `live`")
         if type(k["peek"]) is int and k["text"] is None:
             raise LensRefusal(f"line {k['line']}: `peek <lines>` needs text")
         if k["each"] and k["each"] not in parts:
@@ -1596,7 +2190,7 @@ def to_lines(src, roles=None, style=None):
 # ---------------------------------------------------------------------------------------------------------------------
 HOST = ("me", "today", "session", "touched")
 HOST_FRAMES = ("touched", "changed")      # Juniper: $touched (last event on the thing), $touched.by, $changed.<field>; host reads, never in a fence
-GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected", "quoted", "quoted_in")   # quoted, quoted_in: 13 Oct
+GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected", "quoted", "quoted_in", "part")   # quoted, quoted_in: 13 Oct; part: a6431's pick
 
 
 def _refs_of(node):
@@ -2072,7 +2666,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append(f"{wd} {n[wd]}")
         if n.get("fold"):
             bits.append(("unfolded" if n.get("fold_open") else "folded") + (f' "{n["fold"]}"' if isinstance(n["fold"], str) else "")
-                        + (" float" if n.get("fold_float") else "") + (f" handle {n['fold_handle']}" if n.get("fold_handle") else "")
+                        + (" float" if n.get("fold_float") else "") + (" inline" if n.get("fold_inline") else "")
+                        + (f" handle {n['fold_handle']}" if n.get("fold_handle") else "")
                         + (f" group {n['fold_group']}" if n.get("fold_group") else ""))
         if n.get("wrap") == "verbatim":
             bits.append("verbatim")
@@ -2080,13 +2675,24 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append(f"lines {n['lines'][0]}..{n['lines'][1] if n['lines'][1] is not None else ''}")
         if n.get("hint"):
             bits.append(f'hint "{n["hint"]}"')
+        if n.get("tip"):                  # a6271: an icon has no words of its own; its tip is what it says it is
+            bits.append("tip " + " ".join(f'"{t}"' for t in n["tip"]))
+        if n.get("arrows"):
+            bits.append("arrows")
+        if n.get("caret"):
+            bits.append("caret " + " ".join(n["caret"]))
         if n.get("peek"):
             bits.append("peek" + (f" {n['peek']}" if type(n["peek"]) is int else ""))
         if n.get("picture"):
             bits.append("picture")
+        if n.get("live"):
+            bits.append("live " + n["live"])
         if n.get("light"):
             bits.append("light " + str(len([x for x in str(n["light"]).split(chr(10)) if x.strip()])))
-        if n.get("plain"):
+        if n.get("markdown"):
+            wl = n.get("wikilinks") or {}
+            bits.append("markdown" + (f" · links {sum(1 for v in wl.values() if v.get('id'))} of {len(wl)}" if wl else ""))
+        elif n.get("plain"):
             bits.append("plain")
         elif n.get("text") and runs_of(n["text"], n.get("marks")):
             rs = runs_of(n["text"], n.get("marks"))
@@ -2096,6 +2702,22 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append("marks " + (", ".join(f"{k} {c}" for k in ("strong", "stress", "both", "link") for c in [sum(1 for r in rs if r.get("mark") == k)] if c) or "none"))
         elif n.get("marks"):
             bits.append("marks none")
+        if n.get("media"):
+            ms = media_of(n.get("text") or "")
+            kinds = [m["kind"] for m in ms if m.get("src")]
+            said = ", ".join(f"{kinds.count(k)} {k}" for k in ("video", "image") if k in kinds) or "none"
+            no = [m["refused"] for m in ms if not m.get("src")]
+            bits.append(("media " + n["media"] + " " if n["media"] in ("player", "picture") else "media ") + said + (f" (not shown: {'; '.join(no)})" if no else ""))
+        if isinstance(n.get("page"), dict):          # a6431: what the page shows, and how, as a reader needs it
+            pg = n["page"]
+            if "error" in pg:
+                bits.append(f"page not shown: {pg['error']}")
+            elif not page_source(n.get("text")):
+                bits.append("page not shown: its words name no lens and no /path on this server")
+            else:
+                bits.append(f"page {pg['w']}x{pg['h']}" + (" touch" if pg["touch"] else "") + (" picks" if pg["picks"] else "")
+                            + (" safe " + " ".join(str(x) for x in pg["safe"]) if pg["safe"] else "")
+                            + (f" cutout {pg['cutout']}" if pg["cutout"] else "") + (f" mark {pg['mark']}" if pg["mark"] else ""))
         if n.get("lens"):
             bits.append(f"· lens {n['lens']}")
         if n["box"]:
@@ -2136,7 +2758,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
         for a in n["acts"]:
             if a["on"] == "fold":
                 continue                    # the line already says folded; the fold act is the viewer's, with no line
-            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f' "{a["label"]}"' if a.get("label") else "")
+            bits.append(f"· {a['on']}" + (f" {a['part']}" if a.get("part") else "") + (f" at {a['side']}" if a.get("side") else "")
+                        + (f' "{a["label"]}"' if a.get("label") else "")
                         + (f": {a['line']}" if a.get("line") else ""))
         for a, v in views.items():
             if n["key"] in (v.get("facts") or {}):
@@ -2206,6 +2829,10 @@ def to_words(scene, name, who, at, roots=None, part=None, start=1, whole=False):
     return "\n".join(out), [n for n, a, b, ok in spans if ok and a >= lo and b <= hi]
 
 
+import weakref as _weakref
+_LENSES = _weakref.WeakKeyDictionary()
+
+
 def find_lens(desk, name, at=None):
     """A lens by title, regardless of case, nearest first (verbs.nearest; 9 Oct, step 7): the room `at` (a placing
     lens's own, else where the line stands), the rooms around it, the house, then unplaced (a removed lens leaves its
@@ -2213,7 +2840,17 @@ def find_lens(desk, name, at=None):
     import kinds
     import verbs
     w = desk.world
-    hits = [s for s in w.subjects.values() if kinds.is_lens(s) and s["title"].lower() == name.lower()]
+    # a6010: the lenses by title, made once per change of the world (the home base asked ~20 times a build, each a walk
+    # over every subject); every change to a title or a tag is an event, so the events' count keys it
+    key = (getattr(w, "_eseq", 0), len(w.events), len(w.subjects))
+    hit = _LENSES.get(w)
+    if hit is None or hit[0] != key:
+        by = {}
+        for s in w.subjects.values():
+            if kinds.is_lens(s):
+                by.setdefault(s["title"].lower(), []).append(s)
+        hit = _LENSES[w] = (key, by)
+    hits = list(hit[1].get(name.lower(), ()))
     try:
         s = verbs.nearest(desk, hits, name, "lenses", at)
     except Refusal as e:
@@ -2256,10 +2893,16 @@ def emit(node):
         for k in ("tracks", "gap", "scroll", "measure"):
             if node.get(k) is not None:
                 paint[k] = node[k]
+        if node.get("arrows"):
+            paint["arrows"] = True
         if node.get("fold"):
             paint["fold"] = {"folded": not node.get("fold_open"), "label": node["fold"] if isinstance(node["fold"], str) else (node.get("text") or node.get("part") or "")}
             if node.get("fold_float"):
                 paint["fold"]["float"] = True
+            if node.get("fold_inline"):              # a5359: beside its peek; with no label of its own, the arrow alone
+                paint["fold"]["inline"] = True
+                if not isinstance(node["fold"], str):
+                    paint["fold"]["label"] = ""
             if node.get("fold_handle"):
                 paint["fold"]["handle"] = node["fold_handle"]
             if node.get("fold_group"):
@@ -2274,28 +2917,50 @@ def emit(node):
             paint["hint"] = node["hint"]
         if node.get("picture"):
             paint["picture"] = True
+        if node.get("live"):
+            paint["live"] = node["live"]
         if node.get("light") and str(node["light"]).strip():
             paint["light"] = [x.strip() for x in str(node["light"]).split(chr(10)) if x.strip()]
             if node.get("image_regions"):
                 paint["regions"] = node["image_regions"]
-        if not node.get("plain") and not node.get("picture") and node.get("text"):
-            rs = runs_of(node["text"], node.get("marks"))
+        if node.get("markdown"):              # a5820: the painter reads the Markdown itself; the scene says what [[x]] are
+            paint["markdown"] = True
+            if node.get("wikilinks"):
+                paint["wikilinks"] = node["wikilinks"]
+            if node.get("titles") is not None:
+                paint["titles"] = node["titles"]
+            if node.get("things"):                # a6109: the bare ids in its words, drawn as names
+                paint["things"] = node["things"]
+        elif not node.get("plain") and not node.get("picture") and not node.get("live") and node.get("text"):
+            rs = runs_of(node["text"], node.get("marks"), node.get("things"))
             if node.get("marks"):
                 paint["marks"] = True
             if rs:
                 paint["runs"] = rs            # the text stays the joined words; the fence and the printer do not change
-        ons = {a.get("on") for a in (node.get("acts") or [])}
+        if node.get("media") and node.get("text"):     # a5941: only what media_links shows; the rest stays words
+            shown = [m for m in media_of(node["text"]) if m.get("src")]
+            if shown:
+                paint["media"] = {"mode": node["media"], "items": shown}
+        if isinstance(node.get("page"), dict) and node.get("text"):     # a6431: the page its words name, at its size
+            src = page_source(node["text"])
+            if src:
+                paint["page"] = dict(node["page"], src=src)
+        ons ={a.get("on") for a in (node.get("acts") or [])}
         if "edit" in ons:
             mx = (node.get("lines") or [1, 1])[1]
             paint["commit"] = node.get("commit") or ("enter" if (not node.get("lines") or mx == 1) else "ctrl-enter")
             if node.get("commit_only"):
                 paint["commit_only"] = True
+            if node.get("caret"):
+                paint["caret"] = list(node["caret"])
         if "click" in ons:
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
     if node.get("share") is not None:
         paint["share"] = node["share"]
     if node.get("peek") and not paint.get("absent"):
         paint["peek"] = node["peek"]
+    if node.get("tip") and not paint.get("absent"):        # a6271: on a frame or a text alike
+        paint["tip"] = [t for t in node["tip"] if t]
     node["paint"] = paint
     acts = list(node.get("acts") or [])
     if node.get("fold") and not any(a.get("on") == "fold" for a in acts):
@@ -2384,11 +3049,28 @@ def split_words_arg(desk, arg):
     return " ".join(toks[: k - 1]), opts
 
 
-def scene_for(desk, name, part=None, words=None):
+def scene_for(desk, name, part=None, words=None, on=None, text=True):
     """-> (scene, text), through the staged pipeline in lens_ir (parse table, resolve, lower, evaluate through the read
     accessor, emit, print). scene["def"] is the requested definition, the effective transitive closure with each member's
     status (current | fallback), compiler and style identity, and a frame id. Gestures are honoured only on a frame
     whose whole closure is current; a fallback frame is for reading. The old single-pass evaluator (build, _compile,
-    scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds."""
+    scene_for_old) was retired on 5 Oct, after the goldens were printed from this pipeline and frozen as plain worlds.
+    `on` (a5949, Sable's a4270): the id of a thing the lens is stood on; its root starts on that thing. text=False
+    (a6153): the scene alone, its text "" (a painter that shows no text: ~400 KB and ~25 ms of the home base's build)."""
     import lens_ir
-    return lens_ir.scene_for(desk, name, part, words)
+    return lens_ir.scene_for(desk, name, part, words, on=on, text=text)
+
+
+def split_on_arg(desk, arg):
+    """a5949: `scene <lens> on <id> [<part path> | ok] [words]` -> (the line without `on <id>`, the id or None). A line
+    that names a lens whole is that lens, so a lens titled `notes on paper` is still itself."""
+    toks = arg.split()
+    if "on" not in toks[1:-1]:
+        return arg, None
+    try:
+        find_lens(desk, arg.strip())
+        return arg, None
+    except LensRefusal:
+        pass
+    i = max(k for k, t in enumerate(toks) if t == "on" and 0 < k < len(toks) - 1)
+    return " ".join(toks[:i] + toks[i + 2:]), toks[i + 1]

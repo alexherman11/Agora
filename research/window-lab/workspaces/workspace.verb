@@ -1,0 +1,6 @@
+# workspace <name> | workspace back | workspace save <name>: Alex's home base laid out for a kind of work, in one act
+# (a6427). The workspaces are surfaces in Workspaces ({WS}); workspace-use and workspace-keep do the work.
+# JEFF: run it when Alex asks, and say what changed with the workspace's about= (it is in the receipt).
+workspace-use before when $1 = "back"
+workspace-use $1 when $1 != "back" and $1 != "save"
+workspace-keep $(words-after($*, "save")) when $1 = "save"

@@ -1,0 +1,198 @@
+# direction-signal (a5534, worker-a5534, 15 Oct): the home base as a wall of printed cards. No glass: opaque bone
+# panels with black type laid hard over the dark frost, a heavy grotesque, signal orange for whatever is alive, acid lime
+# for what is chosen, electric blue for JEFF. A pinned panel wears an orange frame; a loose one none. Every role of
+# home-style is here, so any home-base lens can wear it.
+font display = Space Grotesk, Segoe UI, sans-serif
+font sans = Inter Tight, Segoe UI, sans-serif
+font mono = Space Mono, Cascadia Code, monospace
+token night = #0B0B0C
+token paper = #EDEBE3
+token bone = #EDEBE3
+token ink = #0B0B0C
+token accent = #D4FF3A
+token signal = #FF5A1F
+token warm = #FF5A1F
+token jeff = #2E4BFF
+token glass = #EDEBE3
+token glassdeep = #F7F6F1
+token coal = #19191B
+token rim = #0B0B0C
+token soft = ink at 58%
+token faint = #0B0B0C26
+token mine = #D4FF3A
+token jeffwash = #2E4BFF
+token wash = #0B0B0C0F
+token focus = #FF5A1F
+token scrollbar = #0B0B0C59
+token scrollbar_w = 6
+token gap = 8
+token ramp = 1.25
+token text = sans 15/1.45
+token text.mono = mono 12/1.4
+token text.display = display 15/1.05
+role desk : ink, text
+role page : ink, text
+role home : bone, text, pad gap x2, between gap x2
+role bar : between gap x3
+role brand : text.mono down tracked, signal
+role place : text.display up 5 strong, bone
+role meta : text.mono down, soft
+role body : between gap x1.5
+role side : between gap x1.5
+role pinned : on signal, pad gap /1.6
+role loose : pad gap /1.6
+role panel : on glass, ink, pad gap x2, between gap
+role heading : text.display up 3 strong, ink
+role prose : text, ink, space above gap
+role busy : between gap, pad top gap /2
+role live : signal, pulse
+role who : text strong, ink
+role who.jeff : text strong, jeff
+role tiles : between gap
+role tile : on glassdeep, ink, edge faint, pad gap, between gap /2, glide
+role tile.front : on accent, ink, pad gap, between gap /2, glide
+role thumb : on coal, height gap x16
+role tilename : text down strong, ink
+role chat : ink, text
+role room : on glass, ink
+role chathead : pad gap x2, border bottom rim, between gap x1.5
+role face : text.display up 4 strong, bone, on jeff, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role chatname : text.display up 4 strong, ink
+role thinking : text.mono down strong, signal, wave
+role tabs : between gap /2
+role tab : text.mono down, ink, edge rim, pad gap /2, pad left gap, pad right gap
+role tab.on : text.mono down strong, bone, on ink, pad gap /2, pad left gap, pad right gap
+role feed : pad gap x2, between gap /2
+role said : align start, width 46em, space above gap /2
+role said.mine : align end, width 46em, space above gap /2
+role saidhead : between gap, pad bottom gap /4, space above gap
+role bubble : on wash, ink, pad gap x1.5
+role bubble.mine : on mine, ink, pad gap x1.5
+role bubble.jeff : on jeffwash, bone, pad gap x1.5
+role words : text
+role acts : shy, pad left gap
+role tool : text.mono down, soft, pad gap /2
+role working : pad left gap x2
+role typingrow : between gap, pad bottom gap /2
+role dots : signal, wave
+role dock : on glassdeep, border top rim, pad gap x2, between gap
+role answering : on wash, pad gap, between gap
+role to : between gap /2
+role chip : text.mono down, ink, edge rim, pad gap /2, pad left gap, pad right gap
+role chip.on : text.mono down strong, bone, on ink, pad gap /2, pad left gap, pad right gap
+role input : text, ink, on bone, edge rim, pad gap x1.5
+role button : text.mono down strong, ink, on signal, pad gap, pad left gap x2, pad right gap x2
+role hint : text.mono down 2, soft
+role attachment : on wash, pad gap, between gap
+role mark : ink
+role menu.item : text.mono down, ink, pad gap
+role popup : on glassdeep, ink, edge rim, pad gap
+role code : text.mono, on wash
+role hello : pad gap x3, between gap, space below gap x2
+role waithead : between gap
+role waitdesk : between gap
+role waitlist : between gap /2
+role wait : on wash, pad gap, between gap /4, glide
+role wait.on : on accent, pad gap, between gap /4, glide
+role waitfacts : between gap
+role reviewcard : on glassdeep, edge rim, pad gap x1.5, between gap
+role reviewacts : between gap, space above gap /2
+role lane : between gap /2, space above gap
+role lanename : text.mono down 2 strong tracked, ink
+role lanecards : between gap /4
+role taskcard : on wash, pad gap /2, pad left gap, pad right gap
+role taskcard.live : on signal, ink, pad gap /2, pad left gap, pad right gap
+role cardtitle : text down strong
+role cardline : between gap
+role cardwho : text.mono down 2
+role cardlane : text.mono down 2
+role still : faint
+role cardopen : text.mono down 2, soft
+role cardmore : between gap /2, pad top gap /2, pad bottom gap /2, space above gap /2, border top rim
+role cardnote : between gap /4, pad left gap, border left rim
+role cardtext : text down
+role cut : text.mono down, soft
+role viewer : between gap
+role findbar : between gap, on glass, ink, pad gap /2, pad left gap
+role find : text.mono, ink, pad gap
+role pins : between gap /2
+role found : on glass, ink, pad gap x1.5, between gap /2
+role foundlist : between gap /4
+role hit : between gap, pad gap /2
+role shown : on glass, ink, pad gap x2, between gap
+role viewhead : between gap, pad bottom gap, border bottom rim
+role viewlanes : between gap
+role viewlane : on wash, pad gap, between gap
+role viewlanehead : text.mono down strong tracked, ink
+role viewlanelist : between gap /2
+role viewcard : on glassdeep, edge faint, pad gap, between gap /4
+role viewcard.p1 : on signal, ink, pad gap, between gap /4
+role viewcardtitle : text down, ink
+role docheading : text.display up 2 strong, ink, space above gap
+role count : text.display down strong, ink, on signal, pad left gap /1.6, pad right gap /1.6
+role tag : text.mono down 2 tracked, soft
+role tag.demo : text.mono down 2 strong tracked, signal
+role tag.design : text.mono down 2 strong tracked, jeff
+role waithit : between gap /4
+role reviewbody : between gap, pad top gap, border top rim
+role demo : on bone, edge rim, pad gap, height gap x60
+role report : on wash, ink, text, pad gap x1.5, edge rim
+role eyebrow : text.mono tracked, signal, space below gap
+role title : text.display up 2 strong, ink
+role subtitle : text down, soft, space below gap
+role check : on wash, pad gap, space below gap
+role label : text strong, ink
+role good : text.mono strong, ink, on accent, pad left gap
+role detail : text down, soft, space above gap /2
+role boundary : text down 2, soft, space above gap
+role message : pad gap /2, space below gap
+role author : text.mono down strong, jeff
+role composer : text, ink, on bone, edge rim, pad gap
+role appfoot : pad top gap x1.5
+role appdock : on ink, pad gap /2
+role appshelf : between gap /2
+role appicons : between gap /2
+role appslot : between gap /4
+role appicon : on coal, bone, pad gap, width gap x12, between gap /4, glide
+role appicon.on : on accent, ink, pad gap, width gap x12, between gap /4, glide
+role appadd : on coal, bone, pad gap, width gap x12, between gap /4
+role appglyph : text up 3, align center
+role applabel : text.mono down 2, align center
+role readout : text.display up 5 strong, bone
+role readlabel : text.mono down 2 tracked, bone
+role readpill : between gap /2, pad left gap, border left bone
+role readpill.alive : between gap /2, pad left gap, border left signal
+# a5504's board roles (home-board), and its motion words: rail, glow (a breathing halo), glide (a moved thing travels)
+token shadow = #000000
+token raised = #0B0B0C0F
+role bdhead : between gap, pad bottom gap /2, border bottom rim
+role bdlivecount : text.mono down strong, ink, on signal, pad left gap /2, pad right gap /2
+role bdlane : between gap /2, space above gap x1.5
+role bdlanehead : between gap
+role bddot : text down, faint
+role bddot.asked : text down, jeff
+role bddot.working : text down, ink
+role bddot.ready : text down, ink
+role bddot.landing : text down, signal, pulse
+role bdlanename : text.mono down 2 strong tracked, ink
+role bdcount : text.mono down 2 strong, bone, on ink, pad left gap /2, pad right gap /2
+role bdcount.asked : text.mono down 2 strong, bone, on jeff, pad left gap /2, pad right gap /2
+role bdcount.working : text.mono down 2 strong, ink, on signal, pad left gap /2, pad right gap /2
+role bdcount.ready : text.mono down 2 strong, ink, on accent, pad left gap /2, pad right gap /2
+role bdcount.landing : text.mono down 2 strong, bone, on ink, pad left gap /2, pad right gap /2
+role bdcards : between gap /4
+role bdcard : on raised, ink, pad gap /2, pad left gap, pad right gap, glide
+role bdcard.asked : on raised, ink, rail jeff, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.working : on raised, ink, rail signal, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.live : on signal, ink, glow signal, pad gap /2, pad left gap, pad right gap, glide
+role bdcard.asking : on raised, ink, rail signal, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.ready : on accent, ink, pad gap /2, pad left gap, pad right gap, glide
+role bdcard.landing : on ink, bone, glow accent, pad gap /2, pad left gap, pad right gap, glide
+role bdcard.landed : soft, pad gap /4, pad left gap, pad right gap, glide
+role bdline : between gap
+role bdtitle : text down strong
+role bdtitle.landed : text down
+role bdwho : text.mono down 2
+role bdstate : text.mono down 2 strong
+role bdstate.asking : text.mono down 2 strong, bone, on ink, pad left gap /2, pad right gap /2
+role bdmore : between gap /2, pad top gap /2, pad bottom gap /2, space above gap /2, border top rim

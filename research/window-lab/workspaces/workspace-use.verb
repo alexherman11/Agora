@@ -1,0 +1,24 @@
+# workspace-use <name>: lay Alex's home base out as the workspace of that name (a6427; say `workspace <name>`).
+# A workspace is a surface in Workspaces ({WS}) shaped like his layout: columns (span=) of panel notes (lens= shelf=
+# pin= shows=; the chat and the viewer are panels too, a5994), with widgets= view= with= about= glyph= on it; name= is
+# the word you say.
+# His layout as it stands becomes the workspace 'before' (the old one goes, through {R}); a COPY of the named one
+# becomes his layout, so a workspace never changes by use; the viewer opens its view= with its with= lens.
+# Alex and JEFF both change these, so the verb reads them first: an act on what its caller saw before someone else
+# changed it is refused stale (a table marks each row seen, and takes a selection).
+table prop:role=home-view,prop:actor=alex cols=viewing,with,back,find
+table kind:surface,prop:role=home-layout,prop:actor=alex cols=name,view,with,was
+table kind:surface,in:{WS},prop:role=workspace,prop:name=before cols=name when count(kind:surface,in:{WS},prop:role=workspace,prop:name=before) > 0
+do copy kind:surface,in:{WS},prop:role=workspace,prop:name=$1 into=f5204
+do prop kind:surface,prop:role=workspace,prop:actor=alex,-in:{WS},-in:{R} role=workspace-incoming
+do move kind:surface,in:{WS},prop:role=workspace,prop:name=before into={R} when count(kind:surface,in:{WS},prop:role=workspace,prop:name=before) > 0
+do move kind:surface,prop:role=home-layout,prop:actor=alex into={WS}
+do prop kind:surface,in:{WS},prop:role=home-layout,prop:actor=alex role=workspace was=$((max($name of kind:surface,prop:role=home-layout,prop:actor=alex) or \"\")) name=before view=$((max($viewing of prop:role=home-view,prop:actor=alex) or \"\")) with=$((max($with of prop:role=home-view,prop:actor=alex) or \"\")) glyph=↶ about="Your home base as it was before the last workspace."
+do rename kind:surface,in:{WS},prop:role=workspace,prop:name=before title=before
+do prop kind:surface,prop:role=workspace-incoming,prop:actor=alex role=home-layout when $1 != "before"
+do prop kind:surface,prop:role=workspace-incoming,prop:actor=alex role=home-layout name=$((max($was of kind:surface,prop:role=workspace-incoming,prop:actor=alex) or \"\")) when $1 = "before"
+do prop prop:role=home-view,prop:actor=alex viewing=$((max($view of kind:surface,prop:role=home-layout,prop:actor=alex) or \"\")) with=$((max($with of kind:surface,prop:role=home-layout,prop:actor=alex) or \"\")) back=$((max($viewing of prop:role=home-view,prop:actor=alex) or \"\")) find="" when (max($view of kind:surface,prop:role=home-layout,prop:actor=alex) or "") != (max($viewing of prop:role=home-view,prop:actor=alex) or "") or (max($with of kind:surface,prop:role=home-layout,prop:actor=alex) or "") != (max($with of prop:role=home-view,prop:actor=alex) or "")
+table in:{R} cols=kind when count(in:{R}) > 0
+do remove kind:note,in:{R} when count(kind:note,in:{R}) > 0
+do remove kind:surface,in:{R},-prop:role=workspace when count(kind:surface,in:{R},-prop:role=workspace) > 0
+do remove kind:surface,in:{R} when count(kind:surface,in:{R}) > 0

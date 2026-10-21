@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_captures (14 Oct 2026, a5062): a control-screen capture is kept by the house, off the world, until it is sent.
 
     python test_captures.py
@@ -7,7 +8,8 @@ In a scratch folder (captures.ROOT moved there), asks of captures.py:
   - load_capture gives it back unchanged, a new dict each time; another person's id is NotYours, a gone one Missing;
   - sent_copy carries the image's bytes, not a path, and the hash they were kept with;
   - discard and sent remove both files at once, and an id is never given again after a discard;
-  - a capture with no pixels says so: image None, no png beside it.
+  - a capture with no pixels says so: image None, no png beside it;
+  - thumb gives its own person a small png data address of the pixels (a5834), and nothing to anyone else.
 The scratch folder is removed at the end.
 """
 import base64
@@ -95,12 +97,25 @@ try:
     pv = captures.preview("frontier", "alex", loose)
     check("a part not named exactly is previewed with no id", "not named exactly" in pv and "None" not in pv, pv)
 
+    # a5834: the draft's chip shows the pixels small, as a data address a `picture` text paints
+    import io
+    from PIL import Image
+    big = io.BytesIO()
+    Image.new("RGB", (1600, 900), (40, 90, 200)).save(big, "PNG")
+    wide = captures.make("frontier", "alex", {"rect": [0, 0, 1600, 900], "refs": [], "image_size": [1600, 900]}, big.getvalue())
+    t = captures.thumb("frontier", "alex", wide)
+    tw, th = Image.open(io.BytesIO(base64.b64decode(t.split(",", 1)[1]))).size if t.startswith("data:image/png;base64,") else (0, 0)
+    check("thumb is a small png data address, its shape kept", (tw, th) == (320, 180), (t[:40], tw, th))
+    check("thumb of a capture with no pixels is empty", captures.thumb("frontier", "alex", a) == "", "")
+    check("thumb is only for its own person", captures.thumb("frontier", "rowan", wide) == "", "")
+    captures.discard("frontier", "alex", wide)
+
     captures.discard("frontier", "alex", b)
     check("discard removes the envelope and its pixels", not (d / "cap-2.json").exists() and not (d / "cap-2.png").exists(), list(d.iterdir()))
     msg = raises(captures.Missing, captures.load_capture, "frontier", "alex", b)
     check("a discarded capture is Missing", msg and "not kept" in msg, msg)
     c = captures.make("frontier", "alex", {"rect": [0, 0, 1, 1], "refs": []})
-    check("an id is never given again after a discard", c == "cap-5", c)
+    check("an id is never given again after a discard", c == "cap-6", c)
     captures.sent("frontier", "alex", a)
     check("sent removes it once the send is durable", raises(captures.Missing, captures.load_capture, "frontier", "alex", a) is not None, "")
     check("a bad id or name is refused plainly", raises(captures.CaptureError, captures.load_capture, "frontier", "alex", "../x") is not None

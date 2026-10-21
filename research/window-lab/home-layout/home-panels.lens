@@ -1,0 +1,25 @@
+# home-panels: the menu from the bottom (a5496): every panel of the viewer's layout (home-tiling) as a chip in the dock,
+# with its one-line view; lit while the panel is out, dim while it is put away. A press puts it away, or brings it back
+# where it was. Placed at the right end of the dock (home-dock, a5500).
+shelf : row
+  role shelf
+  of prop:role=home-layout,prop:actor=$me as lay
+  each chips
+chips : row
+  role shelf
+  of kind:note,in:$lay.item,prop:role=home-panel as p
+  each chip
+chip : column
+  role dockchip
+  role dockchip.on when ($p.shelf or "") != "yes"
+  let was = ($lay.full or "")
+  on click when ($p.shelf or "") = "yes" do prop $p shelf=no
+  on click when ($p.shelf or "") != "yes" and $item = ($lay.full or "") do prop $p shelf=yes; do prop $lay full=""
+  on click when ($p.shelf or "") != "yes" and $item != ($lay.full or "") do prop $p shelf=yes
+  name : text "$title"
+    role chipname
+    clamp 1
+  sum : column
+    role chipsum
+    only when ($p.lesser or "") != ""
+    lens $p.lesser

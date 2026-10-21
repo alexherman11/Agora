@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_room_reads (a951, talk step 3a3): the lines a room's look prints whole are read; its hint names the world's
 speaking verb.
 

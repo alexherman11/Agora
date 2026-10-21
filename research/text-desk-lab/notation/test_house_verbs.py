@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_house_verbs (9 Oct 2026, step 6 of the grammar unification): the retired built-ins are verb notes of the house.
 
     python test_house_verbs.py
@@ -63,8 +64,8 @@ import moo     # noqa: E402
 gone = ("tidy", "split", "gather", "reveal", "dedupe", "done", "stack")
 check("moo.REGISTRY holds none of the retired compositions", not any(v in moo.REGISTRY for v in gone), sorted(moo.REGISTRY))
 check("every registered verb is general", knife.GENERAL == list(moo.REGISTRY) and not hasattr(knife, "SPECIALIZED"))
-check("the house's verbs were made as notes (six that were Python, and wish: 9 Oct, a3806)",
-      sorted(HOUSE) == ["dedupe", "done", "gather", "reply", "reveal", "tidy", "wish"], HOUSE)
+check("the house's verbs were made as notes (six that were Python, wish: 9 Oct, a3806, and notify: 16 Oct, a5824)",
+      sorted(HOUSE) == ["dedupe", "done", "gather", "notify", "reply", "reveal", "tidy", "wish"], HOUSE)
 
 # 2. help and examine know them as world verbs
 t = reply("juniper", "help tidy")[-1][1]

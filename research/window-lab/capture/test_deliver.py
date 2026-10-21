@@ -61,6 +61,24 @@ def main():
     if len(eight) != 8 or ok9 or context() != eight:
         fails.append(f"a ninth should be refused and left off: {context()}")
     do(f"do remove {draft}")
+
+    # a5834: --draft auto finds the person's own draft as jeff-chat does (role=conversation-draft actor=<who>)
+    who = "capture-test-a5834"
+    ok, t = do(f'do create f571 kind=note title="capture auto test draft" role=conversation-draft actor={who}')
+    m = re.search(r"created (a\d+)", t)
+    auto = argparse.Namespace(world=world, who=who, door=None, draft="auto", do=do)
+    found = C.own_draft(auto)
+    okA, _ = C.deliver("cap-201", auto)
+    _, t2 = do(f"examine {m.group(1)}") if m else (False, "")
+    print("auto:", found, "| draft", m and m.group(1), "|", "context=cap-201" in t2)
+    if not (m and found == m.group(1) and okA and "context=cap-201" in t2):
+        fails.append(f"--draft auto should find {m and m.group(1)} and attach there, found {found}")
+    if m:
+        do(f"do remove {m.group(1)}")
+    nobody = argparse.Namespace(world=world, who="nobody-has-this-draft", door=None, draft="auto", do=do)
+    okN, saidN = C.deliver("cap-202", nobody)
+    if okN or "no chat draft" not in saidN:
+        fails.append(f"with no draft, auto should keep the capture and say so: {saidN}")
     print("FAIL\n  " + "\n  ".join(fails) if fails else "ok")
     return 1 if fails else 0
 

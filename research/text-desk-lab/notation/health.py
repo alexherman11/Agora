@@ -13,8 +13,9 @@ broke a check. Every run without --only and not stopped runs every check below.
 Checks, from this checkout:
   - every lab Python file compiles, and every desk-shell script parses (node --check, when node is here)
   - test_scene.py passes, and every test_*_paint.py when a browser is here (CSS rules only a painter can test)
-  - the rooms tests pass: every test_*.py with '# health: room test' among its first
-    ten lines, each on a small world it builds itself (roomworld.py)
+  - the rooms tests pass: every test_*.py with the line `# health: room test` among its first ten (a5296; there is no
+    list to add to), each on a small world it builds itself (roomworld.py), so a failure is the code's and not today's
+    world's
   - test_door.py passes: deskd is swapped three times behind a door (and once refused) with no event lost or doubled
   - test_visit.py passes (a3204): `visit` and `home` through a real door, a version killed, one line written home
   - calm.style and every style note in <world> read by the one style reader (style.py; 8 Oct: the painter is handed
@@ -26,8 +27,9 @@ Checks, from this checkout:
     verb has a note, each names the arguments the code takes and shows none it doesn't. Each problem is a failed entry
     beginning "help note: "; the house excuses one that was there before the landing
 
-Prints the world's event first, then one line per check and a total; --json adds
-ok, world_at, lenses_ok, failed, failed_checks, ran, partial, stopped and seconds.
+Prints first the event <world> was at (a5296: every number after is taken there), then one line per check, each ending
+in the seconds it took, then a total line. --json adds ok, world_at, lenses_ok,
+lenses_bad, failed, failed_checks, ran, first, partial, stopped and seconds.
 It reads the world under the desk's lock and never writes it.
 """
 import json
@@ -79,6 +81,15 @@ def check_help(world):
     desk.world.me = "health"
     desk.seen, desk.open = {}, {desk.world.root}
     return helpnotes.check(desk), len(helpnotes.entries(desk.world))
+
+
+def world_at(world):
+    """a5296 (a5261 point 5: a worker's numbers were from a copy nobody could date): the event <world> was at, which
+    every number below is taken at. -> 'e10330 (2026-10-15T09:12:03), 10330 events', or why it could not be read."""
+    import export_docs
+    w = export_docs.load(world).world
+    last = w.events[-1] if w.events else {}
+    return f"{last.get('id', 'no event')} ({last.get('at', last.get('day', '?'))}), {len(w.events)} events"
 
 
 def check_python():
@@ -353,7 +364,7 @@ def main():
 
     try:
         at = world_at(world)
-    except Exception as e:
+    except Exception as e:           # a world not on disk (a test's): the checks that need it say so themselves
         at = f"could not be read ({type(e).__name__}: {str(e)[:120]})"
     print(f"world: {world} at {at}")
     t0 = time.perf_counter()

@@ -5,6 +5,7 @@ import re
 import shlex
 
 import blanks
+import carry_on
 import names
 import harness   # registers launch; provides sync
 import helpnotes
@@ -230,7 +231,7 @@ class DeskKnife(DeskMoo):
     _rule_authors = None    # {subject id: (events seen, author)}: who a rule acts as, read from the log once per change
     _rule_notes = None
     _in_rules = False
-    RULE_BLANKS = ("item", "here", "today", "me")
+    RULE_BLANKS = ("item", "here", "today", "now", "me")      # now (a5530): the moment the rule fires
     RULE_FORM = "when <selection> do <verb> [target] [k=v ...]   or   on <verb> [by=<actor>] do <verb> ..."
 
     def _prop_names(self):
@@ -310,7 +311,7 @@ class DeskKnife(DeskMoo):
                 return None, "$new: a rule has no earlier line; it acts on $item, the thing it fired on"
             if name.isdigit() or name in ("this", "*"):
                 return None, (f"${name}{attr} is a verb's word; a rule has none. A rule's blanks: $item $item.title $item.<prop> "
-                              f"$item.maker, $item's own words bare ($title, $status), $here $here.<prop> $today $me $house, or a "
+                              f"$item.maker, $item's own words bare ($title, $status), $here $here.<prop> $today $now $me $house, or a "
                               f"handle; a literal dollar sign is \\$")
             if name not in self.RULE_BLANKS and name != "house" and name not in (self.vars or {}) \
                     and name not in names.FIELDS and name not in self._prop_names():
@@ -318,7 +319,7 @@ class DeskKnife(DeskMoo):
                 # present: a word no thing in the world carries as a prop is refused; $item.<prop> says it on purpose
                 return None, (f"${name}{attr} is no blank in a rule, and no thing here has a prop {name}=. A rule's blanks: "
                               f"$item $item.title $item.<prop> $item.maker, $item's own words bare ($title, $status), $here "
-                              f"$here.<prop> $today $me $house, or a handle; for a prop the thing will have, write $item.{name}")
+                              f"$here.<prop> $today $now $me $house, or a handle; for a prop the thing will have, write $item.{name}")
             if attr and name in ("today", "me"):
                 return None, f"${name}{attr}: ${name} has no parts"
         try:
@@ -1297,6 +1298,31 @@ class DeskKnife(DeskMoo):
     _reply = None       # the reply the current top-level call belongs to (the caller's token, or one per call)
     _made = None        # {reader slot: (reply, ids made most recently in that reply)}: what $new reads next
     _taught_new = None  # the reply whose receipt last taught $new (a948 (6)): once per reply
+    _held = None        # a6437: {reader slot: (reply, what its refused lines would have made)} (carry_on.taint)
+
+    def _held_back(self):
+        rec = (self._held or {}).get(self._slot())
+        return rec[1] if rec and rec[0] == self._reply else None
+
+    def _hold(self, line):
+        """A line of this reply was refused, skipped or not run: what it would have made is held back from the lines
+        after it (carry_on.depends)."""
+        t = dict(carry_on.taint(line), line=line)
+        self._held = dict(self._held or {})
+        self._held[self._slot()] = (self._reply, carry_on.merge(dict(self._held_back() or {}), t))
+
+    def _unhold(self, line, made):
+        """A line that ran: what it made is real now, so $new, its handle or its title name it, not a refused one's."""
+        held = self._held_back()
+        if not held:
+            return
+        t = carry_on.taint(line)
+        if made:
+            held["new"] = False
+        for n in t["names"]:
+            (held.get("names") or {}).pop(n, None)
+        for x in t["titles"]:
+            (held.get("titles") or {}).pop(x, None)
 
     def dispatch(self, name, args):
         if not self._ctxs:
@@ -1347,6 +1373,12 @@ class DeskKnife(DeskMoo):
                 self.world.chat_lines(sid)        # a1581: once per chat, its lines become things (one event each)
             promises.migrate(self)        # a1587: once per world, owe= and awaiting= become promises and requests
             persons.migrate(self)         # a1590: once per world, stored names become the persons who bore them then
+        line = str(args.get("line") or "") if top and name == "desk" else ""
+        why = carry_on.depends(line, self._held_back()) if line else None
+        if why:
+            # a6437: a refused line refuses only itself; a later line that uses what it would have made is not run
+            self._hold(line)
+            return {"text": why, "skipped": True}
         tick = self._tick()
         if tick:
             self._rule_notes = [tick] + (self._rule_notes or [])
@@ -1372,6 +1404,11 @@ class DeskKnife(DeskMoo):
         if top:
             self._made = dict(self._made or {})
             self._made[self._slot()] = (self._reply, ctx.prev, dict(ctx.handles))
+        if line:
+            if "error" in r and not r.get("miss"):
+                self._hold(line)
+            else:
+                self._unhold(line, made)
         # 14 Oct (Snappy Desk): a step of a world verb is not a deed of its own: the rules answer the verb once it is
         # done (its own line comes back here with every step's events), not after each step. A split of 5 steps chose
         # each standing rule's things over the whole world 5 times (65 of its 150 ms); an event rule still sees every
@@ -1562,10 +1599,13 @@ class DeskKnife(DeskMoo):
             if not arg.strip():
                 raise Refusal("scene <lens name> [<part path> | ok | lines] [words]. A lens is a note tagged lens; help scene")
             try:
+                arg, on = scene.split_on_arg(self, arg)            # a5949: scene <lens> on <id>, the lens stood on a thing
+                if on:
+                    on = self._resolve(on)
                 arg, words = scene.split_words_arg(self, arg)      # a4179: scene <lens> [<part path>] words [:3 | from=<n>]
                 name, rest = scene.split_scene_arg(self, arg)
                 if words is not None:
-                    sc, text = scene.scene_for(self, name, rest, words)
+                    sc, text = scene.scene_for(self, name, rest, words, on=on)
                     for n in sc["said"]:                 # only a part whose words printed whole has been seen
                         self._scene_seen(n)
                     return text
@@ -1576,7 +1616,7 @@ class DeskKnife(DeskMoo):
                     s = scene.find_lens(self, name)
                     style = (s.get("props") or {}).get("style")
                     return scene.to_lines(s.get("text") or "", scene.style_roles(self, style), style)
-                sc, text = scene.scene_for(self, name, rest)
+                sc, text = scene.scene_for(self, name, rest, on=on)
             except scene.LensRefusal as e:
                 raise Refusal(str(e))
 

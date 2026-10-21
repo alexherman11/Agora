@@ -1,0 +1,49 @@
+# scripts (a6249, 17 Oct): Alex's own scripts. Each is a note with role=script that the house keeps in step with its
+# file on his PC (notation/scripts_mirror.py): an edit here is written to the file (the old one kept), and a change to
+# the file comes back here. Names and plain sentences only: where the file lives (file=) is never drawn. A script's
+# settings are its own small lens, named by panel= (rocket-settings), placed under its sentence; the words of the
+# script are folded at the foot, and editable.
+scripts : column
+  role scpage
+  head : text "Scripts"
+    role schead
+  intro : text "Your own scripts, kept here and on your PC at once. Change a setting or the words here and the house writes the file within seconds, keeping the old one; change the file and this follows."
+    role scintro
+  list : column
+    role sclist
+    of prop:role=script as sc
+    each script
+  none : text "No scripts here yet."
+    role scmeta
+    only when count(prop:role=script) = 0
+script : column
+  role sccard
+  title : text "$sc.title"
+    role sctitle
+  does : text "$sc.does"
+    role scdoes
+    only when ($sc.does or "") != ""
+  runs : text "$sc.runs"
+    role scmeta
+    only when ($sc.runs or "") != ""
+  never : text "$sc.why_not"
+    role scwarn
+    only when ($sc.why_not or "") != ""
+  panel : column
+    role scpanel
+    only when ($sc.panel or "") != ""
+    lens $sc.panel
+  edited : text "Last edited $sc.edited"
+    role scmeta
+    only when ($sc.edited or "") != ""
+  sync : text "$sc.sync"
+    role scwarn
+    only when ($sc.sync or "") != "" and $sc.sync != "In step with its file."
+  words : column
+    role scwords
+    fold "The script itself"
+    body : text "$sc.text"
+      role sccode
+      verbatim
+      ids
+      on edit do rewrite $sc text="$value"

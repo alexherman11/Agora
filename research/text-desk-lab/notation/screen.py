@@ -8,7 +8,14 @@ and read back what it measured. The screenshot is a PNG a model can open with it
 
 --term keeps the desk terminal beside the lens (it is hidden by default here); --page shell opens the windowed
 desktop (index.html: dock, windows, apps) instead of the painter. --reduced-motion looks as someone whose system asks
-for reduced motion (prefers-reduced-motion: reduce).
+for reduced motion (prefers-reduced-motion: reduce). --scale 1.5 paints as a display scaled 150% does (--size stays
+in CSS pixels: Alex's 3840x2160 at 150% is --size 2560x1440 --scale 1.5; a5736). --visible opens a REAL window (Edge,
+an app window, real GPU and Windows frame; --size in the screen's own scaling, --scale ignored) on a desktop of its own
+that Alex never sees (research/window-lab/sandbox_window.py, a5932): click, right, type and plain keys reach it as
+Windows messages to that window only; `window [file.png]` shoots it as Windows draws it, frame and all; it closes when
+the steps end, and the run ends saying whether Alex's foreground, focus and cursor were untouched. --on-screen x,y is
+the old --visible (a5820): a window on HIS screen at x,y that takes his keyboard as it opens. Only for a demo he asked
+for, never for a test (Alex, 16 Oct).
 
 By default the world is a COPY (sessions/<world>-screen-<pid>.pickle, removed after), served on a free port as the
 keeper serves the real one, by a door (door.py) with a deskd behind it, from a copy of THIS directory's desk-shell/
@@ -19,17 +26,23 @@ real act, as --as, in the real world.
 STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/add, or x,y in CSS pixels, or a CSS
        selector beginning # or . for a part with no key: #term input, .window .titlebar)
     shot [file.png]              screenshot (default screen-<n>.png here); prints the path
+    window [file.png]            with --visible: the real window as Windows draws it, frame and all (PrintWindow)
     facts [key-prefix] [depth]   per painted part (to depth levels below the prefix, default 2): size, whether it
                                  scrolls or is cut, folded, hidden, off screen, a leaf's words; the window; the status line
     click <part|x,y>             left click at the part's centre (a fold handle: click <part>/handle)
+    hover <part|x,y>             the pointer rests there, pressing nothing (a `tip` shows; :hover looks apply)
+    double <part|x,y>            a double-click there (`on double`)
     right <part|x,y>             right click; then `menu` lists the menu that opened
     menu                         the entries of the open right-click menu
     choose <label>               click the entry of the open menu with that label
     type <text>                  click into nothing first; types into what has focus (click the part first)
     key <Enter|Escape|Tab|ArrowDown|...>   a held key goes first: key Ctrl+b, key Shift+Enter
     drag <part> <part|x,y>       press on the first, move, release on the second
-    hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there
-    scroll <part> <dy>           scroll a part by dy pixels
+    hold <part> <part|x,y>       as drag, but stay pressed over the second (look mid-carry); `release` lets go there.
+                                 A hold while holding moves on from where the hand is (`hold - 400,900`), to film a carry
+    scroll <part> <dy>           scroll a part by dy pixels (sets scrollTop, so it cannot find a wheel that never arrives)
+    wheel <part|x,y> <dy>        a real wheel turn there (dy > 0 down; with --visible a Windows WM_MOUSEWHEEL per 120);
+                                 prints which scrolling parts under the pointer moved, or NOTHING moved (a6549)
     wait <ms>
     answer <text>                the next prompt() or confirm() the page opens is answered with text, as a person
                                  typing into it would; a dialog with no answer set is dismissed (and said)
@@ -56,8 +69,13 @@ STEPS (run in order; parts are named by their data-key, e.g. porch/main/right/ad
                                  scroll, focus, whether a menu or float is open, the status line
     stream                       the world events the page's stream from the door delivered: their ids, any gap or
                                  duplicate among them, and how far behind the world the last one is
-    js <expression>              the value of a JavaScript expression in the page (awaited), as JSON
+    js <expression>              the value of a JavaScript expression in the page (awaited), as JSON; js @f.js reads it
+                                 from a file (one expression, e.g. research/window-lab/scroll_cost.js)
 --bare serves the copy from a deskd alone, without the door (as before a1505); `land` then restarts it as the keeper did.
+--logged gives the copy a log, as the live world has one (a snapshot plus the log since): time presses with it, or each
+write pickles the whole copy twice and a press looks ~250 ms slower than it is live (a6010).
+AGORA_TMP chooses scratch space inside this worktree (relative paths start at its root); by default it is
+research/window-lab/.tmp-agora. Python temp files and child TMP/TEMP use it, including Chrome/Edge.
 Example:
     python screen.py frontier --as pike facts porch/main/middle click porch/main/middle/shop/handle facts porch/main/middle shot
 """
@@ -69,7 +87,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -77,7 +94,14 @@ from pathlib import Path
 import websockets
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+
+agora_tmp.configure()  # includes TMP/TEMP inherited by the door and Chrome/Edge
 PY = sys.executable
+SCALE = 1.0          # --scale: the display's scale, as devicePixelRatio (a5736)
+SB = None            # sandbox_window (research/window-lab), loaded by --visible
+VISIBLE = ""         # --on-screen x,y: a real window on HIS screen there (a5820); "sandbox": --visible, hidden (a5932)
 BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe", "/usr/bin/google-chrome", "/usr/bin/chromium"]
@@ -157,13 +181,13 @@ class Page:
             raise RuntimeError(r["exceptionDetails"].get("exception", {}).get("description") or str(r["exceptionDetails"]))
         return r.get("result", {}).get("value")
 
-    async def where(self, target):
+    async def where(self, target, reveal=True):
         if "," in target and all(p.strip().lstrip("-").replace(".", "").isdigit() for p in target.split(",")):
             x, y = (float(p) for p in target.split(","))
             return x, y
         if target[:1] in "#.":                  # a1047: a part with no key (the terminal's line, a shell window) by CSS
             r = await self.js(f"""(() => {{ const e = document.querySelector({json.dumps(target)}); if (!e) return null;
-                e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
+                if ({str(reveal).lower()}) e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
                 return [r.left + r.width / 2, r.top + r.height / 2, r.width, r.height]; }})()""")
             if not r or (r[2] == 0 and r[3] == 0):
                 raise RuntimeError(f"nothing visible matches {target!r}")
@@ -172,7 +196,7 @@ class Page:
         key = target[:-len("/handle")] if handle else target
         r = await self.js(f"""(() => {{ let e = document.querySelector('[data-key="{key}"]'); if (!e) return null;
             {"e = e.querySelector(':scope > button') || e;" if handle else ""}
-            e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
+            if ({str(reveal).lower()}) e.scrollIntoView({{block: 'nearest', inline: 'nearest'}}); const r = e.getBoundingClientRect();
             return [r.left + r.width / 2, r.top + r.height / 2, r.width, r.height]; }})()""")
         if not r:
             raise RuntimeError(f"no painted part {key!r} (try `facts` to list the keys)")
@@ -184,13 +208,17 @@ class Page:
         await self.call("Input.dispatchMouseEvent", type=kind, x=x, y=y, button=button, buttons=buttons, clickCount=count)
 
     async def press(self, x, y, button="left"):
+        if getattr(self, "win", None):          # a5932: the sandbox's real window: a Windows click, to it alone
+            ox, oy, dpr = SB.page_origin(self.win, inner=await self.js("[innerWidth, innerHeight, devicePixelRatio]"))
+            SB.click_at(self.win, ox + x * dpr, oy + y * dpr, button != "left")
+            return
         b = 1 if button == "left" else 2
         await self.mouse("mouseMoved", x, y, "none", 0)
         await self.mouse("mousePressed", x, y, button, b)
         await self.mouse("mouseReleased", x, y, button, 0)
 
 
-STEPS = ("shot", "facts", "click", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wait", "answer", "text",
+STEPS = ("shot", "window", "facts", "click", "hover", "double", "right", "menu", "choose", "type", "key", "drag", "hold", "release", "scroll", "wheel", "wait", "answer", "text",
          "css", "blur", "events", "resend", "desk", "restart", "stop", "start",
          "land", "page", "js", "stream")
 # a1008: every body the page posts to /api/do is kept (page-side, in order), so `resend` can replay one unchanged
@@ -243,19 +271,42 @@ async def run(url, steps, size, shots, restart=None, still=False):
     exe = next((b for b in BROWSERS if Path(b).exists()), None)
     if not exe:
         raise SystemExit("screen: no Chrome or Edge found; looked in " + ", ".join(BROWSERS))
-    prof = tempfile.mkdtemp(prefix="screen-profile-")
+    prof = agora_tmp.directory("screen-profile-")
     port = free_port()
-    br = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
-                           "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--hide-scrollbars",
-                           f"--window-size={w},{h}", "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    br, sandbox, guard = None, None, None
+    if VISIBLE == "sandbox":
+        # a5932 (--visible): a real Edge window on a desktop of its own (sandbox_window.py): nothing of it reaches
+        # Alex's monitor, foreground, focus, cursor or keyboard, and a guard watches that the whole run
+        sandbox = f"screen-{os.getpid()}"
+        guard = SB.Guard(sandbox, f"agora-sandbox-{sandbox}")
+        guard.__enter__()
+        port = SB.open_edge(sandbox, url, f"{w}x{h}")["port"]
+        print(f"screen: a real Edge window on the hidden desktop agora-sandbox-{sandbox} (film it meanwhile with "
+              f"research/window-lab/sandbox_window.py film <s> out.mp4 --name {sandbox})", flush=True)
+    else:
+        # a5820 (--on-screen x,y): a real window on HIS screen, an app window with no tabs or bar, at x,y and the size
+        # asked (13:5x 16 Oct: `--app=about:blank` came up as a whole browser with a tab bar and took the keyboard from
+        # the person at the screen). It takes the focus as it opens: only for a demo he asked for (Alex, 16 Oct)
+        head = [f"--window-position={VISIBLE}", f"--app={url}"] if VISIBLE else ["--headless=new", "--hide-scrollbars", "about:blank"]
+        # a6271: headless at --scale, the browser's own scale, not an emulated one: a screenshot re-reads where the pointer
+        # is in the window's pixels, and with an emulated 1.5 a `hover` at 1556,1375 landed on 1037,916 (its tip gone)
+        if not VISIBLE and SCALE != 1:
+            head.insert(0, f"--force-device-scale-factor={SCALE}")
+        br = subprocess.Popen([exe, f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
+                               "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+                               f"--window-size={w},{h}", *head], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         wait_http(f"http://127.0.0.1:{port}/json/version")
         tabs = json.loads(wait_http(f"http://127.0.0.1:{port}/json"))
         ws_url = next(t["webSocketDebuggerUrl"] for t in tabs if t.get("type") == "page")
-        async with websockets.connect(ws_url, max_size=64 * 1024 * 1024) as ws:
+        async with websockets.connect(ws_url, origin=None, max_size=64 * 1024 * 1024) as ws:
             p = Page(ws)
+            if sandbox:
+                SB.join(sandbox)
+                p.win = SB.main_window(sandbox)
             await p.call("Page.enable")
-            await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=1, mobile=False)
+            if not VISIBLE:          # a6271: at --scale the size only (0 keeps the browser's own scale, set above)
+                await p.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=SCALE if SCALE == 1 else 0, mobile=False)
             if still:
                 await p.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
             await p.call("Page.addScriptToEvaluateOnNewDocument", source=SENDS_JS)
@@ -281,6 +332,16 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     data = (await p.call("Page.captureScreenshot", format="png"))["data"]
                     f.write_bytes(base64.b64decode(data))
                     print(f"shot: {f}")
+                elif s == "window":
+                    if not getattr(p, "win", None):
+                        raise RuntimeError("window: only with --visible (a real window in the sandbox)")
+                    f = steps[i] if i < len(steps) and steps[i].endswith(".png") else None
+                    if f:
+                        i += 1
+                    shots[0] += 1
+                    f = Path(f or f"screen-{shots[0]}.png").resolve()
+                    SB.print_window(p.win).save(f)
+                    print(f"window: {f}")
                 elif s == "facts":
                     pre, depth = "", 2
                     if i < len(steps) and steps[i] not in STEPS and not steps[i].isdigit():
@@ -294,6 +355,21 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await p.press(x, y, "left" if s == "click" else "right")
                     await asyncio.sleep(0.8)
                     print(f"{s} at {round(x)},{round(y)}")
+                elif s == "hover":                          # a6271: the pointer rests on a part (`tip`, :hover), pressing nothing
+                    x, y = await p.where(arg())
+                    i += 1
+                    await p.mouse("mouseMoved", x, y, "none", 0)
+                    await asyncio.sleep(0.8)
+                    print(f"hover at {round(x)},{round(y)}")
+                elif s == "double":                         # a5994: a double-click, as the hand makes one (two presses, the second counted 2)
+                    x, y = await p.where(arg())
+                    i += 1
+                    await p.mouse("mouseMoved", x, y, "none", 0)
+                    for n in (1, 2):
+                        await p.mouse("mousePressed", x, y, "left", 1, n)
+                        await p.mouse("mouseReleased", x, y, "left", 0, n)
+                    await asyncio.sleep(0.8)
+                    print(f"double-clicked at {round(x)},{round(y)}")
                 elif s == "menu":
                     print("menu: " + (await p.js("(() => { const m = document.getElementById('menu-pop'); return m ? [...m.querySelectorAll('button')].map(b => b.textContent).join(' | ') : '(no menu open)'; })()")))
                 elif s == "choose":
@@ -306,9 +382,19 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await asyncio.sleep(1.5)
                     print(f"chose {label!r}")
                 elif s == "type":
-                    await p.call("Input.insertText", text=arg())
+                    if getattr(p, "win", None):         # a5932: keys as Windows messages to the sandbox's window
+                        SB.type_text(SB.focused(p.win), arg())
+                        await asyncio.sleep(0.3)
+                    else:
+                        await p.call("Input.insertText", text=arg())
                     i += 1
                     print("typed")
+                elif s == "key" and getattr(p, "win", None) and "+" not in steps[i][1:] and (steps[i] in SB.VK or len(steps[i]) == 1):
+                    k = arg()
+                    i += 1
+                    SB.press_key(SB.focused(p.win), k)
+                    await asyncio.sleep(1.2 if k == "Enter" else 0.3)
+                    print(f"key {k}")
                 elif s == "key":
                     k = arg()
                     i += 1
@@ -337,11 +423,15 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     await asyncio.sleep(1.5)
                     print(f"dragged {round(x0)},{round(y0)} -> {round(x1)},{round(y1)}")
                 elif s == "hold":                           # a1140: a drag stopped in the air, to look at it mid-carry
-                    x0, y0 = await p.where(arg())
+                    # a5994: a hold while already holding carries on from where the hand is (its first word is not read),
+                    # so shots between holds film a panel travelling
+                    held = getattr(p, "held", None)
+                    x0, y0 = held or await p.where(arg())
                     x1, y1 = await p.where(steps[i + 1])
                     i += 2
-                    await p.mouse("mouseMoved", x0, y0, "none", 0)
-                    await p.mouse("mousePressed", x0, y0, "left", 1)
+                    if not held:
+                        await p.mouse("mouseMoved", x0, y0, "none", 0)
+                        await p.mouse("mousePressed", x0, y0, "left", 1)
                     for t in range(1, 11):
                         await p.mouse("mouseMoved", x0 + (x1 - x0) * t / 10, y0 + (y1 - y0) * t / 10, "left", 1)
                         await asyncio.sleep(0.03)
@@ -357,6 +447,26 @@ async def run(url, steps, size, shots, restart=None, still=False):
                     key, dy = arg(), steps[i + 1]
                     i += 2
                     print(await p.js(f"(() => {{ const e = document.querySelector('[data-key=\"{key}\"]'); if (!e) return 'no part {key}'; e.scrollTop += {float(dy)}; return 'scrolled {key} to ' + Math.round(e.scrollTop); }})()"))
+                elif s == "wheel":                          # a6549: a real wheel turn over a part, not a scrollTop set
+                    x, y = await p.where(arg(), reveal=False)
+                    dy = float(steps[i + 1])
+                    i += 2
+                    probe = f"""(() => {{ const out = []; let e = document.elementFromPoint({x}, {y});
+                        for (; e; e = e.parentElement) {{ if (e.scrollHeight > e.clientHeight + 1 || e === document.scrollingElement)
+                          out.push([e.dataset && e.dataset.key || e.tagName, Math.round(e.scrollTop), getComputedStyle(e).overflowY]); }}
+                        return out; }})()"""
+                    before = await p.js(probe)
+                    if getattr(p, "win", None):
+                        ox, oy, dpr = SB.page_origin(p.win, inner=await p.js("[innerWidth, innerHeight, devicePixelRatio]"))
+                        SB.wheel_at(p.win, ox + x * dpr, oy + y * dpr, dy)
+                    else:
+                        await p.mouse("mouseMoved", x, y, "none", 0)
+                        await p.call("Input.dispatchMouseEvent", type="mouseWheel", x=x, y=y, deltaX=0, deltaY=dy)
+                    await asyncio.sleep(0.6)
+                    after = await p.js(probe)
+                    moved = [f"{a[0]} {a[2]} {a[1]}->{b[1]}" for a, b in zip(before, after) if a[1] != b[1]]
+                    print(f"wheel {round(dy)} at {round(x)},{round(y)}: " + ("; ".join(moved) if moved else
+                          "NOTHING moved (" + "; ".join(f"{a[0]} {a[2]} at {a[1]}" for a in before) + ")"))
                 elif s == "wait":
                     await asyncio.sleep(float(arg()) / 1000)
                     i += 1
@@ -423,16 +533,24 @@ async def run(url, steps, size, shots, restart=None, still=False):
                 elif s == "stream":
                     print(await p.js(STREAM_READ))
                 elif s == "js":
-                    print(json.dumps(await p.js(arg()), ensure_ascii=False, default=str)[:2000])
+                    src = arg()
+                    if src.startswith("@"):       # js @file.js: the expression is the file's text (a5736)
+                        src = Path(src[1:]).read_text(encoding="utf-8")
+                    print(json.dumps(await p.js(src), ensure_ascii=False, default=str)[:2000])
                     i += 1
                 else:
                     raise RuntimeError(f"unknown step {s!r}; see python screen.py --help")
     finally:
-        br.terminate()
-        try:
-            br.wait(timeout=10)
-        except Exception:
-            br.kill()
+        if br:
+            br.terminate()
+            try:
+                br.wait(timeout=10)
+            except Exception:
+                br.kill()
+        if sandbox:
+            SB.close(sandbox, quiet=True)
+            guard.__exit__(None, None, None)
+            print(guard.verdict()[1])
         shutil.rmtree(prof, ignore_errors=True)
 
 
@@ -443,6 +561,7 @@ def main():
         return
     world, who, lens, size, live, steps = a[0], None, "command-center", (1500, 900), False, []
     page, term, still, bare = "lens", False, False, False
+    logged = False
     k = 1
     while k < len(a):
         if a[k] == "--reduced-motion":
@@ -459,10 +578,26 @@ def main():
             lens, k = a[k + 1], k + 2
         elif a[k] == "--size":
             size, k = tuple(int(x) for x in a[k + 1].lower().split("x")), k + 2
+        elif a[k] == "--scale":
+            global SCALE
+            SCALE, k = float(a[k + 1]), k + 2
+        elif a[k] == "--visible":                # a5932: hidden; an old `--visible x,y` keeps working, x,y unused
+            global VISIBLE, SB
+            VISIBLE, k = "sandbox", k + 1
+            if k < len(a) and "," in a[k] and a[k].replace(",", "").replace("-", "").isdigit():
+                k += 1
+            sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+            import sandbox_window as SB
+        elif a[k] == "--on-screen":
+            VISIBLE, k = a[k + 1], k + 2
+            print("screen: --on-screen opens a window on Alex's own screen and takes his keyboard: only for a demo he "
+                  "asked for (Alex, 16 Oct)")
         elif a[k] == "--live":
             live, k = True, k + 1
         elif a[k] == "--bare":
             bare, k = True, k + 1
+        elif a[k] == "--logged":
+            logged, k = True, k + 1
         else:
             steps.append(a[k])
             k += 1
@@ -480,11 +615,17 @@ def main():
             session = f"{world}-screen-{os.getpid()}"
             copy = HERE / "sessions" / f"{session}.pickle"
             shutil.copy(src, copy)
+            if logged:
+                # a6010: as the live world, a snapshot plus a log (Snappy Desk), so a press is timed as it is there: a
+                # copy without one pickles the whole world twice at every write (~250 ms of each press)
+                import pickle
+                import store
+                store.genesis(pickle.loads(copy.read_bytes()), copy, why="screen --logged")
             port = free_port()
             # a1505: served as the keeper serves it, through a door (door.py) with its own deskd behind it, its news
             # kept in a temporary directory, and the painter from a copy of this checkout's desk-shell/ made now, so
             # `land painter` can change it without touching files any other page is served from. --bare: a deskd alone
-            state = tempfile.mkdtemp(prefix="screen-door-")
+            state = agora_tmp.directory("screen-door-")
             shell = Path(state) / "desk-shell"
             shutil.copytree(HERE / "desk-shell", shell)
             serve = (lambda: [PY, "deskd.py", str(port)]) if bare else \

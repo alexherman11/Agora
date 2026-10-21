@@ -1,0 +1,23 @@
+# media-player: one film or picture in its own window (a5941; Alex, 16 Oct: 'open in a native window here, I don't
+# want to have to open a different application to look at a video'). What it shows is the person's own note
+# (role=media-player, actor=$me): src= the path as a chat line wrote it; Pop out on a film in a chat sets it, and
+# anyone (an agent too) may set it by hand. Play, seek, speed and full window are the painter's (`media player`).
+player : column
+  share 1
+  role app
+  mine : column
+    share 1
+    of prop:role=media-player,prop:actor=$me as p
+    each screen
+  none : text "The player needs a note of yours: role=media-player actor=<you>."
+    role meta
+    only when count(prop:role=media-player,prop:actor=$me) = 0
+screen : column
+  share 1
+  film : text "$p.src"
+    share 1
+    media player
+    role film
+  empty : text "Nothing to play yet: press Pop out on a film in a chat."
+    role meta
+    only when ($p.src or "") = ""

@@ -4,6 +4,8 @@ you understand it ... Ideally just the world objects if its not a photo').
     python capture.py [--as alex] [--world frontier] [--draft a5082] [--door http://localhost:8794]
         hold Ctrl+Alt, drag over anything on any monitor, let go: a capture is made and its id printed.
         Escape during the drag cancels and nothing is made. Close this window (or Ctrl+C) to stop it.
+    python capture.py --draft auto --parent <pid>    as the home base starts it (hud.py, a5834): onto the person's own
+        chat draft, and it stops when the home base does. Off: `do prop <home-base lens note> capture=off`.
     python capture.py --rect x,y,w,h      make one capture of that rectangle, with no gesture and nothing drawn
     python capture.py --show x,y,w,h      draw the selection there for two seconds and save a picture of it (a test)
 
@@ -115,6 +117,7 @@ _sig(kernel32.GetModuleHandleW, wt.HMODULE, wt.LPCWSTR)
 _sig(kernel32.CreateMutexW, wt.HANDLE, wt.LPVOID, wt.BOOL, wt.LPCWSTR)
 _sig(kernel32.OpenProcess, wt.HANDLE, wt.DWORD, wt.BOOL, wt.DWORD)
 _sig(kernel32.CloseHandle, wt.BOOL, wt.HANDLE)
+_sig(kernel32.GetExitCodeProcess, wt.BOOL, wt.HANDLE, ctypes.POINTER(wt.DWORD))
 _sig(kernel32.QueryFullProcessImageNameW, wt.BOOL, wt.HANDLE, wt.DWORD, wt.LPWSTR, ctypes.POINTER(wt.DWORD))
 
 
@@ -124,6 +127,16 @@ def ms(t):
 
 def held(vk):
     return bool(user32.GetAsyncKeyState(vk) & 0x8000)
+
+
+def alive(pid):
+    h = kernel32.OpenProcess(0x1000, False, pid)          # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    code = wt.DWORD()
+    kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+    kernel32.CloseHandle(h)
+    return code.value == 259                              # STILL_ACTIVE
 
 
 # --- the screen ---------------------------------------------------------------------------------------------------
@@ -195,12 +208,20 @@ def windows_under(rect, ours=()):
     return hits, nx * ny
 
 
-def fullscreen_in_front():
+def has_page(info, own_pid=None):
+    """May this window hold a page to ask for (its UI Automation tree)? A browser's (Chromium's class), or the home
+    base's own window (a5834: a WinForms form holding WebView2, whose page is found among its descendants)."""
+    return info["class"].startswith("Chrome_WidgetWin") or bool(own_pid and info["pid"] == own_pid)
+
+
+def fullscreen_in_front(own_pid=None):
+    """Is a full-screen program in front? The home base that started us (own_pid, a5834) covers the whole monitor
+    but is not one: a drag over it is what Alex asked for."""
     fg = user32.GetForegroundWindow()
     if not fg:
         return False
     info = window_info(fg)
-    if info["class"] in ("Progman", "WorkerW", "Shell_TrayWnd"):
+    if info["class"] in ("Progman", "WorkerW", "Shell_TrayWnd") or (own_pid and info["pid"] == own_pid):
         return False
     mi = MONITORINFOEXW()
     mi.cbSize = ctypes.sizeof(mi)
@@ -274,13 +295,13 @@ def scene(door, page, since=None):
         return out["scene"], out.get("events_total")
 
 
-def prefetch(point, helper, door, ours=(), since=None, events=None):
+def prefetch(point, helper, door, ours=(), since=None, events=None, own_pid=None):
     """When Ctrl+Alt arms and when the mouse goes down: if an Agora page is under the cursor, begin reading its scene
     (unless a read begun since `since` is kept), so the release need not wait. Reading is what the page itself does
     every 1.5 s; nothing is captured or kept by it."""
     hw = user32.WindowFromPoint(wt.POINT(*point))
     root = user32.GetAncestor(hw, GA_ROOT) if hw else None
-    if not root or int(root) in ours or not window_info(root)["class"].startswith("Chrome_WidgetWin"):
+    if not root or int(root) in ours or not has_page(window_info(root), own_pid):
         return
     try:
         page = agora_page(helper.ask(op="tree", hwnd=int(root)).get("url"), door)
@@ -320,8 +341,11 @@ def scene_nodes(root):
         if item:
             text = p.get("text") if p.get("text") is not None else ("".join(r.get("text", "") for r in p["runs"]) if p.get("runs") else None)
             bind = f.get("bind") if isinstance(f.get("bind"), dict) else {}
+            # a6067: whose words a text shows (the read of its `text`: a lens may read a document's text under another part)
+            text_of = next((e[0] for e in (f.get("reads") or []) if isinstance(e, list) and len(e) > 2 and isinstance(e[2], list)
+                            and "text" in e[2]), None)
             here = {"key": n["key"], "item": item, "subject": bind.get("subject"), "role": p.get("role"), "rev": f.get("rev"),
-                    "text": text, "up": up}
+                    "text": text, "up": up, "text_of": text_of, "text_rev": next((e[1] for e in (f.get("reads") or []) if isinstance(e, list) and e and e[0] == text_of), None)}
             if f.get("item") == item:
                 fenced.setdefault(item, here)
             out.append(here)
@@ -367,14 +391,21 @@ def refs_from(parts, root, events_total, page, rect=None):
         if rect and not covered(p["rect"], rect):
             continue
         if p.get("aid"):
-            n = by_key.get(p["aid"][len("part:"):])
+            # a6067 (Sable c5977 (3)): a line of one continuous text is "part:<key>::<line>"; it is named as its text's
+            # part, with the words under the drag as its passage (document, quoted words, revision)
+            key, _, line = p["aid"][len("part:"):].partition("::")
+            n = by_key.get(key)
             if n is None:
                 continue                     # a part that shows no world object of its own (a lane, a column)
             ref = found.setdefault(n["item"], {"world": world, "item": n["item"], "subject": n["subject"], "kind": None,
                                                "resolved": "yes", "role": None, "lens": lens, "key": None, "words": [],
                                                "rev": n["rev"], "scene_count": events_total, "seen_event": None,
                                                "viewer": who, "_at": p["rect"][1::-1]})
-            ref["words"].append(p.get("words") or n["text"] or "")
+            if line:
+                ref.setdefault("passage", []).append(p.get("words") or "")
+                if n.get("text_of"):                 # the document the words are, and its revision
+                    ref["passage_of"], ref["passage_rev"] = n["text_of"], n.get("text_rev")
+            ref["words"].append(p.get("words") or ("" if line else n["text"]) or "")
             outer = n
             while outer["up"] and outer["up"]["item"] == n["item"]:       # the card, not its title: the item's own part
                 outer = outer["up"]
@@ -389,6 +420,8 @@ def refs_from(parts, root, events_total, page, rect=None):
     for r in out:
         if isinstance(r["words"], list):
             r["words"] = "\n".join(w for w in dict.fromkeys(r["words"]) if w)
+        if isinstance(r.get("passage"), list):
+            r["passage"] = "\n".join(w for w in r["passage"] if w)
     return out
 
 
@@ -403,7 +436,7 @@ def capture(rect, helper, args, ours=(), t0=None, since=None):
     for hwnd, pts in sorted(hits.items(), key=lambda kv: -len(kv[1])):
         info = window_info(hwnd)
         page, doc = None, None
-        if info["class"].startswith("Chrome_WidgetWin"):
+        if has_page(info, getattr(args, "parent", None)):
             try:
                 t = helper.ask(op="tree", hwnd=hwnd, rect=list(rect))
                 page, doc = agora_page(t.get("url"), args.door), t.get("doc")
@@ -502,6 +535,16 @@ def _do(args, line):
 DRAFT_MAX = 8            # Codex m5109, c5124: at most eight captures on a draft
 
 
+def own_draft(args):
+    """a5834: --draft auto is the person's own chat draft, found as the home base's chat (jeff-chat) finds it:
+    `of prop:role=conversation-draft,prop:actor=<who>`, the first. Found again at each capture, so a draft made or
+    replaced while this runs is the one used. Returns its id, or None."""
+    import re
+    ok, t = _do(args, f"find prop:role=conversation-draft,prop:actor={args.who}")
+    m = re.search(r"^\s+(a\d+) ", t, re.M) if ok else None
+    return m.group(1) if m else None
+
+
 def deliver(cid, args):
     """Put the capture's id on the person's draft: 'do prop <draft> context=<ids>' (Codex, Talk a4708 e9820, m5109).
     The draft is read just before, and the id joins those already there, in order, at most eight; if the draft
@@ -509,8 +552,11 @@ def deliver(cid, args):
     chip, unsent until Send. Returns (ok, what was said)."""
     import re
     t = ""
+    draft = own_draft(args) if args.draft == "auto" else args.draft
+    if not draft:
+        return False, f"{args.who} has no chat draft (a note with role=conversation-draft actor={args.who}); {cid} is kept, not attached"
     for _ in range(3):
-        ok, t = _do(args, f"examine {args.draft}")
+        ok, t = _do(args, f"examine {draft}")
         if not ok:
             return False, t
         m = re.search(r"\bcontext=(.*)", t)            # up to the next prop (k=) or the next ' · '
@@ -518,7 +564,7 @@ def deliver(cid, args):
         ids = list(dict.fromkeys([*held, cid]))
         if len(ids) > DRAFT_MAX:
             return False, f"the draft holds {DRAFT_MAX} captures already; {cid} is kept, not attached"
-        ok, t = _do(args, f'do prop {args.draft} context="{" ".join(ids)}"')
+        ok, t = _do(args, f'do prop {draft} context="{" ".join(ids)}"')
         if ok:
             return True, t
         if "changed since" not in t and "since your last look" not in t:
@@ -541,15 +587,18 @@ def report(cid, env, timing, args):
     if args.draft:
         try:
             ok, t = deliver(cid, args)
-            print(f"   on the draft {args.draft}: " + ("yes" if ok else "no: " + t.strip().splitlines()[-1][:200]), flush=True)
+            import re
+            where = re.search(r"\bprop (a\d+) context=", t) if ok else None
+            print(f"   on the draft {where.group(1) if where else args.draft}: " + ("yes" if ok else "no: " + (t.strip().splitlines() or [""])[-1][:200]), flush=True)
         except Exception as e:
             print(f"   not put on the draft {args.draft}: {e}", flush=True)
 
 
 # --- the overlay: an invisible catcher while Ctrl+Alt is held, and the selection as it is dragged -------------------
 class Overlay:
-    def __init__(self, on_done, on_down=None, on_arm=None):
+    def __init__(self, on_done, on_down=None, on_arm=None, parent=None):
         self.on_done, self.on_down, self.on_arm = on_done, on_down, on_arm
+        self.parent, self.checked = parent, 0.0        # a5834: the home base that started us; we end with it
         self.proc = WNDPROC(self.wndproc)
         inst = kernel32.GetModuleHandleW(None)
         for name, cursor, colour in (("AgoraCaptureCatcher", 32515, 0), ("AgoraCaptureSelection", 32512,
@@ -615,11 +664,17 @@ class Overlay:
             elif not held(VK_LBUTTON):          # the button came up somewhere the catcher did not hear it
                 self.finish()
             return
+        if self.parent and time.perf_counter() - self.checked > 2:
+            self.checked = time.perf_counter()
+            if not alive(self.parent):
+                print("the home base that started the control screen is gone; stopping", flush=True)
+                user32.PostQuitMessage(0)
+                return
         both = held(VK_CONTROL) and held(VK_MENU)
         if both and not self.shown:
             if self.armed_at is None:
                 self.armed_at = time.perf_counter()
-            elif (time.perf_counter() - self.armed_at) * 1000 >= ARM_MS and not held(VK_LBUTTON) and not fullscreen_in_front():
+            elif (time.perf_counter() - self.armed_at) * 1000 >= ARM_MS and not held(VK_LBUTTON) and not fullscreen_in_front(self.parent):
                 self.show_catcher()
         elif not both:
             self.armed_at = None
@@ -680,7 +735,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--as", dest="who", default="alex")
     ap.add_argument("--world", default="frontier")
-    ap.add_argument("--draft", default=None, help="the draft note a capture's id is put on (Alex's: a5082)")
+    ap.add_argument("--draft", default=None, help="the draft note a capture's id is put on (Alex's: a5082); "
+                    "auto: the person's own (role=conversation-draft actor=<as>), as the home base's chat finds it")
+    ap.add_argument("--parent", type=int, default=None, help="the home base's pid (hud.py starts us, a5834): stop when "
+                    "it is gone, and never take its window for a full-screen program")
     ap.add_argument("--door", default="http://localhost:8794")
     ap.add_argument("--rect", help="x,y,w,h: capture this rectangle now, with no gesture")
     ap.add_argument("--windows", action="store_true", help="list the Agora pages on screen and where they are")
@@ -721,7 +779,7 @@ def main():
             since = None
             if args.drag_ms:            # as a drag would: the mouse goes down at the corner, the release comes later
                 since = time.perf_counter()
-                threading.Thread(target=prefetch, args=((r[0], r[1]), helper, args.door, (), since, args.events), daemon=True).start()
+                threading.Thread(target=prefetch, args=((r[0], r[1]), helper, args.door, (), since, args.events, args.parent), daemon=True).start()
                 time.sleep(args.drag_ms / 1000)
             cid, env, timing = capture(r, helper, args, since=since)
             report(cid, env, timing, args)
@@ -747,12 +805,12 @@ def main():
 
         def on_arm(point):
             down[0] = time.perf_counter()
-            threading.Thread(target=prefetch, args=(point, helper, args.door, ov.ours, down[0], args.events), daemon=True).start()
+            threading.Thread(target=prefetch, args=(point, helper, args.door, ov.ours, down[0], args.events, args.parent), daemon=True).start()
 
         def on_down(point):
-            threading.Thread(target=prefetch, args=(point, helper, args.door, ov.ours, down[0], args.events), daemon=True).start()
+            threading.Thread(target=prefetch, args=(point, helper, args.door, ov.ours, down[0], args.events, args.parent), daemon=True).start()
 
-        ov = Overlay(lambda r, t0: jobs.put((r, t0)), on_down, on_arm)
+        ov = Overlay(lambda r, t0: jobs.put((r, t0)), on_down, on_arm, parent=args.parent)
 
         def worker():
             while True:

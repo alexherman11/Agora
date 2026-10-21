@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_worker_pool: the house's worker pool (a5284, Alex 15 Oct: two Claude workers and two Astra workers) and slots
 that count only workers running a model (a5261 point 1: a ready or landing card held one, and runs none).
 
@@ -21,7 +22,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -49,8 +49,9 @@ def check(name, ok, detail=""):
 D, R = roomworld.build(say=False)
 W = D.world
 B = R.BOARD
-tmp = tempfile.TemporaryDirectory()
-TMP = Path(tmp.name)
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+TMP = Path(agora_tmp.directory("worker-pool-test-"))
 
 
 def say(me, *lines):

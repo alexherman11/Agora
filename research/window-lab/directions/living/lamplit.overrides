@@ -1,0 +1,226 @@
+# ===== LAMPLIT (a6057, the HUD sprint's lane 3; round 3, converged with lanes 1 and 2 on the design table a6049).
+# The rule: the house at night, seen from outside. Only what is alive gives light, and colour says whose move it is.
+#   warm    Alex's move: it waits on him              accent  an agent acting this moment (mint)
+#   jeff    a resident's move (JEFF or another)       ink     chosen, and every control (white)
+#   everything else is ink, soft or faint on glass, wash, raised: the machine's, or nobody's (queued, ready, past).
+# Numbers and times are in a mono, so they line up and do not jitter. Nothing moves but the timer's own count.
+# THE RULE FOR A ROLE ADDED LATER: a role names a meaning, not a paint. Its colours are only these tokens: warm, jeff,
+# accent, ink, soft, faint, ghost, night (text on a light face), and the materials glass, glassdeep, wash, raised,
+# raisedhi, mine, rim (and their *wash forms: warmwash, jeffwash, accentwash); never a hex. A lens that adds roles
+# appends them to home-style, one desk line each. research/window-lab/directions/living/apply.py lint lists any role
+# that breaks this and any role a lens in the Home base room uses that home-style lacks.
+# How this text is made: apply.py reads the live home-style, adds a5988's feed roles (wf*) where it lacks them, then
+# these lines, and keeps each name once (where it first stood, in its last words): one flat style. Lane 1's board roles
+# (nb*) are its own marked block, written by its apply and never overridden here.
+font sans = Geist, Segoe UI Variable Text, Segoe UI, system-ui, sans-serif
+font mono = Geist Mono, Cascadia Code, ui-monospace, monospace
+token night = #06080B
+token paper = #0A0D11
+token ink = #E7EBF0
+token glass = #0A0D11CC
+token glassdeep = #0B0E13EE
+token rim = ink at 8%
+token soft = ink at 58%
+token faint = ink at 32%
+token ghost = ink at 12%
+token hush = ink at 50%
+token wash = #E7EBF00D
+token raised = #E7EBF009
+token raisedhi = #E7EBF012
+token mine = #E7EBF014
+token focus = ink at 35%
+token card = #12161C
+# the four lights
+token warm = #FFB547
+token warmwash = #FFB54719
+token jeff = #B9A8FF
+token jeffwash = #B9A8FF1A
+token jeffwash2 = #B9A8FF1A
+token accent = #63E2C0
+token accentwash = #63E2C014
+# home-style's other colour tokens, folded into the rule: the machine's lanes are grey; a mark in a document is warm
+token sky = #8E97A4
+token skywash = #8E97A41A
+token teal = #8E97A4
+token tealwash = #8E97A41A
+token mark = #FFB547
+token text = sans 15/1.5
+token text.mono = mono 12/1.5
+token text.big = mono 30/1
+token text.num = mono 26/1
+token text.label = mono 11/1.4
+# --- the glance (home-glance)
+role widgets : between gap x4, align center
+role lgband : between gap x5, align center
+role lgclock : between gap /4
+role lgtime : text.big, ink
+role lgday : text.label tracked, soft
+role lgsentence : between gap x3, align center, pad left gap x4, border left rim
+role lgstat : between gap, align center, corner gap, pad gap /2, pad left gap, pad right gap
+role lgstat.on : between gap, align center, corner gap, pad gap /2, pad left gap, pad right gap, on wash, edge ink
+role lgnum : text.num, soft
+role lgnum.you : text.num medium, warm
+role lgnum.lit : text.num medium, accent
+role lgword : text down, faint
+role lgword.you : text down medium, warm
+role lgword.lit : text down, accent
+role lgcalm : text down, faint
+# --- The house (home-house, home-house-small)
+role lhouse : between gap x1.5
+role lhlist : between gap /2
+role lhme : between gap x1.5, pad gap /1.5, pad left gap x1.5, on wash, corner gap, rail warm
+role lhname.you : text medium, warm, width 4em
+role lhdoing : text, ink
+role lhbeing : on raised, rail accent, corner gap, pad gap /1.5, pad left gap x1.5, between gap /4
+role lhbeing.asks : on jeffwash, rail jeff, corner gap, pad gap /1.5, pad left gap x1.5, between gap /4
+role lhbeing.you : on warmwash, rail warm, corner gap, pad gap /1.5, pad left gap x1.5, between gap /4
+role lhbeing.on : on raisedhi, rail accent, edge ink, corner gap, pad gap /1.5, pad left gap x1.5, between gap /4
+role lhcol : between gap /2
+role lhhead : between gap x1.5
+role lhwhat : text medium, ink
+role lhwho : text.label, soft
+role lhname : text medium, ink
+role lhname.jeff : text medium, jeff
+role lhline : between gap
+role lhstate.asks : text.label medium, jeff
+role lhstate.you : text.label medium, warm
+role lhsince : text.label, faint
+role lhword : text down, soft
+role lhword.now : text down, ink
+role lhfocus : text down, soft
+role lhrest : between gap, pad top gap, border top rim
+role lhrestlabel : text.label tracked, faint
+role lhrestnames : between gap x1.5
+role lhrestname : text down, faint
+role lhrestname.on : text down medium, ink
+role lhcalm : text down, faint
+role lhsmall : between gap
+role lhsmall.lit : text down medium, accent
+# --- the timer as one line (home-timer, home-timer-bar): running is alive, done is your move, idle grey
+role ltimer : between gap, align center
+role ltmode : text.label tracked, faint
+role ltmode.on : text.label medium tracked, accent
+role ltmode.done : text.label medium tracked, warm
+role lttime : text.label medium, soft
+role lttime.on : text.label medium, accent
+role ltgo : text down 2 medium, night, on ink, corner gap x2, pad gap /4, pad left gap, pad right gap
+role ltgo.done : text down 2 medium, night, on warm, corner gap x2, pad gap /4, pad left gap, pad right gap
+role ltbtn : text down 2, soft, edge rim, corner gap x2, pad gap /4, pad left gap, pad right gap
+role ltx : text down, faint, pad left gap /2, pad right gap /2
+# --- the notices (home-notices): what asks you is warm, what only happened is grey
+role nbar : between gap
+role nbell : between gap, align center, on glass, edge rim, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap /2, width 36em
+role nquiet : text down, faint
+role nheld : text down, soft
+role nfirst : between gap
+role nline : between gap, align center
+role ndot : text down 2, faint
+role ndot.you : text down 2, warm
+role ndot.landed : text down 2, faint
+role ndot.asking : text down 2, warm
+role ndot.call : text down 2, warm
+role nlabel : text down medium, soft
+role nlabel.you : text down medium, warm
+role ntitle : text down, ink
+role ncounts : between gap /2
+role ncount : text.label medium, soft, on wash, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role ncount.you : text.label medium, night, on warm, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role nmore : text down 2, soft, pad left gap /2, pad right gap /2
+role nhead : text.label tracked, faint, space above gap /2
+role nhead.you : text.label tracked, warm, space above gap /2
+role nitem : on wash, corner gap, pad gap /2, pad left gap, between gap /2
+role nitem.you : on warmwash, corner gap, pad gap /2, pad left gap, between gap /2, rail warm
+role nat : text.label, faint
+# --- a5988's live feed: actions are the agent acting (accent), thoughts grey, life faint; an error is loud by weight,
+# not colour (warm would say it is yours)
+role busy.on : between gap, pad top gap /2, on wash, edge ink, corner gap
+role wftime : text.label, faint
+role wfkind : text.label medium tracked, accent, width gap x8
+role wfkind.thoughts : text.label medium tracked, soft, width gap x8
+role wfkind.errors : text.label strong tracked, ink, width gap x8
+role wfkind.life : text.label tracked, faint, width gap x8
+role wfwords.errors : text down medium, ink
+# --- the frame: panes are dark glass with a hairline; their titles are quiet labels, so the contents lead
+role brand : text.label tracked, faint
+role pane : on glass, edge rim, corner gap x2, pad gap x2, between gap x1.5
+role pane.big : on glassdeep, edge rim, corner gap x2, pad gap x2, between gap x1.5
+role panehead : between gap
+role panetitle : text.label medium tracked, soft
+role panesum : text down, soft
+role summary : text down, soft
+role hint : text down 2, faint
+role meta : text down, soft
+role tool : text down, faint, pad gap /2
+# --- chrome that wore accent in home-style is chosen or a control: white (accent now means alive, only)
+role chip.on : text down medium, night, on ink, corner gap x2, pad gap /2, pad left gap x1.5, pad right gap x1.5
+role button : on ink, night, text down medium, pad gap, pad left gap x2, pad right gap x2, corner gap x2
+role tile.front : on glassdeep, edge ink, corner gap x1.5, pad gap, between gap /2
+role reviewcard : on glassdeep, edge ink, corner gap x1.5, pad gap x1.5, between gap
+role appicon.on : on mine, edge ink, corner gap x1.5, pad gap, width gap x11, between gap /4
+role dockchip.on : ink, on wash, edge ink, corner gap, pad gap /2, pad left gap, pad right gap
+role railitem.on : ink, on glassdeep, edge ink, corner gap x1.5, pad gap, between gap /4
+role landing : on wash, edge ink, corner gap x2
+role pending : on glassdeep, edge ink, corner gap x1.5, pad gap, between gap /2, space above gap
+role eyebrow : text.mono tracked, soft, space below gap
+role good : text.mono strong, ink, pad left gap
+role author : text down medium, soft
+role nowlabel : text down 2 medium tracked, soft
+role railhead : text.mono down tracked, soft
+role qcard.on : on wash, edge ink, pad gap /2, pad left gap, corner gap
+role viewtab.on : text.mono down, ink, pad gap /2, border bottom ink
+role bullet : soft, pad right gap /2
+role box.on : text up, ink, pad right gap /2
+role h3 : text medium, ink, space above gap x2
+role quote : text up, ink, pad left gap x2, border left rim
+role ticked : text medium, soft
+# --- the old board (home-board) and At work, if still worn: a card is lit only while its worker is at work; one
+# that asks a resident is lilac; the rest grey
+role live : accent
+role busy : between gap, pad top gap /2
+role bdlivecount : text.label medium, accent
+role bddot : text down, faint
+role bddot.asked : text down, faint
+role bddot.working : text down, accent
+role bddot.ready : text down, soft
+role bddot.landing : text down, soft
+role bdlanename : text.label medium tracked, soft
+role bdcount : text.label medium, faint, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.asked : text.label medium, soft, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.working : text.label medium, accent, on accentwash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.ready : text.label medium, soft, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcount.landing : text.label medium, soft, on wash, corner gap x2, pad left gap /2, pad right gap /2
+role bdcard : on raised, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.asked : on raised, rail ghost, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.working : on raised, rail faint, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.live : on raisedhi, rail accent, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.asking : on jeffwash, rail jeff, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.ready : on raised, rail soft, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.landing : on raisedhi, rail soft, edge rim, corner gap, pad gap /2, pad left gap x1.5, pad right gap
+role bdcard.landed : corner gap, pad gap /4, pad left gap x1.5, pad right gap
+role bdtitle.landed : text down, faint
+role bdwho : text.label, faint
+role bdstate : text.label medium, accent
+role bdstate.asking : text.label medium, jeff
+role taskcard.live : on wash, edge accent, corner gap, pad gap /2, pad left gap, pad right gap
+# --- what waits on you is the warm list
+role count : text.label medium, night, on warm, corner gap x2, pad left gap /1.5, pad right gap /1.5
+role wait : on warmwash, rail warm, corner gap, pad gap, pad left gap x1.5, between gap /4
+role wait.on : on warmwash, rail warm, edge warm, corner gap, pad gap, pad left gap x1.5, between gap /4
+role tag : text.label tracked, faint
+role tag.demo : text.label medium tracked, warm
+role tag.design : text.label medium tracked, warm
+# --- the chat: JEFF lilac, you plain
+role thinking : text down, jeff
+role dots : jeff
+role face : on jeffwash, jeff, text up 2 strong, corner gap x3, pad gap, pad left gap x2, pad right gap x2
+role bubble : on wash, corner gap x1.5, pad gap x1.5
+role bubble.mine : on mine, corner gap x1.5, pad gap x1.5
+role bubble.jeff : on jeffwash, corner gap x1.5, pad gap x1.5
+# --- the old ring timer (home-pomodoro), if still worn: running is alive; idle grey; done is your move
+role pomoring : text.label medium, accent, width gap x7
+role pomoring.still : text.label medium, faint, width gap x7
+role pomoring.done : text.label medium, warm, width gap x7
+role pomomode : text.label tracked, faint
+role pomomode.on : text.label medium tracked, accent
+role pomobtn : text down 2 medium, night, on ink, corner gap x2, pad gap /4, pad left gap, pad right gap
+role pomochip : text down 2, soft, edge rim, corner gap x2, pad gap /4, pad left gap, pad right gap

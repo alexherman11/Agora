@@ -5,6 +5,10 @@
     python wm.py --release-all      put back every window the host moved, close the windows it opened, stop its page;
                                     reads only state/wm.json, so it works with the desk stopped (and with the host gone)
 
+Alex never runs these: the home base does (a6113). Its dock icon asks `host wm.start` and `host wm.stop` (wm_switch.py),
+which runs this as its child with --parent <the home base's pid>: when that process is gone the host puts everything
+back and ends. --keys off (or AGORA_WM_KEYS=off in its environment) takes no global key: tests on the sandbox use it.
+
 What it does. The host opens Agora windows the way lens_window.py does (Edge in app mode on lens.html, its own profile)
 and keeps each one's window handle. It does not decide where they go. It paints a LAYOUT LENS, a note in the world
 (wm-strip by default), in an unseen page: Edge with no window (headless), sized to the monitor's work area at the
@@ -26,7 +30,9 @@ Keys (global, while the host runs):
     Ctrl+Alt+Backspace        release everything and stop: adopted windows back where they were, Agora windows closed
 
 What it keeps: intent (order, pinned, collapsed, adopted, and every adopted window's place before) in state/wm.json,
-not in the world. Nothing else of an ordinary program is read or moved unless it was adopted: the windows the host
+not in the world. With it, every process it started, by identity (pid, creation time, executable): release-all ends
+only those that still match, never a pid alone, and a state file from before this boot is put aside untouched
+(a6113, after c6176: a stale file's pids belonged to a Claude resident and to Alex's Writing window by then). Nothing else of an ordinary program is read or moved unless it was adopted: the windows the host
 looks at are its own Edge's (found by process, never by title) and the one in front when Ctrl+Alt+A is pressed.
 """
 import argparse
@@ -49,8 +55,8 @@ STATE = STATE_DIR / "wm.json"
 LOG = STATE_DIR / "wm.log"
 KEYS_FILE = STATE_DIR / "wm.keys"             # a test's asks, read and removed each tick (see Host.asked)
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-PROFILE = STATE_DIR / "edge-profile"          # the Agora windows' Edge (lens_window.py's)
-UNSEEN = STATE_DIR / "edge-unseen"            # the layout page's Edge, with no window
+EDGE_ROOT = STATE_DIR / "wm-edge"             # a6113: each run's own Edge profiles, <run>/windows and <run>/unseen
+                                              # (run_profiles); never state/edge-profile, lens_window.py's
 VIEWER = "wm"
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -143,11 +149,90 @@ def alive(pid):
     return code.value == 259
 
 
-def kill(pid):
-    h = kernel32.OpenProcess(0x0001, False, int(pid))      # PROCESS_TERMINATE: only ever our own Edge's
-    if h:
-        kernel32.TerminateProcess(h, 0)
+# ---- which process is which: a pid alone is never trusted (a6113, after Codex's c6176) ------------------------------
+# Windows gives a pid to a new process soon after its owner ends: on 16 Oct a stale wm.json named an Edge pid that a
+# Claude resident then had. So every process the host starts is kept as {pid, created, exe, parent, line}: its creation
+# time (100 ns ticks since 1601, which no later process with the same pid can share) and its executable. Anything is
+# killed only when both still match, checked on the very handle that kills it; a record missing either is never killed.
+class FILETIME(ctypes.Structure):
+    _fields_ = [("lo", wt.DWORD), ("hi", wt.DWORD)]
+
+
+_sig(kernel32.GetProcessTimes, wt.BOOL, wt.HANDLE, ctypes.POINTER(FILETIME), ctypes.POINTER(FILETIME),
+     ctypes.POINTER(FILETIME), ctypes.POINTER(FILETIME))
+_sig(kernel32.QueryFullProcessImageNameW, wt.BOOL, wt.HANDLE, wt.DWORD, wt.LPWSTR, ctypes.POINTER(wt.DWORD))
+_sig(kernel32.GetTickCount64, ctypes.c_ulonglong)
+
+
+def _of_handle(h):
+    """(created, exe) of an open process handle, or None when it has ended."""
+    code = wt.DWORD()
+    kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+    if code.value != 259:
+        return None
+    c, e, k, u = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+    if not kernel32.GetProcessTimes(h, ctypes.byref(c), ctypes.byref(e), ctypes.byref(k), ctypes.byref(u)):
+        return None
+    buf, n = ctypes.create_unicode_buffer(1024), wt.DWORD(1024)
+    if not kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)):
+        return None
+    return (c.hi << 32) | c.lo, buf.value
+
+
+def identity(pid, **more):
+    """-> {pid, created, exe, ...more} of a process running now, or None."""
+    h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+    if not h:
+        return None
+    try:
+        got = _of_handle(h)
+    finally:
         kernel32.CloseHandle(h)
+    return {"pid": int(pid), "created": got[0], "exe": got[1], **more} if got else None
+
+
+def created_unix(rec):
+    return rec["created"] / 1e7 - 11644473600
+
+
+def same(rec):
+    """'' when the process this record names runs now and is the very one recorded; else why not (in words)."""
+    if not isinstance(rec, dict) or not rec.get("pid") or not rec.get("created") or not rec.get("exe"):
+        return "its creation time or executable was not recorded"
+    now = identity(rec["pid"])
+    if now is None:
+        return "it is not running"
+    if now["created"] != rec["created"]:
+        return f"pid {rec['pid']} now belongs to another process (created at another time: {now['exe']})"
+    if now["exe"].lower() != str(rec["exe"]).lower():
+        return f"pid {rec['pid']} now runs another program ({now['exe']})"
+    return ""
+
+
+def kill_same(rec):
+    """End the process this record names only if it is still that one: '' when ended, else why it was left alone.
+    The check and the kill use one handle, so the pid cannot change hands between them."""
+    if not isinstance(rec, dict) or not rec.get("pid") or not rec.get("created") or not rec.get("exe"):
+        return "its creation time or executable was not recorded"
+    h = kernel32.OpenProcess(0x0001 | PROCESS_QUERY_LIMITED_INFORMATION, False, int(rec["pid"]))   # TERMINATE too
+    if not h:      # ERROR_INVALID_PARAMETER: no process has that pid now
+        return "it is not running" if ctypes.get_last_error() == 87 else \
+            f"it may not be opened (error {ctypes.get_last_error()}); left alone"
+    try:
+        got = _of_handle(h)
+        if got is None:
+            return "it is not running"
+        if got[0] != rec["created"] or got[1].lower() != str(rec["exe"]).lower():
+            return f"pid {rec['pid']} now belongs to another process ({got[1]}); left alone"
+        kernel32.TerminateProcess(h, 0)
+        return ""
+    finally:
+        kernel32.CloseHandle(h)
+
+
+def boot_time():
+    """When Windows last started, as a unix time (to a second or so)."""
+    return time.time() - kernel32.GetTickCount64() / 1000
 
 
 def top_windows_of(pids):
@@ -226,6 +311,29 @@ def monitors():
         return True
     user32.EnumDisplayMonitors(None, None, _MONITORS(each), 0)
     return out
+
+
+def profile_procs(profile, since):
+    """The browser processes on one of THIS run's own profile folders that began after `since` (unix time), as identity
+    records. The folder is made new for the run (run_profiles), so only an Edge this host started can be on it."""
+    out = []
+    for pid in profile_pids(profile):
+        rec = identity(pid, why=f"the browser on {Path(profile).name}")
+        if rec and created_unix(rec) >= since - 2:
+            out.append(rec)
+    return out
+
+
+def run_profiles():
+    """Two new Edge profile folders for one run of the host: (windows, unseen). Never lens_window.py's state/edge-profile,
+    which Writing and other app windows use: on 16 Oct release-all would have ended them (c6176). Folders of runs that
+    ended are removed (one an Edge still holds stays, and is tried again next time)."""
+    import shutil
+    EDGE_ROOT.mkdir(parents=True, exist_ok=True)
+    for old in EDGE_ROOT.iterdir():
+        shutil.rmtree(old, ignore_errors=True)
+    run = EDGE_ROOT / time.strftime("%Y%m%d-%H%M%S")
+    return run / "windows", run / "unseen"
 
 
 def profile_pids(profile):
@@ -328,35 +436,87 @@ def load_state():
 def save_state(st):
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(st, indent=1), encoding="utf-8")
+    tmp.write_text(json.dumps({**st, "saved_at": time.time()}, indent=1), encoding="utf-8")
     os.replace(tmp, STATE)
+
+
+def stale(st):
+    """'' when this state file can be acted on, else why not. A file saved before Windows last started names windows
+    and processes that are all gone, their handles and pids since given to others: it is never acted on."""
+    at = st.get("saved_at")
+    if not isinstance(at, (int, float)):
+        return "it has no save time (written by a host from before 16 Oct's fix)"
+    if at < boot_time() - 5:
+        return f"it was saved at {time.strftime('%d %b %H:%M', time.localtime(at))}, before Windows last started"
+    return ""
+
+
+def retire(why, say=log):
+    """Put a state file that must not be acted on aside (state/wm.stale-<when>.json), touching nothing it names."""
+    to = STATE.with_name(f"wm.stale-{time.strftime('%Y%m%d-%H%M%S')}.json")
+    try:
+        os.replace(STATE, to)
+    except OSError as e:
+        say(f"release-all: could not put the old state file aside ({e}); nothing acted on")
+        return
+    say(f"release-all: the state file was not acted on, because {why}; it is now {to.name}, and nothing it names was touched")
+
+
+def host_alive(st):
+    """The host that wrote this state, if it runs now and is that very process (identity, not a bare pid)."""
+    return bool(st) and not same(st.get("host"))
 
 
 def release_all(st=None, say=log):
     """Every adopted window back where it was, every Agora window the host opened closed, its Edges stopped, and the
-    windows source removed. Reads only the state file: no desk, no door."""
+    windows source removed. Reads only the state file: no desk, no door.
+
+    What it ends and what it never does (a6113, c6178): it ends only processes recorded in edge_procs and unseen_procs
+    whose creation time and executable still match (kill_same), never a pid alone and never a process found by its
+    profile folder. It closes a window only when its process is one of those, and puts an adopted window back only when
+    the window's process is still the one recorded at adoption. A file from before this boot, or with no save time, is
+    retired untouched (stale, retire). Each thing it leaves alone is named in what it says."""
     st = st or load_state()
     if not st:
         say("release-all: no state file; nothing was kept")
         return 0
+    why = stale(st)
+    if why:
+        retire(why, say)
+        return 0
+    procs = [r for r in (st.get("edge_procs") or []) + (st.get("unseen_procs") or []) if isinstance(r, dict)]
+    ours = {r["pid"] for r in procs if not same(r)}             # the recorded Edges that are still those very processes
     back = closed = 0
+    left = []
     for w in st.get("windows", []):
         for key in ("hwnd", "lesser_hwnd"):
             h = w.get(key)
             if not h or not user32.IsWindow(h):
                 continue
             if w["kind"] == "adopted" and key == "hwnd":
-                if pid_of(h) == w.get("pid") and w.get("was"):
-                    put_back(h, w["was"])
-                    back += 1
-            elif pid_of(h) in set(st.get("edge_pids") or []):
+                rec = w.get("proc")
+                whynot = same(rec) or ("" if pid_of(h) == rec.get("pid") else "the window now belongs to another process")
+                if whynot or not w.get("was"):
+                    left.append(f"adopted window {w.get('title', h)!r} not moved: {whynot or 'no place before was kept'}")
+                    continue
+                put_back(h, w["was"])
+                back += 1
+            elif pid_of(h) in ours:
                 user32.PostMessageW(h, WM_CLOSE, 0, 0)
                 closed += 1
+            else:
+                left.append(f"window {h} not closed: its process is not one this host started")
     time.sleep(0.5)
     # the Edges the host started go too: an Edge keeps running after its last window closes, and the unseen one has none
-    for pid in set(st.get("edge_pids") or []) | set(st.get("unseen_pids") or []) | profile_pids(PROFILE) | profile_pids(UNSEEN):
-        if alive(pid):
-            kill(pid)
+    ended = 0
+    for r in procs:
+        whynot = kill_same(r)
+        if not whynot:
+            ended += 1
+        elif whynot != "it is not running":
+            left.append(f"process {r.get('pid')} not ended: {whynot}")
+    for line in left:
+        say("release-all: LEFT ALONE:", line)
     try:
         sys.path.insert(0, str(Path(st.get("notation") or NOTATION)))
         import witnessed
@@ -364,8 +524,9 @@ def release_all(st=None, say=log):
         witnessed.clear(st.get("world") or "frontier", "windows")
     except Exception as e:                       # the desk's code may be what is broken: release-all does not need it
         say("release-all: windows source not removed:", e)
-    say(f"release-all: {back} adopted window(s) put back, {closed} Agora window(s) closed")
-    save_state({**st, "windows": [], "released": time.time()})
+    say(f"release-all: {back} adopted window(s) put back, {closed} Agora window(s) closed, {ended} of the host's own "
+        f"Edge process(es) ended, {len(left)} thing(s) left alone")
+    save_state({**st, "windows": [], "edge_procs": [], "unseen_procs": [], "released": time.time()})
     return 0
 
 
@@ -385,16 +546,34 @@ class Host:
         mons = monitors()
         self.mon = mons[a.monitor] if a.monitor is not None else next(m for m in mons if m["primary"])
         self.windows = []            # [{name, kind, lens, hwnd, lesser, lesser_hwnd, pinned, collapsed, pid, was, title}]
-        self.edge_pids, self.unseen_pids, self.unseen_at, self.n = set(), set(), 0, 0
+        # a6113: every process this host starts, as identity records by pid (kill_same reads them), and this run's own
+        # profile folders, so no Edge it did not start can be taken for one of its own
+        self.edge_procs, self.unseen_procs, self.unseen_at, self.n = {}, {}, 0, 0
+        self.started_at = time.time()
+        self.profile = self.unseen_profile = None             # run() makes them (run_profiles)
+        self.parent =identity(a.parent) if a.parent else None     # the home base, as the process it is now
         self.report_seen, self.applied, self.focus = None, None, None
         self.pending = None          # (what was asked, when): a key, a lens edit, a start; cleared when windows move
         self.timings = []
+        self.parent_checked = 0
 
     # -- the state file
     def save(self):
         save_state({"world": self.world, "notation": str(self.notation), "host_pid": os.getpid(),
-                    "edge_pids": sorted(self.edge_pids), "unseen_pids": sorted(self.unseen_pids),
+                    "host": identity(os.getpid(), why="the window manager host"),
+                    "edge_procs": list(self.edge_procs.values()), "unseen_procs": list(self.unseen_procs.values()),
                     "windows": [{k: v for k, v in w.items()} for w in self.windows]})
+
+    @property
+    def edge_pids(self):
+        return set(self.edge_procs)
+
+    def keep(self, procs, pid, why):
+        """Record a process this host has just started (or found on this run's own profile), once."""
+        if pid not in procs:
+            rec = identity(pid, why=why, parent=os.getpid())
+            if rec:
+                procs[pid] = rec
 
     # -- the windows source: what the layout repeats over
     def say_rows(self, why):
@@ -429,18 +608,20 @@ class Host:
         # --pictures: Edge composites without the GPU, so PrintWindow can draw each window alone (it draws a GPU-composited
         # Edge blank; ran 14 Oct). Only tests ask for it: a picture then holds the host's windows and nothing else
         extra = ["--disable-gpu-compositing"] if self.a.pictures else []
-        p = self.edge(PROFILE, *extra, f"--app={self.url(lens)}", f"--window-size={w // 3},{h // 2}", f"--window-position={x + 40},{y + 40}")
+        # a6113: InPrivate, no sync: a fresh Edge profile signs itself into Alex's Microsoft account and syncs (a5932)
+        p = self.edge(self.profile, *extra, "--inprivate", "--disable-sync", f"--app={self.url(lens)}", f"--window-size={w // 3},{h // 2}", f"--window-position={x + 40},{y + 40}")
+        self.keep(self.edge_procs, p.pid, f"Edge for {lens}")      # the first launch on the profile is its browser
         deadline = time.time() + 15
         while time.time() < deadline:
             time.sleep(0.15)
-            if alive(p.pid):
-                self.edge_pids.add(p.pid)            # the first launch on the profile is its browser and stays
             new = [hw for hw in top_windows_of(self.edge_pids) if hw not in before and hw not in self.hwnds()]
             if new:
                 return new[0]
-            if not alive(p.pid) and not self.edge_pids:
-                # an Edge on this profile was already running (from before): it took the window, so its process is ours
-                self.edge_pids |= profile_pids(PROFILE)
+            if not alive(p.pid) and not any(not same(r) for r in self.edge_procs.values()):
+                # the launch handed its work to another process and ended: on this run's own new profile folder that
+                # process can only be one this host's launch began (and it began after this run started)
+                for r in profile_procs(self.profile, self.started_at):
+                    self.edge_procs.setdefault(r["pid"], {**r, "parent": None})
         log("no window appeared for", lens)
         return None
 
@@ -471,15 +652,18 @@ class Host:
         x, y, w, h = self.mon["work"]
         s = self.mon["scale"]
         self.unseen_at = time.time()
-        p = self.edge(UNSEEN, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--force-device-scale-factor={s}",
+        p = self.edge(self.unseen_profile, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--force-device-scale-factor={s}",
                       f"--window-size={round(w / s)},{round(h / s)}", self.url(self.layout, who=VIEWER))
+        self.keep(self.unseen_procs, p.pid, "Edge launcher for the unseen page")
         for _ in range(40):
-            self.unseen_pids = profile_pids(UNSEEN)
-            if self.unseen_pids:
+            found = profile_procs(self.unseen_profile, self.started_at)
+            for r in found:
+                self.unseen_procs.setdefault(r["pid"], {**r, "parent": None})
+            if found:
                 break
             time.sleep(0.2)
         self.save()
-        log(f"unseen page: {self.layout} at {round(w / s)}x{round(h / s)} css px, scale {s}, launcher {p.pid}, browser {sorted(self.unseen_pids)}")
+        log(f"unseen page: {self.layout} at {round(w / s)}x{round(h / s)} css px, scale {s}, launcher {p.pid}, browser {sorted(self.unseen_procs)}")
 
     def report_path(self):
         return self.notation / "house-state" / "reports" / self.world / f"{urllib.parse.quote(VIEWER, safe='')}.json"
@@ -599,6 +783,8 @@ class Host:
         at = next((k for k, w in enumerate(self.windows) if not w["pinned"]), len(self.windows))
         self.windows.insert(at, {"name": f"x{self.n}", "kind": "adopted", "lens": "", "title": title(fg) or cls.value, "hwnd": fg,
                              "pid": pid_of(fg), "was": placement(fg), "lesser": None, "lesser_hwnd": None,
+                             # a6113: release puts it back only while its process is still this one (never kills it)
+                             "proc": identity(pid_of(fg), why="an adopted window's program"),
                              "pinned": False, "collapsed": False})
         self.save()                  # its place before is kept before anything moves it
         self.say_rows(f"adopt x{self.n}")
@@ -638,7 +824,8 @@ class Host:
 
     # -- the loop
     def tick(self):
-        gone = [w for w in self.windows if not user32.IsWindow(w["hwnd"])]
+        """One look round; -> True when the host should put everything back and stop (its home base is gone)."""
+        gone =[w for w in self.windows if not user32.IsWindow(w["hwnd"])]
         for w in gone:
             self.windows.remove(w)
             if w.get("lesser_hwnd") and user32.IsWindow(w["lesser_hwnd"]):
@@ -658,18 +845,26 @@ class Host:
         rep = self.read_report()
         if rep is not None:
             self.apply(rep)
-        if time.time() - self.unseen_at > 30 and not any(alive(p) for p in self.unseen_pids):
+        if self.a.parent and time.time() - self.parent_checked > 1:
+            self.parent_checked = time.time()
+            # its identity, not its pid: a pid given to a new process must not keep this host running alone
+            if self.parent is None or same(self.parent):
+                log("the home base that started us is gone (pid", self.a.parent, "); putting everything back")
+                return True
+        if time.time() - self.unseen_at > 30 and not any(not same(r) for r in self.unseen_procs.values()):
             log("the unseen page stopped; starting it again")         # at most once in 30 s
             self.start_unseen()
+        return False
 
     def run(self):
         st = load_state()
-        if st and st.get("windows") and st.get("host_pid") and alive(st["host_pid"]) and st["host_pid"] != os.getpid():
-            log("a host is already running (pid", st["host_pid"], ")")
+        if st and st.get("windows") and not stale(st) and host_alive(st) and st["host"]["pid"] != os.getpid():
+            log("a host is already running (pid", st["host"]["pid"], ")")
             return 76
-        if st and st.get("windows"):
-            log("a host before this one left windows; putting them back first")
+        if st and not st.get("released"):
+            log("a host before this one left its state; putting back what it names first")
             release_all(st)
+        self.profile, self.unseen_profile = run_profiles()     # after that release: an old run's folder may be freed
         for lens in [x for x in self.a.open.split(",") if x]:
             self.add_agora(lens)
         time.sleep(0.5)
@@ -679,8 +874,11 @@ class Host:
                 user32.PostMessageW(h, WM_CLOSE, 0, 0)
         self.say_rows("start")
         self.start_unseen()
-        ok = [k for k in self.KEYS if user32.RegisterHotKey(None, k, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, self.KEYS[k][0])]
-        if len(ok) < len(self.KEYS):
+        ok = [k for k in self.KEYS if self.a.keys == "on"
+              and user32.RegisterHotKey(None, k, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, self.KEYS[k][0])]
+        if self.a.keys != "on":
+            log("--keys off: no global key taken")
+        elif len(ok) < len(self.KEYS):
             log("keys taken by another program:", [k for k in self.KEYS if k not in ok])
         user32.SetTimer(None, 0, 30, None)
         msg = wt.MSG()
@@ -691,9 +889,8 @@ class Host:
                         break
                     self.on_key(msg.wParam)
                 elif msg.message == WM_TIMER:
-                    if self.asked():
+                    if self.asked() or self.tick():
                         break
-                    self.tick()
                 if self.a.seconds and time.time() - self.started > self.a.seconds:
                     break
         finally:
@@ -720,6 +917,9 @@ def main():
     ap.add_argument("--monitor", type=int, default=None, help="which monitor, counting from 0 (default: the primary)")
     ap.add_argument("--pictures", action="store_true", help="draw windows so `snap` can picture each alone (tests)")
     ap.add_argument("--seconds", type=float, default=0, help="stop after this long, putting everything back (tests)")
+    ap.add_argument("--parent", type=int, default=None, help="the home base's pid (wm_switch.py): put back and stop when it is gone")
+    ap.add_argument("--keys", choices=("on", "off"), default=os.environ.get("AGORA_WM_KEYS", "on"),
+                    help="off: take no global key (a test on the sandbox desktop)")
     ap.add_argument("--release-all", action="store_true")
     a = ap.parse_args()
     if a.release_all:

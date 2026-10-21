@@ -1,0 +1,7 @@
+# app-preview: STAND-IN (a6427) for worker-a6431's phone preview, so the app dev workspace has its middle panel before
+# a6431 lands. a6431's apply rewrites this note (same title) with the real preview; until then it says so, plainly.
+standin : column
+  share 1
+  role panebody
+  say : text "The phone preview arrives here: a web app at a phone's size, live (commission a6431, being built)."
+    role hint

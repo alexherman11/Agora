@@ -1,0 +1,3 @@
+# a6271: a playtest start with The board panel out (for --only card, with or without the bar)
+read a5674
+do prop a5674 shelf=no

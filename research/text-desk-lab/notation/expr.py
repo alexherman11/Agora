@@ -120,8 +120,8 @@ def fmt(val, reach=True):
         s = str(int(val.v)) if float(val.v).is_integer() else f"{val.v:.4g}" if abs(val.v) < 1e6 else str(val.v)
     elif val.kind == "date":
         s = val.v.isoformat()
-    elif val.kind == "time":
-        s = val.v.strftime("%Y-%m-%d %H:%M")
+    elif val.kind == "time":       # a5530: a time that has seconds ($now, a moment counted to) keeps them
+        s = val.v.strftime("%Y-%m-%d %H:%M" + (":%S" if val.v.second else ""))
     elif val.kind == "duration":
         mins = val.v.total_seconds() / 60
         neg = mins < 0
@@ -229,9 +229,172 @@ def _f_date(args):
     return Value("date", d) if d else none(f"date wants a date, a date-time or a freshness value; got {fmt(args[0])!r}")
 
 
+def _f_words_of(args):
+    """15 Oct (a5398): what someone typed, as one `?` term. A selection splits on spaces and commas and has no quoting,
+    so a find box holding `home base` could not reach `?home+base`: `let q = words-of($v.find)`, then `of ?$q`."""
+    words = [w for w in re.split(r"[\s,+]+", fmt(args[0], reach=False)) if w]
+    return Value("text", "+".join(words)) if words else none("words-of: no words")
+
+
+def _spaced(s):
+    """a5949: a text with every run of white space as one space, and where each of its characters came from."""
+    out, at, gap = [], [], False
+    for i, ch in enumerate(s):
+        if ch.isspace():
+            gap = bool(out)
+            continue
+        if gap:
+            out.append(" ")
+            at.append(i - 1)
+            gap = False
+        out.append(ch)
+        at.append(i)
+    return "".join(out), at
+
+
+def find_words(text, words):
+    """a5949 (Pike c5957, from a5020 section 4: a comment keeps its quoted words and finds them again exactly, never by a
+    guess): where `words` first stand in `text`, however the white space falls (a line break where a space was), with
+    the case as written. -> (start, end) in `text`, or None."""
+    t, at = _spaced(text)
+    w = _spaced(words)[0]
+    if not w:
+        return None
+    i = t.find(w)
+    return None if i < 0 else (at[i], at[i + len(w) - 1] + 1)
+
+
+def _anchor_args(name, args):
+    text, words = fmt(args[0], reach=False), fmt(args[1], reach=False)
+    hit = find_words(text, words)
+    return text, hit, (None if hit else none(f"{name}: the words are not in the text"))
+
+
+def _f_section_of(args):
+    """a5949: the heading over the first place the words stand in a Markdown text (a line starting with #), as its
+    words; "" when they stand before every heading; none when they are not in the text. Where a comment's words are now."""
+    text, hit, no = _anchor_args("section-of", args)
+    if no:
+        return no
+    heads = [m for m in re.finditer(r"(?m)^#{1,6}\s+(.*\S)\s*$", text[:hit[0]])]
+    return Value("text", heads[-1].group(1) if heads else "")
+
+
+def _f_words_before(args):
+    """a5949: the (at most) six words just before the first place the words stand; "" at the start; none when absent.
+    Kept with a comment, they tell 'changed' (the words around it still stand) from 'gone'."""
+    text, hit, no = _anchor_args("words-before", args)
+    return no or Value("text", " ".join(text[:hit[0]].split()[-6:]))
+
+
+def _f_words_after(args):
+    """a5949: the (at most) six words just after the first place the words stand; "" at the end; none when absent."""
+    text, hit, no = _anchor_args("words-after", args)
+    return no or Value("text", " ".join(text[hit[1]:].split()[:6]))
+
+
+# a6460 (Alex, 17 Oct: 'I need some better way to read these need-you proposals'): what a reader puts above a document.
+# Every item tagged for Alex opens with a 'For Alex' block (the Handbook's rule): a heading or a bold line 'For Alex',
+# then at most five lines 'What: ...', 'I recommend: ...', 'I need: ...' (a list, a quote or bold keys all read).
+_FA_HEAD = re.compile(r"^\s*(?:#{1,6}\s*|>\s*)?(?:\*\*|__)?\s*For Alex\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*$", re.I)
+_FA_KEYS = {"what": "what", "what it is": "what", "i recommend": "recommend", "recommend": "recommend",
+            "recommendation": "recommend", "i need": "need", "need": "need", "what i need": "need", "needs": "need"}
+_FA_LINE = re.compile(r"^\s*(?:>\s*)?(?:[-*+]\s+)?(?:\*\*|__)?([A-Za-z][A-Za-z ]{1,20}?)\s*:\s*(?:\*\*|__)?\s*(.*\S)?\s*$")
+
+
+def _for_alex_block(text):
+    """-> (start, end, {what, recommend, need}) of the first For Alex block, or None. The block runs from its head to a
+    blank line after its first key, or the next heading."""
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if not _FA_HEAD.match(line):
+            continue
+        keys, j = {}, i + 1
+        while j < len(lines):
+            s = lines[j]
+            if re.match(r"^\s*#{1,6}\s", s) or (not s.strip() and keys):
+                break
+            m = _FA_LINE.match(s.replace("**", "").replace("__", "")) if s.strip() else None
+            k = _FA_KEYS.get((m.group(1) or "").strip().lower()) if m else None
+            if k and k not in keys:
+                keys[k] = (m.group(2) or "").strip()
+            j += 1
+        return i, j, keys
+    return None
+
+
+def _f_for_alex(args):
+    """for-alex(text, what|recommend|need|rest): a line of the document's For Alex block, or (rest) the document
+    without it; none when it has no block or no such line."""
+    text, key = fmt(args[0], reach=False), fmt(args[1], reach=False).strip().lower()
+    if key not in ("what", "recommend", "need", "rest"):
+        return none(f"for-alex: the second argument is what, recommend, need or rest; got {key!r}")
+    hit = _for_alex_block(text)
+    if key == "rest":
+        if not hit:
+            return Value("text", text)
+        lines = text.split("\n")
+        return Value("text", "\n".join(lines[:hit[0]] + lines[hit[1]:]).strip("\n"))
+    v = (hit[2].get(key) if hit else None)
+    return Value("text", v) if v else none(f"for-alex: no {key} line")
+
+
+def _first_sentence(text, lists):
+    """The first sentence of the first line of prose (lists too when `lists`, their marks taken off), or None."""
+    fa = _for_alex_block(text)
+    lines, fence, opened = text.split("\n"), False, False
+    for i, s in enumerate(lines):
+        t = s.strip()
+        if t.startswith(("```", "~~~")):
+            fence = not fence
+            continue
+        # the opening only: a heading after words (other than a For Alex block) ends the search, so a report whose
+        # opening is a byline and lists gives none, never a sentence from its third section
+        if not fence and re.match(r"^#{1,6}\s", t) and opened:
+            break
+        if t and not fence and not re.match(r"^#{1,6}\s", t) and not (fa and fa[0] <= i < fa[1]):
+            opened = True
+        if lists:
+            t = re.sub(r"^([-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)", "", t)
+        if fence or not t or (fa and fa[0] <= i < fa[1]) or re.match(r"^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||!\[\[)", t):
+            continue
+        if t.endswith(":") or re.search(r"\[[\w ]+\]\s*=", t) or len(t.split()) < 4:
+            continue
+        m = re.match(r"(.+?[.!?])(?=\s+[A-Z“\"(\[]|\s*$)", t)
+        out = (m.group(1) if m else t).strip()
+        if len(out) > 220:
+            out = out[:220].rsplit(" ", 1)[0].rstrip(" ,;:-—(") + "…"
+        return out
+    return None
+
+
+def _f_lead(args):
+    """lead(text): the first sentence of the first paragraph of prose in a Markdown text: past headings, lists, quotes,
+    tables, code, a For Alex block, a label line ending ':' and a legend ('[read] = ...'). At most ~220 characters.
+    What a reader shows as 'what this is' when the thing has no brief= and no For Alex block; none when there is none."""
+    out = _first_sentence(fmt(args[0], reach=False), False)
+    return Value("text", out) if out else none("lead: no paragraph of prose")
+
+
+def _f_gist(args):
+    """gist(text): as lead, but a list item counts as prose: what Skim shows under each heading of a section that is
+    only a list (the collaboration report's sections are)."""
+    out = _first_sentence(fmt(args[0], reach=False), True)
+    return Value("text", out) if out else none("gist: no sentence")
+
+
+def _f_read_minutes(args):
+    """read-minutes(text): about how many minutes the words take to read, at 220 a minute; at least 1."""
+    n = len(fmt(args[0], reach=False).split())
+    return Value("number", max(1, round(n / 220)))
+
+
 FUNCS = {"weekday": (("date",), _f_weekday), "week-of": (("date",), _f_week_of), "day-n": (("date", "n"), _f_day_n),
          "days-from": (("start", "end"), _f_days_from), "day-or-time": (("when", "today"), _f_day_or_time),
-         "time": (("when",), _f_time), "date": (("when",), _f_date)}
+         "time": (("when",), _f_time), "date": (("when",), _f_date), "words-of": (("text",), _f_words_of),
+         "section-of": (("text", "words"), _f_section_of), "words-before": (("text", "words"), _f_words_before),
+         "words-after": (("text", "words"), _f_words_after), "for-alex": (("text", "key"), _f_for_alex),
+         "lead": (("text",), _f_lead), "gist": (("text",), _f_gist), "read-minutes": (("text",), _f_read_minutes)}
 
 
 def call(name, args):
@@ -256,7 +419,7 @@ _TOKEN = re.compile(r"""
   | (?P<dur>\d+(?:\.\d+)?[wdhm]\b)
   | (?P<num>\d+(?:\.\d+)?)
   | (?P<str>"[^"]*")
-  | (?P<name>\$\w+(?:\.\w+)?)
+  | (?P<name>\$\*|\$\w+(?:\.\w+)?)
   | (?P<at>@[\w$.-]+)
   | (?P<call>[A-Za-z_][\w-]*)(?=\()
   | (?P<word>[A-Za-z_]\w*)
@@ -490,9 +653,13 @@ def names_in(text):
 _COMPARABLE = {"number", "date", "time", "duration", "text"}
 
 
+_ID = re.compile(r"([a-z]+)(\d+)")
+
+
 def _cmp(op, a, b):
     if op in ("has", "!has"):
-        hit = fmt(b, reach=False).lower() in fmt(a, reach=False).lower()
+        # a5949: however the white space falls, so words quoted across a line break are still found
+        hit = _spaced(fmt(b, reach=False).lower())[0] in _spaced(fmt(a, reach=False).lower())[0]
         return Value("bool", hit if op == "has" else not hit)
     if a.kind != b.kind:
         if "number" in (a.kind, b.kind) and "text" in (a.kind, b.kind):
@@ -502,6 +669,11 @@ def _cmp(op, a, b):
     if a.kind not in _COMPARABLE and op not in ("=", "!="):
         return none(f"cannot order {a.kind}s")
     x, y = a.v, b.v
+    if a.kind == "text" and op not in ("=", "!="):
+        # a5530: two ids of one letter compare by their number (e9 < e10, as the events were made), not as letters
+        mx, my = _ID.fullmatch(x), _ID.fullmatch(y)
+        if mx and my and mx.group(1) == my.group(1):
+            x, y = int(mx.group(2)), int(my.group(2))
     return Value("bool", {"=": x == y, "!=": x != y, "<": x < y, ">": x > y, "<=": x <= y, ">=": x >= y}[op])
 
 

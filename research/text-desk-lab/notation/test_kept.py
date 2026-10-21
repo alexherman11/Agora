@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_kept (7 Oct 2026): the copies undo keeps, out of the world file (kept.py).
 
     python test_kept.py

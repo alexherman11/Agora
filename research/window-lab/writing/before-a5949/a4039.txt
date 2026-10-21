@@ -1,0 +1,408 @@
+review : column
+  share 1
+  role page
+  global : row
+    role toolbar
+    gap
+    brand : text "WRITING"
+      share 1
+      role railhead
+    new : text "New document"
+      role button
+      on click do newwriting f3402
+  workspace : row
+    share 1
+    gap
+    queue : column
+      scroll scroll
+      share 1
+      role rail
+      qh : text "WRITING"
+        role railhead
+      recent : column
+        fold "Recent"
+        role tree
+        docs : column
+          of prop:role=doc
+          clamp last 3
+          each qrow
+      documentation : column
+        fold "Agora documentation" open
+        role tree
+        sources : column
+          of in:f600,prop:source
+          each qrow
+        implementation : text "Current Implementation"
+          role qtitle
+          on click do review f231
+        docs : column
+          of prop:role=doc,prop:collection=documentation
+          each qrow
+      designs : column
+        fold "Designs for me" open
+        role tree
+        waiting : column
+          of prop:role=doc,prop:design=waiting
+          each qrow
+        answered : column
+          fold "Answered"
+          of prop:role=doc,prop:design=answered
+          each qrow
+      personal : column
+        fold "Personal writing"
+        role tree
+        docs : column
+          of prop:role=doc,prop:collection=personal
+          each qrow
+        empty : text "No documents here yet"
+          role meta
+          only when count(prop:role=doc,prop:collection=personal) = 0
+      loose : column
+        fold "Loose notes"
+        role tree
+        docs : column
+          of prop:role=doc,-prop:design,-prop:collection
+          each qrow
+    desk : column
+      share 4
+      mine : column
+        share 1
+        of prop:role=reviewer,prop:actor=$me as r
+        each open
+qrow : column
+  role qcard
+  qt : text "$title"
+    role qtitle
+    on click do review $item
+open : column
+  share 1
+  of $r.reviewing as d
+  each sheet
+sheet : column
+  share 1
+  head : text "$title"
+    role title
+    on edit do rename $item title="$value"
+  from : text "from $by"
+    role meta
+    only when prop:by
+  calls : row
+    only when prop:design
+    role toolbar
+    gap
+    c0 : text "your call:"
+      role meta
+    c1 : text "build it"
+      role button
+      on click do prop $item verdict=build design=answered
+    c2 : text "build it, with my comments"
+      role button
+      on click do prop $item verdict=changes design=answered
+    c3 : text "not yet, I have questions"
+      role button
+      on click do prop $item verdict=questions
+    c4 : text "wrong shape"
+      role button
+      on click do prop $item verdict=wrong design=answered
+    c5 : text "back to waiting"
+      role tool
+      on click do prop $item design=waiting
+    v1 : text "conversation"
+      role viewtab
+      role viewtab.on when $r.view != "margins"
+      on click do prop prop:role=reviewer,prop:actor=$me view=talk
+    v2 : text "margin notes"
+      role viewtab
+      role viewtab.on when $r.view = "margins"
+      on click do prop prop:role=reviewer,prop:actor=$me view=margins
+  said : text "you said: $verdict"
+    role mark
+    only when prop:verdict
+  work : row
+    share 1
+    gap
+    paper : column
+      share 3
+      pages : column
+        share 1
+        scroll scroll
+        source : column
+          only when kind:note
+          of $item
+          each entry
+        body : column
+          only when kind:surface
+          of in:$item
+          run block
+          each entry
+    talk : column
+      share 2
+      role talkpane
+      only when $d.design != "" and $d.talk != "" and $r.view != "margins"
+      th : text "Talking with $by"
+        role railhead
+      asks : column
+        of lines:$d.talk mark=ask
+        clamp last 3
+        each ask
+      msgs : column
+        share 1
+        scroll end
+        of lines:$d.talk
+        each msg
+      typing : column
+        of house resident=$d.author doing=working
+        each dots
+      helpers : column
+        of prop:role=status,prop:doing=working,prop:chat=$d.talk
+        each helping
+      say : text ""
+        role composer
+        hint "Message the author. Highlight words in the design first to point at them; @name brings anyone in. "
+        commit enter only
+        let pointing = $r.quoting when $r.quote != ""
+        let pointing = "" otherwise
+        on edit do append $d.talk line="$value" about=$(pointing) quote="$r.quote"; do prop $r quote=""
+entry : row
+  let place = $run
+  main : column
+    share 3
+    role leaf
+    of $item
+    each para
+  margin : column
+    share 1
+    role aside
+    only when $d.design = "" or $r.view = "margins"
+    list : column
+      role beside
+      of comments:$item as c
+      each remark
+para : column
+  role block
+  let talked = "yes" when $d.design != "" and $d.talk != "" and count(lines:$d.talk about=$item) > 0
+  let talked = "no" otherwise
+  let spots = join($quote of lines:$d.talk about=$item) when talked = "yes"
+  let spots = "" otherwise
+  let addressee = "@$d.by: " when $d.by != ""
+  let addressee = "" otherwise
+  let talkable = "yes" when $d.design != "" and $d.talk != "" and $r.view != "margins"
+  let talkable = "no" otherwise
+  let held = $r.quote when talkable = "yes" and $r.quoting = $item
+  let held = "" otherwise
+  on select when talkable = "yes" do prop $r quoting=$item quote="$value"
+  on menu "Comment" when talkable = "no" do comment $item line="$(addressee)$selected$value"
+  on menu "Unclear to me" when talkable = "no" do comment $item line="$(addressee)$selected unclear to me"
+  on menu "I agree" when talkable = "no" do comment $item line="$(addressee)$selected I agree"
+  on menu "I disagree" when talkable = "no" do comment $item line="$(addressee)$selected I disagree"
+  on menu "Comment" when talkable = "yes" do append $d.talk line="$value" about=$item quote="$(held)"; do prop $r quote=""
+  on menu "Unclear to me" when talkable = "yes" do append $d.talk line="unclear to me" about=$item quote="$(held)" mark=ask; do prop $r quote=""
+  on menu "I agree" when talkable = "yes" do append $d.talk line="I agree" about=$item quote="$(held)"; do prop $r quote=""
+  on menu "I disagree" when talkable = "yes" do append $d.talk line="I disagree" about=$item quote="$(held)"; do prop $r quote=""
+  let shape = "h2" when $block = "h2"
+  let shape = "bullet" when $block = "bullet"
+  let shape = "number" when $block = "number"
+  let shape = "check" when $block = "check"
+  let shape = "p" otherwise
+  on menu "Plain text" when shape != "p" do prop $item remove=block
+  on menu "Heading" when shape != "h2" do prop $item block=h2
+  on menu "Bullet list" when shape != "bullet" do prop $item block=bullet
+  on menu "Numbered list" when shape != "number" do prop $item block=number
+  on menu "Check list" when shape != "check" do prop $item block=check
+  on menu "Move up" do up $item
+  on menu "Move down" do down $item
+  on menu "Delete line" do remove $item
+  let ticked = "yes" when $checked = "yes"
+  let ticked = "no" otherwise
+  let drawn = "yes" when $block = "figure"
+  let drawn = "no" otherwise
+  let next = "bullet" when $block = "bullet"
+  let next = "number" when $block = "number"
+  let next = "check" when $block = "check"
+  let next = "p" otherwise
+  let ind = 3 when $indent = 3
+  let ind = 2 when $indent = 2
+  let ind = 1 when $indent = 1
+  let ind = 0 otherwise
+  let more = ind + 1 when ind < 3
+  let more = 3 otherwise
+  let less = ind - 1 when ind > 0
+  let less = 0 otherwise
+  line : row
+    gap
+    role in1 when ind = 1
+    role in2 when ind = 2
+    role in3 when ind = 3
+    dot : text "•"
+      role bullet
+      only when $block = "bullet"
+    num : text "$(place)."
+      role bullet
+      only when $block = "number"
+    box : text "☐"
+      role box
+      only when $block = "check" and ticked = "no"
+      on click do prop $item checked=yes
+    tick : text "☑"
+      role box.on
+      only when $block = "check" and ticked = "yes"
+      on click do prop $item remove=checked
+    pic : text "$text"
+      share 1
+      role figure
+      picture
+      only when $block = "figure"
+    words : text "$text"
+      share 1
+      only when drawn = "no" and $item != $r.reviewing
+      role body
+      role h1 when $block = "h1"
+      role h2 when $block = "h2"
+      role h3 when $block = "h3"
+      role quote when $block = "quote"
+      role ticked when $block = "check" and ticked = "yes"
+      role item when $block = "bullet" or $block = "number" or $block = "check"
+      marks
+      light "$(spots)" "$(held)"
+      on edit do rewrite $item text="$value"
+      on key Enter do split $item $(next) "$head" "$tail"
+      let previouswords = join($text of $before) or "" when $before != ""
+      let previouswords = "" otherwise
+      let previouskind = join($block of $before) or "p" when $before != ""
+      let previouskind = "" otherwise
+      on key Backspace when ind > 0 do prop $item indent=$(less)
+      on key Backspace when ind = 0 and shape != "p" do prop $item remove=block
+      on key Backspace when ind = 0 and shape = "p" and $before != "" and previouskind != "figure" and previouskind != "divider" do joinwritten $before $item "$(previouswords)" "$head$tail"
+      let followingwords = join($text of $after) or "" when $after != ""
+      let followingwords = "" otherwise
+      let followingkind = join($block of $after) or "p" when $after != ""
+      let followingkind = "" otherwise
+      on key Delete when $after != "" and followingkind != "figure" and followingkind != "divider" do joinwritten $item $after "$head$tail" "$(followingwords)"
+      on key Tab do prop $item indent=$(more)
+      on key Shift+Tab do prop $item indent=$(less)
+    nativewords : text "$text"
+      commit ctrl-enter
+      share 1
+      only when drawn = "no" and $item = $r.reviewing
+      role body
+      role h1 when $block = "h1"
+      role h2 when $block = "h2"
+      role h3 when $block = "h3"
+      role quote when $block = "quote"
+      role ticked when $block = "check" and ticked = "yes"
+      role item when $block = "bullet" or $block = "number" or $block = "check"
+      marks
+      light "$(spots)" "$(held)"
+      on edit do rewrite $item text="$value"
+    pip : text "●"
+      role pip
+      only when talked = "yes"
+remark : column
+  fold "$by — comment"
+  on open do markread $item id=$cid through=$latest
+  role note
+  role notewaiting when $awaiting = "yes"
+  only when $state = "open"
+  let replylabel = "1 reply" when $reply_count = 1
+  let replylabel = "$reply_count replies" otherwise
+  opening : row
+    gap
+    new : text "● Unread message"
+      role unread
+      only when $unread = "yes"
+    waiting : text "Awaiting your reply"
+      role unread
+      only when $opening_awaiting = "yes"
+  what : text "$text"
+    peek 3
+    role remark
+  info : column
+    peek
+    count : text "$(replylabel)"
+      role meta
+    unread : text "● $unread_count unread"
+      role unread
+      only when $unread_count > 0
+    read : text "Read"
+      role meta
+      only when $unread_count = 0
+    waiting : text "Awaiting your reply"
+      role unread
+      only when $awaiting = "yes"
+  crop : text "Selected region marked on the image"
+    role meta
+    only when $image != ""
+  thread : column
+    of replies:$item
+    each response
+  answer : text ""
+    role replybox
+    hint "reply"
+    commit explicit
+    on edit do comment $item id=$cid line="$value"
+  done : text "resolve"
+    role resolve
+    on click do resolve $item id=$cid
+response : column
+  only when $thread = $c.cid
+  role message
+  role messagewaiting when $awaiting = "yes"
+  unread : text "● Unread message"
+    role unread
+    only when $unread = "yes"
+  waiting : text "Awaiting your reply"
+    role unread
+    only when $awaiting = "yes"
+  author : text "$by"
+    role author
+  words : text "$text"
+    role remark
+ask : column
+  role askcard
+  let pointed = "yes" when $quote != ""
+  let pointed = "no" otherwise
+  ah : text "$who asks"
+    role author
+  aqrow : row
+    only when pointed = "yes"
+    aq : text "“$quote”"
+      role chip
+      clamp 2
+  as : text "$said"
+    role msgbody
+    clamp 3
+msg : column
+  role msg
+  role msg.ask when $mark = "ask"
+  role msg.folded when $mark = "folded"
+  let pointed = "yes" when $quote != ""
+  let pointed = "no" otherwise
+  let folded = "yes" when $mark = "folded"
+  let folded = "no" otherwise
+  mh : text "$who · $at"
+    role meta
+  mqrow : row
+    only when pointed = "yes"
+    mq : text "“$quote”"
+      role chip
+      clamp 1
+  ms : text "$said"
+    role msgbody
+    clamp 6
+    only when folded = "no"
+  mf : text "✓ folded in: $said"
+    role folded
+    clamp 1
+    only when folded = "yes"
+dots : row
+  gap
+  who : text "$resident is working on it"
+    role typing
+  wave : text "•••"
+    role typing.dots
+helping : row
+  gap
+  who : text "$who is working on it"
+    role typing
+  wave : text "•••"
+    role typing.dots

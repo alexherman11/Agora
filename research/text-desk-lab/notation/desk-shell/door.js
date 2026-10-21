@@ -15,7 +15,8 @@ const DoorLine = (() => {
   el.append(line, act, list);
   let st = null, note = "", action = null;
   const today = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
-  const what = n => (n.commits || []).map(c => c[1].replace(/^land /, "")).join("; ") || `deskd ${n.to}`;
+  // a6109 (Alex: never an id inline): 'land a6057: <title>' reads as its title; the list a press opens keeps the commits whole
+  const what = n => (n.commits || []).map(c => c[1].replace(/^land /, "").replace(/^a\d+: /, "")).join("; ") || `deskd ${n.to}`;
   function place() {
     const head = document.querySelector("#term .term-head");
     const into = head && document.body.dataset.inspector === "term" ? head : document.body;

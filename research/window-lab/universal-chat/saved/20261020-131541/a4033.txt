@@ -1,0 +1,2 @@
+# review <document>: make it the design you are reviewing (kept on your own review desk as reviewing=, so each person has their own)
+do prop prop:role=reviewer,prop:actor=$me reviewing=$1

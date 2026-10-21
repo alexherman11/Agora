@@ -72,7 +72,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
+import charter
+import host_route_parent
 import explore       # noqa: E402  _alive(): is a pid still running
+import feeds         # noqa: E402  a5988: what a watched agent is doing, as rows a lens follows
+import usage         # noqa: E402  a6265: how full each agent's context is, and Alex's limit, as rows a lens reads
+import plan_usage    # noqa: E402  a6646: provider plan windows and durable pause episodes
+import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 
 STATE = HERE / "house-state"
@@ -92,7 +98,7 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "on"}
+            "timers": "on", "claude_start_threshold": "off"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -110,6 +116,30 @@ def it_is():
     'It is 13 Oct, 10:46.' writes it; the house's own time, the clock the '~ 10:45 in chat' stamps are read from)."""
     t = time.localtime()
     return f" · it is {t.tm_mday} {time.strftime('%b, %H:%M', t)}"
+
+
+def points_at(w, e, s):
+    """a6638 (Alex, 20 Oct: 'anything I comment on gets routed to the right person'): what a chat line points at, said
+    after its words when it is handed to someone, since the words alone lose it: the thing it is about by its name and
+    id (' [about "Proposal reader" (a6460)'), the words it quotes and the section they stood in. '' when it points at
+    nothing. The line's fields are the writer's (world.py append); nothing here is guessed."""
+    mid = (e.get("args") or {}).get("line_id")
+    line = next((ln for ln in (s or {}).get("lines") or () if ln.get("id") == mid), None) if mid else None
+    if not line:
+        return ""
+    fields = dict((line.get("fields") or {}), **{k: line[k] for k in ("about", "quote") if line.get(k)})
+    said = []
+    about = str(fields.get("about") or "").strip()
+    if about:
+        n = w.nodes.get(about)
+        title = w.title(n) if n else (w.subjects.get(about) or {}).get("title", "")
+        said.append(f"about \"{title}\" ({about})" if title else f"about {about}")
+    quote = " ".join(str(fields.get("quote") or "").split())
+    if quote:
+        heading = str(fields.get("heading") or "").strip()
+        said.append(f"on the words \"{quote[:300]}{'…' if len(quote) > 300 else ''}\""
+                    + (f" under § {heading}" if heading else ""))
+    return f"  [{'; '.join(said)}]" if said else ""
 
 
 def limit_reset(detail):
@@ -225,7 +255,8 @@ def unmarked_in(reply):
 
 
 def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
-    """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; stop at the first refusal. -> the text,
+    """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; a refused line refuses only itself (a6437,
+    carry_on: the desk skips a later line that depends on it, and the text ends saying what ran). -> the text,
     or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736).
     kind (a3204): the line is signed `who` but is the house's own, 'rest' or 'wake'; it is sent as by=house with that
     kind. A line without it is `who`'s own."""
@@ -234,7 +265,8 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
     url = os.environ.get("DESKD", "")
     if not url or url == "off":
         return None
-    lines, out = desk_mcp.split_lines(text), []
+    import carry_on
+    lines, out, tally = desk_mcp.split_lines(text), [], carry_on.Tally()
     reply = __import__("uuid").uuid4().hex      # a806: one reply's lines share it, so $new names what the line before made
     for k, line in enumerate(lines):
         body = json.dumps({"session": world, "as": who, "line": line, "whole": whole, "reply": reply,
@@ -252,11 +284,9 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
             break
         said = r.get("text") or ("ERR " + str(r.get("error")))
         out.append(f"> {line}\n{said}\n")
-        if r.get("error") or said.startswith("ERR"):
-            if k < len(lines) - 1:
-                out.append(f"stopped: {len(lines) - k - 1} later line(s) not run because this one was refused. "
-                           f"Not run: " + " | ".join(lines[k + 1:]))
-            break
+        tally.add(line, said, r.get("error"))
+    if tally.summary():
+        out.append(tally.summary() + "\n")
     return "\n".join(out)
 
 
@@ -377,10 +407,13 @@ class Resident:
         self.failed = False        # this process has already been judged failed (a result error, then its exit)
         self.wakes_at = None       # a1062: when the house would next wake it on its own, while it rests
         self.started = False       # this house process has started it once (the first start after a restart is special)
+        self.reply_source = None   # parent pipe provenance; never taken from child JSON/world actor
 
     # ---- persistence -----------------------------------------------------------------------------------------
     def save(self):
-        self.state_path.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        temp = self.state_path.with_suffix(".tmp")
+        temp.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
+        os.replace(temp, self.state_path)
 
     def log(self, kind, data):
         with (self.dir / "transcript.jsonl").open("a", encoding="utf-8") as f:
@@ -413,13 +446,24 @@ class Resident:
         bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
         if bound != provider:
             raise ValueError(f"{self.rid}: saved conversation belongs to {bound}, not {provider}; preserved")
+        # A plain process resume retains the charter. Fresh memory reads start= once.
+        if not self.state.get("session") or "charter_text" not in self.state:
+            self.state["charter_text"] = charter.collect(
+                self.house.load(), self.house.act, self.rid, props.get("actor", self.rid), "start")
+        charter_file = self.dir / "charter.txt"
+        charter_file.write_text(self.state.get("charter_text", ""), encoding="utf-8")
         if provider == "codex":
             adapter = HERE.parents[1] / "codex-residents" / "codex_resident.py"
             cmd = [sys.executable, str(adapter), "--model", model,
-                   "--reasoning", props.get("reasoning", "medium")]
+                   "--reasoning", props.get("reasoning", "medium"),
+                   "--charter-file", str(charter_file), "--world", self.house.world,
+                   "--target", self.rid, "--actor", props.get("actor", self.rid)]
         elif provider == "claude":
             cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                   "--system-prompt", "", "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--model", model]
+                   "--system-prompt", self.state.get("charter_text", ""), "--tools", "",
+                   "--strict-mcp-config", "--setting-sources", "", "--model", model,
+                   "--settings", json.dumps(charter.claude_hook(
+                       sys.executable, self.house.world, self.rid, props.get("actor", self.rid)))]
         else:
             raise ValueError(f"{self.rid}: unknown resident provider {provider}")
         self.state["session_provider"] = provider
@@ -431,7 +475,8 @@ class Resident:
         self.proc = subprocess.Popen(cmd, cwd=self.dir, env=clean_env(self.house.fake), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=open(self.dir / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1)
-        threading.Thread(target=self._read, args=(self.proc,), daemon=True).start()
+        source = self._bind_child(self.proc)
+        threading.Thread(target=self._read, args=(self.proc, source), daemon=True).start()
         self.busy, self.reply, self.failed = False, [], False
         self.log("start", {"cmd": cmd[1:], "pid": self.proc.pid})
 
@@ -443,22 +488,30 @@ class Resident:
             except Exception:
                 self.proc.kill()
         self.proc = None
+        if route := getattr(self.house, "host_route", None):
+            route.retire(self)
         self.log("stop", {})
 
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
 
-    def _read(self, proc):
+    def _bind_child(self, proc):
+        self.reply, self.reply_source = [], None
+        route = getattr(self.house, "host_route", None)
+        return route.bind(self, proc) if route else None
+
+    def _read(self, proc, source=None):
         for raw in proc.stdout:
             try:
                 ev = json.loads(raw)
             except json.JSONDecodeError:
                 continue
             self.log("event", ev)
-            self.events.put(ev)
+            self.events.put(host_route_parent.ChildEvent(source, ev) if source else ev)
         code = proc.wait()
         self.log("exit", {"code": code, "pid": proc.pid})
-        self.events.put({"type": "exit", "code": code})
+        event = {"type": "exit", "code": code}
+        self.events.put(host_route_parent.ChildEvent(source, event) if source else event)
 
     def send(self, text, kind="news", carry=None):
         """`kind` is door, wake, news or receipt; `carry` is the part that must survive a lost conversation (news and
@@ -515,6 +568,11 @@ class Resident:
         # when the turn then fails, so a delivered message is never sent again into the same conversation (see wake)
         self.state["pending"]["delivered"] = True
         self.save()
+        if plans := getattr(self.house, "plans", None):
+            try:
+                plans.restarting(getattr(self, "cid", self.rid))
+            except Exception as e:
+                self.log("plan_usage", f"{type(e).__name__}: {e}"[:200])
         self.log("sent", text)
         self.busy, self.reply = True, []
 
@@ -526,7 +584,23 @@ class Resident:
                 ev = self.events.get_nowait()
             except queue.Empty:
                 return ended
+            source = None
+            if isinstance(ev, host_route_parent.ChildEvent):
+                route = getattr(self.house, "host_route", None)
+                if not route or not route.current(self, ev.source):
+                    continue  # old child's result/exit must not finish the new child's turn
+                source, ev = ev.source, ev.event
             t = ev.get("type")
+            if plans := getattr(self.house, "plans", None):
+                try:
+                    plans.observe(ev)
+                    if t == "result" and not ev.get("is_error"):
+                        plans.resumed(self.state.get("session_provider", "claude"), getattr(self, "cid", self.rid))
+                    if t == "result":
+                        plans.dirty = True
+                        plans.publish()
+                except Exception as e:  # quota display failure must never eat a completed turn
+                    self.log("plan_usage", f"{type(e).__name__}: {e}"[:200])
             if t == "system" and ev.get("subtype") == "init" and ev.get("session_id"):
                 if self.state.get("session") != ev["session_id"]:
                     self.state["session"] = ev["session_id"]
@@ -535,30 +609,48 @@ class Resident:
                 # claude compacted the conversation: the memory is a summary now, so the next thing the house sends
                 # begins with the welcome again (Alex, 29 Sep: on compaction, or a full reset)
                 self.state["welcome_due"] = "the conversation was compacted"
+                self.state["compactions"] = self.state.get("compactions", 0) + 1
+                if self.state.get("session_provider", "claude") == "claude":
+                    # The SessionStart(compact) hook reads/injects the live charter.
+                    # Keep the resume-time system block current as well.
+                    self.state["charter_text"] = charter.read(self.house.load()).text
+                self.save()
+            elif t == "system" and ev.get("subtype") == "charter_read":
+                # Codex refreshes developer history at the actual boundary, before continuing.
+                self.state["charter_text"] = ev.get("text", "")
                 self.save()
             elif t == "assistant":
                 for c in ev.get("message", {}).get("content", []):
                     if c.get("type") == "text":
+                        previous = getattr(self, "reply_source", None)
+                        self.reply_source = source if not self.reply else previous if previous is source else None
                         self.reply.append(c["text"])
             elif t == "result" and ev.get("is_error"):
                 self.busy = False
                 ended.append({"error": ev.get("subtype") or "error", "detail": str(ev.get("result") or "")[:300]})
                 self.reply = []
+                self.reply_source = None
             elif t == "result":
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
                 self.state["last_turn"] = now()
-                for k in ("pending", "failures", "retry_at"):
+                for k in ("pending", "failures", "retry_at", "retry_kind"):
                     self.state.pop(k, None)
                 # what it wrote, the last few turns, for Alex's view (the `turns` row source; Alex, 29 Sep)
                 said = self.state.setdefault("said", [])
                 said.append({"n": self.state["turns"], "at": self.state["last_turn"], "text": "\n".join(self.reply)[:SAID_CHARS]})
                 del said[:-SAID_KEEP]
                 self.save()
-                ended.append("\n".join(self.reply))
+                text = "\n".join(self.reply)
+                if route := getattr(self.house, "host_route", None):
+                    text = route.intercept(source if source is getattr(self, "reply_source", None) else None, text)
+                ended.append(text)
                 self.reply = []
+                self.reply_source = None
             elif t == "exit":
                 self.busy = False
+                if route := getattr(self.house, "host_route", None):
+                    route.retire(self)
                 self.proc = None
                 ended.append(None)
 
@@ -583,6 +675,13 @@ class House:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.claude, self.claude_version = find_claude()
         self.workshop = workshop.Workshop(self)
+        self.feeds = feeds.Feeds(world, self.dir)
+        self.usage = usage.Usage(world, self.dir)
+        self.plans = plan_usage.Plans(self)
+        self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
+        self.charter_state = {}
+        # No setting/world property can enable this; no journal/backend opened.
+        self.host_route = host_route_parent.ParentDispatcher()
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
@@ -637,6 +736,58 @@ class House:
         where = f"logged in {log['id']} (Misses)" if log is not None else "the miss log could not be made"
         return [f"~ house: {len(lines)} line{'s' if len(lines) != 1 else ''} after > that nothing answered, {where}: "
                 + " | ".join(desk_one_line(l, 60) for l in lines)]
+
+    def toasts(self, w):
+        """a5824: each new line of the Notifications sent chat (role=notifications; the house verb `notify` writes
+        them) becomes a Windows toast on Alex's PC (research/window-lab/notify.py), once, in a thread so a pass never
+        waits on PowerShell. Only for the world frontier under the keeper and with a real model: a copy of the world, a
+        test house or a fake one never reaches his screen. Toasted line ids are kept in house-state/<world>/toasts.json;
+        what was shown or refused is logged there and printed."""
+        if self.world != "frontier" or self.fake or not os.environ.get("HOUSE_KEEPER") \
+                or os.environ.get("AGORA_TOASTS", "").lower() == "off":
+            return
+        try:
+            lab = str(HERE.parents[1] / "window-lab")
+            if lab not in sys.path:
+                sys.path.append(lab)
+            import notify
+            path = self.dir / "toasts.json"
+            try:
+                st = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                st = {"done": [], "log": []}
+            done = set(st["done"])
+            new = notify.pending(w, done, time.strftime("%Y-%m-%dT%H:%M:%S"))
+            if not new:
+                return
+            for mid, who, words, sound in new:
+                st["done"] = (st["done"] + [mid])[-500:]
+
+                def send(mid=mid, who=who, words=words, sound=sound):
+                    try:
+                        got = notify.show(words, sound=sound, by=who)
+                    except Exception as e:
+                        got = f"not shown: {type(e).__name__}: {e}"
+                    print(f"house: toast {mid} from {who}: {got}", flush=True)
+                    with self._toast_lock:
+                        try:
+                            s2 = json.loads(path.read_text(encoding="utf-8"))
+                        except (OSError, ValueError):
+                            s2 = {"done": [], "log": []}
+                        s2["log"] = (s2.get("log", []) + [{"line": mid, "by": who, "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                                            "got": got}])[-200:]
+                        path.write_text(json.dumps(s2, indent=1), encoding="utf-8")
+                threading.Thread(target=send, daemon=True).start()
+            with self._toast_lock:
+                try:
+                    st["log"] = json.loads(path.read_text(encoding="utf-8")).get("log", [])
+                except (OSError, ValueError):
+                    pass
+                path.write_text(json.dumps(st, indent=1), encoding="utf-8")
+        except Exception as e:        # a toast must never stop a pass
+            print(f"house: toasts failed: {type(e).__name__}: {e}", flush=True)
+
+    _toast_lock = threading.Lock()
 
     def note(self, w, title):
         for s in w.subjects.values():
@@ -729,23 +880,24 @@ class House:
                 # with none (from before lines) is read once by the same rule. The receipt asks the same question.
                 to, _ = rooms.line_to(e)
                 now_ = rooms.calls(w, s, to, actor)
+                words = f"{args.get('append')}{points_at(w, e, s)}"      # a6638: and what it points at
                 if sid in mine:                                    # a chat in its own corner is its own
                     if waits:                                      # a1062 (5): a book line is a note at the door,
-                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {words}")
                         urgent = urgent or now_                    # a1566: and a line addressed to it knocks
                         if now_:
                             self._knocked(r, e, s, resting)
                         continue
-                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}): {words}")
                     urgent = True
                     self._knocked(r, e, s, resting)
                 elif "all" in members or actor in members or now_:
                     if now_ and waits:                             # a1566: kept, first and marked, and it knocks
-                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {args.get('append')}")
+                        self._hold(r, e, f"~ {at} in chat \"{s['title']}\" ({e['id']}): {words}")
                         urgent = True
                         self._knocked(r, e, s, resting)
                         continue
-                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {args.get('append')}")
+                    inbox.append(f"~ in chat \"{s['title']}\" ({e['id']}){' (to you)' if now_ else ''}: {words}")
                     urgent = urgent or now_
                     if now_:
                         self._knocked(r, e, s, resting)
@@ -905,6 +1057,12 @@ class House:
     def knock_word(self, w, actor, how):
         """a3150: what happened to a resident a line reached, as the house sees them at this moment."""
         import rooms
+        if how == "an agent, not knocked":
+            # a5267: an agent the house does not run is knocked when a listener of theirs runs (listeners.py), which
+            # hears this record and carries it; with none, their own word (rooms.REACH) or the house's
+            import listeners
+            said = listeners.word(self.world, actor, rooms.REACH.get(str(actor).lower()))
+            return said[1] if said else how
         if how not in ("call", "book"):
             return how
         rid = rooms.corner_of(w, actor)
@@ -929,6 +1087,12 @@ class House:
     # ---- one pass ----------------------------------------------------------------------------------------------
     def step(self):
         w = self.load()
+        if self.world == "frontier" and not self.fake:
+            try:
+                charter.sync(w, self.act, HERE.parents[2] / "AGENTS.md", self.charter_state)
+            except Exception as exc:
+                print(f"house: charter mirror: {type(exc).__name__}: {exc}", flush=True)
+            w = self.load()
         cfg = self.settings(w)
         corners = self.corners(w)
         open_ = [s for s in w.subjects.values() if (s.get("props") or {}).get("objective") == "open"]
@@ -940,6 +1104,7 @@ class House:
             # a3150: who each new line knocks is recorded before anyone is served, so 'in a turn' is as the line found
             # them; while a restart waits no one is knocked, so the house that follows records it (as it does the news)
             w = self.record_knocks(w, corners)
+        self.toasts(w)
         for rid, corner in corners.items():
             r = self.residents.setdefault(rid, Resident(self, rid))
             props = corner.get("props") or {}
@@ -957,13 +1122,19 @@ class House:
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if not r.alive():
-                if props.get("call") and r.state.get("retry_at", 0) > now():
+                provider = props.get("provider", "claude")
+                held = self.plans.wait_until(provider)
+                if held > now():
+                    self.plans.paused(provider, rid, held)
+                    self.set_status(r, corner, "paused")
+                    continue
+                if props.get("call") and r.state.get("retry_at", 0) > now() and r.state.get("retry_kind") != "limit":
                     # a press of wake overrides a back-off, once: the call is used up, so a failure after it backs off again
                     r.state.pop("retry_at")
                     r.log("retry", {"why": f"called by {props['call']} while backing off"})
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
                 if r.state.get("retry_at", 0) > now():
-                    self.set_status(r, corner, "error")
+                    self.set_status(r, corner, "paused" if r.state.get("retry_kind") == "limit" else "error")
                     continue
                 first = not r.started
                 r.start(props.get("model") or cfg["model"])
@@ -1033,6 +1204,19 @@ class House:
             self.set_status(r, corner, "awake")
         self.workshop.step(self.load(), cfg)
         self.beat(corners)
+        try:     # a5988: the feeds someone watches (At work, in the home base); a feed never stops a pass
+            self.feeds.step(self.load(), corners, feeds.house_states(self, corners))
+        except Exception as e:
+            print(f"house: feeds: {type(e).__name__}: {e}", flush=True)
+        try:     # a6265: context and limit use for At work (written at most every usage.GAP s, only when changed)
+            self.usage.step()
+            self.plans.publish()
+        except Exception as e:
+            print(f"house: usage: {type(e).__name__}: {e}", flush=True)
+        try:     # a6249: Alex's scripts (notes role=script) kept in step with their files; only the live world's house
+            self.scripts.step(self.load(), lambda line: self.act("house", line, whole=True))
+        except Exception as e:
+            print(f"house: scripts: {type(e).__name__}: {e}", flush=True)
 
     def wake(self, r, corner, actor, lead):
         line = (corner.get("props") or {}).get("wake") or "look"       # a1027: scripts retired; arrive was the old tree
@@ -1132,6 +1316,9 @@ class House:
         n0 = len(w.events)
         # a5068: news runs only between turns, so the cursor is where this turn's input left off (a2870 Revision 2)
         receipt = self.act(actor, "\n".join(attempts), whole=True, as_of=r.state.get("cursor")) if attempts else ""
+        host_receipts = getattr(text, "host_receipts", ())
+        if host_receipts:
+            receipt = "\n".join(([receipt] if receipt else []) + list(host_receipts))
         if attempts and any(e.get("by") == actor and e.get("verb") != "go" for e in self.load().events[n0:]):
             r.state["idle_wakes"] = 0         # it changed something: an open objective asks again after `breather`
         # Sable c742: a > line nothing answers (a quote) says MISS and stops nothing after it; the desk decides, since
@@ -1219,8 +1406,21 @@ class House:
         r.hold_unanswered(pending, (why or {}).get("detail") if isinstance(why, dict) else "the process ended")
         n = r.state.get("failures", 0) + 1
         reset = limit_reset((why or {}).get("detail") if isinstance(why, dict) else "")
+        detail = (why or {}).get("detail", "") if isinstance(why, dict) else ""
+        if reset or workshop.usage_limited(detail):
+            provider = r.state.get("session_provider", "claude")
+            plans = getattr(self, "plans", None)
+            reset = (plans.reset(provider) if plans else 0) or reset
+            retry_at = reset + 60 if reset else now() + 300
+            r.state.update(retry_at=retry_at, retry_kind="limit")
+            r.save()
+            if plans:
+                plans.paused(provider, r.rid, retry_at)
+            self.set_status(r, corner, "paused")
+            return
         # a usage limit is not the resident failing: try again a minute after the reset it names, not on a doubling
         r.state["failures"], r.state["retry_at"] = n, (reset + 60 if reset else now() + min(60 * 2 ** (n - 1), 3600))
+        r.state["retry_kind"] = "process"
         r.log("failed", {"why": why, "failures": n, "retry_in": int(r.state["retry_at"] - now())})
         r.save()
         self.set_status(r, corner, "error")
@@ -1238,7 +1438,8 @@ class House:
                                      "said": r.state.get("said", [])}
         out["workers"] = {cid: {"actor": wk.actor, "asked_by": wk.asked_by, "alive": wk.alive(),
                                 "doing": "working" if wk.busy else ("waiting" if wk.alive() else "stopped"),
-                                "turns": wk.state.get("turns", 0), "branch": wk.branch}
+                                "turns": wk.state.get("turns", 0), "branch": wk.branch,
+                                "builder": getattr(wk, "builder", None)}
                           for cid, wk in self.workshop.workers.items()}
         (self.dir / "house.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 

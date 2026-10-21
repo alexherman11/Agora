@@ -95,6 +95,14 @@ def ingest(state, result):
         if eid in state.get("handled", {}):
             continue
         author = str(event.get("by", "")).split("/")[0].lower()
+        knock = str((event.get("args") or {}).get("codex", "")) if event.get("verb") == "knock" else ""
+        if knock.startswith("knocked") and event.get("cause"):
+            # a5267: the house's knock record of a line that called codex (stored to=, or a header the text rule
+            # misses); the line itself is what is pending, once
+            cause = event["cause"]
+            if cause not in state.get("handled", {}) and cause not in state.get("pending", {}):
+                state.setdefault("pending", {})[cause] = event
+            continue
         if author in ("codex", "house") or event.get("undone"):
             continue
         addressed = event.get("verb") == "comment" and "codex" in event.get("to", [])
@@ -107,6 +115,41 @@ def ingest(state, result):
 
 def app_call(config, name, arguments):
     return deliver(config, name, arguments, CONFIG)
+
+
+_published = [None]
+
+
+def _witnessed():
+    """The desk's witnessed module, keeping its rows beside the world this listener watches (WORLD): the world's own
+    house-state, so a listener given another world (a test's) never writes over the live one's row."""
+    sys.path.insert(0, str(ROOT / "research/text-desk-lab/notation"))
+    import witnessed
+
+    witnessed.ROOT = WORLD.parent.parent / "house-state"
+    return witnessed, WORLD.stem
+
+
+def publish(state, error=""):
+    """a5267: say to the desk that this listener runs and what it handed to the chat, as the witnessed row
+    listener-codex (listeners.py): the house's knock record and a speaker's receipt read it. Written only when it
+    changes; it has no rows once this process ends."""
+    witnessed, world = _witnessed()
+    row = {
+        "actor": "codex",
+        "carries": "its Codex app chat",
+        "hears": "@codex in event text, and the house's knock records",
+        "delivered": " ".join(sorted(state.get("notified", []), key=lambda e: int(e[1:]) if e[1:].isdigit() else 0)[-200:]),
+        "error": str(error)[:200],
+    }
+    if row != _published[0]:
+        witnessed.write(world, "listener-codex", [row], by=f"visual_event_listener ({os.getpid()})")
+        _published[0] = row
+
+
+def unpublish():
+    witnessed, world = _witnessed()
+    witnessed.clear(world, "listener-codex")
 
 
 def supervise():
@@ -284,6 +327,10 @@ def main():
                         checks += 1
                         config = json.loads(CONFIG.read_text(encoding="utf-8"))
                         result = locked(lambda current=config: process(current))
+                        try:  # a5267: the desk can say it runs; never a reason to retry delivery
+                            publish(json.loads(STATE.read_text(encoding="utf-8")))
+                        except Exception:
+                            pass
                         previous = stamp
                         failures = 0
                         save(
@@ -298,6 +345,10 @@ def main():
                         )
                 except Exception as exc:
                     failures += 1
+                    try:  # a5267: the receipt says the listener runs but is failing, and why
+                        publish(json.loads(STATE.read_text(encoding="utf-8")), error=exc)
+                    except Exception:
+                        pass
                     delay = min(60, 2 ** min(failures, 6))
                     retry_at = time.monotonic() + delay
                     save(
@@ -319,6 +370,10 @@ def main():
             stopped = True
         finally:
             changes.close()
+            try:
+                unpublish()
+            except Exception:
+                pass
             save(
                 STATUS,
                 {

@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (37)
+## open (50)
 
 ### F2. Scripts cannot say who is running them
 
@@ -253,9 +253,87 @@ a5214 · family=code · status=open
 Claude, 15 Oct, building the home base (a3874) and its chat. Two source edits, both landing by hand through the queue.
 1. A row source can only be named in scene.py. The home base wants the windows open on Alex's screen, which a program outside the desk sees (hud.py), and the only way for a lens to read them was a new entry in scene.SOURCES, as `windows` was for the window manager yesterday. Missing word: a source a program declares by writing it. Cured in part with `witnessed:<name>`: any living program's rows beside the house, every field it wrote, read through a frame. Still missing: declaring a source from the world itself (a feed, a mailbox), which the information streams design will need.
 2. A style could not say where a part stands across its parent's flow, so a chat could not put Alex's own lines at the right. Missing word: `align start|center|end|stretch`.
-Friction met on the way, not cured: a lens that names a source the running desk does not know made `do rewrite` answer 502 instead of a refusal (Codex is already on this: lens_ir and test_lens_row_refusal in the live checkout); an empty prop is none, so `only when $draft.reply_to != ""` can't tell, and the cure is `($draft.reply_to or "") != ""`, which nobody would guess.
+Friction met on the way, not cured: a lens that names a source the running desk does not know made `do rewrite` answer 502 instead of a refusal (cured by Codex, f90d49a: an invalid row query is a lens refusal, and the write still succeeds); an empty prop is none, so `only when $draft.reply_to != ""` can't tell, and the cure is `($draft.reply_to or "") != ""`, which nobody would guess.
 
-## curing (27)
+### Source edit (a5267): no world word says how a session the house does not run is reached
+
+a5341 · family=missing-word · status=open
+
+a5267 changed source (rooms.waiting_note, house.knock_word, desk._knock_lines; new listeners.py; the Codex listener) so that @claude and @codex are knocked when a listener of theirs runs. The missing world-level word: a thing that says 'this agent is reachable, through this, and here is what it handed on', as a corner says it for a resident. Today it is a witnessed row (listener-<name>), which is right for liveness (it dies with the process) but cannot be written from the desk, and what it delivered is not kept in the world. If a world word appeared for it (a reach= prop on a person/agent record, or a kind for a door to an outside session), the receipt's words would move into the world.
+
+### Layout words a lens lacked: a weight that follows data, and never scrolling (a5496)
+
+a5619 · family=lens-words · status=open
+
+Source edits by worker-a5496, 15 Oct, for Alex's 'I don't want the interface to scroll ... drag around the different sections ... collapse them' and his dynamic tiling (c5528). Missing world-level words, now in the language: (1) share could not follow data, so widening one panel could not push the others: share $(expr) / share $name, filled per part (scene._w_share, lens_ir after the lets; 0 or none = own size). (2) Nothing meant never scroll: scroll none was accepted and drew as plain overflow. Now scroll none clips, fades at the foot when cut, may shrink below its words, and a row of it never wraps (lens.html; a wrapping flex row's line grows to its tallest child and pushed a column of panels off the screen); scroll none end is cut at the head, the end in view (JEFF's chat). (3) No time of day for a lens: hud.py publishes witnessed:clock (time, day). Left open: earlier chat lines are out of reach in the HUD once the feed never scrolls (a page or an Earlier fold would need the draft to hold an offset and a repeat to skip by it); recency of glances is not kept (Sable c5552: it belongs beside the world, as painters' reports are); Sable's (5), showing the new arrangement on the press before the desk answers, is not done. Aside: in test_scene.py, test_picture_is_a_text_drawn sits below the __main__ block, so running the file never runs it.
+
+### Words a timer and a notification bar lacked: a clock the painter keeps, the moment of a press, newest first (a5530)
+
+a5648 · family=lens-words · status=open
+
+Source edits by worker-a5530, 15 Oct, for Alex's 'a notification bar ... a pomodoro timer' and 'move the time ... to top left'. Missing world-level words, now in the language: (1) nothing on a page could tick: a scene is built only when the world changes, so a clock or a countdown needed a scene a second or a host. Now `live clock|date|until [ring]` on a text: the painter redraws those words from its own clock (lens.js, lens.html). (2) nothing said a count had ended: `on end do <command>`, sent once per moment by the painter at zero (scene.py GESTURES). (3) a press could not say when it happened, so a timer could not be a world fact: the blank `$now` (names.py, blanks.py, desk_knife.py RULE_BLANKS), left unfilled by a lens so the desk fills it when the line arrives; expr times keep their seconds. (4) a repeat could not show newest first: `by -<prop>` (moo.sort_by, lens_ir, deskd), and ids compare and order by their number (e9 before e10; expr._cmp, moo.order_value), so `eid>e10780` means what it says. (5) a fold's label could not count: `fold "$(total)"` now computes (lens_ir). The widgets themselves are world data (research/window-lab/widgets/apply.py). Found while building: a selection as `create`'s target groups what it matches into a new surface (it moved Alex's notices into one) rather than creating in each; rules name the surface by title instead. Not cured: the frame name `x` is refused as a gesture name's shadow, which a reader meets with no hint of why `as x` is special.
+
+### A world act cannot reach the PC: notify needed the house to watch a chat
+
+a5868 · family=missing · status=open
+
+a5824 (16 Oct, worker-a5824). Alex wants a Windows toast when work finishes, sent by any card or rule. The world part is a verb note (notify, a5864: a line in Notifications sent, a5861), but nothing in the world can make something happen on Alex's PC, so a source edit was needed: house.py's House.toasts watches that one chat and calls research/window-lab/notify.py. The missing world-level word: a way for a world act to ask a host for an effect (as a lens's `host <verb>` asks the home base, a5300), say `do host notify <words>`, answered by whichever host process holds the verb and recorded as an event with its answer. With it, the house would not need to know about toasts, and the next host effect (open a file, start a timer on the PC) would be one entry in a table, not another watcher.
+
+### Words a document lacked: a Markdown text drawn and written in place, and following a link (a5820)
+
+a5907 · family=lens-words · status=open
+
+Source edit by worker-a5820, 16 Oct, for Alex's ask (a5820: 'nice clean markdown formatting ... kinda like obsidian but better'). WANTED: a document that is one Markdown text (a4865) drawn as a document (headings, lists, tasks, quotes, code, tables, links, [[wikilinks]], ![[embeds]]) and written in place with the marks shown only on the line being written; a link that opens the other document. DONE IN THE WORLD: the Writing app itself (lens writing, style writing-style, Alex's writer note, the dock icon), research/window-lab/writing/apply.py. DONE IN SOURCE: scene.py the lens word markdown [links <selection>] and the gesture on link ($value the id), scene.wikilinks_of (a title or id named in [[ ]] resolved to a thing, read in lens_ir), press Ctrl+E / Ctrl+S; desk-shell/markdown.js (the reader, the drawing and the live-preview editor), lens.js wiring. WHY NO WORLD EDIT COULD DO IT: the painter draws a text as runs of a closed grammar, and an editable text is a plain contenteditable; a lens cannot say how a text is drawn line by line, nor resolve a name inside a text to a thing. THE SMALLEST SEAM THAT WOULD HAVE MADE IT A WORLD EDIT: (1) a world note that declares a text grammar (line kinds by pattern, each with its role and which characters are marks to hide), read by one generic painter routine; markdown.js would then be one such note; (2) a selection over the words inside a text (things named in it), so a lens could list and resolve links itself.
+
+### A path to a film in a chat line stayed words: no lens word drew a file, and no gesture said Pop out (a5941)
+
+a5999 · family=lens-words · status=open
+
+Alex, 16 Oct: 'can we get that video to be hyperlinked in chat and open in a native window here? I don't want to have to open a different application.' JEFF's line held the demo film's path; the chat drew it as words, since nothing in a lens could draw a file from the PC, and the desk had no way to serve one. Source edits (a5941): scene.py (the word `media [player]`, the gesture `on pop`, `on pop host`), media_links.py (the folders the desk may show and the one judge of a path), deskd.py and door.py (GET /media/ with ranges, refused to other sites), desk-shell/media.js and lens.js/lens.html (the poster, inline play, the player, Pop out; a page with no home base opens `host window <lens>` as a window of its own browser). The world-level words that were missing: `media` on a text, and `on pop`. Still open: the folders are a list in source (media_links.FOLDERS), not world data; a path with spaces is not found; a poster is the film's frame at 0.1 s, not a chosen one.
+
+### Gesture words a lens lacked: a drop by side with its landing shown, and a double-click (a5994)
+
+a6072 · family=lens-words · status=open
+
+Source edits by worker-a5994, 16 Oct, for Alex's 'I need things to be draggable around this screen. It should snap to various sizes as I move it around, pushing other things out of the way ... Double-clicking a window should make it fill the screen'. Missing world-level words, now in the language: (1) `on drop <part> at left|right|top|bottom do ...`: a receiver could say only one thing a drop meant, and the painter showed nothing of where it would land (home-style had no tool.on, so a5496's drag lit nothing, and Alex could not tell a drag was working). Now an act per side, and the painter draws the landing box. (2) `on double do ...`: there was no double-click gesture. Also in the painter: the carry ghost takes the ground of the part around it. screen.py gained `double` and a `hold` that continues a carry. Everything else is world: the verb drop-panel (a branching verb by `when` guards), home-tiling, home-panels, style roles. Files: scene.py, lens_ir.py, desk-shell/lens.js, lens.html, screen.py, test_scene.py.
+
+### Source edit (a5988): what an agent is doing could reach a lens only through house code (feeds.py)
+
+a6077 · family=missing-word · status=open
+
+worker-a5988, 16 Oct. Alex asked to click At work and watch an agent's live feed. The words of a stream are in house-state transcripts, which only the house reads, so making them a lens's rows needed source: feeds.py (Reader turns Claude stream-json and Codex items into rows; redact; Feed tails by offset; Feeds.step writes witnessed:feed-<id> while a viewer stands home-feed on a card or corner) and a guarded call in house.step. The world half (home-feed, home-work) is lenses only. THE MISSING WORDS: (1) a world way to ask the house to observe something on demand: the watched set is read from props (with=home-feed viewing=<id>, or watching=<id>), and the lens name home-feed is a constant in feeds.py, so another lens that wants a feed must use watching= or edit source; a watch= word on a lens note would let any lens declare what it needs observed. (2) a per-source change signal: witnessed.stamp covers every witnessed file, so one feed write repaints every open painter's whole scene (measured on a copy at a 0.5 s write cadence: 47 whole scenes in 23 s); feeds are throttled to one write per 2 s per feed to keep that bounded. (3) redaction is code, not a world rule: what counts as a secret is regexes in feeds.redact.
+
+### An id in words could not be drawn as its name, and a link pressed inside a placed lens could not say where it opens (a6109)
+
+a6169 · family=lens-words · status=open
+
+Missing words, met by a6109 (Alex, 16 Oct: 'I should never see id names ... names of things ... should ALL be clickable'). (1) Words that print an id (a chat line 'in a5949', a title '(a5251)', a viewer head 'surface · f155') had no way to show the thing's name: a lens can print $x.title only for an id it holds in a frame, never for one inside free words, and agents write ids in their words on purpose. The general word became no word: every text that is only read draws an id that names something as its name (scene.things_of, lens.js .t-mark-thing); ids keeps them. (2) on link stood only on a markdown text and the press could go only to that text's own lens; a name in the Conversation or the board had nowhere to go. on link now stands on any part and the nearest above a pressed name is sent, so the home base's root says where (on link do view $value, a house verb). Source: scene.py, lens_ir.py, lens.js, lens.html, markdown.js.
+
+### Words a typed text lacked: one editor for every text, fitted over the desk's words, two undos, passages with names (a6067)
+
+a6191 · family=lens-words · status=open
+
+Source edit by worker-a6067, 16 Oct, for Alex (a6067: the document is one continuous text; one general module for every text a person types into), to Pike's boundary (c5974) and Sable's rules (c5977, and her split on c6106: words the person's, caret the window's). WANTED: one editing module for documents and the chat composer alike: caret, selection, composition, keys and the undo of unsent typing in the painter; edits sent against a version as the person pauses; the desk's new words (a resident's do replace) fitted over unsent typing, or refused loudly; the world's undo of a sent edit; a passage the control screen can name; a dropped capture that asks the world. DONE IN SOURCE: desk-shell/textedit.js (the module; markdown.js shrank to the grammar and drawing); viewer.js (drafts per person kept in step across windows, caret per window, rebased, onDrafts, textState); lens.js (the document and the composers are its customers; textOf names the document a text read); scene.py the gesture on capture; window-lab/capture/capture.py reads part:<key>::<line> as a passage. WHY NO WORLD EDIT COULD DO IT: typing happens below the desk's grain (a keystroke is not an event, by Pike's boundary), so caret, composition and fitting are painter work; and the seam to the desk has only one shape today, a whole value fenced by a revision. THE SMALLEST SEAM THAT WOULD MAKE MORE OF IT A WORLD EDIT: (1) an edit verb that takes a range at a version (at=, gone=, came=, version=) and that the desk maps through what it ordered since (a4865's choice is Alex's: our own ordering or a library), so fitting would move from the painter to the desk and every window would agree; (2) a text's source named in the paint contract (whose words a part shows), so the painter would not read it from the fence's reads; (3) keys as world data (a keymap note a lens names), so which press is a shortcut would not be source.
+
+### Words a press lacked to show its result before the desk answers: leaves and away (a6010)
+
+a6279 · family=lens-words · status=open
+
+worker-a6010, 17 Oct (HUD sprint round 3, the board). A press that changes the world painted only when the desk answered, 300-430 ms in the playtest (act ~100 ms, the home base's scene ~200 ms), so Looks good on a needs-you card was slow however fast the server got. Missing: a way for a lens's style to say what a press will look like at once. Added two style flags (style.py, style.js; no lens or scene word): a part whose look says `leaves` is hidden, its room kept, while a press on a part inside it whose look says `away` waits for its answer; a refusal draws it again beside the reason. Playtest: Looks good 333 -> 5-18 ms, Send back 314 -> 14 ms. Found on the way: taking the card out of the layout made the next card slide under the pointer, and a quick double-click approved two cards (headless, double.js), so the room is kept. Still missing: a press whose result is a move (Later: the card goes under a fold) shows only its leaving at once; where it went waits for the scene.
+
+### Source edit (a6265): how full an agent's context is, and Alex's limit, reach a lens only through house code; a popover from a line needed painter words
+
+a6321 · family=missing-word · status=open
+
+Two words the world lacked for At work's improvement pass (a6265, 17 Oct). (1) What the house observes of an agent's MODEL use: the house logs each agent's stream (Claude's assistant usage, result modelUsage.contextWindow, rate_limit_event; Codex's thread/tokenUsage/updated) into transcripts the world cannot read, so a new module, usage.py, run from house.py's pass beside feeds.py, writes witnessed:usage (context per cent per agent, the account's five-hour and seven-day use). The missing world word: a resident or lens can name a witnessed source but cannot ask the house to observe something new; every such source is house code (as a6077 said for feeds). (2) A popover from a line: `fold float inline` was refused as one or the other (scene.py), and an open float inside a `scroll none` panel was cut at the panel's edge and covered by the next column (lens.js placeFloat lifts it into the browser's top layer; lens.html stops a peek being lifted over it), and closed whenever its part was made again (lens.js keeps it open). The missing word was a lens word for 'over everything, anchored to this line'; float now means that inside a panel.
+
+### Words an icon lacked: what it is, shown on hover without moving anything, and a ground under the pointer that does not move (a6271)
+
+a6329 · family=lens-words · status=open
+
+Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
+
+## curing (39)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -477,7 +555,125 @@ a5104 · family=conversation · status=curing
 
 Missing reusable capabilities encountered building task a5076: per-message default_to overridden by explicit header, atomic unknown-recipient refusal, sayings involving:<person> with original reply targets across chats/comments, bounded detached native context snapshots, composer lines bounds, and scroll-end continuity on window resize. Source edits are coordinated with Sable/Claude. Candidate checks in frontier@conversation-check; final evidence pending.
 
-## cured (59)
+### A lens selection with a space inside `of` crashed the save check instead of refusing
+
+a5372 · family=code · status=curing
+
+worker-a5300, 15 Oct, in frontier-try with explore.py: `do replace` that made a lens line `of in:f5204 kind:note as h` raised world.Refusal "no such id 'f5204 kind:note'" out of desk_knife._visual_notes -> lens_ir.check -> Accessor.select -> _parse_selection, a traceback instead of the usual '~ ! lens does not compile' line (the comma form `in:f5204,kind:note` works). Ran once; not fixed (not my commission). The cure is likely lens_ir.check catching Refusal as it catches LensRefusal.
+
+### A fold's handle could only sit on its own line, above its summary
+
+a5473 · family=lens · status=curing
+
+Found by worker-a5359, 15 Oct, building the home base's board (a5359, Alex c5367: a card must open in place on a press on its title and be one line closed). The missing word: a fold whose handle stands beside its peek and whose peek is the press. Every fold's handle was drawn on its own line above the part, so a card with a one-line peek was two lines closed, and a press on its title did nothing (a clamped title opened only itself). Tried in the world first: a float (not in place), afloat on the handle (clipped, and presses missed it), one clamped text holding the whole card (a lens text can't hold a line break; test_backslash_n_in_a_lens_is_data). Source edit: `fold ... inline` (scene.py, lens.js, lens.html; test_fold_inline), opt-in so the folds that peek today keep their handle above. Still open beside it: a3399, a fold's label cannot compute ($( ) stays literal in it).
+
+### Home base viewer (a5398): a typed phrase can't reach a selection; a placed lens can't be handed its thing
+
+a5488 · family=missing-word · status=curing
+
+worker-a5398, 15 Oct, building the home base's viewer (design a5460; lenses home-viewer, home-note, home-chat, home-surface in f5204). Two source edits, one friction left in the world.
+1. A find box could not search for two words. A selection splits on spaces and commas and has no quoting, so `of ?$v.find` with find=home base asked for ?home and a term 'base', and the lens refused. Missing word: a way to turn typed words into one term. Cured in source with the function `words-of(text)` (expr.py): `let q = words-of($v.find)` then `of ?$q` is ?home+base. A quoted selection value would be the wider cure; nobody has argued for it yet.
+2. A native refusal inside a lens selection escaped the compiler and crashed the command that triggered the check (here `count(kind:task,in:$item)` with a note open, which asks in: of a note). Cured in lens_ir.Accessor.select, as Codex cured row sources in f90d49a: it is now the lens's refusal. This also cures a5372.
+3. Not cured, lived with: a placed lens starts empty, so home-note, home-chat and home-surface each find the viewer note again (`of prop:role=home-view,prop:actor=$me as v`, then `of $v.viewing`). Missing word: a lens stood on a thing (a4228, f4358, waiting on Alex): `lens home-$kind on $r`. With it the kind lenses lose their first two parts, and viewing= can move into the window's own values.
+Also met: `let n` is refused as taken ($n is a built-in), with no word on what took it.
+
+### HUD dock (a5500): a style could not say how a part answers the pointer; the home base could not open an app as a window
+
+a5579 · family=missing-word · status=curing
+
+worker-a5500, 15 Oct, building the home base's dock (lens home-dock, Alex's dock f5565, both in f5204). Two source edits, one friction lived with.
+1. A style had no word for how a part answers the pointer. A button looked the same under the pointer and while pressed (only the painter's own 45% dim on a press in flight), so a dock of icons felt dead. Missing word: a role flag. Cured in source: `touch` (style.py read_prop; style.js draws :hover brighter and raised 3px, :active darker and at 94%; only the brightness for a viewer who asks for reduced motion). Wider cure nobody has argued for: role variants by pointer state (`role x.hover`), so the style says the look rather than one fixed answer.
+2. The home base could not open an Agora app as its own window. Missing word: a host verb. Cured as one entry in research/window-lab/host_verbs.py, `window <lens>`, through lens_window.open_window (split out of its main). Live only once Claude's hud.py hook (a5300 c5383) is in; until then the dock carries no window icon on Alex's screen.
+3. Lived with: `on click host` takes no `when`, and its verb can't be a $field (the verb is checked when the lens compiles), so a dock icon can't say 'ask the host whatever my note says'. Each kind of act is its own part with `only when` (view, chat, window), the glyph and label written three times. Also: an escaped double quote inside a lens text is drawn with its backslash.
+
+### A style could not say a lane's colour bar, a breathing halo, or a card that travels when it changes lane
+
+a5609 · family=lens · status=curing
+
+Found by worker-a5504, 15 Oct, restyling the home base's board (a5504; Alex: 'the board looks boring af', and smooth movement when a card changes lane). The missing words, all in a style: (1) a lane's colour as a bar down a card (edge is a 1px border all round; border left is 1px too); (2) a part that is alive breathing a halo, softer than pulse, which only fades opacity; (3) a card that changed lane travelling to its new place: its key path names its lane, so the painter made a new element and the card jumped; (4) on a dark style, lift drew its shadow in the light ink, a glow under every card. Weighed in the world first, by reading the words, not by painting them (imagined): border left is 1px, too thin to read as a lane; pulse on the card fades its words too; the old card's dot alone is too small to carry a lane; no word moves a part between paints. Source edit, opt-in, nothing else changes: style.py and style.js read rail <colour>, glow <colour> and glide, and lift takes a shadow token's colour when there is one; lens.js glides a part wearing glide from where its thing was painted (FLIP, by the scene node's item), and fades in one newly shown; still under reduced motion. test_scene test_style_read_once. Beside it, also found: a waiting-on-me press was refused as 'you have not seen a5441's prop:full' because the act replaced a prop the pressed part never read, and the painter's status line showed only the refusal's first line ('since your last look'), so Alex saw nothing happen. Cured in the world (each act reads what it replaces in its own when); the status line showing only the header is still open.
+
+### A worker could not be granted one command, and could sign as anyone
+
+a5760 · family=authority · status=curing
+
+Source edit (a5750, worker-a5750, 16 Oct): workshop.py and desk_mcp.py. The world had no word for who may let a builder run what: a worker's tools were one list in Worker.start, the same for every card, so Alex's 'talking with JEFF is the same authority as me' had no way through (a5723 could not read powercfg). Now a card's extra_tools=, set by a plain do prop signed jeff or alex, adds exact commands for that card's worker only, and the card says what was granted. Found on the way: the desk tool took as= from the caller, so a worker could sign as jeff; a worker's tool is now pinned (DESK_PIN). The missing world-level word: a grant, a thing in the world that says who may do what and was given by whom, which the house reads instead of code holding the list. Still a guardrail: a worker keeps python.
+
+### Home base: a capture's picture and the control screen's life needed source (a5834)
+
+a5892 · family=host · status=curing
+
+Missing world words: (1) a row source field for a private capture's pixels: jeff-chat could show only a label, so `thumb` was added to the captures source (scene.py, captures.thumb). (2) A host that keeps a helper process alive: the home base had no word for 'run this tool while I run', so hud.py starts capture.py itself, switched by the capture= prop on a5208. (3) host_verbs.settings read examine's first line, which was often '!! since your last look', so every home-base setting silently read as its default; now the note's own line. A host verb or prop that names a helper (run=capture) would make (2) world-level.
+
+### Home base: a bare Windows key tap, and opening Start, needed source (a5980)
+
+a6028 · family=host · status=curing
+
+Missing world words: (1) a host key that is not a hotkey: the home base's key is the hotkey= prop, read by RegisterHotKey, which binds a key plus modifiers and cannot bind a bare Win tap. So hud.py runs winkey.py (a low-level keyboard hook on its own thread), switched by a new winkey= prop on a5208. A world word for 'how the host is summoned' (summon=tap:Win | hotkey:Ctrl+Alt+J, any number of them) would make the next one a prop, but each kind of summoning still needs its own catcher in source. (2) a host verb to open the Start menu (start): the verb table is closed on purpose, so a new power is source by design. (3) host_verbs.settings now says read=False when the door did not answer, so a setting polled every 15 s keeps what it had instead of falling back to the default.
+
+### The home base was built whole at every change: a placed lens was never kept, and a press fetched two scenes (a6010)
+
+a6090 · family=code · status=curing
+
+worker-a6010, 16 Oct. ran (bench_board.py on a frontier-try copy with a log): any change rebuilt the whole home base, ~490 ms, because nothing inside a placed lens was kept (it was rekeyed in place after its build) and every panel of the home base is a placed lens; persons.reply_by scanned all ~11k events per reply, and touched() all events per $changed. The painter then fetched two whole scenes per press (its refresh and the stream's). Source changes, no new word: lens_ir builds a placed lens under its final keys and keeps it; row sources once per build; indexes for touched and find_lens; lens.js one scene request at a time and data-sending on a pressed part; screen.py --logged. After: ~160 ms a home-base build, 62-69 ms the board; 0 differences kept vs whole over 7 kinds of change. What is still missing in the world's words: a press that says what it will change, so the painter could draw the result before the desk answers (Snappy stage 3 for clicks, not only keys).
+
+### A press waited on the engine, not on any missing word: kept-instance stores too few, sorted repeats never kept, a 50 ms file lock, unchanged witnessed files rewritten (a6153)
+
+a6240 · family=code · status=curing
+
+Source edits of a6153 (HUD presses), 16 Oct. No world word was missing: every cause was the engine's. (1) lens_ir kept instances in 24 stores, one per placed lens per place, and the home base with the board out places more: nothing was kept (now 400). (2) A part holding a by/run repeat was never kept, because its sort keys were read around the accessor (now through it, Accessor.props). (3) Every part made escaped its whole context for gestures it may not have. (4) The painter was sent the scene text it never shows (text=0) and the body was encoded twice. (5) sayings read every saying to keep one (early terms). (6) deskd's world lock was a file tried every 50 ms, even between its own threads (now an in-process lock first). (7) hud.py rewrote four unchanged witnessed files every 2 s, so every page rebuilt every 2 s (witnessed.write changed_only). What is still not a world word: a lens cannot say 'this press changes only my panel' (optimistic paint); see a6153's done comment. Tools and numbers: research/window-lab/press-speed/README.md.
+
+### Agents need a live charter at fresh memory and compaction (a6536)
+
+a6728 · family=missing-word · status=curing
+
+Missing world word: start= on a resident corner, parallel to wake= but only for fresh memory and compaction. Source draft adds charter.py, house/workshop startup hooks, Claude SessionStart(compact) context and Codex developer-history reinjection. It mirrors only a generated AGENTS.md block from the single live agent-charter note. Source remains unlanded; provider boundary acceptance still requires a real runtime observation. No rules or account settings changed.
+20 Oct takeover source-ready update under JEFF c6735/c6737: 16 charter tests OK (0.639s), transport 5 passed in 1.02s, builders/pool/grants/house-words all passed, changed-file Ruff passed, diff check exit 0. Added explicit one-line missing/empty startup disclosure and tested mirror changes with real knock/news/worker-hearing logic: no knock, no session start/send/process spawn, cached sessions retain rules until fresh start or compaction. Copy e13175 (13162 events) proves edited rules reach both provider stub prompts and 411-word receipts e13178/e13181. No real model/process was used; live spawn receipt, Claude/Codex compaction timing and already-running interactive apps remain unverified. Handbook source descriptions updated for landing; existing wake reads remain.
+
+### Album art needs a picture-only media part (music source awaiting landing)
+
+a6988 · family=lens-words · status=curing
+
+Music needs Windows-session album art as a rounded picture with no filename, caption or pop-out controls. The missing world word is media picture: compiler admission and the shared media painter gain this read-only mode; generated art tests compile both music forms. No new timer word is needed: progress is ordinary static row shares updated from reported playback state. The earlier live until bar/since draft was withdrawn under Alex's charter. Source is in worker-a6443; browser checks are blocked before launch by the old branch's system-temp ACL error. PKCE library access and the explicit Connect host verb also need host code; lens/style behavior remains world text.
+
+## unchecked (5)
+
+### Reader words and quiet references missing from the world (a6460)
+
+a6583 · family=reader · status=unchecked
+
+Read: a6460 needed world words for a readable summary and skim: for-alex(text, what|recommend|need|rest), lead(text), gist(text), read-minutes(text). These are added in expr.py because no existing world expression could extract the For Alex block or a section first sentence. The missing painter behavior was a quiet reference: markdown.js and lens.js shorten prose names to four words, number repeats, and draw comment/event/line references as arrows; textedit.js and markdown.js keep the hidden source id hidden on the caret line outside Ctrl+E source. Article spacing belongs to the Markdown read mode; reader layout and actions remain world data in reader.lens and role files. Ran: test_reader_words.py prints reader words: ok; test_reader.py prints reader: ok. Painter proof blocked by screen.py temporary-directory PermissionError; these source edits have not landed.
+
+### Sandbox scratch paths are host code, and relocation alone still fails (a6549)
+
+a6652 · family=host · status=unchecked
+
+Read: no world-level scratch-space word controls Python tempfile or the browser child environment. Source edits: agora_tmp.py adds AGORA_TMP; screen.py and sandbox_window.py call it before allocating scratch/state/profiles; TMP/TEMP/TMPDIR are inherited by children; .gitignore excludes the default .tmp directory. test_agora_tmp.py checks child inheritance and a real file write. Ran 20 Oct: inheritance assertion passed, but the child file write failed with PermissionError inside the worktree temp subdirectory. screen.py also still fails creating desk-shell under that worktree temp directory, before Chrome/Edge launch. This is not a verified browser or scrolling repair. Wheel helper edits in screen.py/sandbox_window.py provide a test word missing from the screen driver (wheel, rather than assigning scrollTop); not yet painter-verified.
+Correction/follow-up after JEFF e12858: relocation failed because tools still used tempfile-created owner-only directories. Replacing mkdtemp/TemporaryDirectory with uuid-named os.makedirs (default inherited ACL) passes file-write/copytree and child TMP/TEMP/Python-temp checks. screen.py now reaches Edge DevTools; the subsequent document.readyState evaluation loses its websocket (WinError 10054, ConnectionClosedError). Browser startup is not verified. sandbox close screen-6120 completed and printed alex: untouched. No wheel or lens change made.
+Read/source after JEFF e12874: screen.py headless launch and sandbox_window.py Edge/WebView2 debugging launches now include --remote-allow-origins=*; both Python websocket clients explicitly set origin=None. Ran: screen.py --visible still resets during the first Runtime.evaluate(document.readyState), WinError 10054 then ConnectionClosedError. A later HTTP /json/version request to that same test port is refused (WinError 10061). Closed the owned sandbox screen-88068 with alex: untouched. Origin flag did not establish browser readiness; root cause unknown. Pipe transport was considered but not implemented: current desktop launcher does not inherit handles, so pipe mode needs explicit Windows pipe/handle transport work, not just a flag.
+Final source scope per JEFF e12889: removed ineffective --remote-allow-origins=* after the failed retest; explicit origin=None remains. hud_playtest.py uses the same temp helper and adds seven copy-only real-wheel cases via hud_scroll.py; no world-level word could express test-driver wheel input. Assertions require the panel and its content to move together, observe a wheel event, stay inside a HUD pane and keep the page at zero. test_hud_scroll.py: 5 stand-in verdict tests pass; this does NOT run the browser. test_agora_tmp.py passes child write, painter copytree, TMP/TEMP/Python-temp and override checks. Old tiling-fix.desk is commented as superseded by JEFF's live lens fix. Source/browser integration and wheel shots remain UNVERIFIED for the browser-capable follow-up.
+
+### Plan usage and resumable provider pauses need a house word (a6646)
+
+a6662 · family=missing-word · status=unchecked
+
+Read: usage.py already follows Claude rate_limit_event.unifiedWindows and context-token streams; workshop.py persists provider retry times, but there is no durable per-window Usage surface, event-driven plan snapshot, per-provider deduplicated notice episode, or configurable fuel-start rule. A world lens cannot read CLI stream metadata or schedule a process resume. Source work for a6646 will bridge only these observations and lifecycle transitions, leaving the gauge and glance in world lenses. No credentials or account settings are read or changed.
+Ran final a6646 recheck: 16 fake-feed/native-world tests OK, including evaluated gauge roles at 69/70/89/90/100%; builder lifecycle and existing usage tests all passed. Source bridges provider observations, native Usage facts, durable pause/notice episodes and fuel-start policy; widget/glance remain world lenses. Full health, actual Codex quota and browser acceptance remain unverified as recorded on the commission and handoff.
+
+### A line's about= never reached the one it called, and a Talk's lines said nothing of their document (a6638)
+
+a6703 · family=conversation · status=unchecked
+
+Source edits for a6638 (the universal conversation), each a world-level word that was missing. (1) house.py points_at: a chat line's fields (about=, quote=, heading=) were kept in the world but the house handed a called resident only its words, so 'about this item' and 'these words' were lost on delivery; no world word can change what the house says to a resident. Missing word: a way for a line to say how it is delivered (or the delivery to carry the line's fields by rule). (2) scene.py sayings rows: a line in a Talk, or a reply, had no about unless its writer typed one, so the Conversation could not tag an agent's answer with its document; a lens can read the chat's talk_of only by a frame per row. Missing word: a row field that inherits from the line's chat or the line it answers. (3) scene.py involving: early pass-over (INVOLVING_EARLY), a speed fix, the same rows (check_involving_early.py).
+
+### Runtime updates lack a verified re-pin gate (a6498)
+
+a6713 · family=missing-word · status=unchecked
+
+Missing world word: check runtime. The world cannot hash a host executable, run isolated compiled-runtime probes, hold an OS publication lock or atomically replace runtime lock files. Draft source in a6498 adds runtime_pin.py, adapter startup gates and probe_support.py, plus empty-profile/stand-in Desk probes and fake binary/inventory tests. Both locks remain untouched until every candidate check passes. Source is not landed. The resident mock probe passed here; the worker mock probe failed at CreateRestrictedToken failed: 87. This is not live agent or current re-pin acceptance.
+Final source checks in this builder: 39 focused tests passed in 7.46s; changed-file Ruff All checks passed; git diff --check exit 0. Tests include fake binaries/inventories, a real cross-process lease, and fake-house receipt/notice delivery. Final resident mock source passed with -E and empty CODEX_HOME. Source uses the worker's existing MCP door route without changing DESKD=off in shells. Source and precise rerun instructions are preserved in research/codex-residents/runtime-pin-handoff.md. Not landed; worker-capable environment and live acceptance are still needed.
+20 Oct source-ready update under JEFF c6757/c6760: 48 focused tests passed in 6.70s; changed-file Ruff passed and diff check exit 0. Source now checks updater provenance and valid OpenAI OpCo, LLC Authenticode before candidate execution; Windows read-only inspection confirms that publisher on the installed candidate. Python-open guards with the real home present and fake credentials prove empty-home launch routing, not native IO containment. Both locks and inventories remain unchanged. Host-side --recheck, full worker mock matrix, real harmless resident/Astra turns and live notice/no-wake observation remain unverified. A healthy ordinary startup skips probes, so JEFF must explicitly --recheck after landing. No account or profile settings changed.
+
+## cured (65)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -989,3 +1185,64 @@ Source edits by Claude, 14 Oct (e0ac4f9, 9f27357, 8d0438a), Snappy Desk stages 3
 a5315 · family=house · status=cured
 
 landing.hand named its branch hand/<who>-<YYYYmmdd-HHMMSS>, to the second. test_landing_queue steps 11 and 12 each make a hand landing by codex; on a fast run they fell in the same second, the second `git branch` failed ('a branch named hand/codex-... already exists'), and the landing room refused every branch (a5245 met it 15 Oct; ran it in the worktree and it failed the same way, with landing.py exactly as main has it). The same can happen live when one builder hand-lands twice quickly. Fixed (landing.py, a5245, commit 876c2b6): a taken name gets -2, -3 ... after it, and its temporary index file is named to match. Ran: test_landing_queue all passed; health.py frontier-try all green. Source edit, not world: the missing word was none at the world level; this is the house's own landing code.
+
+### A button could not ask the program its page is painted in
+
+a5370 · family=lens · status=cured
+
+worker-a5300, 15 Oct (a5300). The missing word: `on click host <verb> [words]`. Every home base button (bring a window forward, Spotify) needed a new js_api and an injected click script in research/window-lab/hud.py, found by a class name. Source edit: scene.py _w_on admits it (the painter's own act, like press), verbs.py leaves it out of a lens's desk steps, lens.js calls window.pywebview.api.host; the verbs are a closed table in research/window-lab/host_verbs.py, published as witnessed:host. Still source: each new native power is one entry in that table; the hud.py hook waits on Claude (patch on a5300).
+
+### Home base: a setting on the lens note (hide_taskbar) had no host behind it
+
+a5606 · family=host · status=cured
+
+a5394, 15 Oct. The world could say hide_taskbar on the home-base lens note (a5300 read it), but nothing in the host acted on it, and hud.py had none of a5300's hook. Source edit: research/window-lab/hud.py (hook steps 1-9 of c5383; Hud.area and whole_monitor cover the whole monitor when hide_taskbar=yes), host_verbs.py (default yes). The missing world word: a host setting is only real once the host does it; each new setting still needs host code. Cover rather than hide, so nothing needs restoring.
+
+### HUD restart must retain its installed Python environment
+
+a5809 · family=missing-word · status=cured
+
+The restart helper discarded the pinned interpreter in favor of _base_executable; the resulting HUD failed to import webview. The missing operational guarantee is restart in the same dependency environment. Preserve sys.executable; verified manual pinned restart starts HUD PID51388.
+
+### A saying must retain one message identity and its real writer
+
+a5853 · family=attribution · status=cured
+
+Read: world.py explicitly aliases JEFF comment/reply/resolve authors to Alex; scene.py splits structured multiline chat messages into rows sharing the same event key except in involving mode. Fix new comment authors and keep each structured message whole in every sayings view. Preserve historic signatures and event log.
+
+### Persistent Codex builders and usage-limit handoff
+
+a6570 · family=missing-word · status=cured
+
+Alex, 20 Oct, explicitly requested two persistent Codex workers with compaction, automatic queue pickup and recovery, and chose safe Codex takeover when Claude reaches its usage limit. He approved the existing house-managed task worktrees. Missing behavior: the standing-builder pool only covered Claude; Codex conversations ended with cards, provider-limit retries retained tasks on Claude, and the pinned executable lived in an app-update directory that was removed. Codex is extending the existing worker pool and recovery path in the main checkout. Candidate: codex-builder-1/2, preserved thread per builder, provider-limit handoff journal preserving edits and Claude state, bounded process retries, exclusive card/builder leases, app-server child cleanup, stable SHA-pinned runtime copy, and an OS supervisor for absent house/door processes. Unit/scheduler/process tests and compiled runtime probes passed; real model process/cwd resume passed. Compaction and production activation are still being checked. No production pool change has been enabled yet.
+20 Oct continuation: committed the persistent worker/recovery implementation as 29fa11d and enabled two Codex builders, two Claude slots, and limit_fallback=codex on The house (e12695). All three quota-held Claude tasks transferred with archived state and preserved worktrees. Both Codex threads started; builder one finished a turn on a6443, then resumed that same thread on queued a6549. This revealed an actual runtime discovery fault: unsupported call tool_searchtool_search_tool. Direct mocked MCP execution had missed it. The corrected code-mode wrapper configuration passed real-model Desk discovery and help in the existing worktree, plus a repeated real-model resume/new-cwd/compaction/continuation probe. Committed as d49c7b0; waiting for the ordinary keeper/house refresh and checking production tool access. Nine focused tests and changed-file Ruff pass. The canonical handbook was updated; its Markdown exporter refused pre-existing direct edits and preserved both files. No claim that these task implementations are finished.
+Verified after activation of d49c7b0: keeper replaced house PID 62288 with 82160. codex-builder-1 retained thread 01a15a98-3283-7cf0-b30c-e47eb6a2e7b9 across a6443 and a6549 and the house restart; codex-builder-2 retained thread 01a15a98-35f0-79d1-8f4a-0968f7df8d62 on a6460. A read-only SDK inspection of each latest production turn found completed Desk MCP calls (four on builder one, two on builder two). Both active runtimes have the corrected code-mode settings. The recovery task remains Running with a fresh heartbeat and recognizes the existing keeper/door/house. The pool is enabled and operational; individual commission implementation and sandbox/browser acceptance are owned by their cards, not claimed complete here. Real-model explicit compaction/new-process/new-cwd continuation passed again. Process leases and adapter crash cleanup were verified with isolated real subprocesses; a forced production crash was not needed.
+
+### Desk sign-in startup and worker recovery
+
+a6631 · family=missing-word · status=cured
+
+Alex, 20 Oct, requested current worker status and automatic Desk/worker recovery at Windows sign-in. Missing lifecycle behavior: the Startup shortcut launches agora_start.py but has no external recovery if that process exits; AgoraHouseRecovery separately launches backend components, creating two startup owners. Codex is connecting the existing scheduled watchdog to the existing full Desk launcher, preserving live services, strengthening single-instance startup and testing restart restoration. Incomplete working tasks resume from saved house state; waiting tasks remain waiting for answers or new work.
+Ran 20 Oct: 6 focused startup tests passed (cold start, adoption, orphan recovery, inspection failure, checkout matching, real OS-lease contention/crash release). Existing builder restart/resume checks passed. Repository pytest: 201 passed, 2 skipped; changed Python Ruff and PowerShell parsing passed. Sign-in task is running. New launcher 20572 adopted the original live services; deliberately terminating only it led to watchdog replacement 91248 within the configured 60-second backoff. Keeper 62740, house 82160, door wrapper 28432, HUD 87440 and capture 33540 remained running unchanged; duplicate launcher exited without starting services. No Windows reboot/sign-out was performed. Docs checker still reports the pre-existing missing Dynamic Desk image. Source: agora_start.py, test_agora_start.py, house_supervisor.ps1; operational instructions updated in a639 and codex-residents/README.md.
+
+## active (1)
+
+### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
+
+a6970 · family=host · status=active
+
+Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
+
+## source-pending (2)
+
+### Adding independent HUD checks needed a shared-list edit (a6749)
+
+a6838 · family=host · status=source-pending
+
+Host friction: independently added HUD playtest coverage required editing the same runner callbacks and order list, causing repeated landing conflicts. The missing extension point was discovery of one step per file. a6749 adds playtest_steps/*.py Step records (order, feature needs, press script with its existing assertions, budgets), scanned by hud_playtest.py. Existing bodies and numbers are preserved, including equal-footing from main. This is test-host structure, not new world behavior. Ran: 13 extraction/discovery/fixture-merge tests and 5 existing wheel-verdict tests pass; real browser acceptance is not run in the Codex sandbox.
+
+### Shared divider gestures need a world paint word
+
+a7107 · family=missing-word · status=source-pending
+
+Updated 20 Oct: expanded source is staged, unlanded and not ready. Missing generic words: resize <prop> min <pixels> for shared-frame weights; partition <prop> min <w> <h> gap <px> [focus <prop>] for a world slicing tree; companion <expression> for focused companions. Whole-panel threshold carry, global/local edge plans, tabs, bounded content sizing and both-axis dividers are implemented behind these words. Tree/focus writes are ordinary fenced props; repeat fingerprints read share/tree/focus/companion dependencies. Ran 164 model/geometry checks, 41 DOM stand-in checks and 6 in-memory scene/world tests; browser endpoint remains blocked, no actual visual acceptance. Workspace copying still needs structured-reference remapping (scope ask c7176); do not apply live. Plain staged payload a7167 and exact patches/acceptance a7180.

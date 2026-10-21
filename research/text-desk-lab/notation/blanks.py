@@ -8,6 +8,8 @@ world verbs, scripts and rules all fill their blanks here, the same way:
     $new           the thing made most recently earlier in this reply (any kind; of several made by one line, the
                    last); refused, saying why, if nothing in this reply made anything. The receipt says what it was
     $today         the clock's date                     $me   whoever is acting
+    $now           the wall clock to the second, when the line runs (2026-10-15T16:40:12; a5530): a lens gesture's
+                   $now is the moment of the press
     $reach         your last line the desk did not do (refused or missed, within the half hour) and what came back,
                    as words: `[typed: ... | came back: ...]`; nothing when there is none (9 Oct; the wish verb uses it)
     $<handle>      a handle you named (set draft = a98, or create ... as=draft)
@@ -58,7 +60,7 @@ WORDS = {".title": "a title", ".text": "a text", ".maker": "a maker's name"}    
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
-KNOWN = ("$here $here.<prop> $new $reach $today $me $me.corner $me.<prop> $house $house.<prop>, a handle ($name: set, or as= in this "
+KNOWN = ("$here $here.<prop> $new $reach $today $now $me $me.corner $me.<prop> $house $house.<prop>, a handle ($name: set, or as= in this "
          "reply); in a verb $1 $2 $* $this; in a rule $item; the current thing's own words ($title, $status); a thing's parts "
          ".title .maker .text .in .before .after .<prop>; a value $( <expr> )")
 
@@ -267,6 +269,9 @@ def expr_env(desk, ctx):
     def get(name):
         if not name.startswith("$"):
             return None                     # a bare word in a command's expression names no let; it is none, and says so
+        if name == "$*":
+            # a6427: a verb's rest of the line, in an expression too (words-after($*, "save")), as $1 is
+            return None if ctx.args is None else str(ctx.rest)
         m = WORD.match(name)
         if not m:
             return None
@@ -428,6 +433,8 @@ def made_by(events):
                 and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
             out.append(e["undo"]["drop_link"])      # a3295: a link is made too; $new is its id (examine, unlink id=)
             continue
+        if e.get("copy") and (e.get("undo") or {}).get("delete") != e["copy"]:
+            continue                                # a6427: a copy made many parts; $new is the copy itself
         if e["verb"] in ("create", "group") and isinstance(e.get("undo"), dict) and e["undo"].get("delete") \
                 and not str(e.get("via") or "").startswith("rule ") and not e.get("undone"):
             out.append(e["undo"]["delete"])

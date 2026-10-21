@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_kinds (5 Oct): kinds in the world. A kind is a note tagged kind; create accepts it; it inherits the verbs of
 what it is built on; rekind moves a thing between kinds of one shape and undo puts it back; a lens is a kind.
 

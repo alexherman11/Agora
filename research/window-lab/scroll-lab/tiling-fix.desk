@@ -1,0 +1,6 @@
+# SUPERSEDED: JEFF applied the live fix himself (e12889). Historical draft only; do not apply.
+# read a5692 :3
+# do replace a5692 old="  body : column\n    role panebody\n    lens $p.lens" new="  body : column\n    role panebody\n    scroll scroll\n    lens $p.lens"
+# do replace a5692 old="    role panebody\n    share 1\n    scroll none\n    lens $p.lens" new="    role panebody\n    share 1\n    scroll scroll\n    lens $p.lens"
+# do replace a5692 old="or ⤡, gives it back. – shelves it (home-panels, in the dock). Nothing scrolls, nothing moves by itself." new="or ⤡, gives it back. – shelves it (home-panels, in the dock). Nothing moves by itself, and the page never scrolls;\n# a pane's body does (a6549, Alex 20 Oct: 'scrolling is not working ... in longer notes'): the pane stays `scroll none`\n# so it keeps inside its column, and its body is `scroll scroll`, a scroll box whose least height is 0, so it gives up\n# the room when the column is full while the title row keeps its own, and what it cannot show scrolls inside it."
+# read a5692 :3

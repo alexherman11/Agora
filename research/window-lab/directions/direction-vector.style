@@ -1,0 +1,197 @@
+# direction-vector (a5534, worker-a5534, 15 Oct): the home base as a flight deck. Phosphor cyan on near-black, square
+# frames open on one side, a lit rail where attention is, amber for whatever is alive, magenta for JEFF (the autopilot
+# colour on a real flight display). Every role of home-style is here, so any home-base lens can wear it.
+font display = Chakra Petch, Segoe UI, sans-serif
+font sans = IBM Plex Sans, Segoe UI, sans-serif
+font mono = JetBrains Mono, Cascadia Code, monospace
+token night = #04070A
+token paper = #04070A
+token ink = #D6F5F1
+token accent = #3EF2D8
+token warm = #FFB020
+token jeff = #F26BFF
+token glass = #050A0DA8
+token glassdeep = #04080BE0
+token rim = #3EF2D833
+token soft = ink at 58%
+token faint = #3EF2D81C
+token mine = #3EF2D81A
+token jeffwash = #F26BFF17
+token warmwash = #FFB0201A
+token wash = #D6F5F10A
+token focus = #3EF2D8
+token scrollbar = #3EF2D84D
+token scrollbar_w = 2
+token gap = 8
+token ramp = 1.2
+token text = sans 14/1.5
+token text.mono = mono 12/1.45
+token text.display = display 14/1.15
+role desk : ink, text
+role page : ink, text
+role home : ink, text, pad gap x2
+role bar : pad bottom gap, space below gap x1.5, between gap x3, border bottom rim
+role brand : text.display up 2 strong tracked, accent
+role place : text.display up medium tracked, ink
+role meta : text.mono down, soft
+role body : between gap x2
+role side : between gap x2
+role pinned : border top accent, pad top gap /4
+role loose : border top faint, pad top gap /4
+role panel : on glass, border left accent, pad gap x2, between gap
+role heading : text.display up 2 strong tracked, accent
+role prose : text, ink, space above gap
+role busy : between gap, pad top gap /2
+role live : warm, pulse
+role who : text medium, ink
+role who.jeff : text.display medium tracked, jeff
+role tiles : between gap
+role tile : on glass, border left faint, pad gap, between gap /2, glide
+role tile.front : on mine, border left accent, pad gap, between gap /2, glide
+role thumb : on wash, edge faint, height gap x17
+role tilename : text.mono down medium, ink
+role chat : ink, text
+role room : on glassdeep, border left jeff, border top rim
+role chathead : pad gap x2, border bottom rim, between gap x1.5
+role face : text.display up 3 strong, night, on jeff, pad gap, pad left gap x1.5, pad right gap x1.5
+role chatname : text.display up 3 strong tracked, ink
+role thinking : text.mono down, jeff, wave
+role tabs : between gap /2
+role tab : text.mono down, soft, pad gap /2, pad left gap, pad right gap, border bottom faint
+role tab.on : text.mono down medium, accent, pad gap /2, pad left gap, pad right gap, border bottom accent
+role feed : pad gap x2, between gap /2
+role said : align start, width 46em, space above gap /2
+role said.mine : align end, width 46em, space above gap /2
+role saidhead : between gap, pad bottom gap /4, space above gap
+role bubble : on wash, border left faint, pad gap x1.5
+role bubble.mine : on mine, border right accent, pad gap x1.5
+role bubble.jeff : on jeffwash, border left jeff, pad gap x1.5
+role words : text, ink
+role acts : shy, pad left gap
+role tool : text.mono down, soft, pad gap /2
+role working : pad left gap x2
+role typingrow : between gap, pad bottom gap /2
+role dots : warm, wave
+role dock : on glass, border top rim, pad gap x2, between gap
+role answering : on wash, border left jeff, pad gap, between gap
+role to : between gap /2
+role chip : text.mono down, soft, edge faint, pad gap /2, pad left gap, pad right gap
+role chip.on : text.mono down medium, night, on accent, pad gap /2, pad left gap, pad right gap
+role input : text, ink, on wash, border left accent, pad gap x1.5
+role button : text.mono down medium, night, on accent, pad gap, pad left gap x2, pad right gap x2
+role hint : text.mono down 2, soft, shy
+role attachment : on wash, pad gap, between gap
+role mark : ink
+role menu.item : text.mono down, ink, pad gap
+role popup : on glassdeep, edge rim, pad gap
+role code : text.mono, on wash
+role hello : pad gap x3, between gap, space below gap x2
+role waithead : between gap
+role waitdesk : between gap
+role waitlist : between gap /2
+role wait : on wash, border left faint, pad gap, between gap /4, glide
+role wait.on : on mine, border left accent, pad gap, between gap /4, glide
+role waitfacts : between gap
+role reviewcard : on glassdeep, border left accent, pad gap x1.5, between gap
+role reviewacts : between gap, space above gap /2
+role lane : between gap /2, space above gap
+role lanename : text.mono down 2 medium tracked, accent
+role lanecards : between gap /4
+role taskcard : on wash, border left faint, pad gap /2, pad left gap, pad right gap
+role taskcard.live : on warmwash, border left warm, pad gap /2, pad left gap, pad right gap
+role cardtitle : text down medium, ink
+role cardline : between gap
+role cardwho : text.mono down 2, soft
+role cardlane : text.mono down 2, soft
+role still : faint
+role cardopen : text.mono down 2, soft
+role cardmore : between gap /2, pad top gap /2, pad bottom gap /2, space above gap /2, border top rim
+role cardnote : between gap /4, pad left gap, border left rim
+role cardtext : text down, soft
+role cut : text.mono down, soft
+role viewer : between gap
+role findbar : between gap, on glass, border bottom accent, pad gap /2, pad left gap
+role find : text.mono, ink, pad gap
+role pins : between gap /2
+role found : on glassdeep, border left accent, pad gap x1.5, between gap /2
+role foundlist : between gap /4
+role hit : between gap, pad gap /2
+role shown : on glassdeep, border left accent, border top rim, pad gap x2, between gap
+role viewhead : between gap, pad bottom gap, border bottom rim
+role viewlanes : between gap
+role viewlane : on wash, border top faint, pad gap, between gap
+role viewlanehead : text.mono down medium tracked, accent
+role viewlanelist : between gap /2
+role viewcard : on glass, border left faint, pad gap, between gap /4
+role viewcard.p1 : on warmwash, border left warm, pad gap, between gap /4
+role viewcardtitle : text down, ink
+role docheading : text.display up 2 medium tracked, accent, space above gap
+role count : text.mono down strong, night, on warm, pad left gap /2, pad right gap /2
+role tag : text.mono down 2 tracked, soft
+role tag.demo : text.mono down 2 medium tracked, warm
+role tag.design : text.mono down 2 medium tracked, jeff
+role waithit : between gap /4
+role reviewbody : between gap, pad top gap, border top rim
+role demo : on night, edge rim, pad gap, height gap x60
+role report : on wash, ink, text, pad gap x1.5, border left accent
+role eyebrow : text.mono tracked, accent, space below gap
+role title : text.display up 2 strong, ink
+role subtitle : text down, soft, space below gap
+role check : on wash, pad gap, space below gap
+role label : text medium, ink
+role good : text.mono strong, accent, pad left gap
+role detail : text down, soft, space above gap /2
+role boundary : text down 2, soft, space above gap
+role message : pad gap /2, space below gap
+role author : text.mono down medium, accent
+role composer : text, ink, on wash, border left accent, pad gap
+role appfoot : pad top gap x2
+role appdock : on glassdeep, border top accent, pad gap, pad left gap x2, pad right gap x2
+role appshelf : between gap x1.5
+role appicons : between gap /2
+role appslot : between gap /4
+role appicon : on wash, border bottom faint, pad gap, width gap x11, between gap /4, glide
+role appicon.on : on mine, border bottom accent, pad gap, width gap x11, between gap /4, glide
+role appadd : on glass, border bottom faint, soft, pad gap, width gap x11, between gap /4
+role appglyph : text.display up 3, accent, align center
+role applabel : text.mono down 2, soft, align center
+role readout : text.display up 4 strong tracked, accent
+role readlabel : text.mono down 2 tracked, soft
+# a5504's board roles (home-board), and its motion words: rail, glow (a breathing halo), glide (a moved thing travels)
+token shadow = #000000
+token go = #8CFF66
+token gowash = #8CFF661A
+token white = #FFFFFF
+token raised = #D6F5F10A
+token raisedhi = #D6F5F114
+role bdhead : between gap, pad bottom gap /2
+role bdlivecount : text.mono down medium, warm, pulse
+role bdlane : between gap /2, space above gap x1.5
+role bdlanehead : between gap, pad bottom gap /4, border bottom faint
+role bddot : text.mono down, faint
+role bddot.asked : text.mono down, jeff
+role bddot.working : text.mono down, accent
+role bddot.ready : text.mono down, go
+role bddot.landing : text.mono down, white, pulse
+role bdlanename : text.mono down 2 medium tracked, soft
+role bdcount : text.mono down 2 medium, soft
+role bdcount.asked : text.mono down 2 strong, jeff
+role bdcount.working : text.mono down 2 strong, accent
+role bdcount.ready : text.mono down 2 strong, go
+role bdcount.landing : text.mono down 2 strong, white
+role bdcards : between gap /4
+role bdcard : on raised, rail faint, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.asked : on raised, rail jeff, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.working : on raised, rail accent, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.live : on warmwash, rail warm, glow warm, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.asking : on raised, rail warm, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.ready : on gowash, rail go, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.landing : on raisedhi, rail white, glow white, pad gap /2, pad left gap x1.5, pad right gap, glide
+role bdcard.landed : pad gap /4, pad left gap x1.5, pad right gap, glide
+role bdline : between gap
+role bdtitle : text down medium, ink
+role bdtitle.landed : text down, soft
+role bdwho : text.mono down 2, soft
+role bdstate : text.mono down 2 medium, accent
+role bdstate.asking : text.mono down 2 strong, warm
+role bdmore : between gap /2, pad top gap /2, pad bottom gap /2, space above gap /2, border top rim

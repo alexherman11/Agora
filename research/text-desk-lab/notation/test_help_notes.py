@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_help_notes (a1595): help lives in the world, as notes in the Help binder; the code keeps a floor; helpnotes.check
 keeps the notes true to the code.
 

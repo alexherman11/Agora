@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_witnessed: rows a program keeps beside the house reach a lens as a row source, and only while it runs (a5052).
 
     python test_witnessed.py

@@ -1,0 +1,19 @@
+# home-timer-bar: the timer in the top bar, only while The house is not showing (a6057). The timer lives in The house's
+# You row; when Alex shelves that panel (or keeps no panel tagged glance-work), or fills the room with another panel
+# (The house is then only a title on the rail), it comes up here, so it is never lost and never shown twice (and its
+# `on end` is drawn once). A widget: tag widget, slot=bar, order=3.
+bar : row
+  role ltimer
+  of prop:role=home-layout,prop:actor=$me as lay
+  each place
+place : row
+  role ltimer
+  away : row
+    only when count(prop:role=home-panel,prop:actor=$me,tag:glance-work,prop:shelf=no) = 0
+    lens home-timer
+  railed : row
+    of prop:role=home-panel,prop:actor=$me,tag:glance-work,prop:shelf=no as hp
+    each railtimer
+railtimer : row
+  only when $index = 1 and ($lay.full or "") != "" and $item != ($lay.full or "")
+  lens home-timer

@@ -56,6 +56,10 @@
   :where(#paint button, #menu-pop button, #door button) { appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }   /* a folded part gives up its share: its siblings take the room */
   /* fold ... float: a menu, its open contents drawn over the page below the handle */
   .l-float { position: relative; }
+  .l-float:not([data-folded="1"]) { z-index: 12; }   /* a6265: an open one lies over its later siblings too (rows of At work) */
+  /* a6265: a float lifted into the top layer (lens.js placeFloat) keeps its role's look, not the browser's popover box */
+  .l-float > [popover] { inset: auto; margin: 0; border: 0; color: inherit; font: inherit; }
+  :where(.l-float > [popover]) { background: transparent; padding: 0; }
   /* a part's own menu (on menu "<label>" do ...), at the pointer */
   #menu-pop textarea, .menu-draft textarea { font: inherit; color: inherit; background: transparent; border: 0; resize: vertical; width: 36ch; max-width: 80vw; box-sizing: border-box; }
   .menu-draft { position: fixed; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box; }
@@ -74,24 +78,121 @@
   #menu-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 12ch; box-sizing: border-box; }
   .l-float > [data-key] { position: absolute; top: 100%; left: 0; z-index: 12; width: max-content; max-width: min(72ch, 90vw);
     max-height: 70vh; overflow: auto; box-sizing: border-box; }
-  .l-float > [data-peek] { position: static; width: auto; max-height: none; }   /* a peek stays beside the handle, in the page */
+  .l-float > [data-peek] { position: static; width: auto; max-height: none; z-index: auto; }   /* a peek stays beside the handle, in the page (a6265: and is not lifted over an open float above it) */
+  /* fold ... inline (a5359): the handle and the peek share the first line; what the fold hides opens below them, easing in */
+  [data-fold-inline] { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .5em; align-items: baseline; }
+  [data-fold-inline] > button { grid-column: 1; }
+  [data-fold-inline] > [data-key] { grid-column: 1 / -1; }
+  [data-fold-inline] > [data-key][data-peek] { grid-column: 2; }
+  [data-fold-inline] > [data-peek] { cursor: pointer; }
+  [data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: l-unfold 180ms ease-out; }
+  @keyframes l-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { [data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: none; } }
+  /* fold ... float inline (a6265): a press on the line opens a popover over the page; it appears, it does not ease in */
+  .l-float[data-fold-inline]:not([data-folded="1"]) > [data-key]:not([data-peek]) { animation: none; }
   [data-now]::after { content: "   now: " attr(data-now); color: var(--t-hush); }   /* both sides, on the card (c359) */
   [data-hint]:empty::before { content: attr(data-hint); color: var(--t-hush); }
   .l-free { position: relative; flex: 1; min-height: 900px; min-width: 1700px; }
   .boxed { position: absolute; box-sizing: border-box; overflow: hidden; margin: 0; }
   .clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
-  [data-clamped][data-cut="1"], [data-clamped][data-opened="1"] { cursor: pointer; }   /* a cut text opens on a press, and closes */
+  [data-clamped][data-cut="1"], [data-clamped][data-opened="1"] { cursor: pointer; }
+  /* a6010: a pressed part whose answer is on its way: dimmed at once, a state and not a motion, until it is painted */
+  [data-sending="1"] { opacity: .5; cursor: progress; }
+  /* `scroll none` (a5496): never scrolls; a part cut at its foot fades there, so the eye knows there is more */
+  /* and it keeps inside its parent: it may shrink below its words, and a row of it is one line (a wrapping row's line
+     grows as tall as its tallest child, which pushed a column of panels off the screen) */
+  [data-scroll="none"] { min-height: 0; min-width: 0; }
+  .l-row[data-scroll="none"] { flex-wrap: nowrap; }
+  [data-scroll="none"][data-cut="1"] { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); }
+  /* `scroll none end`: the end in view, cut (and faded) at the head; what overflows a flex-end column's start is unreachable */
+  .l-column[data-at-end="1"] { justify-content: flex-end; }
+  .l-column[data-at-end="1"] > [data-key] { flex-shrink: 0; }
+  [data-at-end="1"][data-cut="1"] { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to top, #000 calc(100% - 3em), transparent); }   /* a cut text opens on a press, and closes */
   :where(mark[data-light]) { background: none; color: inherit; }   /* `light`: a passage's look is its role's */
   [data-key] { white-space: pre-line; }
   [data-drag], [data-carry] { cursor: grab; touch-action: none; }
+  /* a5994: where a carried thing will land, drawn while it is in the air (the receiver's half on the side its act
+     names, or the whole receiver). Its look is the style's role `landing` when the style has one; this is the floor */
+  .landing-box { position: fixed; pointer-events: none; z-index: 29; box-sizing: border-box; border-radius: 10px;
+    border: 2px solid var(--t-ink, currentColor); background: color-mix(in srgb, var(--t-ink, #888) 10%, transparent); }
+  /* a6271: `tip`, a part's name and what it does, over the page beside it (lens.js). Its look is the style's role `tip`
+     when the style has one; this is the floor. Never pressed, never moved: it shows and hides, nothing more */
+  .lens-tip { position: fixed; z-index: 40; pointer-events: none; display: none; max-width: 22em; box-sizing: border-box;
+    padding: 6px 10px; border-radius: 8px; white-space: normal; background: var(--t-paper, #222); color: var(--t-ink, #eee);
+    border: 1px solid color-mix(in srgb, var(--t-ink, #888) 18%, transparent); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  .lens-tip[data-shown] { display: block; }
+  .lens-tip-name { font-weight: 600; }
+  .lens-tip-about { opacity: .72; margin-top: 2px; }
   .t-verbatim { white-space: pre; overflow-x: auto; }
   .t-picture { white-space: normal; } .t-picture > svg { display: block; width: 100%; height: auto; font: inherit; fill: currentColor; }   /* `picture`: a drawing as wide as its part */
+  /* `media` (a5941, media.js): films and pictures under the words, or one filling its part (`media player`). Sizes
+     follow the part (%, em); the look (colour, edge, the buttons) is the roles media, tool and meta. The one exception
+     to "no colour here": a film's letterbox is black and its play disc white on dark, as every video's is, so the
+     button reads over any picture whatever the style */
+  .t-media { display: flex; flex-direction: column; gap: .5em; margin-top: .5em; white-space: normal; user-select: none; }
+  .media-item { margin: 0; max-width: 32em; display: flex; flex-direction: column; overflow: hidden; }
+  .media-stage { position: relative; display: grid; place-items: center; background: #000; }
+  .media-stage > video, .media-stage > img { display: block; width: 100%; height: auto; max-height: 24em; object-fit: contain; }
+  .media-item .media-stage > video:not([controls]), .media-item .media-stage > img { cursor: pointer; }
+  .media-play { position: absolute; inset: 0; margin: auto !important; width: 3.2em; height: 3.2em; border-radius: 50% !important;
+    display: grid !important; place-items: center; text-align: center !important; color: #fff !important; background: rgba(0,0,0,.55) !important; }
+  .media-play[hidden] { display: none !important; }
+  .media-play svg { width: 1.6em; height: 1.6em; margin-left: .15em; }
+  .media-bar { display: flex; align-items: center; gap: .75em; padding: .35em .6em; min-width: 0; }
+  .media-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .media-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .media-button { white-space: nowrap; }
+  .media-button svg { width: 1.2em; height: 1.2em; display: block; }
+  .media-player { margin: 0; height: 100%; min-height: 0; display: flex; flex-direction: column; outline: none; }
+  .media-player > .media-stage { flex: 1; min-height: 0; }
+  .media-player > .media-stage > video, .media-player > .media-stage > img { width: 100%; height: 100%; max-height: none; }
+  .media-player[data-full] { position: fixed; inset: 0; z-index: 30; }
+  .media-seek { flex: 3; min-width: 6em; accent-color: var(--t-accent, currentColor); }
+  .media-speeds { display: flex; gap: .25em; }
+  .media-speeds > [data-on] { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+  /* `page` (a6431, page.js): a page at a device's size in a frame, scaled to fit the part. The look of the frame is the
+     role `pageframe` (its edge is the device's bezel), of the box round a picked part the role `pagemark`. The exceptions to
+     "no colour here", as a film's letterbox is one: a display cutout is black; a home bar and the safe insets are white
+     in difference with the app under them, so they read on a light app and a dark one, as a phone's own home bar does */
+  .t-page { display: grid; place-items: center; overflow: hidden; min-height: 0; min-width: 0; white-space: normal; }
+  .page-hold { position: relative; flex: none; box-sizing: content-box; }
+  .page-device { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+  .page-frame { display: block; border: 0; width: 100%; height: 100%; background: transparent; }
+  .page-over, .page-mark, .page-aim { position: absolute; pointer-events: none; }
+  .page-over { inset: 0; }
+  .page-inset { position: absolute; mix-blend-mode: difference; background: repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 6px, transparent 6px 12px); }
+  .page-cutout { position: absolute; background: #000; border-radius: 999px; }
+  .page-cutout-notch { border-radius: 0 0 18px 18px; }
+  .page-homebar { position: absolute; height: 5px; border-radius: 3px; background: rgba(255,255,255,.85); mix-blend-mode: difference; }
+  .page-mark { box-sizing: border-box; border: 2px solid var(--t-accent, currentColor); border-radius: 6px; }
+  .page-aim { box-sizing: border-box; border: 1px dashed var(--t-accent, currentColor); border-radius: 4px; }
+  .page-mark[hidden], .page-aim[hidden] { display: none; }
+  /* `live` (a5530): the painter's clock and counts; `until ring` a ring that empties, the time left inside it */
+  .t-live { font-variant-numeric: tabular-nums; }
+  .t-ring { position: relative; display: grid; place-items: center; aspect-ratio: 1; width: 100%; max-width: 9em; margin-inline: auto; white-space: nowrap; }
+  .t-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .t-ring circle { fill: none; stroke-width: 5; }
+  .t-ring .ring-track { stroke: currentColor; opacity: 0.13; }
+  .t-ring .ring-arc { stroke: var(--t-accent, currentColor); stroke-linecap: round; stroke-dasharray: 1 1; transition: stroke-dashoffset 1s linear; }
+  .t-ring[data-ended] .ring-arc { opacity: 0; }     /* a round cap would leave a dot at zero */
+  .t-live[data-ended] { animation: live-end 1.8s ease-in-out 3; }
+  /* a6443: album art alone fills the part and takes its corners. */
+  .t-media.media-picture { margin: 0; gap: 0; display: block; border-radius: inherit; overflow: hidden; aspect-ratio: 1; width: 100%; }
+  .media-picture > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+  @keyframes live-end { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .t-ring .ring-arc { transition: none; } .t-live[data-ended] { animation: none; } }
   [data-focus] [contenteditable]:focus { outline: 1px solid var(--t-focus); outline-offset: 2px; }
+  /* a6642: the press the arrow keys are on, inside an `arrows` frame (its float too): a state, not a motion */
+  [data-arrows] [role="button"]:focus-visible { outline: 2px solid var(--t-focus, currentColor); outline-offset: -2px; border-radius: .3em; }
   [data-tool] { cursor: pointer; user-select: none; }
   [data-pressed] { opacity: 0.45; }   /* a press that is on its way to the desk */
   /* marks in a text (a3486): weight and slant are the reader's own signs, so they are not roles of a style */
   .t-mark-strong { font-weight: 700; } .t-mark-stress { font-style: italic; }
   .t-mark-link { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; color: inherit; }
+  /* a6109: an id drawn as its thing's name: quiet, the words' own colour, a faint underline that firms on hover */
+  .t-mark-thing { color: inherit; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
+  .t-mark-thing[data-thing]:not([data-thing=""]) { cursor: pointer; }
+  .t-mark-thing:hover { text-decoration-style: solid; text-decoration-color: currentColor; }
   /* scrollbars from the style (Alex, 30 Sep: skinny square bars that fit the theme). A style with a `scrollbar` token
      (the thumb's colour) and `scrollbar_w` (its width) draws them; without one the browser's own stay. */
   [data-bars] ::-webkit-scrollbar { width: var(--t-scrollbar_w); height: var(--t-scrollbar_w); background: transparent; }
@@ -108,6 +209,10 @@
 <script src="viewer.js"></script>
 <script src="door.js"></script>
 <script src="image-comments.js"></script>
+<script src="markdown.js"></script>
+<script src="textedit.js"></script>
+<script src="media.js"></script>
+<script src="page.js"></script>
 <script src="lens.js"></script>
 <script src="term.js"></script>
 </body>

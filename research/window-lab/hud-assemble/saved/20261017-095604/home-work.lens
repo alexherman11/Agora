@@ -1,0 +1,17 @@
+# home-work: who of the house is at work now, one panel of the home base (a5208). Split out of home-base by a5496.
+work : column
+  busy : column
+    of house doing=working as h
+    each busy
+  quiet : text "Everyone is resting."
+    role meta
+    only when count(house doing=working) = 0
+busy : row
+  role busy
+  dot : text "•"
+    role live
+  who : text "$h.resident"
+    role who
+    share 1
+  what : text "working"
+    role meta

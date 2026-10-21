@@ -34,11 +34,21 @@ def path(world, name):
     return d / f"{name}.json" if d is not None and _NAME.match(str(name)) else None
 
 
-def write(world, name, rows, by):
-    """Keep `rows` as what `by` (this process) witnesses now, in place of what it said before."""
+def write(world, name, rows, by, changed_only=False):
+    """Keep `rows` as what `by` (this process) witnesses now, in place of what it said before. changed_only (a6153): when
+    this process already said exactly these rows, leave the file as it is and return None. Every rewrite is a new scene
+    for every open page (stamp() is in deskd's scene key, and the door's stream tells each painter): the home base's host
+    rewrote four unchanged sources every 2 s, so each open lens was built again every 2 s and a press waited behind it."""
     p = path(world, name)
     if p is None:
         raise ValueError(f"not a world and source name: {world!r} {name!r}")
+    if changed_only:
+        try:
+            was = json.loads(p.read_text(encoding="utf-8"))
+            if was.get("by") == by and was.get("pid") == os.getpid() and was.get("rows") == json.loads(json.dumps(rows)):
+                return None
+        except (OSError, ValueError, AttributeError):
+            pass
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(p.name + f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps({"by": by, "pid": os.getpid(), "at": time.time(), "rows": rows}, ensure_ascii=False),

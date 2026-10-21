@@ -1,0 +1,23 @@
+# home-icon (a6271): the icon of the thing it stands on. The thing says icon=<name>; the drawing is the note in Icons
+# (role=icon) with that icon=, drawn in the colour of the part around it (its strokes are currentColor), so one drawing
+# is white, amber or mint as the bar's rule says. A thing with no icon of its own shows its glyph= as a character.
+# Placed by the bar (home-dock) under each item: `lens home-icon` under a part that stands on the thing.
+icon : column
+  role tbicon
+  only when ($item or "") != ""
+  of $item as t
+  each draw
+draw : column
+  role tbicon
+  pics : column
+    role tbicon
+    only when ($t.icon or "") != ""
+    of kind:note,prop:role=icon,prop:icon=$t.icon as ic
+    each pic
+  glyph : text "$t.glyph"
+    role tbglyph
+    only when ($t.icon or "") = "" or count(kind:note,prop:role=icon,prop:icon=$t.icon) = 0
+pic : text "$text"
+  role tbpic
+  picture
+  only when $index = 1

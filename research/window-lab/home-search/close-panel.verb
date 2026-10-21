@@ -1,0 +1,4 @@
+# close-panel <panel> <column>: × on a panel that shows one thing (home-thing, made by open-found, a6642) puts it away
+# for good; a column it leaves empty goes too, so the others take its room.
+do remove $1
+do remove $2 when count(in:$2) = 0

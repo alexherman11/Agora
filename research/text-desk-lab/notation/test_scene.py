@@ -266,6 +266,28 @@ def test_carry_and_drop_shape():
         tmp.unlink(missing_ok=True)
 
 
+def test_drop_sides_and_double():
+    """a5994 (Alex: a panel dragged anywhere snaps, shown before release; a double-click fills the room): `on drop <part>
+    at left|right|top|bottom` is one receiver's act for a drop near that edge, beside its plain `on drop`; `on double`
+    is a double-click. Both reach the painter with their lines filled, and the text printer says the side."""
+    refused("root : column, of kind:note, each c, on drop c at middle do move $carried into=$item\nc : text a, carry", "at <left|right|top|bottom>")
+    _, parts = scene.parse("root : column, of kind:note, each c, on drop c at left do move $carried before=$item, on drop c do swap $carried $item\n"
+                           "c : text a, carry, on double do prop $item big=yes")
+    assert parts["root"]["on"][0] == {"on": "drop", "line": "do move $carried before=$item", "part": "c", "side": "left"}, parts["root"]["on"]
+    assert parts["root"]["on"][1] == {"on": "drop", "line": "do swap $carried $item", "part": "c"}
+    assert parts["c"]["on"] == [{"on": "double", "line": "do prop $item big=yes"}]
+    import deskd, lens_ir
+    tmp = _scratch("_test_drop_sides")
+    try:
+        with deskd.Session("_test_drop_sides", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, chr(10).join(["root : column, of kind:note, each c, on drop c at top do move $carried into=f01, on drop c do move $carried into=f01",
+                                                      'c : text "$title", carry']))
+            assert sc["acts"][0] == {"on": "drop", "line": "do move $carried into=f01", "part": "c", "side": "top"} and "side" not in sc["acts"][1]
+            assert "· drop c at top: do move $carried into=f01" in scene.to_text(sc, "t", "jeff", 0)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_role_when_follows_state():
     """a1105: `role <name> when <selection | value test>`; the first that holds wins, else the plain role, and the
     scene prints the role it chose and why. Both evaluators agree."""
@@ -506,6 +528,32 @@ def test_fold_group():
             kids = scene.painter_view(sc)["kids"]
             assert [k["paint"]["fold"].get("group") for k in kids] == ["talk", "talk"], kids
             assert scene.to_text(sc, "ws", "jeff", 0).count("group talk") == 2
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_fold_inline():
+    """a5359 (Alex c5367): `fold ... inline` draws the handle beside the part's peek and a press on the peek opens it.
+    The painter is told `inline`; with no label of its own the handle is the arrow alone (the label is ""); both
+    printers say it; since a6265 it may also float (a press on the peek opens a popover over the page: At work's line);
+    a fold without it is as before (its label falls back to the part's name)."""
+    src = chr(10).join(["ws : column", "  card : column, fold inline", '    line : text "the title", peek', '    more : text "x"',
+                        '  old : column, fold', '    u : text "y"'])
+    _, both = scene.parse(chr(10).join(["x : column, fold float inline", '  line : text "a", peek', '  pop : text "b"']))
+    assert both["x"]["fold_inline"] and both["x"]["fold_float"], both["x"]
+    refused('x : column, fold sideways', "[inline]")
+    root, parts = scene.parse(src)
+    assert [k.get("fold_inline") for k in parts["ws"]["kids"]] == [True, False]
+    import deskd, lens_ir
+    tmp = _scratch("_test_inline")
+    try:
+        with deskd.Session("_test_inline", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            card, old = scene.painter_view(sc)["kids"]
+            assert card["paint"]["fold"].get("inline") is True and card["paint"]["fold"]["label"] == "", card["paint"]["fold"]
+            assert "inline" not in old["paint"]["fold"] and old["paint"]["fold"]["label"] == "old", old["paint"]["fold"]
+            assert scene.to_text(sc, "ws", "jeff", 0).count(" inline") == 1
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -825,6 +873,16 @@ def test_day_or_time():
     assert f("soon", "2026-09-25") == "none"
 
 
+def test_words_of():
+    """a5398: what someone typed in a find box, as one ? term (a selection splits on spaces and commas)."""
+    import expr as X
+    f = lambda a: X.fmt(X.call("words-of", [X.typed(a)]))      # noqa: E731
+    assert f("home base") == "home+base"
+    assert f("  kanban,  board ") == "kanban+board"
+    assert f("lowdown") == "lowdown"
+    assert f("   ") == "none"
+
+
 def test_functions_days_and_the_tree_reader():
     """9 Oct (step 5 of the grammar unification): derive is a let that calls a function; a function's arguments are
     expressions; days:<a>..<b> is a row source with terms over its fields; `over` a let of kind rows still repeats;
@@ -933,7 +991,24 @@ def test_a_texts_keys_and_a_buttons_press():
     assert not any(l.startswith("press") for l in verbs._lens_steps(src)), verbs._lens_steps(src)
     refused('root : column\n  w : text "x"\n    on key Enter do look', "has no `on edit`")
     refused('root : column\n  w : text "x"\n    on edit do look\n    on key F5 do look', "on key <Enter|Tab|Shift+Tab|Backspace|Delete>")
-    refused('root : column\n  w : text "x"\n    on click press Ctrl+Q', "on click press <Ctrl+B|Ctrl+I|Ctrl+K>")
+    refused('root : column\n  w : text "x"\n    on click press Ctrl+Q', "on click press <Ctrl+B|Ctrl+I|Ctrl+K|Ctrl+E|Ctrl+S>")
+
+
+def test_a_button_asks_the_host():
+    """a5300: `on click host <verb> [words]` asks the program the page is painted in (the home base); like `press` it is
+    the painter's own act, so it is never a desk line, and its words keep their $fields for the build to fill."""
+    import verbs
+    src = ('root : column\n  n : text "Next"\n    on click host media.next\n  t : text "Go"\n    on click host bring $w.name\n'
+           '  d : text "Done"\n    on click do prop $item done=yes')
+    _root, parts = scene.parse(src)
+    acts = {k["name"]: k["on"] for k in scene._walk(parts["root"])}
+    assert acts["n"] == [{"on": "click", "line": "host media.next"}], acts["n"]
+    assert acts["t"] == [{"on": "click", "line": "host bring $w.name"}], acts["t"]
+    assert acts["d"][0]["line"] == "do prop $item done=yes"
+    steps = verbs._lens_steps(src)
+    assert not any(l.startswith(("host", "do host")) for l in steps) and any("done=yes" in l for l in steps), steps
+    refused('root : column\n  w : text "x"\n    on click host', "on click host <verb> [words]")
+    refused('root : column\n  w : text "x"\n    on click host Media!', "on click host <verb> [words]")
 
 
 def test_count_word_and_true_size():
@@ -1189,6 +1264,20 @@ def test_style_read_once():
     assert dark["theme"] == "dark" and dark["tokens"]["paper"]["value"] == "#131517" and dark["roles"]["card"]["look"]["on"] == "#191C1F"
     sheet = style.looks("token gap = 8\nrole sheet : height 60em, width 30em, height gap x40, afloat, shy, pulse")["roles"]["sheet"]["look"]
     assert sheet == {"height_em": 60.0, "width_em": 30.0, "height": 320, "afloat": True, "shy": True, "pulse": True}
+    icon = style.looks("token gap = 8\nrole icon : corner gap, touch")["roles"]["icon"]       # a5500: answers the pointer
+    assert icon["look"] == {"corner": 8, "touch": True} and not icon["unread"]
+    # a6010: a card that leaves its list while a press on its Looks good waits for the desk (style.js draws the pair as one
+    # :has rule over the pressed part's data-sending); both flags are read, none is left unread
+    pair = style.looks("token gap = 8\nrole card : corner gap, leaves\nrole ok : away")["roles"]
+    assert pair["card"]["look"] == {"corner": 8, "leaves": True} and pair["ok"]["look"] == {"away": True}
+    assert not pair["card"]["unread"] and not pair["ok"]["unread"]
+    # a5504: a lane's rail, a live card's glow, a card that glides; lift takes the `shadow` token's colour when there is one
+    board = style.looks("token gap = 8\ntoken ink = #E9EEEA\ntoken shadow = #000000\ntoken accent = #8DCDB4\n"
+                        "role card : rail accent, glow accent, lift gap /2, glide\nrole plain : lift gap")["roles"]
+    assert board["card"]["look"] == {"rail": "#8DCDB4", "glow": "#8DCDB4", "lift": 4, "lift_ink": "#000000", "lift_shadow": True, "glide": True}
+    assert not board["card"]["unread"]
+    assert style.looks("token gap = 8\ntoken ink = #E9EEEA\nrole plain : lift gap")["roles"]["plain"]["look"] == {"lift": 8, "lift_ink": "#E9EEEA"}
+    assert style.looks("role x : rail nothing")["roles"]["x"]["unread"]            # a rail names a colour token
     fonts = style.looks("font pixel = Silkscreen, monospace\ntoken text.pixel = pixel 13/1.3\nrole t : text.pixel up")
     assert fonts["roles"]["t"]["look"]["text"] == {"family": "'Silkscreen', monospace", "size": 15, "leading": 1.3} and fonts["fonts"]["pixel"]["face"] == "Silkscreen"
     out = style.for_painter({"name": "x", "text": "role x on paper"}, None)
@@ -1280,16 +1369,82 @@ def test_let_if_and_arithmetic():
         tmp.unlink(missing_ok=True)
 
 
-if __name__ == "__main__":
-    import os
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from
-    n = 0
-    for name, fn in list(globals().items()):
-        if name.startswith("test_"):
-            fn()
-            n += 1
-            print("ok", name)
-    print(f"{n} passed")
+def test_share_follows_data_and_scroll_none():
+    """a5496 (Alex, 15 Oct: panels that never scroll, and one widened pushes the others): `share $(expr)` or `share $name`
+    is a weight filled per part (above 0 a weight, else the part keeps its own size; never sent unfilled); `scroll none`
+    and `scroll none end` are read."""
+    src = chr(10).join(["ws : column, scroll none", "  a : column", "    let w = 3 when 1 = 1", "    let w = 1 otherwise",
+                        "    share $w", "  b : column, share $(2 - 2)", "  c : column, share $(1 + 1), scroll none end"])
+    refused("x : column, share big", "share $(<expr>)")
+    refused("x : column, scroll sideways", "none end")
+    import deskd, lens_ir
+    tmp = _scratch("_test_share_data")
+    try:
+        with deskd.Session("_test_share_data", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pv = scene.painter_view(sc)
+            a, b, c = pv["kids"]
+            assert pv["paint"]["scroll"] == "none"
+            assert a["paint"]["share"] == 3, a["paint"]
+            assert "share" not in b["paint"], b["paint"]          # 0: its own size, and no template reaches the painter
+            assert c["paint"]["share"] == 2 and c["paint"]["scroll"] == "none end"
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_live_words_now_and_newest_first():
+    """a5530 (Alex: a clock top left, a pomodoro whose ring counts down and whose state is a world fact, notifications
+    newest first). `live clock|date|until [ring]` is a text the painter keeps live; `on end` needs `live until`; $now is
+    the moment a line runs (a lens leaves it for the press); a time keeps its seconds; `by -<prop>` is the largest
+    first; two ids of one letter compare by number (e9 < e10)."""
+    import datetime, re as _re
+    import deskd, expr as X, lens_ir, moo
+    refused('x : text "a", live sometimes', "live <clock|date|until|until ring>")
+    assert scene.parse('x : text "media/now-playing/a.jpg", media picture')[1]["x"]["media"] == "picture"
+    refused('x : text "a", media poster', "media picture")
+    refused('x : column, live clock', "is a text word")
+    refused('x : text "a", on end do prop $item state=done', "needs `live until`")
+    refused('x : text "a", live clock, on end do prop $item state=done', "needs `live until`")
+    refused('x : text "a", live until, on edit do prop $item a="$value"', "edit them in a part without `live`")
+    assert X.fmt(X.typed("2026-10-15T17:04:58")) == "2026-10-15 17:04:58" and X.fmt(X.typed("2026-10-15 17:04")) == "2026-10-15 17:04"
+    lt = lambda a, b: X._cmp("<", X.typed(a), X.typed(b)).v      # noqa: E731
+    assert lt("e9", "e10") and not lt("b9", "a10") and lt("e10688", "e10791")     # one letter by number; else as words
+    assert [k for k in moo.sort_by(["e9", "e10", None, "e100"], ["-x"], lambda v, k: v)] == ["e100", "e10", "e9", None]
+    timer = chr(10).join([
+        "pomo : column, of prop:role=pomodoro as t, each timer",
+        "timer : column",
+        "  let ends = $t.started + $t.left * 1m / 60",
+        '  ring : text "$(ends) of 1500", live until ring, on end do prop $t state=done',
+        '  start : text "Start", on click do prop $t state=running started=$now left=1500',
+        "notes : column, of prop:role=notice as nt, each n",
+        "  by -came",
+        'n : text "$nt.title"'])
+    tmp = _scratch("_test_live")
+    try:
+        with deskd.Session("_test_live", "jeff") as desk:
+            say = lambda line: (lambda r: r.get("text") or r.get("error"))(desk.dispatch("desk", {"line": line}))   # noqa: E731
+            say("look")
+            say("do create f01 kind=note title=timer role=pomodoro started=2026-10-15T17:04:58 left=90")
+            for t, came in (("older", "2026-10-15T09:00:05"), ("newest", "2026-10-15T09:00:09"), ("middle", "2026-10-15T09:00:07")):
+                say(f"do create f01 kind=note title={t} role=notice came={came}")
+            sc = lens_ir.evaluate(desk, timer)
+            scene.emit(sc)
+            pv = scene.painter_view(sc)
+            ring, start = pv["kids"][0]["kids"]
+            assert ring["paint"]["text"] == "2026-10-15 17:06:28 of 1500" and ring["paint"]["live"] == "until ring", ring["paint"]
+            assert "runs" not in ring["paint"] and [a["on"] for a in ring["acts"]] == ["end"], ring
+            assert start["acts"][0]["line"].endswith("started=$now left=1500"), start["acts"]      # left for the press
+            assert "live until ring" in scene.to_text(sc, "t", "jeff", 0)
+            order = [k["text"] for k in lens_ir.evaluate(desk, "notes : column, of prop:role=notice as nt, each n\n  by -came\nn : text \"$nt.title\"")["kids"]]
+            assert order == ["newest", "middle", "older"], order
+            before = datetime.datetime.now().replace(microsecond=0)
+            say('read "timer"')
+            r = say('do prop "timer" state=running started=$now')
+            got = _re.search(r"started=(\S+)", r).group(1)
+            assert before <= datetime.datetime.fromisoformat(got) <= datetime.datetime.now(), (got, r)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def test_picture_is_a_text_drawn():
@@ -1310,3 +1465,263 @@ def test_picture_is_a_text_drawn():
             assert "picture" in scene.to_text(sc, "w", "jeff", 0)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def test_tip_names_a_part_filled_as_words():
+    """a6271 (Alex, 17 Oct: icons with no text, 'if I hover them it should say what they are'): `tip "<name>" ["<what it
+    does>"]` on any part, frame or text, filled as words are ($frame.prop, $(expr)); the painter shows it on hover. An
+    absent part sends none, a missing prop fills empty, and the printer says it, since an icon has no words of its own."""
+    refused('x : column, tip', "tip")
+    refused('x : column, tip "a" "b" "c"', "tip")
+    refused('x : column, tip "a" b', "tip")
+    import deskd, lens_ir
+    tmp = _scratch("_test_tip")
+    try:
+        with deskd.Session("_test_tip", "jeff") as desk:
+            say = lambda line: desk.dispatch("desk", {"line": line})["text"]   # noqa: E731
+            say("look f01")
+            say('do create f01 kind=note title=Board role=app about="The whole board, in the middle."')
+            say("do create f01 kind=note title=Music role=app")
+            src = chr(10).join(["w : column, of prop:role=app as d, each app",
+                                "app : column",
+                                '  let k = 2',
+                                '  tip "$d.title" "$d.about $(k) apps."',
+                                '  gone : text "x"',
+                                "    only when 1 = 2",
+                                '    tip "never"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            apps = scene.painter_view(sc)["kids"]
+            tips = sorted(tuple(a["paint"]["tip"]) for a in apps)
+            assert tips == [("Board", "The whole board, in the middle. 2 apps."), ("Music", " 2 apps.")], tips
+            assert all(a["paint"]["kind"] == "frame" for a in apps)
+            assert all("tip" not in a["kids"][0]["paint"] for a in apps), [a["kids"][0]["paint"] for a in apps]
+            assert 'tip "Board" "The whole board, in the middle. 2 apps."' in scene.to_text(sc, "w", "jeff", 0)
+    finally:
+        tmp.unlink(missing_ok=True)
+    import style        # and the bar's style word beside it: `hover <colour>`, a ground under the pointer, no motion
+    lk = style.looks("token ink = #E9EEEA\ntoken wash = #E9EEEA12\nrole icon : ink, hover wash")["roles"]["icon"]["look"]
+    assert lk == {"ink": "#E9EEEA", "hover": "#E9EEEA12"}, lk
+
+
+def test_markdown_is_a_document_and_its_wikilinks_name_things():
+    """a5820: `markdown` paints a text as a Markdown document; the painter reads it, the scene names each [[target]]:
+    an id stays that thing (a rename keeps it), a title is matched whole in any case, and what names nothing says so."""
+    refused("x : column, markdown", "prints no text")
+    import deskd, lens_ir
+    tmp = _scratch("_test_markdown")
+    try:
+        with deskd.Session("_test_markdown", "jeff") as desk:
+            w = desk.world
+            some = next(i for i, n in w.nodes.items() if n.get("type") != "surface" and (w.subjects.get(n.get("subject")) or {}).get("title"))
+            title = w.subjects[w.nodes[some]["subject"]]["title"]
+            md = f"# Head\\n- see [[{some}|that]] and ![[{some}]]\\n- [[nothing called this]]"
+            src = chr(10).join(["w : column", f'  doc : text "{md}", markdown, on link do prop $item open=$value',
+                                '  flat : text "**x** [[y]]"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            doc, flat = scene.painter_view(sc)["kids"]
+            p = doc["paint"]
+            assert p["markdown"] is True and "runs" not in p
+            assert p["wikilinks"][some]["id"] == some and p["wikilinks"][some]["title"] == title
+            assert p["wikilinks"]["nothing called this"]["id"] == ""
+            assert any(a["on"] == "link" for a in doc["acts"])
+            assert "markdown" not in flat["paint"] and "wikilinks" not in flat["paint"]
+            assert "markdown · links 1 of 2" in scene.to_text(sc, "w", "jeff", 0)
+            by_title = scene.wikilinks_of(w, f"[[{title.upper()}]]")[title.upper()]
+            assert by_title["id"] and by_title["title"].lower() == title.lower()
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_a_markdown_message_keeps_its_media_and_its_names():
+    """a6452 (Alex, 17 Oct: rich chat): `markdown` and `media` on one read text (a chat message) compose: the scene
+    paints the document, the films and pictures its words name, and its ids as names; an id in a path stays the path.
+    Editing such a part is still refused (the words are written in a part without `media`)."""
+    scene.parse('x : text "a", markdown, media')
+    refused('x : text "a", markdown, media, on edit do rewrite $item text="$value"', "is edited")
+    import deskd, lens_ir
+    tmp = _scratch("_test_md_media")
+    shown = {"path": "media/clip.mp4", "src": "/media/media/clip.mp4", "kind": "video", "name": "clip.mp4"}
+    real = scene.media_of
+    scene.media_of = lambda text: [shown] if "clip.mp4" in text else []
+    try:
+        with deskd.Session("_test_md_media", "jeff") as desk:
+            w = desk.world
+            some = next(i for i, n in w.nodes.items() if n.get("type") != "surface" and (w.subjects.get(n.get("subject")) or {}).get("title"))
+            md = f"# Head\\n| a | b |\\n|---|---|\\n| {some} | 1 |\\n\\nmedia/clip.mp4 and demos/{some}/x.png"
+            sc = lens_ir.evaluate(desk, chr(10).join(["w : column", f'  doc : text "{md}", markdown, media']))
+            scene.emit(sc)
+            p = scene.painter_view(sc)["kids"][0]["paint"]
+            assert p["markdown"] is True and "runs" not in p
+            assert p["media"] == {"mode": "embed", "items": [shown]}, p.get("media")
+            assert list(p["things"]) == [some], p.get("things")        # named once, in the table; not inside the path
+    finally:
+        scene.media_of = real
+        tmp.unlink(missing_ok=True)
+
+
+def test_ids_in_words_are_drawn_as_the_names_of_what_they_name():
+    """a6109 (Alex, 16 Oct: 'I should never see id names'): an id in words that are only read is drawn as its thing's
+    name, a link carrying the id; an id-looking word that names nothing, an id in code, a text that says `ids` and a
+    text being written keep their words. The printer and the fence keep the words as written."""
+    refused("x : column, ids", "prints no text")
+    import deskd, lens_ir
+    tmp = _scratch("_test_names")
+    try:
+        with deskd.Session("_test_names", "jeff") as desk:
+            w = desk.world
+            some = next(i for i, n in w.nodes.items() if i.startswith("a") and n.get("type") != "surface" and (w.subjects.get(n.get("subject")) or {}).get("title"))
+            title = w.subjects[w.nodes[some]["subject"]]["title"]
+            sid = w.nodes[some]["subject"]
+            room = next(i for i, n in w.nodes.items() if n.get("type") == "surface" and n.get("title"))
+            cs = next(((s, c) for s in w.subjects.values() for c in s.get("comments") or [] if s.get("title") and w.appearances_of(s["id"])), None)
+            ev = {"id": "e99999", "verb": "comment", "target": some, "args": {}, "undo": None, "note": "", "by": "pike", "at": "2026-10-16T12:00:00"}
+            w.events.append(ev)                              # the probe world's own events are e1..e9, too short to be ids
+            ghost = "a" + str(10 ** 9)                      # id-shaped, names nothing
+            words = f"see {some}, {sid} in {room}; {ghost} and a12x and xa{some[1:]} and `{some}` and {ev['id']}" + (f" and {cs[1]['id']}" if cs else "")
+            src = chr(10).join(["w : column, on link do prop $item open=$value", f'  t : text "{words}"', f'  raw : text "{words}", ids',
+                                f'  ed : text "{words}", on edit do rewrite $item text="$value"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            t, raw, ed = scene.painter_view(sc)["kids"]
+            rs = t["paint"]["runs"]
+            named = {r["id"]: r for r in rs if r.get("mark") == "thing"}
+            assert t["paint"]["text"] == words, "the words stay as written"
+            assert named[some]["text"] == scene._short(title) and named[some]["open"] == some and some in named[some]["title"]
+            assert named[sid]["open"] == some, "a subject id opens where it appears"
+            assert named[room]["text"] and named[room]["kind"] == "surface"
+            assert ghost not in named and ghost in "".join(r["text"] for r in rs), "an id that names nothing stays as words"
+            assert "a12x" in "".join(r["text"] for r in rs) and f"xa{some[1:]}" in "".join(r["text"] for r in rs)
+            assert any(r.get("role") == "code" and r["text"] == some for r in rs), "an id in code stays code"
+            assert named[ev["id"]]["kind"] == "event" and named[ev["id"]]["text"].endswith(scene._short(scene._ctx_for(w, ev["target"])["title"], 36))
+            if cs:
+                assert named[cs[1]["id"]]["text"].startswith("comment by ") and named[cs[1]["id"]]["open"] == w.appearances_of(cs[0]["id"])[0]
+            assert not any(r.get("mark") == "thing" for p in (raw["paint"], ed["paint"]) for r in p.get("runs") or [])
+            assert words in scene.to_text(sc, "w", "jeff", 0), "the printer prints the words"
+            assert any(a["on"] == "link" for a in scene.painter_view(sc)["acts"]), "`on link` may stand on any part"
+            worker = scene.things_of(w, "worker-" + some)["worker-" + some]
+            assert worker["name"].startswith("worker on ") and worker["open"] == some
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_a_persons_name_is_a_link_where_it_stands_alone():
+    """a6109, c6186: a person is printed by name, so the name is the link, where a text is only that name or ends
+    'by|to|from <name>'; never in prose, never in a text that is a button, and a word nobody bears stays words."""
+    import deskd, lens_ir, persons
+    tmp = _scratch("_test_people")
+    try:
+        with deskd.Session("_test_people", "jeff") as desk:
+            w = desk.world
+            persons.begin(w, actor="jeff")
+            pid = persons.today(w, "jeff")
+            assert pid, "persons began"
+            src = chr(10).join(["w : column", '  alone : text "jeff"', '  by : text "asked by jeff"', '  prose : text "jeff wrote this and jeff left"',
+                                '  chip : text "jeff"', "    on click do prop $item to=jeff", '  nobody : text "by zzyzx"', f'  pid : text "said {pid}"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            alone, by, prose, chip, nobody, byid = scene.painter_view(sc)["kids"]
+            link = lambda k: [r for r in k["paint"].get("runs") or [] if r.get("mark") == "thing"]      # noqa: E731
+            assert [r["text"] for r in link(alone)] == ["jeff"] and link(alone)[0]["kind"] == "person"
+            assert link(alone)[0]["open"] == (persons.corner(w, pid) or pid)
+            assert [r["text"] for r in link(by)] == ["jeff"] and "".join(r["text"] for r in by["paint"]["runs"]) == "asked by jeff"
+            assert not link(prose) and not link(chip) and not link(nobody)
+            assert [r["kind"] for r in link(byid)] == ["person"], "a person's id is their name"
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_search_box_words():
+    """a6642 (Alex: a search at the top of the HUD; Ctrl+K or typing reaches it, arrows choose, titles first): `caret`
+    on a text being written, `arrows` on a frame, and `title:a+b` (every word in the title) beside ?a+b. Imagined use:
+    a person who wrote 'Garden plan' and, elsewhere, a shopping list that mentions the garden plan, searches 'plan
+    garden': the title is first, the mention after, and 'gardenplan' or one word alone does not stand for both."""
+    assert scene.parse('root : column, arrows\n  a : text "x"')[1]["root"]["arrows"] is True
+    refused("root : column\n  a : text \"x\", arrows", "frame word")
+    refused('root : column\n  a : text "x", caret Ctrl+K', "no `on edit`")
+    refused('root : column\n  a : text "x", caret Alt+F4, on edit do prop $item q="$value"', "caret <")
+    refused('root : column\n  a : text "x", caret typing typing, on edit do prop $item q="$value"', "caret <")
+    import deskd, lens_ir
+    tmp = _scratch("_test_search_box")
+    try:
+        with deskd.Session("_test_search_box", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=note title='Garden plan' text='beds by the fence'")
+            desk.repl("do create f01 kind=note title=Shopping text='seeds for the garden plan, twine'")
+            desk.repl("do create f01 kind=note title='Plan for the shed'")
+            desk.repl("do create f01 kind=note title=Search q='plan garden'")
+            src = chr(10).join(["root : column, arrows, the title:Search as s",
+                                '  box : text "$s.q", caret Ctrl+K typing, on edit do prop $s q="$value"',
+                                "  list : column",
+                                "    let q = words-of($s.q)",
+                                "    titles : column, of title:$q as f, each hit",
+                                "    rest : column, of ?$q,-title:$q as f, each hit",
+                                'hit : text "$title", on click do prop $s q=""'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            assert sc["paint"].get("arrows") is True, sc["paint"]
+            box, lst = sc["kids"]
+            assert box["paint"]["caret"] == ["Ctrl+K", "typing"] and box["paint"]["commit"] == "enter", box["paint"]
+            titles, rest = lst["kids"]
+            assert [k["text"] for k in titles["kids"]] == ["Garden plan"], titles["kids"]
+            assert [k["text"] for k in rest["kids"]] == ["Shopping"], rest["kids"]
+            text = scene.to_text(sc, "t", "jeff", 0)
+            assert "arrows" in text and "caret Ctrl+K typing" in text, text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_page_shows_a_lens_at_a_device_size():
+    """a6431 (Alex, 17 Oct: 'a webapp running in the middle the size of a phone'): `page <w> <h> ...` on a text whose
+    words name a lens (or a /path here) paints the real painter at that size; its size and choices may come from lets
+    (a person's chosen device), an empty let says nothing; `on pick` belongs to a page; an address elsewhere is no page.
+    Imagined use: Alex turns an iPhone on its side with safe areas on, and the same part repaints at 852 x 393."""
+    ok = scene.page_of("393 852 touch picks safe 59 0 34 0 cutout island mark app/a12/list")
+    assert (ok["w"], ok["h"], ok["touch"], ok["picks"], ok["safe"], ok["cutout"], ok["mark"]) == \
+        (393, 852, True, True, [59, 0, 34, 0], "island", "app/a12/list"), ok
+    for bad, said in (("393", "a width and a height"), ("10 852", "a width and a height"), ("393 852 safe 1 2", "four insets"),
+                      ("393 852 cutout star", "cutout <"), ("393 852 zoom", "none of these")):
+        assert "error" in scene.page_of(bad) and said in scene.page_of(bad)["error"], (bad, scene.page_of(bad))
+    refused('root : column\n  p : text "notes", page 393', "a width and a height")
+    refused('root : column\n  p : text "notes", on pick do prop $item picked="$value"', "has no `page`")
+    refused('root : column\n  p : text "notes", page 393 852, on edit do prop $item x="$value"', "is edited")
+    assert scene.page_source("notes") == "notes" and scene.page_source("notes on a12") == "notes on a12"
+    assert not scene.page_source("https://example.com/") and scene.page_source("/lens.html?lens=x") == "/lens.html?lens=x"
+    import deskd, lens_ir
+    tmp = _scratch("_test_page")
+    try:
+        with deskd.Session("_test_page", "jeff") as desk:
+            desk.repl("look")
+            desk.repl("do create f01 kind=note title=Preview app=notes up=no safe=on")
+            src = chr(10).join(["root : column, the title:Preview as pv",
+                                '  phone : text "$pv.app"',
+                                '    let w = 393 when ($pv.up or "yes") = "yes"',
+                                "    let w = 852 otherwise",
+                                '    let h = 852 when ($pv.up or "yes") = "yes"',
+                                "    let h = 393 otherwise",
+                                '    let insets = "safe 0 59 21 59 cutout island" when ($pv.safe or "") = "on"',
+                                '    let insets = "" otherwise',
+                                '    let picks = ""',
+                                "    page $w $h touch $picks $insets",
+                                '    on pick do prop $pv picked="$value" part="$part"'])
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            pg = sc["kids"][0]["paint"]["page"]
+            assert (pg["src"], pg["w"], pg["h"], pg["touch"], pg["picks"], pg["safe"], pg["cutout"]) == \
+                ("notes", 852, 393, True, False, [0, 59, 21, 59], "island"), pg
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+# a5820: this block stood above test_picture_is_a_text_drawn (13 Oct), so that test was never run; it stays last
+if __name__ == "__main__":
+    import os
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))      # the scratch sessions are named from the lab, wherever it is run from
+    n = 0
+    for name, fn in list(globals().items()):
+        if name.startswith("test_"):
+            fn()
+            n += 1
+            print("ok", name)
+    print(f"{n} passed")

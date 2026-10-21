@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_house_words (a1308): the house answers its own words. Every id kind it prints (a, s, f, e, c, l) can be typed
 back; help explains every command a person can type, the nouns it names itself by, and, for a word it doesn't know,
 names every door: the commands, the built-in verbs, the world verbs at hand where you are (Pike's a1299), the topics.

@@ -1,0 +1,146 @@
+# home-board: the board, one panel of the home base (a5208). a5359: commissions in lanes by their commission prop; a card moves when the prop does. Waiting on Alex is the waiting-on-me panel. Split out of home-base by a5496.
+# a5504 (Alex: 'the board looks boring af'): each lane has one colour, used only as small marks (its dot, its count, the
+# rail down its cards). A card is a raised tile; one whose worker is at work this moment breathes (glow); a worker that
+# asks its asker is warm. Cards glide to their new lane when the prop changes (glide, in home-style). Landed is quiet.
+tasks : column
+  let busy = count(house doing=working)
+  head : row
+    role bdhead
+    live : text "● $(busy) at work"
+      role bdlivecount
+      only when busy > 0
+  asked : column
+    role bdlane
+    let nasked = count(prop:commission=asked)
+    only when nasked > 0
+    head : row
+      role bdlanehead
+      dot : text "●"
+        role bddot.asked
+      name : text "ASKED"
+        role bdlanename
+      n : text "$(nasked)"
+        role bdcount.asked
+    cards : column
+      role bdcards
+      of prop:commission=asked as c
+      each taskcard
+  working : column
+    role bdlane
+    let nwork = count(prop:commission=working) + count(prop:commission=waiting)
+    only when nwork > 0
+    head : row
+      role bdlanehead
+      dot : text "●"
+        role bddot.working
+      name : text "WORKING"
+        role bdlanename
+      n : text "$(nwork)"
+        role bdcount.working
+    cards : column
+      role bdcards
+      of prop:commission=working as c
+      each taskcard
+    asking : column
+      role bdcards
+      of prop:commission=waiting as c
+      each taskcard
+  ready : column
+    role bdlane
+    let nready = count(prop:commission=ready)
+    only when nready > 0
+    head : row
+      role bdlanehead
+      dot : text "●"
+        role bddot.ready
+      name : text "READY TO LAND"
+        role bdlanename
+      n : text "$(nready)"
+        role bdcount.ready
+    cards : column
+      role bdcards
+      of prop:commission=ready as c
+      each taskcard
+  landing : column
+    role bdlane
+    let nland = count(prop:commission=landing)
+    only when nland > 0
+    head : row
+      role bdlanehead
+      dot : text "●"
+        role bddot.landing
+      name : text "LANDING"
+        role bdlanename
+      n : text "$(nland)"
+        role bdcount.landing
+    cards : column
+      role bdcards
+      of prop:commission=landing as c
+      each taskcard
+  landed : column
+    role bdlane
+    let nlanded = count(prop:commission=landed)
+    head : row
+      role bdlanehead
+      dot : text "●"
+        role bddot
+      name : text "LANDED"
+        role bdlanename
+      n : text "$(nlanded)"
+        role bdcount
+    cards : column
+      role bdcards
+      of prop:commission=landed as c
+      clamp last 3
+      each taskcard
+# one card, folded to its line; a press on its title opens it in place (a5359)
+taskcard : column
+  role bdcard
+  role bdcard.asked when $c.commission = "asked"
+  role bdcard.working when $c.commission = "working" and count(house doing=working resident=$c.worker) = 0
+  role bdcard.live when $c.commission = "working" and count(house doing=working resident=$c.worker) > 0
+  role bdcard.asking when $c.commission = "waiting"
+  role bdcard.ready when $c.commission = "ready"
+  role bdcard.landing when $c.commission = "landing"
+  role bdcard.landed when $c.commission = "landed"
+  fold inline handle cardopen
+  line : row
+    peek
+    role bdline
+    name : column
+      share 1
+      title : text "$c.title"
+        role bdtitle
+        role bdtitle.landed when $c.commission = "landed"
+        clamp 1
+    asks : text "asks"
+      role bdstate.asking
+      only when $c.commission = "waiting"
+    who : text "$(($c.asked_by or $c.owner) or "")"
+      role bdwho
+      only when (($c.asked_by or $c.owner) or "") != ""
+  more : column
+    role bdmore
+    full : text "$c.title"
+      role cardtitle
+    state : text "$(($c.commission or "for review")) · asked by $(($c.asked_by or "nobody")) · $(($c.worker or "no worker"))"
+      role meta
+    words : text "$c.text"
+      marks
+      role cardtext
+      clamp 6
+    notes : column
+      of comments:$c.item as m
+      each lastnote
+    open : text "Open"
+      role chip
+      on click do view $c.item
+lastnote : column
+  role cardnote
+  only when $index = $count
+  by : text "latest comment, from $m.by"
+    role meta
+  said : text "$m.text"
+    marks
+    role cardtext
+    clamp 4

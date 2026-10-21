@@ -1,0 +1,130 @@
+# home-viewer: the home base's middle (a5398). Find anything in the world, or press a pin, and it opens here, over
+# JEFF's chat; × gives the chat back and Back goes one step. What is open is the viewer's own note (role=home-view,
+# actor=$me): viewing= the thing, back= the one before, find= the words in the box, pins= ids with commas. Each kind is
+# shown by its own lens, home-<kind> (home-note, home-chat, home-surface); rewrite one to change how that kind looks.
+# Anything else gets the plain card below. JEFF may set viewing= only when Alex asked to be shown something.
+viewer : column
+  share 1
+  role viewer
+  mine : column
+    share 1
+    of prop:role=home-view,prop:actor=$me as v
+    each view
+  lost : column
+    share 1
+    only when count(prop:role=home-view,prop:actor=$me) = 0
+    chat : column
+      share 1
+      lens jeff-chat
+view : column
+  share 1
+  role viewer
+  bar : row
+    role findbar
+    box : text "$v.find"
+      role find
+      hint "Find anything: a note, a chat, a board…"
+      lines 1..1
+      share 1
+      commit enter only
+      on edit do prop $v find="$value"
+    clear : text "×"
+      role tool
+      only when ($v.find or "") != ""
+      on click do prop $v find=""
+    back : text "Back"
+      role chip
+      only when ($v.back or "") != ""
+      on click do prop $v viewing="$v.back" back="$v.viewing"
+  pins : row
+    role pins
+    only when ($v.pins or "") != ""
+    of $v.pins as p
+    each pin
+  found : column
+    share 1
+    role found
+    scroll scroll
+    let q = words-of($v.find)
+    only when ($v.find or "") != ""
+    none : text "Nothing holds those words."
+      role meta
+      only when count(?$q) = 0
+    titles : column
+      role foundlist
+      of ?$q as f
+      clamp 60
+      each titled
+    rest : column
+      role foundlist
+      of ?$q as f
+      clamp 60
+      each mentioned
+  open : column
+    share 1
+    only when ($v.viewing or "") != "" and $v.viewing != "a5080" and ($v.find or "") = ""
+    of $v.viewing as r
+    each shown
+  chat : column
+    share 1
+    only when (($v.viewing or "") = "" or $v.viewing = "a5080") and ($v.find or "") = ""
+    lens jeff-chat
+pin : text "$title"
+  role chip
+  role chip.on when $item = $v.viewing
+  clamp 1
+  on click do prop $v viewing=$p back="$v.viewing" find=""
+titled : column
+  only when $title has $v.find
+  hit : row
+    role hit
+    on click do prop $v viewing=$f back="$v.viewing" find=""
+    kind : text "$kind"
+      role meta
+    title : text "$title"
+      role who
+      clamp 1
+      share 1
+mentioned : column
+  only when $title !has $v.find
+  hit : row
+    role hit
+    on click do prop $v viewing=$f back="$v.viewing" find=""
+    kind : text "$kind"
+      role meta
+    title : text "$title"
+      role meta
+      clamp 1
+      share 1
+shown : column
+  share 1
+  role shown
+  head : row
+    role viewhead
+    title : text "$title"
+      role heading
+      clamp 2
+      share 1
+    kind : text "$kind · $item"
+      role meta
+    close : text "×"
+      role tool
+      on click do prop $v viewing="" back="$v.viewing"
+  known : column
+    share 1
+    only when $kind = "note" or $kind = "chat" or $kind = "surface"
+    lens home-$kind
+  plain : column
+    share 1
+    scroll scroll
+    only when $kind != "note" and $kind != "chat" and $kind != "surface"
+    facts : text "status $status · owner $owner · asked by $asked_by"
+      role meta
+      only when ($status or "") != ""
+    next : text "Next: $next"
+      role meta
+      marks
+      only when ($next or "") != ""
+    words : text "$text"
+      role prose
+      marks

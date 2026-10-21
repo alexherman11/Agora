@@ -1,0 +1,12 @@
+# Alex's layout (a5496): two columns of panels, all out; the viewer is pinned right by home-tiling itself.
+look f5204
+do create f5204 kind=surface title="Alex's home layout" layout=row
+do prop "Alex's home layout" role=home-layout actor=alex
+do create "Alex's home layout" kind=surface title="Alex's left column" layout=column
+do create "Alex's home layout" kind=surface title="Alex's middle column" layout=column
+do create "Alex's left column" kind=note title="Waiting on you" role=home-panel actor=alex lens=waiting-on-me lesser=waiting-on-me-small shelf=no
+do create "Alex's left column" kind=note title="The lowdown" role=home-panel actor=alex lens=home-lowdown lesser= shelf=no
+do create "Alex's left column" kind=note title="At work" role=home-panel actor=alex lens=home-work lesser=home-work-small shelf=no
+do create "Alex's middle column" kind=note title="The board" role=home-panel actor=alex lens=home-board lesser=home-board-small shelf=no
+do create "Alex's middle column" kind=note title="Music" role=home-panel actor=alex lens=home-music lesser=home-music-small shelf=no
+do create "Alex's middle column" kind=note title="On your screen" role=home-panel actor=alex lens=home-tiles lesser=home-tiles-small shelf=no

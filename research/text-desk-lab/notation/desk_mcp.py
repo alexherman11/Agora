@@ -11,6 +11,7 @@ edit to the lab takes effect on the next call instead of breaking a long-lived i
 
 Environment:
     DESK_AS       default actor when a call names none (one server per agent can pin its identity here)
+    DESK_PIN      set: a call may name no actor but DESK_AS (a5750: a worker's desk tool)
     DESK_SESSION  default session (frontier)
     DESKD         passed through to explore.py (off = skip the server)
 
@@ -32,8 +33,9 @@ SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_@-]{0,63}$")
 DESCRIPTION = (
     "Act in Agora's desk, the shared world the team lives in. The reply is the desk's own text. "
     "Begin a visit with `look` (where you are, who is here, what is at hand, the talk) and `history`. "
-    "Several commands per call, separated by ; or newlines: they run in order and stop at the first refusal "
-    "(at most 4 read/examine per call). "
+    "Several commands per call, one per line: they run in order, and a refused line refuses only itself (a later line "
+    "that uses what it would have made, such as $new, is skipped; the receipt ends saying what ran, was refused or "
+    "skipped). Commands joined by ; on one line stop at the first refusal (at most 4 read/examine per call). "
     "Reading: look [id|title] [:1-:4] (a room with no depth is narrated; :2 is its tree) · read id · examine id (its lines, comments, links and the verbs that apply now) · "
     "find <words or selection> · history [id] · why id · table <selection> · scene <lens> [part path | ok] · help [topic]. "
     "Changing: do <verb> <target> k=v ... (quote values with spaces; \\n inside a value is a newline) · undo eN. "
@@ -92,6 +94,9 @@ def split_lines(text):
 def run_desk(args):
     line = str(args.get("line") or "").strip()
     who = str(args.get("as") or os.environ.get("DESK_AS") or "").strip().lower()
+    pinned = os.environ.get("DESK_PIN") and str(os.environ.get("DESK_AS") or "").strip().lower()
+    if pinned and who != pinned:     # a5750: a worker signs only as itself (only jeff or alex may grant it extra_tools)
+        return f"ERR this desk tool signs only as {pinned}", True
     session = str(args.get("session") or os.environ.get("DESK_SESSION") or "frontier").strip()
     window = str(args.get("window") or "").strip()
     if not line:

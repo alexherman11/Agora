@@ -1,0 +1,157 @@
+# house-at-work-row: one person at work, one line (a6265), stood on their card (a worker) or corner (a resident) by
+# house-at-work. Who (a resident by name, JEFF lilac; a worker by what it is on, its maker in the popover, never an
+# id), what they are on in words (the card's brief=, else its title; a resident's focus=), one status word in the
+# light of whose move it is, since when, and how full their context is (a bar and a number, from witnessed:usage; none
+# when the house cannot read it). A press opens a popover over the panel: the context in tokens, their word now (the
+# card's now=, else their latest comment; a resident's last reply), their last few actions from the feed (the press
+# asks the house for it: watching= on the viewer note), and 'open the full feed' in the middle.
+row : column
+  let card = $item
+  only when ($item or "") != ""
+  of $item as c
+  each body
+body : column
+  let com = ($c.commission or "")
+  let ask = ($c.asked_by or "")
+  let task = $c.brief when ($c.brief or "") != ""
+  let task = $c.focus when ($c.focus or "") != ""
+  let task = $c.title otherwise
+  let word = ($c.now or "")
+  of prop:role=home-view,prop:actor=$me as v
+  each viewer
+  plain : text "No viewer note for you here (role=home-view, actor=you): a press has nowhere to open."
+    role atcalm
+    only when count(prop:role=home-view,prop:actor=$me) = 0
+viewer : column
+  of witnessed:usage kind=agent corner=$card as u
+  each person
+person : column
+  let st = "you" when $com = "waiting" and $ask = $me
+  let st = "asks" when $com = "waiting"
+  let st = "held" when ($u.held or "") != ""
+  let st = "quiet" when ($u.quiet or "") != ""
+  let st = "lit" when $u.doing = "working"
+  let st = "rest" when $u.doing = "resting"
+  let st = "idle" otherwise
+  let shown = "JEFF" when $u.actor = "jeff"
+  let shown = "Codex" when $com != "" and ($u.provider or "") = "codex"
+  let shown = "Claude" when $com != ""
+  let shown = $u.actor otherwise
+  role atperson
+  role atperson.on when ($v.viewing or "") = $card and ($v.with or "") = "home-feed"
+  role atperson.you when $st = "you"
+  role atperson.asks when $st = "asks"
+  role atperson.lit when $st = "lit"
+  fold float inline handle atmore
+  on open when ($v.watching or "") != $card do prop $v watching=$card
+  line : row
+    peek
+    role atline
+    who : text "$(shown)"
+      role atwho
+      role atwho.jeff when $u.actor = "jeff"
+      only when $com = ""
+    what : text "$(task)"
+      role atwhat
+      share 1
+      clamp 1
+    you : text "asks you"
+      role atstate.you
+      only when $st = "you"
+    asks : text "asks $(ask)"
+      role atstate.asks
+      only when $st = "asks"
+    held : text "held till $u.held"
+      role atstate
+      only when $st = "held"
+    quiet : text "quiet $u.quiet"
+      role atstate.warn
+      only when $st = "quiet"
+    lit : text "working"
+      role atstate.lit
+      only when $st = "lit"
+    idle : text "idle"
+      role atstate
+      only when $st = "idle"
+    rest : text "resting"
+      role atstate
+      only when $st = "rest"
+    since : text "$u.since"
+      role atsince
+      only when ($u.since or "") != ""
+    bar : text "<svg viewBox='0 0 100 10'><rect y='3' width='100' height='4' rx='2' fill='var(--t-ghost)'/><rect y='3' width='$u.ctx' height='4' rx='2' fill='var(--t-soft)'/></svg>"
+      role atbar
+      picture
+      only when ($u.ctxpct or "") != "" and ($u.ctx or 0) < 85
+    barfull : text "<svg viewBox='0 0 100 10'><rect y='3' width='100' height='4' rx='2' fill='var(--t-ghost)'/><rect y='3' width='$u.ctx' height='4' rx='2' fill='var(--t-ink)'/></svg>"
+      role atbar
+      picture
+      only when ($u.ctxpct or "") != "" and ($u.ctx or 0) >= 85
+    pct : text "$u.ctxpct"
+      role atpct
+      role atpct.full when ($u.ctx or 0) >= 85
+      only when ($u.ctxpct or "") != ""
+    nopct : text ""
+      role atpct
+      only when ($u.ctxpct or "") = ""
+  pop : column
+    role atpop
+    head : row
+      role atpophead
+      who : text "$(shown)"
+        role atwho
+        role atwho.jeff when $u.actor = "jeff"
+      what : text "$(task)"
+        role atpopwhat
+        share 1
+        clamp 2
+    ctx : text "context $u.ctxpct full · $u.ctxwords · $u.model"
+      role atpopmeta
+      only when ($u.ctxpct or "") != ""
+    noctx : text "context: not readable for this agent yet · $u.model"
+      role atpopmeta
+      only when ($u.ctxpct or "") = "" and ($u.model or "") != ""
+    now : text "$(word)"
+      role atpopnow
+      clamp 2
+      only when $word != ""
+    latest : column
+      only when $com != "" and $word = ""
+      of comments:$card by=$u.actor as m
+      each lastword
+    turn : column
+      only when $com = ""
+      of turns:$card as t
+      each lastturn
+    feed : column
+      role atpopfeed
+      of witnessed:feed-$card kind!=head as e
+      each feedline
+    wait : text "their actions arrive in a moment (the house writes the feed while you look)"
+      role atpopmeta
+      only when count(witnessed:feed-$card kind=head) = 0
+    go : row
+      role atpopgo
+      full : text "open the full feed"
+        role atgo
+        on click do prop $v viewing=$card back="$v.viewing" find="" with=home-feed
+lastword : text "$m.text"
+  role atpopword
+  only when $index = $count
+  clamp 2
+lastturn : text "$t.said"
+  role atpopword
+  only when $index = $count
+  clamp 2
+feedline : row
+  role atpopline
+  scroll none
+  only when $index > $count - 4
+  at : text "$e.at"
+    role atpoptime
+  kind : text "$e.kind"
+    role atpopkind
+    role atpopkind.quiet when $e.group != "actions"
+  words : text "$e.text"
+    role atpopword
+    clamp 1

@@ -1,0 +1,29 @@
+# CLI quota windows, never context tokens. Press a gauge to see source and age.
+usage : row
+  role puwidgets
+  of prop:role=home-view,prop:actor=$me as v
+  each gauges
+gauges : row
+  role puwidgets
+  of prop:role=usage-window,prop:usage_visible=yes as u
+  each gauge
+gauge : column
+  role pugauge
+  tip "$u.usage_label" "$u.usage_detail"
+  on click do read $v; do prop $v viewing=$u back="$v.viewing" with=plan-usage-reader find=""
+  label : text "$u.usage_label"
+    role pulabel
+  window : text "$u.window"
+    role puquiet
+  bar : row
+    role putrack
+    only when $u.usage_available = "yes"
+    used : text ""
+      role pufill
+      role pufill.red when $u.percent >= 90
+      role pufill.amber when $u.percent >= 70
+      share $u.percent
+      only when $u.percent > 0
+    left : text ""
+      share $(100 - $u.percent)
+      only when $u.percent < 100

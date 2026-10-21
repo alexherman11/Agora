@@ -152,14 +152,31 @@ def v_put(w, nid, a):
 RANK_STEP = 1000
 
 
+_IDLIKE = re.compile(r"([a-z]+)(\d{1,12})")
+
+
 def order_value(v):
-    """Numbers ascending, then words, then a missing value last."""
+    """Numbers ascending, then words, then a missing value last. A word that is letters then a number (an id: e9,
+    e10, a5530) orders by its number, so e9 comes before e10 (a5530)."""
     if v is None or v == "":
         return (2, 0, "")
     try:
         return (0, float(v), "")
     except (TypeError, ValueError):
-        return (1, 0, str(v).lower())
+        s = str(v).lower()
+        m = _IDLIKE.fullmatch(s)
+        return (1, 0, m.group(1) + m.group(2).zfill(12) if m else s)
+
+
+def sort_by(items, keys, get):
+    """`items` in the order of `keys`, each a field name, or `-name` for the largest first (a5530: newest first); a
+    missing value is last either way. `get(item, name)` reads a field. Stable, so ties keep the order they came in."""
+    out = list(items)
+    for k in reversed(list(keys)):
+        name, desc = (k[1:], True) if k.startswith("-") else (k, False)
+        have = [x for x in out if order_value(get(x, name))[0] != 2]
+        out = sorted(have, key=lambda x: order_value(get(x, name)), reverse=desc) + [x for x in out if order_value(get(x, name))[0] == 2]
+    return out
 
 
 def props_of(w, i):
@@ -172,7 +189,7 @@ def props_of(w, i):
 def order_by(w, ids, keys):
     """`ids` in the order of `keys` (props); a stable sort, so ties keep the order they came in: for a selection, the
     order the appearances were made."""
-    return sorted(ids, key=lambda i: tuple(order_value(props_of(w, i).get(k)) for k in keys))
+    return sort_by(ids, keys, lambda i, k: props_of(w, i).get(k))
 
 
 def _lane_group(w, status, priority, leave_out):
@@ -473,6 +490,92 @@ def v_sort(w, nid, a):
     r = _compose(w, steps)
     r["note"] = "order now: " + ", ".join(order)
     return r
+
+
+COPY_REFUSED = ("chat", "image")     # a chat is lines, an image bytes: not text a create can make again
+
+
+@verb("copy", ["surface"], "Make a copy of this surface and everything inside it, in another surface: each surface, view, "
+      "note, task, doc and other thing of text anew, in the same order, with its title, text, tags and props (a chat's lines, an image's "
+      "bytes, comments and links are not copied: a chat or image inside is refused). A prop that names something inside "
+      "the copied surface names its copy. Each part is its own create or prop event, all in one receipt; $new is the copy.",
+      "into=<surface> [title=<str>]", 'do copy f04 into=f02 title="Harbor, again"', level=2)
+def v_copy(w, nid, a):
+    # a6427 (Workspaces): a saved arrangement of the home base is a surface tree, and the desk had no word to copy one
+    # (a verb note has no for-each). Composed of create and prop, as sort is of move, so undo stays per step
+    dest = str(a.get("into") or "")
+    if dest not in w.nodes or w.nodes[dest]["type"] != "surface":
+        raise Refusal("copy needs into=<surface>")
+    if dest == nid or w._is_inside(dest, nid):
+        raise Refusal(f"{dest} is inside {nid}: a copy cannot go inside what it copies")
+    if w.nodes[dest].get("layout") == "view":
+        raise Refusal(f"{dest} is a view: it holds nothing itself; copy into a real surface")
+
+    def walk(fid):
+        for k in w.children(fid):
+            if k["type"] == "surface":
+                yield k
+                if k.get("layout") != "view":
+                    yield from walk(k["id"])
+            else:
+                kind = w.subjects[k["subject"]]["kind"]
+                if kind in COPY_REFUSED:
+                    raise Refusal(f"{k['id']} inside {nid} is a {kind}: copy makes surfaces, views and things of text anew, "
+                                  f"not a {kind} (move it, or place its subject: do place {k['subject']} into=<surface>)")
+                yield k
+    parts = list(walk(nid))
+    made, events, changed = {nid: None}, [], []
+
+    def run(verb, target, args):
+        r = REGISTRY[verb].run(w, target, dict(args))
+        events.extend(r.get("events") or ([r["event"]] if r.get("event") else []))
+        changed.extend(r.get("changed", []))
+        return r
+    try:
+        root = w.nodes[nid]
+        made[nid] = run("create", dest, {"kind": "surface", "title": str(a.get("title") or root["title"]),
+                                         "layout": root.get("layout", "column")})["created"]
+        for k in parts:
+            into = made[k["parent"]]
+            if k["type"] == "surface":
+                if k.get("layout") == "view":
+                    args = {"kind": "view", "title": k["title"], "query": k.get("query", "")}
+                    args.update({x: k[x] for x in ("cols", "by", "desc") if k.get(x)})
+                else:
+                    args = {"kind": "surface", "title": k["title"], "layout": k.get("layout", "column")}
+                made[k["id"]] = run("create", into, args)["created"]
+            else:
+                s = w.subjects[k["subject"]]
+                args = {"kind": s["kind"], "title": s["title"], "text": s.get("text", "")}
+                if s.get("tags"):
+                    args["tags"] = ",".join(s["tags"])
+                if s.get("due"):
+                    args["due"] = s["due"]
+                made[k["id"]] = run("create", into, args)["created"]
+                made[k["subject"]] = made[k["id"]]
+        # props last, once every part has its copy: a value naming a copied part names the part's copy
+        for old in [nid] + [k["id"] for k in parts]:
+            n = w.nodes[old]
+            props = dict((n.get("props") if n["type"] == "surface" else w.subjects[n["subject"]].get("props")) or {})
+            if props:
+                run("prop", made[old], {p: made.get(v) or v for p, v in props.items()})
+    except Refusal as e:
+        for ev in reversed(events):
+            try:
+                w.undo(ev)
+            except Refusal:
+                pass
+        raise Refusal(f"copy of {nid} stopped: {e}; earlier steps undone")
+    w.last_created = made[nid]
+    mine = set(events)
+    for e in reversed(w.events):
+        if not mine:
+            break
+        if e["id"] in mine:
+            mine.discard(e["id"])
+            e["copy"] = made[nid]          # so $new (blanks.made_by) names the copy, not its last part
+    return {"ok": True, "event": events[-1], "events": events, "changed": sorted(set(changed)), "created": made[nid],
+            "note": f"copied {nid} as {made[nid]} inside {dest}: {len(parts) + 1} part(s), {len(events)} event(s)"}
 
 
 def _now(w, props):

@@ -13,10 +13,90 @@ import moo
 import scene as S
 import expr as X
 from desk import aspects_of, aspects_meet, event_aspects
+from world import Refusal
 
 ABSENT = None          # printed (no x); a third value, distinct from "" and from false
 
 
+import weakref as _weakref
+_TOUCH = _weakref.WeakKeyDictionary()
+
+
+def _touch_index(w):
+    """name -> the indices of the events whose target or `changed` names it (a6010: a board of 60 cards asked
+    `$changed.commission` of each, and each ask walked back through all ~11k events, ~2 ms each). Events are only
+    appended (an undo is an event of its own and marks the one it undoes, which the reader still checks), so the
+    index is extended with the new ones; it is made again if the list was replaced or shrank."""
+    ev = w.events
+    hit = _TOUCH.get(w)
+    if hit is None or hit[0] is not ev or hit[1] > len(ev) or (hit[1] and ev[hit[1] - 1] is not hit[2]):
+        hit = [ev, 0, None, {}]
+        _TOUCH[w] = hit
+    idx = hit[3]
+    for i in range(hit[1], len(ev)):
+        e = ev[i]
+        for nm in {e["target"], *(e.get("changed") or [])}:
+            idx.setdefault(nm, []).append(i)
+    if len(ev) != hit[1]:
+        hit[1], hit[2] = len(ev), ev[-1]
+    return idx
+
+
+# a6010: a selection's answer kept across builds, dropped when an event since touched what it reads. The home base asks
+# ~35 selections (count(prop:commission=working) and the like), each a walk over every thing, and every press made
+# them all again. A selection is kept only when every term says what it reads (knife.ASPECTS, or a comparison of a
+# field or prop); `age`, `unanswered` and the promise and request terms (time or talk) are never kept. Events since the
+# last look are read by desk.event_aspects: one that may touch anything (None), a create (a new thing may match any
+# selection) or an undo empties the store; otherwise each kept selection whose aspects meet the event's goes. Every
+# selection reads place (a Trash's things are left out), so any move empties it too. The whole build that
+# LENS_REUSE_VERIFY compares against (_OFF) asks the world afresh, so a stale answer would show as a difference.
+_SELS = _weakref.WeakKeyDictionary()
+
+
+def _selection_aspects(q):
+    """-> the aspects selection `q`'s members are read by, or None when a term reads something no event names."""
+    import knife
+    out = {"place"}
+    for t in [x for x in re.split(r"[,\s]+", (q or "").strip()) if x]:
+        name, op, _v = knife.term_key(t)
+        if op in ("=", "!=", "<", ">", "<=", ">=", "has"):
+            if name == "age":
+                return None
+            out.add("kind" if name == "kind" else name if name in knife.FIELDS else f"prop:{name}")
+            continue
+        if name in ("age", "unanswered", "settled") or name not in knife.ASPECTS:     # settled reads a promise's end too
+            return None
+        out |= knife.ASPECTS[name] or {name}
+    return out
+
+
+def _kept_selections(w, desk):
+    """The store of kept selections for this world and viewer, brought up to its events (see above)."""
+    ev = w.events
+    key = (w.me, getattr(desk, "today", None) or getattr(w, "today", None))
+    hit = _SELS.get(w)
+    if hit is None or hit["ev"] is not ev or hit["n"] > len(ev) or (hit["n"] and ev[hit["n"] - 1] is not hit["last"]):
+        hit = _SELS[w] = {"ev": ev, "n": len(ev), "last": ev[-1] if ev else None, "by": {}}
+    if hit["n"] < len(ev):
+        touched, everything = set(), False
+        for e in ev[hit["n"]:]:
+            a = event_aspects(e)
+            if a is None or "contents" in a or e["verb"] in ("undo", "redo"):
+                everything = True
+                break
+            touched |= a
+        if everything:
+            hit["by"].clear()
+        else:
+            for store in hit["by"].values():
+                for q in [q for q, (_h, asp) in store.items() if asp & touched]:
+                    del store[q]
+        hit["n"], hit["last"] = len(ev), ev[-1]
+    return hit["by"].setdefault(key, {})
+
+
+# (a6010 tried keeping a chat's sayings the same way, ~50 ms of a home-base build, and took it out: who a line calls
+# is the house's rule in code (rooms.calls), which can change with no event, and test_sayings (v) caught it.)
 class Accessor:
     """The seam: six questions, each recorded in R (sable-8 section 1)."""
 
@@ -57,8 +137,19 @@ class Accessor:
             if named is not None:
                 hit = (tuple(named), None)
             else:
-                sel = self.desk._parse_selection(q)
-                hit = (None, tuple(sel[0]) if sel else ())
+                kept = None if _OFF[0] else _kept_selections(self.w, self.desk)
+                hit = kept.get(q, (None,))[0] if kept is not None else None
+                if hit is None:
+                    try:
+                        sel = self.desk._parse_selection(q)
+                    except Refusal as exc:
+                        # 15 Oct (a5398), as rows above: `count(kind:task,in:$item)` on a note asks in: of a note, and
+                        # the native refusal escaped the compiler, so the write that triggered the lens check crashed.
+                        raise S.LensRefusal(f"selection {q!r}: {exc}") from exc
+                    hit = (None, tuple(sel[0]) if sel else ())
+                    asp = _selection_aspects(q) if kept is not None else None
+                    if asp is not None:
+                        kept[q] = (hit, asp)
             self._sel[q] = hit
         named, ids = hit
         self.R.append(("select", q, [i for i, _ in named] if named is not None else list(ids)))
@@ -67,11 +158,31 @@ class Accessor:
         return (list(named), None) if named is not None else (None, list(ids))
 
     def rows(self, src):
-        rs = S.rows(self.desk, src)
+        # a6010: answered once per build, as select is (the world holds still while a lens is built): the home base asked
+        # one chat's lines four times, ~70 ms each. Each asker gets its own copies of the rows
+        if ("rows", src) not in self._sel:
+            try:
+                self._sel[("rows", src)] = S.rows(self.desk, src, memo=self._sel)
+            except Refusal as exc:
+                # Authored row queries use the native selector's refusal type. At the
+                # compiler boundary they belong to lens diagnostics and fallback,
+                # including checks run after an otherwise successful native write.
+                raise S.LensRefusal(f"row source {src!r}: {exc}") from exc
+        rs = self._sel[("rows", src)]
+        rs = None if rs is None else [dict(r) for r in rs]
         self.R.append(("rows", src, len(rs) if rs is not None else None))
         if self.rec:
             self._said("rows", (src,), None if rs is None else [dict(r) for r in rs])
         return rs
+
+    def props(self, i):
+        """a6153: a thing's props as `by` and `run` order a repeat by them (moo.props_of), as a read: a part holding a
+        sorted repeat is kept only while every key it sorted by reads the same."""
+        p = dict(moo.props_of(self.w, i))
+        self.R.append(("props", i, S._rev_of(self.w, i)))
+        if self.rec:
+            self._said("props", (i,), dict(p))
+        return p
 
     def define(self, name):
         s = S.find_lens(self.desk, name, getattr(self, "home", None))     # 9 Oct: nearest to the placing lens's room
@@ -87,10 +198,10 @@ class Accessor:
         n = w.nodes.get(r)
         names = {r} | ({n["subject"]} if n and n.get("subject") else set()) | set(w.appearances_of(r) if r in w.subjects else [])
         hit = None
-        for e in reversed(w.events):
+        idx = _touch_index(w)        # a6010: the events on these names only, not every event of the world each time
+        for i in sorted({i for nm in names for i in idx.get(nm, ())}, reverse=True):
+            e = w.events[i]
             if e.get("undone") or e["verb"] == "undo":
-                continue
-            if e["target"] not in names and not (names & set(e.get("changed") or [])):
                 continue
             if aspect and not aspects_meet({aspect}, event_aspects(e)):
                 continue
@@ -150,6 +261,10 @@ _REUSE = {}                 # (session, viewer, lens text, style, props) -> {ins
 _IR = {}                    # (lens text, style, roles) -> (IR parts, root, what each part reads)
 _OFF = [False]
 _STATS = {"kept": 0, "made": 0, "builds": 0, "differed": 0}
+REUSE_STORES = 400          # a6153: stores of kept instances (evaluate), the oldest let go first
+# a6153: why an instance was made rather than kept, counted by part and reason, while _WHY_ON[0] (bench_board --why)
+_WHY_ON = [os.environ.get("LENS_REUSE_WHY") == "1"]
+_WHY = __import__("collections").Counter()
 VERIFY_EVERY = 25
 _IDENT = re.compile(r"(?<![\w$.])([A-Za-z]\w*)")
 
@@ -188,7 +303,8 @@ def _static(node, irs, memo):
     if got is not None:
         return got
     em, b = node["emit"], node["bind"]
-    words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"]]
+    words = [em.get("text"), em.get("light"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
+             *(em.get("tip") or ())]
     exprs = [c for _, c in em["role_when"]]
     if node["guard"]:
         exprs.append(node["guard"]["src"])
@@ -207,8 +323,10 @@ def _static(node, irs, memo):
             (ffields.add((a, f)) if f else names.add(a))
     for t in exprs:
         idents.update(_IDENT.findall(t))
+    # a6153: a repeat ordered or run by its members' props (`by`, `run`) no longer stops what holds it from being kept:
+    # those props are read through the accessor now (Accessor.props), so the holder's questions include them
     keep = not node["place"] and em.get("at") != "item" and not em.get("spread") and not (
-        b and b["kind"] == "many" and (b.get("by") or b.get("run") or b.get("over")))
+        b and b["kind"] == "many" and b.get("over"))
     inner = list(node["kids"]) + ([irs[b["each"]]] if b and b["kind"] == "many" and b.get("each") in irs else [])
     for k in inner:
         n2, f2, i2, k2 = _static(k, irs, memo)
@@ -337,7 +455,9 @@ def lower(root, parts):
 # Stage 5, evaluate. A transcription of scene.build's make(), with the world reached only through the accessor, the
 # fixed order within a part, host facts in Gamma, count as the true size, and one rule for guards.
 # ---------------------------------------------------------------------------------------------------------------------
-def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=()):
+def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None, cb=(), on=None, prefix=None):
+    """prefix (a6010): a placed lens is built under its placer's key (`<part key>/lens:<name>`) from the start, so its
+    parts have their final keys and what is kept of them can be used again at the next build."""
     props = props or {}
     acc = acc or Accessor(desk)
     # F7: the lens's own style; 9 Oct (step 7): found from the lens's own room (acc.home, set by compile_lens)
@@ -356,9 +476,12 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
     w = desk.world
     count = count if count is not None else [0]
     host = {f: acc.host(f) for f in ("me", "today", "session")}
-    # a placed lens is keyed again under its placer after it is built (S._rekey, in place): nothing of it is kept
-    off = _OFF[0] or os.environ.get("LENS_REUSE") == "off" or len(stack) > 1
-    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)))
+    # a6010: a placed lens was keyed again under its placer after it was built (S._rekey, in place), so nothing of it
+    # could be kept, and the home base (every panel a placed lens) was built whole at every change, ~500 ms. Built
+    # under its final keys now (prefix), it is kept as a root lens is, one store per place it stands (and thing it
+    # stands on, a5949)
+    off = _OFF[0] or os.environ.get("LENS_REUSE") == "off" or (len(stack) > 1 and prefix is None)
+    ck = (getattr(desk, "_session", None), w.me, ik, repr(sorted(props.items(), key=str)), on, prefix)
     prev = {} if off else _REUSE.get(ck, {})
     nxt, used = {}, set()
 
@@ -400,9 +523,18 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 nxt[key] = old
                 _STATS["kept"] += 1
                 return old["out"]
+            if _WHY_ON[0]:
+                bad = next((q for q in old["asks"] if not acc.same(*q)), None)
+                _WHY[f"{each['part']}: asked again, {bad[0]} {str(bad[1])[:80]}" if bad else f"{each['part']}: ?"] += 1
             del acc.R[mark:]
             for r, m in zip(acc.rec, marks):
                 del r[m:]
+        elif _WHY_ON[0]:
+            if old is None:
+                _WHY[f"{each['part']}: new"] += 1
+            else:
+                d = next((i for i, (a, b) in enumerate(zip(old["fp"], fp)) if a != b), None)
+                _WHY[f"{each['part']}: fingerprint {str(old['fp'][d])[:60] if d is not None else '?'} -> {str(fp[d])[:60] if d is not None else ''}"] += 1
         asks, nodes, inner = [], [], []
         acc.rec.append(asks)
         acc.nodes.append(nodes)
@@ -508,6 +640,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         out = {"part": node["part"], "key": key, "role": em["role"], "layout": em["layout"], "item": ctx.get("item"),
                "box": None, "text": None, "clamp": em["clamp"], "acts": [], "kids": []}
         out.update({k: em[k] for k in S.PAINT_WORDS if k in em})
+        if isinstance(out.get("share"), str):
+            del out["share"]                    # a5496: filled below, once the lets are known; never sent unfilled
+        out.pop("tip", None)                    # a6271: the same, for a tip's words
+        out.pop("page", None)                   # a6431: and a page's
         if isinstance(out.get("fold"), str) and "$" in out["fold"]:
             out["fold"] = S._fill(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track)      # a fold's label is words, like text
         if b and b["kind"] == "one":
@@ -636,30 +772,78 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 lt = em["light"]
                 out["light"] = (S._fill_text(lt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in lt
                                 else S._fill(lt, fill_ctx, track))
+            if em.get("markdown") and "[[" in (out["text"] or ""):     # a5820: what each [[wikilink]] names, read now
+                out["wikilinks"] = S.wikilinks_of(w, out["text"], acc.thing)
+            # a6109: an id in words that are only read is drawn as the name of what it names. Not recorded as a read:
+            # a name is how the words look, never what a press on this part was fenced on
+            if out["text"] and not em.get("ids") and not em.get("plain") and not em.get("picture") and not em.get("live") \
+                    and (em.get("markdown") or not any(a["on"] == "edit" for a in node["acts"])):   # a document's drawn lines name too
+                # a person's name only in a text that is no button and no document (c6186: the To chips stay chips)
+                named = S.things_of(w, out["text"], people=not node["acts"] and not em.get("markdown"))
+                if named:
+                    out["things"] = named
+            if isinstance(em.get("markdown"), str) and any(a["on"] == "edit" for a in node["acts"]):
+                # `markdown links <selection>`: what typing [[ offers, read as one membership read (at most 500)
+                named, ids = acc.select(S._fill(em["markdown"], fill_ctx, track))
+                ids = [i for i, _ in named] if named is not None else ids
+                out["titles"] = [{"id": i, "title": c.get("title") or "", "kind": c.get("kind") or ""}
+                                 for i in ids[:500] for c in [S._ctx_for(w, i)] if c.get("title")]
             if em["props"]:
                 out["read"] = {p: pv.get(p) for p in em["props"] if p in pv}
             if missing:
                 out["missing"] = missing
+        if em.get("tip"):                             # a6271: a tip's name and sentence are words, filled as text is
+            tc = {**(ctx.get("_props") or {}), **ctx}
+            out["tip"] = [S._fill_text(t, tc, track, lambda e: X.run(e, xenv()))[0] if "$(" in t else S._fill(t, tc, track)
+                          for t in em["tip"]]
+        if em.get("page") and em["text"] is not None:     # a6431: a page's size and choices, filled as words are, then read
+            tc = {**(ctx.get("_props") or {}), **ctx}
+            pw = em["page"]
+            pw = S._fill_text(pw, tc, track, lambda e: X.run(e, xenv()))[0] if "$(" in pw else S._fill(pw, tc, track)
+            out["page"] = S.page_of(pw)
+        if isinstance(em.get("share"), str):          # a5496: `share $(expr)`, a weight that follows data
+            sc_ctx = {**(ctx.get("_props") or {}), **ctx}
+            s = em["share"]
+            s = S._fill_text(s, sc_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in s else S._fill(s, sc_ctx, track)
+            try:
+                weight = float(s)
+            except (TypeError, ValueError):
+                weight = 0
+            if weight > 0:
+                out["share"] = int(weight) if weight == int(weight) else weight
+            else:
+                out.pop("share", None)
         if ctx.get("_state") and ctx["_state"] != "live":
             out["state"] = ctx["_state"]
+        if isinstance(out.get("fold"), str) and "$(" in out["fold"]:      # a5530: a label computes as words do: fold "$(total)"
+            out["fold"] = S._fill_text(out["fold"], {**(ctx.get("_props") or {}), **ctx}, track, lambda e: X.run(e, xenv()))[0]
         if em.get("picture") and ctx.get("item"):
             original = acc.thing(ctx["item"])
             if out.get("text") == original.get("text"):
                 out["image_regions"] = original.get("_image_regions", [])
         # --- acts
-        safe = {k: (S._cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
         out["id"] = ctx.get("id")
-        safe["_frames"] = {k: {kk: (S._cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
+        # a6153: the escaped context is made once, for a part that has a gesture: made for every part, it escaped each
+        # value of every frame above it (~620k escapes in 8 home-base builds, a fifth of each build)
+        safe_ = []
+
+        def safe():
+            if not safe_:
+                sf = {k: (S._cmd_value(v) if isinstance(v, str) else v) for k, v in ctx.items()}
+                sf["_frames"] = {k: {kk: (S._cmd_value(vv) if isinstance(vv, str) else vv) for kk, vv in f.items()} for k, f in frames.items()}
+                safe_.append(sf)
+            return safe_[0]
+
         def act_line(line):
             # Juniper and Pike, 7 Oct: `do split $item $(next) ...` reached the desk as the words '$(next)', and a
             # paragraph was made with block=$(next). A command computes $( ) as words do, when the part is built
             if "$(" not in line:
-                return S._fill(line, safe, track)
-            return S._fill_text(line, safe, track, lambda e: X.run(e, xenv()), esc=S._cmd_value)[0]
+                return S._fill(line, safe(), track)
+            return S._fill_text(line, safe(), track, lambda e: X.run(e, xenv()), esc=S._cmd_value)[0]
         def offered(a):                  # 14 Oct: `on menu "<label>" when <test>`: the entry is there only where it holds
             return not a.get("when") or X.holds(X.run(a["when"], xenv())[0]) is True
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
-            {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "label") if a.get(k)}}
+            {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "side", "label") if a.get(k)}}
             for a in node["acts"] if offered(a)]
         if node["carry"]:
             if not ctx.get("item"):
@@ -730,7 +914,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 if b.get("by"):
                     out["by"] = b["by"]             # a1069: ordered here, in the scene, so both printers show one order
                 if rs is not None and b.get("by"):
-                    rs = sorted(rs, key=lambda r: tuple(moo.order_value(r.get(k)) for k in b["by"]))
+                    rs = moo.sort_by(rs, b["by"], lambda r, k: r.get(k))
                 if b.get("run"):
                     out["run"] = b["run"]
                 if rs is not None:
@@ -743,19 +927,22 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         out["kids"].append(instance(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
+                    # a6153: the keys a repeat is ordered and run by are read through the accessor (acc.props), so a
+                    # part holding it can be kept: it is used again only while each of them reads the same
+                    pr = {}
+                    props = lambda i: pr[i] if i in pr else pr.setdefault(i, acc.props(i))      # noqa: E731
                     if b.get("by"):
                         if named is not None:
-                            at = {i: k for k, (i, _st) in enumerate(named)}
-                            named = sorted(named, key=lambda x: (tuple(moo.order_value(moo.props_of(w, x[0]).get(k)) for k in b["by"]), at[x[0]]))
+                            named = moo.sort_by(named, b["by"], lambda x, k: props(x[0]).get(k))
                         else:
-                            ids = moo.order_by(w, list(ids), b["by"])
+                            ids = moo.sort_by(list(ids), b["by"], lambda i, k: props(i).get(k))
                     # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in
                     shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]
                              + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []
                     if named is not None and not shown:
                         shown = [["select", sel_text, [list(x) for x in named]]]
                     order = [x[0] for x in named] if named is not None else list(ids)
-                    place = dict(zip(order, S.run_places([moo.props_of(w, i).get(b["run"]) for i in order]))) if b.get("run") else {}
+                    place = dict(zip(order, S.run_places([props(i).get(b["run"]) for i in order]))) if b.get("run") else {}
                     if named is not None:
                         total = len(named)
                         base = max(0, total - keep) if b.get("last") else 0      # $index: the place in the whole repeat
@@ -777,6 +964,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     cut = {"part": "cut", "key": f"{key}/cut", "role": "cut", "layout": None, "item": None, "box": None,
                            "text": (f"{total - keep} earlier not shown (clamp last {keep}); " if b.get("last") else f"{total - keep} more not shown (clamp {keep}); ")
                            + f"find {sel_text} lists all {total}", "clamp": None, "acts": [], "kids": []}
+                    if S.things_of(w, sel_text):                  # a6109: in:f155 is drawn as the board's name
+                        cut["things"] = S.things_of(w, sel_text)
                     if b.get("last"):
                         out["kids"].insert(0, cut)
                     else:
@@ -811,11 +1000,25 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         # --- placed lens
         if node["place"]:
             inner = S._fill(node["place"], ctx)
-            if inner.lower() in stack:
-                raise S.LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
-            sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb)
-            sub["key"] = f"{key}/lens:{inner}"
-            S._rekey(sub, sub["key"])
+            # a5949 (Sable's a4270): the placed lens starts on the thing this part stands on, when it stands on one
+            on = ctx.get("item") if is_thing(w, ctx.get("item")) else None
+            named = "$" in node["place"]       # a name from data: what it names is not this lens's fault
+            held = len(closure) if closure is not None else 0
+            try:
+                if inner.lower() in stack:
+                    raise S.LensRefusal(f"line {node['line']}: lens {inner} contains itself ({' -> '.join(stack + (inner.lower(),))})")
+                sub = compile_lens(desk, acc.define(inner), stack + (inner.lower(),), count, closure if closure is not None else [], acc, cb,
+                                   on=on, prefix=f"{key}/lens:{inner}")
+            except S.LensRefusal as e:
+                # a5949: a lens named from data (`lens $v.with`) that is missing, contains itself or does not compile is
+                # said in one line in its place, and its placer (the home base) is still drawn; a name written in the
+                # lens refuses the lens, as before
+                if not named:
+                    raise
+                if closure is not None:
+                    del closure[held:]
+                sub = cut_node("lens", f"lens {inner or '(no name)'} cannot be drawn here: {str(e).split('. ')[0]}")
+            sub["key"] = f"{key}/lens:{inner}"      # a6010: its parts were built under this key already (prefix)
             out["kids"].append(sub)
             out["lens"] = inner
         # --- fixed kids
@@ -823,18 +1026,71 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             out["kids"].append(make(kid, dict(ctx, n=out.get("n", ctx.get("n", "")), count=out.get("size", ctx.get("count", ""))), f"{key}/{kid['part']}", em["layout"], chain, cb))
         return out
 
-    sc = make(irs[root], {}, root, cb=cb)
+    # a5949 (Sable's a4270): a lens stood on a thing starts on it, its fields and $item, as an instance of a repeat does
+    root_ctx = {k: v for k, v in acc.thing(on).items() if k != "_frames"} if on else {}
+    sc = make(irs[root], root_ctx, f"{prefix}/{root}" if prefix else root, cb=cb)
+    if prefix:
+        sc["key"] = prefix              # the placed lens's root stands at its placer's key; its parts under <prefix>/<root>
     sc["R"] = list(acc.R)
     if not off:
         _REUSE.pop(ck, None)
         _REUSE[ck] = nxt
-        while len(_REUSE) > 24:
+        # a6153: one store per lens per place it stands, so one home base with the board out is ~30 stores; at 24 each
+        # build pushed out the stores the next one needed, and nothing was kept (kept 4, made 260). Together the stores
+        # of one page hold about one scene, so a few hundred cost little
+        while len(_REUSE) > REUSE_STORES:
             _REUSE.pop(next(iter(_REUSE)))
     return sc
 
 
-def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
-    """One lens to a scene through the staged pipeline, recording the definition used; fallback as scene._compile does."""
+def is_thing(w, i):
+    """a5949: whether an id names a thing (an appearance or a subject) a lens can be stood on."""
+    return isinstance(i, str) and (i in w.nodes or i in w.subjects)
+
+
+def may_read(desk, on):
+    """a5949 (Sable, on a5949; Juniper in f4358: an address is not believed): THE one place that asks whether this
+    viewer may have a lens stood on this thing, for all three doors (a typed `scene <lens> on`, an address's on=, a lens
+    placed on a thing), since every one of them comes through compile_lens. Today everyone here may read everything, so
+    it only asks that the id names a thing; strangers (Juniper's room) will add their refusal here. -> None or why not."""
+    if not is_thing(desk.world, on):
+        return f"on={on}: no thing has that id"
+    return None
+
+
+def stood_refusal(desk, acc, s, on):
+    """a5949 (Sable's a4270, 'each lens must say what it can stand on and refuse the rest in words'): may_read, then a
+    lens note's stands_on=<selection>, what it can be stood on. -> the words of a refusal, or None when it may stand."""
+    if not on:
+        return None
+    no = may_read(desk, on)
+    if no:
+        return f"{no}, so lens {s['title']} cannot be stood on it"
+    sel = (s.get("props") or {}).get("stands_on")
+    if not sel:
+        return None
+    w = desk.world
+    mine = {on} | ({w.nodes[on].get("subject")} if on in w.nodes else set(w.appearances_of(on) if on in w.subjects else []))
+    named, ids = acc.select(sel)
+    hits = {i for i, _ in named} if named is not None else set(ids)
+    hits |= {w.nodes[i].get("subject") for i in hits if i in w.nodes}
+    if mine & hits:
+        return None
+    subj = w.subjects.get(w.nodes[on].get("subject")) if on in w.nodes else w.subjects.get(on)
+    return f"lens {s['title']} stands on {sel}; {(subj or {}).get('title', on)} ({on}) is not one"
+
+
+def cut_node(part, text):
+    """a5949: one line said in place of a lens that cannot be drawn here (stood on what it does not stand on, or placed
+    by a name from data that is missing, contains itself or does not compile), so its placer is still drawn."""
+    return {"part": part, "key": part, "role": "cut", "layout": None, "item": None, "box": None, "text": text,
+            "clamp": None, "acts": [], "kids": []}
+
+
+def compile_lens(desk, s, stack, count, closure, acc=None, cb=(), on=None, prefix=None):
+    """One lens to a scene through the staged pipeline, recording the definition used; fallback as scene._compile does.
+    `on` (a5949): the thing the lens is stood on, where its root starts; a lens note's stands_on= may refuse it.
+    `prefix` (a6010): the key a placed lens stands at, under which its parts are built (evaluate)."""
     good = getattr(desk, "_lens_good", None)
     if good is None:
         good = desk._lens_good = {}
@@ -852,12 +1108,15 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
     prev_home = getattr(acc, "home", None)
     acc.home = S.room_of_thing(desk.world, s)      # 9 Oct (step 7): this lens's own lookups (its style, the lenses it places) stand in its room
     try:
+        no = stood_refusal(desk, acc, s, on)
+        if no:
+            return cut_node(stack[-1] if stack else s["title"], no)
         try:
             import persons
             import verbs
             b = verbs.binding_of(desk.world, ("s", s["id"]), s["text"])     # a1590: its names mean whom they meant when saved
             with persons.reading(desk, (b or {}).get("persons")):
-                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb)
+                sc = evaluate(desk, s["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, cb=cb, on=on, prefix=prefix)
             stamp(sc)
             good[s["id"]] = {"text": s["text"], "rev": s["rev"]}
             return sc
@@ -870,7 +1129,7 @@ def compile_lens(desk, s, stack, count, closure, acc=None, cb=()):
                 raise
             del closure[mark:]
             entry.update(status="fallback", shown_rev=g["rev"], refusal=str(e), refused_in=e.lens)
-            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc)
+            sc = evaluate(desk, g["text"], stack, count, props=s.get("props") or {}, closure=closure, acc=acc, on=on, prefix=prefix)
             stamp(sc)
             sc["broken"] = f"lens {s['title']}: {e}"
             return sc
@@ -960,23 +1219,24 @@ def part_names(sc):
     return sorted(x for x in out if x)
 
 
-def scene_for(desk, name, part=None, words=None):
+def scene_for(desk, name, part=None, words=None, on=None, text=True):
     """-> (scene, text), as scene.scene_for, through the staged pipeline. With `part`, the text is only the parts that
     path names (find_parts) and what is inside them; scene["printed"] lists those nodes. With `words` (a4179:
     {"start": n, "whole": bool}) the text is the scene's words alone (scene.to_words), and scene["said"] lists the
-    nodes it showed whole, each for itself."""
+    nodes it showed whole, each for itself. With `on` (a5949) the lens is stood on that thing: an address is not
+    believed (Juniper, a4270), so an id that names no thing is refused here, where the scene is built."""
     s = S.find_lens(desk, name)
     closure = []
     acc = Accessor(desk)
     import promises
     with promises.held(desk.world), S.still(desk.world):     # a4838: the world holds still while a lens is built
-        sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc)
+        sc = compile_lens(desk, s, (s["title"].lower(),), [0], closure, acc, on=on)
         _STATS["builds"] += 1
         if os.environ.get("LENS_REUSE") != "off" and (os.environ.get("LENS_REUSE_VERIFY") == "1" or _STATS["builds"] % VERIFY_EVERY == 0):
             closure2 = []
             _OFF[0] = True
             try:
-                sc2 = compile_lens(desk, s, (s["title"].lower(),), [0], closure2, Accessor(desk))
+                sc2 = compile_lens(desk, s, (s["title"].lower(),), [0], closure2, Accessor(desk), on=on)
             finally:
                 _OFF[0] = False
             S.emit(sc)
@@ -995,7 +1255,7 @@ def scene_for(desk, name, part=None, words=None):
     at = len(desk.world.events)
     fallen = [c for c in closure if c["status"] == "fallback"]
     sc["def"] = dict(lens=s["title"], id=s["id"], rev=s["rev"], status="fallback" if fallen else "current", closure=closure,
-                     frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **S._identity())
+                     frame=".".join(f"{c['id']}r{c['rev']}" for c in closure), **S._identity(), **({"on": on} if on else {}))
     name = (s.get("props") or {}).get("style")
     home = S.room_of_thing(desk.world, s)          # 9 Oct (step 7): the style nearest the lens's own room
     if name:                                  # F7: which style paints this lens, and which revision of it
@@ -1012,6 +1272,8 @@ def scene_for(desk, name, part=None, words=None):
         if not roots:
             raise S.LensRefusal(f"no part {part!r} in the scene of {s['title']}. Its parts: {' '.join(part_names(sc))}")
         sc["printed"] = roots
+    if not text and words is None:
+        return sc, ""          # a6153: a painter that shows no text is not sent one (deskd's text=0)
     if words is not None:
         text, sc["said"] = S.to_words(sc, s["title"], desk.world.me, at, roots=roots, part=part,
                                       start=words.get("start", 1), whole=words.get("whole", False))

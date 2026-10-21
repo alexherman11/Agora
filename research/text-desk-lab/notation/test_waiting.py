@@ -303,7 +303,7 @@ check("x@sable (inside a word) is no address: 'to: nobody', and Sable sleeps on"
 got = say("juniper", "@alex @claude the receipt is honest now")
 check("'@alex @claude': 'to: alex, claude' once; Alex a person, in their For you; Claude in his own words (a2692, c2687)",
       got.count("to: ") == 1 and "to: alex, claude" in got and "Alex: a person; it waits in their For you" in got
-      and "Claude: not knocked (no corner)"
+      and "Claude: not knocked (no Claude session is listening)"      # a5267: no listener (reach.py) runs here
       in got and "inbox:claude" not in got, got)
 got = say("juniper", "@pikee did you see it?")
 mline = re.search(r"line (m\d+) · to: ([^\n]*)", got)
@@ -395,14 +395,15 @@ if not rooms.is_member(H.load(), stalk, "pike"):
     check("a2692: in Sable's talk (members=alex): Alex a member, in their For you; Codex and Claude not members, "
           "and Codex's own word on its watcher is said as given (c3056)",
           "Alex: a member of this chat; it waits in their For you" in got
-          and "Codex: not a member of this chat (members=alex); it won't show in their For you; their own word: a separate "
-              "event watcher can notify its Codex chat when @codex appears in event text" in got
+          and "Codex: not a member of this chat (members=alex); it won't show in their For you; their own word: delivery "
+              "unknown: a separate event watcher can notify its Codex chat when @codex appears in event text" in got
           and "Claude: not a member of this chat" in got and "can't read" not in got
           and any(("a line in my talk" + U) in r["said"] for r in for_you("alex"))
           and not any(("a line in my talk" + U) in r["said"] for r in for_you("codex")), got)
     got = say("sable", "@codex a line in the lounge")
-    check("a2692: in the Lounge, Codex's line is its own word alone", "Codex: a separate event watcher can notify its Codex "
-          "chat when @codex appears in event text; delivery is not confirmed here" in got and "inbox:codex" not in got, got)
+    check("a2692: in the Lounge, Codex's line is its own word alone (a5267: with no listener's row, delivery unknown)",
+          "Codex: delivery unknown: a separate event watcher can notify its Codex chat when @codex appears in event text; "
+          "it says nothing here" in got and "inbox:codex" not in got, got)
     wl = H.load()
     eold = next(e["id"] for e in wl.events if ("not for you to read" + U) in str((e.get("args") or {}).get("append", "")))
     snow = wl.subjects[stalk["id"]]

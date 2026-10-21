@@ -1,0 +1,70 @@
+# direction-signal-base (a5534): the home base as a stage and a rack, a copy of home-base (a5208) wearing direction-signal.
+# A wordmark and three big numbers across the top. The stage (the viewer) takes the left half, pinned in orange;
+# the rest is a rack of four equal tiles at the right, each scrolling on its own, so nothing pushes anything else down.
+home : column
+  share 1
+  role home
+  let waits = count(tag:ready-for-review) + count(prop:design=waiting)
+  let flying = count(prop:commission=working) + count(prop:commission=waiting)
+  let crew = count(house doing=working)
+  bar : row
+    role bar
+    hello : column
+      share 1
+      mark : text "AGORA / $(weekday($today)) $today / CTRL+ALT+J"
+        role brand
+      name : text "Home base"
+        role place
+    r1 : column
+      role readpill
+      n : text "$(waits)"
+        role readout
+      l : text "WAITING ON YOU"
+        role readlabel
+    r2 : column
+      role readpill
+      role readpill.alive when flying > 0
+      n : text "$(flying)"
+        role readout
+      l : text "IN FLIGHT"
+        role readlabel
+    r3 : column
+      role readpill
+      role readpill.alive when crew > 0
+      n : text "$(crew)"
+        role readout
+      l : text "AT WORK"
+        role readlabel
+  body : grid 10 11
+    share 1
+    role body
+    stage : column
+      share 1
+      role pinned
+      lens home-viewer
+    rack : grid 1 1
+      share 1
+      role body
+      waiting : column
+        role loose
+        scroll scroll
+        lens waiting-on-me
+      board : column
+        role loose
+        scroll scroll
+        lens home-board
+      screen : column
+        role loose
+        scroll scroll
+        cell : column
+          role panel
+          lens home-tiles
+      people : column
+        role loose
+        scroll scroll
+        work : column
+          lens home-work
+        lowdown : column
+          lens home-lowdown
+  dock : row
+    lens home-dock

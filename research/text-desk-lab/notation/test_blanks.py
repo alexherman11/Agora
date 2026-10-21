@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_blanks (a806, rooms step 2a): the one filler, $here and $new, presence, and rest going home.
 
     python test_blanks.py

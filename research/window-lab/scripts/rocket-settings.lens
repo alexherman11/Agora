@@ -1,0 +1,37 @@
+# rocket-settings (a6249): the Rocket League timer's two numbers, stood on its note (placed by scripts-page through
+# panel=, or: scene rocket-settings on <the note>). Each is a prop the house carries to the timer's settings file; the
+# timer reads it at its next check.
+settings : column
+  role scsettings
+  on : column
+    only when ($item or "") != ""
+    one : column
+      of $item as r
+      each numbers
+  nothing : text "rocket-settings stands on the Rocket League timer's note"
+    role scmeta
+    only when ($item or "") = ""
+numbers : column
+  role scsettings
+  weekday : row
+    role scsetting
+    label : text "Monday to Friday"
+      role sclabel
+    n : text "$r.weekday_minutes"
+      role scnumber
+      lines 1..1
+      commit enter
+      on edit do prop $r weekday_minutes="$value"
+    unit : text "minutes"
+      role scmeta
+  weekend : row
+    role scsetting
+    label : text "Saturday and Sunday"
+      role sclabel
+    n : text "$r.weekend_minutes"
+      role scnumber
+      lines 1..1
+      commit enter
+      on edit do prop $r weekend_minutes="$value"
+    unit : text "minutes"
+      role scmeta

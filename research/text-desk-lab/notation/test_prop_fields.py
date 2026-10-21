@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_prop_fields (a1322): prop query= changes a view's selection; a field the house keeps elsewhere is never a prop;
 an ok never hides a blank kept as typed.
 

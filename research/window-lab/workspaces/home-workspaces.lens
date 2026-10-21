@@ -1,0 +1,30 @@
+# home-workspaces: Alex's workspaces as icons in the dock (a6427), each its glyph, its name and sentence on hover; the
+# one he is in is lit. A press is the verb `workspace <name>` (the whole home base laid out for that work, in one act);
+# ↶ is `workspace back`, the arrangement before the last one. The workspaces are surfaces in Workspaces (role=workspaces
+# actor=$me in the Home base room), in its order; a new one is `workspace save <name>`, never a line here.
+spaces : row
+  role appicons
+  of kind:surface,prop:role=workspaces,prop:actor=$me as h
+  each shelf
+shelf : row
+  role appicons
+  of prop:role=home-layout,prop:actor=$me as lay
+  each icons
+icons : row
+  role appicons
+  of kind:surface,in:$h.item,prop:role=workspace,-prop:name=before as ws
+  each space
+  back : column
+    only when count(kind:surface,in:$h.item,prop:role=workspace,prop:name=before) > 0
+    role appicon
+    tip "back" "The home base as it was before the last workspace: press to go back to it."
+    on click do workspace back
+    glyph : text "↶"
+      role appglyph
+space : column
+  role appicon
+  role appicon.on when ($lay.name or "") = $ws.name
+  tip "$ws.title" "$ws.about"
+  on click when ($lay.name or "") != $ws.name do workspace $ws.name
+  glyph : text "$(($ws.glyph or "◇"))"
+    role appglyph

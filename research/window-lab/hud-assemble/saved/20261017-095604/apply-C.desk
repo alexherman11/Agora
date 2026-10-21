@@ -1,0 +1,6 @@
+read a5674
+do prop a5674 shelf=no
+read a5668
+do prop a5668 shelf=yes
+look f5666
+do prop f5666 span=2

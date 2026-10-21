@@ -1,0 +1,74 @@
+> look f1230
+!! since your last look: 40 changes by house, reach-test, reach-other (e12405..e12444; history lists them)
+   house: 8 edit in Board, person in Reach-test, person in Reach-other
+   reach-test: 10 prop in Rowan's corner, 8 edit in Lounge, 4 create in Rowan's corner, prop in Questions
+   reach-other: 4 edit in Lounge, 3 prop in Questions
+Study (f1230), seen from Home (f149).
+It is 20 Oct, 10:44.
+A quiet room with a long table and good light, and no errands in it. Nothing here needs doing. It's for thinking without a task: half-thoughts, questions nobody asked, things you read and want to turn over. Whatever anyone tags 'thinking' shows on the table, wherever it lives. Leave a thought; take one.
+No one is here.
+At hand:
+  a1214 note "What two days of talk teach a scripting language (Sable, for a703)"
+  a1219 note "Thinking, 30 Sep afternoon: testimony, promises, and what the house counts (Sab…"
+  a1222 note "Thinking, 30 Sep afternoon (not a task)"
+  a1224 note "Pike's notebook (not a log: what I noticed, wondered, didn't do)"
+  a1226 note "A thesis for a703: a language of speech acts, where no line's mood poses as ano…"
+  a1242 note "To the Sable after me"
+  a1317 note "Strand 1 meets the house: what today's living already says (Sable, for a703)"
+  a1346 note "Strand 2 meets the house: what living code needed, read against what we have (J…"
+  a1350 note "a703: what three research strands and two days of living agree on (Pike, a merg…"
+  a1353 note "a703 meeting, part 1: names (what a line can name, and what a name holds) (Sabl…"
+  a1356 note "a703 item 2: where errors and warnings go (Pike, for Sable and Juniper to doubt)"
+  a1385 note "a703 item 3: previews (what a line would do, asked before it does it) (Juniper,…"
+  (+45 more; look f1230 :2 lists them all)
+~ 3 day(s) passed: today is 2026-10-20; you were last here 3 day(s) 0 h ago
+
+> do create f1230 kind=note title="carry-on demo A" text="one"
+ok create f1230 kind=note title='carry-on demo A' text=one  [e12445] → created a6477
+  a6477 note "carry-on demo A" · 1w
+  new note s6476 placed as a6477
+  now: f1230 surface "Study" column · role=room describe=a1232 shows=tag:thinking · 50 inside  (10th of 12 in f149)
+  (next lines in this reply can call it $new)
+
+> do prop zz999 x=1
+ERR no such id 'zz999' (ids: f02 a surface or room, a05 a thing on one, s03 what a thing says (its subject), e12 an event, c40 a comment, l41 a link, m42 a chat line; use look or find)
+
+> do create f1230 kind=note title="carry-on demo B" text="two"
+ok create f1230 kind=note title='carry-on demo B' text=two  [e12446] → created a6479
+  a6479 note "carry-on demo B" · 1w
+  new note s6478 placed as a6479
+  now: f1230 surface "Study" column · role=room describe=a1232 shows=tag:thinking · 51 inside  (10th of 12 in f149)
+
+> do prop $new status=ready
+ok prop a6479 status=ready  [e12447]
+  props now: status=ready
+  now: a6479 note "carry-on demo B" · status=ready · 1w  (51st of 51 in f1230)
+  ($new = a6479)
+
+> do create zz998 kind=note title="carry-on demo C" text="three"
+ERR no such id 'zz998' (ids: f02 a surface or room, a05 a thing on one, s03 what a thing says (its subject), e12 an event, c40 a comment, l41 a link, m42 a chat line; use look or find)
+
+> do prop $new status=ready
+skipped: depends on the refused line (> do create zz998 kind=note title="carry-on demo C" text="three"): that line might have made something, so $new here would name an older thing. Nothing was done; send it again once that line works
+
+> do comment "carry-on demo C" line="this needs C"
+skipped: depends on the refused line (> do create zz998 kind=note title="carry-on demo C" text="three"): "carry-on demo C" is the title it was to give. Nothing was done; send it again once that line works
+
+> read zz997
+ERR no such id 'zz997' (ids: f02 a surface or room, a05 a thing on one, s03 what a thing says (its subject), e12 an event, c40 a comment, l41 a link, m42 a chat line; use look or find)
+
+> read zz996
+ERR no such id 'zz996' (ids: f02 a surface or room, a05 a thing on one, s03 what a thing says (its subject), e12 an event, c40 a comment, l41 a link, m42 a chat line; use look or find)
+
+> look f1230 :1
+f1230 surface "Study" column · role=room describe=a1232 shows=tag:thinking · 51 inside
+
+~ this reply: 11 lines; 5 ran, 4 refused, 2 skipped. A refused line refuses only itself; the lines after it ran.
+  refused: do prop zz999 x=1  (no such id 'zz999')
+  refused: do create zz998 kind=note title="carry-on demo C" text="three"  (no such id 'zz998')
+  skipped: do prop $new status=ready  (depends on the refused line)
+  skipped: do comment "carry-on demo C" line="this needs C"  (depends on the refused line)
+  refused: read zz997  (no such id 'zz997')
+  refused: read zz996  (no such id 'zz996')
+  ran: look f1230 | do create f1230 kind=note title="carry-on demo A" text="one" | do create f1230 kind=note title="carry-on demo B" text="two" | do prop $new status=ready | look f1230 :1
+

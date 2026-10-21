@@ -1,0 +1,3 @@
+# home-work-small: who is at work, in one line (a5496), for its panel title and the shelf.
+n : text "$(count(house doing=working)) at work"
+  role summary

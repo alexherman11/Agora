@@ -1,0 +1,302 @@
+# jeff-chat: Alex and JEFF talking, in the Conversation (a5080). The feed groups a run of lines by one writer under one
+# name; Alex's own lines stand at the right. "Everything" shows every line anyone said to or by Alex, anywhere; JEFF
+# chooses what reaches Alex now, and the whole feed is always here to read. The draft (role=conversation-draft,
+# actor=$me) holds who it goes to (to), what it answers (reply_to, quote) and which feed is shown (view).
+chat : column
+  share 1
+  role chat
+  of prop:role=conversation-draft,prop:actor=$me as draft
+  each room
+room : column
+  share 1
+  role room
+  head : row
+    role chathead
+    face : text "J"
+      role face
+    who : column
+      share 1
+      name : text "JEFF"
+        role chatname
+      state : text "thinking…"
+        role thinking
+        only when count(house doing=working resident=jeff) > 0
+      rest : text "here when you want him"
+        role meta
+        only when count(house doing=working resident=jeff) = 0
+    tabs : row
+      role tabs
+      all : text "All"
+        role tab
+        role tab.on when ($draft.view or "") != "jeff-only"
+        on click when ($draft.view or "") = "jeff-only" do prop $draft view=all
+      mine : text "Just JEFF"
+        role tab
+        role tab.on when ($draft.view or "") = "jeff-only"
+        on click when ($draft.view or "") != "jeff-only" do prop $draft view=jeff-only
+  about : column
+    of prop:role=home-view,prop:actor=$me as v
+    each abouting
+  hello : column
+    role hello
+    only when count(sayings in:a5080) = 0
+    hi : text "JEFF is new, as of today."
+      role heading
+    what : text "He keeps the whole picture: what the residents and builders are doing, what is waiting on you, and what can wait. Ask him anything, or ask for the lowdown."
+      role meta
+  feed : column
+    share 1
+    scroll end
+    role feed
+    only when ($draft.view or "") = "jeff-only"
+    of sayings in:a5080 as s
+    clamp last 120
+    run name
+    each said
+  everything : column
+    share 1
+    scroll end
+    role feed
+    only when ($draft.view or "") != "jeff-only"
+    of sayings involving:alex as s
+    clamp last 120
+    run name
+    each said
+  working : row
+    role working
+    of house doing=working as h
+    each typing
+  dock : column
+    role dock
+    let vopen = (max($viewing of prop:role=home-view,prop:actor=$me) or "")
+    let about = vopen when vopen != "" and vopen != "a5080" and vopen != ($draft.unabout or "")
+    let about = "" otherwise
+    let wview = (max($view of prop:role=writer,prop:actor=$me) or "")
+    let qin = (max($quote_in of prop:role=writer,prop:actor=$me) or "")
+    let qwords = (max($quote of prop:role=writer,prop:actor=$me) or "")
+    let wopen = (max($open of prop:role=writer,prop:actor=$me) or "")
+    let held = qwords when wview = "conversation" and qin != "" and qwords != "" and (qin = vopen or qin = wopen)
+    let held = "" otherwise
+    let elsewhere = "yes" when ($draft.reply_to or "") != "" and ($draft.reply_in or "") != "" and $draft.reply_in != "a5080"
+    let elsewhere = "no" otherwise
+    answering : row
+      role answering
+      only when ($draft.reply_to or "") != "" or ($draft.reply_thread or "") != ""
+      q : text "Answering: $draft.quote"
+        role meta
+        clamp 1
+        share 1
+      in : text "in $draft.reply_in"
+        role meta
+        clamp 1
+        only when elsewhere = "yes" or ($draft.reply_thread or "") != ""
+      x : text "×"
+        role tool
+        on click do prop $draft reply_to="" quote="" reply_in="" reply_thread="" reply_kind=""
+    commenting : column
+      role commenting
+      only when held != ""
+      the prop:role=writer,prop:actor=$me as w
+      on : column
+        the $w.quote_in as d
+        let talk = ($d.talk or "")
+        let isnote = "yes" when $d.kind = "note"
+        let isnote = "no" otherwise
+        let pointing = ($w.quoting or $d.item)
+        let ptext = join($text of $w.quoting) when isnote = "no"
+        let ptext = "" otherwise
+        let around = $d.text when isnote = "yes"
+        let around = ptext otherwise
+        let wbefore = (words-before(around, held) or "")
+        let wafter = (words-after(around, held) or "")
+        let wheading = (section-of($d.text, held) or "") when isnote = "yes"
+        let wheading = "" otherwise
+        let route = $d.author when ($d.author or "") != "" and $d.author != $me
+        let route = $d.owner when ($d.owner or "") != "" and $d.owner != $me
+        let route = "jeff" otherwise
+        let rules = "A conversation about this document between Alex and its author; anyone may be called in with @name. Keep each message short: one point. If you took his point, change the document and say so in one line with mark=folded. Ask only what you need from him, with mark=ask. To point at a passage: do append <this chat> line=<your words> about=<the document or its paragraph> quote=<its words>."
+        what : row
+          role answering
+          k : text "Comment on"
+            role meta
+          q : text "“$(held)”"
+            role meta
+            clamp 2
+            share 1
+          x : text "×"
+            role tool
+            on click do read $w; do prop $w quote="" quoting="" quote_in=""
+        where : row
+          role tagline
+          in : text "in $d.item"
+            role meta
+            clamp 1
+          new : text "· goes to $(route), kept in its Talk"
+            role receipt
+            only when talk = ""
+          old : text "· goes to the people of its Talk"
+            role receipt
+            only when talk != ""
+        say : text ""
+          role input
+          hint "Your comment on these words…"
+          lines 1..12
+          commit explicit
+          on edit when talk != "" do append $d.talk line="$value" about=$(pointing) quote="$(held)" words_before="$(wbefore)" words_after="$(wafter)" heading="$(wheading)"; read $w; do prop $w quote="" quoting="" quote_in=""
+          on edit when talk = "" do look f3402; do create f3402 kind=chat title="Talk: $d.title" talk_of=$d.item with="$me,$(route)" describe="$(rules)"; read $d.item; do prop $d.item talk=$new; do append $new line="$value" about=$(pointing) quote="$(held)" words_before="$(wbefore)" words_after="$(wafter)" heading="$(wheading)"; read $w; do prop $w quote="" quoting="" quote_in=""
+    to : row
+      role to
+      only when held = "" and elsewhere = "no" and ($draft.reply_thread or "") = ""
+      label : text "To"
+        role meta
+      j : text "JEFF"
+        role chip
+        role chip.on when $draft.to = "jeff"
+        on click do prop $draft to=jeff
+      s : text "Sable"
+        role chip
+        role chip.on when $draft.to = "sable"
+        on click do prop $draft to=sable
+      p : text "Pike"
+        role chip
+        role chip.on when $draft.to = "pike"
+        on click do prop $draft to=pike
+      u : text "Juniper"
+        role chip
+        role chip.on when $draft.to = "juniper"
+        on click do prop $draft to=juniper
+      r : text "Rowan"
+        role chip
+        role chip.on when $draft.to = "rowan"
+        on click do prop $draft to=rowan
+      c : text "Claude"
+        role chip
+        role chip.on when $draft.to = "claude"
+        on click do prop $draft to=claude
+    attachments : column
+      only when held = ""
+      of captures $draft.context
+      each attachment
+    say : text ""
+      role input
+      only when held = ""
+      hint "Write to JEFF, or anyone above…"
+      lines 1..12
+      commit explicit
+      on edit when elsewhere = "no" and ($draft.reply_thread or "") = "" do append a5080 line="$value" default_to="$draft.to" captures="$draft.context" context_from="$draft" reply_to="$draft.reply_to" about="$(about)"
+      on edit when elsewhere = "yes" do append $draft.reply_in line="$value" reply_to="$draft.reply_to"; read $draft; do prop $draft reply_to="" quote="" reply_in="" reply_kind=""
+      on edit when ($draft.reply_thread or "") != "" do comment $draft.reply_in id=$draft.reply_thread line="$value"; read $draft; do prop $draft reply_thread="" quote="" reply_in="" reply_kind=""
+    footer : row
+      role urfooter
+      only when held = ""
+      help : text "Enter sends · Shift+Enter for a new line · @name to send to someone else · Ctrl+Alt drag to show JEFF something"
+        role hint
+        share 1
+      quota : row
+        lens home-usage
+    helpc : text "Enter sends your comment to the document's Talk · it shows here, with who it went to · × goes back to talking to JEFF"
+      role hint
+      only when held != ""
+said : column
+  role said
+  role said.mine when $s.name = "alex"
+  head : row
+    role saidhead
+    only when $run = 1
+    who : text "$s.by"
+      role who
+      role who.jeff when $s.name = "jeff"
+    to : text "to $s.to"
+      role meta
+      only when $s.to != "" and $s.to != "alex" and $s.to != "jeff"
+    at : text "$s.at"
+      role meta
+    where : text "in $s.in"
+      role place
+      only when $s.item != "a5080"
+  bubble : column
+    role bubble
+    role bubble.mine when $s.name = "alex"
+    role bubble.jeff when $s.name = "jeff"
+    quoted : text "“$s.quote”"
+      role chatquote
+      clamp 3
+      only when ($s.quote or "") != ""
+    body : text "$s.said"
+      marks
+      role words
+      media
+      on pop do prop prop:role=media-player,prop:actor=$me src="$value" opened=$now
+      on pop host window media-player
+    more : column
+      only when $s.context != ""
+      fold "What was shown"
+      what : text "$s.context_summary"
+        role meta
+  tagline : row
+    role tagline
+    only when ($s.about or "") != "" or ($s.name = "alex" and $s.item != "a5080")
+    k : text "about"
+      role meta
+      only when ($s.about or "") != ""
+    what : text "$s.about"
+      role aboutname
+      clamp 1
+      only when ($s.about or "") != ""
+    sent : text "sent to $s.to"
+      role receipt
+      only when $s.name = "alex" and ($s.to or "") != ""
+    nobody : text "sent to no one: say @name to call someone"
+      role receipt
+      only when $s.name = "alex" and ($s.to or "") = ""
+  acts : row
+    role acts
+    answer : text "Answer"
+      role tool
+      on click when $s.what = "line" do prop $draft reply_to=$s.line quote="$s.said" reply_in=$s.item reply_kind=line reply_thread=""
+      on click when $s.what != "line" do prop $draft reply_thread=$s.thread quote="$s.said" reply_in=$s.item reply_kind=$s.what reply_to=""
+typing : row
+  role typingrow
+  dots : text "• • •"
+    role dots
+  who : text "$h.resident is working"
+    role meta
+attachment : row
+  role attachment
+  pic : text "$thumb"
+    picture
+    role attachthumb
+    only when ($thumb or "") != ""
+  label : text "$label"
+    role meta
+    share 1
+  remove : text "Remove"
+    role tool
+    on click do prop $draft context="$remaining"
+abouting : column
+  let open = $v.viewing when ($v.viewing or "") != "" and $v.viewing != "a5080"
+  let open = "" otherwise
+  on : row
+    role abouthead
+    only when open != "" and open != ($draft.unabout or "")
+    k : text "About"
+      role aboutkey
+    what : text "$v.viewing"
+      role aboutname
+      clamp 1
+      share 1
+    note : text "what you write goes with it"
+      role meta
+    x : text "×"
+      role tool
+      tip "Not about it" "Your lines stop carrying what is open in the middle, until you open something else"
+      on click when ($draft.unabout or "") != $v.viewing do prop $draft unabout=$v.viewing
+  off : row
+    role tagline
+    only when open != "" and open = ($draft.unabout or "")
+    k : text "Not about what is open"
+      role meta
+      share 1
+    back : text "About it again"
+      role tool
+      on click when ($draft.unabout or "") != "" do prop $draft unabout=""

@@ -1,0 +1,15 @@
+# app-preview-small: the phone preview in one line, beside its panel's title (a6431): the device, or what is pointed at
+small : row
+  role apsmall
+  of prop:role=app-preview,prop:actor=$me as pv
+  each line
+line : row
+  role apsmall
+  the $pv.device as dev
+  device : text "$dev.title"
+    role apmeta
+    only when ($pv.picked or "") = ""
+  picked : text "pointing at $pv.picked"
+    role apmeta
+    clamp 1
+    only when ($pv.picked or "") != ""

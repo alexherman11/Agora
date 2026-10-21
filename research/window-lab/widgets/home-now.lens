@@ -1,0 +1,18 @@
+# home-now: one line, what Alex is on right now, in his own words (a5530). It is a world fact on his now note (role=now
+# actor=$me, prop doing=), so JEFF and the residents can read what he is doing and keep quiet about the rest, and the
+# timer beside it times it. Click the words to write; Enter keeps them. A widget: tag widget, slot=bar, order=2.
+now : row
+  role nowbar
+  of prop:role=now,prop:actor=$me as nw
+  each line
+  none : text "no now note (role=now actor=you) in the Home base room"
+    role hint
+    only when count(prop:role=now,prop:actor=$me) = 0
+line : row
+  role nowline
+  label : text "NOW"
+    role nowlabel
+  doing : text "$nw.doing"
+    role nowtext
+    hint "what are you on?"
+    on edit do prop $nw doing="$value"

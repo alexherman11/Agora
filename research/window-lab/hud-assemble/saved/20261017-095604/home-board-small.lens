@@ -1,0 +1,3 @@
+# home-board-small: the board in one line (a5496), for its panel title and the shelf.
+n : text "$(count(prop:commission=working) + count(prop:commission=waiting)) working · $(count(prop:commission=ready) + count(prop:commission=landing)) landing"
+  role summary

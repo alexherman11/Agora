@@ -1,3 +1,4 @@
+# health: room test (health.py runs every test_*.py with this line among its first ten)
 """test_house_cols (a1431): a view or a table can show who made a thing and who last changed it, read from the house's
 own events (made_by made_at edited_by edited_at), never from props; a column that names nothing is said.
 
