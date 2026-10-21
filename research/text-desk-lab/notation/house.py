@@ -1471,6 +1471,11 @@ class House:
             return r.stdout.strip() if r.returncode == 0 else ""
         started_on, passes = head(), 0
         checked_on = started_on       # the HEAD-watch's baseline; started_on stays what this process imported
+        # No timer: startup requests one full comparison from the live writer.
+        try:
+            self.act("house", "log-world check", whole=True)
+        except Exception as e:
+            print(f"house: log-world startup request unavailable: {type(e).__name__}: {e}", flush=True)
         try:
             while True:
                 try:

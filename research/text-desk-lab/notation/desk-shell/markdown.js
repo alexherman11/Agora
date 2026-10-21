@@ -65,7 +65,11 @@
   .md-doc .md-wl.md-thing:has(> [data-deco].md-glyph),.md-doc .md-wl.md-thing:has(> [data-deco].md-refn){text-decoration:none}
   .md-doc:not(.md-raw) .md-line.md-active .md-wl > .md-syn{display:none}
   .md-doc.md-raw .md-wl > [data-deco]{display:none}
+  .md-part,.te-wrap,.md-doc{min-width:0;max-width:100%;box-sizing:border-box}
   .md-doc.md-read{line-height:1.62}
+  .md-doc.md-read .md-widget{max-width:100%;overflow-x:auto}
+  .md-doc.md-read .md-code{white-space:pre-wrap;overflow-wrap:anywhere}
+  .md-doc.md-read [role=link]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
   .md-doc.md-read .md-p{margin:0 0 .8em}
   .md-doc.md-read .md-li{margin:0 0 .3em}
   .md-doc.md-read .md-h1,.md-doc.md-read .md-h2{margin-top:1.3em}

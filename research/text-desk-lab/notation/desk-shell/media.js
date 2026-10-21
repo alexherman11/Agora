@@ -118,5 +118,17 @@
     box.append(img); el.replaceChildren(box);
   }
 
-  window.Media = { draw(el, media, pop) { if (!media || !media.items || !media.items.length) return; (media.mode === "player" ? player : media.mode === "picture" ? picture : embed)(el, media.items, pop); } };
+  // Pictures already drawn by a read document still offer the same native Pop out.
+  function inline(el, items, pop) {
+    if (!pop) return;
+    for (const img of el.querySelectorAll("img.md-img[data-media]")) {
+      const item = (items || []).find(i => i.kind === "image" && i.src === img.dataset.media);
+      if (!item) continue;
+      const out = button("Pop out", "tool", "Open " + item.name + " in its own window");
+      out.classList.add("media-pop"); out.dataset.deco = "1"; out.contentEditable = "false";
+      out.addEventListener("click", e => { e.stopPropagation(); pop(item); });
+      img.after(out);
+    }
+  }
+  window.Media = { inline, draw(el, media, pop) { if (!media || !media.items || !media.items.length) return; (media.mode === "player" ? player : media.mode === "picture" ? picture : embed)(el, media.items, pop); } };
 })();

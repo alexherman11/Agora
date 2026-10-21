@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (50)
+## open (51)
 
 ### F2. Scripts cannot say who is running them
 
@@ -333,7 +333,13 @@ a6329 · family=lens-words · status=open
 
 Source edits by worker-a6271, 17 Oct, for Alex's 'one unified bar that is lower and more discreet like the windows bar. They should have good icons, no text. If i hover them it should say what they are.' Missing world-level words, now in the language: (1) `tip "<name>" ["<one sentence of what it does>"]` on any part, filled as words are: the painter shows it in one float over the page beside the part while the pointer rests on it (or it has keyboard focus), after a moment, at once when running along a bar; the style's role `tip` gives its look; the printer says it, so a resident reading a scene knows what an icon is. Without it a part with no words could not say what it was at all (a native title would not wear the style, and a headless shot cannot see one). (2) style `hover <colour>`: a ground under the pointer, nothing moving; `touch` was the only pointer word, and it lifts, which Alex has ruled out. screen.py gained `hover <part>`, and runs at --scale with the browser's own device scale: with an emulated one, a screenshot re-read the pointer at 1/1.5 of where it was and every hover look was lost in the picture. Everything else is world: lenses home-dock (the bar) and home-icon, the Icons surface, icon= about= lights= props, style roles tb* and tip. Files: scene.py, lens_ir.py, style.py, desk-shell/lens.js, lens.html, style/style.js, screen.py, test_scene.py, research/window-lab/hud_playtest.py (finds an icon by its tip).
 
-## curing (42)
+### Item pickup needs explicit carry and atomic promotion words
+
+a7659 · family=language · status=open
+
+Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
+
+## curing (43)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -652,6 +658,13 @@ Read: named on-drop parts were required to carry inside the same lens, and the b
 a7443 · family=lens-words · status=curing
 
 Source staged on viewer tabs commission: the world lacked an undoable multi-projection Agora history operation and a way to name a frame reading scope independently of reused DOM keys. Adds narrow current-world browse and generic remember word; chrome remains staged world text. Native selector composition now preserves every composite event for undo, not just its final prop, and omits None for a no-op. No live tabs migration or painter activation. In-memory controller/commands/repaint and fake DOM pass; real guarded browser remains blocked at initial websocket read.
+20 October source repair after guarded review: named tab projections need ownership/lifecycle reconciliation, not a second history. Pending source groups only matching viewer/actor chrome under one surface, updates subject titles as well as labels, and reuses closed slots. Six staged Home search exclusions cover rows and counts; no global hiding rule. Real in-memory tests cover 25 reuse cycles, actor isolation, undo and actual search repaint; guarded repaired-byte review and JEFF menu/routes remain outstanding. Earlier initial websocket failure is historical, not a claim of current browser inability.
+
+### Read-only Markdown lacked keyboard links and inline native media controls
+
+a7613 · family=painter · status=curing
+
+Source a7557, pending landing and guarded acceptance. The existing markdown word already composes with media, but read-only links lacked Tab/Enter access and an approved inline picture lost media Pop out after deduplication. Generic TextEdit read semantics, Media.inline and narrow lens action routing supply these without chat-specific source, edit actions or new privilege; read code/table width rules constrain content. Five actual-module DOM stand-in tests and three in-memory actual-lens/dispatch checks pass; no browser/layout/clipboard acceptance. Exact body-only patches/reversal are staged in Richer chat — exact staged body passages and reversal. No live Conversation edits or sends.
 
 ## unchecked (7)
 
@@ -1276,3 +1289,6 @@ Host friction: independently added HUD playtest coverage required editing the sa
 a7107 · family=missing-word · status=source-pending
 
 Updated 20 Oct, source staged only: missing generic words resize, partition, companion, sizing and chrome provide world-declared shared weights, split/tab geometry, focused companions, natural size and bare-app tool policy. Whole-panel threshold carry and one preview/drop plan handle global/local edges; content leaves have manual edge extents and shared dividers persist weights. Repeat fingerprints include their expression/prop dependencies. Partition gesture fences include exact membership and direct-panel appearance/subject revisions (guarded shelves too), refreshed after reuse; concurrent panel policy/membership changes refuse. Necessary copy capability approved c7177: copy_json opts props into version-1 typed {$ref:identity} remapping; literal strings/keys and external refs remain unchanged; malformed/version errors refuse before creation. Ran 167 model checks,45 DOM stand-in checks,10 scene/world tests,3 copy-review recipe tests,4 typed-copy tests including actual workspace save/use. Browser remains blocked; no live acceptance/apply. Latest c7201 pane.bare/appgrip and music filled/scroll treatment preserved in staged lens a7167; scoped apply/docs/restore/checklist a7180. Source/acceptance details: hud-dividers/NAVIGATION.md.
+
+
+20 Oct round5 source candidate: generic authored grip default ownership and action-control drag guard repaired per JEFF, with no geometry/containment redesign. Passive nested summaries may carry; editors stay native; control clicks remain, returning/cancelled drags do not activate. 281 DOM stand-in checks pass; no fresh browser claim. Targeted guarded recheck still gates readiness/live use; EVIDENCE.md/current staged a7180 distinguish source tests from the reviewer's world-border proof.
