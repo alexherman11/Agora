@@ -1,0 +1,3 @@
+# Opening a named Agora item changes the active tab; it never changes chat context.
+do browse prop:role=home-view,prop:actor=$me action=open target=$1
+do prop prop:role=home-panel,prop:actor=$me,prop:lens=home-viewer shelf=no when count(prop:role=home-panel,prop:actor=$me,prop:lens=home-viewer,prop:shelf=yes) > 0

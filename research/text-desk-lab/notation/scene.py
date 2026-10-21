@@ -150,6 +150,7 @@ import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
 PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS += ("remember",)  # reading scope, viewer hands only; never drafts or permissions
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
 # double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
@@ -1192,6 +1193,13 @@ def _w_commit(node, p, val, n, env):
         node["commit_only"] = True
 
 
+def _w_remember(node, p, val, n, env):
+    m = re.fullmatch(r'"([^"]+)"', val)
+    if not m:
+        raise LensRefusal(f'line {n}: `remember "<reading scope>"` on a frame; got {p!r}')
+    node["remember"] = m.group(1)
+
+
 def _w_hint(node, p, val, n, env):
     m = re.fullmatch(r'"([^"]*)"', val)
     if not m or not m.group(1):
@@ -1941,6 +1949,7 @@ WORDS = {
     "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end|none end", _w_scroll),
+    "remember": ('remember "<reading scope>"', _w_remember),
     "fold": ('fold ["<handle label>"] [open] [float] [inline] [handle <role>] [group <name>]', _w_fold),
     "measure": ("measure <n>ch", _w_measure),
     "verbatim": ("verbatim", _w_verbatim),
@@ -2094,8 +2103,8 @@ def parse(src, roles=None, style=None):
         _check_part(k, k["line"])          # after every line, since a part's words may follow its children
         if k["caret"] and (k["text"] is None or not any(a["on"] == "edit" for a in k["on"])):
             raise LensRefusal(f"line {k['line']}: `caret` brings the caret to a text being written: this part has no `on edit`")
-        for wd in ("gap", "scroll", "fold", "measure", "arrows"):
-            if k[wd] not in (None, False) and not k["layout"]:
+        for wd in ("gap", "scroll", "fold", "measure", "arrows", "remember"):
+            if k.get(wd) not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
         for wd in ("wrap", "lines", "hint", "commit", "light", "live"):
             if k.get(wd) is not None and k["text"] is None:
@@ -2210,6 +2219,7 @@ def _refs_of(node):
     if node["only"] and X.looks_like(node["only"]):
         srcs.append(("only", node["only"]))
     srcs += [("on", a["line"]) for a in node["on"]]
+    srcs += [("remember", node.get("remember") or "")]
     srcs += [("role", c) for _, c in node["role_when"]]          # a1105: a role's test reads names like `only when`
     for word, text in srcs:
         for a, b in _VAR.findall(text):
@@ -2898,7 +2908,7 @@ def emit(node):
         paint["cut"] = True
     # pike-7 sections 6 and 9: tracks, gap, scroll, fold and measure on a frame; wrap and lines on text; share on any child
     if paint["kind"] == "frame":
-        for k in ("tracks", "gap", "scroll", "measure"):
+        for k in ("tracks", "gap", "scroll", "measure", "remember"):
             if node.get(k) is not None:
                 paint[k] = node[k]
         if node.get("arrows"):

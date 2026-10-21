@@ -438,7 +438,7 @@ def v_replace(w, nid, a):
 # ---------------------------------------------------------------- level 2: task-shaped verbs, composed
 
 
-def _compose(w, steps):
+def _compose(w, steps, world="current"):
     """Run (verb, nid, args) steps; return one receipt naming all events. Abort and undo on refusal."""
     events, changed = [], []
     for verb, nid, args in steps:
@@ -450,7 +450,11 @@ def _compose(w, steps):
                     r = with_untrash(w, nid, r, was)
             except Refusal as e:
                 if "is not a verb of" in str(e) and verb in REGISTRY:   # registry verbs (tag, prop, due ...) over a selection
-                    r = REGISTRY[verb].run(w, nid, dict(args))
+                    if verb == "browse":
+                        from viewer_tabs import run
+                        r = run(w, nid, dict(args), world=world)
+                    else:
+                        r = REGISTRY[verb].run(w, nid, dict(args))
                 else:
                     raise
         except Refusal as e:
@@ -460,7 +464,7 @@ def _compose(w, steps):
                 except Refusal:
                     pass
             raise Refusal(f"stopped at {verb} {nid}: {e}; earlier steps undone")
-        events += r["events"] if was and r.get("events") else [r["event"]]
+        events += r.get("events") or ([r["event"]] if r.get("event") else [])
         changed += r.get("changed", [])
     return {"ok": True, "event": events[-1] if events else None, "events": events, "changed": sorted(set(changed))}
 
@@ -576,6 +580,14 @@ def v_copy(w, nid, a):
             e["copy"] = made[nid]          # so $new (blanks.made_by) names the copy, not its last part
     return {"ok": True, "event": events[-1], "events": events, "changed": sorted(set(changed)), "created": made[nid],
             "note": f"copied {nid} as {made[nid]} inside {dest}: {len(parts) + 1} part(s), {len(events)} event(s)"}
+
+
+@verb("browse", ["note"], "Navigate Agora-only viewer tabs. Web/device targets remain unavailable.",
+      "action=init|open|new|select|close|back|forward|reload|lens|position [target=<Agora item or address>] [tab=<key>] [lens=<name>] [scroll=<n>] [zoom=<n>]",
+      "do browse prop:role=home-view,prop:actor=$me action=back")
+def v_browse(w, nid, a):
+    from viewer_tabs import run
+    return run(w, nid, a)
 
 
 def _now(w, props):

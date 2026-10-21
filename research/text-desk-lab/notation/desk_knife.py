@@ -2198,7 +2198,7 @@ class DeskKnife(DeskMoo):
                         continue
                     kept.add(sid)
                 steps.append((verb, i, {k: v for k, v in kv.items() if k != "one"}))
-            r = moo._compose(w, steps)
+            r = moo._compose(w, steps, world=(getattr(self, "_session", "") or "current").split("@")[0])
         for e in r.get("events", []):
             ev = next((x for x in w.events if x["id"] == e), None)
             if ev is not None:

@@ -277,6 +277,7 @@
   // child's track shrinks to its handle; gap, scroll and measure on any frame; fold is the lens's default, overridden by
   // this viewer only, never an event. The fold handle is the one control the painter draws itself (role tool).
   function frames(el, n, p) {
+    if (p.remember) el.dataset.remember = p.remember;
     if (p.gap != null) el.style.gap = typeof p.gap === "number" ? p.gap + "px" : p.gap[0] === "/" ? `calc(var(--t-gap) / ${p.gap.slice(1)})` : `calc(${p.gap.slice(1)} * var(--t-gap))`;   // F10: steps of the style's gap
     if (p.scroll && p.scroll !== "none" && p.scroll !== "none end") { el.style.overflow = "auto"; el.dataset.scroll = p.scroll; }
     // a5496 (Alex, 15 Oct: 'I don't want the interface to scroll'): `scroll none` never scrolls; what does not fit is

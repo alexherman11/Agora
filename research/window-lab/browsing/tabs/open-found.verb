@@ -1,0 +1,2 @@
+# Search follows the active tab; preserves the argument contract for home-search.
+do view $1
