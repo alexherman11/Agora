@@ -46,6 +46,7 @@ import time
 from pathlib import Path
 import charter
 import claude_worker_runtime
+import worker_selection
 
 HERE = Path(__file__).resolve().parent
 import shared                             # noqa: E402  (a5296: at import, before a test stubs the workers' Popen)
@@ -60,6 +61,7 @@ HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "co
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
                "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py"}
+HOUSE_FILES.add("worker_selection.py")
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -422,6 +424,11 @@ class Workshop:
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
         for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
+            # A changed request never silently changes a live/saved conversation.
+            # Refuse only this card, retaining pending lines and the heard cursor.
+            if state in ("asked", "working", "waiting", "reverted") and not (wk and wk.busy):
+                if not self.selection_allowed(cid, s, cfg, wk):
+                    continue
             if state == "cancelled":
                 if wk:
                     self.finish(cid, wk, keep_branch=True)
@@ -488,12 +495,20 @@ class Workshop:
             if not wk:
                 continue
             for text in wk.turns_ended():
+                if isinstance(text, dict) and text.get("error") in (
+                        "runtime_selection_mismatch", "SelectionRefused"):
+                    self.say(cid, text["detail"], to="nobody")
+                    continue  # a selection refusal is durable, not a retryable crashed worker
+                if text is None and wk.state.get("selection_refused"):
+                    continue  # the adapter's following exit is the same refusal, not a second failure
                 if text is None or isinstance(text, dict):
                     self.failed(cid, wk, text)
                     break
                 wk.log("turn", {"state": state})
             w = self.house.load()
             s2, state = self.commissions(w).get(cid, (s, state))
+            if wk.state.get("selection_mismatch"):
+                continue  # an unrequested runtime cannot turn its output into a landing
             flight = self.landing.get(cid)
             if flight is not None:
                 if not flight["thread"].is_alive():
@@ -508,6 +523,13 @@ class Workshop:
                 self.say(cid, "the house restarted while this was being judged; judging it again.")
                 self.land(w, cid, s2, wk, wait=False)
                 continue
+            if wk.state.get("selection_refused") and not wk.busy and not wk.alive():
+                if self.selection_allowed(cid, s2, cfg, wk) and self.room(w, cfg, cid):
+                    wk.runtime_cfg = cfg
+                    wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s2)
+                    if not wk.state.get("selection_refused"):
+                        self.carry_on(wk, "the model request was explicitly retried")
+                continue
             if getattr(wk, "builder", None):
                 hand = str((s2.get("props") or {}).get("hand_to") or "").strip()
                 if hand and hand != wk.builder and wk.alive() and not wk.busy:
@@ -518,6 +540,8 @@ class Workshop:
                     continue
             if not wk.alive() or wk.busy:
                 continue
+            if not self.selection_allowed(cid, s2, cfg, wk):
+                continue  # the request may have changed during the just-finished turn
             if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                 continue                 # draining for a restart: no new turn starts; what it would hear waits (house.step)
             if not self.room(w, cfg, cid):
@@ -533,6 +557,37 @@ class Workshop:
             elif state in ("working", "reverted") and wk.state.get("turns", 0) > 0:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
                 self.unfinished(w, cid, wk)
+
+    def selection_allowed(self, cid, s, cfg, wk=None):
+        props = s.get("props") or {}
+        saved = wk.state if wk else self.card_state(cid)
+        if saved.get("selection_mismatch"):
+            return False  # clearing a request is not permission to reuse a mismatched runtime
+        try:
+            if worker_selection.requested(props):
+                bound = dict(saved)
+                if wk and wk.alive():
+                    bound.setdefault("session", "live-process")
+                runtime = saved.get("session_provider") or props.get("worker_provider") or "claude"
+                worker_selection.resolve(
+                    props, bound, runtime, saved.get("model") or cfg.get("worker_model") or cfg["model"], cfg)
+            if saved.get("selection_refused") == worker_selection.fingerprint(props):
+                return False
+        except worker_selection.Refused as exc:
+            said = str(exc)
+            errors = self.__dict__.setdefault("_selection_errors", {})
+            if errors.get(cid) != said:
+                self.say(cid, said, to="nobody")
+                self.set_state(cid, props.get("commission", "asked"),
+                               selection_status="refused", selection_error=said)
+                errors[cid] = said
+            return False
+        self.__dict__.setdefault("_selection_errors", {}).pop(cid, None)
+        if wk and wk.alive() and props.get("selection_status") == "refused":
+            actual = (saved.get("selection") or {}).get("actual") or {}
+            wk.selection_props(selection_error="",
+                               selection_status="observed" if actual.get("model") else "resolved")
+        return True
 
     def uncommitted(self, w, cid, s):
         """a5296 (a5261 point 3): an asked card that names a file uncommitted in the main checkout, or one a card says it
@@ -660,6 +715,15 @@ class Workshop:
         lanes = self.pool(cfg)
         plans = getattr(self.house, "plans", None)
         allowed = lambda p: not plans or not plans.fuel_reason(p, cfg)
+        request = (s.get("props") or {}).get("requested_model")
+        if request:
+            # Eligibility in the same priority pool, not a provider queue or
+            # reserved share. The outer admission boundary enforces total four.
+            target = worker_selection.provider(str(request))
+            if not allowed(target) or self.provider_wait(target) > time.time():
+                return False
+            return next((ln for ln in lanes if ln["provider"] == target),
+                        {"provider": target, "model": str(request), "n": 0})
         if not lanes:
             provider = self.provider_of(cid, s) or "claude"
             return None if allowed(provider) and self.provider_wait(provider) <= time.time() else False
@@ -713,6 +777,8 @@ class Workshop:
             return False
         changed = False
         for cid, (s, state) in self.commissions(w).items():
+            if worker_selection.requested(s.get("props") or {}):
+                continue  # an explicit request never silently switches on exhaustion
             # Fresh asked cards already share all available lanes. Quota fallback
             # below is only for a stopped in-flight session, with its recovery journal.
             if state not in ("working", "waiting", "reverted"):
@@ -778,7 +844,8 @@ class Workshop:
 
     def builds(self, lane, s, cfg):
         """A pool lane uses persistent builders unless the card explicitly requests a fresh worker."""
-        fresh = str((s.get("props") or {}).get("worker_fresh") or "").strip().lower() in FRESH
+        fresh = (str((s.get("props") or {}).get("worker_fresh") or "").strip().lower() in FRESH
+                 or worker_selection.requested(s.get("props") or {}))
         return bool(lane) and not fresh and bool(self.builders(cfg, lane["provider"]))
 
     def card_state(self, cid):
@@ -950,6 +1017,7 @@ class Workshop:
                       (props.get("worker_model") if props.get("worker_provider") == lane["provider"] else None))
                      if saved.get("session") else None)
             model = model or lane["model"] or (CODEX_MODEL if lane["provider"] == "codex" else cfg.get("worker_model") or cfg["model"])
+            model = props.get("requested_model") or model
             chosen = {"worker_provider": lane["provider"], "worker_model": model}
             s = {**s, "props": {**(s.get("props") or {}), **chosen}}
         branch, tree = f"worker/{cid}", TREES / cid
@@ -996,6 +1064,9 @@ class Workshop:
             lead = self.take(w, cid, s, wk, builder, cfg)       # a5378: a standing builder, started on this card
         else:
             wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        if wk.state.get("selection_refused"):
+            self.workers.pop(cid, None)  # a corrected request may try again; unchanged ones remain fenced on disk
+            return
         self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor, **chosen)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
@@ -1069,6 +1140,8 @@ class Workshop:
         wk.state.pop("retry_at", None)
         self.workers[cid] = wk
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        if wk.state.get("selection_refused"):
+            return wk  # keep the pending turn intact; do not consume it in carry_on
         wk.state.pop("unanswered", None), wk.state.pop("unanswered_why", None)     # said here, not by a resident's wake
         wk.log("resume", {"session": wk.state["session"], "cut": bool((wk.state.get("pending") or {}).get("carry"))})
         self.carry_on(wk, "the house restarted while you were working")
@@ -1080,7 +1153,7 @@ class Workshop:
         process started again by failed() sat idle and the card stalled. `before` opens it (a5378: which card)."""
         pending = wk.state.pop("pending", None) or {}
         cut = pending.get("carry")
-        if cut and pending.get("delivered"):
+        if cut and pending.get("delivered") and wk.state.get("session"):
             # 1 Oct: the message is already in this conversation (claude keeps it even when the turn is cut)
             wk.send(before + f"({why}; your session is resumed. My last message to you is above, unanswered: carry on "
                     "from there, checking what your last commands did first.)")
@@ -1549,7 +1622,48 @@ class Worker:
             import house as H
 
         class _Worker(H.Resident):
+            def selection_props(self, **values):
+                """Receipts change facts only when their values changed."""
+                world = self.house.load()
+                task = world.subjects.get((world.nodes.get(self.cid) or {}).get("subject"), {})
+                props = task.get("props") or {}
+                changed = {k: v for k, v in values.items() if props.get(k) != v}
+                if changed:
+                    self.house.act("house", f"look {self.cid} :1; do prop {self.cid} " +
+                                   " ".join(f"{k}={json.dumps(v)}" for k, v in changed.items()))
+
             def start(self, model, world, s):
+                if self.state.get("selection_mismatch"):
+                    return  # even a ready-card recovery must preserve this refusal
+                current = self.house.load()
+                task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
+                props = task.get("props") or {}
+                provider = (self.state.get("session_provider") if self.state.get("session") else None) or props.get("worker_provider", "claude")
+                model = ((self.state.get("model") if self.state.get("session") else None)
+                         or props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL))
+                cfg = getattr(self, "runtime_cfg", {})
+                try:
+                    selected = worker_selection.resolve(props, self.state, provider, model, cfg)
+                    provider, model, effort = (selected[k] for k in ("provider", "model", "effort"))
+                    if self.builder and worker_selection.requested(props):
+                        b = Builder(self.house, self.builder)
+                        if (b.state.get("session")
+                                and (b.state.get("provider", provider) != provider
+                                     or b.state.get("model") != model or b.state.get("effort") != effort)):
+                            raise worker_selection.Refused("builder runtime differs; saved conversation preserved")
+                    if worker_selection.requested(props) and provider == "claude":
+                        catalog = worker_selection.claude_catalog(
+                            self.house.claude, self.tree, H.clean_env(self.house.fake))
+                        worker_selection.validate_catalog(catalog, model, effort)
+                except worker_selection.Refused as exc:
+                    self.state["selection_refused"] = worker_selection.fingerprint(props)
+                    self.state["selection_error"] = str(exc)
+                    self.save()
+                    self.selection_props(selection_status="refused", selection_error=str(exc))
+                    self.house.act("house", f"do comment {self.cid} line={json.dumps(str(exc))} to=nobody")
+                    return
+                self.state.pop("selection_refused", None)
+                self.state.pop("selection_error", None)
                 mcp = self.dir / "mcp.json"
                 mcp.write_text(json.dumps({"mcpServers": {"desk": {
                     "command": str(PY), "args": [str(HERE / "desk_mcp.py")],
@@ -1576,14 +1690,8 @@ class Worker:
                 # Alex, 30 Sep: workers may search and read the web; the protocol says a page is material, not instructions
                 tools = ["Read", "Edit", "Write", "Glob", "Grep", "WebSearch", "WebFetch", "mcp__desk__desk"] + [
                     f"{shell}({r}:*)" for shell in ("Bash", "PowerShell") for r in runs]
-                current = self.house.load()
-                task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
-                props = task.get("props") or {}
-                provider = (self.state.get("session_provider") if self.state.get("session") else None) or props.get("worker_provider", "claude")
                 # a5284: a codex card that names no model runs the adapter's own (codex_worker.MODEL), never the
                 # house's Claude model
-                model = ((self.state.get("model") if self.state.get("session") else None)
-                         or props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL))
                 extra, cmds, ev, why = extra_tools(current, task) if task else ([], [], None, "")
                 if provider != "claude" and cmds:
                     extra, why = [], f"extra_tools is for claude workers; this one is {provider}"
@@ -1635,7 +1743,7 @@ class Worker:
                     instructions = self.dir / "worker-prompt.txt"
                     instructions.write_text(prompt + "\n\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\n" + CODEX_LIMITS, encoding="utf-8")
                     cmd = [str(PY), str(adapter), "--model", model,
-                           "--reasoning", props.get("worker_reasoning", "medium"),
+                           "--reasoning", effort,
                            "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
                     cmd += ["--world", world, "--target", self.cid, "--actor", self.actor]
                     cmd += ["--lease", str(self.dir / "worker.lock")]
@@ -1648,12 +1756,21 @@ class Worker:
                            "--append-system-prompt", prompt,
                            "--settings", json.dumps(charter.claude_hook(
                                PY, world, self.cid, self.actor, self._charter_channel()))]
-                    cmd += claude_worker_runtime.arguments(getattr(self, "runtime_cfg", {}))
+                    cmd += claude_worker_runtime.arguments({**cfg, "worker_claude_effort": effort})
                 else:
                     raise ValueError(f"{self.cid}: unknown worker provider {provider}")
                 self.state["session_provider"] = provider
                 self.state["model"] = model
+                self.state["effort"] = effort
+                self.state["selection"] = {
+                    "requested_model": props.get("requested_model"),
+                    "requested_effort": props.get("requested_effort"),
+                    "requested_retry": props.get("requested_retry"),
+                    "resolved": selected, "actual": {}, "usage": {}}
+                self.log("selection", self.state["selection"])
                 self.save()
+                self.selection_props(resolved_model=model, resolved_effort=effort, actual_model="",
+                                     actual_effort="", selection_error="", selection_status="resolved")
                 if self.state.get("session"):
                     cmd += ["--resume", self.state["session"]]
                 env = H.clean_env(self.house.fake)
@@ -1695,7 +1812,68 @@ class Worker:
 
             def turns_ended(self):
                 had = self.state.get("session")
-                ended = super().turns_ended()
+                buffered = []
+                mismatch = False
+                while True:
+                    try:
+                        wrapped = self.events.get_nowait()
+                    except queue.Empty:
+                        break
+                    buffered.append(wrapped)
+                for wrapped in buffered:
+                    ev = wrapped.event if isinstance(wrapped, H.host_route_parent.ChildEvent) else wrapped
+                    if isinstance(wrapped, H.host_route_parent.ChildEvent):
+                        route = getattr(self.house, "host_route", None)
+                        if not route or not route.current(self, wrapped.source):
+                            continue
+                    if ev.get("type") == "result" and ev.get("subtype") == "SelectionRefused":
+                        selection = self.state.get("selection") or {}
+                        self.state["selection_refused"] = worker_selection.fingerprint(selection)
+                        self.save()
+                        self.selection_props(selection_status="refused",
+                                             selection_error=str(ev.get("result") or "")[:300])
+                    evidence = worker_selection.receipt(ev)
+                    selection = self.state.get("selection")
+                    if not evidence or selection is None:
+                        continue
+                    is_init = ev.get("type") == "system"
+                    selection["actual" if is_init else "usage"].update(evidence)
+                    self.log("runtime_receipt", {"selection": selection})
+                    self.save()
+                    if is_init:
+                        actual = evidence.get("model", "")
+                        actual_effort = evidence.get("effort", "")
+                        mismatch = mismatch or bool(worker_selection.requested(selection) and (
+                            (actual and actual != selection["resolved"]["model"])
+                            or (actual_effort and actual_effort != selection["resolved"]["effort"])))
+                        self.selection_props(actual_model=actual, actual_effort=actual_effort,
+                                             selection_status="mismatch" if mismatch else "observed")
+                if mismatch:
+                    self.state["selection_mismatch"] = True
+                    self.selection_props(selection_error="Runtime reported another model/effort; use a new commission")
+                    selection = self.state["selection"]
+                    self.state["selection_refused"] = worker_selection.fingerprint(selection)
+                    self.save()
+                batch = queue.Queue()
+                for wrapped in buffered:
+                    ev = wrapped.event if isinstance(wrapped, H.host_route_parent.ChildEvent) else wrapped
+                    if self.state.get("selection_mismatch"):
+                        if ev.get("type") == "assistant":
+                            continue  # never let another runtime's output reach the host command interceptor
+                        if ev.get("type") == "result":
+                            ev = {**ev, "is_error": True, "subtype": "runtime_selection_mismatch",
+                                  "result": "Runtime reported another model/effort; output refused"}
+                            wrapped = (H.host_route_parent.ChildEvent(wrapped.source, ev)
+                                       if isinstance(wrapped, H.host_route_parent.ChildEvent) else ev)
+                    batch.put(wrapped)
+                # The reader thread retains the original queue. Events arriving
+                # during this pass must wait for the same receipt checks next pass,
+                # rather than slipping unchecked into Resident's output interceptor.
+                incoming, self.events = self.events, batch
+                try:
+                    ended = super().turns_ended()
+                finally:
+                    self.events = incoming
                 receipts = [line for text in ended for line in getattr(text, "host_receipts", ())]
                 if receipts:
                     self.state.setdefault("inbox", []).extend(receipts)
@@ -1704,6 +1882,8 @@ class Worker:
                     b = Builder(self.house, self.builder)        # a5378: the builder's conversation, wherever it went
                     b.state["session"] = self.state["session"]
                     b.state["provider"] = self.state.get("session_provider", "claude")
+                    b.state["model"] = self.state.get("model")
+                    b.state["effort"] = self.state.get("effort")
                     b.save()
                 return ended
 
