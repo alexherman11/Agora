@@ -339,7 +339,7 @@ a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
 
-## curing (45)
+## curing (46)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -677,6 +677,12 @@ Source edit (a7544, desk-shell/lens.js placeFloat, approved by JEFF e15996). The
 a7843 · family=code · status=curing
 
 a7816: the missing engine boundary was under-lock writer admission before detached command execution and store.begin/commit. Retaining only save_desk's writer guard allowed a refused foreign request to append a journal record. Provider compaction helpers also needed a read-result handoff to the parent, rather than writing a receipt from DESKD=off. Source prepared with real explore/Session/store copy tests; historical divergence and log records are deliberately untouched.
+
+### Sandbox cleanup needs a truthful closed/unknown receipt
+
+a8394 · family=refusal · status=curing
+
+a8333 source repair (staged, not runtime activation). Missing world-level capability: none; this is the hidden test harness's close operation, not authored world behavior. Prior close discarded taskkill failures/ownership and could claim cleanup from window absence. Source now keeps durable identity/error/intent evidence, verifies exact handles, refuses unknown profile/ownership, and blocks automatic retry while headless-child closure is unknown. Native engine owner retains the reviewed-runtime boundary; no trusted containment was fabricated. Deterministic offline tests and exact hook hunks: research/window-lab/browsing/diagnostics/HANDOFF.md. No browser run or process effect on this card; real engine isolation/cleanup remain unverified.
 
 ## unchecked (7)
 
