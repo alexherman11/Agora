@@ -12,6 +12,11 @@ POST /api/do   {"session": "...", "as": "...", "line": "..."}    run desk comman
 GET  /api/events?session=<name>&since=<n>       events after index n (poll this; it is cheap: an unchanged world file
                                                  is not loaded)
 GET  /api/version, /api/health                  the code this runs, the painter's files' hash and scene shape; ok
+GET  /api/map?session=&as=&scope=<f123>         a7950: the living map's agora-map/1 draw from pin and route notes, and
+                                                 the problems (map_seam.py); reads only
+POST /api/map  {"session", "as", "scope", "message"}   one map-frame message checked: the line and
+                                                 fence it means, or {"refused": why}; it runs nothing (the host sends
+                                                 the line to /api/do)
 Under the keeper it runs behind door.py (a1505), which swaps it for one on new code; see door.py.
 GET  /anything-else                              static files from static_dir (the shell)
 
@@ -635,6 +640,15 @@ class Session:
                    f"saved={'yes' if getattr(self, '_saved', False) else 'looked' if getattr(self, '_looked', False) else 'held' if self.hold else 'no'}")
 
 
+def _map_scope(v):
+    """a7950: a map's scope is one surface id (f123), or nothing for the whole world."""
+    if v in (None, ""):
+        return None
+    if not isinstance(v, str) or not re.fullmatch(r"f[0-9]{1,9}", v):
+        raise BadRequest("scope must be a surface id (f123), or empty")
+    return v
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(STATIC), **kw)
@@ -694,6 +708,12 @@ class Handler(SimpleHTTPRequestHandler):
             with Session(q.get("session", "desktop"), q.get("as")) as desk:
                 snap = snapshot_for(desk)
             return self._json(snap)
+        if u.path == "/api/map":
+            # a7950: the living map's 'draw', built from pin and route notes (map_seam.py); reads only
+            import map_seam
+            scope = _map_scope(q.get("scope"))
+            with Session(q.get("session", "desktop"), q.get("as"), read=True) as desk:
+                return self._json(map_seam.draw(desk.world, scope))
         if u.path == "/api/scene":
             import scene
             key = _scene_key(q)
@@ -857,8 +877,19 @@ class Handler(SimpleHTTPRequestHandler):
             # shell's style panel); nothing is stored
             import style
             return self._json(style.for_painter({"text": str(body.get("text", ""))}, body.get("theme")))
+        if urlparse(self.path).path == "/api/map":
+            # a7950: one message from a map frame, checked (map_seam.check). Nothing is run here: the answer is the one
+            # line and the fence it was drawn at, which the host page sends to /api/do like any press, so the door's
+            # routing, the fence, the event and its undo are the ones every gesture has
+            import map_seam
+            scope = _map_scope(body.get("scope"))
+            with Session(body.get("session", "desktop"), body.get("as"), read=True) as desk:
+                try:
+                    return self._json(map_seam.check(desk.world, body.get("message"), scope))
+                except map_seam.Refused as e:
+                    return self._json({"refused": str(e)})
         if urlparse(self.path).path != "/api/do":
-            return self._json({"error": "POST /api/do, /api/observe or /api/style"}, 404)
+            return self._json({"error": "POST /api/do, /api/map, /api/observe or /api/style"}, 404)
         line = str(body.get("line", "")).strip()
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)
