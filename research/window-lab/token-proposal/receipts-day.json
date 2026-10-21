@@ -1,0 +1,265 @@
+{
+  "begin": "2026-10-20T00:00:00-07:00",
+  "end_exclusive": "2026-10-20T16:52:00-07:00",
+  "active_receipt_files": 39,
+  "malformed_lines": 90,
+  "groups": {
+    "other residents": {
+      "first": "2026-10-20T10:43:42-07:00",
+      "last": "2026-10-20T16:01:17-07:00",
+      "active_folders": 6,
+      "kinds": {
+        "start": 41,
+        "restart": 35,
+        "event": 346,
+        "exit": 30,
+        "failed": 6,
+        "sent": 20,
+        "stop": 45,
+        "rest": 5,
+        "home": 5
+      },
+      "types": {
+        "result": 21,
+        "system": 85,
+        "system:init": 22,
+        "codex_event": 201,
+        "assistant": 29,
+        "assistant_without_id": 1,
+        "system:thinking_tokens": 63,
+        "rate_limit_event": 10
+      },
+      "result_models": {
+        "claude-opus-5-5": 14
+      },
+      "result_counter_deltas": {
+        "inputTokens": 28,
+        "outputTokens": 15078,
+        "cacheReadInputTokens": 8434200,
+        "cacheCreationInputTokens": 2585572
+      },
+      "unique_assistant_messages": 14,
+      "message_usage_totals": {
+        "input_tokens": 28,
+        "cache_creation_input_tokens": 2585572,
+        "cache_read_input_tokens": 8434200,
+        "output_tokens": 79
+      },
+      "max_message_context": 956962,
+      "tool_names": {}
+    },
+    "JEFF": {
+      "first": "2026-10-20T10:43:42-07:00",
+      "last": "2026-10-20T16:38:41-07:00",
+      "active_folders": 1,
+      "kinds": {
+        "start": 10,
+        "sent": 179,
+        "event": 19879,
+        "rest": 83,
+        "home": 83,
+        "restart": 6,
+        "exit": 7,
+        "stop": 8,
+        "failed": 1,
+        "provider_handover": 1,
+        "welcome": 2
+      },
+      "types": {
+        "system": 321,
+        "system:init": 97,
+        "system:api_retry": 1,
+        "system:thinking_tokens": 221,
+        "assistant": 245,
+        "rate_limit_event": 56,
+        "result": 178,
+        "codex_event": 19079,
+        "assistant_without_id": 84,
+        "system:compact_boundary": 1,
+        "system:charter_read": 1
+      },
+      "result_models": {
+        "claude-sonnet-5-5": 94
+      },
+      "result_counter_deltas": {
+        "inputTokens": 180,
+        "outputTokens": 49600,
+        "cacheReadInputTokens": 56659595,
+        "cacheCreationInputTokens": 1347989
+      },
+      "unique_assistant_messages": 94,
+      "message_usage_totals": {
+        "input_tokens": 184,
+        "cache_creation_input_tokens": 1351707,
+        "cache_read_input_tokens": 57973559,
+        "output_tokens": 514
+      },
+      "max_message_context": 732536,
+      "tool_names": {}
+    },
+    "workers": {
+      "first": "2026-10-20T10:43:43-07:00",
+      "last": "2026-10-20T16:51:58-07:00",
+      "active_folders": 32,
+      "kinds": {
+        "start": 97,
+        "resume": 23,
+        "exit": 74,
+        "stop": 127,
+        "sent": 101,
+        "event": 190779,
+        "turn": 83,
+        "kept": 20,
+        "set down": 50,
+        "restart": 1
+      },
+      "types": {
+        "system": 6818,
+        "system:init": 91,
+        "codex_event": 178143,
+        "system:compact_boundary": 27,
+        "system:charter_read": 15,
+        "assistant": 3338,
+        "assistant_without_id": 62,
+        "result": 96,
+        "system:thinking_tokens": 6248,
+        "system:permission_denied": 32,
+        "user": 1885,
+        "rate_limit_event": 405,
+        "system:vcs_state_changed": 6,
+        "system:task_started": 190,
+        "system:task_notification": 188,
+        "tool_progress": 94,
+        "system:background_tasks_changed": 12,
+        "system:task_updated": 6,
+        "system:api_retry": 3
+      },
+      "result_models": {
+        "claude-opus-5-5": 27,
+        "claude-haiku-4-5-20251001": 1
+      },
+      "result_counter_deltas": {
+        "inputTokens": 692,
+        "outputTokens": 174473,
+        "cacheReadInputTokens": 170166904,
+        "cacheCreationInputTokens": 814694
+      },
+      "unique_assistant_messages": 1300,
+      "message_usage_totals": {
+        "input_tokens": 2592,
+        "cache_creation_input_tokens": 3285138,
+        "cache_read_input_tokens": 396088402,
+        "output_tokens": 21585
+      },
+      "max_message_context": 821637,
+      "tool_names": {
+        "Bash": 634,
+        "mcp__desk__desk": 236,
+        "Write": 125,
+        "Grep": 209,
+        "Edit": 349,
+        "Read": 241,
+        "Glob": 8,
+        "ToolSearch": 7,
+        "TaskStop": 1,
+        "PowerShell": 13
+      }
+    }
+  },
+  "quota_windows": {
+    "2026-10-20T12:10:00-07:00": {
+      "observations": 280,
+      "first": {
+        "at": "2026-10-20T10:43:49-07:00",
+        "bucket": "workers",
+        "windows": {
+          "five_hour": {
+            "utilization": 0.32,
+            "resetsAt": 1792523400
+          },
+          "seven_day": {
+            "utilization": 0.07,
+            "resetsAt": 1793052000
+          }
+        }
+      },
+      "last": {
+        "at": "2026-10-20T11:45:21-07:00",
+        "bucket": "workers",
+        "windows": {
+          "five_hour": {
+            "utilization": 1,
+            "resetsAt": 1792523400
+          },
+          "seven_day": {
+            "utilization": 0.12,
+            "resetsAt": 1793052000
+          }
+        }
+      },
+      "first_full": {
+        "at": "2026-10-20T11:07:03-07:00",
+        "bucket": "workers",
+        "windows": {
+          "five_hour": {
+            "utilization": 1,
+            "resetsAt": 1792523400
+          },
+          "seven_day": {
+            "utilization": 0.11,
+            "resetsAt": 1793052000
+          }
+        }
+      }
+    },
+    "2026-10-20T17:10:00-07:00": {
+      "observations": 191,
+      "first": {
+        "at": "2026-10-20T12:11:26-07:00",
+        "bucket": "JEFF",
+        "windows": {
+          "five_hour": {
+            "utilization": 0,
+            "resetsAt": 1792541400
+          },
+          "seven_day": {
+            "utilization": 0.12,
+            "resetsAt": 1793052000
+          }
+        }
+      },
+      "last": {
+        "at": "2026-10-20T14:01:06-07:00",
+        "bucket": "workers",
+        "windows": {
+          "five_hour": {
+            "utilization": 1,
+            "resetsAt": 1792541400
+          },
+          "seven_day": {
+            "utilization": 0.2,
+            "resetsAt": 1793052000
+          }
+        }
+      },
+      "first_full": {
+        "at": "2026-10-20T14:00:53-07:00",
+        "bucket": "JEFF",
+        "windows": {
+          "five_hour": {
+            "utilization": 1,
+            "resetsAt": 1792541400
+          },
+          "seven_day": {
+            "utilization": 0.2,
+            "resetsAt": 1793052000
+          }
+        }
+      }
+    }
+  },
+  "result_session_models_missing_baseline": {
+    "workers": 6
+  },
+  "result_counter_decreases_skipped": 8
+}
