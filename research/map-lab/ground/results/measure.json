@@ -34,10 +34,10 @@
     1.5
    ],
    "load": {
-    "first_frame_ms": 526.5,
-    "dom_content_loaded_ms": 533.3,
-    "load_event_ms": 533.7,
-    "transfer_bytes": 262008,
+    "first_frame_ms": 501.4,
+    "dom_content_loaded_ms": 506.8,
+    "load_event_ms": 507.1,
+    "transfer_bytes": 262576,
     "resources": [
      [
       "fixture.js",
@@ -49,7 +49,7 @@
      ],
      [
       "map.js",
-      40709
+      41277
      ]
     ]
    },
@@ -96,7 +96,7 @@
     "draw_ms": {
      "n": 90,
      "p50": 0.2,
-     "p95": 0.3,
+     "p95": 0.4,
      "max": 0.4
     },
     "interval_ms": {
@@ -115,13 +115,13 @@
      "n": 240,
      "p50": 0.2,
      "p95": 0.3,
-     "max": 0.5
+     "max": 0.8
     },
     "interval_ms": {
      "n": 238,
      "p50": 16.67,
-     "p95": 16.8,
-     "max": 16.9
+     "p95": 16.7,
+     "max": 17.6
     }
    },
    "curve": {
@@ -232,7 +232,7 @@
     },
     "isolation": {
      "origin": "null",
-     "url_origin": "http://127.0.0.1:55764",
+     "url_origin": "http://127.0.0.1:49239",
      "parent_document": "blocked: SecurityError",
      "parent_host": "blocked: SecurityError",
      "fetch": "blocked: TypeError",
@@ -240,26 +240,29 @@
     },
     "after_drag": {
      "host_log": [
-      "moved Museum Tavern to 51.518182, -0.124604 (rev 2)"
+      "moved Museum Tavern to 51.517667, -0.126865 (rev 2)"
      ],
      "host_rev": 2,
      "frame_rev": 2,
      "moves_sent": 1
     },
     "stale_move": {
+     "grabbed": "p2",
      "host_log": [
-      "refused: Museum Tavern changed since (rev 1, now 2)"
+      "refused: Museum Tavern changed since (rev 2, now 3)"
      ],
-     "host_pin": {
-      "id": "p2",
-      "rev": 2,
-      "lat": 51.518181596159344,
-      "lon": -0.1246042027996398,
-      "height": 0,
-      "label": "Museum Tavern",
-      "icon": "2",
-      "colour": "#e0603a"
-     }
+     "host_pin_unchanged": true,
+     "frame_redrawn_rev": 3,
+     "host_rev": 3
+    },
+    "window_not_port": {
+     "host_log": [
+      "refused: posted to the window, not on the port"
+     ],
+     "frame_refusals": [
+      "posted to the window, not on the port"
+     ],
+     "frame_still_draws": 3
     },
     "press": [
      "pressed British Museum"
@@ -277,10 +280,10 @@
     1.5
    ],
    "load": {
-    "first_frame_ms": 501.9,
-    "dom_content_loaded_ms": 507.6,
-    "load_event_ms": 507.8,
-    "transfer_bytes": 262008,
+    "first_frame_ms": 708.9,
+    "dom_content_loaded_ms": 718.7,
+    "load_event_ms": 719.1,
+    "transfer_bytes": 262576,
     "resources": [
      [
       "fixture.js",
@@ -292,7 +295,7 @@
      ],
      [
       "map.js",
-      40709
+      41277
      ]
     ]
    },
@@ -338,7 +341,7 @@
     "yaw_turned": 1.8,
     "draw_ms": {
      "n": 90,
-     "p50": 0.2,
+     "p50": 0.3,
      "p95": 0.4,
      "max": 0.5
     },
@@ -357,8 +360,8 @@
     "draw_ms": {
      "n": 240,
      "p50": 0.2,
-     "p95": 0.3,
-     "max": 0.4
+     "p95": 0.4,
+     "max": 0.6
     },
     "interval_ms": {
      "n": 238,
@@ -475,7 +478,7 @@
     },
     "isolation": {
      "origin": "null",
-     "url_origin": "http://127.0.0.1:55764",
+     "url_origin": "http://127.0.0.1:49239",
      "parent_document": "blocked: SecurityError",
      "parent_host": "blocked: SecurityError",
      "fetch": "blocked: TypeError",
@@ -483,26 +486,29 @@
     },
     "after_drag": {
      "host_log": [
-      "moved Museum Tavern to 51.518182, -0.124966 (rev 2)"
+      "moved Museum Tavern to 51.517813, -0.126586 (rev 2)"
      ],
      "host_rev": 2,
      "frame_rev": 2,
      "moves_sent": 1
     },
     "stale_move": {
+     "grabbed": "p2",
      "host_log": [
-      "refused: Museum Tavern changed since (rev 1, now 2)"
+      "refused: Museum Tavern changed since (rev 2, now 3)"
      ],
-     "host_pin": {
-      "id": "p2",
-      "rev": 2,
-      "lat": 51.518182020264206,
-      "lon": -0.12496617515343364,
-      "height": 0,
-      "label": "Museum Tavern",
-      "icon": "2",
-      "colour": "#e0603a"
-     }
+     "host_pin_unchanged": true,
+     "frame_redrawn_rev": 3,
+     "host_rev": 3
+    },
+    "window_not_port": {
+     "host_log": [
+      "refused: posted to the window, not on the port"
+     ],
+     "frame_refusals": [
+      "posted to the window, not on the port"
+     ],
+     "frame_still_draws": 3
     },
     "press": [
      "pressed British Museum"
@@ -510,6 +516,6 @@
    }
   }
  ],
- "guard": "alex: untouched by the sandbox (foreground, focus, cursor and input desktop polled every 20 ms: no sandbox window became his foreground, none showed on his desktop, the input desktop stayed Default, the cursor never moved without real input); 78 changes came with real input (someone at the PC), so are theirs",
- "at": "2026-10-21 11:25:01"
+ "guard": "alex: untouched by the sandbox (foreground, focus, cursor and input desktop polled every 20 ms: no sandbox window became his foreground, none showed on his desktop, the input desktop stayed Default, the cursor never moved without real input); 1467 changes came with real input (someone at the PC), so are theirs",
+ "at": "2026-10-21 11:29:12"
 }

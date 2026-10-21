@@ -228,15 +228,30 @@ def run_size(base, w, h, out):
           try { localStorage.length; o.storage = 'allowed'; } catch (e) { o.storage = 'blocked: ' + e.name; }
           return o; })()""")
         tip = js_in(fcd, ctx,"(() => { const p = __map.drawn().pins[1]; return __map.project(p.lat, p.lon, 0); })()")
-        drag(c, tip[0], tip[1] - 14, tip[0] + 70, tip[1] + 20 - 14, 20)
+        drag(c, tip[0], tip[1] - 14, tip[0] - 70, tip[1] + 20 - 14, 20)    # west, away from the other two pins
         time.sleep(0.6)
         fr["after_drag"] = {"host_log": c.js("__host.log.slice(-2)"),
                             "host_rev": c.js("__host.state.pins[1].rev"),
                             "frame_rev": js_in(fcd, ctx,"__map.drawn().pins[1].rev"),
                             "moves_sent": js_in(fcd, ctx,"__map.outbox.filter(m => m.op === 'move').length")}
-        js_in(fcd, ctx,"parent.postMessage({channel: 'agora-map/1', op: 'move', id: 'p2', rev: 1, lat: 51.5185, lon: -0.1262}, '*')")
+        # a newer edit the frame has not seen (as if made by line elsewhere), then a real drag from the old picture
+        c.js("__host.state.pins[1].rev += 1")
+        before = c.js("JSON.stringify(__host.state.pins[1])")
+        tip = js_in(fcd, ctx, "(() => { const p = __map.drawn().pins[1]; return __map.project(p.lat, p.lon, 0); })()")
+        drag(c, tip[0], tip[1] - 14, tip[0] - 40, tip[1] + 40 - 14, 20)
+        time.sleep(0.6)
+        fr["stale_move"] = {"grabbed": js_in(fcd, ctx, "__map.outbox.filter(m => m.op === 'move').slice(-1)[0].id"),
+                            "host_log": c.js("__host.log.slice(-1)"),
+                            "host_pin_unchanged": c.js("JSON.stringify(__host.state.pins[1])") == before,
+                            "frame_redrawn_rev": js_in(fcd, ctx, "__map.drawn().pins[1].rev"),
+                            "host_rev": c.js("__host.state.pins[1].rev")}
+        # well-formed, but on the window instead of the port: refused both ways
+        js_in(fcd, ctx, "parent.postMessage({channel: 'agora-map/1', op: 'press', id: 'p1'}, '*')")
+        c.js("__host.frame.contentWindow.postMessage({channel: 'agora-map/1', op: 'draw', pins: [], routes: []}, '*')")
         time.sleep(0.4)
-        fr["stale_move"] = {"host_log": c.js("__host.log.slice(-1)"), "host_pin": c.js("__host.state.pins[1]")}
+        fr["window_not_port"] = {"host_log": c.js("__host.log.slice(-1)"),
+                                 "frame_refusals": js_in(fcd, ctx, "__map.refusals.slice(-1)"),
+                                 "frame_still_draws": js_in(fcd, ctx, "__map.drawn().pins.length")}
         tip = js_in(fcd, ctx,"(() => { const p = __map.drawn().pins[0]; return __map.project(p.lat, p.lon, 0); })()")
         mouse(c, "mouseMoved", tip[0], tip[1] - 14)
         mouse(c, "mousePressed", tip[0], tip[1] - 14, 1, "left")

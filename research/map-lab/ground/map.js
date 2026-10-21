@@ -3,6 +3,7 @@
 // Messages (contract a7875, THE SEAM), channel agora-map/1, coordinates always named lat and lon:
 //   in   {channel, op:'draw', pins:[{id, rev, lat, lon, height, label, icon, colour}], routes:[{id, rev, label, pins:[ids]}]}
 //   out  {channel, op:'press', id}   {channel, op:'drop', lat, lon}   {channel, op:'move', id, rev, lat, lon}
+//   all of these travel on the MessagePort the parent's {channel, op:'hello'} carried; nothing on the window counts
 'use strict';
 (() => {
   const CH = 'agora-map/1';
@@ -482,11 +483,14 @@
   }
 
   // ---- messages --------------------------------------------------------------------------------------------------
+  // Who is speaking (a7875): a sandboxed frame's origin is 'null', so the host proves itself by handing this load one
+  // MessagePort in a 'hello'. Draws are taken from that port only, and press, drop and move go out on it only.
   const outbox = [], refusals = [];
+  let port = null;
   function send(m) {
     const msg = Object.assign({channel: CH}, m);
     outbox.push(msg);
-    if (window.parent !== window) window.parent.postMessage(msg, '*');   // ids and coordinates only; nothing private
+    if (port) port.postMessage(msg);           // ids and coordinates only; never a command, never an actor
   }
   const ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
   const fin = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
@@ -541,8 +545,14 @@
   }
   function refuse(why) { refusals.push(why); status('refused a message: ' + why); return {refused: [why]}; }
   window.addEventListener('message', ev => {
-    if (window.parent === window || ev.source !== window.parent) { refusals.push('message not from the parent'); return; }
-    receive(ev.data);
+    const d = ev.data;
+    if (window.parent !== window && ev.source === window.parent && d && d.channel === CH && d.op === 'hello' && ev.ports[0]) {
+      if (port) port.close();
+      port = ev.ports[0];
+      port.onmessage = m => receive(m.data);
+      return;
+    }
+    refuse('posted to the window, not on the port');      // even a well-formed draw
   });
 
   // ---- input -----------------------------------------------------------------------------------------------------

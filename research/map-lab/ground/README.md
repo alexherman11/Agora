@@ -39,7 +39,8 @@ This is the geography half of the first slice (map card a7858; contract a7875). 
 - **The seam** (a7875, THE SEAM; channel `agora-map/1`, carried as a field named `channel`):
   - In: `{channel, op:'draw', pins:[{id, rev, lat, lon, height, label, icon, colour}], routes:[{id, rev, label, pins:[ids]}]}`. Each draw replaces the whole picture.
   - Out: `{channel, op:'press', id}`, `{channel, op:'drop', lat, lon}` and `{channel, op:'move', id, rev, lat, lon}`. A move carries the rev the frame drew.
-  - The frame accepts messages only from its parent. A message that is not a draw on the right channel is refused whole.
+  - Who is speaking (c8088): each time the frame loads, the host makes a new MessageChannel and sends one `{channel, op:'hello'}` to the frame's window, carrying a port. The frame keeps that port, takes draws only from it, and sends press, drop and move only on it. Anything posted to the window is refused, in both directions.
+  - A message on the port that is not a draw on the right channel is refused whole.
   - Inside a draw, a bad pin or route is refused alone, and the rest draws. Unknown fields are dropped, labels are set as text only, and colours must be `#rrggbb`.
   - `host.html` holds the frame with `sandbox="allow-scripts"` and no `allow-same-origin`. The frame gets an opaque origin (`null`), cannot touch its parent or storage, and its CSP allows no network.
 
@@ -56,10 +57,10 @@ Hardware:
 | footprints | ≤ 500 | 335 | 335 |
 | triangles | ≤ 100,000 | 19,314 (11,122 buildings + 8,192 ground), plus 13,446 outline segments | same |
 | fixture size | ≤ 5 MiB | 207,985 B (0.198 MiB); 262,008 B for the whole page | same |
-| cold load to first drawn frame | (record) | 526.5 ms | 501.9 ms |
-| p95 draw time (CPU + GPU, `gl.finish`), real mouse drag, 90 frames | ≤ 33 ms | 0.3 ms | 0.4 ms |
-| p95 draw time, 240-frame spin | ≤ 33 ms | 0.3 ms | 0.3 ms |
-| p95 frame interval, spin | ≤ 33 ms | 16.8 ms (vsync) | 16.7 ms |
+| cold load to first drawn frame | (record) | 501.4 ms | 708.9 ms |
+| p95 draw time (CPU + GPU, `gl.finish`), real mouse drag, 90 frames | ≤ 33 ms | 0.4 ms | 0.4 ms |
+| p95 draw time, 240-frame spin | ≤ 33 ms | 0.3 ms | 0.4 ms |
+| p95 frame interval, spin | ≤ 33 ms | 16.7 ms (vsync) | 16.7 ms |
 | p95 frame interval, drag | | 33.5 ms | 33.5 ms |
 | frames drawn while idle, 3 s after load and after input | 0 | 0 and 0 | 0 and 0 |
 | static plan, WebGL refused | works | 3 pins, list, attribution, 0 idle frames | same |
@@ -76,8 +77,10 @@ The drag's frame interval of 33.5 ms is the driver's input rate, not the map's s
 **Frame round trip** (host.html at both sizes):
 - The draw arrives, with three pins and a route in order p1, p2, p3.
 - A real mouse drag of pin 2 sends exactly one `move`. The host accepts it at rev 1 → 2, and the frame then shows rev 2.
-- A second move at the old rev 1 is refused ("changed since"), and the pin is unchanged.
+- Then the host makes a newer edit the frame has not seen (rev 2 → 3), and a second real drag of the same pin sends rev 2. It is refused ("changed since"), the host's pin is unchanged, and the frame is redrawn at rev 3.
+- A well-formed press posted to the window, and a draw posted to the frame's window, are both refused ("posted to the window, not on the port"). The frame keeps its 3 pins.
 - A click on pin 1 sends `press`.
+- Across the day's 6 runs, cold load to first frame was 501 to 709 ms.
 - From inside the frame, `parent.document`, `parent.__host` and `localStorage` all throw SecurityError, and `fetch` is blocked.
 
 ## Images
