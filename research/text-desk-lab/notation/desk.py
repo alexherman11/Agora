@@ -25,6 +25,7 @@ HELP = """commands (one per call):
   pivot id               appearance -> its subject and every place it appears; subject -> appearances
   find words             search titles and text
   history [id]           recent events (with undo ids); history e12 one event, what it caused, its undo
+  log-world [check|status] isolated log replay's answer; check requests a full comparison in the live writer
   do verb id k=v ...     change something. e.g. do move a04 into=f02   do append a03 line="new item"
   undo eN                revert an event
   plan / apply           (apply variant only) paste an edited outline; the desk diffs it into ops
@@ -45,7 +46,7 @@ RECORD_ID = re.compile(r"^([eclm])(\d+)$")
 HASH = re.compile(r"^[0-9a-f]{7,40}$")
 
 BASE_COMMANDS = {"help", "?", "look", "open", "close", "read", "where", "verbs", "pivot", "find", "history", "undo",
-                 "do", "plan", "apply"}
+                 "do", "plan", "apply", "log-world"}
 
 
 def aspects_of(verb, args):
@@ -346,6 +347,9 @@ class Desk:
                              f"a verb anyone can make is a note tagged verb (help verbs)")
         cmd, argv = words[0].lower(), words[1:]
         argv = [a.lstrip("@") for a in argv]
+        if cmd == "log-world":
+            import log_world
+            return log_world.command(self, argv)
         if cmd in ("help", "?"):
             return HELP
         if cmd == "look":

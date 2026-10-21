@@ -52,3 +52,6 @@ research/window-lab/.tmp-*/
 
 # a5941: films and pictures a person puts here for the desk to show (media_links.FOLDERS); like window-lab's demos/
 /media/
+
+# House-owned paired proof data and synthetic log-world fixtures are never source.
+/.agora-tmp/
