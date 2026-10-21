@@ -70,6 +70,74 @@ def order(copy):
         print(f"hunk {k + 1}: {said.strip().splitlines()[-1][:160]}")
 
 
+def batch(copy, who, line):
+    """a press's batch as the painter sends it: not whole, so ; splits it into commands"""
+    import json
+    import urllib.request
+    body = json.dumps({"session": copy.session, "as": who, "line": line}).encode()
+    req = urllib.request.Request(f"{copy.base}/api/do", body, {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        out = json.loads(r.read())
+    said = (("ERR " + out["error"] + "\n") if out.get("error") else "") + (out.get("text") or "")
+    print(f"--- {who} (batch)> {line[:200]}\n{said.rstrip()}\n")
+    return said
+
+
+def notice(copy, vid):
+    """a7761's notice press (do view <about>; do remove <notice>) after a shelve, then Back: is the notice removed, and
+    where does Back go?"""
+    out = copy.do("find prop:role=notice,prop:to=alex", ME)
+    ids = re.findall(r"^\s+(a\d+) note ", out, re.M)
+    print(f"notices to alex: {len(ids)}")
+    n = ids[0]
+    about = re.search(r"about=(\w+)", show(copy, ME, f"examine {n}")).group(1)
+    show(copy, "alex", "do view a5202")
+    show(copy, "alex", "do view f155")
+    print("viewer:", viewer(copy))
+    show(copy, "alex", f"read {vid}")
+    show(copy, "alex", f"do unview {vid}")
+    print("viewer after unview:", viewer(copy))
+    show(copy, "alex", f"look {n}")
+    batch(copy, "alex", f"do view {about}; do remove {n}")
+    print("viewer after the press:", viewer(copy))
+    print("notice after:", copy.do(f"examine {n}", ME).strip().splitlines()[:2])
+    print("notices to alex now:", len(re.findall(r"^\s+(a\d+) note ", copy.do("find prop:role=notice,prop:to=alex", ME), re.M)))
+    show(copy, "alex", f"read {vid}")
+    show(copy, "alex", f"do browse {vid} action=back")
+    print("viewer after Back (want f155):", viewer(copy))
+
+
+def usage(copy, vid):
+    """a7761's usage press (browse open target=<usage note> lens=plan-usage-reader; unshelve) after a shelve: what
+    happens to the tabs?"""
+    show(copy, "alex", "do view a5202")
+    show(copy, "alex", "do view f155")
+    print("viewer:", viewer(copy))
+    show(copy, "alex", f"read {vid}")
+    show(copy, "alex", f"do unview {vid}")
+    print("viewer after unview:", viewer(copy))
+    u = re.search(r"^\s+(a\d+) note ", copy.do("find prop:role=plan-usage", ME), re.M)
+    target = u.group(1) if u else "a6866"
+    show(copy, ME, f"examine {target}")
+    show(copy, "alex", f"read {vid}")
+    batch(copy, "alex", f"do browse {vid} action=open target={target} lens=plan-usage-reader; " + W.UNSHELF.replace("$me", "alex"))
+    print("viewer after the press:", viewer(copy))
+    show(copy, "alex", f"read {vid}")
+    show(copy, "alex", f"do browse {vid} action=back")
+    print("viewer after Back (want f155):", viewer(copy))
+    plain = "do prop prop:role=home-panel,prop:actor=alex,prop:lens=home-viewer shelf=no"
+    print("== the unshelve without its guard, the Viewer shelved:")
+    show(copy, "alex", f"read {vid}")
+    show(copy, "alex", f"do unview {vid}")
+    show(copy, "alex", f"read {vid}")
+    batch(copy, "alex", f"do browse {vid} action=open target={target} lens=plan-usage-reader; {plain}")
+    print("panel:", copy.do("find prop:role=home-panel,prop:actor=alex,prop:lens=home-viewer", ME).strip().splitlines()[-2:])
+    print("== the same, the Viewer already out:")
+    show(copy, "alex", f"read {vid}")
+    batch(copy, "alex", f"do browse {vid} action=open target=a5202 lens=home-feed; {plain}")
+    print("viewer:", viewer(copy))
+
+
 def main():
     what = sys.argv[1] if len(sys.argv) > 1 else "deleted"
     copy = pt.Copy("frontier-try")
@@ -78,7 +146,9 @@ def main():
             return order(copy)
         log, _, _, vid = W.apply_copy(lambda who, line: copy.do(line, who))
         print("\n".join(log[-6:]))
-        {"deleted": deleted, "bypass": bypass}[what](copy, vid)
+        if what in ("notice", "usage"):
+            print("\n".join(W.compose_jeff(lambda line: copy.do(line, ME))[-3:]))
+        {"deleted": deleted, "bypass": bypass, "notice": notice, "usage": usage}[what](copy, vid)
     finally:
         copy.close()
 

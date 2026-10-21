@@ -131,15 +131,14 @@ async def migrate(R):
 
 async def show(R):
     """the Viewer is on the desk for the journeys (when the copy has it shelved, a search result brings it back)"""
-    if await R.js("!!__tr.viewer()"):
-        R.record("show", show.__doc__, "ran", "the Viewer was already out", {}, [])
-        return
+    out = await R.js("!!__tr.viewer()")
     before = await state(R)
+    # either way the journeys start on Long note A (a7544: a copy with the Viewer out on Board gave pins no first step)
     await search_open(R, "Long note A synthetic", R.made["Long note A (synthetic)"])
     after = await state(R)
     ok = await R.wait_for("!!__tr.viewer()", 4)
     R.record("show", show.__doc__, "pass" if ok and after["viewing"] == R.made["Long note A (synthetic)"] else "fail",
-             f"Viewer shelved in this copy (viewing {before['viewing']!r}); a search result brought it out on {after['viewing']} in {after['active_tab']}",
+             f"Viewer {'out' if out else 'shelved'} in this copy (viewing {before['viewing']!r}); a search result opened {after['viewing']} in {after['active_tab']}",
              {"before": before, "after": after}, [await R.shot("show")])
 
 
@@ -398,7 +397,7 @@ async def keyboard(R):
 async def bypass(R):
     """routes that still write viewing= directly (a board card): what the tabs and Back do afterwards"""
     seen = {"before": await state(R), "tabs before": [(t["tab"], t.get("active")) for t in R.open_tabs()]}
-    card = "[...document.querySelectorAll('[data-key*=\"lens:home-board\"]')].filter(__tr.vis).find(e => e._n && (e._n.acts || []).some(a => a.on === 'click' && /viewing=/.test(a.line)))"
+    card = "[...document.querySelectorAll('[data-key*=\"lens:home-board\"]')].filter(__tr.vis).find(e => e._n && (e._n.acts || []).some(a => a.on === 'click' && /viewing=|do view /.test(a.line)))"
     k = await R.js(f"(() => {{ const e = {card}; return e ? [e.dataset.key, e.innerText.trim().slice(0, 60)] : null; }})()")
     if not k:                                  # the names that open things are inside an opened card: open one first
         row = ("[...document.querySelectorAll('[data-key*=\"lens:home-board\"] [data-fold-inline], [data-key*=\"lens:home-board\"] .l-fold-handle, [data-key*=\"lens:home-board\"] button')]"
@@ -421,16 +420,18 @@ async def bypass(R):
     seen["tab notes"] = [(t["tab"], t.get("active")) for t in R.open_tabs()]
     out = "ran"
     note = ""
+    seen["press line"] = await R.js(f"(() => {{ const e = {card}; return e ? e._n.acts.filter(a => a.on === 'click').map(a => a.line.slice(0, 120)) : null; }})()")
     if seen["after card"]["viewing"] != seen["before"]["viewing"]:
-        tabs_after = R.viewer().get("tabs_state", "")
         if await R.js(chip("Back")):
             await R.press(chip("Back"), what="Back")
             seen["after Back"] = await state(R)
             shots.append(await R.shot("bypass-back"))
-        note = (f"card {k[1]!r} set viewing {seen['before']['viewing']} -> {seen['after card']['viewing']} directly; "
-                f"tab label/state not updated (active {seen['after card']['active_tab']}, can_back {seen['after card']['can_back']}); "
-                f"Back then went to {seen.get('after Back', {}).get('viewing', '(no Back)')}")
-        out = "fail"
+        back_to = seen.get("after Back", {}).get("viewing", "(no Back)")
+        routed = seen["after card"]["can_back"] == "yes" and back_to == seen["before"]["viewing"]
+        note = (f"card {k[1]!r} ({seen['press line']}) moved viewing {seen['before']['viewing']} -> {seen['after card']['viewing']}; "
+                f"tab {seen['after card']['active_tab']} can_back {seen['after card']['can_back']}; Back then went to {back_to}"
+                + (" (the page before: the tab's own history)" if routed else " (NOT the page before)"))
+        out = "pass" if routed else "fail"
     else:
         note = f"card {k[1]!r} did not change viewing (opens elsewhere?)"
     R.record("bypass", bypass.__doc__, out, note, seen, shots)
@@ -528,6 +529,256 @@ async def overflow(R):
              seen, shots)
 
 
+async def order(R):
+    """reused slots (c7704): close three middle tabs, open two new ones; the notes do not grow, the menu lists rows by their order (numbers past 9 too), the new tabs last"""
+    notes, seen = [], {}
+    all0 = R.tabs()
+    open0 = [t for t in all0 if t.get("closed") == "no"]
+    if len(open0) < 8:
+        R.record("order", order.__doc__, "blocked", f"only {len(open0)} open tabs to work with", {}, [])
+        return
+    for t in open0[2:5]:
+        R.do(f"do browse {R.vid} action=close tab={t['tab']}", "alex")
+    for pid in (R.made["Long note A (synthetic)"], R.made["Long note B (synthetic)"]):
+        R.do(f"do browse {R.vid} action=new target={pid}", "alex")
+    await asyncio.sleep(1.5)
+    all1 = R.tabs()
+    open1 = [t for t in all1 if t.get("closed") == "no"]
+    seen["notes"] = [len(all0), len(all1)]
+    if len(all1) > len(all0):
+        notes.append(f"tab notes grew {len(all0)} -> {len(all1)} (closed slots not reused)")
+    await menu_close(R)
+    await menu_open(R)
+    await asyncio.sleep(0.5)
+    rows = await R.js(f"{TAB_ROWS}.map(e => e.dataset.key.match(/menu\\/(a\\d+)\\/name$/)[1])")
+    by_order = [t["id"] for t in sorted(open1, key=lambda t: int(t["order"]) if t["order"].isdigit() else 10 ** 9)]
+    seen["menu ids"], seen["by order"] = rows, by_order
+    seen["orders"] = [(t["id"], t["order"], t["tab"]) for t in open1]
+    st = R.raw()[1]
+    keys = re.findall(r'"key": ?"(tab-\d+)"', st) or re.findall(r'"(tab-\d+)"', st)
+    seen["state tab keys"] = keys[:60]
+    if rows != by_order:
+        notes.append(f"menu rows are not in order: first differences {[(i, a, b) for i, (a, b) in enumerate(zip(rows, by_order)) if a != b][:4]}")
+    newest = [t["id"] for t in open1 if t not in open0 and t["id"] not in {x["id"] for x in open0}]
+    seen["reused/new notes"] = newest
+    if newest and by_order[-len(newest):] != newest and set(by_order[-len(newest):]) != set(newest):
+        notes.append(f"the new tabs are not last in order: {newest} vs tail {by_order[-len(newest):]}")
+    shots = [await R.shot("order-menu")]
+    await menu_close(R)
+    R.record("order", order.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"notes {seen['notes'][0]} -> {seen['notes'][1]} (slots reused); menu lists {len(rows)} rows by order, new tabs {newest} last", seen, shots)
+
+
+MENU_BOX = (f"(() => {{ const rows = {TAB_ROWS}; if (!rows.length) return null; const m = rows[0].closest('[data-key$=\"/bar/tabs/menu\"]'); if (!m) return null; "
+            "const h = (m.closest('.l-float') || m.parentElement).getBoundingClientRect(), r = __tr.R(m); "
+            "return { r, handle: [h.top, h.bottom], sh: m.scrollHeight, ch: m.clientHeight, mh: m.style.maxHeight, rows: rows.length, ih: innerHeight, iw: innerWidth, "
+            "up: r[1] + r[3] <= h.top + 1, inView: r[1] >= -0.5 && r[1] + r[3] <= innerHeight + 0.5 && r[0] >= -0.5 && r[0] + r[2] <= innerWidth + 0.5 }; })()")
+
+
+async def floats(R):
+    """the long Tabs menu as a lifted float: inside the page at either edge, scrolls inside, every row reachable by keys, Escape closes it; again after a resize and at 125% zoom"""
+    notes, seen, shots, blocked = [], {}, [], []
+    n = int((await state(R))["tab_count"])
+    if n < 12:
+        R.record("floats", floats.__doc__, "blocked", f"only {n} tabs: no long menu", {}, [])
+        return
+    page0 = await R.js("__tr.page()")
+
+    async def look(tag):
+        await menu_close(R)
+        await menu_open(R)
+        await asyncio.sleep(0.5)
+        m = await R.js(MENU_BOX)
+        seen[tag] = m
+        if not m:
+            panel = next((l for l in R.lines("prop:role=home-panel,prop:actor=alex") if "home-viewer" in l), "")
+            handle = await R.js(f"(() => {{ const e = {TABS_HANDLE}; return e ? [__tr.vis(e), __tr.R(e), __tr.hit(e)] : null; }})()")
+            seen[tag] = {"panel": panel[-60:], "tabs handle": handle, "page": await R.js("__tr.page()")}
+            if handle and handle[2] and not handle[2]["ok"]:
+                blocked.append(f"{tag}: the Tabs handle is covered by {handle[2]['at'][:40]} at this size (the HUD's layout, not the float)")
+            else:
+                notes.append(f"{tag}: menu did not open (Tabs handle {handle}; {panel[-30:]})")
+            shots.append(await R.shot(f"floats-{tag}-shut"))
+            return None
+        if not m["inView"]:
+            notes.append(f"{tag}: menu reaches outside the page {m['r']} on {m['iw']}x{m['ih']}")
+        if m["rows"] > 6 and m["sh"] <= m["ch"] + 1 and m["r"][3] < m["rows"] * 18:
+            notes.append(f"{tag}: rows cut and the menu does not scroll ({m['sh']}<={m['ch']})")
+        shots.append(await R.shot(f"floats-{tag}"))
+        return m
+
+    await look("as-is")
+    # keys: into the list, down to the last row; the focused row must be inside the menu's box
+    await R.press(TABS_HANDLE, what="the Tabs handle (close)")
+    await R.press(TABS_HANDLE, what="the Tabs handle (open)")
+    await asyncio.sleep(0.4)
+    for _ in range(3):
+        await R.w.key("Tab")
+        if await R.js(f"{TAB_ROWS}.some(e => e.contains(document.activeElement) || e === document.activeElement || (document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-key*=\"/bar/tabs/menu/\"]')))"):
+            break
+    # Down until the focus stops moving (a row has two stops, its name and its ×)
+    was, still = None, 0
+    for _ in range(3 * n + 6):
+        await R.w.key("ArrowDown")
+        await asyncio.sleep(0.05)
+        now = await R.js("(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key) || ''")
+        still = still + 1 if now == was else 0
+        was = now
+        if still >= 3:
+            break
+    focus = await R.js("(() => { const a = document.activeElement; const row = a && a.closest && a.closest('[data-key*=\"/bar/tabs/menu/a\"]'); const m = row && row.closest('[data-key$=\"/bar/tabs/menu\"]'); "
+                       "if (!row || !m) return {key: a && a.dataset && a.dataset.key}; const r = row.getBoundingClientRect(), b = m.getBoundingClientRect(); "
+                       "return {key: row.dataset.key.split('/').slice(-2).join('/'), inside: r.top >= b.top - 1 && r.bottom <= b.bottom + 1, scrollTop: m.scrollTop}; })()")
+    # the menu lists by order (slots are reused, so creation order is not menu order): its last row is the highest order
+    last_open = sorted((t for t in R.tabs() if t.get("closed") == "no"), key=lambda t: int(t.get("order") or 0))
+    seen["keys"] = focus
+    if not focus or not focus.get("inside") or (last_open and last_open[-1]["id"] not in (focus.get("key") or "")):
+        notes.append(f"keys: the last row was not reached and shown inside the menu ({focus}; last {last_open[-1]['id'] if last_open else None})")
+    await R.w.key("Escape")
+    await asyncio.sleep(0.4)
+    seen["after Escape"] = {"rows": await R.js(f"{TAB_ROWS}.length"), "focus": await R.js("(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key || document.activeElement.tagName || '').slice(-60)")}
+    seen["after Escape"]["panel"] = next((l for l in R.lines("prop:role=home-panel,prop:actor=alex") if "home-viewer" in l), "")[-60:]
+    seen["after Escape"]["viewing"] = (await state(R))["viewing"]
+    shots.append(await R.shot("floats-after-escape"))
+    if seen["after Escape"]["rows"]:
+        notes.append("Escape left the menu open")
+    if "shelf=yes" in seen["after Escape"]["panel"]:
+        notes.append("Escape on the menu also shelved the Viewer")
+    # a shorter page (a resize), then 125% zoom: the menu is placed again inside it
+    # the real (hidden) window resized through the browser's own window bounds, so posted presses still land: a short
+    # page, then the CSS page 125% zoom would give (each side / 1.25; the layout is in CSS px, the DPR stays)
+    iw, ih = page0["iw"], page0["ih"]
+    win = await R.w.p.call("Browser.getWindowForTarget")
+    wid, b0 = win["windowId"], dict(win["bounds"])
+
+    async def size_to(w, h):
+        b = dict(b0)
+        for _ in range(3):
+            pg = await R.js("[innerWidth, innerHeight]")
+            if abs(pg[0] - w) <= 2 and abs(pg[1] - h) <= 2:
+                break
+            cur = (await R.w.p.call("Browser.getWindowBounds", windowId=wid))["bounds"]
+            b = {"windowState": "normal", "width": int(cur["width"] + (w - pg[0]) * cur["width"] / max(pg[0], 1)),
+                 "height": int(cur["height"] + (h - pg[1]) * cur["width"] / max(pg[0], 1))}
+            await R.w.p.call("Browser.setWindowBounds", windowId=wid, bounds=b)
+            await asyncio.sleep(1.2)
+        return await R.js("__tr.page()")
+
+    try:
+        # (0.9: at 0.62 of 800 the HUD gives the viewer tile no room at all, a7544 ran it: its Tabs handle lies under the shelf)
+        seen["resized page"] = await size_to(iw, int(ih * 0.9))
+        await look("resized")
+        seen["zoom-125 page"] = await size_to(int(iw / 1.25), int(ih / 1.25))
+        await look("zoom-125")
+        await menu_close(R)
+    finally:
+        await size_to(iw, ih)
+    await menu_close(R)
+    seen["page after"] = await R.js("__tr.page()")
+    if seen["page after"]["sy"] or seen["page after"]["sx"]:
+        notes.append(f"the HUD scrolled: {seen['page after']}")
+    opened = [k for k in ("as-is", "resized", "zoom-125") if (seen.get(k) or {}).get("r")]
+    R.record("floats", floats.__doc__, "fail" if notes else ("pass" if not blocked else "pass (part blocked)"),
+             "; ".join(notes + blocked) if notes else "menu inside the page each time (" + ", ".join(f"{k} {seen[k]['iw']}x{seen[k]['ih']}: {seen[k]['r']} {'above' if seen[k]['up'] else 'below'} its handle, max-height {seen[k]['mh'] or 'none'}, scroll {seen[k]['sh']}>{seen[k]['ch']}" for k in opened)
+             + f"); last row reached by keys {focus.get('key')}; Escape closed it, Viewer kept" + ("; " + "; ".join(blocked) if blocked else ""),
+             seen, shots)
+
+
+# the painter's acts carry the lines as said, with $names already filled in (do view a7466; do remove a7725)
+# (the notices list last: open, it lies over the usage widget)
+ROUTE_LENSES = [("home-work", "lens=home-feed"), ("home-house", "lens=home-feed"), ("home-usage", "lens=plan-usage-reader"),
+                ("waiting-on-me", "^do view [af]\\d+"), ("home-surface", "^do view [af]\\d+"), ("home-notices", "^do view [af]\\d+; do remove [af]\\d+")]
+
+
+def press_in(lens, pat):
+    return (f"[...document.querySelectorAll('[data-key*=\"lens:{lens}\"]')].filter(__tr.vis).find(e => e._n && (e._n.acts || [])"
+            f".some(a => a.on === 'click' && new RegExp({json.dumps(pat)}).test(a.line)) && __tr.hit(e) && __tr.hit(e).ok)")
+
+
+async def routes(R):
+    """every rerouted entry that is drawn: it moves the active tab's own history (Back returns), opens with its lens, unshelves the Viewer, and a notice is still removed"""
+    notes, seen, shots, tried = [], {}, [], 0
+    # open the notices list, so its rows are drawn
+    nh = "[...document.querySelectorAll('[data-key*=\"lens:home-notices\"] .l-float > button, [data-key*=\"lens:home-notices\"] .l-fold-handle')].find(__tr.vis)"
+    for lens, pat in ROUTE_LENSES:
+        if lens == "home-notices" and await R.js(f"!!{nh}") and not await R.js(f"!!{press_in(lens, pat)}"):
+            await R.press(nh, what="the notices list")
+            await asyncio.sleep(0.6)
+        el = press_in(lens, pat)
+        k = await R.js(f"(() => {{ const e = {el}; return e ? [e.dataset.key.split('lens:{lens}')[1].slice(0, 80), e.innerText.trim().slice(0, 40), e._n.acts.filter(a => a.on === 'click').map(a => a.line.slice(0, 140))] : null; }})()")
+        if not k:
+            diag = await R.js(f"(() => {{ const all = [...document.querySelectorAll('[data-key*=\"lens:{lens}\"]')]; const v = all.filter(__tr.vis); "
+                              f"const a = v.filter(e => e._n && (e._n.acts || []).some(a => a.on === 'click')); "
+                              f"return {{drawn: all.length, visible: v.length, presses: a.slice(0, 4).map(e => [e.innerText.trim().slice(0, 24), (__tr.hit(e) || {{}}).ok, e._n.acts.filter(a => a.on === 'click').map(a => a.line.slice(0, 90))])}}; }})()")
+            seen[lens] = f"no rerouted press to hit (blocked): {diag}"
+            continue
+        tried += 1
+        # the Viewer shelved first where the clause unshelves it: the press must bring it back
+        unshelves = "shelf=no" in " ".join(k[2]) or "do view" in " ".join(k[2])
+        pre = dict(await state(R))                # the page Back must return to: the active tab's own entry (shelving keeps it)
+        try:
+            ts = json.loads(R.viewer().get("tabs_state", "") or "{}")
+            t = next(t for t in ts["tabs"] if t["key"] == ts["active"])
+            pre["viewing"] = t["entries"][t["index"]]["target"]["address"].rsplit("/", 1)[-1] if t["index"] >= 0 else ""
+        except (ValueError, KeyError, StopIteration, IndexError):
+            pass
+        if unshelves:
+            R.do("look " + R.vid, "alex")
+            R.do(f"do unview {R.vid}", "alex")
+            await asyncio.sleep(1.0)
+        s0 = await state(R)
+        gone = re.search(r"do remove ([af]\d+)", " ".join(k[2]))   # the pressed notice itself (find lists a capped few)
+        await R.press(el, what=f"{lens} {k[1]!r}")
+        await asyncio.sleep(1.2)
+        s1 = await state(R)
+        panel = next((l for l in R.lines("prop:role=home-panel,prop:actor=alex") if "home-viewer" in l), "")
+        row = {"pressed": k, "before": {x: s0[x] for x in ("viewing", "with", "active_tab", "can_back")},
+               "after": {x: s1[x] for x in ("viewing", "with", "active_tab", "can_back")}, "panel": panel[-80:]}
+        bad = []
+        if s1["viewing"] == s0["viewing"] and s1["with"] == s0["with"]:
+            bad.append("nothing opened")
+        if s1["active_tab"] != s0["active_tab"]:
+            bad.append(f"tab changed {s0['active_tab']} -> {s1['active_tab']}")
+        want_lens = re.search(r"lens=([\w-]+)", " ".join(k[2]))
+        if want_lens and s1["with"] != want_lens.group(1):
+            bad.append(f"lens {s1['with']!r}, want {want_lens.group(1)}")
+        if unshelves and "shelf=yes" in panel:
+            bad.append("the Viewer stayed shelved")
+            # recorded; now bring it out by the copy's door (as alex, copy only) so the journeys after this one can run
+            pid = panel.split()[0]
+            R.do(f"look {pid}", "alex")
+            R.do(f"do prop {pid} shelf=no", "alex")
+            await asyncio.sleep(1.2)
+        if gone:
+            said = R.do(f"examine {gone.group(1)}").strip().splitlines()
+            row["notice after"] = said[0][:120] if said else ""
+            if "not in the world now" not in row["notice after"]:
+                bad.append(f"the pressed notice {gone.group(1)} was not removed ({row['notice after']})")
+        if pre["viewing"] and s1["can_back"] == "yes" and not await R.js(f"!!{chip('Back')}"):
+            bad.append("no Back chip on the page after the press")
+        elif pre["viewing"] and s1["can_back"] == "yes":
+            await R.press(chip("Back"), what="Back")
+            await asyncio.sleep(0.8)
+            back = await state(R)
+            row["after Back"] = {x: back[x] for x in ("viewing", "with")}
+            if back["viewing"] != pre["viewing"]:
+                bad.append(f"Back went to {back['viewing']}, want {pre['viewing']}")
+        elif pre["viewing"]:
+            bad.append("no Back after the press")
+        row["problems"] = bad
+        seen[lens] = row
+        shots.append(await R.shot(f"route-{lens}"))
+        notes += [f"{lens}: {b}" for b in bad]
+    if await R.js("[...document.querySelectorAll('[data-key*=\"lens:home-notices\"] .l-float')].some(f => f.dataset.folded !== '1')"):
+        await R.press(nh, what="the notices list (close)")
+        await asyncio.sleep(0.4)
+    out = "blocked" if not tried else ("pass" if not notes else "fail")
+    if not tried:
+        notes = [f"{l}: {seen[l]}" for l, _ in ROUTE_LENSES]
+    R.record("routes", routes.__doc__, out, "; ".join(notes) or f"{tried} rerouted entries pressed; each moved the tab's own history with its lens and Back returned; "
+             + "; ".join(f"{l}: {seen[l] if isinstance(seen[l], str) else seen[l]['after']}" for l, _ in ROUTE_LENSES if l in seen), seen, shots)
+
+
 async def close(R):
     """Close on the active tab moves to its neighbour; closing every tab leaves one blank tab"""
     notes, seen = [], {}
@@ -610,4 +861,4 @@ async def draft_end(R):
 
 ALL = [("probe", probe), ("draft-start", draft_start), ("migrate", migrate), ("show", show), ("history", pins_history), ("new-tab", new_tab),
        ("reading", reading), ("draft-again", draft_start), ("lens", lens), ("open-new-tab", new_tab_menu), ("keyboard", keyboard), ("denied", denied),
-       ("bypass", bypass), ("overflow", overflow), ("search-dup", search_dup), ("close", close), ("unview", unview), ("draft-end", draft_end)]
+       ("bypass", bypass), ("routes", routes), ("overflow", overflow), ("order", order), ("floats", floats), ("search-dup", search_dup), ("close", close), ("unview", unview), ("draft-end", draft_end)]

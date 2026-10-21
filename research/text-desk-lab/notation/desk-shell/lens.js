@@ -331,20 +331,27 @@
   // the next column (a popover from a line of At work, in a narrow column): it is lifted into the page's top layer (a
   // manual popover, which no clip or later sibling covers), under its line, or above it when the page has no room below.
   // Closed, it goes back to the page's flow (lens.html's .l-float).
+  // a7544 (the Tabs menu ran off an 800 px page): a lifted float is also sized to the page. It opens on the side of its
+  // line with room for it, or else the side with more room, and is no taller than that room; the rest scrolls inside it
+  // (lens.html gives it overflow auto), so every row stays reachable by wheel and keys. Placed again on each settle
+  // (repaint, scroll, resize).
   function placeFloat(el) {
     if (!el.parentElement || !el.parentElement.closest('[data-scroll="none"]')) return;
     const r = el.getBoundingClientRect();
     for (const c of el.querySelectorAll(":scope > [data-key]:not([data-peek])")) {
       if (el.dataset.folded === "1") {
         if (c.popover && c.matches(":popover-open")) c.hidePopover();
-        c.style.position = c.style.left = c.style.top = ""; continue;
+        c.style.position = c.style.left = c.style.top = c.style.maxHeight = ""; continue;
       }
       if (c.showPopover && !c.popover) c.popover = "manual";
       if (c.popover && !c.matches(":popover-open")) try { c.showPopover(); } catch (e) {}
-      c.style.position = "fixed";
-      const w = c.offsetWidth, h = c.offsetHeight;
+      c.style.position = "fixed"; c.style.maxHeight = "";
+      const w = c.offsetWidth, h = c.offsetHeight, edge = 4;
+      const below = innerHeight - r.bottom - edge, above = r.top - edge;
+      const up = h > below && above > below, room = Math.max(0, up ? above : below);
+      if (h > room) c.style.maxHeight = room + "px";
       c.style.left = Math.max(0, Math.min(r.left, innerWidth - w)) + "px";
-      c.style.top = (r.bottom + h > innerHeight && r.top - h >= 0 ? r.top - h : r.bottom) + "px";
+      c.style.top = (up ? r.top - Math.min(h, room) : r.bottom) + "px";
     }
   }
   // a6642 (Alex, 20 Oct: search results chosen with the arrow keys and Enter): `arrows` on a frame. Its stops are the

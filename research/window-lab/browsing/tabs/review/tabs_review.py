@@ -54,7 +54,8 @@ CHAT_TA ="[...document.querySelectorAll('textarea')].find(e => __tr.vis(e) && e.
 
 def props_of(line):
     """key=value pairs of a find/examine line (values without spaces; page_name and label may be cut, used only as hints)."""
-    return dict(re.findall(r"(\w+)=(\S*)", line.split(" · ")[1] if " · " in line else line))
+    # everything after the title (a page name may itself hold ' · ', as "Claude · 5 hours" does: a7544 ran it)
+    return dict(re.findall(r"(\w+)=(\S*)", line.split(" · ", 1)[1] if " · " in line else line))
 
 
 class Review:
@@ -179,10 +180,12 @@ async def main():
     ap.add_argument("--probe", action="store_true")
     ap.add_argument("--only", type=lambda s: s.split(","), default=None)
     ap.add_argument("--candidate", choices=sorted(CANDIDATES), default=None)
+    ap.add_argument("--jeff-fixes", action="store_true", help="c7704: compose search exclusions, menu look/order and the 20 routes on the copy")
     a = ap.parse_args()
     size = (1280, 800) if a.small else (2560, 1440)
     pt.SIZE = size
-    out = DEMOS / (f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{size[0]}x{size[1]}" + (f"-candidate-{a.candidate}" if a.candidate else ""))
+    out = DEMOS / (f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{size[0]}x{size[1]}" + ("-jeff-fixes" if a.jeff_fixes else "")
+                   + (f"-candidate-{a.candidate}" if a.candidate else ""))
     out.mkdir(parents=True, exist_ok=True)
     copy = pt.Copy(a.world)
     win, guard, R, errors, stagelog = None, None, None, None, []
@@ -192,6 +195,8 @@ async def main():
                 "draft": [l.strip() for l in copy.do("find prop:role=conversation-draft,prop:actor=alex", ME).splitlines() if " note " in l],
                 "layout": [l.strip() for l in copy.do("find prop:role=home-panel,prop:actor=alex", ME).splitlines() if " note " in l]}
         stagelog, saved, before, vid = W.apply_copy(lambda who, line: copy.do(line, who))
+        if a.jeff_fixes:
+            stagelog += ["JEFF's copy-review payload a7761 + search exclusions a7693, composed exactly on the copy (never live):"] + W.compose_jeff(lambda line: copy.do(line, ME))
         if a.candidate:
             # NOT the staged bytes: a reviewer's candidate world fix, applied after them so its effect can be seen
             old, new = CANDIDATES[a.candidate]

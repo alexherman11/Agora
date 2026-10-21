@@ -24,7 +24,7 @@ import stage  # noqa: E402
 
 NOTES = ("a5486", "a6194", "a6782", "a6790")          # home-viewer, view, open-found, unview (unview is read, never changed)
 PAYLOAD = [TABS / f for f in ("patches.json", "originals.json", "stage.py", "home-viewer.lens", "view.verb",
-                              "open-found.verb", "HANDOFF.md")]
+                              "open-found.verb", "HANDOFF.md", "search-exclusions.json")]
 SOURCE = [NOTATION / f for f in ("tab_history.py", "viewer_tabs.py", "moo.py", "desk_moo.py", "desk_knife.py", "scene.py",
                                  "lens_ir.py", "desk-shell/viewer.js", "desk-shell/lens.js", "desk-shell/textedit.js")]
 
@@ -115,6 +115,63 @@ def apply_copy(do_as):
     said = do_as("alex", f"do browse {vid} action=init")
     log.append("init as alex: " + said.strip().splitlines()[-1][:200])
     return log, have, before, vid
+
+
+# c7704/e16026: JEFF's copy-review payload a7761, exactly, composed on the COPY (never live). (old, new, times)
+# Search: a7693/search-exclusions.json exactly. Menu: role searchdrop before measure 40ch, by order after the of line.
+# Routes: the 20 clauses of Study note a7754, as a7761 converts them (view; or browse open with lens=, then unshelve).
+MENU = [("      menu : column\n        measure 40ch\n        scroll scroll\n        of prop:role=viewer-tab,prop:viewer=$v,prop:closed=no as t\n",
+         "      menu : column\n        role searchdrop\n        measure 40ch\n        scroll scroll\n        of prop:role=viewer-tab,prop:viewer=$v,prop:closed=no as t\n        by order\n", 1)]
+UNSHELF = ("do prop prop:role=home-panel,prop:actor=$me,prop:lens=home-viewer shelf=no when "
+           "count(prop:role=home-panel,prop:actor=$me,prop:lens=home-viewer,prop:shelf=yes) > 0")
+FEED = "do browse $v action=open target={x} lens=home-feed; " + UNSHELF
+ROUTES = {
+    "a5548": [('do read $hv; do prop $hv viewing=$c back="$hv.viewing" find=""', "do view $c", 8)],
+    "a5715": [('do prop $hv viewing=$nt.about back="$hv.viewing" find=""; do remove $nt', "do view $nt.about; do remove $nt", 1),
+              ('do prop $hv viewing=$s.item back="$hv.viewing" find=""', "do view $s.item", 1)],
+    "a5439": [('on click when ($hv.find or "") != "" do prop $hv viewing=$w back="$hv.viewing" find=""', 'on click when ($hv.find or "") != "" do view $w', 1),
+              ('on click when ($hv.find or "") = "" do prop $hv viewing=$w back="$hv.viewing"', 'on click when ($hv.find or "") = "" do view $w', 1)],
+    "a5484": [('do prop $v viewing=$c back="$v.viewing"', "do view $c", 2)],
+    "a5544": [('do prop $v viewing=$h.corner back="$v.viewing" find="" with=home-feed', FEED.format(x="$h.corner"), 1),
+              ('do prop $v viewing=$c back="$v.viewing" find="" with=home-feed', FEED.format(x="$c"), 1)],
+    "a6352": [('do prop $v viewing=$h.corner back="$v.viewing" find="" with=home-feed', FEED.format(x="$h.corner"), 1),
+              ('do prop $v viewing=$r.corner back="$v.viewing" find="" with=home-feed', FEED.format(x="$r.corner"), 1)],
+    "a6771": [('do read $v; do prop $v viewing=$u back="$v.viewing" with=plan-usage-reader find=""',
+               "do browse $v action=open target=$u lens=plan-usage-reader; " + UNSHELF, 2)],
+}
+
+
+def compose_jeff(do):
+    """Apply the three world fixes to the COPY after the staged hunks. Every passage is counted first (the exact times
+    expected, or nothing is written); a lens with repeated identical clauses is rewritten whole, in the copy only. -> log"""
+    log = []
+    search = json.loads((TABS / "search-exclusions.json").read_text(encoding="utf-8"))
+    plan = {"a5486": MENU, **ROUTES}
+    have = {n: body(do(f"read {n} :3")) for n in [*search, *plan]}
+    stage.prepare({n: have[n] for n in search}, search)          # all six search passages exactly once, before any write
+    for n, hs in plan.items():
+        for old, new, times in hs:
+            c = have[n].count(old)
+            if c != times:
+                raise SystemExit(f"compose refused: {n} has {c} of {old[:70]!r}, want {times}")
+    for n, hs in search.items():
+        for h in hs:
+            do(f"read {n} :3")
+            said = do(f"do replace {n} old={q(h['old'])} new={q(h['new'])}")
+            log.append(f"search {n}: {said.strip().splitlines()[-1][:120]}")
+    for n, hs in plan.items():
+        text = have[n]
+        for old, new, times in hs:
+            text = text.replace(old, new)
+        do(f"read {n} :3")
+        said = do(f"do rewrite {n} text={q(text)}")
+        ok = not said.startswith("ERR") and "refused" not in said.split("\n")[0]
+        log.append(f"{'menu' if n == 'a5486' else 'routes'} {n}: {said.strip().splitlines()[-1][:120]}")
+        if not ok:
+            raise SystemExit(f"compose refused at {n}:\n{said[:800]}")
+        if body(do(f"read {n} :3")) != text:
+            raise SystemExit(f"compose: {n} reads back differently")
+    return log
 
 
 def main():
