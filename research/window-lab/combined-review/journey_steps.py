@@ -868,7 +868,7 @@ async def consecutive(J):
     await J.reload()
     await fixture(J)
     fr = await frame(J)
-    notes, rows = [], []
+    notes, rows, declined = [], [], []
     for side, (x, y) in (("bottom", (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)), ("top", (fr[0] + fr[2] / 2, fr[1] + 3)),
                          ("left", (fr[0] + 3, fr[1] + fr[3] / 2))):
         before = {"sel": await J.js("__cr.selection()"), "us": await J.js("document.body.style.userSelect")}
@@ -877,25 +877,31 @@ async def consecutive(J):
                                lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection(), us: document.body.style.userSelect, pv: __cr.previews().length})"))
         after = {"sel": await J.js("__cr.selection()"), "us": await J.js("document.body.style.userSelect")}
         rows.append({"side": side, "before": before, "mid": seen[1], "after": after})
+        # round 3 (c7502): a grab during the previous drop's pending answer is DECLINED by design; it must be clean
         if not seen[1]["ghost"]:
-            notes.append(f"{side}: the carry did not start")
-        if seen[1]["sel"]:
-            notes.append(f"{side}: {seen[1]['sel']} characters selected mid-carry")
-        if seen[1]["us"] != "none":
-            notes.append(f"{side}: selection not suppressed mid-carry (userSelect {seen[1]['us']!r})")
+            declined.append(side)
+            if seen[1]["sel"]:
+                notes.append(f"{side}: declined grab selected {seen[1]['sel']} characters")
+        else:
+            if seen[1]["sel"]:
+                notes.append(f"{side}: {seen[1]['sel']} characters selected mid-carry")
+            if seen[1]["us"] != "none":
+                notes.append(f"{side}: selection not suppressed mid-carry (userSelect {seen[1]['us']!r})")
         if after["us"] != before["us"]:
             notes.append(f"{side}: userSelect {before['us']!r} -> {after['us']!r} after release")
     await J.settle(2.5)
-    b = await box(J, "The board")
-    if not b or abs(b["r"][3] - fr[3]) > TOL or abs(b["r"][0] - fr[0]) > TOL:
-        notes.append(f"after the third drop the board is {b and b['r']}, not the left edge spanning {fr[3]:.1f}")
     notes += await problems(J)
     left = await J.js("__cr.selection()")
     if left:
         notes.append(f"{left} characters still selected at the end (the next carry starting on them would be cancelled)")
+    gx, gy = await grip(J, "The board")
+    seen, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)], lambda a, b: J.js("!!__cr.ghost()"))
+    if not seen[1]:
+        notes.append("the carry after the answers arrived did not start")
+    await answered(J)
     J.record("consecutive", consecutive.__doc__, "pass" if not notes else "fail",
-             "; ".join(notes) or "bottom, top, left with no pause: each picked up (ghost, 0 selected, userSelect none mid-carry, restored after), the last one landed",
-             {"rows": rows}, [await J.shot("consecutive")])
+             "; ".join(notes) or f"three grabs with no pause: {3 - len(declined)} carried, {len(declined)} declined while an answer was pending ({declined}) with nothing selected and the policy unchanged; the next grab after the answers carried and landed",
+             {"rows": rows, "declined": declined}, [await J.shot("consecutive")])
     await restore(J)
 
 
@@ -1269,6 +1275,123 @@ async def workspace_identity(J):
              {"new": new, "tree ids": sorted(tree_ids)}, shots)
 
 
+# ---- round 3 (c7505): the busy-declined press, and the focus-drop mismatch measured ----------------------------
+
+async def busy(J):
+    """answer held back 1.5 s: a grab during the pending answer is declined cleanly (no ghost, nothing selected, no tree change, policy unchanged); after the answer the next carry works and lands"""
+    await J.reload()
+    f = await fixture(J)
+    await wrap_fetch(J)
+    await J.js("window.__ev = []; if (!window.__evb) { window.__evb = 1; for (const t of ['pointerdown','pointercancel','selectstart','dragstart']) document.addEventListener(t, e => window.__ev.push([t, e.defaultPrevented]), false); }")
+    await J.js("window.__delay = 1500")
+    fr = await frame(J)
+    gx, gy = await grip(J, "The board")
+    await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)])
+    planned = await box(J, "The board")
+    await J.js("window.__ev = []")
+    us0 = await J.js("document.body.style.userSelect")
+    bx, by = await grip(J, "The board")
+    seen, handle = await J.hold(bx, by, [(bx + 30, by - 10), (fr[0] + fr[2] / 2, fr[1] + 3)],
+                                lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection(), us: document.body.style.userSelect, pv: __cr.previews().length})"), release=False)
+    J.up(handle)
+    await asyncio.sleep(0.2)
+    declined = {"mid": seen[1], "after": {"sel": await J.js("__cr.selection()"), "us": await J.js("document.body.style.userSelect"), "board": await box(J, "The board")},
+                "events": await J.js("window.__ev.slice(0, 8)")}
+    shot1 = await J.shot("busy-declined")
+    waited = await answered(J, 6)
+    await J.js("window.__delay = 0")
+    st = json.loads((await J.js("__cr.state()"))["tree"])
+    gx, gy = await grip(J, "The board")
+    seen2, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (fr[0] + 3, fr[1] + fr[3] / 2)], lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection(), pv: __cr.previews()})"))
+    await answered(J)
+    after = await box(J, "The board")
+    notes = []
+    if declined["mid"]["ghost"]:
+        notes.append("the grab during the pending answer started a carry")
+    if declined["mid"]["sel"] or declined["after"]["sel"]:
+        notes.append(f"the declined grab selected {max(declined['mid']['sel'], declined['after']['sel'])} characters")
+    if declined["after"]["us"] != us0 or declined["mid"]["us"] != us0:
+        notes.append(f"the declined grab changed userSelect ({us0!r} -> {declined['mid']['us']!r}/{declined['after']['us']!r})")
+    if [e for e in declined["events"] if e[0] in ("pointercancel", "dragstart")]:
+        notes.append(f"native drag events fired: {declined['events']}")
+    if not declined["after"]["board"] or not agree(declined["after"]["board"]["r"], planned["r"]):
+        notes.append(f"the optimistic layout moved under the declined grab ({declined['after']['board'] and declined['after']['board']['r']} vs {planned['r']})")
+    if waited is None:
+        notes.append("the held-back answer never repainted the tools")
+    if json.loads(f["tree"]) == st:
+        notes.append("the first drop did not commit")
+    if not seen2[1]["ghost"] or seen2[1]["sel"]:
+        notes.append(f"the carry after the answer: ghost {seen2[1]['ghost']}, selected {seen2[1]['sel']}")
+    pv = [p for p in seen2[1]["pv"] if p["in"] == "partition"]
+    if not pv or not after or not agree(pv[0]["r"], after["r"]):
+        notes.append(f"after-answer drop: preview {pv and pv[0]['r']} result {after and after['r']}")
+    J.record("busy", busy.__doc__, "pass" if not notes else "fail",
+             "; ".join(notes) or f"declined cleanly (no ghost, 0 selected, userSelect {us0!r} kept, events {[e[0] for e in declined['events']]}, layout held); answer painted after {waited} ms; the next carry started with nothing selected and landed at its preview {after['r']}",
+             {"declined": declined, "answer ms": waited, "next": seen2[1], "result": after}, [shot1, await J.shot("busy-after")])
+    await restore(J)
+
+
+PLOG = r"""(() => { if (window.__plogged) return; window.__plogged = 1; const P = window.Partition; window.__plog = { plan: null, geometry: [] };
+  const opts = o => o && { minimum: o.minimum, gap: o.gap, tab: o.tab, visible: o.visible ? [...o.visible] : null, intrinsic: o.intrinsic || null };
+  const plan = P.plan, geometry = P.geometry;
+  P.plan = function (tree, dragged, target, bounds, options) { const r = plan.apply(this, arguments);
+    window.__plog.plan = { tree: JSON.stringify(tree), dragged, target, bounds, options: opts(options), result: r && { box: r.box, tree: JSON.stringify(r.tree) } }; return r; };
+  P.geometry = function (root, bounds, options) { const r = geometry.apply(this, arguments);
+    window.__plog.geometry.push({ root: JSON.stringify(root), bounds, options: opts(options), boxes: r.boxes, splits: r.splits.map(s => ({ path: s.path, mins: s.mins, gap: s.gap, box: s.box, children: s.children })) });
+    if (window.__plog.geometry.length > 6) window.__plog.geometry.shift(); return r; }; })()"""
+
+
+async def focusdiag(J):
+    """MEASUREMENT for the owner (c7505): focused Board, Chat carried to the desk's bottom edge; root client size and rect, preview / post-release / post-answer rectangles, tree and focus, and the actual P.plan and P.geometry inputs. No tolerance widened"""
+    await J.reload()
+    await fixture(J)
+    await J.js(PLOG)
+    root = ("(() => { const r = __cr.root(); const chain = []; for (let e = r; e && e !== document.body; e = e.parentElement) { "
+            "const sibs = [...(e.parentElement ? e.parentElement.children : [])].filter(s => s !== e && __cr.vis(s)).map(s => [(s.dataset.key || s.className || s.tagName).toString().split('/').slice(-2).join('/'), __cr.R(s)]); "
+            "chain.push([(e.dataset.key || e.className || e.tagName).toString().split('/').slice(-2).join('/'), __cr.R(e), sibs.slice(0, 6)]); if (chain.length > 7) break; } "
+            "return { client: [r.clientWidth, r.clientHeight], rect: __cr.R(r), offset: [r.offsetLeft, r.offsetTop, r.offsetWidth, r.offsetHeight], ancestors: chain }; })()")
+    out = {"root before focus": await J.js(root)}
+    x, y = await grip(J, "The board")
+    await J.w.dblclick(x, y)
+    await answered(J)
+    await J.settle(1)
+    out["state in focus"] = await J.js("__cr.state()")
+    out["root in focus"] = await J.js(root)
+    out["boxes in focus"] = await J.js("__cr.boxes()")
+    await J.js("window.__plog.geometry = []; window.__plog.plan = null")
+    fr = await frame(J)
+    cx, cy = await grip(J, "Chat")
+    seen, handle = await J.hold(cx, cy, [(cx + 30, cy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)],
+                                lambda a, b: J.js("({previews: __cr.previews(), plan: window.__plog.plan})"), release=False)
+    out["preview"] = seen[1]["previews"]
+    out["P.plan at the preview"] = seen[1]["plan"]
+    await J.js("window.__plog.geometry = []")
+    J.up(handle)
+    await asyncio.sleep(0.05)
+    out["chat right after release"] = await box(J, "Chat")
+    out["root right after release"] = await J.js(root)
+    out["P.geometry calls by release"] = await J.js("window.__plog.geometry.slice()")
+    await J.js("window.__plog.geometry = []")
+    out["answer painted after ms"] = await answered(J)
+    await J.settle(0.5)
+    out["chat after the answer"] = await box(J, "Chat")
+    out["root after the answer"] = await J.js(root)
+    out["state after the answer"] = await J.js("__cr.state()")
+    out["P.geometry calls after the answer"] = await J.js("window.__plog.geometry.slice(-3)")
+    pv = [p for p in out["preview"] if p["in"] == "partition"]
+    a, b = (pv[0]["r"] if pv else None), (out["chat after the answer"] or {}).get("r")
+    diff = [round(q - p, 2) for p, q in zip(a, b)] if a and b else None
+    out["preview minus result"] = diff
+    (J.out / "focusdiag.json").write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
+    ok = bool(diff) and all(abs(d) <= TOL for d in diff)
+    J.record("focusdiag", focusdiag.__doc__, "pass" if ok else "fail",
+             f"preview {a}, right after release {(out['chat right after release'] or {}).get('r')}, after the answer {b}; difference {diff}; full capture in focusdiag.json",
+             {"file": "focusdiag.json"}, [await J.shot("focusdiag")])
+    await restore(J)
+
+
+ROUND3 = [("busy", busy), ("focusdiag", focusdiag)]
+
 ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive),("immediate", immediate), ("refusal", refusal), ("cancel-policy", cancel_policy),
           ("composer", composer), ("tabs-focus", tabs_focus), ("receivers", receivers), ("doc-pins", doc_pins), ("tints", tints),
           ("workspace", workspace_identity)]
@@ -1276,6 +1399,6 @@ ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive)
 ALL = [("facts", facts), ("clicks", clicks), ("ghost", ghost), ("edges", edges), ("local", local), ("fit", fit),
        ("dividers", dividers), ("focus", focus), ("shelf", shelf), ("cancel", cancel), ("stale", stale), ("draft", draft),
        ("bare", bare), ("dock-pin", dock_pins), ("dock-order", dock_order), ("dock-look", dock_look), ("reload", reload_keeps)]
-ALL = ALL[:3] + ROUND2[:4] + ALL[3:] + ROUND2[4:]     # the workspace emulation replaces the layout: always last
+ALL = ALL[:3] + ROUND3 + ROUND2[:4] + ALL[3:] + ROUND2[4:]     # the workspace emulation replaces the layout: always last
 DIAGNOSES = [("escdiag", escdiag), ("debug", debug), ("syncdiag", syncdiag)]      # --only escdiag / debug runs these
 ALL += DIAGNOSES

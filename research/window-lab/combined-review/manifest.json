@@ -1,6 +1,6 @@
 {
  "base": "c5c988c",
- "main": "a981e1a",
+ "main": "fda965e",
  "theirs": "C:\\Projects\\Agora4\\.worktrees\\a7045",
  "files": [
   {
@@ -54,10 +54,10 @@
   {
    "path": "research/text-desk-lab/notation/desk-shell/partition-ui.js",
    "how": "new",
-   "theirs_sha256": "2CD497F27AE22C621CB7B4140BC938564E7293178563DF0878F30ADA6168B535",
+   "theirs_sha256": "59313EC1C0A6774362B60A4208530467FD89CD4FD6FB6DE30AC803CB4FEDDAE6",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "2CD497F27AE22C621CB7B4140BC938564E7293178563DF0878F30ADA6168B535"
+   "composed_sha256": "59313EC1C0A6774362B60A4208530467FD89CD4FD6FB6DE30AC803CB4FEDDAE6"
   },
   {
    "path": "research/text-desk-lab/notation/desk-shell/partition.js",
@@ -158,10 +158,10 @@
   {
    "path": "research/window-lab/hud-dividers/EVIDENCE.md",
    "how": "new",
-   "theirs_sha256": "71F05283E1C6F8BC09B951826070AC71ABBAF4BE16CCFDDC8595BE066C3F61E5",
+   "theirs_sha256": "67A7ED71B50D871B959523B6A45C23C2614D0AB877EED2A139E2AB861BFB8E9D",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "71F05283E1C6F8BC09B951826070AC71ABBAF4BE16CCFDDC8595BE066C3F61E5"
+   "composed_sha256": "67A7ED71B50D871B959523B6A45C23C2614D0AB877EED2A139E2AB861BFB8E9D"
   },
   {
    "path": "research/window-lab/hud-dividers/HANDOFF.md",
@@ -174,10 +174,10 @@
   {
    "path": "research/window-lab/hud-dividers/NAVIGATION.md",
    "how": "new",
-   "theirs_sha256": "81DC2B4E1A2817B572F577D92FA5EBCF16D02EAB00EA8AEADA4EDE4B2921EF46",
+   "theirs_sha256": "F271B947FE73AF20F8D37474B32B498423B781FEBC97C07BE33987CB357C6098",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "81DC2B4E1A2817B572F577D92FA5EBCF16D02EAB00EA8AEADA4EDE4B2921EF46"
+   "composed_sha256": "F271B947FE73AF20F8D37474B32B498423B781FEBC97C07BE33987CB357C6098"
   },
   {
    "path": "research/window-lab/hud-dividers/bundle.py",
@@ -268,6 +268,14 @@
    "composed_sha256": "6F5DD0D4FCA42C2A814C14DD5BF230FE7278902216A3618600ACBC74B61D6FDB"
   },
   {
+   "path": "research/window-lab/hud-dividers/test_navigation_step.py",
+   "how": "new",
+   "theirs_sha256": "A4B0F26797A0DEF4E9476C54E776D8B5AAC67E6ED0963716CB523BB8CBCED0E7",
+   "base_sha256": null,
+   "main_sha256": null,
+   "composed_sha256": "A4B0F26797A0DEF4E9476C54E776D8B5AAC67E6ED0963716CB523BB8CBCED0E7"
+  },
+  {
    "path": "research/window-lab/hud-dividers/test_partition.js",
    "how": "new",
    "theirs_sha256": "007274E3DD8DD4044B698B501297EF6C4F06E49AF32B6063D949CD1A77018D41",
@@ -278,10 +286,10 @@
   {
    "path": "research/window-lab/hud-dividers/test_partition_ui.js",
    "how": "new",
-   "theirs_sha256": "44D7F9040B7E36235FC1F867DC216AFC02060869305B0D5ADAEF97E073744749",
+   "theirs_sha256": "40D80DC066B36FADB0BA7CC1400525198CB52B6D8423194EC04CCB39194A4BBC",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "44D7F9040B7E36235FC1F867DC216AFC02060869305B0D5ADAEF97E073744749"
+   "composed_sha256": "40D80DC066B36FADB0BA7CC1400525198CB52B6D8423194EC04CCB39194A4BBC"
   },
   {
    "path": "research/window-lab/hud-dividers/test_pointer.js",
@@ -310,10 +318,10 @@
   {
    "path": "research/window-lab/playtest_steps/partition_navigation.py",
    "how": "new",
-   "theirs_sha256": "BACFDB4508C1514888E5ABF6D8A71EB1218B4C907C9C8ADB2B3C241D0D65090A",
+   "theirs_sha256": "11568A7DD155DF755441032A160AE6DE35FB9AD84437CA50CBDA93AE41C912C6",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "BACFDB4508C1514888E5ABF6D8A71EB1218B4C907C9C8ADB2B3C241D0D65090A"
+   "composed_sha256": "11568A7DD155DF755441032A160AE6DE35FB9AD84437CA50CBDA93AE41C912C6"
   },
   {
    "path": "research/window-lab/slim-dock/before-home-dock.lens",
