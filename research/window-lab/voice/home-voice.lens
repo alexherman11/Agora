@@ -1,0 +1,101 @@
+# home-voice (a8901, Voice with JEFF step 3): talking to JEFF by voice, from his chat in the home base. Staged: the
+# note is made, and placed in jeff-chat's dock (lens home-voice), only at JEFF's activation, with Alex's word.
+# Shown only while the home base's switch says voice=on (the home-base note's prop, JEFF's). The microphone is lit while
+# the home base listens (witnessed:voice, research/window-lab/voice.py, the host's rows: never the world log). His
+# words show as he speaks, greyed while tentative; each finished utterance is one line in the Conversation, marked
+# spoken (on spoken: once; the door refuses a repeat). The first press asks him in two lines, kept on his own draft as
+# voice=allowed or voice=never. JEFF's answers after a spoken line are read aloud once each (on spoken host voice.say).
+# a9138: while lit it names the microphone it listens on ($v.device: Windows' name for it, read before lighting), so a
+# wrong default reads as its name, not as silence; with no input device Talk says so and does not light.
+voice : column
+  only when count(tag:lens,title:home-base,prop:voice=on) > 0
+  of prop:role=conversation-draft,prop:actor=$me as draft
+  each talk
+talk : column
+  let consent = ($draft.voice or "")
+  let lit = "yes" when count(witnessed:voice kind=state state=listening) > 0
+  let lit = "no" otherwise
+  let aloud = "yes" when count(witnessed:voice kind=state aloud=yes) > 0
+  let aloud = "no" otherwise
+  let nomic = "yes" when count(witnessed:voice kind=state mic=none) > 0
+  let nomic = "no" otherwise
+  bar : row
+    role toolbar
+    only when consent != "never"
+    mic : text "Talk"
+      role chip
+      role chip.on when lit = "yes"
+      only when nomic = "no"
+      tip "Talk to JEFF" "Press and speak: your words go to JEFF as a line. Press again, or stay quiet, to stop."
+      on click when consent = "allowed" and lit = "no" host voice.listen
+      on click when consent = "allowed" and lit = "yes" host voice.stop
+      on click when consent != "allowed" do prop $draft voice_ask=yes
+    nomic_chip : text "Talk · no microphone"
+      role chip
+      only when nomic = "yes"
+      tip "No microphone found" "Windows has no input device, so Talk is not listening. Plug one in, then press again."
+      on click when consent = "allowed" host voice.listen
+    listening : column
+      only when lit = "yes"
+      of witnessed:voice kind=state state=listening as v
+      each listening_on
+    nomic_says : text "No microphone found: Windows has no input device, so Talk is not listening"
+      role meta
+      only when nomic = "yes"
+    reading : text "Reading JEFF aloud · press anywhere to stop"
+      role meta
+      only when aloud = "yes" and lit = "no"
+  ask : column
+    role askcard
+    only when consent = "" and ($draft.voice_ask or "") = "yes"
+    one : text "Talk to JEFF by voice: it listens only while Talk is lit, and your voice stays on this computer (Windows' own speech)."
+      role words
+    two : text "Your words go to JEFF as a line of text, as if you had typed them; his answer is read aloud."
+      role words
+    choose : row
+      role acts
+      allow : text "Allow"
+        role tool
+        on click do prop $draft voice=allowed voice_ask=""
+      later : text "Not now"
+        role tool
+        on click do prop $draft voice_ask=""
+      never : text "Off for good"
+        role tool
+        on click do prop $draft voice=never voice_ask=""
+  off : text "Voice is off for good. Ask JEFF to turn it back on."
+    role meta
+    only when consent = "never" and ($draft.voice_ask or "") = "yes"
+  heard : column
+    only when consent = "allowed"
+    of witnessed:voice kind=state as v
+    each tentative
+  lines : column
+    only when consent = "allowed"
+    of witnessed:voice kind=final as f
+    each spoken
+listening_on : text "Listening on $v.device · press Talk or stay quiet to stop"
+  role meta
+tentative : text "$v.tentative"
+  role hint
+  only when ($v.tentative or "") != ""
+spoken : column
+  said : row
+    role tagline
+    words : text "$f.words"
+      role words
+      share 1
+      on spoken do append a5080 line="$value" spoken=yes utterance=$f.utterance default_to=jeff
+    state : text "$f.jeff"
+      role receipt
+  after : column
+    of lines:a5080 utterance=$f.utterance as sl
+    each replies
+replies : column
+  of lines:a5080 by=jeff seq>$sl.seq as j
+  each answer
+answer : column
+  said : text "$j.said"
+    role meta
+    clamp 1
+    on spoken host voice.say $j.line $value
