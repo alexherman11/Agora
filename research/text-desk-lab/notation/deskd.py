@@ -337,6 +337,13 @@ def _release(name):
     _take(name, lock)
     try:
         if LEASES.get(name):
+            import log_world
+            held = _DESKS.get(str(SESSIONS / f"{name}.pickle"))
+            if held:
+                try:
+                    log_world.detach(held[1], SESSIONS / f"{name}.pickle", "writer lease released")
+                except Exception:
+                    store._fault(store.log_path(SESSIONS / f"{name}.pickle"), "log-world release report failed")
             _snapshot(name, under_lock=True, looks=True)       # its people's seen marks too: the next one starts from them
             LEASES[name] = False
             try:
@@ -389,15 +396,20 @@ def _trace(line):
         pass
 
 
+class ObserverReleased(RuntimeError):
+    pass
+
+
 class Session:
     """Load under the lock, act, save, release: the same discipline explore.py follows."""
 
-    def __init__(self, name, actor, read=False):
+    def __init__(self, name, actor, read=False, observer=False):
         # 14 Oct (deskd trace: page builds and event checks held the lock 21 s in 3 minutes, a third of it pickling the
         # whole world twice to learn they had changed nothing): `read` is a request that only looks. It copies nothing
         # and saves nothing; whatever it touched in memory (a viewer's seen-marks) is saved with the next change to the
         # world, and a deskd swapped for new code before then forgets it (the viewer sees 'since your last look' again)
         self.read, self.hold = read, False
+        self.observer = observer
         if not SESSION_NAME.match(str(name)):
             # review 29 Sep: any string became a file path, `..` included, and was created and saved
             raise BadRequest(f"no session named {str(name)[:80]!r}: a session name is letters, digits, _ @ - (at most 64; no . or slashes)")
@@ -409,10 +421,12 @@ class Session:
 
     def __enter__(self):
         self._t0 = time.perf_counter()
-        hold = False if self.read else _hold(self.name)        # may ask the deskd before this one to let go (no lock held)
+        hold = True if self.observer else False if self.read else _hold(self.name)
         _take(self.name, self.lock)
         self._t1 = time.perf_counter()
         try:
+            if self.observer and not LEASES.get(self.name):
+                raise ObserverReleased("the writer lease ended")
             return self._enter_locked(hold)
         except BaseException:
             _give(self.name, self.lock)          # a6153: never left held (the in-process lock has no stale-age escape)
@@ -472,6 +486,27 @@ class Session:
         # Snappy Desk stage 4 (14 Oct, looking never writes): what the world was before, cheaply, so a held request that
         # changed no fact of it (a look, a read, a view's request) is not a reason to save it
         self._facts0 = (len(desk.world.events), store.log_path(self.path).stat().st_size if store.log_path(self.path).exists() else 0)
+        # The checker belongs to the single writer, never to a served/copied
+        # replay session. Full replay/comparison and receipt I/O run off-lock.
+        if not self.read and self.hold:
+            import log_world
+
+            def publish(name=self.name):
+                try:
+                    with Session(name, "house", observer=True):
+                        pass              # may use this lease, never ask another writer to release its lease
+                except ObserverReleased:
+                    pass
+
+            try:
+                log_world.attach(desk, self.path, publish)
+                log_world.project(desk, self.path)
+            except Exception:
+                # An observer cannot refuse the person's press.
+                checker = log_world._CHECKERS.get(str(self.path))
+                if checker:
+                    checker.unavailable("writer bridge could not finish publishing its report")
+                store._fault(store.log_path(self.path), "log-world bridge failed")
         if self.read or (self.hold and self.stamp is not None):
             self.before = None
             return desk
@@ -529,7 +564,15 @@ class Session:
             _DESKS.pop(str(self.path), None)
             raise
         finally:
-            _give(self.name, self.lock)
+            try:
+                if self.observer:
+                    import log_world
+                    checker = log_world._CHECKERS.get(str(self.path))
+                    if checker:
+                        ms = (time.perf_counter() - self._t1) * 1000
+                        checker.publish_lock_ms = {"last": ms, "max": max(ms, checker.publish_lock_ms["max"])}
+            finally:
+                _give(self.name, self.lock)
             t2 = time.perf_counter()
             _trace(f"{time.strftime('%H:%M:%S')} {self.name} {self.actor} {getattr(_REQ, 'what', '?')} "
                    f"wait={(self._t1 - self._t0) * 1000:.0f} held={(t2 - self._t1) * 1000:.0f} "
