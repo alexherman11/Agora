@@ -158,7 +158,8 @@ Each of these clauses ends in `do prop …home-viewer shelf=no when count(…) >
   - Page errors [] at both sizes.
   - Guard on every run: "alex: untouched by the sandbox".
 - **Reports** (in `research/window-lab/demos/tabs-review/`):
-  - 2560: `2026-10-20-231140-2560x1440-jeff-fixes`, and the final run (see the done comment)
+  - 2560: `2026-10-21-093250-2560x1440-jeff-fixes` (every journey passed; routes stopped on one 502 from the copy's door, so its 2560 result is from `2026-10-20-231140-2560x1440-jeff-fixes`)
+  - a run on 20 Oct at 23:3x lost its DevTools connection after `show` and hung with no guard verdict. Its Edge window or copy door may have been left running; I could not list processes to check.
   - 1280: `2026-10-20-231524-1280x800-jeff-fixes`
 - **Door repros:** `repro.py notice` and `repro.py usage`.
 
