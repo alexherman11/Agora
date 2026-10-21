@@ -647,7 +647,7 @@ a7348 · family=shape · status=curing
 
 Read: named on-drop parts were required to carry inside the same lens, and the browser receiver lookup used one part name; a dock could not accept a meaningful thing from another lens. Source a7223 adds on drop any with pickup-time act and revision snapshots, shared CarryTargets planning/submit for specialised drag adapters, guarded host menus/clicks through the existing closed host table, command identity fields, literal computed-value preservation, and typed tree-activate for restoring hidden tabs. Pin/open/reorder/remove policy, icon colours and chrome stay in staged world verbs/lenses. Source tests ran; real browser acceptance is blocked by the hidden Edge connection closing before page ready. World apply and the a7045 adapter hook are staged, not active. Missing arbitrary native-app stable identity/launch is intentionally separate (JEFF c7264).
 
-## unchecked (6)
+## unchecked (7)
 
 ### Reader words and quiet references missing from the world (a6460)
 
@@ -690,6 +690,12 @@ Final source checks in this builder: 39 focused tests passed in 7.46s; changed-f
 a7309 · family=missing-word · status=unchecked
 
 The staged browsing controller and request-policy experiment live only under research/window-lab/browsing. Missing world word: intentional typed navigation with per-tab history and an authenticated, unprivileged renderer/file-selection boundary. A lens can arrange chrome but cannot enforce native request isolation or authorize local file handles. Existing page embeds are trusted previews; scripts_mirror is an explicitly commissioned write-through script integration, not a general file browser or file-selection permission. This stage activates neither. See [[Browsing — architecture and acceptance]] for the staged source and unresolved security gates.
+
+### Account inbox lacks an isolated private-reader word
+
+a7374 · family=privacy · status=unchecked
+
+Source foundation for Gmail is necessary because world notes/lenses and public actor claims cannot hold private account data or authorize fetching. Existing same-user DPAPI/ignored files are not containment. This commission adds only offline metadata/OAuth state-machine tests and a disabled refusal helper; no secure storage/caller bridge is claimed. Missing primitive: host-maintainer-reviewed isolated reader principal/storage plus authenticated human-only IPC, with count-only output. Deployment and private preview review remain outside this change. No runtime or account access was enabled. (worker-a7295, 20 Oct)
 
 ## cured (65)
 
