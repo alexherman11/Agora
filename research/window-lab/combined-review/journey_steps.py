@@ -849,9 +849,11 @@ async def consecutive_paced(J):
                          ("left", (fr[0] + 3, fr[1] + fr[3] / 2))):
         sel0 = await J.js("__cr.selection()")
         gx, gy = await grip(J, "The board")
-        seen, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (x, y)], lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection()})"))
+        at = await J.js(f"(() => {{ const g = __cr.grip(__cr.byLabel('The board')), e = document.elementFromPoint({gx}, {gy}); return {{grip: g && [g.dataset.key.split('/').slice(-2).join('/'), __cr.R(g)], "
+                        f"at: e && [(e.dataset.key || e.className || e.tagName).toString().split('/').slice(-2).join('/'), e.tagName, (e.innerText || '').slice(0, 30), getComputedStyle(e).userSelect], sending: document.querySelectorAll('[data-sending=\"1\"]').length}}; }})()")
+        seen, _ = await J.hold(gx, gy, [(gx + 30, gy + 10), (x, y)], lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection(), text: String(getSelection()).slice(0, 60)})"))
         waited = await answered(J)
-        rows.append({"side": side, "selected before": sel0, "mid": seen[1], "answer painted after ms": waited})
+        rows.append({"side": side, "selected before": sel0, "press": [gx, gy], "pressed on": at, "mid": seen[1], "answer painted after ms": waited})
         if not seen[1]["ghost"] or seen[1]["sel"]:
             notes.append(f"{side}: carry {'started' if seen[1]['ghost'] else 'did not start'}, {seen[1]['sel']} selected")
     b = await box(J, "The board")
@@ -1355,6 +1357,10 @@ async def focusdiag(J):
     await J.w.dblclick(x, y)
     await answered(J)
     await J.settle(1)
+    toprow = ("(() => { const t = document.querySelector('[data-key$=\"f5664/top\"]'); if (!t) return null; const walk = (e, d) => [...e.children].filter(__cr.vis).flatMap(k => "
+              "[[(k.dataset.key || k.className || k.tagName).toString().split('/').slice(-2).join('/'), __cr.R(k), getComputedStyle(k).lineHeight, (k.innerText || '').split('\\n')[0].slice(0, 24)], ...(d < 3 ? walk(k, d + 1) : [])]); "
+              "return { rect: __cr.R(t), parts: walk(t, 0).slice(0, 40) }; })()")
+    out["top row in focus"] = await J.js(toprow)
     out["state in focus"] = await J.js("__cr.state()")
     out["root in focus"] = await J.js(root)
     out["boxes in focus"] = await J.js("__cr.boxes()")
@@ -1362,7 +1368,9 @@ async def focusdiag(J):
     fr = await frame(J)
     cx, cy = await grip(J, "Chat")
     seen, handle = await J.hold(cx, cy, [(cx + 30, cy + 10), (fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)],
-                                lambda a, b: J.js("({previews: __cr.previews(), plan: window.__plog.plan})"), release=False)
+                                lambda a, b: J.js(f"({{previews: __cr.previews(), plan: window.__plog.plan, root: {root}}})"), release=False)
+    out["root at pickup"] = seen[0]["root"]
+    out["root at the preview"] = seen[1]["root"]
     out["preview"] = seen[1]["previews"]
     out["P.plan at the preview"] = seen[1]["plan"]
     await J.js("window.__plog.geometry = []")
@@ -1377,20 +1385,110 @@ async def focusdiag(J):
     out["chat after the answer"] = await box(J, "Chat")
     out["root after the answer"] = await J.js(root)
     out["state after the answer"] = await J.js("__cr.state()")
+    out["top row after the answer"] = await J.js(toprow)
+    tf, ta = out["top row in focus"] or {}, out["top row after the answer"] or {}
+    after = {p[0]: p for p in ta.get("parts", [])}
+    out["top row parts that changed"] = [[p[0], p[1], (after.get(p[0]) or [None, None])[1], p[3]] for p in tf.get("parts", [])
+                                         if not after.get(p[0]) or any(abs(a - b) > 0.5 for a, b in zip(p[1], after[p[0]][1]))]
     out["P.geometry calls after the answer"] = await J.js("window.__plog.geometry.slice(-3)")
     pv = [p for p in out["preview"] if p["in"] == "partition"]
     a, b = (pv[0]["r"] if pv else None), (out["chat after the answer"] or {}).get("r")
     diff = [round(q - p, 2) for p, q in zip(a, b)] if a and b else None
     out["preview minus result"] = diff
+    # c7522: the root and the layout's top row at each stage; a frame that changes size under the preview is the drift
+    def top_row(r):
+        for _, _, sibs in (r or {}).get("ancestors", []):
+            for name, rr in sibs:
+                if name.endswith("/top") or name == "top":
+                    return rr
+        return None
+    stages = {s: out.get(f"root {s}") for s in ("in focus", "at pickup", "at the preview", "right after release", "after the answer")}
+    out["frames by stage"] = {s: {"root": (r or {}).get("rect"), "client": (r or {}).get("client"), "top row": top_row(r)} for s, r in stages.items()}
+    heights = [v["root"][3] for v in out["frames by stage"].values() if v["root"]]
+    out["root height spread"] = round(max(heights) - min(heights), 2) if heights else None
     (J.out / "focusdiag.json").write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
-    ok = bool(diff) and all(abs(d) <= TOL for d in diff)
+    ok = bool(diff) and all(abs(d) <= TOL for d in diff) and (out["root height spread"] or 0) <= TOL
     J.record("focusdiag", focusdiag.__doc__, "pass" if ok else "fail",
-             f"preview {a}, right after release {(out['chat right after release'] or {}).get('r')}, after the answer {b}; difference {diff}; full capture in focusdiag.json",
+             f"preview {a}, right after release {(out['chat right after release'] or {}).get('r')}, after the answer {b}; difference {diff}; "
+             f"root height spread across focus/pickup/preview/release/answer {out['root height spread']} px; "
+             + "; ".join(f"{s}: root {v['root']} top row {v['top row']}" for s, v in out["frames by stage"].items()) + "; full capture in focusdiag.json",
              {"file": "focusdiag.json"}, [await J.shot("focusdiag")])
     await restore(J)
 
 
-ROUND3 = [("busy", busy), ("focusdiag", focusdiag)]
+CONTAIN = r"""(() => { const root = __cr.root(), cs = getComputedStyle(root), fr = __cr.R(root), out = { contain: cs.contain, root: fr, client: [root.clientWidth, root.clientHeight], panels: [], fixed: [] };
+  for (const p of [...root.children].filter(e => e._n && e._n.paint.partition_item && __cr.vis(e))) {
+    const r = __cr.R(p), sc = [...p.querySelectorAll('*')].filter(e => { const s = getComputedStyle(e); return /auto|scroll/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 && e.clientHeight > 0; });
+    const kids = [...p.children].filter(__cr.vis).map(k => __cr.R(k));
+    out.panels.push({ label: (p.querySelector('[data-carry]') || p).innerText.split('\n')[0].slice(0, 30), r, inside: r[0] >= fr[0] - 1 && r[1] >= fr[1] - 1 && r[0] + r[2] <= fr[0] + fr[2] + 1 && r[1] + r[3] <= fr[1] + fr[3] + 1,
+      cut: p.scrollWidth > p.clientWidth + 1, scrollers: sc.length, kids: kids.length, widest: Math.max(0, ...kids.map(k => k[2])) });
+  }
+  for (const e of root.querySelectorAll('*')) { const s = getComputedStyle(e); if (s.position === 'fixed' && __cr.vis(e)) out.fixed.push({ key: (e.dataset.key || e.className).toString().split('/').slice(-2).join('/'), r: __cr.R(e), top: s.top, left: s.left, popover: !!(e.popover && e.matches(':popover-open')) }); }
+  return out; })()"""
+
+
+async def containment(J):
+    """c7522: the bounded partition with contain: no clipped or empty panels, a root that is not empty or shrunk, fixed descendants placed against the page, a part menu at the pointer, wheel scroll inside a panel, focus/pin geometry"""
+    await J.reload()
+    await fixture(J)
+    fr0 = await frame(J)
+    c = await J.js(CONTAIN)
+    bad = []
+    if not c["root"] or c["root"][2] < 100 or c["root"][3] < 100:
+        bad.append(f"root is {c['root']}")
+    for p in c["panels"]:
+        if not p["inside"]: bad.append(f"{p['label']} outside the root")
+        if p["cut"]: bad.append(f"{p['label']} cut sideways")
+        if p["r"][2] < 40 or p["r"][3] < 40 or not p["kids"]: bad.append(f"{p['label']} empty or shrunk {p['r']}")
+    # fixed descendants inside a layout-contained root are placed against the root, not the page: their rect top must equal their style top
+    for f in c["fixed"]:
+        try:
+            if not f["popover"] and abs(float(f["top"].rstrip("px")) - f["r"][1]) > 1: bad.append(f"fixed {f['key']} at {f['r'][1]} but asks top {f['top']} (placed against the root)")
+        except ValueError:
+            pass
+    # a part menu at the pointer (menus are body-level, so this checks the press reaches the part through the root)
+    menu = None
+    card = await J.js("(() => { const e = [...__cr.root().querySelectorAll('[data-menu]')].find(e => __cr.vis(e) && e.getBoundingClientRect().height > 8); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left + Math.min(20, r.width / 2), r.top + r.height / 2]; })()")
+    if card:
+        await J.w.click(card[0], card[1], right=True)
+        await asyncio.sleep(0.4)
+        menu = await J.js("(() => { const m = document.getElementById('menu-pop'); return m ? __cr.R(m) : null; })()")
+        iw, ih = await J.js("[innerWidth, innerHeight]")
+        if menu and (abs(menu[0] - card[0]) > 300 or abs(menu[1] - card[1]) > 300 or menu[0] < 0 or menu[1] < 0
+                     or menu[0] + menu[2] > iw + 1 or menu[1] + menu[3] > ih + 1):
+            bad.append(f"menu at {menu}, pressed at {card}")
+        await J.w.key("Escape")
+        await asyncio.sleep(0.3)
+    # wheel inside the first panel that scrolls
+    wheel = await J.js("(() => { const root = __cr.root(); const e = [...root.querySelectorAll('*')].find(e => { const s = getComputedStyle(e); return /auto|scroll/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 20 && e.clientHeight > 40 && __cr.vis(e); }); if (!e) return null; e.dataset.crWheel = '1'; const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + Math.min(40, r.height / 2), e.scrollTop]; })()")
+    scrolled = None
+    if wheel:
+        await J.w.wheel(wheel[0], wheel[1], 240)
+        await asyncio.sleep(0.5)
+        top = await J.js("(() => { const e = document.querySelector('[data-cr-wheel]'); return e ? e.scrollTop : null; })()")
+        scrolled = [wheel[2], top]
+        if top is None or top <= wheel[2]: bad.append(f"wheel inside a panel did not scroll ({wheel[2]} -> {top})")
+        await J.js("(() => { const e = document.querySelector('[data-cr-wheel]'); if (e) { e.scrollTop = 0; delete e.dataset.crWheel; } })()")
+    # focus and back: the root keeps its size; pins in the header are still pressable
+    x, y = await grip(J, "The board")
+    await J.w.dblclick(x, y)
+    await answered(J)
+    await J.settle(1)
+    cf = await J.js(CONTAIN)
+    await restore(J)
+    cb = await J.js(CONTAIN)
+    for tag, cc in (("in focus", cf), ("after focus", cb)):
+        if not cc["root"] or cc["root"][3] < 100: bad.append(f"root {tag} is {cc['root']}")
+        for p in cc["panels"]:
+            if p["r"][2] < 40 or p["r"][3] < 40 or not p["inside"]: bad.append(f"{tag}: {p['label']} {p['r']} inside={p['inside']}")
+    J.record("containment", containment.__doc__, "pass" if not bad else "fail",
+             f"contain {c['contain']!r}; root {c['root']} client {c['client']} (frame before {fr0}); {len(c['panels'])} panels, {sum(p['scrollers'] for p in c['panels'])} scrollers; "
+             f"fixed descendants {len(c['fixed'])}; menu {menu} for a press at {card}; wheel {scrolled}; root in focus {cf['root']}, after {cb['root']}"
+             + (f"; problems: {bad}" if bad else "; no clipped/empty panel, root whole, menu at the pointer, wheel scrolls"),
+             {"before": c, "in focus": cf, "after": cb}, [await J.shot("containment")])
+
+
+ROUND3 = [("busy", busy), ("focusdiag", focusdiag), ("containment", containment)]
 
 ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive),("immediate", immediate), ("refusal", refusal), ("cancel-policy", cancel_policy),
           ("composer", composer), ("tabs-focus", tabs_focus), ("receivers", receivers), ("doc-pins", doc_pins), ("tints", tints),

@@ -2,6 +2,49 @@
 
 worker-a7466 (builder-1), 20 Oct 2026. Acceptance only: no source fix to the reviewed code, no live apply.
 
+## Round 4 (c7522): the owner's candidate c7517
+
+**Bytes reviewed (ran; all five match c7517):**
+- lens.js 5915058E0E1A0C7266EB9048AB1E786D58ACC61F95B78986806E2971AB435230. Composed by a three-way merge with main 5837d3e: one line differs from the owner's file (main's `if (p.remember) el.dataset.remember = p.remember;`).
+- partition-ui.js 2F29419624DD1691E13D8FFC55D9B38B8B5BDC1BDEAF64D510C253C7A7BB129A
+- test_partition_ui.js F8C5D716E80889AB63A8292A9709E94835A41BD7ABE8947AF765703F9CACDE43
+- partition_navigation.py 07066CC9C79F7F8DF603D7D3E241EF210E8F72E5BF8BF8040C89DE58D3C2466C
+- test_navigation_step.py 2576A48037A50E2754D9516A0B8697AA8C02D53FBDD7DD1A767FC912E4E0318E
+
+Composed copy-only over 5837d3e: 58 files, 4 block unions, 0 conflicts; restored afterwards. World copy at e14924. DPR 1.5 at both sizes. Guard verdict on every run: "alex: untouched by the sandbox".
+
+**Focus exit, Board in focus, Chat carried to the bottom — still fails at 1280; passes at 2560 (ran).**
+- 1280 (`demos/combined-review/2026-10-20-193432-1280x800`, `193525`):
+  - the partition root is [16, 329.1, 1248, 380.1] at focus, pickup, preview and release, and [16, 326.4, 1248, 382.8] after the answer;
+  - the top row is 297.1 tall at focus, pickup, preview and release, and 294.4 after the answer;
+  - preview minus result [0, -1.2, 0, +1.5], unchanged from round 3.
+- The containment holds the partition (`contain: size layout`, measured), but the drift comes from outside it: the top row `f5664/top` lies outside the partition, and inside it `widgets/a6348` (the clock-and-counts widget) is 244.6 px tall in focus and 241.9 after. The capture is in focusdiag.json, "top row parts that changed".
+- 2560: the root height spread across the stages is 0.0 and the difference is 0.
+- No tolerance was widened.
+
+**Containment (new journey `containment`) — PASS at both sizes (ran).**
+- The root is whole: [16, 326.4, 1248, 382.8] at 1280 and [16, 79.8, 2528, 1269.3] at 2560, equal to the frame before.
+- Every panel is inside the root, none cut sideways, none empty; the same holds in focus and after focus.
+- 0 fixed-position descendants inside the root. Wheel scroll inside a panel moved it 0 to 200.
+- Not covered: a part menu inside the partition. No `[data-menu]` part was found there; part menus are added to body, so containment cannot place them (read lens.js:489-504).
+- Floats are lifted into the top layer (read lens.js:351-366); they were not driven.
+
+**partition_navigation (the owner's corrected recipe), owner bytes, no probe — PASS (functional) at both sizes (ran).**
+- 2560: `demos/hud-playtest/2026-10-20-193557`. 1280: `193623` and `193648`.
+- "title click unchanged; four global edge spans; one divider persisted; copy fixture restored". Marked slow at 513-542 ms against the 300 ms aim.
+- Every logged carry hit is the panel's appgrip (`.../a5676/appgrip`, 8 px tall).
+- This was 0 of 6 at 1280 in round 3.
+
+**Full regression:**
+- **2560** (`193712`, `195230`): every journey passes in `195230`, with dock-colour blocked (no tints in this world; the tints journey passes). Passes include busy, consecutive, immediate, refusal, cancel, cancel-policy, draft (caret 16), composer (context unchanged), receivers, dock pins/order/look, doc-pins and the workspace emulation.
+- **2560, one failure in five runs of `consecutive-paced`** (`193712`): after the first carry's answer, the next press on the Board's title selected 818 characters and did not carry. The shot shows the selection inside the Board's header text "1 wait on JEFF", a count that was in the header in that copy. Reruns (`194436`, `194505`, `195230`) passed. The press diagnosis (element under the press) was added afterwards and has not caught a failing run.
+- **1280** (`194552`): the same as round 3. Fails:
+  - focusdiag and tabs-focus: the focus drift above;
+  - fit: the 300 px allocation bounds it, n/a by design;
+  - draft: typing did not arrive, and composer is blocked; both because the composer is cut off at 1280 (`BODY.r-desk` under its centre), as before;
+  - doc-pins: the viewer title is under `DIV.r-top`, as before.
+  - Everything else passes, including busy, consecutive, immediate, refusal, cancel, containment and receivers.
+
 ## Round 3 (c7505): the owner's repair c7502
 
 **Bytes reviewed (ran, all match c7502):**
