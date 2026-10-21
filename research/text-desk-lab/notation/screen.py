@@ -10,7 +10,8 @@ and read back what it measured. The screenshot is a PNG a model can open with it
 desktop (index.html: dock, windows, apps) instead of the painter. --reduced-motion looks as someone whose system asks
 for reduced motion (prefers-reduced-motion: reduce). --scale 1.5 paints as a display scaled 150% does (--size stays
 in CSS pixels: Alex's 3840x2160 at 150% is --size 2560x1440 --scale 1.5; a5736). --visible opens a REAL window (Edge,
-an app window, real GPU and Windows frame; --size in the screen's own scaling, --scale ignored) on a desktop of its own
+an app window, real GPU and Windows frame; --size is the page's CSS viewport in the screen's own scaling, the window
+grown by its frame to hold it, and printed as measured, a7413; --scale ignored) on a desktop of its own
 that Alex never sees (research/window-lab/sandbox_window.py, a5932): click, right, type and plain keys reach it as
 Windows messages to that window only; `window [file.png]` shoots it as Windows draws it, frame and all; it closes when
 the steps end, and the run ends saying whether Alex's foreground, focus and cursor were untouched. --on-screen x,y is
@@ -273,16 +274,13 @@ async def run(url, steps, size, shots, restart=None, still=False):
         raise SystemExit("screen: no Chrome or Edge found; looked in " + ", ".join(BROWSERS))
     prof = agora_tmp.directory("screen-profile-")
     port = free_port()
-    br, sandbox, guard = None, None, None
+    br, sandbox, guard, opened = None, None, None, False
     if VISIBLE == "sandbox":
         # a5932 (--visible): a real Edge window on a desktop of its own (sandbox_window.py): nothing of it reaches
         # Alex's monitor, foreground, focus, cursor or keyboard, and a guard watches that the whole run
         sandbox = f"screen-{os.getpid()}"
         guard = SB.Guard(sandbox, f"agora-sandbox-{sandbox}")
         guard.__enter__()
-        port = SB.open_edge(sandbox, url, f"{w}x{h}")["port"]
-        print(f"screen: a real Edge window on the hidden desktop agora-sandbox-{sandbox} (film it meanwhile with "
-              f"research/window-lab/sandbox_window.py film <s> out.mp4 --name {sandbox})", flush=True)
     else:
         # a5820 (--on-screen x,y): a real window on HIS screen, an app window with no tabs or bar, at x,y and the size
         # asked (13:5x 16 Oct: `--app=about:blank` came up as a whole browser with a tab bar and took the keyboard from
@@ -296,6 +294,13 @@ async def run(url, steps, size, shots, restart=None, still=False):
                                "--no-first-run", "--no-default-browser-check", "--disable-extensions",
                                f"--window-size={w},{h}", *head], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
+        if sandbox:              # a7413: inside the try, so a failed start still ends the guard and says so
+            st = SB.open_edge(sandbox, url, f"{w}x{h}")
+            port, (iw, ih, dpr) = st["port"], st["viewport"]
+            print(f"screen: a real Edge window on the hidden desktop agora-sandbox-{sandbox}, page {iw}x{ih} CSS px at "
+                  f"devicePixelRatio {dpr}{'' if [iw, ih] == [w, h] else f' (NOT the {w}x{h} asked)'} (film it "
+                  f"meanwhile with research/window-lab/sandbox_window.py film <s> out.mp4 --name {sandbox})", flush=True)
+        opened = True
         wait_http(f"http://127.0.0.1:{port}/json/version")
         tabs = json.loads(wait_http(f"http://127.0.0.1:{port}/json"))
         ws_url = next(t["webSocketDebuggerUrl"] for t in tabs if t.get("type") == "page")
@@ -550,7 +555,8 @@ async def run(url, steps, size, shots, restart=None, still=False):
         if sandbox:
             SB.close(sandbox, quiet=True)
             guard.__exit__(None, None, None)
-            print(guard.verdict()[1])
+            print(guard.verdict()[1] if opened else "guard over a start that failed (no page was tested, so this is "
+                  "not an acceptance verdict): " + guard.verdict()[1])
         shutil.rmtree(prof, ignore_errors=True)
 
 
