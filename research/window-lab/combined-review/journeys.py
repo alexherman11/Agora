@@ -155,6 +155,15 @@ async def main():
             print("glance fix (copy only):", said.splitlines()[0][:200] if said else said)
             if "ERR" in said:
                 raise SystemExit("the staged glance fix did not apply to the copy: " + said[:300])
+        # a7784: Alex's layout now has the Viewer shelved; earlier rounds' journeys stand on four panels, so the copy (only)
+        # opens The lowdown in it, as a press on a name does (the view verb brings the Viewer panel out)
+        import re as _re
+        vline = copy.do("find prop:role=home-panel,prop:actor=alex,prop:lens=home-viewer", "hud-playtest")
+        if "shelf=yes" in vline:
+            vid = _re.search(r"^\s+(a\d+) note", copy.do("find prop:role=home-view,prop:actor=alex", "hud-playtest"), _re.M).group(1)
+            copy.do(f"read {vid}", "alex")
+            said = copy.do("do view a5202", "alex")
+            print("viewer brought out in the copy:", (said.strip().splitlines() or [""])[-1][:160])
         win = pt.Window(False)
         await win.open(copy.url())
         for _ in range(100):
