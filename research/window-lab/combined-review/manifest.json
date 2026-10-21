@@ -1,6 +1,6 @@
 {
  "base": "c5c988c",
- "main": "5837d3e",
+ "main": "c429747",
  "theirs": "C:\\Projects\\Agora4\\.worktrees\\a7045",
  "files": [
   {
@@ -158,10 +158,10 @@
   {
    "path": "research/window-lab/hud-dividers/EVIDENCE.md",
    "how": "new",
-   "theirs_sha256": "545A4B3B7EF328497C4732267B5A247787A6977C34CAFB1A7A802CED5BE29D90",
+   "theirs_sha256": "C9820A9DFA755D9E095F8FD4F24A8CFD8642E742D0947D6A04FA301EED94061F",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "545A4B3B7EF328497C4732267B5A247787A6977C34CAFB1A7A802CED5BE29D90"
+   "composed_sha256": "C9820A9DFA755D9E095F8FD4F24A8CFD8642E742D0947D6A04FA301EED94061F"
   },
   {
    "path": "research/window-lab/hud-dividers/HANDOFF.md",
@@ -174,10 +174,10 @@
   {
    "path": "research/window-lab/hud-dividers/NAVIGATION.md",
    "how": "new",
-   "theirs_sha256": "EFA9BCED4E8AC51B6A3FB63CA04CDA1829DEDFCF5183ACE3D48D4BCC0433CF42",
+   "theirs_sha256": "D73887439EA4A303EDD33C0414D3A177E1A6B483F9BD0F985A9CE89F9A1CF8DF",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "EFA9BCED4E8AC51B6A3FB63CA04CDA1829DEDFCF5183ACE3D48D4BCC0433CF42"
+   "composed_sha256": "D73887439EA4A303EDD33C0414D3A177E1A6B483F9BD0F985A9CE89F9A1CF8DF"
   },
   {
    "path": "research/window-lab/hud-dividers/bundle.py",
@@ -270,10 +270,10 @@
   {
    "path": "research/window-lab/hud-dividers/test_navigation_step.py",
    "how": "new",
-   "theirs_sha256": "2576A48037A50E2754D9516A0B8697AA8C02D53FBDD7DD1A767FC912E4E0318E",
+   "theirs_sha256": "B88EA3355398E3294DB71FBD05B9DF4C727AC4505E734DD727FFF7632F83CFE5",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "2576A48037A50E2754D9516A0B8697AA8C02D53FBDD7DD1A767FC912E4E0318E"
+   "composed_sha256": "B88EA3355398E3294DB71FBD05B9DF4C727AC4505E734DD727FFF7632F83CFE5"
   },
   {
    "path": "research/window-lab/hud-dividers/test_partition.js",
@@ -318,10 +318,10 @@
   {
    "path": "research/window-lab/playtest_steps/partition_navigation.py",
    "how": "new",
-   "theirs_sha256": "07066CC9C79F7F8DF603D7D3E241EF210E8F72E5BF8BF8040C89DE58D3C2466C",
+   "theirs_sha256": "E09828CB00D7267198A1A8BF407A18EEFB63327B4FCA792801384ADADC929F4C",
    "base_sha256": null,
    "main_sha256": null,
-   "composed_sha256": "07066CC9C79F7F8DF603D7D3E241EF210E8F72E5BF8BF8040C89DE58D3C2466C"
+   "composed_sha256": "E09828CB00D7267198A1A8BF407A18EEFB63327B4FCA792801384ADADC929F4C"
   },
   {
    "path": "research/window-lab/slim-dock/before-home-dock.lens",

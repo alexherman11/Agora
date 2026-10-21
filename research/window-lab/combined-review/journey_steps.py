@@ -1360,6 +1360,9 @@ async def focusdiag(J):
     toprow = ("(() => { const t = document.querySelector('[data-key$=\"f5664/top\"]'); if (!t) return null; const walk = (e, d) => [...e.children].filter(__cr.vis).flatMap(k => "
               "[[(k.dataset.key || k.className || k.tagName).toString().split('/').slice(-2).join('/'), __cr.R(k), getComputedStyle(k).lineHeight, (k.innerText || '').split('\\n')[0].slice(0, 24)], ...(d < 3 ? walk(k, d + 1) : [])]); "
               "return { rect: __cr.R(t), parts: walk(t, 0).slice(0, 40) }; })()")
+    lgstat = ("[...document.querySelectorAll('[class*=\"lgstat\"]')].filter(__cr.vis).map(e => { const s = getComputedStyle(e); "
+              "return [e.className, __cr.R(e), s.borderTopWidth + ' ' + s.borderBottomWidth + ' ' + s.borderLeftWidth, s.borderTopStyle, s.borderTopColor, (e.innerText || '').replace(/\\s+/g, ' ').slice(0, 20)]; })")
+    out["count chips in focus"] = await J.js(lgstat)
     out["top row in focus"] = await J.js(toprow)
     out["state in focus"] = await J.js("__cr.state()")
     out["root in focus"] = await J.js(root)
@@ -1386,6 +1389,7 @@ async def focusdiag(J):
     out["root after the answer"] = await J.js(root)
     out["state after the answer"] = await J.js("__cr.state()")
     out["top row after the answer"] = await J.js(toprow)
+    out["count chips after the answer"] = await J.js(lgstat)
     tf, ta = out["top row in focus"] or {}, out["top row after the answer"] or {}
     after = {p[0]: p for p in ta.get("parts", [])}
     out["top row parts that changed"] = [[p[0], p[1], (after.get(p[0]) or [None, None])[1], p[3]] for p in tf.get("parts", [])
@@ -1411,6 +1415,7 @@ async def focusdiag(J):
     J.record("focusdiag", focusdiag.__doc__, "pass" if ok else "fail",
              f"preview {a}, right after release {(out['chat right after release'] or {}).get('r')}, after the answer {b}; difference {diff}; "
              f"root height spread across focus/pickup/preview/release/answer {out['root height spread']} px; "
+             f"count chips in focus {[(c[0], c[1][3], c[2]) for c in out['count chips in focus'] or []]}, after {[(c[0], c[1][3], c[2]) for c in out['count chips after the answer'] or []]}; "
              + "; ".join(f"{s}: root {v['root']} top row {v['top row']}" for s, v in out["frames by stage"].items()) + "; full capture in focusdiag.json",
              {"file": "focusdiag.json"}, [await J.shot("focusdiag")])
     await restore(J)
@@ -1488,7 +1493,57 @@ async def containment(J):
              {"before": c, "in focus": cf, "after": cb}, [await J.shot("containment")])
 
 
-ROUND3 = [("busy", busy), ("focusdiag", focusdiag), ("containment", containment)]
+HEADPARTS = r"""(() => { const p = __cr.byLabel('The board'), g = p && __cr.grip(p); if (!g) return null;
+  const isCtl = e => !!e.closest('button, a, input, textarea, select, [role=button], [contenteditable=true]') || !!(e._n && e._n.acts && e._n.acts.some(a => a.on === 'click'));
+  const chain = e => { const c = []; for (let k = e; k && k !== g.parentElement; k = k.parentElement) c.push((k.dataset.key ? k.dataset.key.split('/').slice(-1)[0] : '') + '<' + k.tagName.toLowerCase() + (k.className ? '.' + String(k.className).split(' ')[0] : '') + (k.dataset.carry !== undefined ? ' data-carry' : '') + (isCtl(k) && !k.contains(g) ? ' CONTROL' : '') + '>'); return c.join(' / '); };
+  const leaves = [...g.querySelectorAll('*')].filter(e => __cr.vis(e) && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()));
+  return { grip: [g.dataset.key.split('/').slice(-2).join('/'), __cr.R(g), getComputedStyle(g).userSelect],
+    parts: leaves.slice(0, 16).map(e => { const r = e.getBoundingClientRect(), x = r.left + Math.min(r.width / 2, 12), y = r.top + r.height / 2, at = document.elementFromPoint(x, y);
+      return { text: e.textContent.trim().slice(0, 24), x, y, chain: chain(e), control: isCtl(e), userSelect: getComputedStyle(e).userSelect, hitSelf: at === e || e.contains(at), at: at && chain(at) }; }) }; })()"""
+
+
+async def countpress(J):
+    """c7532: every text piece inside the Board's title grip after it is carried to the bottom: its element and ancestry up to the grip, control or not, and whether a press there carries or selects (no selection clearing; a page left with text selected is reloaded and recorded)"""
+    await J.reload()
+    await fixture(J)
+    fr = await frame(J)
+    await carry_to(J, "The board", fr[0] + fr[2] / 2, fr[1] + fr[3] - 3)
+    await answered(J)
+    await J.settle(1)
+    hp = await J.js(HEADPARTS)
+    if not hp:
+        J.record("countpress", countpress.__doc__, "blocked", "no Board grip", {}, [await J.shot("countpress")])
+        return
+    rows, bad = [], []
+    for part in hp["parts"]:
+        if not part["hitSelf"]:
+            rows.append({**part, "result": "covered"})
+            continue
+        # out and back to the press point before release (Escape is not used: with nothing carried it would close the home base)
+        seen, _ = await J.hold(part["x"], part["y"], [(part["x"] + 30, part["y"] + 12), (part["x"] + 60, part["y"] + 40), (part["x"], part["y"])],
+                               lambda a, b: J.js("({ghost: !!__cr.ghost(), sel: __cr.selection(), text: String(getSelection()).slice(0, 40)})"))
+        await answered(J)
+        await asyncio.sleep(0.4)
+        mid = seen[1]
+        result = "carried" if mid["ghost"] and not mid["sel"] else ("selected " + repr(mid["text"]) if mid["sel"] else "nothing")
+        rows.append({**part, "result": result, "mid": mid})
+        if not part["control"] and result != "carried":
+            bad.append(f"{part['text']!r} ({part['chain'].split(' / ')[0]}): {result}")
+        if mid["sel"] or await J.js("__cr.selection()"):
+            J.reloads.append(("countpress", mid["sel"]))
+            await J.reload()
+            await answered(J)
+            await J.settle(0.5)
+    st = await J.js("__cr.state()")
+    (J.out / "countpress.json").write_text(json.dumps({"grip": hp["grip"], "rows": rows, "state": st}, indent=1, default=str), encoding="utf-8")
+    J.record("countpress", countpress.__doc__, "pass" if not bad else "fail",
+             f"grip {hp['grip']}; " + "; ".join(f"{r['text']!r}{' [control]' if r['control'] else ''} -> {r['result']}" for r in rows)
+             + (f"; non-control pieces that did not carry: {bad}" if bad else "") + "; ancestry in countpress.json",
+             {"file": "countpress.json"}, [await J.shot("countpress")])
+    await restore(J)
+
+
+ROUND3 = [("busy", busy), ("focusdiag", focusdiag), ("containment", containment), ("countpress", countpress)]
 
 ROUND2 = [("consecutive-paced", consecutive_paced), ("consecutive", consecutive),("immediate", immediate), ("refusal", refusal), ("cancel-policy", cancel_policy),
           ("composer", composer), ("tabs-focus", tabs_focus), ("receivers", receivers), ("doc-pins", doc_pins), ("tints", tints),

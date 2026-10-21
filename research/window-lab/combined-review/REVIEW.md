@@ -2,7 +2,44 @@
 
 worker-a7466 (builder-1), 20 Oct 2026. Acceptance only: no source fix to the reviewed code, no live apply.
 
-## Round 4 (c7522): the owner's candidate c7517
+## Round 5 (c7532): JEFF's staged glance fix a7531, and the Board header press
+
+**Bytes (ran):**
+- Source unchanged since c7517: partition-ui.js 2F294196…, lens.js 5915058E… (composed with main's one line).
+- The owner has since changed two test files:
+  - partition_navigation.py E09828CB00D7267198A1A8BF407A18EEFB63327B4FCA792801384ADADC929F4C
+  - test_navigation_step.py B88EA3355398E3294DB71FBD05B9DF4C727AC4505E734DD727FFF7632F83CFE5
+- Composed copy-only over c429747: 58 files, 0 conflicts; restored afterwards. World copy at e14981 (later runs at e15270). DPR 1.5 at both sizes.
+- The guard verdict was "untouched by the sandbox" on every run. One run (`213308`) also logged a foreground change on Alex's PC with no input, not to a sandbox window.
+
+**The staged fix, applied only in the copy** (`journeys.py --glance-fix`): exactly a7531. Add `token glanceclear = #00000000` and append `, edge glanceclear` to `role lgstat`; `lgstat.on` is unchanged. The desk answered `ok replace a5206`.
+
+**Measured first, without the fix** (`demos/combined-review/2026-10-20-213037-1280x800/focusdiag.json`, "count chips"):
+- In focus, two of the three glance counts ("7 wait on you" and "1 queued") wear `lgstat.on`. That gives them a 0.667 px solid ink border (1 device px), so each is 36.8 tall against 35.5 for `lgstat`.
+- Out of focus, all three are `lgstat`: 0 px border, 35.5 tall.
+- Two chips at 1.3 px each give the 2.7 px top-row change.
+
+**With the fix** (`213146` and `214036` at 1280; `213308` at 2560):
+- Every chip is 36.8 tall, with a 0.667 px border in both states: transparent when off, ink when on. Widths are the same in both states.
+- The top row holds at 298.4 at every stage, and the root at [16, 330.4, 1248, 378.8].
+- Focus exit, Board in focus, Chat carried to the bottom: preview = right after release = after the answer = [16, 527.9, 1248, 181.5]. Difference [0, 0, 0, 0], root spread 0.0, at both sizes. tabs-focus passes at 1280.
+- **The drift is closed.**
+- Side effect: the top row now always reserves the border, so at 1280 the panels are 379 tall instead of 383 (3 chips × 1.33 px). No count state shifts against another.
+
+**Full regression with the fix:**
+- 2560 (`213308`): every journey passes except the new `countpress` (below); dock-colour is blocked (no tints).
+- 1280 (`214036`): passes include focusdiag, tabs-focus, busy, consecutive, consecutive-paced, immediate, refusal, cancel, containment, receivers and dock. Fails as before: fit (n/a by the 300 px allocation), draft and composer (composer cut off), doc-pins (viewer title under `DIV.r-top`). Plus `countpress`.
+
+**The owner's updated recipe (`partition_navigation`, E09828CB…) — PASS at both sizes** (`hud-playtest/2026-10-20-214748` at 1280, `214813` at 2560).
+- It now logs pointer events with their ancestry: every press is on `a5676/appgrip`, `prevented: false`, `selected: 0`.
+- Marked slow at 462 / 508 ms.
+
+**The Board header press, made deterministic (new journey `countpress`)** (`213037` and `214036` at 1280, `213308` at 2560; ancestry in `countpress.json`):
+- After the Board is carried to the bottom, the journey presses every text piece inside its title grip `a5674/grip` (`div.r-panehead data-carry`, user-select auto). Each press moves out and back to its start; there is no Escape and no selection clearing.
+- `The board` (`title < div.r-panetitle`): carries.
+- `7 need you` (`you < div.r-nbsmall_need / lens:home-board-small < div.r-nbsmall / sum < div.r-panesum / grip`), `1 moving` (`moving < div.r-summary / …`) and `1 wait on JEFF` (`waits < div.r-nbsmall_jeff / …`): not controls, and inside the grip. At 1280 each press starts a text selection that runs into the Board body. At 2560, `7 need you` selected 1 character and the other two did nothing; none of them carried.
+- `◆` (pin) and `–` (away) are controls: a press and drag on them does not carry, but at 1280 it selected text (" working").
+- The question for the owner: the summary is a nested lens (`home-board-small`) inside the grip. If it is meant to be grip interior, it should carry. If it is excluded, it should still not start a page selection. A drag from a control should not select either.
 
 **Bytes reviewed (ran; all five match c7517):**
 - lens.js 5915058E0E1A0C7266EB9048AB1E786D58ACC61F95B78986806E2971AB435230. Composed by a three-way merge with main 5837d3e: one line differs from the owner's file (main's `if (p.remember) el.dataset.remember = p.remember;`).
