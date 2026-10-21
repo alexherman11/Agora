@@ -25,6 +25,7 @@ import os
 import pickle
 import re
 import sys
+import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -427,7 +428,10 @@ class Session:
         try:
             if self.observer and not LEASES.get(self.name):
                 raise ObserverReleased("the writer lease ended")
-            return self._enter_locked(hold)
+            desk = self._enter_locked(hold)
+            self._writer_thread = threading.get_ident()
+            self._atomic_unknown = False
+            return desk
         except BaseException:
             _give(self.name, self.lock)          # a6153: never left held (the in-process lock has no stale-age escape)
             raise
@@ -513,8 +517,54 @@ class Session:
         self.before = before if before is not None else pickle.dumps(desk) if self.path.exists() else None
         return desk
 
+    def atomic(self, operation_id, observed, steps):
+        """Internal admission, not a public route or caller authentication.
+
+        A future public adapter still needs ordinary source/actor/receiver checks.
+        """
+        if self.read or self.observer or getattr(self, "_writer_thread", None) != threading.get_ident():
+            raise BadRequest("atomic admission needs this thread's active writer Session")
+        if self._atomic_unknown:
+            raise BadRequest("reopen the Session to reconcile an unknown atomic outcome")
+        import atomic_world
+        try:
+            return atomic_world.execute(self, operation_id, observed, steps)
+        except atomic_world.UnknownCommit:
+            self._atomic_unknown = True
+            raise
+
+    def atomic_undo(self, operation_id, observed, original_operation):
+        """Whole-record undo through the same strict, isolated admission."""
+        if self.read or self.observer or getattr(self, "_writer_thread", None) != threading.get_ident():
+            raise BadRequest("atomic undo needs this thread's active writer Session")
+        if self._atomic_unknown:
+            raise BadRequest("reopen the Session to reconcile an unknown atomic outcome")
+        import atomic_world
+        try:
+            return atomic_world.undo(self, operation_id, observed, original_operation)
+        except atomic_world.UnknownCommit:
+            self._atomic_unknown = True
+            raise
+
+    def atomic_status(self, operation_id):
+        """Reconcile a durable operation identity without admitting a mutation."""
+        if self.read or self.observer or getattr(self, "_writer_thread", None) != threading.get_ident():
+            raise BadRequest("atomic reconciliation needs this thread's active writer Session")
+        if self._atomic_unknown:
+            raise BadRequest("reopen the Session to reconcile an unknown atomic outcome")
+        import atomic_world
+        try:
+            return atomic_world.status(self, operation_id)
+        except atomic_world.UnknownCommit:
+            self._atomic_unknown = True
+            raise
+
     def __exit__(self, *exc):
         try:
+            if getattr(self, "_atomic_unknown", False):
+                # A full durable record may exist despite a failed response.
+                _DESKS.pop(str(self.path), None)
+                return
             d = self.desk
             self.per[self.actor] = (d.seen, d.open, d.last_event_seen)
             if self.read:
@@ -564,6 +614,7 @@ class Session:
             _DESKS.pop(str(self.path), None)
             raise
         finally:
+            self._writer_thread = None
             try:
                 if self.observer:
                     import log_world

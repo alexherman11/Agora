@@ -51,6 +51,7 @@ import os
 import re
 import sys
 import time
+from copy import deepcopy
 from pathlib import Path
 
 SHAPE = 1
@@ -611,9 +612,14 @@ class Log:
                 f.seek(size - back)
                 tail = f.read(back)
                 if tail and not tail.endswith(b"\n"):
+                    # A large interrupted record can exceed the last 64 KiB.
+                    # Find its actual beginning before appending the next line.
+                    while b"\n" not in tail and back < size:
+                        back = min(size, back * 2)
+                        f.seek(size - back)
+                        tail = f.read(back)
                     cut = tail.rfind(b"\n") + 1
-                    if cut or back == size:
-                        f.truncate(size - back + cut)
+                    f.truncate(size - back + cut)
         with open(self.path, "ab") as f:
             f.write(line)
             f.flush()
@@ -875,13 +881,24 @@ def catch_up(desk, pickle_path):
             eid = str(p.get("e") or "")
             if not eid:
                 continue
-            w.events.append({"id": eid, "verb": p.get("verb"), "target": p.get("target"), "args": p.get("args") or {},
-                             "by": p.get("by") or rec.get("by"), "at": rec.get("at"), "cmd": rec.get("words", ""),
-                             "note": "put back from the log: the world's file was saved before it"})
+            if rec.get("atomic_world"):
+                # Keep metadata used by aspect fences, rules and whole undo.
+                w.events.append(deepcopy(p["event"]))
+            else:
+                w.events.append({"id": eid, "verb": p.get("verb"), "target": p.get("target"), "args": p.get("args") or {},
+                                 "by": p.get("by") or rec.get("by"), "at": rec.get("at"), "cmd": rec.get("words", ""),
+                                 "note": "put back from the log: the world's file was saved before it"})
             if eid[1:].isdigit():
                 w._eseq = max(getattr(w, "_eseq", 0) or 0, int(eid[1:]))
+            if p.get("verb") == "undo":
+                original = w.event_by_id(p.get("target"))
+                if original:
+                    original["undone"] = True
         if rec.get("ids") is not None:
             w._ids = max(getattr(w, "_ids", 0) or 0, rec["ids"])
+        if rec.get("atomic_world"):
+            import atomic_world
+            atomic_world.restore_metadata(desk, rec)
         desk._snap_at = (rec["seq"], end)
         n += 1
     if n:
