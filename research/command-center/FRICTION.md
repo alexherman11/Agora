@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (52)
+## open (53)
 
 ### F2. Scripts cannot say who is running them
 
@@ -344,6 +344,12 @@ Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-l
 a9135 · family=missing-word · status=open
 
 Alex (21 Oct, m9114/m9123) allows house restarts whenever nothing important would break, and asked JEFF to restart now. No world verb does it: a restart happens only as a side effect of landing a house file, once the house finds itself idle. Wanted: a world verb (e.g. restart-house) that waits for idle, says what is in flight, keeps drafts and receipts, and refuses during a game; JEFF uses it under Alex's standing approval.
+
+### A per-card tool grant doesn't reach a worker session already running
+
+a9172 · family=authority · status=open
+
+21 Oct, a9138: JEFF set extra_tools (mkdir; cp -t of 8 named files) on a working card; the running Claude worker's tries were still refused ('outside the working directories'; 'cp with flags requires manual approval'). Grants seem read only at session start, and flagged cp is refused regardless. Wanted: a grant takes effect on the next tool call (or the house says plainly it needs a fresh session), and exact allowlisted commands work with their flags.
 
 ## curing (46)
 
