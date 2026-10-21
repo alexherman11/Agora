@@ -59,7 +59,8 @@ PY = Path(sys.executable)
 HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
-               "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py"}
+               "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py",
+               "artifact_view.py", "guarded_artifacts.py", "image_comments.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 

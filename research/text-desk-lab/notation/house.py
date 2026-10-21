@@ -685,7 +685,7 @@ class House:
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
         self.charter_state = {}
         # No setting/world property can enable this; no journal/backend opened.
-        self.host_route = host_route_parent.ParentDispatcher()
+        self.host_route = host_route_parent.ParentDispatcher(house=None if fake else self)   # a8191: artifact-view only
 
     # ---- the world -------------------------------------------------------------------------------------------
     def load(self):
