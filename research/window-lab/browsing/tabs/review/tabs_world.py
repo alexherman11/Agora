@@ -141,12 +141,45 @@ ROUTES = {
 }
 
 
-def compose_jeff(do):
+# c7956: JEFF's staged a7937 replaces the six lens-preserving clauses' invalid lens-line unshelve with a world verb,
+# view-with-lens <item> <lens>, whose conditional unshelve stays inside the verb. Its body is read from a7937 itself.
+HELPER_NOTE = "a7937"
+
+
+def helper_body(live_do):
+    """The verb's exact lines, as a7937 proposes them (from '# view-with-lens' to the guarded unshelve line)."""
+    text = body(live_do(f"read {HELPER_NOTE} :3"))
+    lines = text.splitlines()
+    i = next(k for k, l in enumerate(lines) if l.startswith("# view-with-lens"))
+    j = next(k for k in range(i, len(lines)) if lines[k].startswith("do prop prop:role=home-panel"))
+    return "\n".join(lines[i:j + 1])
+
+
+def helped_routes():
+    """a7761's routes with the six lens-preserving clauses sent through view-with-lens (a7937)."""
+    out = {}
+    for n, hs in ROUTES.items():
+        rows = []
+        for old, new, times in hs:
+            m = re.search(r"target=(\$[\w.]+) lens=([\w-]+)", new)
+            rows.append((old, f"do view-with-lens {m.group(1)} {m.group(2)}" if m else new, times))
+        out[n] = rows
+    return out
+
+
+def compose_jeff(do, helper=None):
     """Apply the three world fixes to the COPY after the staged hunks. Every passage is counted first (the exact times
-    expected, or nothing is written); a lens with repeated identical clauses is rewritten whole, in the copy only. -> log"""
+    expected, or nothing is written); a lens with repeated identical clauses is rewritten whole, in the copy only.
+    helper: a7937's verb body: made on the copy (Home base, beside view) and used by the six lens routes. -> log"""
     log = []
     search = json.loads((TABS / "search-exclusions.json").read_text(encoding="utf-8"))
-    plan = {"a5486": MENU, **ROUTES}
+    plan = {"a5486": MENU, **(helped_routes() if helper else ROUTES)}
+    if helper:
+        do("look f5204")
+        said = do(f"do create f5204 kind=note title=view-with-lens tags=verb on=house text={q(helper)}")
+        log.append("helper view-with-lens (a7937, copy only): " + (said.strip().splitlines() or [""])[0][:160])
+        if "ERR" in said:
+            raise SystemExit("compose refused at the helper verb:\n" + said[:800])
     have = {n: body(do(f"read {n} :3")) for n in [*search, *plan]}
     stage.prepare({n: have[n] for n in search}, search)          # all six search passages exactly once, before any write
     for n, hs in plan.items():

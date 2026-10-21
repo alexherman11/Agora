@@ -111,24 +111,42 @@ def _connect(hud, words):
     """Only an explicit button press may open the account setup pages."""
     import media
     import spotify_connect
+    import spotify_like
     import webbrowser
     if not _CONNECT_LOCK.acquire(blocking=False):
         return "Spotify connection is already open"
-    library = media.likes()
+    try:
+        library = media.likes()
+    except Exception:
+        _CONNECT_LOCK.release()
+        raise Refused(spotify_like.connection_message(None)) from None
     library.connect_status = "Spotify connection is open in your browser."
+
+    def refresh():
+        try:
+            hud.say_desktop()
+        except Exception:
+            # Refresh failure must not leak connection details via a thread traceback.
+            pass
 
     def run():
         try:
             spotify_connect.connect(library, webbrowser.open)
             library.connect_status = ""
-        except Exception:
+        except Exception as error:
             # Do not publish account replies, codes or tokens into the world.
-            library.connect_status = "Spotify did not connect. Press Connect Spotify to try again."
+            library.connect_status = spotify_like.connection_message(error)
         finally:
             _CONNECT_LOCK.release()
-            hud.say_desktop()
+            refresh()
 
-    threading.Thread(target=run, daemon=True).start()
+    try:
+        threading.Thread(target=run, daemon=True).start()
+    except Exception:
+        _CONNECT_LOCK.release()
+        library.connect_status = spotify_like.connection_message(None)
+        refresh()
+        raise Refused(library.connect_status) from None
     return "opening Spotify connection"
 
 

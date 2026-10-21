@@ -1726,5 +1726,139 @@ ALL = [("facts", facts), ("clicks", clicks), ("ghost", ghost), ("edges", edges),
        ("dividers", dividers), ("focus", focus), ("shelf", shelf), ("cancel", cancel), ("stale", stale), ("draft", draft),
        ("bare", bare), ("dock-pin", dock_pins), ("dock-order", dock_order), ("dock-look", dock_look), ("reload", reload_keeps)]
 ALL = ALL[:3] + ROUND6 + ROUND3 + ROUND2[:4] + ALL[3:] + ROUND2[4:]     # the workspace emulation replaces the layout: always last
-DIAGNOSES = [("escdiag", escdiag), ("debug", debug), ("syncdiag", syncdiag)]      # --only escdiag / debug runs these
+DT_INSTALL = """(() => { if (window.__dt) return 'have';
+  const D = window.__dt = {fetch: [], loaf: [], lt: [], frames: [], muts: [], on: false};
+  const f0 = window.fetch.bind(window);
+  window.fetch = async (u, o) => { const s = String(u), t = performance.now();
+    try { const r = await f0(u, o); D.fetch.push({u: s.split('?')[0], have: s.includes('have='), t, d: performance.now() - t, len: +(r.headers.get('content-length') || 0)}); return r; }
+    catch (e) { D.fetch.push({u: s.split('?')[0], t, d: performance.now() - t, err: String(e)}); throw e; } };
+  try { new PerformanceObserver(l => { for (const e of l.getEntries()) D.loaf.push({t: e.startTime, d: e.duration, block: e.blockingDuration,
+      render: e.renderStart ? e.startTime + e.duration - e.renderStart : 0, layout: (e.scripts || []).reduce((s, x) => s + (x.forcedStyleAndLayoutDuration || 0), 0),
+      scripts: (e.scripts || []).map(s => ({fn: s.sourceFunctionName, src: (s.sourceURL || '').split('/').pop(), inv: (s.invoker || '').slice(0, 60), d: Math.round(s.duration), fsl: Math.round(s.forcedStyleAndLayoutDuration || 0)})).slice(0, 4)}); })
+      .observe({type: 'long-animation-frame'}); D.loafOk = true; } catch (e) { D.loafOk = String(e); }
+  try { new PerformanceObserver(l => { for (const e of l.getEntries()) D.lt.push({t: e.startTime, d: e.duration}); }).observe({type: 'longtask'}); } catch (e) {}
+  const paint = document.getElementById('paint') || document.body;
+  new MutationObserver(ms => { D.muts.push({t: performance.now(), n: ms.length, removed: ms.reduce((s, m) => s + m.removedNodes.length, 0), attrs: ms.filter(m => m.type === 'attributes').length}); })
+    .observe(paint, {childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class']});
+  let last = null; const tick = t => { if (!D.on) { last = null; return; } if (last != null) D.frames.push([t, t - last]); last = t; requestAnimationFrame(tick); };
+  D.start = () => { D.on = true; requestAnimationFrame(tick); return performance.now(); };
+  D.stop = () => { D.on = false; return performance.now(); };
+  return 'installed'; })()"""
+
+DT_WINDOW = """((a, b) => { const D = window.__dt, w = x => x.t >= a && x.t <= b, sort = xs => xs.slice().sort((p, q) => p - q), pc = (xs, p) => xs.length ? +sort(xs)[Math.min(xs.length - 1, Math.round(p * (xs.length - 1)))].toFixed(1) : null;
+  const fr = D.frames.filter(f => f[0] >= a && f[0] <= b).map(f => f[1]);
+  const sc = D.fetch.filter(x => w(x) && x.u.endsWith('/api/scene')), loaf = D.loaf.filter(w), muts = D.muts.filter(w);
+  const fns = {}; for (const l of loaf) for (const s of l.scripts) { const k = (s.fn || s.inv || '?') + ' ' + s.src; fns[k] = (fns[k] || 0) + s.d; }
+  return {ms: Math.round(b - a), frames: fr.length, frame_p50: pc(fr, .5), frame_p95: pc(fr, .95), frame_max: pc(fr, 1), over_50ms: fr.filter(x => x > 50).length, over_100ms: fr.filter(x => x > 100).length,
+    scene_requests: sc.length, scene_p95_ms: pc(sc.map(x => x.d), .95), scene_max_ms: pc(sc.map(x => x.d), 1), scene_bodies_kb: sc.map(x => Math.round(x.len / 1024)),
+    other_requests: Object.entries(D.fetch.filter(x => w(x) && !x.u.endsWith('/api/scene')).reduce((m, x) => (m[x.u] = (m[x.u] || 0) + 1, m), {})),
+    loaf_count: loaf.length, loaf_max_ms: pc(loaf.map(x => x.d), 1), loaf_sum_ms: Math.round(loaf.reduce((s, x) => s + x.d, 0)), loaf_forced_layout_ms: Math.round(loaf.reduce((s, x) => s + x.layout, 0)),
+    loaf_top: Object.entries(fns).sort((p, q) => q[1] - p[1]).slice(0, 5), longtasks: D.lt.filter(w).length,
+    mutation_batches: muts.length, removed_nodes: muts.reduce((s, m) => s + m.removed, 0), style_changes: muts.reduce((s, m) => s + m.attrs, 0)}; })"""
+
+DT_NARROW = """(() => __cr.members().filter(__cr.vis).map(e => { const r = e.getBoundingClientRect();
+  const cut = [...e.querySelectorAll('button,[data-key],textarea,input')].filter(x => { const q = x.getBoundingClientRect(); return q.width && (q.right > r.right + 1 || q.left < r.left - 1); }).length;
+  return {label: __cr.label(e), w: Math.round(r.width), h: Math.round(r.height), overflow_x: e.scrollWidth > e.clientWidth + 1, controls_cut: cut,
+          lens: (e._n && e._n.paint && e._n.paint.lens) || ''}; }))()"""
+
+
+async def dragtimes(J):
+    """a7925/c7983: what a slow drag between tiles costs: scene requests, paints, long frames, layout, draft (diagnosis)"""
+    import threading
+    await fixture(J)
+    await J.js(DT_INSTALL)
+    loaf_ok = await J.js("window.__dt.loafOk")
+    read = "(() => { const t = [...document.querySelectorAll('textarea')].find(e => __cr.vis(e) && e.closest('[data-key*=\"lens:jeff-chat\"]')); return t ? [t.value, t.selectionStart, document.activeElement === t] : null; })()"
+    c = await J.js("(() => { const t = [...document.querySelectorAll('textarea')].find(e => __cr.vis(e) && e.closest('[data-key*=\"lens:jeff-chat\"]')); return t ? __cr.hit(t) : null; })()")
+    if c:
+        await J.w.click(c["x"], c["y"])
+        await J.settle(0.4)
+        await J.w.type("unsent a7925 words")
+        await J.settle(0.4)
+    v0 = await J.js(read)
+    n0 = await J.js(DOS)
+    out = {"long-animation-frame API": loaf_ok, "draft typed": v0, "conditions": {}}
+    stop = threading.Event()
+    ticks = []
+
+    def writer():
+        # live-like churn: the live world took ~100 events in ~6 min (e17315..e17415, 21 Oct), JEFF's cards among them;
+        # one visible board-card change every 1.5 s here, on the COPY only
+        k = 0
+        while not stop.is_set():
+            k += 1
+            said = J.copy.do(f"do prop a7925 next={q(f'review tick {k}')}", "jeff")
+            ticks.append("ERR" not in said)
+            stop.wait(1.5)
+
+    async def carry_slow():
+        gx, gy = await grip(J, "The board")
+        others = [b for b in await J.js("__cr.boxes()") if "board" not in b["label"].lower()]
+        pts = [(gx + 30, gy + 10)]
+        for b in others + others[::-1]:
+            pts.append((b["r"][0] + b["r"][2] / 2, b["r"][1] + b["r"][3] / 2))
+        pts.append((gx, gy))                                   # back where it started: a carry that changes nothing
+        a = await J.js("window.__dt.start()")
+        seen, _ = await J.hold(gx, gy, pts, lambda x, y: J.js("({ghost: !!__cr.ghost(), previews: __cr.previews().length})"))
+        b = await J.js("performance.now()")
+        await J.settle(1.5)
+        c2 = await J.js("window.__dt.stop()")
+        return a, b, c2, {"stops": len(pts), "ghost all the way": all(s["ghost"] for s in seen[:-1])}
+
+    async def divider_slow():
+        ds = [d for d in await J.js("__cr.chrome()") if d["label"].startswith("Resize neighbouring")]
+        if not ds:
+            return None
+        d = ds[0]
+        x, y = d["r"][0] + d["r"][2] / 2, d["r"][1] + d["r"][3] / 2
+        step = [(x + k * 40, y) if d["axis"] == "x" else (x, y + k * 40) for k in (1, 2, 3, 4, 5, 4, 3, 2, 1)]
+        a = await J.js("window.__dt.start()")
+        seen, _ = await J.hold(x, y, step, lambda px, py: J.js(DT_NARROW))
+        b = await J.js("performance.now()")
+        await J.settle(1.6)
+        c2 = await J.js("window.__dt.stop()")
+        narrowest = min((m for s in seen for m in s), key=lambda m: m["w"], default=None)
+        return a, b, c2, {"axis": d["axis"], "narrowest panel mid-drag": narrowest,
+                          "panels cut mid-drag": sorted({m["label"] for s in seen for m in s if m["overflow_x"] or m["controls_cut"]})}
+
+    shots = []
+    for cond in ("quiet", "busy"):
+        th = None
+        if cond == "busy":
+            stop.clear()
+            th = threading.Thread(target=writer, daemon=True)
+            th.start()
+            await J.settle(2)
+        res = {}
+        for name, g in (("carry across tiles", carry_slow), ("divider", divider_slow)):
+            r = await g()
+            if r is None:
+                res[name] = "no divider"
+                continue
+            a, b, c2, extra = r
+            res[name] = {"held": await J.js(f"{DT_WINDOW}({a}, {b})"), "after release 1.5 s": await J.js(f"{DT_WINDOW}({b}, {c2})"),
+                         **extra, "draft": await J.js(read)}
+            shots.append(await J.shot(f"dragtimes-{cond}-{name.split()[0]}"))
+            await restore(J)
+        if th:
+            stop.set()
+            th.join(5)
+            res["writer"] = {"ticks": len(ticks), "accepted": sum(ticks)}
+        out["conditions"][cond] = res
+    out["narrow now"] = await J.js(DT_NARROW)
+    out["layout writes (do requests: one per released gesture)"] = (await J.js(DOS)) - n0
+    v1 = await J.js(read)
+    out["draft at end"] = v1
+    notes = []
+    if await J.js("[...document.querySelectorAll('[data-key*=\"lens:jeff-chat\"]')].some(e => e.innerText.includes('unsent a7925 words') && e.tagName !== 'TEXTAREA' && !e.querySelector('textarea'))"):
+        notes.append("the draft words appear outside the composer (sent?)")
+    if v0 and (not v1 or v1[0] != v0[0]):
+        notes.append(f"draft words changed: {v1}")
+    print(json.dumps(out, indent=1, ensure_ascii=False)[:9000])
+    J.record("dragtimes", dragtimes.__doc__, "ran" if not notes else "fail", "; ".join(notes) or "timings recorded (facts)", out, shots)
+    if v1 and v1[0]:
+        await J.js("(() => { const t = [...document.querySelectorAll('textarea')].find(e => __cr.vis(e) && e.closest('[data-key*=\"lens:jeff-chat\"]')); if (t) { t.value = ''; t.dispatchEvent(new Event('input', {bubbles: true})); } })()")
+
+
+DIAGNOSES = [("escdiag", escdiag), ("debug", debug), ("syncdiag", syncdiag), ("dragtimes", dragtimes)]      # --only escdiag / debug runs these
 ALL += DIAGNOSES

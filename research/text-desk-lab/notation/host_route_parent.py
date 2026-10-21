@@ -34,10 +34,15 @@ class TurnText(str):
 
 
 class ParentDispatcher:
-    """Default house dispatcher: provenance active, host capability disabled."""
+    """Default house dispatcher: provenance active, host capability disabled. a8191: given the house, one typed action
+    answers, artifact-view (artifact_view.py: a guarded test screenshot shown to a resident); every other refuses."""
 
-    def __init__(self):
+    def __init__(self, house=None):
         self.sessions = {}
+        self.artifact_view = None
+        if house is not None:
+            import artifact_view
+            self.artifact_view = artifact_view.ArtifactView(house, self)
 
     def bind(self, owner, process):
         source = ChildSession(owner, process, uuid.uuid4().hex, getattr(owner, "cid", None))
@@ -52,6 +57,8 @@ class ParentDispatcher:
         self.sessions.pop(owner, None)
 
     def handle(self, source, payload):
+        if self.artifact_view is not None and payload.get("action") == "artifact-view":
+            return self.artifact_view.handle(source, payload)
         return {"status": "refused", "reason": "host route disabled pending review"}
 
     def intercept(self, source, text):
