@@ -6,7 +6,9 @@ import unittest
 from pathlib import Path
 
 import roomworld
+import rooms
 import scene
+import task_flow
 from plan_usage import q
 
 VERB = (Path(__file__).resolve().parents[2] / "window-lab" /
@@ -18,6 +20,10 @@ class Routing(unittest.TestCase):
         self.d, self.r = roomworld.build(say=False)
         self.w = self.d.world
         self.run_line(f'do append {self.r.TALK[self.r.BOARD]} line="Fixture actor registered."', "alex")
+        # JEFF is a resident in the live world (a corner with role=resident actor=jeff); Alex is a person, with none
+        corner = self.make('kind=surface title="JEFF\'s corner"')
+        self.run_line(f"look {corner}")
+        self.run_line(f"do prop {corner} role=resident actor=jeff")
         self.box = self.make("kind=surface title=\"Alex's notices\"")
         self.old = self.make('kind=note title=historical role=notice to=alex topic=asking', self.box)
         self.old_subject = copy.deepcopy(self.w.subjects[self.w.nodes[self.old]["subject"]])
@@ -58,14 +64,42 @@ class Routing(unittest.TestCase):
         return [s["props"]["to"] for s in self.w.subjects.values()
                 if s.get("props", {}).get("about") == card and s["props"].get("topic") == "asking"]
 
+    def last(self, verb, by):
+        return next(e for e in reversed(self.w.events) if e.get("verb") == verb and e.get("by") == by)
+
+    def heard(self, card, asker):
+        """How the asker hears a waiting card's question, by the house's own readings: the task notice the house
+        queues for the commission=waiting event (task_flow.notices), and the knock of the mark=ask comment
+        (rooms.reached). -> (recipients of the task notice, how the comment reached the asker)."""
+        comment = self.last("comment", "worker-fixture")
+        self.wait(card)
+        waiting = self.last("prop", "house")
+        return ([n["recipient"] for n in task_flow.notices(self.w, waiting)],
+                rooms.reached(self.w, comment).get(asker))
+
     def test_asker_jeff_alex_and_resident(self):
-        for asker in ("jeff", "alex", "juniper"):
+        # a resident asker hears it from the house, twice over, so no notice note is made for them; Alex (a person,
+        # no corner) gets the note his notices bell shows
+        for asker in ("jeff", "juniper"):
             card = self.card(asker)
             self.comment(card)
-            self.wait(card)
-            self.assertEqual(self.recipients(card), [asker])
+            self.assertEqual(self.heard(card, asker), ([asker], "call"))
+            self.assertEqual(self.recipients(card), [])
+        card = self.card("alex")
+        self.comment(card)
+        self.wait(card)
+        self.assertEqual(self.recipients(card), ["alex"])
         self.assertEqual(self.w.subjects[self.w.nodes[self.old]["subject"]], self.old_subject)
         self.assertEqual(self.w.events[:len(self.old_events)], self.old_events)
+
+    def test_a_notice_note_to_a_resident_reaches_no_one(self):
+        # why the note is not made for a resident: the house reads a created note with to= as reaching no one, and
+        # makes no task notice of it; only Alex's bell (home-notices, to=$me on a person's home base) shows one
+        self.run_line(f"look {self.box}", "house")
+        self.run_line(f"do create {self.box} kind=note title=asking role=notice to=jeff topic=asking", "house")
+        made = self.last("create", "house")
+        self.assertEqual(rooms.reached(self.w, made), {})
+        self.assertEqual(task_flow.notices(self.w, made), [])
 
     def test_explicit_alex_permission_survives_unrelated_activity(self):
         card = self.card("jeff")
@@ -96,7 +130,7 @@ class Routing(unittest.TestCase):
         card = self.card("jeff")
         self.comment(card, "@alex: FYI only.", mark="")
         self.wait(card)
-        self.assertEqual(self.recipients(card), ["jeff"])
+        self.assertEqual(self.recipients(card), [])          # JEFF's, through the house; nothing in Alex's bell
 
     def test_answered_alex_question_does_not_capture_later_question(self):
         card = self.card("jeff")
@@ -105,7 +139,7 @@ class Routing(unittest.TestCase):
         self.run_line(f'do comment {card} id={cid} line="Declined."', "alex")
         self.comment(card, "Juniper? No, this card belongs to JEFF.")
         self.wait(card)
-        self.assertEqual(self.recipients(card), ["jeff"])
+        self.assertEqual(self.recipients(card), [])
 
 
 if __name__ == "__main__":
