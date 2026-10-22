@@ -1,0 +1,127 @@
+{
+  "launch": {
+    "desktop": "agora-sandbox-admit-90ea9811de71",
+    "profile": "fresh disposable InPrivate profile (contents excluded)",
+    "started_at": 1792611337.7253437,
+    "public_navigation": false,
+    "source_sha256": {
+      "run_admission.py": "dc096a2fe04751cb0ee1df73b43cf33e40610f02c4e9988d0cf09349396b7c6b",
+      "admission_probe.py": "95d21a9e6f7bb76a9628f23c6c674f5e74af93651ce2d40c55df629fb02c42f7",
+      "admission_result.py": "98b98b88eb79b4687a888ea5aca51a02ff99c874c77d76515df09ab8dd096976"
+    },
+    "pid": 73204,
+    "wait": 0,
+    "remaining_windows": [],
+    "guard_code": 0,
+    "guard": "alex: untouched by the sandbox (foreground, focus, cursor and input desktop polled every 20 ms: no sandbox window became his foreground, none showed on his desktop, the input desktop stayed Default, the cursor never moved without real input)",
+    "matching_processes_after_exit": 0,
+    "offline_message_boundary_passed": true
+  },
+  "receipt": {
+    "desktop": "agora-sandbox-admit-90ea9811de71",
+    "pid": 40072,
+    "events": [
+      {
+        "phase": "importing",
+        "seconds": 0.0
+      },
+      {
+        "phase": "message_loop",
+        "seconds": 0.437
+      },
+      {
+        "phase": "shown",
+        "seconds": 0.453,
+        "handle_created": true
+      },
+      {
+        "phase": "initializing",
+        "seconds": 0.468
+      },
+      {
+        "phase": "initialized",
+        "seconds": 0.718,
+        "engine": "155.0.4283.62"
+      },
+      {
+        "phase": "offline_policy",
+        "seconds": 0.734,
+        "messages": true,
+        "host_objects": false
+      },
+      {
+        "phase": "navigation_completed",
+        "seconds": 0.765,
+        "success": true,
+        "status": "Unknown"
+      },
+      {
+        "phase": "evaluated",
+        "seconds": 0.781,
+        "mode": "positive_control",
+        "result": {
+          "title": "Offline admission",
+          "topBridge": "undefined",
+          "childBridge": "undefined",
+          "topMessage": "sent",
+          "childMessage": "sent",
+          "childReady": "complete"
+        }
+      },
+      {
+        "phase": "message_delivery",
+        "seconds": 1.281,
+        "mode": "positive_control",
+        "received": [
+          "top",
+          "child"
+        ]
+      },
+      {
+        "phase": "offline_policy",
+        "seconds": 1.281,
+        "messages": false,
+        "host_objects": false
+      },
+      {
+        "phase": "navigation_completed",
+        "seconds": 1.343,
+        "success": true,
+        "status": "Unknown"
+      },
+      {
+        "phase": "evaluated",
+        "seconds": 1.343,
+        "mode": "disabled",
+        "result": {
+          "title": "Offline admission",
+          "topBridge": "undefined",
+          "childBridge": "undefined",
+          "topMessage": "sent",
+          "childMessage": "sent",
+          "childReady": "complete"
+        }
+      },
+      {
+        "phase": "message_delivery",
+        "seconds": 1.843,
+        "mode": "disabled",
+        "received": []
+      },
+      {
+        "phase": "form_closed",
+        "seconds": 1.859
+      },
+      {
+        "phase": "disposed",
+        "seconds": 1.859
+      },
+      {
+        "phase": "child_exit",
+        "seconds": 1.875
+      }
+    ],
+    "public_navigation": false,
+    "phase": "child_exit"
+  }
+}
