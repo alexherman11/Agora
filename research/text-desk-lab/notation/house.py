@@ -1622,14 +1622,19 @@ class House:
             self.act("house", "log-world check", whole=True)
         except Exception as e:
             print(f"house: log-world startup request unavailable: {type(e).__name__}: {e}", flush=True)
+        guard_publisher = None
+        if self.world == "frontier" and not self.fake:
+            guard_publisher = guard_context.Publisher()
         try:
+            if guard_publisher:
+                guard_publisher.start()
             while True:
-                if self.world == "frontier" and not self.fake:
+                if guard_publisher:
                     try:
-                        guard_context.publish(self.settings(self.load()).get("guard_nongame", ""))
+                        guard_publisher.update(self.settings(self.load()).get("guard_nongame", ""))
                     except Exception as exc:
-                        # Old observations expire; failure never admits a run.
-                        print(f"house: guard context unavailable: {type(exc).__name__}", flush=True)
+                        guard_publisher.update("")
+                        print(f"house: guard policy unavailable: {type(exc).__name__}", flush=True)
                 try:
                     self.step()
                 except Exception as e:
@@ -1681,6 +1686,8 @@ class House:
         except KeyboardInterrupt:
             pass
         finally:
+            if guard_publisher and guard_publisher.thread.ident is not None:
+                guard_publisher.close()
             everyone = list(self.residents.values()) + list(self.workshop.workers.values())
             for x in everyone:          # every pipe closed first, so the waits in stop() overlap (not 20 s each)
                 try:

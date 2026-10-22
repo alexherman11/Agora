@@ -10,11 +10,48 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import threading
 import time
 
 SCHEMA = "house-guard-context-v2"
 MAX_AGE = 5.0
 HERE = Path(__file__).resolve().parent
+
+
+class Publisher:
+    """House-owned sampler; no world reads, resident wakes or OS wake timers.
+
+    Sample every second, or immediately after a slower observation. A slow
+    main loop cannot hold this up. Sampling failures leave the reader fail-closed.
+    The house supplies its current policy without sharing a mutable world.
+    """
+    def __init__(self):
+        self.nongame = ""
+        self.stopped = threading.Event()
+        self.thread = threading.Thread(target=self.run, name="guard-context", daemon=True)
+
+    def start(self):
+        self.thread.start()
+
+    def update(self, nongame):
+        self.nongame = nongame
+
+    def run(self):
+        while not self.stopped.is_set():
+            started = time.monotonic()
+            try:
+                publish(self.nongame)
+            except Exception as exc:
+                # Never retain exception text that could contain host details.
+                print(f"house: guard context unavailable: {type(exc).__name__}", flush=True)
+            if self.stopped.wait(max(0.0, 1.0 - (time.monotonic() - started))):
+                break
+
+    def close(self):
+        self.stopped.set()
+        # HUD identity's existing CIM probe has a three-second timeout. Do not
+        # hold house shutdown indefinitely if a native probe stalls.
+        self.thread.join(timeout=4.0)
 
 
 def main_root():
