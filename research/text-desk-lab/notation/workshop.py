@@ -1089,7 +1089,9 @@ class Workshop:
                     result = pw.transfer(landing, REPO if source == "main" else TREES / source,
                                          tree, source, cid, spec["paths"], receipt, key,
                                          report_checkpoint=lambda saved:
-                                             self.report_receiver_checkpoint(cid, receipt, saved))
+                                             self.report_receiver_checkpoint(cid, receipt, saved),
+                                         conflict=spec.get("conflict", "hold"),
+                                         stage_name=str(spec.get("request") or ""))
             finally:
                 landing._unlock(lock)
             self.brought(cid, subject, key, receipt, result)
@@ -1143,6 +1145,24 @@ class Workshop:
             raise pw.Held("recipient checkpoint inventory not confirmed on card; delivery held")
 
     def brought(self, cid, subject, key, receipt, result):
+        if result.get("mode") == "beside":
+            # a10253: a conflict staged beside, not merged: the inventory says what to merge by hand
+            status = f"staged beside {key}: {result['stage']}"
+            if (subject.get("props") or {}).get("brings_status") != status:
+                self.bring_props(cid, brings_status=status, brings_receipt=str(receipt))
+                rows = "; ".join(
+                    f"{name}: {item['status']} (base {(item['base'] or {}).get('sha256', 'none')[:12]}, incoming "
+                    f"{item['incoming']['sha256'][:12]}, current {(item['current'] or {}).get('sha256', 'none')[:12]})"
+                    for name, item in sorted(result["inventory"].items()))
+                self.say(cid, f"Preserved work from {result['source']} conflicts with this branch, so it is staged "
+                         f"beside your files, not merged: {result['stage']}/incoming/ (the source's versions), "
+                         f"{result['stage']}/base/ (the common base) and {result['stage']}/INVENTORY.json. Your own "
+                         f"files are unchanged. Inventory: {rows}. Merge each both-changed file by hand, keeping "
+                         f"current changes; then remove {result['stage']}/ before ready (landing refuses .incoming/). "
+                         f"Source {result['source_commit']}; receiver {result['recipient_after']}; full SHA-256 "
+                         f"manifest: {receipt.as_posix()}. No main landing, model start or code execution.",
+                         to="nobody")
+            return
         status = f"applied {key}"
         if (subject.get("props") or {}).get("brings_status") != status:
             self.bring_props(cid, brings_status=status, brings_receipt=str(receipt))

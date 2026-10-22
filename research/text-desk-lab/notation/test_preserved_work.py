@@ -128,6 +128,127 @@ class Handoffs(unittest.TestCase):
             self.run_transfer()
         self.assertEqual(pw.head(self.dest), again)
 
+    # a10253: a conflict staged beside the receiver's files, for a hand merge
+    def beside_fixture(self):
+        self.put(self.source, "research/pkg/existing.txt", "source\n")       # both changed: a real conflict
+        self.put(self.source, "research/pkg/new.txt", "only the source has me\n")
+        self.put(self.dest, "research/pkg/existing.txt", "receiver painter change\n")
+        self.commit(self.dest)
+        return pw.head(self.dest)
+
+    def run_beside(self, name="r1"):
+        return pw.transfer(landing, self.source, self.dest, "a1", "a2", ["research/pkg/"], self.receipt,
+                           "fixture-key", conflict="beside", stage_name=name)
+
+    def test_conflict_beside_stages_incoming_and_base_and_leaves_receiver_files(self):
+        before = self.beside_fixture()
+        data = self.run_beside()
+        self.assertEqual((data["phase"], data["mode"], data["stage"]), ("applied", "beside", ".incoming/r1"))
+        d = self.dest
+        self.assertEqual((d / "research/pkg/existing.txt").read_text(), "receiver painter change\n")
+        self.assertFalse((d / "research/pkg/new.txt").exists())
+        self.assertEqual((d / ".incoming/r1/incoming/research/pkg/existing.txt").read_text(), "source\n")
+        self.assertEqual((d / ".incoming/r1/base/research/pkg/existing.txt").read_text(), "base\n")
+        self.assertEqual((d / ".incoming/r1/incoming/research/pkg/new.txt").read_text(), "only the source has me\n")
+        self.assertFalse((d / ".incoming/r1/base/research/pkg/new.txt").exists())
+        inv = json.loads((d / ".incoming/r1/INVENTORY.json").read_text())
+        self.assertEqual({k: v["status"] for k, v in inv["files"].items()},
+                         {"research/pkg/existing.txt": "both-changed", "research/pkg/new.txt": "incoming-only"})
+        row = inv["files"]["research/pkg/existing.txt"]
+        for side, text in (("base", "base\n"), ("incoming", "source\n"), ("current", "receiver painter change\n")):
+            self.assertEqual(row[side]["sha256"], hashlib.sha256(text.encode()).hexdigest(), side)
+        self.assertEqual(inv["files"], data["inventory"])
+        # one new commit on the receiver's HEAD that only adds .incoming/; the tree is clean
+        self.assertEqual(pw.out(d, "rev-parse", "HEAD^"), before)
+        self.assertEqual(pw.git(d, "rev-parse", "-q", "--verify", "HEAD^2", check=False).returncode, 1)
+        changed = pw.out(d, "diff", "--name-only", before, "HEAD").splitlines()
+        self.assertTrue(changed and all(p.startswith(".incoming/r1/") for p in changed), changed)
+        self.assertEqual(pw.git(d, "status", "--porcelain").stdout, b"")
+        # the source's change is not recorded as merged, so a later ordinary merge still sees it
+        self.assertNotEqual(pw.git(d, "merge-base", "--is-ancestor", data["projection"], "HEAD",
+                                   check=False).returncode, 0)
+        self.assertEqual(sorted(data["received_files"]), sorted(data["staged"]))
+        # the receiver's own files, byte for byte, before and after staging (Rowan c10297)
+        own = data["receiver_own_files"]
+        self.assertEqual(own, data["receiver_own_files_after"])
+        self.assertEqual(list(own), ["research/pkg/existing.txt"])
+        self.assertEqual(own["research/pkg/existing.txt"]["sha256"],
+                         hashlib.sha256((d / "research/pkg/existing.txt").read_bytes()).hexdigest())
+        # retry is idempotent: no second staging commit
+        self.assertEqual(self.run_beside()["recipient_after"], data["recipient_after"])
+        self.assertEqual(pw.head(d), data["recipient_after"])
+
+    def test_beside_after_hand_merge_and_removal_stays_reconciled(self):
+        self.beside_fixture()
+        data = self.run_beside()
+        self.put(self.dest, "research/pkg/existing.txt", "receiver painter change\nsource\n")
+        pw.git(self.dest, "rm", "-r", "-q", ".incoming")
+        self.commit(self.dest)
+        self.assertEqual(self.run_beside()["recipient_after"], data["recipient_after"])
+        files = pw.out(self.dest, "diff", "--name-only", data["recipient_after"] + "^", "HEAD").splitlines()
+        self.assertEqual(files, ["research/pkg/existing.txt"])        # .incoming came and went: nothing to land
+        # the staged commit stays reachable: its inventory and versions remain in the branch's history
+        self.assertEqual(pw.git(self.dest, "merge-base", "--is-ancestor", data["recipient_after"], "HEAD",
+                                check=False).returncode, 0)
+        kept = json.loads(pw.out(self.dest, "show", data["recipient_after"] + ":.incoming/r1/INVENTORY.json"))
+        self.assertEqual(kept["files"], data["inventory"])
+
+    def test_beside_dirty_receiver_is_checkpointed_first(self):
+        self.beside_fixture()
+        self.put(self.dest, "research/pkg/existing.txt", "uncommitted receiver work\n")
+        data = self.run_beside()
+        self.assertEqual((self.dest / "research/pkg/existing.txt").read_text(), "uncommitted receiver work\n")
+        self.assertEqual(data["inventory"]["research/pkg/existing.txt"]["current"]["sha256"],
+                         hashlib.sha256(b"uncommitted receiver work\n").hexdigest())
+        self.assertEqual(pw.git(self.dest, "status", "--porcelain").stdout, b"")
+
+    def test_beside_without_conflict_merges_as_before(self):
+        self.put(self.source, "research/pkg/new.txt", "clean\n")
+        data = self.run_beside()
+        self.assertNotIn("mode", data)
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "clean\n")
+        self.assertFalse((self.dest / ".incoming").exists())
+
+    def test_beside_refuses_an_occupied_stage_and_changes_nothing(self):
+        self.beside_fixture()
+        self.put(self.dest, ".incoming/r1/INVENTORY.json", "{}")
+        self.commit(self.dest)
+        before = pw.head(self.dest)
+        with self.assertRaisesRegex(pw.Held, "already holds"):
+            self.run_beside()
+        self.assertEqual(pw.head(self.dest), before)
+        self.assertEqual((self.dest / "research/pkg/existing.txt").read_text(), "receiver painter change\n")
+
+    def test_beside_stage_name_is_a_plain_word_or_the_key(self):
+        self.assertEqual(pw.stage_dir("a9352-window-plumbing-3", "k" * 64), ".incoming/a9352-window-plumbing-3")
+        self.assertEqual(pw.stage_dir("../x", "abcdef0123456789zz"), ".incoming/abcdef0123456789")
+        self.assertEqual(pw.stage_dir("", "abcdef0123456789zz"), ".incoming/abcdef0123456789")
+
+    def test_request_conflict_mode_is_part_of_the_key_and_checked(self):
+        plain = json.dumps({"source": "a1", "paths": ["research/pkg/"], "request": "r"})
+        beside = json.dumps({"source": "a1", "paths": ["research/pkg/"], "request": "r", "conflict": "beside"})
+        self.assertNotEqual(pw.request(plain, "a2")[1], pw.request(beside, "a2")[1])
+        with self.assertRaisesRegex(pw.Held, "conflict must be"):
+            pw.request(json.dumps({"source": "a1", "paths": ["x"], "conflict": "overwrite"}), "a2")
+
+    def test_landing_refuses_a_branch_still_holding_incoming(self):
+        self.assertTrue(".incoming/r1/INVENTORY.json".startswith(landing.BANNED))
+        self.assertFalse("research/pkg/x".startswith(landing.BANNED))
+
+    def test_house_posts_the_beside_inventory_once(self):
+        self.beside_fixture()
+        ws, subject = self.fake_workshop()
+        subject["props"]["brings"] = json.dumps({"source": "a1", "paths": ["research/pkg/"],
+                                                 "request": "r1", "conflict": "beside"})
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertTrue(ws.bring("a2", subject))
+        said = [t for c, t in self.messages if "staged" in t and "beside" in t]
+        self.assertEqual(len(said), 1, self.messages)
+        self.assertIn("research/pkg/existing.txt: both-changed", said[0])
+        self.assertIn(".incoming/r1/INVENTORY.json", said[0])
+        self.assertTrue(subject["props"]["brings_status"].startswith("staged beside"))
+        self.assertEqual((self.dest / "research/pkg/existing.txt").read_text(), "receiver painter change\n")
+
     def test_staged_source_is_not_changed_or_receiver_checkpointed(self):
         self.put(self.source, "research/pkg/new.txt", "source")
         self.put(self.dest, "own.txt", "receiver work")

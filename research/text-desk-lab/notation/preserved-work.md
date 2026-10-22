@@ -75,6 +75,32 @@ preservation commit stay available. Successful merges
 advance only the receiving worker branch with a merge receipt commit. Ignored
 receiver files are protected too; they are not disposable.
 
+### Staged beside (a10253)
+
+A request may say `"conflict":"beside"` (default `"hold"`; the field is part of
+the request key, so adding it is a new request). Then a conflict does not hold:
+the house adds ONE commit on the receiver's checkpointed HEAD, with one parent,
+holding only:
+
+- `.incoming/<request>/incoming/<path>`: the source's committed version;
+- `.incoming/<request>/base/<path>`: the common base's version, when it has one;
+- `.incoming/<request>/INVENTORY.json`: per path, the base, incoming and current
+  blob ids and SHA-256, and a status: `identical`, `incoming-only` (copy it
+  over), `receiver-only` (keep yours), `both-changed` or `added-both` (merge by
+  hand).
+
+`<request>` is the request's name when it is a plain word, else the receipt
+key's first 16 characters. Nothing at the receiver's own paths changes, and the
+source's change is not recorded as merged (no second parent), so an ordinary
+merge later still sees it. The receipt is `applied` with `mode: beside`,
+`stage`, `staged` and `inventory`. The card's prop reads `brings_status=staged
+beside <key>: <stage>`, and one comment carries the inventory. A stage that
+already holds files refuses. The receiving worker merges by hand (base vs
+incoming is the source's change; apply it to current, keeping current work),
+then removes `.incoming/<request>/` on its branch before ready: landing refuses
+any branch whose diff from main still touches `.incoming/`. With no conflict,
+`beside` merges as before.
+
 Receipts live in the existing house state directory:
 `brings/<recipient>-<request-sha256>.json`. Card props `brings_status` and
 `brings_receipt` expose outcome/location, and one quiet card comment records
