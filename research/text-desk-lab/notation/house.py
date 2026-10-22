@@ -43,9 +43,10 @@ house-state/<world>/house.json (with liveness, turns and the time of the last tu
 Transcripts (every stream event, and every message the house sent) are house-state/<world>/<corner>/transcript.jsonl.
 Everything is kept per world: two worlds can hold the same corner ids (a copy of a world does), and a resident must
 never resume another world's conversation.
-Settings are props on the Desktop's note "The house": model, breather, wake_every, timers (off: only a call wakes a
-resident, never an open objective, wake_every or the end of a timed rest; 13 Oct), and for workers: workers (how many at
-once, default 1), worker_model (default: model) and worker_pool (a5284: each provider's share of them, e.g.
+Settings are props on the Desktop's note "The house": model, breather, wake_every, timers (off, the default since
+a8980: no open objective or wake_every wakes a resident; 13 Oct), rest_wakes (on, the default: a resident's own timed
+rest ends at its deadline, on the first house pass at or after it, so after the computer resumes if it slept then;
+never an OS wake timer; Alex 21 Oct, a8980), and for workers: workers (how many at once, default 1), worker_model (default: model) and worker_pool (a5284: each provider's share of them, e.g.
 "2 claude, 2 codex gpt-6-astra"; a card's own worker_provider and worker_model win). Replay never wakes anyone.
 
 Workers (workshop.py): a task with prop commission=asked is taken up by a disposable worker with real tools in its own
@@ -101,7 +102,7 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "on", "claude_start_threshold": "off"}
+            "timers": "off", "rest_wakes": "on", "claude_start_threshold": "off"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -1263,7 +1264,7 @@ class House:
                 # one for a whole turn with no caller, at every landing of a house file, through any rest. A resident
                 # resting when the house stopped, whose conversation resumes with nothing unanswered, keeps resting:
                 # its rest ends as it would have (a call, its time, the house's own wake), on the resumed conversation
-                resting = r.state.get("at_rest") or r.state.get("rest_until", 0) > now()     # (a rest from older code)
+                resting = bool(r.state.get("at_rest") or r.state.get("rest_until"))     # (a rest from older code)
                 keep = first and resting and r.state.get("session") and \
                     not any(r.state.get(k) for k in ("unanswered", "undelivered", "lost", "door", "welcome_due"))
                 if keep:
@@ -1290,28 +1291,29 @@ class House:
             # before the next, up to wake_every; a turn that changes the world, or a call, makes it short again. A
             # resident at work on the objective is still asked every `breather`; one who looked and rested is let be
             breather = min(float(cfg["breather"]) * 2 ** min(int(r.state.get("idle_wakes", 0)), 12), float(cfg["wake_every"]))
-            r.wakes_at = until or (last + breather if objective else last + float(cfg["wake_every"]))
-            # 13 Oct (Alex: 'none of this wake on timers stuff, its wasting my usage limit. They should get woken by
-            # comments, worker reports etc, but not on timers'): timers=off on the house note, and only a call wakes a
-            # resident: not an open objective, not wake_every, not the end of a rest it timed itself
-            timers = str(cfg.get("timers", "on")).strip().lower() != "off"
-            if not timers:
-                r.wakes_at = None
+            # a8980: chosen rest deadlines are promises, separate from periodic wakes.
+            # No OS timer: if the machine sleeps, the next ordinary pass handles overdue rests.
+            timers = str(cfg.get("timers", "off")).strip().lower() == "on"
+            rest_wakes = str(cfg.get("rest_wakes", "on")).strip().lower() == "on"
+            r.wakes_at = ((until if rest_wakes else None) if until else
+                          (last + breather if objective else last + float(cfg["wake_every"])) if timers else None)
             if called:                                     # a call ends any rest
                 r.state["idle_wakes"] = 0
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
+                r.wakes_at = None
                 head = self.woken_by(r)                    # a3150: its first line names the line, a4473: and the time
                 r.send("\n".join(head + self.take(r, "" if head else it_is())))
                 if props.get("call"):                      # delivered: clear it, so the next press is a change again
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
-            elif not timers or (until and now() < until):  # resting for a while, or no timers: only a call reaches it
-                self.set_status(r, corner, "awake")
-                continue
-            elif until:
+            elif until and rest_wakes and now() >= until:
                 slept = r.state.pop("rest_for", None) or 0
                 r.state.pop("rest_until", None)
+                r.wakes_at = None
                 self.wake(r, corner, actor, f"(you rested {human(slept)})\n")
+            elif until or not timers:  # pending/disabled chosen rest, or no periodic wakes
+                self.set_status(r, corner, "awake")
+                continue
             elif objective and idle >= breather:
                 r.state["idle_wakes"] = int(r.state.get("idle_wakes", 0)) + 1
                 self.wake(r, corner, actor, f"(time passes; an objective is open: {self.objectives}. If nothing in it is "
