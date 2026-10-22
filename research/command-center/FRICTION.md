@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (65)
+## open (68)
 
 ### F2. Scripts cannot say who is running them
 
@@ -431,6 +431,29 @@ Found 21 Oct by worker-a8911 (a8911), ran on an in-memory roomworld. In a verb l
 a10524 · family=medium · status=open
 
 Juniper, 22 Oct: building My asks (a10494) for Alex, who wants his asks newest first. 'by -<prop>' sorts largest first, but a thing carries no time of its own (when it was made, when it last changed), so there is nothing to sort by. Pike knows $changed.<prop> only through day-or-time, which gives a time to show, not an order. Ask: commissioned as lens vocabulary.
+
+### Board paint — pre-page-ready guarded failure (a10621)
+
+a10662 · family=tool-runtime · status=open
+
+Ran, 22 Oct 2026, worker-a10621 on branch worker/a10621 at 6bd0c65. One authorised attempt only: pinned Python screen.py frontier-try --as alex --lens home-base --size 1280x800 --scale 1.5 --visible facts shot research/window-lab/demos/combined-review/2026-10-22-120000-1280x800/01-board.png.
+Result: exit 1 before a tested page. Exact failure: edge started on the sandbox desktop but failed at document.readyState: ConnectionClosedError: Exception message redacted; edge pid 69408 presence unknown (see ownership receipt), its DevTools port no longer answered (URLError); cleanup requested, see its receipt (not a tested page).
+Guard printed alex untouched (foreground, focus, cursor and input desktop polled every 20 ms); screen.py explicitly labels this a guard over a start that failed, NOT acceptance. No actual CSS viewport/DPR, Board part dimensions, overlap list or screenshot was obtained. No PNG exists, hence no screenshot sha256. 2560x1440 was not attempted after this concrete failure; no repeat, process action or bypass.
+Read: live board-goals a9070 at e26824 uses grid 1fr 1fr (two columns), not the four columns in the commissioning text. Alex layout f5664 already has full=a5674, which find role=home-panel confirms is The board. Music is a5676; no copied or live layout change was needed or made. Source read: screen.py, sandbox_window.py, guarded_artifacts.py and current guarded browser guidance a9198.
+Both requested sizes remain BLOCKED, not none-overlapping. No lens cause established by paint. Need an admitted browser-capable execution lane with healthy document.readyState; runtime owner must reconcile its unknown-presence/cleanup receipt before any further launch. No Alex screen/input, live world apply, host restart or Conversation action occurred.
+Artifact constraints read: selector uses the main combined-review root, RUN/report.json with successful Guard and passed capture-row provenance, plus bounded PNG dimensions <=2048 each axis. Worktree output alone is not canonical delivery. At 2560 CSS px/DPR1.5 a full viewport exceeds that image limit: retain full evidence separately and provide a provenance-recorded Board crop within bounds or have selector owner resolve the limit. No fabricated report, shot, hash or acceptance.
+
+### A worker's full health run dies when the house moves its builder to another card
+
+a10706 · family=house · status=open
+
+builder-2, 22 Oct (a10575, a10637). health.py on frontier-try takes many minutes. Started in the background, it was stopped each time the house moved me to another card: three runs, none finished. A foreground run was cut off by the session ending. Two cards (a10575, a10637) went to ready or checkpoint without a full health result. What would fix it: health could run as a house job owned by the card, not the builder's session, with its result written on the card; or the house could not move a builder while its health run is still going. Workaround used: commit first, run the focused tests, and say plainly that health was not run.
+
+### A partition inside a content-sized host gives its leaves no height, and they draw over each other without a word
+
+a10716 · family=lens-words · status=open
+
+Found by Pike's Board paint check, 22 Oct 09:0x (e27117): task-board's sections were partition panels inside an auto-height column; the painter measured them at 0 height, drawn over each other. The partition engine (partition-ui.js, the one tiling engine) needs a host with a definite height and says nothing when it lacks one. Wanted, before task cards go into partitions (seam on a7606): either the partition sizes its leaves to their content when its host has no definite height, or the scene refuses it in words ('partition needs a host with a height'), never a silent overlap. Owner: Sable, tiling lead. Not built yet.
 
 ## curing (48)
 
@@ -1445,7 +1468,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (12)
+## source-pending (13)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1527,6 +1550,16 @@ Missing world act: commission=prepare, updating a preserved worker branch withou
 a10610 · family=missing-guard · status=source-pending
 
 a10303: rejected candidate e208515 contained two forbidden sessions paths from detached first-parent fixture commit6c86859, not worker source c1359aa. Existing branch admission missed landing-room contamination. Staged source rechecks final candidate before live index/parking/merge and aborts judgment if health changes room HEAD. Five isolated regressions pass; original fixture process not attributed. No live session data read/moved/deleted. Evidence: [[Prepare preserved branches — source checks and deployment handoff]].
+
+### Guard-context freshness — independent sampler and age evidence
+
+a10711 · family=host-reliability · status=source-pending
+
+Built for a10644, 22 Oct: one daemon sampler owned by the live non-fake frontier house, serial one-second start cadence, immediate next sample after a slower probe. No world read/lock in its thread. Main loop supplies latest guard_nongame, cleared on policy-read failure. Shutdown signals and joins bounded four seconds. No resident wakes or OS wake timers. Fixed output path, timestamps at observation start, MAX_AGE=5, dual clocks and all refusal rules unchanged. Slow native/OS/sleep cases still fail closed. No new lens word.
+Read: House.run publication inside main loop caused loop latency to age the observation; guard_context.py and its existing offline refusal/atomic/path tests.
+Ran: test_guard_context.py 20 tests in 1.243s OK; test_house_restart.py 13 tests in 1.065s OK. Coverage includes independent publication while main waits, policy update/failure, sample failure/redaction, slow-probe cadence, stop, close and live/fake/copy boundary. Full health running, append outcome.
+LIVE baseline READ ONLY before landing: finite sample_guard_age.py, 20 reads one second apart, 3 distinct observations from publisher PID 76620, 6 fresh/admitted and 14 stale refusals. Wall ages min 2.719882s, median 7.231455s, max 14.016350s. All foreground pythonw.exe, foreground_hud=true, state2, input Default, game=null. Admissions follow existing policy, not proof of game absence or an admitted browser. No browser launch or observation publication. These are OLD publisher numbers.
+Source guidance: research/window-lab/sandbox-ownership/FRESHNESS.md. Finite readback: python research/window-lab/sample_guard_age.py. After ordinary landing and authorised house refresh, run it and require all 20 wall and boot ages <=5; retain admitted/reason separately. Post-landing distribution NOT YET RUN. No restart performed here, no policy/settings/account/input change. Do not call live freshness complete from offline tests.
 
 ## source-staged (1)
 
