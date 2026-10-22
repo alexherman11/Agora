@@ -79,8 +79,67 @@ def main():
     okN, saidN = C.deliver("cap-202", nobody)
     if okN or "no chat draft" not in saidN:
         fails.append(f"with no draft, auto should keep the capture and say so: {saidN}")
+    fails += pending_cases(do, world)
     print("FAIL\n  " + "\n  ".join(fails) if fails else "ok")
     return 1 if fails else 0
+
+
+def pending_cases(do, world):
+    """a10486: the drag's end marks the draft (pending=<token>) before the capture is read; the capture replaces its
+    token in one prop, on the draft that was open when the drag ended; a failed capture takes its token off."""
+    fails = []
+    who = "capture-test-a10486"
+
+    def draft_of(title):
+        ok, t = do(f'do create f571 kind=note title="{title}" role=conversation-draft actor={who}')
+        m = re.search(r"created (a\d+)", t)
+        return m and m.group(1)
+
+    def held(d):
+        _, t = do(f"examine {d}")
+        return C._field(t, "context", r"cap-\d+"), C._field(t, "pending", r"wait-\d+-\d+")
+
+    a = draft_of("pending test draft")
+    args = argparse.Namespace(world=world, who=who, door=None, draft="auto", do=do)
+    p1 = C.Pending(args).start()
+    p1.marked.wait(60)
+    now = held(a)
+    print("marked at the drag's end:", now)
+    if now != ([], [p1.token]):
+        fails.append(f"the drag's end should mark the draft pending, before the capture: {now}")
+    p2 = C.Pending(args).start()                    # a second drag while the first is still being read
+    p2.marked.wait(60)
+    ok2, _ = C.deliver("cap-302", args, p2)         # the second finishes first
+    mid = held(a)
+    ok1, _ = C.deliver("cap-301", args, p1)
+    both = held(a)
+    print("two, finished out of order:", mid, "->", both)
+    if not (ok1 and ok2 and mid == (["cap-302"], [p1.token]) and both == (["cap-302", "cap-301"], [])):
+        fails.append(f"two captures should each replace their own token: {mid} -> {both}")
+    p3 = C.Pending(args).start()
+    p3.marked.wait(60)
+    p3.drop()                                       # explicit cancellation, not a processing failure
+    if held(a) != (["cap-302", "cap-301"], []):
+        fails.append(f"explicit cancellation should take its token off and leave the rest: {held(a)}")
+    # the drag ended on draft a; a newer draft b becomes the person's before the capture is read: it still goes to a
+    p4 = C.Pending(args).start()
+    p4.marked.wait(60)
+    do(f"do prop {a} role=old-draft")
+    b = draft_of("the next draft")
+    ok4, _ = C.deliver("cap-304", args, p4)
+    print("the drag's draft:", held(a), "| the next:", held(b))
+    if not (ok4 and held(a) == (["cap-302", "cap-301", "cap-304"], []) and held(b) == ([], [])):
+        fails.append(f"a capture should go to the draft open when its drag ended: {held(a)} / {held(b)}")
+    # A stopped control screen leaves the token; only an explicit cancellation clears it.
+    p5 = C.Pending(args).start()
+    p5.marked.wait(60)
+    C.clear_pending(args)
+    if held(b)[1]:
+        fails.append(f"explicit cancellation should clear the token: {held(b)}")
+    for d in (a, b):
+        if d:
+            do(f"do remove {d}")
+    return fails
 
 
 if __name__ == "__main__":

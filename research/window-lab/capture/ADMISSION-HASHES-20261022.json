@@ -1,0 +1,16 @@
+{
+  "head": "1f6cbe52d0434efee01035a749e713f25e53a06c",
+  "main_ref": "09ef2530ec848cbbcf0afc5d0934737095c3cc69",
+  "files": {
+    "research/text-desk-lab/notation/desk-shell/lens.js": "f21951afd84204b46fba913f2255a8d8ccc1e9b384d9d3a086d1357f2a56b7f9",
+    "research/text-desk-lab/notation/desk_knife.py": "d96747bdbfe61f61d65863f6235a1dc3eafd7faf25f598ced0de0c77060436bf",
+    "research/text-desk-lab/notation/lens_ir.py": "5a2b9185fe1ff6dea6c07e75854d28f4e6437c64fe1636ecf2b74ec2b8dbdbcb",
+    "research/text-desk-lab/notation/message_context.py": "f1b7201a147db5d7d4aeffa8d52f95d7aec3094348e68ecf1c14c6fe5f1b642c",
+    "research/text-desk-lab/notation/scene.py": "6ed67d5594892f12be739a320f3bdcec5331cceecc8acf824e05321c2c5ff6e1",
+    "research/text-desk-lab/notation/test_capture_admission.py": "b88c6e18c6cf234db82136abd0f9a8bf65023717eeee6ca693ba029428e92c64",
+    "research/window-lab/capture/capture.py": "769092a365cd3c0799bc814d0e2fa93177ab3d2340e9a66841f374189b5b388d",
+    "research/window-lab/capture/wait_patches.py": "4fb2317fdeb3a1802ccbe81480eafde282a0b623a7445a5e3df148b49bd47f9c",
+    "research/window-lab/capture/world-bases-20261022.json": "92eb7b44588f45bbf689d33f496d076fe38dc476eb2593c03a181fc1431416ad",
+    "research/window-lab/capture/test_wait_deadline.js": "438290c1168b05d95a0683aa2727797a7982c441ec752cce7cd7240dc9963022"
+  }
+}
