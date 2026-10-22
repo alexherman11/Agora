@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (64)
+## open (65)
 
 ### F2. Scripts cannot say who is running them
 
@@ -425,6 +425,12 @@ Read/ran, worker-a7877, 21 October: status=done creates a promise sill question,
 a10043 · family=verbs · status=open
 
 Found 21 Oct by worker-a8911 (a8911), ran on an in-memory roomworld. In a verb line's when, "$1.asked_by" = "alex" is always false on a card asked by alex, and "$1.asked_by" != "" is true even on a card with no asked_by: inside quotes the blank is not filled for the comparison. The skip receipt still shows it filled ('when "juniper" = ""'), which hides the cause. Unquoted, $1.asked_by = "alex" works (and with and). Missing word: either fill blanks inside quoted operands of when, or refuse a quoted blank when the verb is saved, saying to write it unquoted. Also: on a card with no asked_by, any line naming $1.asked_by is refused by itself ('a47 has no asked_by='), so a when cannot test for a prop's absence on $1.
+
+### A lens can't list things newest first: no creation or change time to sort a repeat by
+
+a10524 · family=medium · status=open
+
+Juniper, 22 Oct: building My asks (a10494) for Alex, who wants his asks newest first. 'by -<prop>' sorts largest first, but a thing carries no time of its own (when it was made, when it last changed), so there is nothing to sort by. Pike knows $changed.<prop> only through day-or-time, which gives a time to show, not an order. Ask: commissioned as lens vocabulary.
 
 ## curing (48)
 
@@ -1439,7 +1445,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (11)
+## source-pending (12)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1515,6 +1521,12 @@ Live follow-up: checkpoint code landed as 9d6394c, but brings cannot recognize i
 a10348 · family=missing-word · status=source-pending
 
 Missing world act: commission=prepare, updating a preserved worker branch without judging/landing/restart. Workers' own git merge is denied; ready is too broad for pre-acceptance synchronization. Source and14 offline tests are prepared on a10303; live use remains pending landing and real receipts. See [[Prepare preserved branches — source checks and deployment handoff]].
+
+### Landing candidate can acquire world files outside the worker branch
+
+a10610 · family=missing-guard · status=source-pending
+
+a10303: rejected candidate e208515 contained two forbidden sessions paths from detached first-parent fixture commit6c86859, not worker source c1359aa. Existing branch admission missed landing-room contamination. Staged source rechecks final candidate before live index/parking/merge and aborts judgment if health changes room HEAD. Five isolated regressions pass; original fixture process not attributed. No live session data read/moved/deleted. Evidence: [[Prepare preserved branches — source checks and deployment handoff]].
 
 ## source-staged (1)
 
