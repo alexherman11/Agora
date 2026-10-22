@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (64)
+## open (65)
 
 ### F2. Scripts cannot say who is running them
 
@@ -425,6 +425,12 @@ a9936 · family=authority · status=open
 a9948 · family=code · status=open
 
 Read/ran, worker-a7877, 21 October: status=done creates a promise sill question, then after_act directly appends asked-end to the existing promise without declaring it changed. The quick logger and observer both miss that mutation; a later periodic verification detects/reconciles it and retains two observations. Missing underlying capability: every hook side-effect needs a complete event footprint (and ordinary undo/revision handling). Request: narrow promise-hook recording fix with original-command regression and undo/reload checks. Synthetic diagnosis only; no production patch, ready or live repair authorized in this round. Evidence and proposed fix: [[Promise asked-end — one missed footprint, two divergence observations]].
+
+### A quoted $1.prop in a verb's when is compared as its literal text
+
+a10043 · family=verbs · status=open
+
+Found 21 Oct by worker-a8911 (a8911), ran on an in-memory roomworld. In a verb line's when, "$1.asked_by" = "alex" is always false on a card asked by alex, and "$1.asked_by" != "" is true even on a card with no asked_by: inside quotes the blank is not filled for the comparison. The skip receipt still shows it filled ('when "juniper" = ""'), which hides the cause. Unquoted, $1.asked_by = "alex" works (and with and). Missing word: either fill blanks inside quoted operands of when, or refuse a quoted blank when the verb is saved, saying to write it unquoted. Also: on a card with no asked_by, any line naming $1.asked_by is refused by itself ('a47 has no asked_by='), so a when cannot test for a prop's absence on $1.
 
 ## curing (47)
 
