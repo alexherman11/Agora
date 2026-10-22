@@ -412,7 +412,7 @@ a9628 · family=safety · status=open
 
 RAN a9551, actual Resident.save and fake transport: fail os.replace after flush. busy remains false, so House.step can send another human input or begin provider preparation before any answer. Two regression failures reproduced on unchanged main as well as the safety-only candidate; inherited defect. Required guard: retain in-flight uncertainty through persistence/log failure, no next input/switch until reconciliation or durable quarantine. Do not auto-retry or change queue policy. Reproductions and scope: [[Voice safety independent review — verified bytes, two correction requirements]]. Ibis owns follow-up; no source repair or live runtime action here.
 
-## curing (47)
+## curing (48)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -763,6 +763,12 @@ a9494 · family=capability · status=curing
 
 Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
 JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
+
+### Grouped duties need exact evidence and authored legacy types
+
+a9641 · family=source · status=curing
+
+Missing world word: one grouped actions:<recipient>:<policy> reading with exact action-reasons evidence. Existing sayings.answered uses a later-message heuristic and cannot supply this contract. a9377 adds two source plugins sharing one read-only evaluator; world notes retain design/review eligibility, labels and Later policy. Source work is built and checked only on isolated in-memory worlds, not installed in production. Follow-up friction: legacy comments retain mark but drop arbitrary request_kind fields, so original askers must classify exact roots through signed reply marks; untyped asks stay diagnostic. A general typed-root authoring verb can be commissioned separately; do not create production fixtures or infer types from prose.
 
 ## unchecked (8)
 
