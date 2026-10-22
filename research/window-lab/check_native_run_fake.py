@@ -132,13 +132,17 @@ def run():
                 try:
                     pid = sb.start(name, [executable, "-I", "-S", "-c", FIXTURE, str(ready),
                                           "--sandbox-profile=" + str(profile)], job=scope)
-                    v.explain(pid)
+                    # the launcher's own measured birth receipts; the grandchild and any console host are explained
+                    # only by their measured parent chain, never by the fixture's word (c10251)
+                    for owner in sb.load(name)["owners"]:
+                        v.add_birth({"pid": owner["pid"], "created": owner["created"], "exe": owner["exe"]})
                     deadline = time.monotonic() + 8
                     while not ready.exists() and time.monotonic() < deadline:
                         time.sleep(0.02)
                     fixture = json.loads(ready.read_text(encoding="utf-8"))
                     data["fixture"] = fixture
-                    v.explain(fixture["grandchild"])
+                    if not guard_context.read()["admitted"]:
+                        data["admission_lapsed_mid_run"] = True     # said, never hidden; the run is already live
                     v.start_sampling(0.1)
                     time.sleep(2.0)
                     data["gate"] = v.gate()
