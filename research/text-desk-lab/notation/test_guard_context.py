@@ -4,6 +4,7 @@ import json
 import ctypes
 from pathlib import Path
 import sys
+import threading
 import unittest
 from unittest.mock import patch, Mock
 
@@ -174,11 +175,68 @@ class ContextTests(unittest.TestCase):
                                         ("frontier",123,0)]:
                 s=Stub()
                 s.world,s.fake=world,fake
-                with patch.object(g,"publish") as pub:
+                with patch.object(g,"Publisher") as publisher:
                     house.House.run(s)
-                    self.assertEqual(pub.call_count,expected)
+                    self.assertEqual(publisher.call_count,expected)
                     if expected:
-                        pub.assert_called_once_with("Example.exe")
+                        publisher.return_value.start.assert_called_once_with()
+                        publisher.return_value.update.assert_called_with("Example.exe")
+                        publisher.return_value.close.assert_called_once_with()
+            s = Stub()
+            s.load = Mock(side_effect=OSError("private"))
+            with patch.object(g, "Publisher") as publisher:
+                house.House.run(s)
+                publisher.return_value.update.assert_called_once_with("")
+                publisher.return_value.close.assert_called_once_with()
+
+    def test_sampler_continues_while_house_thread_is_blocked(self):
+        first, second = threading.Event(), threading.Event()
+        sampler = g.Publisher()
+        calls = []
+        def capture(policy):
+            calls.append(policy)
+            (first if len(calls) == 1 else second).set()
+        with patch.object(g, "publish", side_effect=capture):
+            sampler.update("first.exe")
+            sampler.start()
+            try:
+                self.assertTrue(first.wait(2))
+                sampler.update("second.exe")
+                # Main thread waits instead of running another House.step.
+                self.assertTrue(second.wait(2))
+            finally:
+                sampler.close()
+        self.assertFalse(sampler.thread.is_alive())
+        self.assertEqual(calls, ["first.exe", "second.exe"])
+
+    def test_sampler_waits_after_failure_and_stops_without_extra_publish(self):
+        sampler = g.Publisher()
+        sampler.stopped = Mock()
+        sampler.stopped.is_set.return_value = False
+        sampler.stopped.wait.side_effect = [False, True]
+        with patch.object(g.time, "monotonic", return_value=0), \
+             patch.object(g, "publish", side_effect=[OSError("private"), True]) as pub:
+            sampler.run()
+        self.assertEqual(pub.call_count, 2)
+        self.assertEqual(sampler.stopped.wait.call_args_list,
+                         [((1.0,),), ((1.0,),)])
+
+    def test_closed_sampler_does_not_publish(self):
+        sampler = g.Publisher()
+        sampler.stopped.set()
+        with patch.object(g, "publish") as pub:
+            sampler.run()
+        pub.assert_not_called()
+
+    def test_slow_sample_does_not_add_another_second_of_staleness(self):
+        sampler = g.Publisher()
+        sampler.stopped = Mock()
+        sampler.stopped.is_set.return_value = False
+        sampler.stopped.wait.return_value = True
+        with patch.object(g.time, "monotonic", side_effect=[0, 3]), \
+             patch.object(g, "publish"):
+            sampler.run()
+        sampler.stopped.wait.assert_called_once_with(0.0)
 
     def fullscreen(self, exe="chatgpt.exe", names="chatgpt.exe"):
         return {**self.clear(), "notification_state":2, "full_screen":True,
