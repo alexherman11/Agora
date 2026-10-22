@@ -347,7 +347,7 @@ class LogWorldTests(unittest.TestCase):
             self.assertEqual(status, initial)
         self.assertEqual(checker.covered_records, observed + 12)
         self.assertEqual(store.flatten(checker.replay.world), store.flatten(self.w))
-        for key in ("observed", "unavailable", "at", "capture_ms", "max_capture_ms"):
+        for key in ("checked_event", "observed", "unavailable", "at", "capture_ms", "max_capture_ms"):
             self.assertNotIn(key, status["props"])
         self.assertLess(len(status["text"].splitlines()), 8)
 
@@ -429,14 +429,14 @@ class LogWorldTests(unittest.TestCase):
         import moo
         nid, _, checker = self.status_fixture()
         ctx = store.safe_begin(self.d, self.path)
-        moo.REGISTRY["prop"].run(self.w, nid, dict(observed="old counter", unavailable="old gaps",
+        moo.REGISTRY["prop"].run(self.w, nid, dict(checked_event="e1", observed="old counter", unavailable="old gaps",
                                                  at="1770000000", capture_ms="5", _by="house"))
         store.safe_commit(ctx, self.d, lw.REPORT_WORDS, "house")
         checker.jobs.join()
         lw.project(self.d, self.path)
         checker.jobs.join()
         props = self.w.subjects[self.w.nodes[nid]["subject"]]["props"]
-        for key in ("observed", "unavailable", "at", "capture_ms"):
+        for key in ("checked_event", "observed", "unavailable", "at", "capture_ms"):
             self.assertNotIn(key, props)
         checker.stopped = True
         checker.unavailable("copy-only unavailable")
@@ -561,7 +561,7 @@ class LogWorldTests(unittest.TestCase):
             checker.jobs.join()
             self.assertEqual(checker.snapshot()["state"], "in-step", checker.snapshot())
         ctx = store.safe_begin(self.d, self.path)
-        made = self.w.apply("create", self.r.BOARD, None, {"kind": "note", "title": "New"}, "jeff")
+        self.w.apply("create", self.r.BOARD, None, {"kind": "note", "title": "New"}, "jeff")
         store.safe_commit(ctx, self.d, "test create", "jeff")
         checker.jobs.join()
         self.assertEqual(checker.snapshot()["state"], "in-step", checker.snapshot())
@@ -571,6 +571,295 @@ class LogWorldTests(unittest.TestCase):
         store.safe_commit(ctx, self.d, "test remove", "jeff")
         checker.jobs.join()
         self.assertEqual(checker.snapshot()["state"], "in-step", checker.snapshot())
+
+    def historical_gap(self, checker):
+        sid = self.w.nodes[self.r.CARDS[0]]["subject"]
+        self.w.subjects[sid]["props"]["unlogged"] = "historical gap"
+        store._MARKS.pop(self.w, None)
+        self.change("logger reconciles its own history")
+        checker.jobs.join()
+        self.assertEqual(checker.snapshot()["state"], "diverged")
+        self.assertEqual(store.flatten(checker.replay.world), store.flatten(self.w))
+
+    def baseline_request(self, checker, request="copy-only-request"):
+        return {"request": request, "reason": "Synthetic diagnosed refused write; keep historical evidence.",
+                "divergence_hash": checker.snapshot()["retained_divergence_hash"]}
+
+    def test_baseline_matching_full_check_retains_journal_and_evidence_resets_only_epoch(self):
+        nid, evidence, checker = self.status_fixture()
+        self.historical_gap(checker)
+        old = copy.deepcopy(checker.replay.divergences)
+        journal_prefix = checker.journal.read_bytes()
+        raw_log = self.log.path.read_bytes()
+        request = self.baseline_request(checker)
+        self.assertTrue(lw.checkpoint(self.d, self.path, full=True, baseline=request))
+        checker.jobs.join()
+        report = checker.snapshot()
+        self.assertEqual(report["state"], "in-step", report)
+        self.assertEqual(report["divergences"], old)
+        self.assertFalse(report["active_divergences"])
+        self.assertEqual((report["observed_seconds"], report["observed_records"]), (0, 0))
+        self.assertTrue(checker.journal.read_bytes().startswith(journal_prefix))
+        self.assertEqual(self.log.path.read_bytes(), raw_log)
+        baseline = report["baselines"][-1]
+        self.assertEqual(baseline["set_aside"], old)
+        self.assertEqual(baseline["full_differences"], 0)
+        self.assertEqual(baseline["event"], report["last_full"])
+        lw.project(self.d, self.path)
+        checker.jobs.join()
+        detail = json.loads(self.w.subjects[self.w.nodes[evidence]["subject"]]["text"].split("\n\n", 1)[1])
+        self.assertEqual(detail["divergences"], old)
+        self.assertEqual(detail["baselines"][-1], baseline)
+        props = self.w.subjects[self.w.nodes[nid]["subject"]]["props"]
+        self.assertNotIn("checked_event", props)
+        self.assertEqual(props["first_divergence"], store.h([]))
+        self.change("independent observation in new epoch")
+        checker.jobs.join()
+        self.assertEqual(checker.covered_records, 1)
+
+    def test_baseline_full_mismatch_refuses_with_exact_difference_retained(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        sid = self.w.nodes[self.r.CARDS[1]]["subject"]
+        self.w.subjects[sid]["title"] = "Still missing from the log"
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        report = checker.snapshot()
+        self.assertEqual(report["state"], "diverged")
+        self.assertFalse(report["baselines"])
+        self.assertIn("refused", report["baseline_result"])
+        self.assertTrue(any(d["thing"] == sid and d["live"] == "Still missing from the log"
+                            for d in report["divergences"]))
+        rows = [json.loads(s) for s in checker.journal.read_text().splitlines()]
+        refusal = next(r for r in rows if r["kind"] == "baseline-refused")
+        self.assertGreater(refusal["full_differences"], 0)
+
+    def test_baseline_stale_inventory_cannot_forgive_new_repaired_gap(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        sid = self.w.nodes[self.r.CARDS[1]]["subject"]
+        self.w.subjects[sid]["props"]["new_gap"] = "new discrepancy"
+        store._MARKS.pop(self.w, None)
+        self.change("second repair")
+        checker.jobs.join()
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        self.assertFalse(checker.snapshot()["baselines"])
+        self.assertIn("refused", checker.snapshot()["baseline_result"])
+        self.assertEqual(store.flatten(checker.replay.world), store.flatten(self.w))
+
+    def test_baseline_retry_and_restart_keep_boundary_counters_and_new_first_divergence(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        self.change("new independent observation")
+        checker.jobs.join()
+        count = checker.covered_records
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        self.assertEqual(checker.covered_records, count)
+        self.assertEqual(len(checker.replay.baselines), 1)
+        checker.close()
+        self.checkers.remove(checker)
+        other = lw.Checker(self.log.path, checker.journal)
+        self.checkers.append(other)
+        lw._CHECKERS[str(self.path)] = other
+        lw.checkpoint(self.d, self.path, full=True)
+        other.jobs.join()
+        self.assertEqual(other.snapshot()["state"], "in-step", other.snapshot())
+        self.assertEqual(other.covered_records, count)
+        self.assertEqual(other.replay.baselines, checker.replay.baselines)
+        sid = self.w.nodes[self.r.CARDS[1]]["subject"]
+        self.w.subjects[sid]["props"]["later"] = "new epoch discrepancy"
+        store._MARKS.pop(self.w, None)
+        self.change("new divergence since baseline")
+        other.jobs.join()
+        report = other.snapshot()
+        self.assertEqual(report["state"], "diverged")
+        self.assertGreater(len(report["divergences"]), len(report["active_divergences"]))
+        self.assertEqual(report["active_divergences"][0]["aspect"], "prop:later")
+        self.assertIn("prop:later", report["line"])
+
+    def test_baseline_receipt_failure_does_not_start_new_epoch(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        with patch.object(checker, "_write", side_effect=OSError("synthetic failed durable write")):
+            lw.checkpoint(self.d, self.path, full=True, baseline=request)
+            checker.jobs.join()
+        self.assertEqual(checker.snapshot()["state"], "unavailable")
+        self.assertFalse(checker.replay.baselines)
+
+    def test_baseline_command_uses_documented_world_request_and_changes_no_world_facts(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        ctx = store.safe_begin(self.d, self.path)
+        self.d._store = ctx
+        self.w.apply("create", self.w.root, None, {
+            "kind": "note", "title": "Baseline request", "role": "log-world-baseline-request",
+            "text": "Diagnosed historical refused write, not lost live state; evidence preserved.",
+            "divergence_hash": checker.snapshot()["retained_divergence_hash"]}, "juniper")
+        note = self.w.last_created
+        store.safe_commit(ctx, self.d, "document baseline request", "juniper")
+        checker.jobs.join()
+        before = store.flatten(self.w)
+        raw_log = self.log.path.read_bytes()
+        self.d._store = store.safe_begin(self.d, self.path)
+        result = self.d.repl("log-world baseline " + note)
+        store.safe_commit(self.d._store, self.d, "log-world baseline " + note, "juniper")
+        checker.jobs.join()
+        self.assertIn("queued", result)
+        self.assertEqual(checker.snapshot()["state"], "in-step", checker.snapshot())
+        self.assertEqual(store.flatten(self.w), before)
+        self.assertEqual(self.log.path.read_bytes(), raw_log)
+        self.d._store = store.safe_begin(self.d, self.path)
+        self.assertIn("refused", self.d.repl("log-world baseline " + self.r.CARDS[0]))
+        store.safe_commit(self.d._store, self.d, "invalid baseline request", "juniper")
+
+    def test_baseline_duplicate_queued_requests_do_not_reset_observation_epoch_twice(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        for _ in range(2):
+            lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        rows = [json.loads(s) for s in checker.journal.read_text().splitlines()]
+        self.assertEqual(len([r for r in rows if r["kind"] == "baseline"]), 1)
+        self.assertEqual(len(checker.replay.baselines), 1)
+
+    def test_baseline_without_full_capture_refuses(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        checker.submit(store.flatten(self.w), self.log.path.stat().st_size, f"e{self.w._eseq}",
+                       baseline=self.baseline_request(checker))
+        checker.jobs.join()
+        self.assertFalse(checker.replay.baselines)
+        self.assertEqual(checker.snapshot()["state"], "diverged")
+
+    def test_baseline_cannot_set_aside_broken_log_integrity_even_with_matching_world(self):
+        checker = self.checker()
+        rec = {"seq": checker.replay.seq, "eseq": self.w._eseq}
+        checker.replay.add(rec, "world", "record digest", "bad", "good", "broken state digest")
+        checker.current = checker.replay.report()
+        lw.checkpoint(self.d, self.path, full=True, baseline=self.baseline_request(checker))
+        checker.jobs.join()
+        self.assertFalse(checker.replay.baselines)
+        self.assertIn("integrity", checker.snapshot()["baseline_result"])
+
+    def test_baseline_receipt_with_wrong_historical_prefix_fails_closed_on_reload(self):
+        checker = self.checker()
+        self.historical_gap(checker)
+        journal = Path(self.tmp.name) / "bad-baseline.jsonl"
+        journal.write_text(checker.journal.read_text() + json.dumps({
+            "kind": "baseline", "at": time.time(),
+            "detail": {"set_aside_count": 1, "divergence_hash": "wrong"}}) + "\n", encoding="utf-8")
+        other = lw.Checker(self.log.path, journal)
+        self.checkers.append(other)
+        other.submit(store.flatten(self.w), self.log.path.stat().st_size, f"e{self.w._eseq}", full=True)
+        other.jobs.join()
+        self.assertEqual(other.snapshot()["state"], "unavailable")
+        self.assertIn("retained divergence prefix", other.snapshot()["line"])
+
+    def restart_checker(self, checker):
+        checker.close()
+        self.checkers.remove(checker)
+        other = lw.Checker(self.log.path, checker.journal)
+        self.checkers.append(other)
+        lw._CHECKERS[str(self.path)] = other
+        lw.checkpoint(self.d, self.path, full=True)
+        other.jobs.join()
+        return other
+
+    def public_evidence(self, evidence):
+        lw.project(self.d, self.path)
+        lw._CHECKERS[str(self.path)].jobs.join()
+        text = self.w.subjects[self.w.nodes[evidence]["subject"]]["text"]
+        return json.loads(text.split("\n\n", 1)[1])
+
+    def test_refused_attempt_remains_public_after_ordinary_updates_and_restart(self):
+        _, evidence, checker = self.status_fixture()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        request["divergence_hash"] = "stale reviewed inventory"
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        attempt = checker.snapshot()["baseline_attempt"]
+        self.assertIn("refused", attempt["result"])
+        self.assertEqual(self.public_evidence(evidence)["last_baseline_refusal"], attempt)
+        self.change("ordinary update must not erase operator result")
+        checker.jobs.join()
+        self.assertEqual(checker.snapshot()["baseline_attempt"], attempt)
+        other = self.restart_checker(checker)
+        self.assertEqual(other.snapshot()["baseline_attempt"], attempt)
+        self.assertEqual(other.snapshot()["last_baseline_refusal"], attempt)
+        self.assertEqual(self.public_evidence(evidence)["baseline_attempt"], attempt)
+        self.d._store = store.safe_begin(self.d, self.path)
+        self.assertIn("stale reviewed inventory", self.d.repl("log-world status"))
+        store.safe_commit(self.d._store, self.d, "log-world status", "juniper")
+        other.jobs.join()
+
+    def test_acceptance_and_duplicate_keep_last_refusal_and_do_not_hide_new_divergence(self):
+        _, evidence, checker = self.status_fixture()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        lw.checkpoint(self.d, self.path, baseline=request)  # no full capture
+        checker.jobs.join()
+        refused = checker.snapshot()["last_baseline_refusal"]
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        accepted = checker.snapshot()["baseline_attempt"]
+        self.assertIn("accepted", accepted["result"])
+        self.assertEqual(checker.snapshot()["last_baseline_refusal"], refused)
+        self.assertIn("not a claim that history is repaired", checker.replay.baselines[-1]["meaning"])
+        self.assertEqual(self.public_evidence(evidence)["baseline_attempt"], accepted)
+        self.change("independent observation")
+        checker.jobs.join()
+        sid = self.w.nodes[self.r.CARDS[1]]["subject"]
+        self.w.subjects[sid]["title"] = "New post-baseline fault"
+        lw.checkpoint(self.d, self.path, full=True, baseline=request)
+        checker.jobs.join()
+        self.assertEqual(checker.snapshot()["state"], "diverged")
+        self.assertEqual(len(checker.replay.baselines), 1)
+        self.assertIn("already recorded", checker.snapshot()["baseline_result"])
+        count = checker.covered_records
+        self.change("ordinary update cannot resume ended period")
+        checker.jobs.join()
+        self.assertEqual(checker.covered_records, count)
+        other = self.restart_checker(checker)
+        self.assertEqual(other.snapshot()["state"], "diverged")
+        self.assertEqual(other.snapshot()["last_baseline_refusal"], refused)
+        self.assertIn("already recorded", self.public_evidence(evidence)["baseline_attempt"]["result"])
+        self.assertEqual(other.covered_records, count)
+
+    def test_durable_acceptance_survives_missing_result_and_failed_world_projection(self):
+        _, evidence, checker = self.status_fixture()
+        self.historical_gap(checker)
+        request = self.baseline_request(checker)
+        write = checker._write
+
+        def fail_result(row):
+            if row["kind"] == "baseline-result":
+                raise OSError("synthetic crash after durable baseline")
+            write(row)
+
+        with patch.object(checker, "_write", side_effect=fail_result):
+            lw.checkpoint(self.d, self.path, full=True, baseline=request)
+            checker.jobs.join()
+        self.assertEqual(checker.snapshot()["state"], "unavailable")
+        other = self.restart_checker(checker)
+        self.assertEqual(other.snapshot()["state"], "in-step", other.snapshot())
+        self.assertIn("accepted", other.snapshot()["baseline_result"])
+        self.assertEqual((other.covered_records, other.covered_seconds), (0, 0))
+        # A world projection failure cannot manufacture or erase journal acceptance.
+        with patch.object(store, "safe_begin", side_effect=OSError("projection unavailable")):
+            with self.assertRaises(OSError):
+                lw.project(self.d, self.path)
+        self.assertEqual(self.public_evidence(evidence)["baselines"], other.replay.baselines)
+        self.assertEqual(len(other.replay.baselines), 1)
 
 
 if __name__ == "__main__":

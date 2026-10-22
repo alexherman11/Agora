@@ -565,9 +565,13 @@ def command(desk, verb, arg):
         return f"ok {ev['id']}: {aid} {verb} \"{st['what']}\": {phrase(w, st)}" + (f" · about {about}" if about else "") + f"\n  {where}"
     if not words:
         raise Refusal(USAGE[verb])
-    target = desk._resolve(words[0], allow_subject=False)
-    sid = w.subject_of(target)
-    if not is_promise(w, target):
+    target = desk._resolve(words[0], allow_subject=True)
+    if target in w.subjects and target not in w.nodes:
+        # a10089: a request's subject names it as well as its appearance does; the action queue's rows carry the
+        # subject ($reason.source), so a lens's one-click Decline sends `do decline s2737`
+        target = aid_of(w, target)
+    sid = w.subject_of(target) if target in w.nodes else None
+    if sid is None or not is_promise(w, target):
         raise Refusal(f"{target} is not a promise or request; promises are in the Promises surface "
                       f"({surface(w) or 'none yet'}). promises lists yours")
     if desk.seen.get(target) is None and desk.seen.get(sid) is None:
@@ -1029,7 +1033,15 @@ def after_act(desk, n0):
             qs["text"] = qs["text"].replace("<this note>", r["created"])
             evx = next(e for e in w.events if e["id"] == r["event"])
             evx["cause"], evx["via"] = new[0]["id"], VIA
-            w.subjects[st["sid"]]["promise"]["acts"].append([r["event"], "asked-end"])
+            # The question also changes an existing promise. Keep that change
+            # in the originating event, for incremental recording and undo.
+            s = w.subjects[st["sid"]]
+            evx["undo"]["restore_subjects"] = [deepcopy(s)]
+            evx.setdefault("changed", []).append(st["sid"])
+            s["promise"]["acts"].append([r["event"], "asked-end"])
+            s["rev"] += 1
+            for a in w.appearances_of(st["sid"]):
+                w._bump(a)
             notes.append(f"~ {card} left the living with {x} still open: {name} is asked once, on their sill "
                          f"({r['created']}): {q}")
     return notes

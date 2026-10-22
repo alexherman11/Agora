@@ -87,6 +87,27 @@
     return r;
   }
 
+  // a8901: `on spoken` acts when its part is painted with words it has not acted on in this page (once per distinct
+  // filled line), and only inside the home base, whose voice heard them (research/window-lab/voice.py). A desk line
+  // goes with a gesture id made from the filled line, so a second page or a reload is answered 'already done'
+  const SPOKEN = new Set();
+  function idOf(s) {           // two FNV-1a hashes of the line: the same words make the same id in every page
+    let a = 0x811c9dc5, b = 0x01000193;
+    for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 16777619) >>> 0; b = Math.imul(b ^ c, 2246822519) >>> 0; }
+    return "spoken-" + a.toString(16) + b.toString(16);
+  }
+  function spoken(el, n, a, p) {
+    const words = String(p.text != null ? p.text : el.textContent || "").trim();
+    if (!words) return;
+    const line = a.line.replace(/\$value\b/g, () => TEXT.esc(words)), key = (n.key || "") + "|" + line;
+    if (SPOKEN.has(key)) return;
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || typeof api.host !== "function") return;     // not the home base (or its bridge not ready: the next paint)
+    SPOKEN.add(key);
+    if (line.startsWith("host ")) host(line.slice(5));
+    else send(n, line, undefined, undefined, { gesture: idOf(line) });
+  }
+
   // Astra: a gesture acts on the generation that was painted. It carries what was observed; the desk's fence judges that.
   async function send(n, line, draft, more, attachment) {
     const token = V.beginSend(n.key); if (!token) return;       // one send per part at a time (viewer.js)
@@ -232,7 +253,7 @@
     if (p.share != null) { el.style.flex = `${p.share} 1 0`; el.style.minWidth = el.style.minHeight = "0"; el.dataset.share = "1"; }
     // a grid given a share is bounded, so it divides its height among its rows and its cells fill them; a cell with
     // `scroll` then scrolls inside the window instead of the page growing (Alex, 29 Sep: the window is bounded)
-    if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
+    if (p.share != null && p.tracks && !/^fill /.test(p.tracks[0])) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     if (p.caret) el.dataset.caret = p.caret.join(" ");    // a6642: what brings the caret here from anywhere (caretKeys)
@@ -263,6 +284,7 @@
         send(el._n, a.line.replace("$x", Math.round(e.clientX - r.left + el.scrollLeft)).replace("$y", Math.round(e.clientY - r.top + el.scrollTop)))
           .finally(() => { delete el.dataset.pressed; });
       });
+      if (a.on === "spoken") spoken(el, n, a, p);
       if (a.on === "edit" && !p.markdown) edits(el, n, a);
       if (a.on === "drag" && p.box) drags(el, n, a);
       if (a.on === "carry") carries(el, n);
@@ -539,6 +561,14 @@
   function tracks(el) {
     const p = el._n && el._n.paint; if (!p || !p.tracks) return;
     const kids = [...el.children].filter(c => c.dataset.key);
+    // a10637: `grid fill <min>`: as many equal columns as this part's own width holds, each at least <min> (never wider
+    // than the part), children flowing into rows in order; counted by the browser, so a resize writes nothing
+    if (/^fill /.test(p.tracks[0])) {
+      const m = p.tracks[0].slice(5), least = /gap$/.test(m) ? `calc(${parseFloat(m)} * var(--t-gap))` : m;
+      el.style.gridTemplateColumns = `repeat(auto-fill, minmax(min(${least}, 100%), 1fr))`;
+      el.dataset.fill = "1";
+      return;
+    }
     el.style.gridTemplateColumns = p.tracks.map((t, i) => kids[i] && kids[i].dataset.folded ? "auto" : t === "fit" ? "max-content" : /gap$/.test(t) ? `calc(${parseFloat(t)} * var(--t-gap))` : `minmax(0, ${t})`).join(" ");
     kids.forEach((c, i) => { if (i < p.tracks.length) c.style.gridColumn = String(i + 1); });
   }

@@ -267,7 +267,10 @@ def _world_word(desk, step):
         if len(argv) < 2:
             return None
         word = argv[1].lstrip("@").lower()
-        builtin = word in desk._builtin_verbs()
+        # a10089: `do accept|decline|withdraw|... <promise>` is the desk's own promise command (desk_knife routes it,
+        # a1587), not a world verb, so a stored line (a lens's Decline button) is bound as the desk's, as it runs
+        import promises
+        builtin = word in desk._builtin_verbs() or word in promises.VERBS + promises.HOUSE_VERBS
         return None if builtin else (word, argv[2:])
     word = argv[0].lstrip("@").lower()
     return None if word in DESK_WORDS else (word, argv[1:])

@@ -191,7 +191,9 @@ def test_midturn_delivery_and_explicit_peer_collaboration(setup):
     assert receipt["delivery"] == "runtime_accepted"
     assert receipt["sender"] == "human"
     assert any("Keep the old colors" in text for text in workers["left"].updates)
-    assert any("Found the cause" in text for text in workers["right"].updates)
+    # Peer sends queue for the scheduler so runtime steering happens outside the
+    # world authority lock; the other worker's direct receipt is not that delivery.
+    until(lambda: any("Found the cause" in text for text in workers["right"].updates))
     release.set()
     until(lambda: status(s, right)["state"] == "ready")
 

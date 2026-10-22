@@ -27,7 +27,6 @@ import os
 import subprocess
 import sys
 import atexit
-import shutil
 from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
@@ -45,8 +44,18 @@ def check(name, ok, detail=""):
 
 sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
 import agora_tmp
+from fixture_cleanup import remove_tree
 TMP = Path(agora_tmp.directory("lq-"))
-atexit.register(shutil.rmtree, TMP, ignore_errors=True)
+
+
+def clean_fixture():
+    errors = remove_tree(TMP, readonly=True)
+    if errors:
+        print("test_landing_queue: retained private scratch:\n" + "\n".join(errors), file=sys.stderr)
+    return not errors
+
+
+atexit.register(clean_fixture)  # Also report cleanup on an early test exception.
 LIVE = TMP / "live"
 os.environ["LANDING_LIVE"] = str(LIVE)
 os.environ["LANDING_ROOM"] = str(TMP / "room")
@@ -367,6 +376,7 @@ with patch.object(landing.subprocess, "run", return_value=SimpleNamespace(
 check("19. nonzero health exit cannot be overridden by an ok JSON receipt",
       not h["ok"] and any("exited 1" in x for x in h["failed"]), h)
 
+landing.room_at(was)  # judged requires the room to hold the named commit.
 kept, worlds = {}, []
 def fake_health(world, cwd, **how):
     worlds.append(world)
@@ -379,6 +389,7 @@ check("20. cached health never substitutes a different world at the same commit"
       worlds == ["copy-one", "copy-two"], worlds)
 
 print(landing.status())
-print(f"{len(fails)} failed" if fails else "all passed")
 subprocess.run(["git", "worktree", "prune"], cwd=LIVE, capture_output=True)
+check("21. private landing repositories and lock scratch removed", clean_fixture())
+print(f"{len(fails)} failed" if fails else "all passed")
 sys.exit(1 if fails else 0)

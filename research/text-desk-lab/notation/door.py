@@ -59,6 +59,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 NOTATION = HERE.relative_to(REPO).as_posix()      # where the lab is in any checkout: research/text-desk-lab/notation
 PY = sys.executable
+# Services and Git never consume the door's stdin. In particular, inheriting
+# --lifetime-stdin's pipe while its reader blocks can stall Windows child
+# startup until EOF (including the venv Python launcher). Keep it door-only.
 HOP = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-authorization",
        "proxy-authenticate", "host", "content-length", "origin", "sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest"}
 
@@ -73,7 +76,8 @@ def free_port():
 
 def git(*args):
     try:
-        return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, timeout=20).stdout.strip()
+        return subprocess.run(["git", *args], cwd=REPO, stdin=subprocess.DEVNULL,
+                              capture_output=True, text=True, timeout=20).stdout.strip()
     except Exception:
         return ""
 
@@ -99,8 +103,11 @@ class Backend:
         out.write(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} door starts deskd {code} on {self.port}\n")
         out.flush()
         cmd = [PY, *(argv or ["deskd.py"]), str(self.port), *([door.static] if door.static and not argv else [])]
-        self.proc = subprocess.Popen(cmd, cwd=HERE, env={**os.environ, "DESKD_CODE": code, "DESKD_PARENT": str(os.getpid()), **(env or {})},
-                                     stdout=out, stderr=subprocess.STDOUT)
+        try:
+            self.proc = subprocess.Popen(cmd, cwd=HERE, env={**os.environ, "DESKD_CODE": code, "DESKD_PARENT": str(os.getpid()), **(env or {})},
+                                         stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT)
+        finally:
+            out.close()
         self.painter = None
 
     def alive(self):
@@ -132,12 +139,13 @@ class Backend:
                 self.proc.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
+                self.proc.wait(timeout=20)
 
 
 def git_in(tree, *args):
     """git in a commission's worktree. -> (ok, stdout); the door types git so that no resident does."""
     try:
-        r = subprocess.run(["git", *args], cwd=tree, capture_output=True, text=True, timeout=30)
+        r = subprocess.run(["git", *args], cwd=tree, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
         return r.returncode == 0, r.stdout.strip()
     except Exception:
         return False, ""
@@ -207,7 +215,8 @@ class Version:
         import io
         import tarfile
         try:
-            r = subprocess.run(["git", "archive", "--format=tar", self.sha, NOTATION], cwd=self.tree, capture_output=True, timeout=120)
+            r = subprocess.run(["git", "archive", "--format=tar", self.sha, NOTATION], cwd=self.tree,
+                               stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
         except Exception as e:
             return f"could not be read out of git ({type(e).__name__}: {e})"
         if r.returncode:
@@ -233,8 +242,12 @@ class Version:
         env = {k: v for k, v in os.environ.items()
                if not any(s in k.upper() for s in SECRET) and not k.upper().startswith(("ANTHROPIC", "CLAUDE", "OPENAI"))}
         out = open(self.out, "a", encoding="utf-8")
-        self.proc = subprocess.Popen([PY, "deskd.py", str(self.port)], cwd=self.dir, stdout=out, stderr=subprocess.STDOUT,
-                                     env={**env, "DESKD": "off", "DESKD_CODE": self.label, "DESKD_PARENT": str(os.getpid())})
+        try:
+            self.proc = subprocess.Popen([PY, "deskd.py", str(self.port)], cwd=self.dir, stdout=out, stderr=subprocess.STDOUT,
+                                         stdin=subprocess.DEVNULL,
+                                         env={**env, "DESKD": "off", "DESKD_CODE": self.label, "DESKD_PARENT": str(os.getpid())})
+        finally:
+            out.close()
         t = time.time() + timeout
         while True:
             if not self.alive():
@@ -266,6 +279,7 @@ class Version:
                 self.proc.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
+                self.proc.wait(timeout=20)
         for _ in range(20):                       # Windows lets go of a stopped process's files a moment later
             shutil.rmtree(self.dir, ignore_errors=True)
             if not self.dir.exists():
@@ -322,6 +336,8 @@ class Door:
         self.visiting, self.entering = threading.RLock(), threading.Lock()
         self.visits_begin()
         self.current, self.swapping = None, threading.Lock()
+        self.stopping = threading.Event()
+        self.retiring, self.retiring_lock = [], threading.Lock()
         self.scenes = {}                 # the scene queries pages asked for: query string -> last asked (time)
         self.changed = threading.Condition()
         self.head = git("rev-parse", "HEAD") if watch_git else ""
@@ -402,7 +418,7 @@ class Door:
         return None
 
     def start_first(self):
-        while True:
+        while not self.stopping.is_set():
             code = (git("rev-parse", "--short", "HEAD") if self.watch_git else "") or "dev"
             b = Backend(self, code)
             why = self.healthy(b)
@@ -412,7 +428,7 @@ class Door:
                 return
             self.log(f"door: the first deskd ({code}) failed: {why}; trying again in 30 s")
             b.stop(0)
-            time.sleep(30)
+            self.stopping.wait(30)
 
     def swap(self, code=None, argv=None, env=None, commits=None, head=None):
         """Start a new deskd beside the current one and switch to it if it is healthy. -> (ok, why)."""
@@ -452,8 +468,7 @@ class Door:
 
     def watch(self):
         """git HEAD moving is a landing (or anyone's commit): swap to it. A deskd that died is started again."""
-        while True:
-            time.sleep(2)
+        while not self.stopping.wait(2):
             try:
                 if self.watch_git:
                     now = git("rev-parse", "HEAD")
@@ -653,6 +668,8 @@ class Door:
         if not ok or not sha:
             return answer(body, error=f"[door] {cid}'s worktree has no commit git can name; nothing was changed.")
         with self.entering:                        # one entry at a time: two who come together share one version
+            if self.stopping.is_set():
+                return answer(body, error="[door] stopping; no visit was started.")
             with self.visiting:
                 cur = self.away.get(who)
                 there = [v for v in self.versions.values() if v.cid == cid and v.alive() and v.visitors - {who}]
@@ -682,7 +699,7 @@ class Door:
                 ver.first = who
                 why = ver.start()
                 if why:
-                    threading.Thread(target=ver.stop, daemon=True).start()
+                    self.retire(ver)
                     self.log(f"door: {who} was refused entry to {ver.label}: {why}")
                     return answer(body, error=f"[door] {cid} at {sha[:7]} can't be entered: its desk {why}. You are still "
                                               f"{'in ' + cur.label if cur else 'home'}; nothing was changed.")
@@ -747,7 +764,21 @@ class Door:
         if not v.visitors:
             if self.versions.get((v.cid, v.sha)) is v:
                 del self.versions[(v.cid, v.sha)]
-            threading.Thread(target=v.stop, daemon=True).start()
+            self.retire(v)
+
+    def retire(self, version):
+        """Keep asynchronous visit cleanup owned until it has actually finished."""
+        with self.retiring_lock:
+            self.retiring = [t for t in self.retiring if t.is_alive()]
+            thread = threading.Thread(target=version.stop, daemon=True)
+            self.retiring.append(thread)
+            thread.start()
+
+    def join_retired(self):
+        with self.retiring_lock:
+            threads = list(self.retiring)
+        for thread in threads:
+            thread.join()
 
     def behind(self, v, who):
         """What `who` made or changed in the version, counted from its events since the copy (Pike c3163, Juniper's
@@ -1068,18 +1099,45 @@ def main():
     static = a[a.index("--static") + 1] if "--static" in a[:-1] else None
     trees = a[a.index("--trees") + 1] if "--trees" in a[:-1] else None
     DOOR = Door(port, world, state, "--no-git" not in a, static, trees)
-    DOOR.start_first()
-    threading.Thread(target=DOOR.watch, daemon=True).start()
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    srv.daemon_threads = True
-    print(f"door on http://localhost:{port}", flush=True)
+    watcher, srv = None, None
+    serving, finished = threading.Event(), threading.Event()
+    if "--lifetime-stdin" in a:
+        # Tests own this pipe. EOF also arrives if the test dies without running
+        # finally. Production doors never opt in; no PID lookup/foreign kill.
+        def parent_gone():
+            sys.stdin.buffer.read()
+            DOOR.stopping.set()
+            while not finished.is_set():
+                if serving.wait(0.1):
+                    srv.shutdown()
+                    return
+        threading.Thread(target=parent_gone, daemon=True).start()
     try:
+        DOOR.start_first()
+        if DOOR.stopping.is_set():
+            return
+        srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        srv.daemon_threads = True
+        watcher = threading.Thread(target=DOOR.watch, daemon=True)
+        watcher.start()
+        print(f"door on http://localhost:{port}", flush=True)
+        serving.set()
         srv.serve_forever()
     finally:
-        if DOOR.current:
-            DOOR.current.stop(5)
-        for v in list(DOOR.versions.values()):
-            v.stop()
+        finished.set()
+        DOOR.stopping.set()
+        if watcher is not None:
+            watcher.join()
+        if srv is not None:
+            srv.server_close()
+        # A request can still be starting a version. Wait for that owned start
+        # to register or refuse before enumerating children and returning EOF.
+        with DOOR.entering, DOOR.visiting:
+            if DOOR.current:
+                DOOR.current.stop(5)
+            for v in list(DOOR.versions.values()):
+                v.stop()
+            DOOR.join_retired()
 
 
 if __name__ == "__main__":

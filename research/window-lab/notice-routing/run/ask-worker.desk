@@ -1,0 +1,6 @@
+look a10020 :1
+do comment a10020 line="Copy check r3: which way, A or B?" mark=ask
+look a10022 :1
+do comment a10022 line="Copy check r3: may I go on?" mark=ask
+look a10024 :1
+do comment a10024 line="Copy check r3: is this the right file?" mark=ask
