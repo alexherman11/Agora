@@ -29,9 +29,14 @@ Required policy props:
 Use the literal `none` for an empty selection. Missing/blank required props,
 unknown policy/recipient, malformed selectors and plain title strings refuse.
 Optional `action_design_label` and `action_review_label` default to `design` and
-`review`. Optional `action_question_news` is a world selection of question parents
-or targets that are news (e.g. closed cards); default `none`. This selection never
-excludes a permission. Consumer policy authors must supply their closed-card
+`review`. Optional `action_question_news` names question parents or targets that
+are news (e.g. closed cards); default `none`. It holds one or more selections kept
+apart by `;`, and a thing matching ANY clause is news (a10109: the selection grammar
+has AND, no cross-property OR, so the union lives in this one field), e.g.
+`prop:status=done; prop:commission=landed; prop:commission=cancelled; prop:design=answered; prop:design=replaced; prop:archived`.
+Spaces around `;` are ignored. `none` alone is empty; an empty clause, `none` among
+clauses, or a clause that is not a selection refuses the policy. News applies only to
+ordinary questions: it never excludes a permission or a native request. Consumer policy authors must supply their closed-card
 selection; the source contains no production design/review/closed-card predicate.
 
 Rowan's staged policy uses `prop:action_defer=later` for whole-target Later and

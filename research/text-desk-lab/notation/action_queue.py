@@ -58,7 +58,7 @@ def _policy(desk, ref):
     if not recipient:
         raise Refusal("actions policy action_recipient must name a known person")
     sets = {}
-    for k in (*required[:4], "action_question_news"):
+    for k in required[:4]:
         q = p.get(k, "none")
         if q == "none":
             sets[k] = set()
@@ -67,8 +67,28 @@ def _policy(desk, ref):
         if hit is None:
             raise Refusal(f"actions policy {k} must be a selection or none")
         sets[k] = {canonical(w, n) for n in hit[0]}
+    sets["action_question_news"] = _news(w, p.get("action_question_news", "none"))
     labels = {kind: p.get(f"action_{kind}_label", kind) for kind in ("design", "review")}
     return sid, recipient, sets, labels, p
+
+
+def _news(w, q):
+    """a10109: action_question_news holds one or more selections, clauses kept apart by ';'. A thing matching any
+    clause is news (the union lives in this field: the selection grammar has AND, no cross-property OR). `none`
+    alone is empty; an empty clause, or `none` among clauses, refuses rather than matching anything."""
+    q = str(q).strip()
+    if q == "none":
+        return set()
+    out = set()
+    for clause in (c.strip() for c in q.split(";")):
+        if not clause or clause == "none":
+            raise Refusal("actions policy action_question_news must be none, or selections kept apart by ;"
+                          " with no empty clause")
+        hit = knife.parse_selection(w, clause)
+        if hit is None:
+            raise Refusal(f"actions policy action_question_news clause {clause!r} is not a selection")
+        out |= {canonical(w, n) for n in hit[0]}
+    return out
 
 
 def _active_events(w):

@@ -266,6 +266,65 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(self.groups("yes")[0]["reason_count"], 1)
         self.assertEqual(len(scene.line_rows(self.d, self.chat)), 2)
 
+    # a10109: Rowan's clauses, kept apart by ; in the one field
+    ROWAN_NEWS = ("prop:status=done; prop:commission=landed; prop:commission=cancelled; prop:design=answered; "
+                  "prop:design=replaced; prop:archived")
+
+    def news_policy(self, news):
+        self.prop(self.policy, action_question_news=news)
+
+    def is_news(self):
+        """A question on the target: news (listed, not counted) or live (counted)."""
+        return self.groups("yes") == [] and len(self.all_reasons()) >= 1
+
+    def test_news_each_clause_alone_makes_a_question_news(self):
+        self.news_policy(self.ROWAN_NEWS)
+        self.ask()
+        self.assertFalse(self.is_news())                       # nothing matches yet: a live question
+        cases = [{"status": "done"}, {"commission": "landed"}, {"commission": "cancelled"},
+                 {"design": "answered"}, {"design": "replaced"}, {"archived": "yes"}]
+        for props in cases:
+            with self.subTest(props):
+                self.prop(**props)
+                self.assertTrue(self.is_news(), props)
+                self.say("juniper", f"look {self.target} :3", f"do prop {self.target} remove={','.join(props)}")
+                self.assertFalse(self.is_news(), props)
+
+    def test_news_two_clauses_only_one_matches(self):
+        self.news_policy("prop:status=done; prop:commission=landed")
+        self.ask()
+        self.prop(commission="landed", status="doing")         # the second clause matches, the first does not
+        self.assertTrue(self.is_news())
+
+    def test_news_never_excludes_a_permission_on_a_done_card(self):
+        self.news_policy(self.ROWAN_NEWS)
+        self.prop(status="done")
+        self.ask("permission")
+        self.native()
+        reasons = self.all_reasons()
+        self.assertEqual({r["kind"] for r in reasons}, {"permission"})
+        self.assertEqual(self.groups("yes")[0]["reason_count"], 2)
+
+    def test_news_a_paused_card_stays_live(self):
+        self.news_policy(self.ROWAN_NEWS)
+        self.prop(commission="paused")
+        self.ask()
+        self.assertEqual(self.groups("yes")[0]["reason_count"], 1)
+
+    def test_news_a_malformed_or_empty_clause_refuses(self):
+        self.ask()
+        for bad in ("prop:status=done;;prop:commission=landed", "prop:status=done;", "prop:status=done; nonsense:bad",
+                    "none; prop:status=done", " ; "):
+            with self.subTest(bad):
+                self.news_policy(bad)
+                with self.assertRaises(Refusal):
+                    self.groups()
+        self.news_policy("none")
+        self.assertEqual(self.groups("yes")[0]["reason_count"], 1)
+        self.news_policy("prop:fixture_closed=yes")           # one clause, as before
+        self.prop(fixture_closed="yes")
+        self.assertTrue(self.is_news())
+
     def test_unknown_recipient_and_invalid_authored_context_are_diagnostic(self):
         self.ask(to="nobody-real")
         self.assertEqual(self.groups("yes"), [])
