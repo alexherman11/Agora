@@ -565,9 +565,13 @@ def command(desk, verb, arg):
         return f"ok {ev['id']}: {aid} {verb} \"{st['what']}\": {phrase(w, st)}" + (f" · about {about}" if about else "") + f"\n  {where}"
     if not words:
         raise Refusal(USAGE[verb])
-    target = desk._resolve(words[0], allow_subject=False)
-    sid = w.subject_of(target)
-    if not is_promise(w, target):
+    target = desk._resolve(words[0], allow_subject=True)
+    if target in w.subjects and target not in w.nodes:
+        # a10089: a request's subject names it as well as its appearance does; the action queue's rows carry the
+        # subject ($reason.source), so a lens's one-click Decline sends `do decline s2737`
+        target = aid_of(w, target)
+    sid = w.subject_of(target) if target in w.nodes else None
+    if sid is None or not is_promise(w, target):
         raise Refusal(f"{target} is not a promise or request; promises are in the Promises surface "
                       f"({surface(w) or 'none yet'}). promises lists yours")
     if desk.seen.get(target) is None and desk.seen.get(sid) is None:
