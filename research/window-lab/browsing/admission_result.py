@@ -18,6 +18,7 @@ def message_boundary_passed(receipt):
             "process_failed",
             "initialization_failed",
             "evaluation_failed",
+            "engine_refused",
         }
         for e in events
     ):

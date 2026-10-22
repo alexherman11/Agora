@@ -11,12 +11,17 @@ import os
 import sys
 import time
 from pathlib import Path
+from admission_job import read, write
+from admission_policy import configure, install as install_offline_policy
 
 
 def main():
     folder = Path(sys.argv[1]).resolve()
     folder.relative_to(Path(__file__).resolve().parents[1] / ".tmp-agora")
     name = sys.argv[2]
+    token = sys.argv[3]
+    if len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
+        raise ValueError("fresh fixture request identity required")
     if not name.startswith("agora-sandbox-admit-"):
         raise ValueError("named admission desktop required")
     user, kernel = ctypes.windll.user32, ctypes.windll.kernel32
@@ -59,6 +64,7 @@ def main():
     from Microsoft.Web.WebView2.Core import (
         CoreWebView2WebResourceContext,
         CoreWebView2WebResourceRequestSourceKinds,
+        CoreWebView2PermissionState,
     )
     from Microsoft.Web.WebView2.WinForms import CoreWebView2CreationProperties, WebView2
     from System import Action, String
@@ -68,6 +74,7 @@ def main():
 
     def run():
         form, view = None, None
+        timers = []
         try:
             form = Form()
             form.Text = "Agora offline admission probe"
@@ -80,6 +87,7 @@ def main():
             view.Dock = DockStyle.Fill
             form.Controls.Add(view)
             deadline = Timer()
+            timers.append(deadline)
             deadline.Interval = 25000
 
             def expired(*_):
@@ -102,21 +110,31 @@ def main():
                     return
                 core = view.CoreWebView2
                 record("initialized", engine=str(core.Environment.BrowserVersionString))
+                actual_profile = Path(str(core.Environment.UserDataFolder)).resolve()
+                if (actual_profile != (folder / "profile").resolve()
+                        or not core.Profile.IsInPrivateModeEnabled):
+                    record("engine_refused", reason="fresh InPrivate profile not established")
+                    form.Close()
+                    return
+                record("profile_identity", folder=str(actual_profile), in_private=True)
                 core.Environment.BrowserProcessExited += lambda _, e: record(
                     "browser_exited", kind=str(e.BrowserProcessExitKind), pid=e.BrowserProcessId
                 )
-                core.ProcessFailed += lambda _, e: record(
-                    "process_failed", kind=str(e.ProcessFailedKind)
-                )
+                def failed(_, e):
+                    record("process_failed", kind=str(e.ProcessFailedKind))
+                    deadline.Stop()
+                    form.Close()
+
+                core.ProcessFailed += failed
                 settings = core.Settings
                 # Positive control first: the native event counters must actually work.
                 # No host object or command handler exists in either phase.
-                settings.IsWebMessageEnabled = True
-                settings.AreHostObjectsAllowed = False
-                settings.AreDevToolsEnabled = False
-                settings.IsGeneralAutofillEnabled = False
-                settings.IsPasswordAutosaveEnabled = False
-                settings.AreDefaultContextMenusEnabled = False
+                configure(settings, positive_control=True)
+                install_offline_policy(
+                    core, lambda kind: record("policy_refusal", kind=kind),
+                    CoreWebView2PermissionState.Deny,
+                    CoreWebView2WebResourceContext.All,
+                    CoreWebView2WebResourceRequestSourceKinds.All)
                 messages = []
                 core.WebMessageReceived += lambda *_: messages.append("top")
 
@@ -124,18 +142,6 @@ def main():
                     e.Frame.WebMessageReceived += lambda *_: messages.append("child")
 
                 core.FrameCreated += frame_created
-                core.AddWebResourceRequestedFilter(
-                    "*",
-                    CoreWebView2WebResourceContext.All,
-                    CoreWebView2WebResourceRequestSourceKinds.All,
-                )
-
-                def deny(_, e):
-                    e.Response = core.Environment.CreateWebResourceResponse(
-                        None, 403, "Offline probe", ""
-                    )
-
-                core.WebResourceRequested += deny
                 mode = ["positive_control"]
                 html = (
                     "<!doctype html><title>Offline admission</title>"
@@ -153,6 +159,10 @@ def main():
                         "navigation_completed", success=e.IsSuccess, status=str(e.WebErrorStatus)
                     )
                     if not e.IsSuccess:
+                        form.Close()
+                        return
+                    if int(core.BrowserProcessId) != engine_pid:
+                        record("engine_refused", reason="engine PID changed")
                         form.Close()
                         return
                     scheduler = TaskScheduler.FromCurrentSynchronizationContext()
@@ -173,13 +183,18 @@ def main():
                             result = json.loads(json.loads(str(answer.Result)))
                             record("evaluated", mode=mode[0], result=result)
                             observation = Timer()
+                            timers.append(observation)
                             observation.Interval = 500
 
                             def finish(*_):
                                 observation.Stop()
                                 record("message_delivery", mode=mode[0], received=list(messages))
                                 if mode[0] == "positive_control":
-                                    settings.IsWebMessageEnabled = False
+                                    if int(core.BrowserProcessId) != engine_pid:
+                                        record("engine_refused", reason="engine PID changed")
+                                        form.Close()
+                                        return
+                                    configure(settings)
                                     mode[0] = "disabled"
                                     messages.clear()
                                     record(
@@ -202,7 +217,38 @@ def main():
                     task.ContinueWith(Action[Task[String]](checked), scheduler)
 
                 core.NavigationCompleted += loaded
-                core.NavigateToString(html)
+                # Policy precedes content. The parent verifies this engine
+                # through its held Job and process handles. JSON alone proves
+                # no ownership and grants no host authority.
+                engine_pid = int(core.BrowserProcessId)
+                write(folder / "engine-request.json",
+                      {"request": token, "host_pid": os.getpid(), "engine_pid": engine_pid})
+                admission_timer = Timer()
+                timers.append(admission_timer)
+                admission_timer.Interval = 20
+
+                def admitted(*_):
+                    response = folder / "engine-admission.json"
+                    if not response.exists():
+                        return  # the existing explicit deadline remains active
+                    admission_timer.Stop()
+                    try:
+                        value = read(response)
+                        if (value.get("request") != token
+                                or value.get("engine_pid") != engine_pid
+                                or value.get("admitted") is not True
+                                or not value.get("job_id")
+                                or int(core.BrowserProcessId) != engine_pid):
+                            raise RuntimeError("parent engine fence refused")
+                        record("engine_admitted", engine_pid=engine_pid,
+                               job_id=value["job_id"])
+                        core.NavigateToString(html)
+                    except Exception as exc:
+                        record("engine_refused", error_type=type(exc).__name__)
+                        form.Close()
+
+                admission_timer.Tick += admitted
+                admission_timer.Start()
 
             view.CoreWebView2InitializationCompleted += ready
 
@@ -224,6 +270,9 @@ def main():
                 hresult=getattr(exc, "HResult", None),
             )
         finally:
+            for timer in timers:
+                timer.Stop()
+                timer.Dispose()
             if view is not None:
                 view.Dispose()
             if form is not None:

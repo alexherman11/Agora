@@ -1,110 +1,54 @@
-"""One fresh, offline admission run; observes graceful exit, never taskkills.
+"""OFFLINE retained-Job fixture. Not authorized to launch by source readiness.
 
-Run with the pinned interpreter. A timeout leaves an honest receipt for review.
+No legacy process query/adoption, taskkill, public page or privileged web bridge.
+Native execution requires a separately admitted guarded lane and lead approval.
 """
-
-import ctypes
 import hashlib
-import json
-import subprocess
 import sys
-import time
 import uuid
 from pathlib import Path
 
+from admission_job import run, write
 from admission_result import message_boundary_passed
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))
-import sandbox_window as sandbox  # noqa: E402
 
 
 def main():
-    processes = subprocess.run(
-        [
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            "$ErrorActionPreference='Stop'; @(Get-CimInstance Win32_Process | "
-            "Where-Object {$_.Name -match "
-            "'^(RocketLeague|FortniteClient.*|cs2|valorant.*|dota2)\\.exe$'}).Count",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=True,
-    )
-    if processes.stdout.strip() != "0" or sandbox.alex()["input desktop"] != "Default":
-        raise RuntimeError("active/unlocked/no-game precondition not established")
+    # Lazy imports keep offline tests free from import-time Windows API calls.
+    sys.path.insert(0, str(HERE.parent))
+    sys.path.insert(0, str(HERE.parents[1] / "text-desk-lab" / "notation"))
+    import sandbox_window as sandbox
+    import guard_context
+    from hud_lifecycle import Windows
+
+    if guard_context.read().get("admitted") is not True:
+        raise RuntimeError("fresh world-owned guard admission required; no launch")
+    sandbox.STATE.mkdir(parents=True, exist_ok=True)  # same setup as shared open()
     name = "admit-" + uuid.uuid4().hex[:12]
+    token = uuid.uuid4().hex
     folder = Path(sandbox.agora_tmp.directory(name + "-"))
-    manifest = {
-        "desktop": "agora-sandbox-" + name,
-        "profile": str(folder / "profile"),
-        "started_at": time.time(),
-        "public_navigation": False,
-        "source_sha256": {
-            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in (Path(__file__), HERE / "admission_probe.py", HERE / "admission_result.py")
-        },
-    }
-    kernel = ctypes.windll.kernel32
-    kernel.OpenProcess.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_uint]
-    kernel.OpenProcess.restype = ctypes.c_void_p
-    kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint]
-    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
-    with sandbox.Guard(name, "Agora offline admission probe") as guard:
-        pid = sandbox.start(
-            name,
-            [sys.executable, str(HERE / "admission_probe.py"), str(folder), manifest["desktop"]],
-        )
-        manifest["pid"] = pid
-        (folder / "launch.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        handle = kernel.OpenProcess(0x100000, False, pid)
-        if not handle:
-            manifest["wait"] = "unknown: no process handle"
-        else:
-            try:
-                manifest["wait"] = int(kernel.WaitForSingleObject(handle, 40000))
-            finally:
-                kernel.CloseHandle(handle)
-        time.sleep(2)
-        manifest["remaining_windows"] = sandbox.top_windows_quiet(name)
-    code, verdict = guard.verdict()
-    manifest["guard_code"], manifest["guard"] = code, verdict
-    (folder / "launch.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    sources = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in (Path(__file__), HERE / "admission_probe.py",
+                         HERE / "admission_result.py", HERE / "admission_job.py",
+                         HERE / "admission_policy.py")}
+    write(folder / "source.json", sources)
+    result = run(
+        sandbox, guard_context.read, Windows(), name, folder,
+        [sys.executable, str(HERE / "admission_probe.py"), str(folder),
+         "agora-sandbox-" + name, token], token)
+    passed = (result.get("phase") == "child_exit"
+              and result.get("engine_admitted") is True
+              and result.get("job_closure") == "proven empty"
+              and result.get("guard_code") == 0
+              and message_boundary_passed(result.get("child", {})))
+    result["offline_message_boundary_passed"] = passed
+    result["native_adversarial_containment"] = "not certified by this message fixture"
+    write(folder / "launch.json", result)
     print("receipt_directory:", folder)
-    print(json.dumps(manifest, indent=2))
-    receipt = folder / "receipt.json"
-    passed = False
-    if receipt.exists():
-        print(receipt.read_text(encoding="utf-8"))
-        passed = message_boundary_passed(json.loads(receipt.read_text(encoding="utf-8")))
     print("offline_message_boundary_passed:", passed)
-    # Process inventory is read-only. Never adopt or terminate a PID from this query.
-    query = (
-        "$ErrorActionPreference='Stop'; @(Get-CimInstance Win32_Process | "
-        "Where-Object {$_.Name -notmatch 'powershell|pwsh' -and $_.CommandLine -like '*"
-        + name
-        + "*'}).Count"
-    )
-    check = subprocess.run(
-        ["powershell", "-NoProfile", "-Command", query],
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=True,
-    )
-    manifest["matching_processes_after_exit"] = int(check.stdout.strip())
-    manifest["offline_message_boundary_passed"] = passed
-    (folder / "launch.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print("matching_processes_after_exit:", manifest["matching_processes_after_exit"])
-    clean = (
-        manifest["wait"] == 0
-        and not manifest["remaining_windows"]
-        and manifest["matching_processes_after_exit"] == 0
-    )
-    return code or (0 if passed and clean else 2)
+    print("job_closure:", result["job_closure"])
+    return 0 if passed else 2
 
 
 if __name__ == "__main__":

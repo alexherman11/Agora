@@ -53,6 +53,7 @@ class AdmissionVerdictTests(unittest.TestCase):
         for event in (
             {"phase": "deadline_fired"},
             {"phase": "process_failed"},
+            {"phase": "engine_refused"},
             {"phase": "navigation_completed", "success": False},
         ):
             report = receipt()
