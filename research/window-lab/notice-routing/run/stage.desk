@@ -1,0 +1,4 @@
+look f5204 :1
+do create f5204 kind=note title=notify-question-owner tags=verb on=house text="# notify-question-owner <card>: route the existing waiting notice, without changing knocks.\n# A native unanswered question explicitly to Alex takes precedence over asked_by.\ndo create \"Alex's notices\" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) > 0\ndo create \"Alex's notices\" kind=note title=asking role=notice to=$1.asked_by topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) = 0"
+read a5701
+do replace a5701 old="when prop:commission=waiting do create \"Alex's notices\" kind=note title=asking role=notice to=alex topic=asking about=$item came=$now" new="when prop:commission=waiting do notify-question-owner $item"

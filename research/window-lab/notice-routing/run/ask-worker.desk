@@ -1,0 +1,6 @@
+look a9808 :1
+do comment a9808 line="Copy check: which way, A or B?" mark=ask
+look a9810 :1
+do comment a9810 line="Copy check: may I go on?" mark=ask
+look a9812 :1
+do comment a9812 line="Copy check: Alex, may this program be ended?" to=alex mark=ask
