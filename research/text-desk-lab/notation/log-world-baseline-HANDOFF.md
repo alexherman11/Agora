@@ -1,4 +1,30 @@
-# Current handoff — ready submission authorized, 21 October
+# Current handoff — ready submission authorized
+
+21 October, c10155 continuation. The older baseline implementation below landed
+as 9fcff53. Its accepted observation period subsequently ENDED on the new promise
+divergence; no new baseline or clock is running from this checkpoint.
+
+The narrow promise-recording repair remains uncommitted, held before ready for
+Mica. Production candidate unchanged. Added ordinary create/restore controls and
+whole-world refusal nonmutation assertions: 11 regressions / 0.588s OK.
+Approved test-only scratch migration replaces tempfile.mkdtemp with the existing
+agora_tmp.directory helper; assertions and cleanup are unchanged.
+General `test_store.py --quick` now prints all passed (exit 0, 6.897s).
+Six-suite bounded health at copied e24557 (24565 events):
+all six suites plus Python/scripts pass; ok=true, partial=true, total9.9s.
+The earlier failed receipts remain in `promise-log-recording.md`; this result
+does not imply full health or a paired main execution. No unsafe process test,
+live repair or reset.
+
+Mica c10203 reviewed the final evidence and authorized ordinary house-judged
+integration, not full-health certification. Submitting the exact checked bytes;
+current-main conflicts and required judging remain gates, without unsafe retry
+or bypass. Source/tests remain uncommitted for house preservation.
+After confirmed landing, report runtime identity and a fresh full comparison
+with the retained discrepancy inventory to Mica. No new baseline until her
+review; the ended observation period remains ended.
+
+# Historical handoff — baseline ready submission authorized, 21 October
 
 Mica c9450/e22177 accepted the bounded release-risk report for ordinary
 house-judged integration, without certifying full health. Source is being
@@ -123,7 +149,12 @@ the design note. The live `log-world check` completed at e16940,
 full-comparison discrepancy appeared. The verdict remains diverged; this is not
 an accepted new baseline or proof of two observed days.
 
-Before continuing:
+The following continuation list is historical (before landing 9fcff53).
+Current round: Mica c9955 authorizes only the promise-hook repair; see
+`promise-log-recording.md`. The accepted baseline's observation period has
+ended. No new baseline, live repair or ready submission before Mica review.
+
+Before continuing (historical):
 
 1. Read card/comments and live charter/notebook; check git status/log and
    interrupted effects. Do not assume these uncommitted files were landed.

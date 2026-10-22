@@ -20,7 +20,6 @@ import json
 import os
 import re
 import sys
-import tempfile
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -42,7 +41,10 @@ def check(name, ok, detail=""):
 import roomworld   # noqa: E402
 import store       # noqa: E402
 
-TMP = Path(tempfile.mkdtemp(prefix="store-test-"))
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp   # noqa: E402
+
+TMP = Path(agora_tmp.directory("store-test-"))
 PATH = TMP / "t.pickle"
 LOG = store.Log(store.log_path(PATH))
 D, R = roomworld.build()
