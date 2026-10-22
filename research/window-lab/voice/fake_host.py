@@ -5,7 +5,7 @@
 A page painted by screen.py has no home base, so a stub bridge (stub.js) stands in for window.pywebview.api.host and
 posts here; this runs voice.Voice on voice.FakeEngine for the page's world (a screen.py copy), writing witnessed:voice
 as the home base would and telling the page's door. POST /engine {session, do: hear|finish|done, text} makes the fake
-engine hear words, finish an utterance, or end the voice. It answers only 127.0.0.1 and ends itself after --for.
+engine hear words, finish an utterance, or end the voice; do: mic names the microphone it reports ("" for none, a9138). It answers only 127.0.0.1 and ends itself after --for.
 """
 import json
 import sys
@@ -71,7 +71,8 @@ class H(BaseHTTPRequestHandler):
                 return self.answer(f"ERR no verb {verb}")
             if self.path == "/engine":
                 {"hear": lambda: eng.hear(body["text"]), "finish": lambda: eng.finish(body["text"]),
-                 "done": eng.done_speaking}[body["do"]]()
+                 "done": eng.done_speaking,
+                 "mic": lambda: setattr(eng, "mic", body["text"])}[body["do"]]()   # a9138: "" = no input device
                 return self.answer("ok")
         except voice.Refused as e:
             return self.answer(f"ERR {e}")

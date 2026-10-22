@@ -154,7 +154,7 @@ class Consent(Case):
                 mock.patch.object(voice, "consent_of", return_value="allowed"), \
                 mock.patch("notify.state", return_value="shown"), mock.patch("witnessed.write"):
             self.assertEqual(host_verbs.call(hud, "voice.listen"), "ok listening (the microphone is lit)")
-            self.assertEqual(eng.calls, [("listen", "mic")])
+            self.assertEqual(eng.calls, [("device",), ("listen", "mic")])      # a9138: named first
             self.assertEqual(host_verbs.call(hud, "voice.say", 'm12 "Done: the board is open."'),
                              "ok reading m12 aloud")
             self.assertEqual(host_verbs.call(hud, "voice.say", "m12 Done: the board is open."), "ok already read m12")
@@ -223,6 +223,56 @@ class JeffsState(Case):
         self.eng.finish("hello")
         self.clock.t += voice.KEEP + 1
         self.assertEqual(self.finals(), [])
+
+
+class TheMicrophone(Case):
+    """a9138: the lit state names the microphone; with none, Talk says so and does not light."""
+
+    def test_lit_names_the_microphone_it_listens_on(self):
+        self.make()
+        self.eng.mic = "Microphone (Wireless Controller)"
+        self.v.listen()
+        s = self.state()
+        self.assertEqual((s["state"], s["device"], s["mic"]), ("listening", "Microphone (Wireless Controller)", "found"))
+        self.assertEqual(self.eng.calls[:2], [("device",), ("listen", "mic")])     # named before anything listens
+        self.assertTrue(self.published[-1][0]["device"])                         # in the rows the lens reads
+
+    def test_no_input_device_says_so_and_does_not_light(self):
+        self.make()
+        self.eng.mic = ""
+        r = self.v.listen()
+        s = self.state()
+        self.assertIn("no microphone", r)
+        self.assertEqual((s["state"], s["mic"], s["why"]), ("off", "none", "no microphone found"))
+        self.assertNotIn(("listen", "mic"), self.eng.calls)                       # nothing was asked to listen
+        self.eng.mic = "Microphone (USB Headset)"                                 # plugged in: the next press lights
+        self.v.listen()
+        self.assertEqual((self.state()["state"], self.state()["mic"]), ("listening", "found"))
+
+    def test_a_name_that_cannot_be_read_still_lights_and_says_so(self):
+        self.make()
+        self.eng.mic = None
+        self.v.listen()
+        self.assertEqual(self.state()["device"], "a microphone Windows did not name")
+
+    def test_the_child_saying_no_microphone_at_listen_turns_it_off(self):
+        self.make()
+        self.v.listen()
+        self.eng.event({"ev": "error", "where": "listen", "why": "no microphone"})
+        self.assertEqual((self.state()["state"], self.state()["mic"]), ("off", "none"))
+
+    def test_the_child_renaming_it_while_listening_shows_the_new_name(self):
+        self.make()
+        self.v.listen()
+        self.eng.event({"ev": "device", "name": "Microphone (AudioRelay)"})
+        self.assertEqual(self.state()["device"], "Microphone (AudioRelay)")
+
+    def test_the_lens_shows_the_name_and_the_no_microphone_chip(self):
+        lens = (HERE / "voice" / "home-voice.lens").read_text(encoding="utf-8")
+        self.assertIn('"Listening on $v.device', lens)
+        self.assertIn("of witnessed:voice kind=state state=listening as v", lens)
+        self.assertIn('"Talk · no microphone"', lens)
+        self.assertIn("count(witnessed:voice kind=state mic=none)", lens)
 
 
 class Echo(unittest.TestCase):

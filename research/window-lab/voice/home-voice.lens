@@ -5,6 +5,8 @@
 # words show as he speaks, greyed while tentative; each finished utterance is one line in the Conversation, marked
 # spoken (on spoken: once; the door refuses a repeat). The first press asks him in two lines, kept on his own draft as
 # voice=allowed or voice=never. JEFF's answers after a spoken line are read aloud once each (on spoken host voice.say).
+# a9138: while lit it names the microphone it listens on ($v.device: Windows' name for it, read before lighting), so a
+# wrong default reads as its name, not as silence; with no input device Talk says so and does not light.
 voice : column
   only when count(tag:lens,title:home-base,prop:voice=on) > 0
   of prop:role=conversation-draft,prop:actor=$me as draft
@@ -15,19 +17,31 @@ talk : column
   let lit = "no" otherwise
   let aloud = "yes" when count(witnessed:voice kind=state aloud=yes) > 0
   let aloud = "no" otherwise
+  let nomic = "yes" when count(witnessed:voice kind=state mic=none) > 0
+  let nomic = "no" otherwise
   bar : row
     role toolbar
     only when consent != "never"
     mic : text "Talk"
       role chip
       role chip.on when lit = "yes"
+      only when nomic = "no"
       tip "Talk to JEFF" "Press and speak: your words go to JEFF as a line. Press again, or stay quiet, to stop."
       on click when consent = "allowed" and lit = "no" host voice.listen
       on click when consent = "allowed" and lit = "yes" host voice.stop
       on click when consent != "allowed" do prop $draft voice_ask=yes
-    listening : text "Listening · press Talk or stay quiet to stop"
-      role meta
+    nomic_chip : text "Talk · no microphone"
+      role chip
+      only when nomic = "yes"
+      tip "No microphone found" "Windows has no input device, so Talk is not listening. Plug one in, then press again."
+      on click when consent = "allowed" host voice.listen
+    listening : column
       only when lit = "yes"
+      of witnessed:voice kind=state state=listening as v
+      each listening_on
+    nomic_says : text "No microphone found: Windows has no input device, so Talk is not listening"
+      role meta
+      only when nomic = "yes"
     reading : text "Reading JEFF aloud · press anywhere to stop"
       role meta
       only when aloud = "yes" and lit = "no"
@@ -60,6 +74,8 @@ talk : column
     only when consent = "allowed"
     of witnessed:voice kind=final as f
     each spoken
+listening_on : text "Listening on $v.device · press Talk or stay quiet to stop"
+  role meta
 tentative : text "$v.tentative"
   role hint
   only when ($v.tentative or "") != ""

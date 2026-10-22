@@ -23,6 +23,11 @@ have passed, so two said close together are two rows and two lines. Tentative wo
 act. The readback, 'Heard: <words>', is the desk's own, said at once; JEFF's answer is read when the painter asks
 (voice.say <line id> <words>), once per line id. Any press of the microphone or the stop hushes the voice; his words
 heard while it speaks hush it too, unless they are the voice's own words coming back through the microphone (echo()).
+
+a9138: before it lights, a listen asks the engine for the microphone's name (engine.device(): Windows' name for the
+endpoint a listen would use, read from its property store; nothing opened). The state row carries it (device, and mic
+found / none / unknown), so the lens says 'Listening on <name>' and a wrong default reads as its name, not as silence.
+With no input device it does not light: mic=none, and the lens says so.
 """
 import json
 import subprocess
@@ -56,10 +61,15 @@ def echo(heard, said):
 class FakeEngine:
     """Tests: what a recognizer and a voice would say, scripted. Nothing is listened to or played."""
 
-    def __init__(self):
+    def __init__(self, mic="Microphone (Fake Headset)"):
         self.calls, self.event = [], None
         self.listening = False
         self.speaking = None
+        self.mic = mic                        # the name device() reads; "" no input device, None unreadable
+
+    def device(self):
+        self.calls.append(("device",))
+        return self.mic
 
     def listen(self, source="mic"):
         self.calls.append(("listen", source))
@@ -105,6 +115,7 @@ class SapiEngine:
     def __init__(self, script=HERE / "voice" / "voice_host.ps1"):
         self.event, self.ready = None, threading.Event()
         self.info = {}
+        self.named, self.name = threading.Event(), None
         self.proc = subprocess.Popen(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
@@ -120,6 +131,9 @@ class SapiEngine:
             if ev.get("ev") == "ready":
                 self.info = ev
                 self.ready.set()
+            if ev.get("ev") == "device":
+                self.name = ev.get("name")
+                self.named.set()
             if self.event:
                 self.event(ev)
         self.ready.set()
@@ -133,6 +147,14 @@ class SapiEngine:
         except (OSError, ValueError):
             if self.event:
                 self.event({"ev": "error", "where": "send", "why": "the speech child is gone"})
+
+    def device(self, wait=3.0):
+        """The name of the microphone a listen would use, read from Windows (voice_host.ps1 `device`: its property
+        store only, nothing opened); "" when there is no input device, None when it could not be read in time."""
+        self.ready.wait(wait * 5)
+        self.named.clear()
+        self._send({"do": "device"})
+        return self.name if self.named.wait(wait) else None
 
     def listen(self, source="mic"):
         self._send({"do": "listen", "from": "mic" if source == "mic" else "file", "path": "" if source == "mic"
@@ -174,6 +196,7 @@ class Voice:
         self.speaking, self.speaking_text, self.spoke_at, self.last_said = None, "", 0.0, ""
         self.said = set()                     # line ids read aloud once
         self.heard_at = 0.0
+        self.device, self.mic = "", "unknown"  # a9138: the microphone's name, and found / none / unknown
         engine.event = self.event
         self._rows()
 
@@ -189,6 +212,7 @@ class Voice:
                 f["answering"] = True
         out = [{"kind": "state", "state": self.state, "tentative": self.tentative, "aloud": "yes" if self.speaking else "no",
                 "speaking": self.speaking or "", "why": self.why, "utterance": self.utterance or "",
+                "device": self.device, "mic": self.mic,
                 "consent_1": CONSENT_TEXT[0], "consent_2": CONSENT_TEXT[1]}]
         out += [{"kind": "final", "utterance": f["utterance"], "words": f["words"], "conf": round(f["conf"], 2),
                  "at": round(f["at"], 1), "jeff": self._jeff_word(f, jeff)} for f in self.finals]
@@ -220,6 +244,15 @@ class Voice:
             self.hush_now()                   # pressing the microphone stops the voice at once
             if self.state == "listening":
                 return "already listening"
+            # a9138: name the microphone before lighting, so a wrong default reads as its name, not as silence; with
+            # no input device it says so and does not light. Read only: nothing is opened until engine.listen
+            name = self.engine.device() if self.source == "mic" else f"the file {Path(str(self.source)).name}"
+            if name == "":
+                self.state, self.why, self.tentative = "off", "no microphone found", ""
+                self.device, self.mic = "", "none"
+                self._rows()
+                return "not listening: no microphone found (Windows has no input device)"
+            self.device, self.mic = name or "a microphone Windows did not name", "found"
             self.state, self.why, self.tentative = "listening", "", ""
             self.utterance = uuid.uuid4().hex[:12]
             self.heard_at = self.clock()
@@ -329,10 +362,16 @@ class Voice:
                     self.last_said, self.spoke_at = self.speaking_text, self.clock()
                     self.speaking, self.speaking_text = None, ""
                     self._rows()
+            elif kind == "device":                # the child names it again as it starts listening
+                if self.state == "listening" and ev.get("name"):
+                    self.device = str(ev["name"])
+                    self._rows()
             elif kind == "error":
                 self.why = f"{ev.get('where')}: {ev.get('why')}"
                 if ev.get("where") == "listen":
                     self.state = "off"
+                    if ev.get("why") == "no microphone":   # unplugged between the name and the listen
+                        self.device, self.mic, self.why = "", "none", "no microphone found"
                 self._rows()
 
 
