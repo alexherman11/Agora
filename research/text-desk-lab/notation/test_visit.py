@@ -32,7 +32,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -45,6 +44,7 @@ import roomworld   # noqa: E402
 import explore     # noqa: E402
 import rooms       # noqa: E402
 import scene       # noqa: E402
+from fixture_cleanup import remove_tree, visit_directory
 
 WORLD = f"roomworld-visit-{os.getpid()}-try"
 NOTATION = HERE.relative_to(HERE.parents[2]).as_posix()
@@ -106,11 +106,12 @@ D, R = roomworld.build()
 D._session = WORLD
 saved = HERE / "sessions" / f"{WORLD}.pickle"
 saved.write_bytes(pickle.dumps(D))
-tmp = Path(tempfile.mkdtemp(prefix="test-visit-"))
+tmp = visit_directory()
 state, trees = tmp / "state", tmp / "trees"
 port = free_port()
 base = f"http://127.0.0.1:{port}"
 door = None
+owned_doors = []
 
 
 def raw(who, line, session=WORLD, headers=None, whole=True, **more):
@@ -137,8 +138,11 @@ def at_home():
 
 
 def start_door():
-    p = subprocess.Popen([sys.executable, "door.py", str(port), "--no-git", "--world", WORLD, "--state", str(state),
-                          "--trees", str(trees)], cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with (tmp / "door.out").open("a", encoding="utf-8") as out:
+        p = subprocess.Popen([sys.executable, "door.py", str(port), "--no-git", "--world", WORLD, "--state", str(state),
+                              "--trees", str(trees), "--lifetime-stdin"], cwd=HERE, stdin=subprocess.PIPE,
+                             stdout=out, stderr=subprocess.STDOUT)
+    owned_doors.append(p)  # Own the start even if readiness or shutdown fails.
     t = time.time() + 60
     while time.time() < t:
         try:
@@ -146,7 +150,19 @@ def start_door():
                 return p
         except OSError:
             time.sleep(0.2)
+        if p.poll() is not None:
+            break
+    for path in (tmp / "door.out", state / "deskd.out"):
+        if path.exists():
+            print(f"test_visit: {path.name}:\n{path.read_text(encoding='utf-8', errors='replace')[-6000:]}", flush=True)
+    stop_door(p)
     raise SystemExit("test_visit: the door did not answer within 60 s")
+
+
+def stop_door(p):
+    """EOF asks this exact owned door to stop and reap its own children."""
+    p.stdin.close()
+    p.wait(timeout=90)
 
 
 try:
@@ -275,7 +291,11 @@ try:
     say("juniper", "visit a9001 with=sable")      # two inside when it dies: each is told, once (Pike e5672)
     vs = get(base + "/door/status")["versions"]
     pid = vs[one]["pid"]
-    subprocess.run(["taskkill", "/F", "/PID", str(pid)] if sys.platform == "win32" else ["kill", "-9", str(pid)], capture_output=True)
+    killed = subprocess.run(["taskkill", "/F", "/PID", str(pid)] if sys.platform == "win32" else ["kill", "-9", str(pid)],
+                            capture_output=True, text=True)
+    if killed.returncode:
+        raise SystemExit("test_visit: could not stop the owned fixture version: " +
+                         (killed.stderr or killed.stdout).strip()[-1200:])
     time.sleep(1)
     before = total()
     t = say("juniper", f'do create {R.SHELF} kind=note title="typed after it died"')
@@ -365,9 +385,8 @@ try:
     check("explore.py refuses an away actor's line when the door did not answer it",
           explore.away_in(WORLD, "pike", state) == f"a9001@{sha2[:7]}" and explore.away_in(WORLD, "sable", state) is None
           and explore.away_in("another-world", "pike", state) is None)
-    door.terminate()
-    door.wait()
-    time.sleep(3.5)                               # its deskds go on their own (DESKD_PARENT)
+    stop_door(door)
+    door = None
     door = start_door()
     t = say("pike", f'do create {R.SHELF} kind=note title="typed after the door restarted"')
     check("a door started again brings pike home, told, and the line is run nowhere",
@@ -376,13 +395,22 @@ try:
     t = say("pike", "go")
     check("and the line after is home's", "VERSION" not in t and "[in " not in t and SAYS in t, t)
 finally:
-    if door is not None:
-        door.terminate()
-        door.wait()
-        time.sleep(3.5)
-    for p in (saved, saved.with_suffix(".lock")):
-        p.unlink(missing_ok=True)
-    shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        for p in owned_doors:
+            if p.poll() is None:
+                try:
+                    stop_door(p)
+                except subprocess.TimeoutExpired:
+                    check("owned door stopped within cleanup deadline", False,
+                          f"retained fixture at {tmp}; pid {p.pid} has not exited")
+    finally:
+        if all(p.poll() is not None for p in owned_doors):
+            for p in (saved, saved.with_suffix(".lock")):
+                p.unlink(missing_ok=True)
+            remaining = remove_tree(tmp, readonly=True)
+            check("all private visit scratch removed after owned servers exited", not remaining, "\n".join(remaining))
+        else:
+            check("owned door exited before cleanup", False, f"retained fixture at {tmp}; own door has not exited")
 
 print(f"{len(fails)} failed" if fails else "all passed", f"({time.time() - t0:.0f} s, world {WORLD})")
 sys.exit(1 if fails else 0)

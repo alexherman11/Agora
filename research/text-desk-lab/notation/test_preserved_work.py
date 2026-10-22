@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import sys
 from types import SimpleNamespace
 import unittest
@@ -16,12 +15,13 @@ import agora_tmp
 import landing
 import preserved_work as pw
 import workshop
+from fixture_cleanup import remove_tree
 
 
 class Handoffs(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(agora_tmp.directory("bring-"))
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.addCleanup(self.clean_fixture)
         self.live, self.trees = self.tmp / "live", self.tmp / "trees"
         self.live.mkdir()
         self.trees.mkdir()
@@ -45,6 +45,10 @@ class Handoffs(unittest.TestCase):
         for card, path in [("a1", self.source), ("a2", self.dest)]:
             pw.git(self.live, "worktree", "add", "-b", f"worker/{card}", str(path), "HEAD")
         self.receipt = self.state / "receipt.json"
+
+    def clean_fixture(self):
+        self.assertEqual(remove_tree(self.tmp, readonly=True), [],
+                         "private preserved-work fixture must be removed")
 
     def put(self, root, name, text):
         path = root / name
