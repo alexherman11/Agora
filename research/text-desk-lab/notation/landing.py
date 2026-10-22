@@ -140,8 +140,29 @@ def room_at(base):
     git("merge", "--abort", cwd=ROOM)
     git("checkout", "--detach", "--force", base, cwd=ROOM, check=True)
     git("reset", "--hard", base, cwd=ROOM, check=True)
-    git("clean", "-ffdxq", cwd=ROOM, check=True)
+    clean_room()
     return ROOM / NOTATION
+
+
+def clean_room():
+    """Ignore only isolated tool scratch, not untracked source contamination."""
+    from fixture_cleanup import remove_tree
+    scratch = ROOM / "research/window-lab/.tmp-agora"
+    errors = remove_tree(scratch)
+    if errors:
+        log("cleanup-warning", path=str(scratch), errors=errors)
+        print("landing: retained tool scratch; could not remove:\n" + "\n".join(errors), file=sys.stderr)
+    # Old tests can still be letting go of scratch. Git must not race their
+    # recursive deletion. The exclusion is rooted, not a repository-wide glob.
+    args = ("clean", "-ffdxq", "-e", "/research/window-lab/.tmp-agora/")
+    result = git(*args, cwd=ROOM)
+    if result.returncode:
+        # A concurrent remover may have finished between Git's scan and unlink.
+        # Retry once; any persistent failure outside scratch still refuses.
+        result = git(*args, cwd=ROOM)
+        if result.returncode:
+            raise RuntimeError(f"landing clean could not remove non-scratch files: "
+                               f"{(result.stderr or result.stdout).strip()[-1600:]}")
 
 
 def merge_in(branches, why, heads=None):
@@ -196,6 +217,11 @@ def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
     scratch = Path(cwd).resolve().parents[2] / "research/window-lab/.tmp-agora"
     os.makedirs(scratch, exist_ok=True)
     env = {**os.environ, "DESKD": "off", **{key: str(scratch) for key in ("AGORA_TMP", "TMP", "TEMP", "TMPDIR")}}
+    # Visits make nested Git repositories and run child servers. Their private
+    # lifetime must not overlap a subsequent room reset/clean after a restart.
+    visits = STATE / "test-visits"
+    visits.mkdir(parents=True, exist_ok=True)
+    env["AGORA_VISIT_TMP"] = str(visits.resolve())
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=1200, env=env)
     lines = (r.stdout or "").strip().splitlines()

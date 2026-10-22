@@ -360,6 +360,122 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(self.all_reasons()[0]["resolution_state"], "open")
         self.assertEqual(self.groups("yes")[0]["reason_count"], 1)
 
+    def legacy_native(self, missing=False, **args):
+        request = self.native()
+        sid = self.w.subject_of(request)
+        original = self.w.events[-1]
+        if missing:
+            self.w.events.remove(original)
+            self.w.subjects[sid]["props"]["asked_by"] = "juniper"
+        else:
+            original.update(verb="prop", args=args)
+        return request, sid
+
+    def test_stored_single_bearers_missing_origin_are_labelled_and_read_only(self):
+        _, sid = self.legacy_native(missing=True)
+        before = copy.deepcopy((self.w.events, self.w.subjects, self.w.nodes))
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["recipient_source"]), (self.alex, "stored"))
+        self.assertEqual((r["asker"], r["asker_source"]), (self.juniper, "stored"))
+        self.assertEqual((r["resolution_state"], r["resolution_evidence"]), ("open", ""))
+        self.assertEqual(self.groups("yes")[0]["reason_count"], 1)
+        self.assertEqual(before, (self.w.events, self.w.subjects, self.w.nodes))
+        self.assertEqual(r["source"], sid)
+
+    def test_stored_multi_bearer_recipient_and_asker_stay_diagnostic(self):
+        self.legacy_native(missing=True)
+        self.say("alex", "person new alex kind=human", "person new juniper kind=resident")
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["asker"]), ("", ""))
+        self.assertEqual((r["recipient_source"], r["asker_source"]), ("stored", "stored"))
+        self.assertEqual(self.groups("yes"), [])
+        self.assertEqual(r["resolution_state"], "open")
+
+    def test_stored_person_ids_are_not_rebound_to_new_name_bearers(self):
+        _, sid = self.legacy_native(missing=True)
+        self.w.subjects[sid]["props"].update(to=self.alex, asked_by=self.juniper)
+        self.say("alex", "person new alex kind=human", "person new juniper kind=resident")
+        r = self.all_reasons(recipient=self.alex)[0]
+        self.assertEqual((r["recipient"], r["asker"]), (self.alex, self.juniper))
+        self.assertEqual(r["eligible"], "yes")
+
+    def test_legacy_property_recipient_agrees_but_asker_remains_event_time(self):
+        self.legacy_native(awaiting="alex")
+        self.say("alex", "person new juniper kind=resident")
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["recipient_source"]), (self.alex, "stored"))
+        self.assertEqual((r["asker"], r["asker_source"]), (self.juniper, "event"))
+        self.assertEqual(r["eligible"], "yes")
+
+    def test_legacy_property_conflict_is_diagnostic_never_either_recipient(self):
+        self.legacy_native(awaiting="pike")
+        r = self.all_reasons()[0]
+        self.assertEqual(r["recipient"], "")
+        self.assertIn("disagrees", r["uncertainty"])
+        self.assertEqual(self.groups("yes"), [])
+        self.assertEqual(r["resolution_state"], "open")
+
+    def test_legacy_property_without_addressee_uses_stored_single_bearer(self):
+        self.legacy_native()
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["recipient_source"]), (self.alex, "stored"))
+        self.assertEqual(r["asker_source"], "event")
+        self.assertEqual(r["eligible"], "yes")
+
+    def test_legacy_matching_name_with_multiple_bearers_is_still_diagnostic(self):
+        self.legacy_native(awaiting="alex")
+        self.say("alex", "person new alex kind=human")
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["recipient_source"]), ("", "stored"))
+        self.assertEqual(self.groups("yes"), [])
+
+    def test_other_retained_origins_and_missing_event_author_do_not_fallback(self):
+        request = self.native()
+        original = self.w.events[-1]
+        self.w.subjects[self.w.subject_of(request)]["props"]["asked_by"] = self.juniper
+        original.update(verb="comment", args={}, who=None)
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["asker"]), ("", ""))
+        self.assertEqual((r["recipient_source"], r["asker_source"]), ("event", "event"))
+        self.assertEqual(self.groups("yes"), [])
+
+    def test_native_origin_wins_even_missing_or_invalid_to(self):
+        request = self.native()
+        original = self.w.events[-1]
+        self.w.subjects[self.w.subject_of(request)]["props"].update(to="pike", asked_by="pike")
+        r = self.all_reasons()[0]
+        self.assertEqual((r["recipient"], r["recipient_source"]), (self.alex, "event"))
+        self.assertEqual((r["asker"], r["asker_source"]), (self.juniper, "event"))
+        for args in ({}, {"to": "unknown-person"}, {"to": ""}):
+            with self.subTest(args=args):
+                original["args"] = args
+                r = self.all_reasons()[0]
+                self.assertEqual((r["recipient"], r["recipient_source"]), ("", "event"))
+                self.assertEqual(self.groups("yes"), [])
+
+    def test_undone_origin_does_not_enable_stored_fallback(self):
+        self.native()
+        self.w.events[-1]["undone"] = True
+        self.assertEqual(self.all_reasons(), [])
+
+    def test_missing_origin_terminal_checks_still_require_exact_actor_and_act(self):
+        for act, actor in (("accept", "alex"), ("decline", "alex"), ("withdraw", "juniper")):
+            with self.subTest(act=act):
+                self.setUp()
+                request = self.native()
+                original = self.w.events[-1]
+                sid = self.w.subject_of(request)
+                self.say(actor, f"read {request}", f"{act} {request}")
+                evidence = self.w.events[-1]
+                self.w.events.remove(original)
+                self.w.subjects[sid]["props"]["asked_by"] = self.juniper
+                self.assertEqual(self.all_reasons()[0]["resolution_evidence"], evidence["id"])
+                evidence["who"] = persons.today(self.w, "pike")
+                self.assertEqual(self.all_reasons()[0]["resolution_state"], "open")
+                evidence["who"] = persons.today(self.w, actor)
+                self.w.subjects[sid]["promise"]["acts"][-1][1] = "confirm"
+                self.assertEqual(self.all_reasons()[0]["resolution_state"], "open")
+
     def test_stale_actions_and_wrong_actor_preserve_viewer_draft_and_paused_branch(self):
         viewer = self.make("note", "Viewer", role="home-view", viewing=self.target, with_="reader")
         draft = self.make("note", "Draft", text="Unsent words", context="selected", reply_to="m1")

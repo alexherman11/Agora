@@ -52,8 +52,13 @@ staging exists, the existing index is committed first and the final worktree
 second, retaining both versions in history. Hooks and signing are disabled.
 The durable receipt records raw worktree hashes, staged hashes, committed blob
 hashes, checkpoint commits and deletions. An exact inventory comment is posted
-on the receiving card before source delivery proceeds. Failure to post holds
-delivery; the saved checkpoint can be reported again without repeating commits.
+on the receiving card before source delivery proceeds. Confirmation reads the
+house-authored structured request key and complete checkpoint/hash inventory,
+not the exact rendered comment or its position. New comments use forward-slash
+receipt paths. Already-posted legacy inventories are reusable when their JSON
+inventory and request-specific receipt filename match, even if the desk decoded
+a Windows directory escape into a newline. Failure to confirm holds delivery;
+retry reuses matching evidence without reposting or repeating commits.
 
 An idle source worker's selected files are committed on its own branch; other
 uncommitted files remain in place. Git hooks/signing are not run by that commit.
