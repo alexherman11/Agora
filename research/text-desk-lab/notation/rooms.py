@@ -506,11 +506,16 @@ def reached(w, e):
     'book' (a resident's or agent's plain line in their own corner's chat: it waits for their next wake). For anyone
     else it is the words the record keeps: not a member of the chat, a person, an agent, or no one by that name."""
     import persons
+    import conversation_policy
     from world import written
     args = e.get("args") or {}
     by = str(e.get("by") or "")
     if e.get("undone") or e.get("verb") == "knock":
         return {}
+    import task_flow
+    handoffs = task_flow.notices(w, e)
+    if handoffs:
+        return {notice["recipient"]: "call" for notice in handoffs}
     sid = e["target"]
     if sid in w.nodes and w.nodes[sid]["type"] == "appearance":
         sid = w.nodes[sid]["subject"]
@@ -535,7 +540,10 @@ def reached(w, e):
                                for a in w.nodes.values())
         called = any(same_person(w, x, actor) for x in named)
         if chat:
-            if calls(w, s, to, actor):
+            if (calls(w, s, to, actor)
+                    or (conversation_policy.queue_enabled(s)
+                        and conversation_policy.human_event(w, e)
+                        and conversation_policy.receives(w, s, e, actor))):
                 out[str(actor).lower()] = "call"
             elif mine:
                 out[str(actor).lower()] = "call" if kind_of(w, by) == "person" else "book"
@@ -665,6 +673,15 @@ def waiting_note(desk, nid, text):
     owners = book_owners(w, sid)
     for a in owners:
         names.append(a)
+    # The same native routing fact as House.news: ordinary human follow-ups
+    # in an opted-in conversation request the resident's next turn without @.
+    # This is a delivery request, not evidence of provider receipt or a model turn.
+    import conversation_policy
+    queued_recipients = set()
+    if e and conversation_policy.queue_enabled(s) and conversation_policy.human_event(w, e):
+        queued_recipients = {a for a, how in reached(w, e).items()
+                             if how == "call" and conversation_policy.receives(w, s, e, a)}
+        names.extend(sorted(queued_recipients))
     seen = set()
     for a in names:
         if a in seen or same_person(w, a, me):
@@ -708,7 +725,7 @@ def waiting_note(desk, nid, text):
             continue
         row = rows.get(corner_of(w, a)) or {}
         doing = str(row.get("doing", ""))
-        knocks = calls(w, s, to, a) or (person and a in owners)
+        knocks = calls(w, s, to, a) or (person and a in owners) or a in queued_recipients
         if a not in owners and not is_member(w, s, a):
             out.append(f"{name}: not a member of this chat (members={(s.get('props') or {}).get('members')}); not knocked")
         elif asleep(w, a):
@@ -719,6 +736,8 @@ def waiting_note(desk, nid, text):
                        f"them{marked} until it runs")
         elif doing == "working":
             out.append(f"{name}: in a turn; your line goes with what reaches them when it ends")
+        elif a in queued_recipients:
+            out.append(f"{name}: queued for the next turn; wake requested when the house processes it")
         elif knocks:
             out.append(f"{name}: woken")
         else:

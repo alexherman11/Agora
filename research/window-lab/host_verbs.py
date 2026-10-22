@@ -46,7 +46,8 @@ import threading
 import urllib.request
 from ctypes import wintypes as wt
 
-DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes", "capture": "on", "winkey": "on"}
+DEFAULTS = {"hotkey": "Ctrl+Alt+J", "monitor": "main", "hide_taskbar": "yes", "capture": "on", "winkey": "on",
+            "voice": "off"}
 
 
 # -- the verbs: name -> (what it does, what words it takes, how). Each `how` gets the home base and the words, and
@@ -111,24 +112,42 @@ def _connect(hud, words):
     """Only an explicit button press may open the account setup pages."""
     import media
     import spotify_connect
+    import spotify_like
     import webbrowser
     if not _CONNECT_LOCK.acquire(blocking=False):
         return "Spotify connection is already open"
-    library = media.likes()
+    try:
+        library = media.likes()
+    except Exception:
+        _CONNECT_LOCK.release()
+        raise Refused(spotify_like.connection_message(None)) from None
     library.connect_status = "Spotify connection is open in your browser."
+
+    def refresh():
+        try:
+            hud.say_desktop()
+        except Exception:
+            # Refresh failure must not leak connection details via a thread traceback.
+            pass
 
     def run():
         try:
             spotify_connect.connect(library, webbrowser.open)
             library.connect_status = ""
-        except Exception:
+        except Exception as error:
             # Do not publish account replies, codes or tokens into the world.
-            library.connect_status = "Spotify did not connect. Press Connect Spotify to try again."
+            library.connect_status = spotify_like.connection_message(error)
         finally:
             _CONNECT_LOCK.release()
-            hud.say_desktop()
+            refresh()
 
-    threading.Thread(target=run, daemon=True).start()
+    try:
+        threading.Thread(target=run, daemon=True).start()
+    except Exception:
+        _CONNECT_LOCK.release()
+        library.connect_status = spotify_like.connection_message(None)
+        refresh()
+        raise Refused(library.connect_status) from None
     return "opening Spotify connection"
 
 
@@ -186,6 +205,33 @@ def _wm_stop(hud, words):
     return wm_switch.SWITCH.stop(hud)
 
 
+def _voice(action):
+    # a8901: the home base's ears and mouth (voice.py). Each is refused unless voice=on here, Alex allowed it on his
+    # own draft, the home base is shown and Windows says no game or full-screen app has the screen. Its words are
+    # never run: voice.say reads them aloud, once per id
+    def press(hud, words):
+        import voice
+        if getattr(hud, "voice", None) is None:
+            if action in ("stop", "hush"):
+                return "not listening, and the voice is quiet"
+            why = voice.gate_for(hud)              # before the speech child is ever started
+            if why:
+                raise Refused(f"voice.{action}: {why}")
+        try:
+            v = voice.of(hud)
+            if action == "listen":
+                return v.listen()
+            if action == "stop":
+                return v.stop("pressed")
+            if action == "hush":
+                return v.hush()
+            sid, _, text = words.strip().partition(" ")
+            return v.say(sid, text.strip().strip('"'))
+        except voice.Refused as e:
+            raise Refused(str(e))
+    return press
+
+
 VERBS = {
     "bring": ("bring that window forward and put the home base away", "window", _bring),
     "notify": ("show a Windows notification, title Agora (silent; words beginning ! ring)", "words", _notify),
@@ -203,6 +249,11 @@ VERBS = {
     "media.like": ("save the song playing to Spotify's Liked Songs", "", _like(True)),
     "media.unlike": ("take the song playing out of Spotify's Liked Songs", "", _like(False)),
     "media.connect": ("connect Spotify through its consent page; no library changes", "", _connect),
+    "voice.listen": ("listen for Alex's words with Windows' own local speech, while the microphone is lit (only with "
+                     "voice=on and his Allow)", "", _voice("listen")),
+    "voice.stop": ("stop listening, and the voice", "", _voice("stop")),
+    "voice.hush": ("stop the voice reading aloud", "", _voice("hush")),
+    "voice.say": ("read words aloud once, in a local Windows voice (a JEFF line, by its id)", "id words", _voice("say")),
 }
 
 
@@ -258,7 +309,7 @@ def settings(door, world, lens, who="hud"):
         if not v:
             continue
         ok = (k == "hotkey" and hotkey(v)) or (k == "monitor" and (v == "main" or v.isdigit())) or \
-             (k == "hide_taskbar" and v in ("yes", "no")) or (k in ("capture", "winkey") and v in ("on", "off"))
+             (k == "hide_taskbar" and v in ("yes", "no")) or (k in ("capture", "winkey", "voice") and v in ("on", "off"))
         (out.__setitem__(k, v) if ok else bad.append(f"{k}={v}"))
     out["unread"] = bad
     out["read"] = read            # a5980: False when the door did not answer, so a caller can keep what it had

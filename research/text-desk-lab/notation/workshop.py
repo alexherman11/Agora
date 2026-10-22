@@ -46,6 +46,7 @@ import time
 from pathlib import Path
 import charter
 import claude_worker_runtime
+import worker_selection
 
 HERE = Path(__file__).resolve().parent
 import shared                             # noqa: E402  (a5296: at import, before a test stubs the workers' Popen)
@@ -56,10 +57,13 @@ PY = Path(sys.executable)
 # Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
 # call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
-HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
+HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py", "guard_context.py",
+               "resident_continuity.py", "conversation_policy.py", "task_flow.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
-               "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py"}
+               "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py",
+               "artifact_view.py", "guarded_artifacts.py", "image_comments.py", "worker_selection.py",
+               "preserved_work.py", "shared.py", "house_restart.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -72,13 +76,19 @@ AGENTS.md, above this protocol, is how we work here: its principles and evidence
 to you. This protocol adds only what is particular to a worker.
 
 Talking: whoever commissioned you is {asked_by}. Speak to them through the desk tool, as a comment on the commission.
-A comment wakes them only when you mark it as a question:
-  do comment {task} line="..." mark=ask
-Ask when you need to widen your scope, when a design decision should not be yours alone, or when you are stuck; then
-end your turn, and their answer comes back to you as a message. A comment without mark=ask wakes nobody: it stays on
-the card for whoever looks, so progress notes, plans and your done report go there unmarked. (A comment that opens
-with @name, or says to=name, still calls that person: use it only when you mean to call them.) Your landing, and what
-the house says on the card, wake {asked_by} on their own.
+First find role=worker-collaboration and read that short shared guide; it is the living collaboration policy.
+Keep routine progress on the card without calling anyone. Lead with a short authored summary (usually 2–4
+sentences): outcome or blocker, why it matters, and the next action. Put detailed logs and evidence in a linked note,
+not the lead's context. For a consequential checkpoint, completion, failure or changed blocker, publish ONE update:
+  do prop {task} worker_milestone=checkpoint worker_summary="Outcome; next action" worker_evidence="<evidence note>"
+Use completed, failed or blocked for the other milestones. These structured milestones wake your lead once; routine
+comments do not. Ask a question with `do comment {task} line="..." mark=ask`, then end your turn for their answer.
+When blocked, name blocked_on, blocker_owner and resume_when on the card. Do not repeatedly announce the same block.
+To yield for urgent work, checkpoint first, then `do prop {task} commission=yielded` and end your turn. The house
+resumes yielded work when eligible capacity is free, preserving your work and conversation. commission=paused is a
+manual hold; it never resumes just because a slot frees. Never use yielded for approval, safety or unresolved blockers.
+Your lead collaborates with you: bring decisions and meaningful results; own routine execution and ask for detail
+only when needed. A report is evidence for the lead to review, not proof a change is accepted or live.
 Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). It reaches you as
 '~ <who> called you in "<chat>" (<id>), line m<n> ...': answer there, not on the commission, naming them:
   do append <id> line="@<who>: ..." reply_to=m<n>
@@ -86,13 +96,17 @@ Anyone may also call you by name in a chat (a line that opens '@{actor}: ...'). 
 Never: touch {notation}/sessions/ (the worlds) or any .env file; push; delete what you did not make; edit
 src/agora3/prompts/jeff.md.
 
-The builders' notebook: one note every builder reads and adds to (Alex, 15 Oct: shared knowledge for all the workers).
-Before you start, read it: `find role=builders-notebook` names it (find it by role, never by an id you remember), and
-`read <it> :3` shows all of it. Before your done comment, add what a later builder would need from this commission: a
-gotcha, a tool, a way that worked (not a summary of your work), one short line at the end of the section it belongs in,
-signed and dated, through `do replace <it> old="<that section's last line, exactly as you read it>"
-new="<the same line>\\n- <your entry> ({actor}, <day month>)"`. Read it again just before: others add to it while you
-work. A wrong entry is corrected in place and says so; none is deleted.
+Worker documentation: maintain a shared, useful documentation store yourselves (Alex, 21 Oct), not one growing notebook.
+Start with `find role=worker-documentation-index`; read its short navigation index, then only relevant topic notes.
+Choose and improve the organization as the work demands. Search before creating a note; update an existing topic
+when appropriate, or split an oversized topic into linked notes. Keep the index to links and one-line descriptions.
+Separate current guidance and reusable lessons from task-specific evidence, decisions and historical investigations.
+Make detailed evidence world-readable to resident leads; keep repository documentation beside code where useful,
+with a linked world summary. State what is current, what was tested, and what remains uncertain. Link from the task.
+Before finishing, maintain the relevant documentation and index instead of appending another work report to a catch-all.
+The old `role=builders-notebook` note is historical source material, not the default append target or required full read.
+When moving useful material into topic notes, preserve attribution, evidence and recovery links; mark superseded
+guidance explicitly. Never erase someone else's reasoning merely to shorten a document.
 
 Running things: the house has copied the live world into your worktree as {notation}/sessions/{world}-try.pickle,
 and copies it again after every landing, so keep nothing there you need. health.py prints the event its world was at:
@@ -138,11 +152,11 @@ the sections in your done comment. Don't edit the markdown file itself:
 the house exports it from the binder when your branch lands.
 
 Finishing: commit your change on your branch (git add the files you changed; git commit). Add your entry to the
-builders' notebook (above). Then, through the desk:
-  do comment {task} line="done: what changed; what you ran and what it printed; what you did not check; your notebook entry"
-  do prop {task} commission=ready
-The house lands it: merges into main, checks the host is still whole, reverts if not, and tells you both. The done
-comment is unmarked: it waits on the card, where {asked_by} reads it when the landing wakes them.
+worker documentation store (above). Then, through the desk:
+  do prop {task} commission=ready worker_milestone=completed worker_summary="Built and checked; remaining limitation; ready for landing" worker_evidence="<full evidence note>"
+The evidence note names what changed, checks and their results, limits, and the topic documentation you maintained. The concise update
+wakes the lead; they can open evidence as needed. The house lands it: merges into main, checks the host is still whole,
+reverts if not, and tells you both. Completed means your implementation work is complete, not that it is live.
 
 When main moves under you (another landing touched your files), the house merges main into your branch when it lands
 it (a6753): a clean merge is committed and judged with no word from you; a conflict leaves its <<<<<<< ======= >>>>>>>
@@ -150,14 +164,21 @@ markers in your files (not committed) and the card lists the files and the block
 hold (plain file edits, no git), re-make any goldens you changed, run health, and set ready again: the house commits
 the merge. A binary conflict is not merged: the card says which files. If you can run git you may still merge first:
   git merge main             (resolve conflicts with Edit, then git add and git commit)
-  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)"""
+  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)
+
+To update a preserved branch BEFORE acceptance, request commission=prepare and end your turn.
+The house waits for the runtime to be set down and its card lease released, checkpoints uncommitted
+source with hashes, and merges current main under landing serialization. It returns working with a
+receipt and conflict inventory; prepare never judges, lands or restarts. Resolve conflicts with plain
+file edits, rerun acceptance and re-read the card/comments before any later ready request.
+Interrupted preparation is held for reconciliation; never blindly repeat it through a new request."""
 
 
 WHO_WORKER = "You are a worker in Agora's house: a disposable builder for one commission, then gone."
 # a5378 (Alex, 15 Oct: persistent compacting workers with shared memory; Jeff uses the workers, not Claude)
 WHO_BUILDER = """You are {builder}, one of Agora's standing builders. Your conversation carries on from commission to
 commission (your model runtime compacts it when it grows long), so what you learned on earlier cards is still yours; what the
-other builders learned is in the builders' notebook (below). Each commission has its own worktree and branch, and on the
+other builders learned is in the indexed worker documentation store. Each commission has its own worktree and branch, and on the
 desk you sign as {actor} while you work on {task}: the name belongs to the card, so whoever calls it reaches the card's
 builder. A card can come to you from another builder: its card, its comments and its git log are where it stands. To hand
 this card to another builder (one who knows the area better, or when you cannot finish it well): `do prop {task}
@@ -243,6 +264,36 @@ def atomic_state(path, value):
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(value, indent=1), encoding="utf-8")
     os.replace(tmp, path)
+
+
+def lease_free(path):
+    """a9031: whether no process holds this worker lease (codex-residents/worker_lease.py's OS lock on its first byte).
+    Taken and let go at once; a missing file is free. An unreadable one is not: never guess that a card is unowned."""
+    if not Path(path).exists():
+        return True
+    try:
+        with open(path, "a+b") as f:
+            f.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                except OSError:
+                    return False
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError:
+                    return False
+                fcntl.flock(f, fcntl.LOCK_UN)
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
 
 
 def health(world, cwd=HERE):
@@ -422,6 +473,25 @@ class Workshop:
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
         for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
+            if state == "prepare":
+                self.prepare(cid, s)
+                continue  # preparation never enters worker dispatch or landing
+            if (s.get("props") or {}).get("brings") and not self.bring(cid, s):
+                continue  # A dependency never starts a model or overwrites its work.
+            if state == "paused":
+                # Finish an already-running turn but never deliver another message or restart.
+                if wk:
+                    for _ in wk.turns_ended():
+                        pass
+                continue
+            if state == "yielded":
+                self.capacity_resume(w, cid, s, wk, cfg)
+                continue
+            # A changed request never silently changes a live/saved conversation.
+            # Refuse only this card, retaining pending lines and the heard cursor.
+            if state in ("asked", "working", "waiting", "reverted") and not (wk and wk.busy):
+                if not self.selection_allowed(cid, s, cfg, wk):
+                    continue
             if state == "cancelled":
                 if wk:
                     self.finish(cid, wk, keep_branch=True)
@@ -488,12 +558,20 @@ class Workshop:
             if not wk:
                 continue
             for text in wk.turns_ended():
+                if isinstance(text, dict) and text.get("error") in (
+                        "runtime_selection_mismatch", "SelectionRefused"):
+                    self.say(cid, text["detail"], to="nobody")
+                    continue  # a selection refusal is durable, not a retryable crashed worker
+                if text is None and wk.state.get("selection_refused"):
+                    continue  # the adapter's following exit is the same refusal, not a second failure
                 if text is None or isinstance(text, dict):
                     self.failed(cid, wk, text)
                     break
                 wk.log("turn", {"state": state})
             w = self.house.load()
             s2, state = self.commissions(w).get(cid, (s, state))
+            if wk.state.get("selection_mismatch"):
+                continue  # an unrequested runtime cannot turn its output into a landing
             flight = self.landing.get(cid)
             if flight is not None:
                 if not flight["thread"].is_alive():
@@ -508,6 +586,13 @@ class Workshop:
                 self.say(cid, "the house restarted while this was being judged; judging it again.")
                 self.land(w, cid, s2, wk, wait=False)
                 continue
+            if wk.state.get("selection_refused") and not wk.busy and not wk.alive():
+                if self.selection_allowed(cid, s2, cfg, wk) and self.room(w, cfg, cid):
+                    wk.runtime_cfg = cfg
+                    wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s2)
+                    if not wk.state.get("selection_refused"):
+                        self.carry_on(wk, "the model request was explicitly retried")
+                continue
             if getattr(wk, "builder", None):
                 hand = str((s2.get("props") or {}).get("hand_to") or "").strip()
                 if hand and hand != wk.builder and wk.alive() and not wk.busy:
@@ -518,6 +603,8 @@ class Workshop:
                     continue
             if not wk.alive() or wk.busy:
                 continue
+            if not self.selection_allowed(cid, s2, cfg, wk):
+                continue  # the request may have changed during the just-finished turn
             if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                 continue                 # draining for a restart: no new turn starts; what it would hear waits (house.step)
             if not self.room(w, cfg, cid):
@@ -534,6 +621,95 @@ class Workshop:
                 self.set_state(cid, "waiting")          # its turn ended without finishing: it waits on someone
                 self.unfinished(w, cid, wk)
 
+    def capacity_resume(self, w, cid, s, wk, cfg):
+        """Only an explicit capacity yield is automatic; manual holds never enter here.
+
+        A busy turn finishes cooperatively before resumption. Existing retry/model
+        fences and the shared capacity limit apply, with no cursor consumption while
+        queued. The worktree, pending turn and saved conversation remain intact.
+        """
+        if wk:
+            for result in wk.turns_ended():
+                if result is None or isinstance(result, dict):
+                    # Keep errors for the usual working-state failure handler.
+                    wk.state["yield_error"] = result or {"detail": "the process ended"}
+                    wk.save()
+            if wk.busy:
+                return False
+        current = self.commissions(self.house.load()).get(cid)
+        if not current or current[1] != "yielded":
+            return False  # a finished turn or a lead changed the card while it drained
+        s = current[0]
+        props = s.get("props") or {}
+        if props.get("blocked_on") or props.get("approval_required") in (True, "true", "yes"):
+            return False
+        saved = wk.state if wk else self.card_state(cid)
+        if saved.get("retry_at", 0) > time.time():
+            return False
+        provider = self.provider_of(cid, s) or "claude"
+        if self.provider_wait(provider) > time.time():
+            return False
+        if plans := getattr(self.house, "plans", None):
+            reason = plans.queue_reason(provider, cfg)
+            plans.target(cid, reason)
+            if reason:
+                return False
+        if not self.selection_allowed(cid, s, cfg, wk) or not self.room(w, cfg, cid):
+            return False
+        if self.restart_wanted and os.environ.get("HOUSE_KEEPER"):
+            return False
+        if not wk and not self.real_tree(TREES / cid):
+            return False  # no fresh work or implicit re-ask from a missing worktree
+        if not wk:
+            wk = self.resume(w, cid, s, cfg)
+        if not wk:
+            return False
+        self.set_state(cid, "working")
+        s = {**s, "props": {**(s.get("props") or {}), "commission": "working"}}
+        error = wk.state.pop("yield_error", None)
+        if error:
+            self.failed(cid, wk, error)
+        elif not wk.alive() and getattr(wk, "builder", None):
+            self.parked(w, cid, s, "working", wk, cfg)
+        elif wk.alive() and not wk.busy:
+            heard = self.heard(w, cid, s, wk)
+            wk.send("Capacity is available again. Continue from your checkpoint; check what already completed."
+                    + ("\n" + "\n".join(heard) if heard else ""))
+        elif not wk.alive():
+            self.workers.pop(cid, None)  # normal resume path, retaining the saved session
+        return True
+
+    def selection_allowed(self, cid, s, cfg, wk=None):
+        props = s.get("props") or {}
+        saved = wk.state if wk else self.card_state(cid)
+        if saved.get("selection_mismatch"):
+            return False  # clearing a request is not permission to reuse a mismatched runtime
+        try:
+            if worker_selection.requested(props):
+                bound = dict(saved)
+                if wk and wk.alive():
+                    bound.setdefault("session", "live-process")
+                runtime = saved.get("session_provider") or props.get("worker_provider") or "claude"
+                worker_selection.resolve(
+                    props, bound, runtime, saved.get("model") or cfg.get("worker_model") or cfg["model"], cfg)
+            if saved.get("selection_refused") == worker_selection.fingerprint(props):
+                return False
+        except worker_selection.Refused as exc:
+            said = str(exc)
+            errors = self.__dict__.setdefault("_selection_errors", {})
+            if errors.get(cid) != said:
+                self.say(cid, said, to="nobody")
+                self.set_state(cid, props.get("commission", "asked"),
+                               selection_status="refused", selection_error=said)
+                errors[cid] = said
+            return False
+        self.__dict__.setdefault("_selection_errors", {}).pop(cid, None)
+        if wk and wk.alive() and props.get("selection_status") == "refused":
+            actual = (saved.get("selection") or {}).get("actual") or {}
+            wk.selection_props(selection_error="",
+                               selection_status="observed" if actual.get("model") else "resolved")
+        return True
+
     def uncommitted(self, w, cid, s):
         """a5296 (a5261 point 3): an asked card that names a file uncommitted in the main checkout, or one a card says it
         is in, hears so at once (shared.check), once for what was found (prop uncommitted= keeps it). -> True to hold it:
@@ -542,7 +718,7 @@ class Workshop:
         if said == "ok":
             return False
         try:
-            c = shared.check(s, REPO, w)
+            c = shared.check(s, REPO, w, available=self.brought_paths(cid, s))
         except Exception:                # git could not be read: the card starts as it did before a5296
             return False
         if c["key"] and c["key"] != said:
@@ -610,7 +786,7 @@ class Workshop:
         except (OSError, ValueError):
             waits = {}
         now = time.time()
-        current = {cid: waits.get(cid, now) for cid, (_, state) in cs.items() if state == "asked"}
+        current = {cid: waits.get(cid, now) for cid, (_, state) in cs.items() if state in ("asked", "yielded")}
         if current != waits:
             atomic_state(path, current)
         w = self.house.load()
@@ -624,7 +800,7 @@ class Workshop:
             age = max(0, int((now - current.get(cid, now)) // 3600))
             fit = str(p.get("worker_prefer") or "") in free
             # Stable object identity only breaks ties; creation order is not priority.
-            return (state == "asked", -(priority + age), -fit, int(cid[1:]) if cid[1:].isdigit() else cid)
+            return (state in ("asked", "yielded"), -(priority + age), -fit, int(cid[1:]) if cid[1:].isdigit() else cid)
         return sorted(cs.items(), key=key)
 
     @staticmethod
@@ -660,6 +836,15 @@ class Workshop:
         lanes = self.pool(cfg)
         plans = getattr(self.house, "plans", None)
         allowed = lambda p: not plans or not plans.fuel_reason(p, cfg)
+        request = (s.get("props") or {}).get("requested_model")
+        if request:
+            # Eligibility in the same priority pool, not a provider queue or
+            # reserved share. The outer admission boundary enforces total four.
+            target = worker_selection.provider(str(request))
+            if not allowed(target) or self.provider_wait(target) > time.time():
+                return False
+            return next((ln for ln in lanes if ln["provider"] == target),
+                        {"provider": target, "model": str(request), "n": 0})
         if not lanes:
             provider = self.provider_of(cid, s) or "claude"
             return None if allowed(provider) and self.provider_wait(provider) <= time.time() else False
@@ -700,68 +885,119 @@ class Workshop:
         return max(self.provider_limits().get(provider, {}).get("retry_at", 0),
                    plans.wait_until(provider) if plans else 0)
 
+    @staticmethod
+    def fallbacks(cfg):
+        """The house note's limit_fallback: the providers a quota-held card may move TO. "codex" (a6570): a Claude card
+        held by Claude's usage limit goes on with a Codex builder. "claude" (a9031): a Codex card held by Codex's limit
+        goes on with a Claude builder. "codex, claude": both. Anything else: none."""
+        return {p for p in re.split(r"[,\s]+", str(cfg.get("limit_fallback") or "").lower()) if p in ("claude", "codex")}
+
     def limit_handoffs(self, w, cfg):
-        """Transfer a stopped, quota-held Claude card without reusing its conversation or losing its files.
+        """Transfer a stopped, quota-held card to the other provider's standing builders without reusing its
+        conversation or losing its files: Claude to Codex (a6570), and Codex to Claude (a9031). The card keeps its
+        worktree, branch, edits and desk name; the held provider's state is archived under handoffs/.
 
         The saved handoff marker is a recovery journal: if the house dies between saving local state and changing
-        the native card, the next pass completes that same handoff before any worker can be resumed.
+        the native card, the next pass completes that same handoff before any worker can be resumed. A card moved once
+        stays with its new provider when the old one's limit resets: nothing moves it back (its saved provider is the
+        new one); it moves again only if the new provider is limited in turn and the fallback names the way back.
         """
-        if cfg.get("limit_fallback") != "codex":
+        targets = self.fallbacks(cfg)
+        if not targets:
             return False
-        lanes = [ln for ln in self.pool(cfg) if ln["provider"] == "codex" and ln["n"] > 0]
-        if not lanes:
+        lanes = {p: [ln for ln in self.pool(cfg) if ln["provider"] == p and ln["n"] > 0] for p in targets}
+        if not any(lanes.values()):
             return False
         changed = False
-        for cid, (s, state) in self.commissions(w).items():
+        cs = self.commissions(w)
+        # a9031 (JEFF c9079: 'one at a time within the cap'): the house note may say the order cards move in
+        # (handoff_order=a1,a2,...: those first, in that order; the rest after, oldest first) and how many moved cards may
+        # be underway at once (handoff_at_once=1: a moved card still working holds the next back). Unset: as a6570 was.
+        order = [c for c in re.split(r"[,\s]+", str(cfg.get("handoff_order") or "")) if c]
+        try:
+            at_once = int(cfg.get("handoff_at_once") or 0)
+        except ValueError:
+            at_once = 0
+        rank = lambda c: (order.index(c) if c in order else len(order), int(c[1:]) if c[1:].isdigit() else 0)  # noqa: E731
+        underway = {p: set() for p in ("claude", "codex")}     # moved cards still working, by the provider they went to
+        for c, (_, state) in cs.items():
+            moved = self.card_state(c)
+            to = (moved.get("handoff_pending") or moved.get("last_handoff") or {}).get("to")
+            if to in underway and state in ("working", "reverted"):
+                underway[to].add(c)
+        for cid in sorted(cs, key=rank):
+            s, state = cs[cid]
+            if worker_selection.requested(s.get("props") or {}):
+                continue  # an explicit request never silently switches on exhaustion
             # Fresh asked cards already share all available lanes. Quota fallback
             # below is only for a stopped in-flight session, with its recovery journal.
             if state not in ("working", "waiting", "reverted"):
                 continue
             st = self.card_state(cid)
             transfer = st.get("handoff_pending")
+            source = st.get("session_provider", "claude")
+            target = (transfer or {}).get("to") or ("codex" if source == "claude" else "claude")
             # Old versions stored retry_at only for a known provider limit. New retryable crashes use retry_kind.
-            limited = st.get("retry_at") and st.get("retry_kind", "limit") == "limit"
-            if not transfer and not (limited and st.get("session_provider", "claude") == "claude"):
+            # a9031: also a card on a provider held now that never met the limit itself (paused before it, then
+            # resumed by a lead): its own conversation is on a provider that will not answer until the reset. Codex
+            # cards only: a6570's Claude direction stays as it was (Claude's plan pacing also holds it, briefly)
+            limited = ((st.get("retry_at") and st.get("retry_kind", "limit") == "limit")
+                       or (source == "codex" and st.get("session") and self.provider_wait(source) > time.time()))
+            if not transfer and not (limited and target in targets and lanes.get(target)):
                 continue
+            if not transfer and self.provider_wait(target) > time.time():
+                continue  # both providers are held: it waits for whichever comes back, on its own provider
+            if not transfer and at_once and len(underway[target]) >= at_once:
+                continue  # a card moved before is still underway: the next waits its turn (handoff_order)
             wk = self.workers.get(cid)
             if wk and (wk.busy or wk.alive()):
                 continue
             if not self.real_tree(TREES / cid):
                 continue
             path = self.house.dir / f"worker-{cid}" / "state.json"
+            if not lease_free(path.parent / "worker.lock"):
+                continue  # a Codex adapter (even one a former house left) still owns the card: never two at once
+            name = {"claude": "Claude", "codex": "Codex"}
             if not transfer:
-                archive = path.parent / "handoffs" / f"claude-{time.time_ns()}.json"
+                archive = path.parent / "handoffs" / f"{source}-{time.time_ns()}.json"
                 atomic_state(archive, st)
                 limits = self.provider_limits()
-                limits["claude"] = {"retry_at": max(st.get("retry_at", 0), self.provider_wait("claude")),
-                                    "detail": st.get("last_error", "Claude usage-limit handoff")}
+                limits[source] = {"retry_at": max(st.get("retry_at", 0), self.provider_wait(source)),
+                                  "detail": st.get("last_error", f"{name[source]} usage-limit handoff")}
                 atomic_state(self.house.dir / "provider-limits.json", limits)
-                transfer = {"from": "claude", "to": "codex", "archive": str(archive),
-                            "model": lanes[0]["model"] or CODEX_MODEL}
+                lane = (lanes.get(target) or [{"model": ""}])[0]
+                model = lane["model"] or (CODEX_MODEL if target == "codex" else cfg.get("worker_model") or cfg.get("model"))
+                transfer = {"from": source, "to": target, "archive": str(archive), "model": model}
                 carry = (st.get("pending") or {}).get("carry", "")
+                before = st.get("builder")
                 for key in ("session", "builder", "retry_at", "retry_kind", "failures", "unanswered",
-                            "unanswered_why", "last_error"):
+                            "unanswered_why", "last_error", "model", "effort"):
                     st.pop(key, None)
-                st.update(session_provider="codex", handoff_pending=transfer)
+                st.update(session_provider=target, handoff_pending=transfer)
+                if before:
+                    st["handed_from"] = before       # take() says whose card it was
                 st["pending"] = {"delivered": False, "carry":
-                    f"Claude hit its usage limit. You now own commission {cid}; its old process is stopped. "
-                    f"The existing worktree and all edits are preserved. Read the card and comments, git status "
-                    f"and git diff before acting; verify what the last command did before repeating an effect. "
-                    f"Do not assume you have Claude's conversation.\n\n{s.get('title', '')}\n{s.get('text', '')}"
-                    f"\n\nLast pending instruction (may refer to Claude's prior context):\n{carry}"}
+                    f"{name[source]} hit its usage limit. You now own commission {cid}; its old process is stopped. "
+                    f"The existing worktree and all edits are preserved. Read the card and comments, git log, "
+                    f"git status and git diff before acting: its last checkpoint comment and commits are where it "
+                    f"stands. Verify what the last command did before repeating an effect. "
+                    f"Do not assume you have {name[source]}'s conversation.\n\n{s.get('title', '')}\n{s.get('text', '')}"
+                    f"\n\nLast pending instruction (may refer to {name[source]}'s prior context):\n{carry}"}
                 atomic_state(path, st)
-            self.set_state(cid, "working", worker_provider="codex", worker_model=transfer["model"])
+            self.set_state(cid, "working", worker_provider=transfer["to"], worker_model=transfer["model"])
             # set_state is a native gateway operation, not a projection edit. Verify it before clearing the journal.
             current = self.commissions(self.house.load()).get(cid)
-            if not current or current[0].get("props", {}).get("worker_provider") != "codex":
+            if not current or current[0].get("props", {}).get("worker_provider") != transfer["to"]:
                 continue
             st.pop("handoff_pending", None)
             st["last_handoff"] = transfer
             atomic_state(path, st)
+            underway[transfer["to"]].add(cid)
             self.workers.pop(cid, None)
-            self.say(cid, "Claude reached its usage limit. A persistent Codex builder will continue this card in "
-                          "the same worktree; edits and Claude's saved conversation are preserved. "
-                          "Claude will not resume this card automatically.")
+            frm, to = name[transfer["from"]], name[transfer["to"]]
+            self.say(cid, f"{frm} reached its usage limit. A persistent {to} builder will continue this card in "
+                          f"the same worktree; edits and {frm}'s saved conversation are preserved. "
+                          f"{frm} will not resume this card automatically.")
             changed = True
         return changed
 
@@ -778,8 +1014,280 @@ class Workshop:
 
     def builds(self, lane, s, cfg):
         """A pool lane uses persistent builders unless the card explicitly requests a fresh worker."""
-        fresh = str((s.get("props") or {}).get("worker_fresh") or "").strip().lower() in FRESH
+        fresh = (str((s.get("props") or {}).get("worker_fresh") or "").strip().lower() in FRESH
+                 or worker_selection.requested(s.get("props") or {}))
         return bool(lane) and not fresh and bool(self.builders(cfg, lane["provider"]))
+
+    def prepare(self, cid, subject):
+        """House-only branch preparation; never judge, land or request restart."""
+        import landing
+        import preserved_work as pw
+        try:
+            wk = self.workers.get(cid)
+            if wk and (wk.busy or wk.alive()):
+                raise pw.Held("worker process still owns the card; waiting for it to be set down")
+            if cid in self.landing:
+                raise pw.Held("card is being judged")
+            saved = self.card_state(cid)
+            if saved.get("session") and saved.get("session_provider", "claude") != "codex":
+                proc = getattr(wk, "proc", None)
+                if proc is None or proc.poll() is None:
+                    raise pw.Held("unleased saved runtime needs a known stopped owner")
+            runtime = HERE.parents[1] / "codex-residents"
+            if str(runtime) not in sys.path:
+                sys.path.insert(0, str(runtime))
+            from worker_lease import worker_leases
+            lock = landing._try_lock()
+            if not lock:
+                raise pw.Held("landing serialization is busy; prepare queued")
+            try:
+                with worker_leases([self.house.dir / f"worker-{cid}" / "worker.lock"], timeout=0):
+                    w = self.house.load()
+                    fresh = self.commissions(w).get(cid)
+                    if not fresh or fresh[1] != "prepare":
+                        return
+                    sid = fresh[0]["id"]
+                    requests = [e for e in w.events
+                                if not e.get("undone") and
+                                (e.get("args") or {}).get("commission") == "prepare" and
+                                e.get("target") in (cid, sid)]
+                    if not requests:
+                        raise pw.Held("prepare needs its world request event")
+                    request = str(requests[-1]["id"])
+                    receipt = self.house.dir / "prepares" / f"{cid}-{request}.json"
+                    def admit():
+                        latest = self.house.load()
+                        current = self.commissions(latest).get(cid)
+                        if not current or current[1] != "prepare":
+                            raise pw.Held("prepare withdrawn during checkpoint; branch kept, merge not started")
+                        newer = [e for e in latest.events if not e.get("undone")
+                                 and (e.get("args") or {}).get("commission") == "prepare"
+                                 and e.get("target") in (cid, sid)]
+                        if not newer or str(newer[-1]["id"]) != request:
+                            raise pw.Held("prepare request changed during checkpoint")
+                    result = pw.prepare_main(REPO, TREES / cid, cid, receipt, request,
+                        report=lambda kept: self.report_receiver_checkpoint(cid, receipt, kept),
+                        admit=admit)
+                    admit()  # preserve a changed/withdrawn world request after the Git wait too
+                    if result["conflicts"] and not result.get("merge_aborted"):
+                        # Reuse ready's ordinary marker fence after a prepare
+                        # conflict, including after parent/runtime recovery.
+                        pending = dict(files=result["conflicts"], at=time.time(),
+                                       main=result["main"], prepare_receipt=str(receipt))
+                        if wk:
+                            wk.state["house_merge"] = pending
+                            wk.save()
+                        else:
+                            state = self.card_state(cid)
+                            state["house_merge"] = pending
+                            atomic_state(self.house.dir / f"worker-{cid}" / "state.json", state)
+                    detail = (f"Preparation only: main {result['main']} merged into the preserved branch; "
+                              f"result {result['phase']}, HEAD {result['after']}. "
+                              f"Receipt: {receipt}. No judging, landing or restart. ")
+                    if result.get("merge_aborted"):
+                        detail += ("Binary conflicts: " + ", ".join(result["binary"])
+                                   + ". Merge aborted; checkpoint retained. Ask the lead which version to keep.")
+                    elif result["conflicts"]:
+                        detail += ("Conflicts left for plain file edits: " + ", ".join(result["conflicts"])
+                                   + ".\n" + self._hunks(TREES / cid, result["conflicts"]))
+                    else:
+                        detail += "Clean merge; run acceptance before ready."
+                    # A crash before this state update reuses the durable result.
+                    self.say(cid, detail, to="nobody")
+                    self.set_state(cid, "working", prepare_status=result["phase"],
+                                   prepare_receipt=str(receipt))
+            finally:
+                landing._unlock(lock)
+        except (pw.Held, RuntimeError, OSError, ValueError) as exc:
+            detail = "held: " + str(exc)[:800]
+            fresh = self.commissions(self.house.load()).get(cid)
+            if fresh and fresh[1] == "prepare" and (fresh[0].get("props") or {}).get("prepare_status") != detail:
+                self.bring_props(cid, prepare_status=detail)
+                self.say(cid, "Preparation " + detail, to="nobody")
+
+    def bring(self, cid, subject):
+        """Process even paused recipients, without unpausing or starting them."""
+        import landing
+        import preserved_work as pw
+        raw = (subject.get("props") or {}).get("brings")
+        key = ""
+        try:
+            spec, key = pw.request(raw, cid)
+            receipt = self.house.dir / "brings" / f"{cid}-{key}.json"
+            # Already completed handoffs must not block a running receiver.
+            if receipt.exists():
+                saved = pw.read_receipt(receipt)
+                if saved.get("phase") == "applied":
+                    tree = TREES / cid
+                    pw.registered(REPO, tree, f"worker/{cid}")
+                    if pw.git(tree, "merge-base", "--is-ancestor", saved["recipient_after"],
+                              "HEAD", check=False).returncode == 0:
+                        self.brought(cid, subject, key, receipt, saved)
+                        return True
+                    raise pw.Held("completed bring is no longer in this worktree; reconcile its receipt")
+            source = spec["source"]
+            if prior := spec.get("after"):
+                other = self.commissions(self.house.load()).get(prior)
+                if not other or not (other[0].get("props") or {}).get("brings"):
+                    raise pw.Held(f"waiting for {prior}'s handoff request")
+                _, prior_key = pw.request(other[0]["props"]["brings"], prior)
+                prior_path = self.house.dir / "brings" / f"{prior}-{prior_key}.json"
+                if not prior_path.exists():
+                    raise pw.Held(f"waiting for {prior}'s handoff receipt")
+                prior_result = pw.read_receipt(prior_path)
+                if prior_result.get("phase") != "applied":
+                    raise pw.Held(f"waiting for {prior}'s completed handoff")
+                # A reviewed/reported recipient may already have had its idle
+                # worktree removed. Its kept branch (or landed main) is durable.
+                if not any(pw.git(REPO, "merge-base", "--is-ancestor",
+                                  prior_result["recipient_after"], ref, check=False).returncode == 0
+                           for ref in (f"refs/heads/worker/{prior}", "refs/heads/main")):
+                    raise pw.Held(f"{prior}'s handoff needs reconciliation")
+            if source != "main" and source not in self.commissions(self.house.load()):
+                raise pw.Held("unknown source card")
+            for card in {cid, source} - {"main"}:
+                worker = self.workers.get(card)
+                if worker and (worker.busy or worker.alive()):
+                    raise pw.Held(f"{card} still has a worker process; waiting for it to be set down")
+                if card in self.landing:
+                    raise pw.Held(f"{card} is being judged")
+                saved_worker = self.card_state(card)
+                if saved_worker.get("session") and saved_worker.get("session_provider", "claude") != "codex":
+                    # Legacy Claude starts have no card process lease. An empty
+                    # lease cannot certify a surviving, untracked process gone.
+                    proc = getattr(worker, "proc", None)
+                    if proc is None or proc.poll() is None:
+                        raise pw.Held(f"{card} has an unleased saved runtime; "
+                                      "a known stopped owner is required before importing")
+            # The process-held card leases also cover adapters surviving a house
+            # restart. A transient lease_free() test is insufficient here.
+            runtime = HERE.parents[1] / "codex-residents"
+            if str(runtime) not in sys.path:
+                sys.path.insert(0, str(runtime))
+            from worker_lease import worker_leases
+            lock = landing._try_lock()
+            if not lock:
+                raise pw.Held("landing serialization is busy; handoff queued")
+            try:
+                leases = [self.house.dir / f"worker-{card}" / "worker.lock"
+                          for card in {cid, source} - {"main"}]
+                with worker_leases(leases, timeout=0):
+                    # Do not honor a stale request after waiting on an owner.
+                    fresh = self.commissions(self.house.load()).get(cid)
+                    if not fresh or (fresh[0].get("props") or {}).get("brings") != raw:
+                        raise pw.Held("brings request changed")
+                    tree = TREES / cid
+                    if not tree.exists():
+                        branch = f"worker/{cid}"
+                        exists = git("show-ref", "--verify", "--quiet", f"refs/heads/{branch}",
+                                     cwd=REPO).returncode == 0
+                        git("worktree", "add", str(tree), *([] if exists else ["-b", branch]),
+                            *([branch] if exists else ["HEAD"]), cwd=REPO, check=True)
+                    result = pw.transfer(landing, REPO if source == "main" else TREES / source,
+                                         tree, source, cid, spec["paths"], receipt, key,
+                                         report_checkpoint=lambda saved:
+                                             self.report_receiver_checkpoint(cid, receipt, saved),
+                                         conflict=spec.get("conflict", "hold"),
+                                         stage_name=str(spec.get("request") or ""))
+            finally:
+                landing._unlock(lock)
+            self.brought(cid, subject, key, receipt, result)
+            return True
+        except (pw.Held, RuntimeError, OSError, ValueError) as exc:
+            # Same blocked state is said once; a material change has its own receipt.
+            detail = str(exc)[:800]
+            status = f"held {key}: {detail}"
+            if (subject.get("props") or {}).get("brings_status") != status:
+                self.bring_props(cid, brings_status=status)
+                self.say(cid, "Preserved-work handoff held: " + detail, to="nobody")
+            return False
+
+    def report_receiver_checkpoint(self, cid, receipt, saved):
+        import preserved_work as pw
+        prefix = "Receiver work checkpointed before handoff: "
+        request = receipt.stem.removeprefix(cid + "-")
+        inventory = {k: v for k, v in saved.items() if k != "reported"}
+        payload = {"request": request, "checkpoint": inventory}
+        text = (prefix + json.dumps(payload, sort_keys=True) +
+                f". Durable inventory: {receipt.as_posix()}. Own worker branch only; not ready or landed.")
+
+        def matches(comment):
+            if comment.get("by") != "house":
+                return False
+            body = comment.get("text", "")
+            if not body.startswith(prefix):
+                return False
+            try:
+                value, end = json.JSONDecoder().raw_decode(body[len(prefix):])
+            except (ValueError, TypeError):
+                return False
+            if not isinstance(value, dict):
+                return False
+            if "checkpoint" in value:
+                return value.get("request") == request and value["checkpoint"] == inventory
+            # Already-landed inventories carried the request in their receipt
+            # filename. Windows \n in the directory was decoded by the desk;
+            # the filename and JSON hashes survive. Reuse that evidence once.
+            tail = body[len(prefix) + end:]
+            return (value == inventory and tail.startswith(". Durable inventory: ") and
+                    re.search(r"(?<![\w-])" + re.escape(receipt.name) + r"(?=\. |$)", tail)
+                    is not None)
+
+        def recorded():
+            current = self.commissions(self.house.load()).get(cid)
+            return current and any(matches(c) for c in current[0].get("comments", []))
+        if not recorded():
+            self.say(cid, text, to="nobody")
+        if not recorded():
+            raise pw.Held("recipient checkpoint inventory not confirmed on card; delivery held")
+
+    def brought(self, cid, subject, key, receipt, result):
+        if result.get("mode") == "beside":
+            # a10253: a conflict staged beside, not merged: the inventory says what to merge by hand
+            status = f"staged beside {key}: {result['stage']}"
+            if (subject.get("props") or {}).get("brings_status") != status:
+                self.bring_props(cid, brings_status=status, brings_receipt=str(receipt))
+                rows = "; ".join(
+                    f"{name}: {item['status']} (base {(item['base'] or {}).get('sha256', 'none')[:12]}, incoming "
+                    f"{item['incoming']['sha256'][:12]}, current {(item['current'] or {}).get('sha256', 'none')[:12]})"
+                    for name, item in sorted(result["inventory"].items()))
+                self.say(cid, f"Preserved work from {result['source']} conflicts with this branch, so it is staged "
+                         f"beside your files, not merged: {result['stage']}/incoming/ (the source's versions), "
+                         f"{result['stage']}/base/ (the common base) and {result['stage']}/INVENTORY.json. Your own "
+                         f"files are unchanged. Inventory: {rows}. Merge each both-changed file by hand, keeping "
+                         f"current changes; then remove {result['stage']}/ before ready (landing refuses .incoming/). "
+                         f"Source {result['source_commit']}; receiver {result['recipient_after']}; full SHA-256 "
+                         f"manifest: {receipt.as_posix()}. No main landing, model start or code execution.",
+                         to="nobody")
+            return
+        status = f"applied {key}"
+        if (subject.get("props") or {}).get("brings_status") != status:
+            self.bring_props(cid, brings_status=status, brings_receipt=str(receipt))
+            self.say(cid, f"Preserved work brought from {result['source']}: {len(result['files'])} files; "
+                     f"source {result['source_commit']}; receiver {result['recipient_after']}. "
+                     f"Raw-file and committed-blob SHA256 manifest: {receipt}. "
+                     "No main landing, model start or transferred code execution.", to="nobody")
+
+    def bring_props(self, cid, **props):
+        # Bookkeeping never writes commission state from an earlier scene.
+        extra = " ".join(f"{k}={json.dumps(str(v), ensure_ascii=False)}" for k, v in props.items())
+        self.house.act("house", f"look {cid} :1; do prop {cid} {extra}")
+
+    def brought_paths(self, cid, subject):
+        """Only a real imported commit satisfies the new-main-file hold."""
+        import preserved_work as pw
+        try:
+            _, key = pw.request((subject.get("props") or {}).get("brings"), cid)
+            receipt = pw.read_receipt(self.house.dir / "brings" / f"{cid}-{key}.json")
+            tree = TREES / cid
+            pw.registered(REPO, tree, f"worker/{cid}")
+            if receipt.get("phase") == "applied" and pw.git(
+                    tree, "merge-base", "--is-ancestor", receipt["recipient_after"],
+                    "HEAD", check=False).returncode == 0:
+                return set(receipt["files"])
+        except (pw.Held, OSError, ValueError, KeyError):
+            pass
+        return set()
 
     def card_state(self, cid):
         try:
@@ -821,7 +1329,8 @@ class Workshop:
             held.set_down(f"{name} went to {cid}")
         wk.runtime_cfg = cfg
         b = Builder(self.house, name)
-        before, last = wk.state.get("builder"), b.state.get("on")
+        # a9031: a card moved by a usage limit names the other provider's builder that began it
+        before, last = wk.state.pop("handed_from", None) or wk.state.get("builder"), b.state.get("on")
         handed = (s.get("props") or {}).get("hand_to") is not None      # read before the act below clears it
         if wk.alive() and before != name:
             wk.set_down(f"{name} takes it over")
@@ -950,6 +1459,7 @@ class Workshop:
                       (props.get("worker_model") if props.get("worker_provider") == lane["provider"] else None))
                      if saved.get("session") else None)
             model = model or lane["model"] or (CODEX_MODEL if lane["provider"] == "codex" else cfg.get("worker_model") or cfg["model"])
+            model = props.get("requested_model") or model
             chosen = {"worker_provider": lane["provider"], "worker_model": model}
             s = {**s, "props": {**(s.get("props") or {}), **chosen}}
         branch, tree = f"worker/{cid}", TREES / cid
@@ -996,11 +1506,14 @@ class Workshop:
             lead = self.take(w, cid, s, wk, builder, cfg)       # a5378: a standing builder, started on this card
         else:
             wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        if wk.state.get("selection_refused"):
+            self.workers.pop(cid, None)  # a corrected request may try again; unchanged ones remain fenced on disk
+            return
         self.set_state(cid, "working", asked_by=asked_by, worker=wk.actor, **chosen)
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
         try:                              # a5296: what the house found about the files it names, said to the card at ask
-            found = shared.check(s, REPO, w)["worker"]
+            found = shared.check(s, REPO, w, available=self.brought_paths(cid, s))["worker"]
             first += f"\n\n{found}" if found else ""
         except Exception:
             pass
@@ -1048,8 +1561,13 @@ class Workshop:
             return None
         wk = Worker(self.house, cid, TREES / cid, f"worker/{cid}", self.asked_by(w, s))     # a1590: the name, never p2919
         wk.runtime_cfg = cfg
-        if not getattr(wk, "builder", None) and self.provider_of(cid, s) == "codex" and self.builders(cfg, "codex"):
-            name = self.free_builder(w, cfg, provider="codex")
+        provider = self.provider_of(cid, s)
+        # a Codex card goes to a Codex builder; a card handed to Claude by a usage limit (a9031) to a Claude builder:
+        # it has no Claude conversation of its own to resume
+        handed = (wk.state.get("last_handoff") or {}).get("to") == "claude" and not wk.state.get("session")
+        if not getattr(wk, "builder", None) and (provider == "codex" or (provider == "claude" and handed)) \
+                and self.builders(cfg, provider):
+            name = self.free_builder(w, cfg, provider=provider)
             if not name:
                 return None
             wk.builder = name
@@ -1069,6 +1587,8 @@ class Workshop:
         wk.state.pop("retry_at", None)
         self.workers[cid] = wk
         wk.start(cfg.get("worker_model") or cfg["model"], self.house.world, s)
+        if wk.state.get("selection_refused"):
+            return wk  # keep the pending turn intact; do not consume it in carry_on
         wk.state.pop("unanswered", None), wk.state.pop("unanswered_why", None)     # said here, not by a resident's wake
         wk.log("resume", {"session": wk.state["session"], "cut": bool((wk.state.get("pending") or {}).get("carry"))})
         self.carry_on(wk, "the house restarted while you were working")
@@ -1080,7 +1600,7 @@ class Workshop:
         process started again by failed() sat idle and the card stalled. `before` opens it (a5378: which card)."""
         pending = wk.state.pop("pending", None) or {}
         cut = pending.get("carry")
-        if cut and pending.get("delivered"):
+        if cut and pending.get("delivered") and wk.state.get("session"):
             # 1 Oct: the message is already in this conversation (claude keeps it even when the turn is cut)
             wk.send(before + f"({why}; your session is resumed. My last message to you is above, unanswered: carry on "
                     "from there, checking what your last commands did first.)")
@@ -1328,7 +1848,7 @@ class Workshop:
         if r.returncode:
             self.returned(cid, s, wk, "working", f"the house could not commit your resolution of the merge: "
                                                  f"{(r.stdout + r.stderr).strip()[-500:]}",
-                          f"~ house: the house could not commit your resolution of the merge; see the card.")
+                          "~ house: the house could not commit your resolution of the merge; see the card.")
             return False
         wk.state.pop("house_merge", None)
         wk.save()
@@ -1549,7 +2069,48 @@ class Worker:
             import house as H
 
         class _Worker(H.Resident):
+            def selection_props(self, **values):
+                """Receipts change facts only when their values changed."""
+                world = self.house.load()
+                task = world.subjects.get((world.nodes.get(self.cid) or {}).get("subject"), {})
+                props = task.get("props") or {}
+                changed = {k: v for k, v in values.items() if props.get(k) != v}
+                if changed:
+                    self.house.act("house", f"look {self.cid} :1; do prop {self.cid} " +
+                                   " ".join(f"{k}={json.dumps(v)}" for k, v in changed.items()))
+
             def start(self, model, world, s):
+                if self.state.get("selection_mismatch"):
+                    return  # even a ready-card recovery must preserve this refusal
+                current = self.house.load()
+                task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
+                props = task.get("props") or {}
+                provider = (self.state.get("session_provider") if self.state.get("session") else None) or props.get("worker_provider", "claude")
+                model = ((self.state.get("model") if self.state.get("session") else None)
+                         or props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL))
+                cfg = getattr(self, "runtime_cfg", {})
+                try:
+                    selected = worker_selection.resolve(props, self.state, provider, model, cfg)
+                    provider, model, effort = (selected[k] for k in ("provider", "model", "effort"))
+                    if self.builder and worker_selection.requested(props):
+                        b = Builder(self.house, self.builder)
+                        if (b.state.get("session")
+                                and (b.state.get("provider", provider) != provider
+                                     or b.state.get("model") != model or b.state.get("effort") != effort)):
+                            raise worker_selection.Refused("builder runtime differs; saved conversation preserved")
+                    if worker_selection.requested(props) and provider == "claude":
+                        catalog = worker_selection.claude_catalog(
+                            self.house.claude, self.tree, H.clean_env(self.house.fake))
+                        worker_selection.validate_catalog(catalog, model, effort)
+                except worker_selection.Refused as exc:
+                    self.state["selection_refused"] = worker_selection.fingerprint(props)
+                    self.state["selection_error"] = str(exc)
+                    self.save()
+                    self.selection_props(selection_status="refused", selection_error=str(exc))
+                    self.house.act("house", f"do comment {self.cid} line={json.dumps(str(exc))} to=nobody")
+                    return
+                self.state.pop("selection_refused", None)
+                self.state.pop("selection_error", None)
                 mcp = self.dir / "mcp.json"
                 mcp.write_text(json.dumps({"mcpServers": {"desk": {
                     "command": str(PY), "args": [str(HERE / "desk_mcp.py")],
@@ -1576,14 +2137,8 @@ class Worker:
                 # Alex, 30 Sep: workers may search and read the web; the protocol says a page is material, not instructions
                 tools = ["Read", "Edit", "Write", "Glob", "Grep", "WebSearch", "WebFetch", "mcp__desk__desk"] + [
                     f"{shell}({r}:*)" for shell in ("Bash", "PowerShell") for r in runs]
-                current = self.house.load()
-                task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
-                props = task.get("props") or {}
-                provider = (self.state.get("session_provider") if self.state.get("session") else None) or props.get("worker_provider", "claude")
                 # a5284: a codex card that names no model runs the adapter's own (codex_worker.MODEL), never the
                 # house's Claude model
-                model = ((self.state.get("model") if self.state.get("session") else None)
-                         or props.get("worker_model") or (model if provider == "claude" else CODEX_MODEL))
                 extra, cmds, ev, why = extra_tools(current, task) if task else ([], [], None, "")
                 if provider != "claude" and cmds:
                     extra, why = [], f"extra_tools is for claude workers; this one is {provider}"
@@ -1635,7 +2190,7 @@ class Worker:
                     instructions = self.dir / "worker-prompt.txt"
                     instructions.write_text(prompt + "\n\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\n" + CODEX_LIMITS, encoding="utf-8")
                     cmd = [str(PY), str(adapter), "--model", model,
-                           "--reasoning", props.get("worker_reasoning", "medium"),
+                           "--reasoning", effort,
                            "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
                     cmd += ["--world", world, "--target", self.cid, "--actor", self.actor]
                     cmd += ["--lease", str(self.dir / "worker.lock")]
@@ -1648,12 +2203,21 @@ class Worker:
                            "--append-system-prompt", prompt,
                            "--settings", json.dumps(charter.claude_hook(
                                PY, world, self.cid, self.actor, self._charter_channel()))]
-                    cmd += claude_worker_runtime.arguments(getattr(self, "runtime_cfg", {}))
+                    cmd += claude_worker_runtime.arguments({**cfg, "worker_claude_effort": effort})
                 else:
                     raise ValueError(f"{self.cid}: unknown worker provider {provider}")
                 self.state["session_provider"] = provider
                 self.state["model"] = model
+                self.state["effort"] = effort
+                self.state["selection"] = {
+                    "requested_model": props.get("requested_model"),
+                    "requested_effort": props.get("requested_effort"),
+                    "requested_retry": props.get("requested_retry"),
+                    "resolved": selected, "actual": {}, "usage": {}}
+                self.log("selection", self.state["selection"])
                 self.save()
+                self.selection_props(resolved_model=model, resolved_effort=effort, actual_model="",
+                                     actual_effort="", selection_error="", selection_status="resolved")
                 if self.state.get("session"):
                     cmd += ["--resume", self.state["session"]]
                 env = H.clean_env(self.house.fake)
@@ -1695,7 +2259,68 @@ class Worker:
 
             def turns_ended(self):
                 had = self.state.get("session")
-                ended = super().turns_ended()
+                buffered = []
+                mismatch = False
+                while True:
+                    try:
+                        wrapped = self.events.get_nowait()
+                    except queue.Empty:
+                        break
+                    buffered.append(wrapped)
+                for wrapped in buffered:
+                    ev = wrapped.event if isinstance(wrapped, H.host_route_parent.ChildEvent) else wrapped
+                    if isinstance(wrapped, H.host_route_parent.ChildEvent):
+                        route = getattr(self.house, "host_route", None)
+                        if not route or not route.current(self, wrapped.source):
+                            continue
+                    if ev.get("type") == "result" and ev.get("subtype") == "SelectionRefused":
+                        selection = self.state.get("selection") or {}
+                        self.state["selection_refused"] = worker_selection.fingerprint(selection)
+                        self.save()
+                        self.selection_props(selection_status="refused",
+                                             selection_error=str(ev.get("result") or "")[:300])
+                    evidence = worker_selection.receipt(ev)
+                    selection = self.state.get("selection")
+                    if not evidence or selection is None:
+                        continue
+                    is_init = ev.get("type") == "system"
+                    selection["actual" if is_init else "usage"].update(evidence)
+                    self.log("runtime_receipt", {"selection": selection})
+                    self.save()
+                    if is_init:
+                        actual = evidence.get("model", "")
+                        actual_effort = evidence.get("effort", "")
+                        mismatch = mismatch or bool(worker_selection.requested(selection) and (
+                            (actual and actual != selection["resolved"]["model"])
+                            or (actual_effort and actual_effort != selection["resolved"]["effort"])))
+                        self.selection_props(actual_model=actual, actual_effort=actual_effort,
+                                             selection_status="mismatch" if mismatch else "observed")
+                if mismatch:
+                    self.state["selection_mismatch"] = True
+                    self.selection_props(selection_error="Runtime reported another model/effort; use a new commission")
+                    selection = self.state["selection"]
+                    self.state["selection_refused"] = worker_selection.fingerprint(selection)
+                    self.save()
+                batch = queue.Queue()
+                for wrapped in buffered:
+                    ev = wrapped.event if isinstance(wrapped, H.host_route_parent.ChildEvent) else wrapped
+                    if self.state.get("selection_mismatch"):
+                        if ev.get("type") == "assistant":
+                            continue  # never let another runtime's output reach the host command interceptor
+                        if ev.get("type") == "result":
+                            ev = {**ev, "is_error": True, "subtype": "runtime_selection_mismatch",
+                                  "result": "Runtime reported another model/effort; output refused"}
+                            wrapped = (H.host_route_parent.ChildEvent(wrapped.source, ev)
+                                       if isinstance(wrapped, H.host_route_parent.ChildEvent) else ev)
+                    batch.put(wrapped)
+                # The reader thread retains the original queue. Events arriving
+                # during this pass must wait for the same receipt checks next pass,
+                # rather than slipping unchecked into Resident's output interceptor.
+                incoming, self.events = self.events, batch
+                try:
+                    ended = super().turns_ended()
+                finally:
+                    self.events = incoming
                 receipts = [line for text in ended for line in getattr(text, "host_receipts", ())]
                 if receipts:
                     self.state.setdefault("inbox", []).extend(receipts)
@@ -1704,6 +2329,8 @@ class Worker:
                     b = Builder(self.house, self.builder)        # a5378: the builder's conversation, wherever it went
                     b.state["session"] = self.state["session"]
                     b.state["provider"] = self.state.get("session_provider", "claude")
+                    b.state["model"] = self.state.get("model")
+                    b.state["effort"] = self.state.get("effort")
                     b.save()
                 return ended
 

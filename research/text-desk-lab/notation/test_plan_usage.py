@@ -1,6 +1,7 @@
 # health: room test
 """Fake quota feed, real native facts; no browser, credentials or model calls."""
 import json
+import copy
 import os
 import queue
 import sys
@@ -8,7 +9,7 @@ import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 os.environ["DESKD"] = "off"
 os.environ.setdefault("HOUSE_CLAUDE", "claude")
@@ -234,7 +235,7 @@ class Quotas(unittest.TestCase):
         self.assertEqual(len(self.calls), before)
         self.assertTrue(restarted.state["pauses"]["claude"]["notices"][0]["sent"])
 
-    def test_notice_retries_after_desk_refusal(self):
+    def test_notice_unknown_delivery_does_not_blindly_retry(self):
         real_act = self.h.act
         def refused(who, line):
             if line.startswith("notify "):
@@ -245,7 +246,76 @@ class Quotas(unittest.TestCase):
         self.assertFalse(self.p.state["pauses"]["claude"]["notices"][0]["sent"])
         self.h.act = real_act
         self.p.flush_notices()
-        self.assertTrue(self.p.state["pauses"]["claude"]["notices"][0]["sent"])
+        notice = self.p.state["pauses"]["claude"]["notices"][0]
+        self.assertFalse(notice["sent"])
+        self.assertEqual(notice["delivery"], "unknown")
+        self.assertEqual(sum(line.startswith("notify ") for line in self.calls), 0)
+
+    def test_stale_snapshot_three_flushes_append_once(self):
+        # Production House.load keys its cache by pickle mtime. The writer can
+        # acknowledge a logged append before its background pickle changes.
+        stale = copy.deepcopy(self.w)
+        reader = house.House.__new__(house.House)
+        reader.world, reader.mtime, reader.desk = "inmemory", 12, SimpleNamespace(world=stale)
+        fake_path = MagicMock()
+        fake_path.__truediv__.return_value = fake_path
+        fake_path.stat.return_value.st_mtime = 12
+        self.h.load = reader.load
+        with patch.object(house, "HERE", fake_path), patch.object(house.export_docs, "load") as reload:
+            self.p.paused("claude", self.card, 2060)
+            self.p.flush_notices()
+            self.p.flush_notices()
+            reload.assert_not_called()
+        sent = next(s for s in self.w.subjects.values()
+                    if s.get("props", {}).get("role") == "notifications")
+        self.assertEqual(len(sent["lines"]), 1)
+        notice = self.p.state["pauses"]["claude"]["notices"][0]
+        self.assertTrue(notice["sent"])
+        self.assertRegex(notice["receipt"], r"e\d+")
+        with patch.object(Path, "read_text", return_value=json.dumps(self.p.state)):
+            restarted = plan_usage.Plans(self.h, clock=lambda: self.now)
+        with patch.object(house, "HERE", fake_path):
+            restarted.flush_notices()
+        self.assertEqual(len(sent["lines"]), 1)
+
+    def test_resume_result_and_publications_preserve_historical_line(self):
+        self.p.paused("claude", self.card, 2060)
+        sent = next(s for s in self.w.subjects.values()
+                    if s.get("props", {}).get("role") == "notifications")
+        historical = copy.deepcopy(sent["lines"])
+        stale = copy.deepcopy(self.w)
+        self.h.load = lambda: stale
+        self.now = 2060
+        r = house.Resident.__new__(house.Resident)
+        r.rid, r.house, r.reply = self.card, self.h, []
+        r.state = {"session_provider": "codex", "pending": {"delivered": True}, "retry_kind": "limit"}
+        r.save, r.log, r.events = Mock(), Mock(), queue.Queue()
+        r.events.put({"type": "result", "is_error": False})
+        self.assertEqual(house.Resident.turns_ended(r), [""])
+        self.p.publish()  # the end-of-step publication after the turn publication
+        self.assertEqual(len(sent["lines"]), 2)
+        self.assertEqual(sent["lines"][:1], historical)
+        self.assertIn("work resumed with Codex", sent["lines"][-1]["text"])
+
+    def test_lost_ack_stale_snapshot_restart_reconciles_without_resend(self):
+        stale = copy.deepcopy(self.w)
+        self.h.load = lambda: stale
+        act = self.h.act
+        def lost(who, line):
+            result = act(who, line)
+            if line.startswith("notify "):
+                raise TimeoutError("response lost after commit")
+            return result
+        self.h.act = lost
+        self.p.paused("claude", self.card, 2060)
+        self.h.act = act
+        with patch.object(Path, "read_text", return_value=json.dumps(self.p.state)):
+            restarted = plan_usage.Plans(self.h, clock=lambda: self.now)
+        restarted.flush_notices()
+        self.assertFalse(restarted.state["pauses"]["claude"]["notices"][0]["sent"])
+        self.h.load = lambda: self.w
+        restarted.flush_notices()
+        self.assertTrue(restarted.state["pauses"]["claude"]["notices"][0]["sent"])
         self.assertEqual(sum(line.startswith("notify ") for line in self.calls), 1)
 
     def test_pool_uses_other_lane_at_threshold(self):

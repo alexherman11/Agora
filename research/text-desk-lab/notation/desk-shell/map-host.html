@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- a7950: the living map's host page. ?session=&as=&scope=<f123>&frame=<name> (a page under /map/). The frame is
+     isolated; this page is the seam (map-host.js). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Living map</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f6f3ec; color: #2c2a26; font: 14px/1.4 system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  .map-frame { flex: 1; border: 0; width: 100%; min-height: 0; background: #eef1ea; }
+  #status { min-height: 1.4em; padding: 4px 10px; color: #6b5d3e; }
+</style>
+</head>
+<body>
+<div id="status" role="status" aria-live="polite"></div>
+<script src="map-host.js"></script>
+<script>
+  (function () {
+    const p = new URLSearchParams(location.search);
+    // frame=ground is ground's real frame (a7946, served from research/map-lab/ground); the stand-in stays the default
+    const frame = p.get("frame") || "standin.html";
+    const src = frame === "ground" ? "map/ground/map.html" : /^[a-z0-9][a-z0-9-]{0,40}\.html$/.test(frame) ? "map/" + frame : null;
+    if (!src) { document.getElementById("status").textContent = "frame= names a page under /map/, or ground"; return; }
+    MapHost.start({ session: p.get("session") || "desktop", as: p.get("as") || "alex", scope: p.get("scope") || "",
+                    frameSrc: src + (location.hash || ""), status: document.getElementById("status") });
+  })();
+</script>
+</body>
+</html>

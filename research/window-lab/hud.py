@@ -279,6 +279,10 @@ class Hud:
         css = ("html{background:#0d100f url(%s) center/cover no-repeat fixed!important}"
                "body,#paint{background:transparent!important}") % frost
         self.window.evaluate_js(CLICKS)
+        # a8901: any press in the home base stops the voice at once (voice.hush is nothing while it is quiet)
+        self.window.evaluate_js("window.__voiceHush || (window.__voiceHush = 1, document.addEventListener('pointerdown',"
+                                " () => { const a = window.pywebview && window.pywebview.api;"
+                                " if (a && a.host) a.host('voice.hush', ''); }, true))")
         self.window.evaluate_js("(() => { let s = document.getElementById('hud-frost');"
                                 " if (!s) { s = document.createElement('style'); s.id = 'hud-frost'; document.head.append(s); }"
                                 " s.textContent = %s; })()" % json.dumps(css))
@@ -300,12 +304,16 @@ class Hud:
                                      by="hud", changed_only=True))
         if not any(wrote):
             return rows
+        self.tell_pages()
+        return rows
+
+    def tell_pages(self):
+        """The door tells each open page that a witnessed source changed, so it is painted again (voice.py too)."""
         try:
             urllib.request.urlopen(urllib.request.Request(self.door + "/door/witnessed", data=b"{}", method="POST"),
                                    timeout=2).read()
         except OSError:
             pass
-        return rows
 
     # -- live pictures of windows, where the lens put their parts
     def slots(self):
@@ -376,6 +384,8 @@ class Hud:
         if not self.shown:
             return
         self.shown = False
+        if getattr(self, "voice", None) is not None:
+            self.voice.stop("the home base was hidden")      # a8901: it never listens or speaks while put away
         self.drop_thumbs()
         self.window.hide()
         if self.keys_tid:
@@ -525,6 +535,8 @@ class Hud:
                 continue
             n += 1
             try:
+                if n % 4 == 0 and getattr(self, "voice", None) is not None:
+                    self.voice.tick()                 # a8901: silence, a game or the switch end a listening
                 if n % 8 == 0:
                     self.say_desktop()
                 self.place_thumbs()
@@ -564,6 +576,10 @@ class Hud:
         witnessed.clear(self.a.world, "media")
         witnessed.clear(self.a.world, "clock")
         witnessed.clear(self.a.world, "host")
+        if getattr(self, "voice", None) is not None:          # a8901: the speech child ends with the home base
+            self.voice.stop("the home base closed")
+            self.voice.engine.close()
+        witnessed.clear(self.a.world, "voice")
         if self.keys_tid:
             user32.PostThreadMessageW(self.keys_tid, WM_QUIT, 0, 0)
         remove_own_pid(PIDFILE, os.getpid())

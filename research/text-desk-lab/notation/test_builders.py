@@ -17,7 +17,11 @@ the world copy and every process stubbed (Popen is caught: each start is a comma
   6. a refused landing on a parked card waits for a builder, who is told the failure
   7. carry_conversation: the newest copy (and what claude keeps beside it) goes to the folder claude will look in
   8. a conversation that cannot be found: the builder starts fresh and is told so
-  9. the protocol: the notebook rule (found by role), Alex's screen and the demo rule; a builder is told who it is
+  9. the protocol: the documentation rule (its index found by role), Alex's screen and the demo rule
+ 10-13. Codex builders, crash retries, and a Claude card held by Claude's usage limit going on with Codex (a6570)
+ 14-19. the reverse (a9031): a Codex card held by Codex's limit goes on with a Claude builder from its own worktree and
+     checkpoint, only when limit_fallback names claude; once, never twice; never while a Codex adapter holds its lease;
+     never back to Codex when Codex resets; within the worker cap; not at all while Claude is held too
 """
 import atexit
 import json
@@ -365,17 +369,19 @@ reset()
 
 # ---- 9. the protocol ---------------------------------------------------------------------------------------------------
 P = workshop.PROTOCOL
-check("9. the protocol reads the notebook rule: found by role, read before, an entry before the done comment",
-      "find role=builders-notebook" in P and "Before you start, read it" in P and "Before your done comment, add" in P
-      and "your notebook entry" in P, P[:200])
+# a9031: since a44450e (Alex, 21 Oct) the rule is a shared documentation store found by its index, not one notebook
+check("9. the protocol reads the documentation rule: the index found by role, topic notes kept, the old notebook historical",
+      "find role=worker-documentation-index" in P and "Before finishing, maintain the relevant documentation" in P
+      and "historical source material" in P, P[:200])
 check("9. the protocol says how to see and record Alex's screen, and the demo rule",
       "screen_tools.py look" in P and "screen_tools.py record" in P and "research/window-lab/demos/" in P
       and "say on the card what will appear" in P and "names its recording" in P)
 codex = card("A fresh Codex card", worker_provider="codex", worker_fresh="yes")
 WS.step(W, {**POOL, "worker_pool": "2 codex gpt-6-astra"})
 cp = (WS.workers[codex].dir / "worker-prompt.txt").read_text(encoding="utf-8")
-check("9. a Codex worker's prompt has the notebook rule too, and is a disposable worker",
-      "find role=builders-notebook" in cp and "a disposable builder" in cp and WS.workers[codex].builder is None)
+check("9. a Codex worker's prompt has the documentation rule too, and is a disposable worker",
+      "find role=worker-documentation-index" in cp and "a disposable builder" in cp and WS.workers[codex].builder is None,
+      cp[:300])
 reset()
 
 # Codex builders keep their own thread across commissions, without Claude's cwd copying.
@@ -474,6 +480,202 @@ check("13. a restarted house completes the prepared transfer once",
       and "handoff_pending" not in WS.workers[interrupted].state
       and len(list((transfer_path.parent / "handoffs").glob("*.json"))) == 1)
 reset()
+
+# ---- 14-19. a9031: the reverse. A Codex card held by Codex's usage limit goes on with a Claude builder -------------------
+LIMITS = H.dir / "provider-limits.json"
+
+
+def clear_limits():
+    workshop.atomic_state(LIMITS, {})
+    for name in ("builder-1", "builder-2", "codex-builder-1", "codex-builder-2"):
+        b = workshop.Builder(H, name)
+        b.state.pop("retry_at", None)
+        b.save()
+
+
+def codex_card(title, pool):
+    """A card worked by a Codex builder, which then hits Codex's usage limit mid-task with an edit on disk."""
+    cid = card(title)
+    WS.step(W, pool)
+    wk = WS.workers[cid]
+    assert wk.builder.startswith("codex-builder-"), wk.builder
+    end_turn(cid, "CODEX-KEPT-" + cid)
+    wk.state["pending"] = {"carry": "Continue from checkpoint c1: run the baseline check next.", "delivered": True}
+    wk.tree.mkdir(parents=True, exist_ok=True)
+    (wk.tree / "checkpoint.txt").write_text("half done, uncommitted")
+    wk.save()
+    wk.busy = False
+    WS.failed(cid, wk, {"detail": "insufficient_quota: usage limit reached; resets 5:27am"})
+    return cid, wk
+
+
+def claude_procs(cid):
+    return [(cmd, p) for cmd, p in procs if cmd[0] == "claude.exe" and WS.workers.get(cid) and WS.workers[cid].proc is p]
+
+
+clear_limits()
+CODEX_ONLY = {**POOL, "worker_pool": "2 codex gpt-6.1-sol", "limit_fallback": "codex, claude"}
+BOTH = {**POOL, "worker_pool": "2 claude, 2 codex gpt-6.1-sol", "limit_fallback": "codex, claude"}
+check("14. limit_fallback reads both ways", workshop.Workshop.fallbacks(BOTH) == {"codex", "claude"}
+      and workshop.Workshop.fallbacks({"limit_fallback": "codex"}) == {"codex"}
+      and workshop.Workshop.fallbacks({}) == set())
+held, hwk = codex_card("Log baseline, Codex checkpoint c1", CODEX_ONLY)
+check("14. (setup) Codex's limit holds the card on its Codex thread, worktree kept",
+      hwk.state["retry_kind"] == "limit" and hwk.state["session_provider"] == "codex"
+      and props(held)["commission"] == "working")
+n = len(procs)
+WS.step(W, {**CODEX_ONLY, "limit_fallback": "codex"})
+check("15. with limit_fallback=codex only (a6570 as it was), a Codex-held card stays on Codex, untouched",
+      props(held)["worker_provider"] == "codex" and len(procs) == n
+      and "last_handoff" not in workshop.Workshop.card_state(WS, held))
+WS.step(W, BOTH)
+moved = WS.workers.get(held)
+st = moved.state if moved else {}
+archive = json.loads(Path(st["last_handoff"]["archive"]).read_text()) if st.get("last_handoff") else {}
+check("16. with 'codex, claude' it goes to a Claude builder: worker_provider=claude, the Codex thread archived",
+      props(held)["worker_provider"] == "claude" and moved and moved.builder in ("builder-1", "builder-2")
+      and archive.get("session") == "CODEX-KEPT-" + held and archive.get("session_provider") == "codex"
+      and Path(st["last_handoff"]["archive"]).name.startswith("codex-"), (props(held), st))
+cmd, p = procs[-1]
+told = "\n".join(sent(p))
+check("16. the Claude builder is a claude process that never resumes the Codex thread, in the same worktree",
+      cmd[0] == "claude.exe" and "CODEX-KEPT-" + held not in cmd and moved.tree == hwk.tree
+      and (moved.tree / "checkpoint.txt").read_text() == "half done, uncommitted", cmd[-4:])
+check("16. it is told whose card it was, that Codex hit its limit, to read its checkpoint, and the task",
+      "taking over commission" in told and "codex-builder-1 began it" in told and "Codex hit its usage limit" in told
+      and "last checkpoint comment" in told and "Continue from checkpoint c1" in told
+      and "Log baseline, Codex checkpoint c1" in told and "Do not assume you have Codex's conversation" in told, told[:900])
+said = say("pike", f"read {held}")
+check("16. the card says so in the world", "Codex reached its usage limit. A persistent Claude builder" in said, said[-600:])
+n, k = len(procs), len(list((moved.dir / "handoffs").glob("*.json")))
+WS.step(W, BOTH)
+WS.step(W, BOTH)
+check("17. never twice: further passes start nothing more and archive nothing more",
+      len(procs) == n and len(list((moved.dir / "handoffs").glob("*.json"))) == k
+      and len([x for x in WS.workers.values() if x.cid == held and x.alive()]) == 1)
+# Codex's limit resets: the card stays with Claude, and no Codex builder picks it up again
+workshop.atomic_state(LIMITS, {"codex": {"retry_at": time.time() - 60, "detail": "reset"}})
+for name in ("codex-builder-1", "codex-builder-2"):
+    b = workshop.Builder(H, name)
+    b.state["retry_at"] = time.time() - 60
+    b.save()
+end_turn(held, "CLAUDE-AFTER-" + held)
+setp(held, commission="waiting")
+WS.step(W, BOTH)
+WS.workers.pop(held, None)            # and a house restart rereads everything
+WS = workshop.Workshop(H)
+WS.land = lambda w, cid, s, wk, wait=True: None
+WS.step(W, BOTH)
+codex_on_it = [cmd for cmd, p in procs[n:] if "codex_worker.py" in " ".join(map(str, cmd)) and held in cmd]
+check("17. when Codex's limit resets the card does not go back: still Claude, no Codex process for it, no new handoff",
+      props(held)["worker_provider"] == "claude" and not codex_on_it
+      and workshop.Workshop.card_state(WS, held).get("session_provider") == "claude"
+      and len(list((moved.dir / "handoffs").glob("*.json"))) == k, (props(held), codex_on_it))
+reset()
+clear_limits()
+
+# A Codex adapter still holding the card's lease (one a former house left running): no transfer until it lets go
+leased, lwk = codex_card("Leased by a Codex adapter", CODEX_ONLY)
+lock = H.dir / f"worker-{leased}" / "worker.lock"
+lock.parent.mkdir(parents=True, exist_ok=True)
+f = open(lock, "a+b")
+f.write(b"0")
+f.flush()
+f.seek(0)
+if os.name == "nt":
+    import msvcrt
+    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+else:
+    import fcntl
+    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+WS.step(W, BOTH)
+check("18. a card whose lease a Codex process still holds is not moved: never two runtimes on one card",
+      props(leased)["worker_provider"] == "codex" and not workshop.lease_free(lock))
+f.seek(0)
+if os.name == "nt":
+    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    fcntl.flock(f, fcntl.LOCK_UN)
+f.close()
+WS.step(W, BOTH)
+check("18. once the lease is free, the same card moves", props(leased)["worker_provider"] == "claude"
+      and workshop.lease_free(lock))
+reset()
+clear_limits()
+
+# The four-worker cap: the moved card waits for a slot like any other
+CAP = {**BOTH, "workers": "1"}
+busy = card("Already running on Claude", worker_provider="claude")
+WS.step(W, {**CAP, "worker_pool": "2 claude"})
+capped, cwk = codex_card("Codex-held under a full house", {**CODEX_ONLY, "workers": "2"})
+n = len(procs)
+WS.step(W, CAP)
+check("19. the move is made, but with every slot busy no Claude process starts for it",
+      props(capped)["worker_provider"] == "claude" and len(procs) == n
+      and len(WS.running(W)) <= 1)
+setp(busy, commission="waiting")
+WS.workers[busy].busy = False
+WS.step(W, CAP)
+check("19. when a slot frees, a Claude builder takes it, and never more than the cap run",
+      WS.workers.get(capped) and WS.workers[capped].alive() and WS.workers[capped].builder.startswith("builder-")
+      and len(WS.running(W)) <= 1)
+reset()
+clear_limits()
+
+# Both providers held: it stays where it is and waits for its own provider's reset
+both, bwk = codex_card("Both providers held", CODEX_ONLY)
+workshop.atomic_state(LIMITS, {**json.loads(LIMITS.read_text()), "claude": {"retry_at": time.time() + 3600, "detail": "x"}})
+WS.step(W, BOTH)
+check("19. with Claude held too, nothing moves", props(both)["worker_provider"] == "codex"
+      and "handoff_pending" not in workshop.Workshop.card_state(WS, both))
+reset()
+clear_limits()
+
+# JEFF c9079: a resume order, one at a time. handoff_order names who goes first; handoff_at_once=1 holds the rest back
+FOUR_CODEX = {**CODEX_ONLY, "worker_pool": "3 codex gpt-6.1-sol", "workers": "4"}
+c1, c2, c3 = card("Held one"), card("Held two"), card("Held three")
+WS.step(W, FOUR_CODEX)
+for c in (c1, c2, c3):
+    end_turn(c, "CODEX-" + c)
+    wk = WS.workers[c]
+    wk.state["pending"] = {"carry": "carry on", "delivered": True}
+    wk.tree.mkdir(parents=True, exist_ok=True)
+    wk.save()
+    wk.busy = False
+    WS.failed(c, wk, {"detail": "insufficient_quota: usage limit reached"})
+ORDERED = {**BOTH, "handoff_order": f"{c3}, {c1}", "handoff_at_once": "1"}
+WS.step(W, ORDERED)
+prov = lambda: [props(c)["worker_provider"] for c in (c3, c1, c2)]  # noqa: E731
+check("20. one at a time, first in handoff_order: only the third card moves", prov() == ["claude", "codex", "codex"], prov())
+WS.step(W, ORDERED)
+check("20. while it is underway the next waits", prov() == ["claude", "codex", "codex"], prov())
+end_turn(c3, "CLAUDE-" + c3)
+WS.step(W, ORDERED)                 # its turn ended unfinished: it waits on someone, and is no longer underway
+WS.step(W, ORDERED)
+check("20. when it is no longer working, the next in the order moves", props(c3)["commission"] == "waiting"
+      and prov() == ["claude", "claude", "codex"], (props(c3)["commission"], prov()))
+reset()
+clear_limits()
+
+# A card paused before Codex's limit (so it never met the limit itself), then resumed by a lead while Codex is held
+quiet = card("Paused before the limit")
+WS.step(W, CODEX_ONLY)
+end_turn(quiet, "CODEX-QUIET")
+qwk = WS.workers[quiet]
+qwk.tree.mkdir(parents=True, exist_ok=True)
+qwk.stop()
+WS.workers.pop(quiet, None)
+setp(quiet, commission="paused")
+workshop.atomic_state(LIMITS, {"codex": {"retry_at": time.time() + 3600, "detail": "held"}})
+WS.step(W, BOTH)
+check("21. a paused card is not moved (a lead's hold)", props(quiet)["worker_provider"] == "codex")
+setp(quiet, commission="working")
+WS.step(W, BOTH)
+check("21. resumed while Codex is held, it moves though it never met the limit itself",
+      props(quiet)["worker_provider"] == "claude" and WS.workers[quiet].builder.startswith("builder-"),
+      props(quiet))
+reset()
+clear_limits()
 
 mock.patch.stopall()
 print(f"{len(fails)} FAILED" if fails else "all passed")

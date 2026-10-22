@@ -31,8 +31,9 @@ def judge(samples, ours=(), his_titles=(), inputs=None, far=True, crash=False):
     def next_input():
         last["t"] = next(times, last["t"])
         return last["t"]
-    real = (sw._alex, sw.last_input, sw.ticks)
+    real = (sw._alex, sw.last_input, sw.ticks, sw.owner, sw.exe)
     sw._alex, sw.last_input = next_state, next_input
+    sw.owner, sw.exe = lambda hwnd: 0, lambda pid: "fixture"
     sw.ticks = lambda: last["t"] + (10_000 if far else 20)       # his last input long ago (far), or just now
     try:
         g = sw.Guard("scripted", "sandbox test")
@@ -42,7 +43,7 @@ def judge(samples, ours=(), his_titles=(), inputs=None, far=True, crash=False):
             time.sleep(0.4)
         return g.verdict()
     finally:
-        sw._alex, sw.last_input, sw.ticks = real
+        sw._alex, sw.last_input, sw.ticks, sw.owner, sw.exe = real
 
 
 def main():

@@ -1,0 +1,6 @@
+read a9814
+do rewrite a9814 text="# notify-question-owner <card>: the waiting card's question, noticed once, for the one it is for.\n# A native unanswered question to Alex is his. Otherwise the card's asker: a resident (a corner of their own) already\n# hears it through the house (the task notice for commission=waiting, and the knock of the mark=ask comment), so no\n# note is made for them; a person with no corner gets the note their notices bell shows. A card with no asked_by\n# refuses the second line (it cannot be read) and gets a note only for a question to Alex.\ndo create \"Alex's notices\" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) > 0\ndo create \"Alex's notices\" kind=note title=asking role=notice to=$1.asked_by topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) = 0 and count(kind:surface,prop:role=resident,prop:actor=$1.asked_by) = 0"
+look f5189 :1
+do create f5189 kind=task title="Copy check a8911 r2: JEFF-asked card" asked_by=jeff commission=working
+do create f5189 kind=task title="Copy check a8911 r2: Alex-asked card" asked_by=alex commission=working
+do create f5189 kind=task title="Copy check a8911 r2: permission card" asked_by=jeff commission=working

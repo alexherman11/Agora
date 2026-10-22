@@ -1,0 +1,114 @@
+<!doctype html>
+<!-- a7950: a stand-in map frame that speaks agora-map/1 (world note a7875) until the ground worker's frame exists.
+     It draws the pins as a keyboard list, and offers press, move, a stale move and a drop, as a map would send them.
+     With #probe it also tries what a hostile frame would: messages outside the contract, and every way out of the
+     sandbox to the HUD bridge, the host page and the desk; it reports what happened as one last message (which the
+     host refuses as an unknown op, and logs). It never runs in the HUD. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 10px; background: #eef1ea; color: #2c2a26; font: 14px/1.4 system-ui, sans-serif; }
+  button { font: inherit; margin: 2px; padding: 4px 8px; border: 1px solid #b8b2a2; border-radius: 6px; background: #fffdf8; }
+  li { margin: 4px 0; }
+  .route { color: #4b6a8a; }
+</style>
+</head>
+<body>
+<p id="head">Stand-in map: waiting for a draw.</p>
+<ul id="pins"></ul>
+<ul id="routes"></ul>
+<p><button id="drop" type="button">Drop a pin at 51.5190, -0.1265</button></p>
+<script>
+  "use strict";
+  const CH = "agora-map/1";
+  let draw = null, port = null;
+  const send = m => port && port.postMessage(m);             // only on the port the host gave this load
+  addEventListener("message", e => {
+    if (e.source !== parent || !e.data || e.data.channel !== CH || e.data.op !== "hello" || !e.ports[0]) return;
+    port = e.ports[0];
+    port.onmessage = m => drawn(m.data);
+  });
+  function drawn(d) {
+    if (!d || d.channel !== CH || d.op !== "draw") return;
+    draw = d;
+    window.__draws = (window.__draws || 0) + 1;
+    document.getElementById("head").textContent = `Stand-in map: ${d.pins.length} pins, ${d.routes.length} routes (draw ${window.__draws}).`;
+    const ul = document.getElementById("pins"); ul.textContent = "";
+    for (const p of d.pins) {
+      const li = document.createElement("li"); li.dataset.pin = p.id; li.dataset.rev = p.rev;
+      li.dataset.lat = p.lat; li.dataset.lon = p.lon;
+      const b = (label, cls, f) => { const x = document.createElement("button"); x.type = "button"; x.textContent = label; x.className = cls; x.onclick = f; li.appendChild(x); };
+      b(`${p.label} (${p.lat.toFixed(5)}, ${p.lon.toFixed(5)})`, "press", () => send({ channel: CH, op: "press", id: p.id }));
+      b("move north", "move", () => send({ channel: CH, op: "move", id: p.id, rev: p.rev, lat: p.lat + 0.001, lon: p.lon }));
+      b("move from an old revision", "stale", () => send({ channel: CH, op: "move", id: p.id, rev: p.rev - 1, lat: p.lat - 0.002, lon: p.lon }));
+      ul.appendChild(li);
+    }
+    const ur = document.getElementById("routes"); ur.textContent = "";
+    for (const r of d.routes) {
+      const li = document.createElement("li"); li.className = "route"; li.dataset.route = r.id; li.dataset.order = r.pins.join(",");
+      li.textContent = `${r.label}: ${r.pins.join(" → ")}`; ur.appendChild(li);
+    }
+  }
+  document.getElementById("drop").onclick = () => send({ channel: CH, op: "drop", lat: 51.519, lon: -0.1265 });
+
+  // #reopen (JEFF via Pike, e17339): a frame that loads again but keeps its scripts, and so its old port. It rewrites
+  // itself (document.open/write/close), which fires the iframe's load in the host; it takes the new port from the new
+  // hello, then sends one press on the OLD port and one on the new port (the control).
+  if (location.hash === "#reopen") setTimeout(() => {
+    const old = port, id = draw && draw.pins[0] ? draw.pins[0].id : "a1";
+    let fresh = null;
+    const take = e => { if (e.source === parent && e.data && e.data.op === "hello" && e.ports[0]) fresh = e.ports[0]; };
+    document.open();
+    document.write("<!doctype html><p>Stand-in map, rewritten in place: the same scripts, a new document.</p>");
+    document.close();
+    addEventListener("message", take);
+    setTimeout(() => {
+      if (old) old.postMessage({ channel: CH, op: "press", id });
+      if (fresh) fresh.postMessage({ channel: CH, op: "press", id });
+      (fresh || old) && (fresh || old).postMessage({ channel: CH, op: "report", reopen: { kept_old: !!old, got_new: !!fresh, same: old === fresh } });
+    }, 1500);
+  }, 1500);
+
+  if (location.hash === "#probe") setTimeout(() => {
+    const out = {}, t = (k, f) => { try { out[k] = f(); } catch (e) { out[k] = "threw " + e.name; } };
+    // the bridge, as a page in the HUD would reach it
+    t("pywebview here", () => typeof window.pywebview);
+    t("chrome.webview here", () => typeof (window.chrome && window.chrome.webview));
+    t("chrome.webview.postMessage", () => { window.chrome.webview.postMessage(["touched", JSON.stringify(["from the frame"]), "a7950"]); return "sent"; });
+    t("parent.pywebview", () => typeof parent.pywebview);
+    t("parent.pywebview.api.touched", () => { parent.pywebview.api.touched("from the frame via parent"); return "called"; });
+    t("top.document", () => typeof top.document.body);
+    t("parent.MapHost", () => typeof parent.MapHost);
+    t("navigate the top page", () => { top.location.href = "about:blank"; return "navigated"; });
+    t("open a window", () => String(window.open("about:blank")));
+    t("localStorage", () => typeof localStorage.length);
+    t("document.cookie", () => typeof document.cookie);
+    // messages outside the contract (each must be refused by the host or by deskd)
+    const id = draw && draw.pins[0] ? draw.pins[0].id : "a1", rev = draw && draw.pins[0] ? draw.pins[0].rev : 1;
+    const hostile = [
+      ["wrong channel", { channel: "agora-map/2", op: "press", id }],
+      ["no channel", { op: "press", id }],
+      ["unknown op", { channel: CH, op: "remove", id }],
+      ["NaN", { channel: CH, op: "move", id, rev, lat: NaN, lon: 0 }],
+      ["Infinity", { channel: CH, op: "drop", lat: Infinity, lon: 0 }],
+      ["out of range", { channel: CH, op: "move", id, rev, lat: 95, lon: 0 }],
+      ["unknown thing", { channel: CH, op: "press", id: "a999999" }],
+      ["command in the id", { channel: CH, op: "press", id: `${id}; do remove ${id}` }],
+      ["command beside", { channel: CH, op: "press", id, line: `do remove ${id}` }],
+      ["a bare command", `do remove ${id}`],
+      ["an array", [CH, "press", id]],
+    ];
+    for (const [, m] of hostile) send(m);
+    // a well-formed press, but to the window rather than on the port: refused, whoever it is from
+    parent.postMessage({ channel: CH, op: "press", id }, "*");
+    // and the desk itself, past the host: a request from an opaque origin says Origin: null
+    fetch("/api/do", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session: "x", as: "alex", line: `do remove ${id}` }) })
+      .then(r => r.status, e => "threw " + e.name)
+      .then(s => { out["POST /api/do"] = s;
+        return fetch("/api/map?session=x&as=alex").then(r => r.status, e => "threw " + e.name); })
+      .then(s => { out["GET /api/map"] = s; send({ channel: CH, op: "report", hostile: hostile.map(h => h[0]), results: out }); });
+  }, 1500);
+</script>
+</body>
+</html>

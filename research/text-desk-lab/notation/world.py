@@ -1509,7 +1509,9 @@ class World:
                 self._order(fid, order)
                 for k in [k for i, k in enumerate(order) if kids[i] != k] + [fid]:
                     self._bump(k)
-        elif "delete" in u:
+        # A create hook may also restore existing subjects (e.g. a promise's
+        # asked-end marker). Restore those and remove the created thing.
+        if "delete" in u:
             gone = self.nodes.pop(u["delete"], None)
             if gone and gone["parent"]:
                 self.reflow(gone["parent"])
