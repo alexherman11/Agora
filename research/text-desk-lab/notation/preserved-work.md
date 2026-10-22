@@ -24,7 +24,7 @@ explicit without resuming either worker. A status prop alone is insufficient.
 The house processes this before normal admission, even for paused cards,
 without changing their paused state. It reserves both card process leases
 and shares the existing landing lock. A process still alive, a held lease,
-landing in progress, dirty receiver, staged source index, wrong branch,
+landing in progress, unsafe receiver inputs, staged source index, wrong branch,
 missing input, linked path or merge in progress holds the request. It never
 stops a worker to obtain a lease. A waiting receiver does not consume a model
 slot. A missing receiver worktree is created by the house on its existing
@@ -42,6 +42,19 @@ contents as safe to execute.
 
 ## Preservation and conflict policy
 
+Before importing, the house checkpoints the stopped receiver's own dirty and
+untracked nonignored source on its existing worker branch, under the same card
+lease and landing lock. Session copies are excluded; private/linked inputs,
+unmerged files and unsupported entries hold rather than being blindly committed.
+The receiver inventory is bounded to 200 paths / 32 MiB, including any staged
+version. Deleted files and rename sides are recorded explicitly. If partial
+staging exists, the existing index is committed first and the final worktree
+second, retaining both versions in history. Hooks and signing are disabled.
+The durable receipt records raw worktree hashes, staged hashes, committed blob
+hashes, checkpoint commits and deletions. An exact inventory comment is posted
+on the receiving card before source delivery proceeds. Failure to post holds
+delivery; the saved checkpoint can be reported again without repeating commits.
+
 An idle source worker's selected files are committed on its own branch; other
 uncommitted files remain in place. Git hooks/signing are not run by that commit.
 Main inputs reuse **landing.hand**, the recording half of `landing.py --files`,
@@ -51,8 +64,9 @@ deliberately do not call that half. Main files, HEAD and index remain untouched.
 A projection commit contains only selected source paths on the source/receiver
 common base. This prevents accidentally importing unrelated source commits or
 held deployments. Git `merge-tree --write-tree` checks a three-way merge in
-objects before the receiver changes. A conflict leaves its HEAD, index and files
-unchanged. The source preservation commit stays available. Successful merges
+objects before the incoming merge changes the receiver. A conflict leaves its
+checkpointed HEAD, index and files unchanged; its own checkpoint and the source
+preservation commit stay available. Successful merges
 advance only the receiving worker branch with a merge receipt commit. Ignored
 receiver files are protected too; they are not disposable.
 
@@ -73,13 +87,17 @@ The existing main-new-file admission check accepts only files in a completed
 import receipt whose receiving commit is still in the worker's ancestry.
 Other missing-file holds and shared-source warnings are retained.
 
+A durable `receiver-preserving` receipt precedes receiver commits; interruption
+in that phase holds for inspection and never repeats an uncertain commit.
+`receiver-preserved` records the completed checkpoint, before card reporting and
+delivery. It can resume only with the checkpoint in ancestry and a clean receiver.
 A durable `planned` receipt precedes receiver fast-forward. If the house dies
 afterward, ancestry reconciles that receipt without another preservation commit.
 If the result is not in the receiver ancestry, or source preservation was
 interrupted, the house holds rather than guessing or replaying. The maintainer
 inspects the receipt and Git state before issuing a new request. Atomicity
-across source and receiver is not claimed: a refused merge may have preserved
-the source while leaving the receiver untouched.
+across source and receiver is not claimed: a refused merge may have checkpointed
+the receiver and preserved the source, while importing nothing.
 
 To abandon a held request, clear `brings`; nothing is deleted or rolled back.
 To reverse a successful import, review/revert its receipt merge on the receiving
