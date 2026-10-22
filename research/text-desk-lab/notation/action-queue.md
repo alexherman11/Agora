@@ -40,7 +40,7 @@ defers a sibling reason. A group is Later only through the explicit group select
 Overlapping design/review membership yields one group and two reasons.
 
 Group fields: `key target title later reason_count counted uncertainty recipient item`.
-Reason fields: `request_key kind source asker recipient resolution_state
+Reason fields: `request_key kind source asker recipient asker_source recipient_source resolution_state
 resolution_evidence later eligible uncertainty key target label asker_label
 recipient_label item`. `asker` and `recipient` are person ids; readable labels are
 separate. `reason_count` counts eligible unresolved reasons. Resolved, excluded
@@ -104,6 +104,24 @@ activation, without mutating the world. Reopening has a fresh reason key.
 Unavailable before-images or comment-dependent eligibility without full snapshots
 produce unknown-asker diagnostics rather than invented provenance. No archive
 files or session worlds are opened by the evaluator.
+
+Native request identity fallback (a9693, Juniper c9707): when the referenced
+ask origin is absent from retained history, stored `to` and `asked_by` may
+supply recipient and asker. An existing person id remains that identity; a name
+resolves only if it has had exactly one bearer in the persons index. Missing or
+ambiguous identities remain diagnostic. An undone origin is not absent history.
+A retained native ask always wins, even with missing/invalid `to` or author.
+For a migrated request whose retained origin is a legacy `prop` event without
+a `to` argument, only the recipient uses this stored fallback; the asker stays
+event-derived. If that event names an `awaiting` recipient, its event-time
+identity must agree with the stored recipient, otherwise the row is uncertain
+and neither recipient is selected. No other retained origin admits fallback.
+Native reasons expose `recipient_source=event|stored` and
+`asker_source=event|stored`, including diagnostic rows; these fields describe
+identity provenance, not consent. Other reason kinds do not use these fields.
+Group rows remain aggregates: inspect `action-reasons` for provenance.
+Fallback never resolves a request or changes permission enforcement; only its
+own recipient's accept/decline or original asker's withdraw is terminal.
 
 ## Checks
 

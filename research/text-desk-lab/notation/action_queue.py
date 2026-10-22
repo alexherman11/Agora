@@ -12,7 +12,7 @@ from world import Refusal
 
 
 GROUP_FIELDS = ("key", "target", "title", "later", "reason_count", "counted", "uncertainty", "recipient", "item")
-REASON_FIELDS = ("request_key", "kind", "source", "asker", "recipient", "resolution_state",
+REASON_FIELDS = ("request_key", "kind", "source", "asker", "recipient", "asker_source", "recipient_source", "resolution_state",
                  "resolution_evidence", "later", "eligible", "uncertainty", "key", "target",
                  "label", "asker_label", "recipient_label", "item")
 
@@ -28,6 +28,14 @@ def person(w, ref, event=None):
     if event is not None:
         return persons.at(w, ref, int(event["id"][1:])) or ""
     return persons.resolve(w, ref)[0] or ""
+
+
+def _stored_person(w, ref):
+    """Untimed stored names are safe only when they have had one bearer."""
+    if persons.is_pid(w, ref):
+        return ref
+    bearers = persons.index(w).bearers(ref)
+    return bearers[0] if len(bearers) == 1 else ""
 
 
 def _policy(desk, ref):
@@ -207,28 +215,49 @@ def _question_reasons(w, events, news):
 
 def _native_reasons(w, events):
     by_id = {e["id"]: e for e in events}
+    retained = {e["id"] for e in w.events}
     for sid, s in w.subjects.items():
         acts = (s.get("promise") or {}).get("acts") or []
-        original = next((by_id[a[0]] for a in acts if a[1] == "ask" and a[0] in by_id), None)
-        if not original:
+        start = next((i for i, a in enumerate(acts) if a[1] == "ask" and a[0] in by_id), None)
+        if start is None:
+            start = next((i for i, a in enumerate(acts) if a[1] == "ask"), None)
+        if start is None:
             continue
-        asker = persons.of_event(w, original) or ""
-        # Creation args are historical; mutable props and today's name bearer are not the recipient.
-        to = (original.get("args") or {}).get("to", "")
-        recipient = person(w, to, original) if to else ""
-        about = (original.get("args") or {}).get("about", "")
+        original = by_id.get(acts[start][0])
+        if not original and acts[start][0] in retained:
+            continue  # An undone origin is not missing history.
+        props = s.get("props") or {}
+        args = (original or {}).get("args") or {}
+        asker = ((persons.of_event(w, original) or "") if original
+                 else _stored_person(w, props.get("asked_by", "")))
+        asker_source = "event" if original else "stored"
+        # A native ask wins even with missing/invalid args. Only a legacy prop
+        # origin without to (or a genuinely absent origin) admits stored identity.
+        stored = not original or (original.get("verb") == "prop" and "to" not in args)
+        to = props.get("to", "") if stored else args.get("to", "")
+        recipient = _stored_person(w, to) if stored else person(w, to, original) if to else ""
+        conflict = False
+        if stored and original and args.get("awaiting"):
+            historical = person(w, args["awaiting"], original)
+            conflict = not recipient or not historical or recipient != historical
+            if conflict:
+                recipient = ""
+        about = props.get("about", "") if not original else args.get("about", "")
         target = canonical(w, about) if about else sid
-        r = _reason("permission", sid, sid, target or sid, asker, recipient)
+        r = _reason("permission", sid, sid, target or sid, asker, recipient,
+                    asker_source=asker_source, recipient_source="stored" if stored else "event")
         issues = []
+        if conflict:
+            issues.append("stored recipient disagrees with legacy origin or cannot be verified")
         if not asker:
             issues.append("original asker is unknown")
         if not recipient:
             issues.append("recipient is unknown")
         if about and not target:
             issues.append("authored target is unknown")
-        for a in acts:
+        for a in (acts if original else acts[start + 1:]):
             e = by_id.get(a[0])
-            if not e or int(e["id"][1:]) <= int(original["id"][1:]):
+            if not e or (original and int(e["id"][1:]) <= int(original["id"][1:])):
                 continue
             actor, act = persons.of_event(w, e), a[1]
             if ((act in ("accept", "decline") and recipient and actor == recipient)
