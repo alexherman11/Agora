@@ -1439,7 +1439,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (10)
+## source-pending (11)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1509,6 +1509,12 @@ a9618 · family=missing-word · status=source-pending
 
 Missing world behavior: brings must preserve a stopped receiver’s own dirty and untracked source before importing. Current landed capability refuses every dirty receiver. Commission a9603 extends the existing preserved_work path under its existing worker leases and landing lock: own-branch checkpoint and exact hash inventory first, then conflict-preflighted delivery; no discard/reset/stash or readiness change. Source edits: preserved_work.py, Workshop.bring reporting, offline regressions and preserved-work.md. Evidence will be linked from the commission.
 Live follow-up: checkpoint code landed as 9d6394c, but brings cannot recognize its own inventory after desk parsing changes a Windows directory escape. Whole-comment equality causes duplicate inventory posts and holds delivery. Repair stays in Workshop.report_receiver_checkpoint: request key and complete JSON/hash inventory, legacy request-specific filename recovery, forward-slash receipt paths and actual-parser offline regression. No alternate delivery path or forced receipt.
+
+### No prepare-only main synchronization before worker acceptance
+
+a10348 · family=missing-word · status=source-pending
+
+Missing world act: commission=prepare, updating a preserved worker branch without judging/landing/restart. Workers' own git merge is denied; ready is too broad for pre-acceptance synchronization. Source and14 offline tests are prepared on a10303; live use remains pending landing and real receipts. See [[Prepare preserved branches — source checks and deployment handoff]].
 
 ## source-staged (1)
 
