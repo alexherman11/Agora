@@ -1033,7 +1033,15 @@ def after_act(desk, n0):
             qs["text"] = qs["text"].replace("<this note>", r["created"])
             evx = next(e for e in w.events if e["id"] == r["event"])
             evx["cause"], evx["via"] = new[0]["id"], VIA
-            w.subjects[st["sid"]]["promise"]["acts"].append([r["event"], "asked-end"])
+            # The question also changes an existing promise. Keep that change
+            # in the originating event, for incremental recording and undo.
+            s = w.subjects[st["sid"]]
+            evx["undo"]["restore_subjects"] = [deepcopy(s)]
+            evx.setdefault("changed", []).append(st["sid"])
+            s["promise"]["acts"].append([r["event"], "asked-end"])
+            s["rev"] += 1
+            for a in w.appearances_of(st["sid"]):
+                w._bump(a)
             notes.append(f"~ {card} left the living with {x} still open: {name} is asked once, on their sill "
                          f"({r['created']}): {q}")
     return notes
