@@ -117,6 +117,14 @@ class PROCESS_INFORMATION(ctypes.Structure):
     _fields_ = [("hProcess", wt.HANDLE), ("hThread", wt.HANDLE), ("dwProcessId", wt.DWORD), ("dwThreadId", wt.DWORD)]
 
 
+k32.CreateProcessW.argtypes = [wt.LPCWSTR, wt.LPWSTR, ctypes.c_void_p, ctypes.c_void_p,
+                              wt.BOOL, wt.DWORD, ctypes.c_void_p, wt.LPCWSTR,
+                              ctypes.POINTER(STARTUPINFOW), ctypes.POINTER(PROCESS_INFORMATION)]
+k32.CreateProcessW.restype = wt.BOOL
+k32.CloseHandle.argtypes = [wt.HANDLE]
+k32.CloseHandle.restype = wt.BOOL
+
+
 class GUITHREADINFO(ctypes.Structure):
     _fields_ = [("cbSize", wt.DWORD), ("flags", wt.DWORD), ("hwndActive", wt.HWND), ("hwndFocus", wt.HWND),
                 ("hwndCapture", wt.HWND), ("hwndMenuOwner", wt.HWND), ("hwndMoveSize", wt.HWND),
@@ -246,15 +254,23 @@ def _start_locked(name, argv, env=None):
     """CreateProcess on the sandbox desktop; -> pid. The handle of the desktop is held by the process from then on."""
     from sandbox_owned import OwnedProcesses
     from sandbox_receipts import complete, error, write
+    from sandbox_birth import intent, capture, persist_then_resume
+    backend = OwnedProcesses()
+    parent = backend.native.identity(os.getpid())
+    if parent is None:
+        raise RuntimeError("launcher identity unavailable; no launch")
+    parent = {"pid": os.getpid(), "created": parent[0], "exe": parent[1]}
+    facts = intent(argv, parent, f"WinSta0\\agora-sandbox-{name}")
     f = state_file(name)
     st = {"pids": [], "owners": [], "at": time.time()}
     if f.exists():
         st = json.loads(f.read_text(encoding="utf-8"))
-        if st.get("cleanup") or any(r.get("status") == "pending" for r in st.get("launches", [])):
+        if st.get("cleanup") or any(r.get("status") not in ("running", "failed", "created")
+                                    for r in st.get("launches", [])):
             raise RuntimeError("previous cleanup receipt needs reconciliation; no launch")
         if set(st.get("pids", [])) - {p["pid"] for p in st.get("owners", []) if complete(p)}:
             raise RuntimeError("previous ownership incomplete; no launch")
-    launch = {"status": "pending", "at": time.time()}
+    launch = {"status": "pending", "at": time.time(), "intent": facts}
     st.setdefault("launches", []).append(launch)
     write(f, st)  # unknown crash outcome blocks another launch, even before PID capture
     h, full = desktop(name, create=True)
@@ -266,8 +282,8 @@ def _start_locked(name, argv, env=None):
     if env:
         merged = {**os.environ, **env}
         block = ctypes.create_unicode_buffer("".join(f"{k}={v}\0" for k, v in merged.items()) + "\0")
-    flags = 0x00000200 | 0x08000000 | (0x400 if block else 0)  # NEW_PROCESS_GROUP, NO_WINDOW, UNICODE_ENVIRONMENT
-    ok = k32.CreateProcessW(None, line, None, None, False, flags, block, None, ctypes.byref(si), ctypes.byref(pi))
+    flags = 0x4 | 0x00000200 | 0x08000000 | (0x400 if block else 0)  # SUSPENDED; no child code before receipt
+    ok = k32.CreateProcessW(argv[0], line, None, None, False, flags, block, None, ctypes.byref(si), ctypes.byref(pi))
     if not ok:
         launch.update(status="failed", winerror=int(k32.GetLastError()))
         write(f, st)
@@ -276,12 +292,18 @@ def _start_locked(name, argv, env=None):
     # A missing/denied metadata read retains an UNKNOWN owner; never adopt a
     # window's PID as a replacement. This does not grant host/WMI access.
     st.setdefault("pid", pi.dwProcessId)
-    launch.update(status="created", pid=pi.dwProcessId)
+    launch.update(status="suspended", pid=pi.dwProcessId)
     st.setdefault("pids", []).append(pi.dwProcessId)
     try:
-        st.setdefault("owners", []).append(OwnedProcesses().on_handle(pi.dwProcessId, pi.hProcess))
+        birth = capture(facts, pi.dwProcessId, backend.native.of_handle(pi.hProcess))
+        k32.ResumeThread.argtypes = [wt.HANDLE]
+        k32.ResumeThread.restype = wt.DWORD
+        persist_then_resume(st, launch, birth, lambda data: write(f, data),
+                            lambda: k32.ResumeThread(pi.hThread))
     except Exception as exc:
         st.setdefault("ownership_errors", []).append({"pid": pi.dwProcessId, "error": error(exc)})
+        write(f, st)
+        raise
     finally:
         # Persist even partial ownership; failure is not permission to kill.
         try:

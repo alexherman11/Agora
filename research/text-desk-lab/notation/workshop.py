@@ -57,7 +57,7 @@ PY = Path(sys.executable)
 # Alex, 30 Sep: the code changes while everyone works. A desk command runs fresh code (desk_mcp starts explore.py per
 # call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
-HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py",
+HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py", "guard_context.py",
                "resident_continuity.py", "conversation_policy.py", "task_flow.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
