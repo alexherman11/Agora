@@ -1,0 +1,75 @@
+"""Offline characterization, not a native run or production repair.
+
+Calls the current shared method with fake user32 functions. The proposed
+classifier below is a design fixture only; no launcher imports or consumes it.
+"""
+import ctypes
+from pathlib import Path
+import sys
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from native_run_verify import Native
+
+
+def proposed_verdict(ok, callback_failed=False):
+    # A zero BOOL, including error 0 or 18, cannot certify an empty desktop.
+    return "observed" if ok and not callback_failed else "unknown"
+
+
+class EnumerationDesign(unittest.TestCase):
+    def current(self, ok, error, visited=0):
+        closed = []
+        def enumerate_windows(handle, callback, _):
+            for _ in range(visited):
+                callback(100, 0)
+            ctypes.set_last_error(error)
+            return ok
+        def owner(hwnd, pid):
+            pid._obj.value = 42
+            return 1
+        native = object.__new__(Native)  # never initialize any Windows library
+        native.enum_type = lambda callback: callback
+        native.u = SimpleNamespace(
+            OpenDesktopW=lambda *args: 1,
+            EnumDesktopWindows=enumerate_windows,
+            GetWindowThreadProcessId=owner,
+            IsWindowVisible=lambda hwnd: True,
+            CloseDesktop=lambda handle: closed.append(handle),
+        )
+        # Keep the interpreter's incoming last-error value unchanged.
+        with patch.object(ctypes, "get_last_error", return_value=error):
+            try:
+                return native.desktop_window_owners("fake-only")
+            finally:
+                self.assertEqual(closed, [1])
+
+    def test_retained_error_shape_is_unknown_not_empty(self):
+        with self.assertRaises(OSError):
+            self.current(False, 18)
+        self.assertEqual(proposed_verdict(False), "unknown")
+
+    def test_current_partial_failure_returns_partial_list(self):
+        self.assertEqual(self.current(False, 18, visited=1), [(42, True)])
+        self.assertEqual(proposed_verdict(False), "unknown")
+
+    def test_current_zero_error_failure_looks_empty(self):
+        self.assertEqual(self.current(False, 0), [])
+        self.assertEqual(proposed_verdict(False), "unknown")
+
+    def test_success_empty_is_distinct_from_failure(self):
+        self.assertEqual(self.current(True, 0), [])
+        self.assertEqual(proposed_verdict(True), "observed")
+
+    def test_success_ignores_stale_error(self):
+        self.assertEqual(self.current(True, 18), [])
+        self.assertEqual(proposed_verdict(True), "observed")
+
+    def test_callback_failure_cannot_certify_completion(self):
+        self.assertEqual(proposed_verdict(True, callback_failed=True), "unknown")
+
+
+if __name__ == "__main__":
+    unittest.main()

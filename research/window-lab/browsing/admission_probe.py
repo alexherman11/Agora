@@ -11,8 +11,10 @@ import os
 import sys
 import time
 from pathlib import Path
+
 from admission_job import read, write
-from admission_policy import configure, install as install_offline_policy
+from admission_policy import configure
+from admission_policy import install as install_offline_policy
 
 
 def main():
@@ -42,10 +44,14 @@ def main():
     if value.value != name:
         raise RuntimeError("wrong desktop; no window created")
     started = time.monotonic()
-    report = {"desktop": name, "pid": os.getpid(), "events": [], "public_navigation": False}
+    binding = None
+    report = {"desktop": name, "pid": os.getpid(), "request": token,
+              "profile": str(folder / "profile"),
+              "events": [], "public_navigation": False}
 
     def record(phase, **fields):
         report["phase"] = phase
+        report["binding"] = binding
         report["events"].append(
             {"phase": phase, "seconds": round(time.monotonic() - started, 3), **fields}
         )
@@ -54,6 +60,22 @@ def main():
         temp.replace(folder / "receipt.json")
 
     record("importing")
+    # The parent measures this candidate PID; it never adopts JSON as authority.
+    bound_deadline = time.monotonic() + 10
+    while not (folder / "host-binding.json").exists():
+        if time.monotonic() >= bound_deadline:
+            record("host_binding_deadline")
+            return
+        time.sleep(.02)
+    binding = read(folder / "host-binding.json")
+    if (binding.get("request") != token
+            or binding.get("host", {}).get("pid") != os.getpid()
+            or binding.get("desktop") != name
+            or Path(binding.get("profile", "")).resolve() != folder / "profile"
+            or not binding.get("job_id")):
+        record("host_binding_refused")
+        return
+    record("host_bound")
     import clr
 
     clr.AddReference("System.Windows.Forms")
@@ -62,9 +84,9 @@ def main():
     clr.AddReference(str(lib / "Microsoft.Web.WebView2.Core.dll"))
     clr.AddReference(str(lib / "Microsoft.Web.WebView2.WinForms.dll"))
     from Microsoft.Web.WebView2.Core import (
+        CoreWebView2PermissionState,
         CoreWebView2WebResourceContext,
         CoreWebView2WebResourceRequestSourceKinds,
-        CoreWebView2PermissionState,
     )
     from Microsoft.Web.WebView2.WinForms import CoreWebView2CreationProperties, WebView2
     from System import Action, String
@@ -221,8 +243,18 @@ def main():
                 # through its held Job and process handles. JSON alone proves
                 # no ownership and grants no host authority.
                 engine_pid = int(core.BrowserProcessId)
+                engine_report = {
+                    "browser_pid": engine_pid,
+                    "user_data_folder": str(core.Environment.UserDataFolder),
+                    "processes": [
+                        {"pid": int(p.ProcessId), "kind": str(p.Kind)}
+                        for p in core.Environment.GetProcessInfos()
+                    ],
+                }
                 write(folder / "engine-request.json",
-                      {"request": token, "host_pid": os.getpid(), "engine_pid": engine_pid})
+                      {"request": token, "host_pid": os.getpid(), "engine_pid": engine_pid,
+                       "desktop": name, "profile": str(folder / "profile"), "binding": binding,
+                       "engine_report": engine_report})
                 admission_timer = Timer()
                 timers.append(admission_timer)
                 admission_timer.Interval = 20
@@ -237,6 +269,9 @@ def main():
                         if (value.get("request") != token
                                 or value.get("engine_pid") != engine_pid
                                 or value.get("admitted") is not True
+                                or value.get("binding") != binding
+                                or type(value.get("created")) is not int
+                                or value["created"] < binding["host"]["created"]
                                 or not value.get("job_id")
                                 or int(core.BrowserProcessId) != engine_pid):
                             raise RuntimeError("parent engine fence refused")
