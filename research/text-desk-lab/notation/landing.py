@@ -260,6 +260,10 @@ def judged(world, sha, kept, **how):
     copy_world(world, ROOM / NOTATION)
     t0 = time.time()
     h = health(world, ROOM / NOTATION, **how)
+    current = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
+    if current != sha:
+        raise RuntimeError(f"health changed landing-room HEAD from {sha} to {current}; "
+                           "judgment discarded; live checkout unchanged")
     log("health", sha=sha[:7], how={k: v for k, v in how.items() if k != "changed"}, seconds=round(time.time() - t0, 1),
         ok=h.get("ok"), stopped=h.get("stopped"), failed=(h.get("failed") or [])[:4])
     h["partial"] = bool(how.get("only")) or bool(h.get("partial")) or bool(h.get("stopped"))
@@ -402,6 +406,12 @@ def advance(sha, base, why):
     if head != base:
         return False, None, "main moved while this was judged"
     changed = set(git("diff", "--name-only", base, sha, cwd=LIVE, check=True).stdout.split("\n")) - {""}
+    # Recheck the actual candidate, not just each requested branch. A health
+    # fixture must never smuggle copied world state into the room's ancestry.
+    # Do this before staging/parking anything in the live checkout.
+    banned = sorted(p for p in changed if p.startswith(BANNED) or p.endswith(".env"))
+    if banned:
+        return False, None, "candidate contains paths that may not land: " + ", ".join(banned)
     # a file that already holds what lands (a hand landing's own files) is not in the way: nothing to park
     dirty = [p for p in dirty_in_live() if p in changed]
     overlap = sorted(p for p in dirty if not _holds(p, sha))

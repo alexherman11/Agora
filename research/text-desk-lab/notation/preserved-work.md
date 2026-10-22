@@ -141,6 +141,17 @@ ordinary house path, never a reset or rewrite of main.
 This source path is separately tested by `test_prepare.py` with isolated Git
 repositories. Source tests are not evidence that a live card was prepared.
 
+Landing isolation: branch admission alone is insufficient. The final candidate
+is checked again for forbidden paths (including every changed `sessions/`
+path) before live index inspection, parking or fast-forward. A health run that
+changes the landing room's HEAD aborts judgment and is not cached. Never move
+or remove live world files to make a contaminated candidate merge. Preserve
+its Git identities for diagnosis; regenerate the candidate from the clean
+main through the house's ordinary landing path. `test_landing_state_guard.py`
+exercises a fixture commit on the candidate's first-parent side, unchanged
+live stand-ins, tracked session modifications/deletions and clean-source
+landing, plus health HEAD mutation and normal judgment.
+
 `workshop.py` and the new imported module belong in `HOUSE_FILES`; loading this
 integration needs an ordinary house deployment. Alex explicitly allows that
 for a9421. This does not authorize activation of any transferred candidate.
