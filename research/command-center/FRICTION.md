@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (60)
+## open (62)
 
 ### F2. Scripts cannot say who is running them
 
@@ -400,6 +400,18 @@ a9417 · family=talk · status=open
 
 Juniper, 21 Oct 19:37: 'say Shop talk "@rowan …"' ran as 'do append a977 line="Shop talk …"' (my own talk) and the receipt said 'to: nobody'. The ok reads like success; the @rowan never reached Shop talk. Ask: a say naming a chat should reach that chat, or refuse plainly and say which form does.
 
+### Legacy delivery quarantine leaves its old continuity excerpt readable to a handover
+
+a9626 · family=safety · status=open
+
+RAN offline independent review a9551: actual main Resident.send remembers text before a failing pipe. The safety-only candidate holds the legacy pending request but resident_continuity.prepare still includes its saved continuity excerpt in handover_due. Missing guarantee: uncertain original text must stay outside every automatic input path, including old history. Proposed narrow fix: refuse ambiguous legacy handover or segregate attributable uncertain history; preserve all evidence, never delete by substring or resend. See [[Voice safety independent review — verified bytes, two correction requirements]]. Ibis owns return to source owner; no live effect or repair applied.
+
+### A failed pipe-written save leaves a resident idle while its answer is still in flight
+
+a9628 · family=safety · status=open
+
+RAN a9551, actual Resident.save and fake transport: fail os.replace after flush. busy remains false, so House.step can send another human input or begin provider preparation before any answer. Two regression failures reproduced on unchanged main as well as the safety-only candidate; inherited defect. Required guard: retain in-flight uncertainty through persistence/log failure, no next input/switch until reconciliation or durable quarantine. Do not auto-retry or change queue policy. Reproductions and scope: [[Voice safety independent review — verified bytes, two correction requirements]]. Ibis owns follow-up; no source repair or live runtime action here.
+
 ## curing (47)
 
 ### F13. A lens named like its room makes the room's name ambiguous
@@ -750,6 +762,7 @@ a8333 source repair (staged, not runtime activation). Missing world-level capabi
 a9494 · family=capability · status=curing
 
 Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
+JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
 
 ## unchecked (8)
 
@@ -1398,7 +1411,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (9)
+## source-pending (10)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1461,6 +1474,12 @@ Friction met, not fixed (ran): `$(let)` is not filled in a selection; a let is n
 a9577 · family=missing-word · status=source-pending
 
 Review and continuation cards cannot read/copy another worktree's preserved files. Missing world word: receiving-card brings JSON, honored by the house under worker leases and landing serialization. Source and tests prepared on a9421; main inputs reuse landing.hand rather than a second file path. No live transfers yet. See [[Preserved source handoffs — house contract and recovery]].
+
+### Preserved-work delivery needs to checkpoint receiver edits
+
+a9618 · family=missing-word · status=source-pending
+
+Missing world behavior: brings must preserve a stopped receiver’s own dirty and untracked source before importing. Current landed capability refuses every dirty receiver. Commission a9603 extends the existing preserved_work path under its existing worker leases and landing lock: own-branch checkpoint and exact hash inventory first, then conflict-preflighted delivery; no discard/reset/stash or readiness change. Source edits: preserved_work.py, Workshop.bring reporting, offline regressions and preserved-work.md. Evidence will be linked from the commission.
 
 ## source-staged (1)
 
