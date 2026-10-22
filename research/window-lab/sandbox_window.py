@@ -238,19 +238,29 @@ def join(name):
     return h
 
 
-def start(name, argv, env=None):
+def job_scope(name):
+    """Opt in to family ownership; caller must hold this context until cleanup.
+
+    A standalone `open`/`run` CLI does not gain persistent job ownership: its
+    process exits. No background service or manifest-based job adoption.
+    """
+    from sandbox_job import Scope
+    return Scope(name)
+
+
+def start(name, argv, env=None, *, job=None):
     """Serialize launches with cleanup; an abandoned lock needs reconciliation."""
     f = state_file(name)
     lock = f.with_suffix(".cleanup-lock")
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     try:
-        return _start_locked(name, argv, env)
+        return _start_locked(name, argv, env, job=job)
     finally:
         os.close(fd)
         lock.unlink(missing_ok=True)
 
 
-def _start_locked(name, argv, env=None):
+def _start_locked(name, argv, env=None, *, job=None):
     """CreateProcess on the sandbox desktop; -> pid. The handle of the desktop is held by the process from then on."""
     from sandbox_owned import OwnedProcesses
     from sandbox_receipts import complete, error, write
@@ -270,7 +280,14 @@ def _start_locked(name, argv, env=None):
             raise RuntimeError("previous cleanup receipt needs reconciliation; no launch")
         if set(st.get("pids", [])) - {p["pid"] for p in st.get("owners", []) if complete(p)}:
             raise RuntimeError("previous ownership incomplete; no launch")
+    if job is not None:
+        job.admit(name, parent, st)
+        st["job"] = dict(job.descriptor)
+    elif st.get("job"):
+        raise RuntimeError("live job scope required; no direct-child fallback")
     launch = {"status": "pending", "at": time.time(), "intent": facts}
+    if job is not None:
+        launch["job_id"] = job.descriptor["id"]
     st.setdefault("launches", []).append(launch)
     write(f, st)  # unknown crash outcome blocks another launch, even before PID capture
     h, full = desktop(name, create=True)
@@ -296,6 +313,11 @@ def _start_locked(name, argv, env=None):
     st.setdefault("pids", []).append(pi.dwProcessId)
     try:
         birth = capture(facts, pi.dwProcessId, backend.native.of_handle(pi.hProcess))
+        if job is not None:
+            write(f, st)  # suspended child known, before assignment
+            job.native.assign(job.handle, pi.hProcess)
+            launch["job_assigned"] = True
+            birth["job_id"] = job.descriptor["id"]
         k32.ResumeThread.argtypes = [wt.HANDLE]
         k32.ResumeThread.restype = wt.DWORD
         persist_then_resume(st, launch, birth, lambda data: write(f, data),
@@ -715,7 +737,8 @@ def close(name, quiet=False):
     """Cleanup only recorded identities; preserve failed/unknown ownership.
 
     No taskkill /T, PID adoption from a desktop, profile sweep or ignored error.
-    Children need their own parent/creation/exe/profile records before cleanup.
+    Legacy children need exact birth records. Opt-in jobs require their original
+    live owner handle and complete enrolled-root receipts; never reopen/adopt.
     """
     import os
     from sandbox_owned import OwnedProcesses
@@ -752,7 +775,11 @@ def close(name, quiet=False):
             return None
 
         try:
-            result = cleanup(st, OwnedProcesses(), lambda data: write(f, data), remaining)
+            if st.get("job"):
+                import sandbox_job
+                result = sandbox_job.cleanup(st, sandbox_job.live(name, st), lambda data: write(f, data))
+            else:
+                result = cleanup(st, OwnedProcesses(), lambda data: write(f, data), remaining)
         except Exception as exc:
             result = {"ok": False, "reason": "cleanup failed; ownership retained", "error": error(exc)}
             # If writing the primary receipt failed, do not overwrite its
@@ -763,7 +790,9 @@ def close(name, quiet=False):
                 pass
         if result["ok"]:
             # Retain receipts even on success; never delete a profile here.
-            f.replace(f.with_name(f.stem + f".closed-{time.time_ns()}.json"))
+            archive = f.with_name(f.stem + f".closed-{time.time_ns()}.json")
+            f.replace(archive)
+            result["receipt"] = str(archive)
         if not quiet:
             print(f"sandbox {name}: {result['reason']}; receipts retained")
         return result
