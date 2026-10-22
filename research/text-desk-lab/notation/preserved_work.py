@@ -237,24 +237,56 @@ def prepare_main(live, tree, card, receipt_path, request_id, report=None, admit=
         data = json.loads(receipt_path.read_text(encoding="utf-8"))
         if data.get("request") != request_id:
             raise Held("prepare receipt belongs to another request")
-        if data.get("phase") not in ("prepared", "prepare-conflict"):
+        phase = data.get("phase")
+        if phase in ("prepared", "prepare-conflict"):
+            if head(tree) != data["after"]:
+                raise Held("prepared branch changed before reporting; reconcile receipt")
+            return data
+        if phase not in ("receiver-preserved", "receiver-preserving", "prepare-started"):
             raise Held("interrupted prepare needs reconciliation; not replaying")
-        if head(tree) != data["after"]:
-            raise Held("prepared branch changed before reporting; reconcile receipt")
-        return data
-    if receipt_path.parent.exists():
-        for previous in receipt_path.parent.glob(card + "-*.json"):
-            prior = json.loads(previous.read_text(encoding="utf-8"))
-            if prior.get("phase") not in ("prepared", "prepare-conflict"):
-                raise Held("earlier prepare needs reconciliation; not starting another")
-    registered(live, tree, f"worker/{card}")
-    main = out(live, "rev-parse", "refs/heads/main")
-    data = dict(request=request_id, phase="prepare-started",
-                before=head(tree), main=main)
-    write_receipt(receipt_path, data)
+        # Only pre-merge states with a provable checkpoint boundary can resume.
+        # Never repeat an unknown commit or merge, or reset anyone's index.
+        registered(live, tree, f"worker/{card}")
+        saved = data.get("receiver_checkpoint")
+        if phase == "receiver-preserved" and saved and head(tree) == saved.get("after"):
+            clean_receiver(tree)
+        elif phase == "receiver-preserving" and saved and head(tree) == saved.get("before"):
+            files, staged = receiver_edits(tree)
+            if files != saved["files"]:
+                raise Held("interrupted checkpoint files changed; reconciliation required")
+            # git add may have completed before a failed commit. Admit only
+            # the original index or the exact captured working version.
+            captured_index = set(staged) == set(files) and all(
+                (item.get("deleted") and staged[name].get("deleted")) or
+                (not item.get("deleted") and not staged[name].get("deleted") and
+                 out(tree, "hash-object", "--path=" + name, "--", name) ==
+                 out(tree, "rev-parse", ":" + name))
+                for name, item in files.items())
+            if staged != saved.get("index_files", {}) and not captured_index:
+                raise Held("interrupted checkpoint index changed; reconciliation required")
+            data.setdefault("reconciliations", []).append(
+                {"phase": phase, "checkpoint": saved,
+                 "reason": "HEAD unchanged; exact captured files/index verified"})
+            del data["receiver_checkpoint"]
+            write_receipt(receipt_path, data)
+        elif phase == "prepare-started" and head(tree) == data.get("before"):
+            pass
+        else:
+            raise Held("interrupted prepare needs reconciliation; not replaying")
+    else:
+        if receipt_path.parent.exists():
+            for previous in receipt_path.parent.glob(card + "-*.json"):
+                prior = json.loads(previous.read_text(encoding="utf-8"))
+                if prior.get("phase") not in ("prepared", "prepare-conflict"):
+                    raise Held("earlier prepare needs reconciliation; not starting another")
+        registered(live, tree, f"worker/{card}")
+        data = dict(request=request_id, phase="prepare-started",
+                    before=head(tree), main=out(live, "rev-parse", "refs/heads/main"))
+        write_receipt(receipt_path, data)
     checkpoint_receiver(tree, card, receipt_path, data, report)
     if admit is not None:
         admit()
+    main = data["main"]
     data.update(phase="prepare-merging", checkpoint_head=head(tree))
     write_receipt(receipt_path, data)
     result = git(tree, "merge", "--no-ff", "-m",

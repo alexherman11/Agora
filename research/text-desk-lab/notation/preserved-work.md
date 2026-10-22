@@ -127,9 +127,14 @@ conflicted files. Conflicts remain uncommitted in the worker's files.
 Ordinary later `ready` commits their resolution and judges; prepare does not.
 
 Receipts live under `house-state/<world>/prepares/<card>-<request-event>.json`.
-Completed reporting retries reuse the same result. Interrupted checkpoint
-or merge phases hold for reconciliation, including across new requests;
-the house does not abort/reset/replay an uncertain merge. Clearing a request
+Completed reporting retries reuse the same result. Pre-merge recovery may
+continue an already recorded checkpoint only at its exact saved HEAD with a
+clean receiver; confirmation is retried without another preservation commit.
+Before any checkpoint commit, an unchanged HEAD plus exact raw-file inventory
+and the original index (or exactly the captured files after Git normalization)
+allows the checkpoint to continue. The prior inventory stays in the receipt.
+Changed files/index/HEAD and uncertain commit or merge outcomes remain held,
+including across new requests; the house does not abort/reset/replay an uncertain merge. Clearing a request
 does not undo a checkpoint. Reversal is a reviewed branch change through the
 ordinary house path, never a reset or rewrite of main.
 
