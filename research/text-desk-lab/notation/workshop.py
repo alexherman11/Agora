@@ -63,7 +63,7 @@ HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "co
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
                "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py",
                "artifact_view.py", "guarded_artifacts.py", "image_comments.py", "worker_selection.py",
-               "preserved_work.py", "shared.py"}
+               "preserved_work.py", "shared.py", "house_restart.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 

@@ -84,6 +84,7 @@ import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in ste
 import workshop      # noqa: E402  workers for what the world can't change yet
 import task_flow
 import guard_context
+import house_restart  # noqa: E402  a10269: a restart asked for from the world
 
 STATE = HERE / "house-state"
 # a916, use versus mention: words inside backticks or quotes are talked about, never addressed (the rule lives in
@@ -1608,6 +1609,12 @@ class House:
             return r.stdout.strip() if r.returncode == 0 else ""
         started_on, passes = head(), 0
         checked_on = started_on       # the HEAD-watch's baseline; started_on stays what this process imported
+        # a10269: a restart asked for from the world; the one that brought this house up says so on its note
+        self.restarts = house_restart.Restarts(self)
+        try:
+            self.restarts.started_up(self.load())
+        except Exception as e:
+            print(f"house: restart notes unreadable at start: {type(e).__name__}: {e}", flush=True)
         # No timer: startup requests one full comparison from the live writer.
         try:
             self.act("house", "log-world check", whole=True)
@@ -1641,16 +1648,33 @@ class House:
                             self.workshop.restart_wanted = True
                         else:
                             checked_on = now_on       # nothing the house runs changed: deskd and the next command have it
+                busy = ([r.rid for r in self.residents.values() if r.busy]
+                        + [c for c, x in self.workshop.workers.items() if x.busy]
+                        + [f"landing {c}" for c in self.workshop.landing])      # a landing being judged is never cut
+                try:
+                    w = self.load()
+                    cfg = self.settings(w)
+                    self.restarts.step(w, cfg, busy, keeper=bool(os.environ.get("HOUSE_KEEPER")))
+                except Exception as e:
+                    cfg = {}
+                    print(f"house: restart notes: {type(e).__name__}: {e}", flush=True)
                 if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     self.restart_since = getattr(self, "restart_since", None) or now()
-                    busy = ([r.rid for r in self.residents.values() if r.busy]
-                            + [c for c, x in self.workshop.workers.items() if x.busy]
-                            + [f"landing {c}" for c in self.workshop.landing])      # a landing being judged is never cut
-                    if not busy or now() - self.restart_since >= RESTART_GRACE:
-                        print("house: the code changed; restarting on it"
+                    # a10269: a restart the world asked for waits for idle and cuts nothing; a landing's still cuts
+                    # after RESTART_GRACE, as before
+                    if house_restart.should_exit(self.restarts.owns, busy, now() - self.restart_since, RESTART_GRACE):
+                        if not self.restarts.leaving(cfg):
+                            print("house: a requested restart was refused at the last moment (the guard)", flush=True)
+                            self.restart_since = None
+                            time.sleep(2)
+                            continue
+                        print("house: " + ("restarting as asked in the world" if self.restarts.owns
+                                           else "the code changed; restarting on it")
                               + (f" (cutting {', '.join(busy)}: each resumes, and is told)" if busy else ""), flush=True)
                         self.exit_code = RESTART
                         break
+                else:
+                    self.restart_since = None
                 time.sleep(2)
         except KeyboardInterrupt:
             pass
