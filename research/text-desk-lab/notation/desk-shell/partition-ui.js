@@ -214,7 +214,8 @@
       try { await api.send(g.el._n, P.command(g.el._n, tree, focus)); }
       finally {
         pending = false; api.hold(false);
-        try { await api.refresh(); } finally { restore?.(); }
+        if (restore) { try { await api.refresh(); } finally { restore(); } }
+        else api.refresh();
       }
     }
     function continuity(g) {
@@ -338,7 +339,7 @@
           document.body.appendChild(ghost); whole.style.opacity = ".35";
           const preview = document.createElement("div"); preview.className = "landing-box"; g.el.appendChild(preview);
           active = { kind: "carry", g, ghost, preview, whole, next: null, previewKey: "",
-            bounds: rect(g.el), boxes: g.geometry.boxes, restore: continuity(g), snap: null,
+            bounds: rect(g.el), boxes: g.geometry.boxes, restore: g.magnetic ? continuity(g) : null, snap: null,
             external: host.CarryTargets?.session(paint, { el: grip, n: grip._n }, api.send, g.el) };
           // Only a threshold drag changes selection policy; clicks and app
           // controls retain their normal focus/caret behavior.
@@ -351,7 +352,16 @@
         m.preventDefault();
         active.ghost.style.transform = `translate(${m.clientX - start.x}px,${m.clientY - start.y}px)`;
         if (active.external?.move(m)) {
-          active.snap = null; showCandidate(active, null); return;
+          if (g.magnetic) { active.snap = null; showCandidate(active, null); }
+          else { active.next = null; active.preview.hidden = true; }
+          return;
+        }
+        if (!g.magnetic) {
+          const target = P.hit(rect(g.el), g.geometry.boxes, pagePoint(g, m), id);
+          const p = P.plan(g.tree, id, target, rect(g.el), g.options);
+          active.next = p?.tree; active.preview.hidden = !p;
+          if (p?.box) place(active.preview, p.box);
+          return;
         }
         const prior = active.snap;
         const snap = P.magneticHit(active.bounds, active.boxes, pagePoint(g, m), id, prior);
@@ -372,13 +382,14 @@
         e.preventDefault(); api.hold(true);
         const preview = document.createElement("div"); preview.className = "landing-box"; g.el.appendChild(preview);
         active = { g, kind: "carry", whole, id: whole._n.paint.partition_item, preview, next: null,
-          previewKey: "", restore: continuity(g) };
+          previewKey: "", restore: g.magnetic ? continuity(g) : null };
       } else if (active?.g === g && active.kind === "carry") {
         const side = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "top", ArrowDown: "bottom" }[e.key];
         if (side) {
           e.preventDefault();
-          const plan = P.previewPlan(g.tree, active.id, { global: true, side }, rect(g.el), g.options);
-          showCandidate(active, plan);
+          const plan = (g.magnetic ? P.previewPlan : P.plan)(g.tree, active.id, { global: true, side }, rect(g.el), g.options);
+          if (g.magnetic) showCandidate(active, plan);
+          else { active.next = plan?.tree; if (plan?.box) place(active.preview, plan.box); }
         } else if (e.key === "Enter") { e.preventDefault(); finish(false); }
       }
       return true;
@@ -400,7 +411,7 @@
           else n.kids.forEach(visit); })(tree.root);
         const intrinsic = Object.fromEntries([...members].filter(([id]) => content.has(id)).map(([id, e]) =>
           [id, measure(e, el.clientWidth, spec.minimum)]));
-        const g = { el, members, visible, tree, focus: spec.focus || "", chrome: [],
+        const g = { el, members, visible, tree, focus: spec.focus || "", magnetic: spec.magnetic === true, chrome: [],
           options: { minimum: spec.minimum, gap: spec.gap, intrinsic } };
         g.options.visible = visible;
         el.dataset.partition = "1"; el.style.position = "relative"; el.style.display = "block"; el.style.padding = "0"; el.style.gap = "0";

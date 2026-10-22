@@ -55,3 +55,6 @@ research/window-lab/.tmp-*/
 
 # House-owned paired proof data and synthetic log-world fixtures are never source.
 /.agora-tmp/
+
+# a8588: exact retained test-owned scratch; JEFF e30455, no cleanup authorized.
+/pytest-cache-files-vc77xj4l/

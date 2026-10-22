@@ -111,7 +111,7 @@ the one form. The words:
     carry                        this part's thing can be picked up (pointer or keys) and put down on a part that says `on drop`
     resize <prop> min <pixels>    shared repeated frames: drag the gap between neighbours, save both weights as this prop;
                                  arrows adjust, Enter saves, Escape cancels. Minimum outer sizes scale if the viewport is too small.
-    partition <prop> min <w> <h> gap <pixels> [focus <prop>]
+    partition <prop> min <w> <h> gap <pixels> [focus <prop>] [magnetic]
                                  bounded split/tab tree stored as JSON in that world prop; direct bound children are
                                  leaves, ordinary fenced prop writes save drops, tabs, content sizes and divider weights.
     companion <expression>       a partition child stays beside the focused child when this expression holds.
@@ -1674,10 +1674,12 @@ def _w_resize(node, p, val, n, env):
 
 
 def _w_partition(node, p, val, n, env):
-    m = re.fullmatch(r"([a-zA-Z_][\w-]*) min ([1-9]\d*) ([1-9]\d*) gap (\d+)(?: focus ([a-zA-Z_][\w-]*))?", val.strip())
+    m = re.fullmatch(r"([a-zA-Z_][\w-]*) min ([1-9]\d*) ([1-9]\d*) gap (\d+)(?: focus ([a-zA-Z_][\w-]*))?( magnetic)?", val.strip())
     if not m:
-        raise LensRefusal(f"line {n}: `partition <prop> min <width> <height> gap <pixels> [focus <prop>]`; got {p!r}")
+        raise LensRefusal(f"line {n}: `partition <prop> min <width> <height> gap <pixels> [focus <prop>] [magnetic]`; got {p!r}")
     node["partition"] = dict(prop=m[1], minimum=[int(m[2]), int(m[3])], gap=int(m[4]), focus_prop=m[5])
+    if m[6]:
+        node["partition"]["magnetic"] = True
 
 
 def _w_companion(node, p, val, n, env):
@@ -2023,7 +2025,7 @@ WORDS = {
     "light": ('light "<passages>"', _w_light),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
-    "partition": ("partition <prop> min <width> <height> gap <pixels> [focus <prop>]", _w_partition),
+    "partition": ("partition <prop> min <width> <height> gap <pixels> [focus <prop>] [magnetic]", _w_partition),
     "companion": ("companion <expression>", _w_companion),
     "sizing": ("sizing <expression>", _w_companion),
     "chrome": ("chrome <expression>", _w_companion),
@@ -2741,7 +2743,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
         if n.get("partition"):
             spec = n["partition"]
             bits.append(f"partition {spec['prop']} min {spec['minimum']} gap {spec['gap']}"
-                        + (f" focus {spec['focus_prop']}={spec.get('focus') or '(none)'}" if spec.get("focus_prop") else ""))
+                        + (f" focus {spec['focus_prop']}={spec.get('focus') or '(none)'}" if spec.get("focus_prop") else "")
+                        + (" magnetic" if spec.get("magnetic") else ""))
         if n.get("companion") is not None:
             bits.append(f"companion {n['companion']}")
         for word in ("sizing", "chrome"):

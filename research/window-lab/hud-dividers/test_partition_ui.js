@@ -67,7 +67,7 @@ function treeFrom(line){
 }
 async function main(){
   const tree={v:1,root:{axis:"x",kids:[{axis:"y",kids:[{id:"a"},{id:"c"}],weights:[1,1]},{id:"b"}],weights:[1,1]}};
-  const n={key:"tiles",paint:{partition:{tree:JSON.stringify(tree),minimum:[240,140],gap:16,focus:""}},
+  const n={key:"tiles",paint:{partition:{tree:JSON.stringify(tree),minimum:[240,140],gap:16,focus:"",magnetic:true}},
     acts:[{on:"arrange",line:'do prop layout tree="$value" full="$partition_focus"'},{on:"partition-focus",line:'do prop layout full="$value"'}],
     fence:{item:"layout",reads:[["layout",3,["prop:tree","prop:full"]]],defpart:{path:"root/tiles",hash:"one"}}};
   const paint=new Element(), root=new Element("DIV",n); paint.appendChild(root); document.body.appendChild(paint);
