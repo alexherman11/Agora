@@ -1,0 +1,9 @@
+{
+  "research/text-desk-lab/notation/desk-shell/partition.js": "5f69b2c66407b31d693d4e5dcacd39623e8a5c6ff433f4c83b3bd453ba58c3a2",
+  "research/text-desk-lab/notation/desk-shell/partition-ui.js": "b1db5633e822fbbc784e7366694430471cec2aedbb6e9d2229109d8e34e36f30",
+  "research/window-lab/hud-dividers/test_partition_ui.js": "150f0642337c26e79e371afbd6ac94ba5933647aa1a270a18a18c4f8efa916bf",
+  "research/window-lab/hud-dividers/test_magnetic_preview.js": "0e06303009152ae7edc96c27db0985b5c1ee6d5b41367493be1fe9bb667e7e98",
+  "research/window-lab/hud-dividers/bench_magnetic_preview.js": "0bda5bccf5b82f99cc5ab6966c554bc02f5dd8684586f58e8bb5c554bf0fe2fe",
+  "research/window-lab/hud-dividers/SOURCE.patch": "4e666dc737ec4be2ddb0550aa8f5b7e0b73e6d14467b6a79346c5040c08f1ea3",
+  "research/window-lab/hud-dividers/MAGNETIC-PREVIEW.md": "8dec2aeb31479dc9e0c1305cf86bb0407c085b32a5ba969bf3bc274278568f67"
+}
