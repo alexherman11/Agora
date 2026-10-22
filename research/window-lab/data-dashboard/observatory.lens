@@ -1,0 +1,147 @@
+root : column
+  role watch
+  measure 92ch
+  head : row
+    role header
+    title : text "AGORA / CREW"
+      role title
+      share 1
+    clock : text "$clock"
+      the @STATUS@
+      role muted
+  count : text "$resident_summary | $worker_summary | queue $queued"
+    the @STATUS@
+    role body
+  freshness : text "$freshness"
+    the @STATUS@
+    role muted
+    role state.bad when $stale = "yes"
+  residents : column
+    title : row
+      role section
+      label : text "RESIDENTS"
+        share 1
+      unit : text "CONTEXT / CAPACITY"
+    rows : column
+      of tag:watch-resident as p
+      each person
+  workers : column
+    title : text "WORKERS / ACTIVE TASKS"
+      role section
+    rows : column
+      of tag:watch-worker as p
+      each worker
+    empty : text "$worker_empty"
+      the @STATUS@
+      role muted
+      only when $worker_empty != ""
+    inactive : column
+      fold "$inactive_summary"
+      the @STATUS@
+      only when $inactive_count > 0
+      rows : column
+        of tag:watch-inactive as p
+        each worker
+  accounts : column
+    title : text "ACCOUNT QUOTA / USED %"
+      role section
+    rows : column
+      of charts:@QUOTA@/marks as g
+      each quota
+    age : text "$quota_age"
+      the @STATUS@
+      role muted
+  evidence : column
+    fold "Evidence / reset times / unknowns"
+    role detail
+    context : text "Context is last reported tokens / capacity. Measurement age unknown. Not cumulative token consumption."
+    quota : text "$quota_note"
+      the @STATUS@
+    method : text "$method"
+      the @STATUS@
+    ctx : column
+      of charts:@CONTEXT@ as g
+      each source
+    account : column
+      of charts:@QUOTA@ as g
+      each source
+    studio : text "Open Studio example"
+      role tool
+      on click host window studio
+
+person : column
+  fold inline handle chevron
+  tip "$title" "Expand reported status and context evidence"
+  role row
+  line : grid 9 8 16 12 7
+    gap 4
+    peek
+    name : text "$title"
+      role name
+      clamp 1
+    state : text "$state_word"
+      role state
+      role state.on when $doing = "working"
+      role state.warn when $status_word = "paused"
+    model : text "$model_short"
+      role muted
+      clamp 1
+    bar : column
+      of charts:$p.ctx/marks as g
+      each strip
+    pct : text "$ctx_label"
+      role pct
+      role pct.warn when $ctx_level = "warn"
+      role pct.full when $ctx_level = "full"
+  detail : text "$text"
+    role detail
+
+worker : column
+  fold inline handle chevron
+  tip "$title" "Expand task and worker evidence"
+  role row
+  line : column
+    peek
+    status : grid 9 8 16 12 7
+      gap 4
+      name : text "$worker_name"
+        role name
+        clamp 1
+      state : text "$state_word"
+        role state
+        role state.on when $doing = "working"
+      model : text "$model_short"
+        role muted
+        clamp 1
+      bar : column
+        of charts:$p.ctx/marks as g
+        each strip
+      pct : text "$ctx_label"
+        role pct
+        role pct.warn when $ctx_level = "warn"
+        role pct.full when $ctx_level = "full"
+    task : text "$title"
+      role body
+      clamp 1
+  detail : text "$text"
+    role detail
+
+quota : grid 16 28 12
+  gap 8
+  role row
+  label : text "$g.label"
+    role body
+  bar : text "$g.picture"
+    picture
+  number : text "$g.value_text"
+    role pct
+    only when $g.status != "unknown"
+  unknown : text "unknown"
+    role muted
+    only when $g.status = "unknown"
+
+strip : text "$g.picture"
+  picture
+
+source : text "$g.detail"
+  role muted
