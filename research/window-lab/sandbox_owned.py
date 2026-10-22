@@ -1,7 +1,8 @@
 """Exact owned-process fences using the existing Windows handle adapter.
 
-No import-time process queries. WMI metadata is queried only for the supplied
-owned PID, with the ordinary token; denial is final, with no alternate route.
+No import-time process queries. New suspended births use their original launch
+facts plus exact returned-handle identity. Legacy receipts still require WMI
+metadata for the supplied owned PID; denial is final, with no alternate route.
 No process-tree kill, PID-only kill or discovery-by-desktop/profile fallback.
 """
 import json
@@ -105,6 +106,8 @@ class OwnedProcesses:
             self.native.k.CloseHandle(handle)
 
     def finish(self, owner):
+        if owner.get("method") == "CreateProcessW-suspended-v1":
+            return self.finish_birth(owner)
         # Absence of a command-line profile flag is not proof of the engine's
         # actual profile (e.g. a Python/WebView2 host sets it in-process).
         # Recording that absence is useful, but cannot admit termination.
@@ -126,5 +129,32 @@ class OwnedProcesses:
         except MetadataUnavailable as exc:
             return {"status": "refused", "reason": "owned metadata unavailable",
                     "metadata_receipt": exc.receipt}
+        finally:
+            n.k.CloseHandle(handle)
+
+    def finish_birth(self, owner):
+        """Reopen and pin the recorded birth, never rediscover/adopt a child.
+
+        Launch facts were captured before its initial thread ran. This verifies
+        the same birth, not mutable engine configuration or descendant closure.
+        Access denied remains a refusal; no WMI fallback or tree termination.
+        """
+        from sandbox_birth import valid
+        if not valid(owner):
+            return {"status": "refused", "reason": "birth receipt incomplete"}
+        n = self.native
+        handle = n.k.OpenProcess(0x1000 | 1 | 0x100000, False, owner["pid"])
+        if not handle:
+            return {"status": "refused", "winerror": n.c.get_last_error(),
+                    "reason": "cannot open owned process"}
+        try:
+            if n.of_handle(handle) != (owner["created"], path_key(owner["exe"])):
+                return {"status": "refused", "reason": "owned birth changed"}
+            if not n.k.TerminateProcess(handle, 0):
+                return {"status": "failed", "winerror": n.c.get_last_error(),
+                        "reason": "owned termination failed"}
+            wait = n.k.WaitForSingleObject(handle, 3000)
+            return {"status": "ended" if wait == 0 else "pending", "wait": int(wait),
+                    "scope": "recorded direct child only"}
         finally:
             n.k.CloseHandle(handle)
