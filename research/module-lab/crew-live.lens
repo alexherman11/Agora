@@ -1,0 +1,116 @@
+root : column
+  role watch
+  measure 92ch
+  rows : column
+    of crew:summary as s
+    each overview
+overview : column
+  head : row
+    role header
+    title : text "AGORA / CREW"
+      role title
+      share 1
+    clock : text "$s.clock"
+      role muted
+  counts : text "$s.counts"
+    role body
+  freshness : text "$s.freshness"
+    role muted
+    role state.bad when $s.status = "stale"
+  residents : column
+    title : text "RESIDENTS / CONTEXT CAPACITY"
+      role section
+    rows : column
+      of crew:residents as p
+      each person
+  workers : column
+    title : text "WORKERS / ACTIVE TASKS"
+      role section
+    rows : column
+      of crew:workers as p
+      each worker
+    empty : text "No working or waiting workers reported"
+      role muted
+      only when count(crew:workers) = 0
+    inactive : column
+      fold "$s.inactive_count inactive workers"
+      only when $s.inactive_count > 0
+      rows : column
+        of crew:inactive as p
+        each worker
+  accounts : column
+    title : text "ACCOUNT QUOTA / USED %"
+      role section
+    rows : column
+      of crew:quota as g
+      each quota
+  evidence : column
+    fold "Evidence / reset times / unknowns"
+    role detail
+    method : text "$s.detail"
+    accounts : column
+      of crew:quota as g
+      each evidence
+  modules : text "Open Composition workshop"
+    role tool
+    on click host window composition-workshop
+person : column
+  fold inline handle chevron
+  tip "$p.title" "Expand reported context and status"
+  role row
+  line : grid 9 8 16 12 7
+    gap 4
+    peek
+    name : text "$p.title"
+      role name
+      clamp 1
+    state : text "$p.state"
+      role state
+      role state.on when $p.doing = "working" and $p.state != "stale"
+      role state.warn when $p.state = "paused"
+    model : text "$p.model"
+      role muted
+      clamp 1
+    bar : text "$p.picture"
+      picture
+    pct : text "$p.percent"
+      role pct
+  detail : text "$p.detail"
+    role detail
+worker : column
+  fold inline handle chevron
+  tip "$p.title" "Expand task and worker evidence"
+  role row
+  line : column
+    peek
+    status : grid 9 8 16 12 7
+      gap 4
+      name : text "$p.worker_name"
+        role name
+        clamp 1
+      state : text "$p.state"
+        role state
+        role state.on when $p.doing = "working" and $p.state != "stale"
+      model : text "$p.model"
+        role muted
+        clamp 1
+      bar : text "$p.picture"
+        picture
+      pct : text "$p.percent"
+        role pct
+    task : text "$p.title"
+      role body
+      clamp 1
+  detail : text "$p.detail"
+    role detail
+quota : grid 16 28 12
+  gap 8
+  role row
+  label : text "$g.title"
+    role body
+  bar : text "$g.picture"
+    picture
+  pct : text "$g.percent"
+    role pct
+evidence : text "$g.title: $g.status. $g.detail"
+  role muted
