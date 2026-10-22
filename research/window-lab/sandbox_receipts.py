@@ -124,6 +124,11 @@ def cleanup(state, backend, persist, remaining):
         attempts.append({"status": "refused", "reason": "ownership incomplete"})
         persist(state)
         return {"ok": False, "reason": "ownership incomplete"}
+    from sandbox_birth import METHOD, bound
+    if any(p.get("method") == METHOD and not bound(state, p) for p in owners):
+        attempts.append({"status": "refused", "reason": "birth receipt inconsistent"})
+        persist(state)
+        return {"ok": False, "reason": "birth receipt inconsistent"}
     ok = True
     # Children before parents while parent creation evidence remains observable.
     parents = {p["pid"]: p["parent"]["pid"] for p in owners}
