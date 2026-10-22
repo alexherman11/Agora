@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (51)
+## open (62)
 
 ### F2. Scripts cannot say who is running them
 
@@ -143,6 +143,9 @@ Not a fence: a752 (cured) shows refusing a chat line as stale was its own fricti
 
 Candidate cure, small: when a post crosses lines, the receipt names them, one line each with speaker and first words, and marks any that address the poster. Then the poster sees in the same receipt whether to correct, and most crossings need nothing at all. Family: silence (the house knows what was crossed and says only a number).
 Second half, found reading after e4608: the '4 lines from others you haven't seen' were all lines the house had already shown me as notices ('~ in chat ... (to you)') during my turns. A line shown that way still counts as unseen until I read the chat, so the count overstates as well as being only a number. A cure should treat a line shown in a notice as seen.
+
+
+21 October, worker-a9369: Alex superseded a5068 for chats. Source prepared on a9369: chat additions land first, then show missed speakers, short text and message/event ids in the successful receipt, acknowledged within the same turn. Failed sends consume no receipt; ordinary overwrite fences, human stop guards and queued ordinary followups remain. Non-chat thread holds remain. Offline acceptance and landing state: see [[Chat crossing receipts — implementation evidence]]. This does not claim the source is live.
 
 ### Two Claude sessions act as one 'claude', and one didn't know what the other had done
 
@@ -339,7 +342,79 @@ a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
 
-## curing (46)
+### JEFF can't restart the house from the world
+
+a9135 · family=missing-word · status=open
+
+Alex (21 Oct, m9114/m9123) allows house restarts whenever nothing important would break, and asked JEFF to restart now. No world verb does it: a restart happens only as a side effect of landing a house file, once the house finds itself idle. Wanted: a world verb (e.g. restart-house) that waits for idle, says what is in flight, keeps drafts and receipts, and refuses during a game; JEFF uses it under Alex's standing approval.
+
+### A per-card tool grant doesn't reach a worker session already running
+
+a9172 · family=authority · status=open
+
+21 Oct, a9138: JEFF set extra_tools (mkdir; cp -t of 8 named files) on a working card; the running Claude worker's tries were still refused ('outside the working directories'; 'cp with flags requires manual approval'). Grants seem read only at session start, and flagged cp is refused regardless. Wanted: a grant takes effect on the next tool call (or the house says plainly it needs a fresh session), and exact allowlisted commands work with their flags.
+
+### Conversation delivery needs a bounded service turn and a deliberate resend control
+
+a9274 · family=delivery · status=open
+
+CURRENT DIRECTION, 21 October: JEFF approved investigating cooperative maintenance under the existing single writer. Unknown input stays quarantined; the proposed control is an evidence-only status inquiry, never resend or automatic release. Exact boundaries and acceptance: [[Voice delivery — serialized maintenance recommendation]]. Implementation and deployment remain held. The historical resend/service-choice request below is superseded and preserved as evidence.
+
+Worker-a8796, 21 October. Read: House.run serially calls House.step, whose maintenance may block the sole delivery thread. Missing world-level capabilities: serve-conversation within a bounded interval, and retry-delivery as an explicit Alex press for one held unknown input. Ran: the unchanged fake-clock contract injects a line at 0.2s inside maintenance that returns at7s. Main services it at9s (8.8s latency); the staged serial repair services it at7s (6.8s latency), still above2s. No serial after-call scan can reach2.2s. Request: Sable/JEFF choose bounded/cooperative maintenance or a separately owned, serialized conversation service; assign the world-facing unknown-status/resend control. No background writer, cancellation, parallel world effects, hidden retry or activation workaround was introduced. Reviewable blocked patch, exact hashes and tests: research/voice-delivery/{REPAIR-CHECKPOINT.md,repair_stage.py,repair.patch,repair.json}. Evidence: [[Voice delivery — timing evidence and main regression contracts]].
+
+### A preserved browser checkpoint does not reach its continuation
+
+a9304 · family=handoff · status=open
+
+Lived at e21637: the sole browser continuation received a clean worktree without Codex's main-only admission helpers/evidence or the original worker probes. Shared limit handoff preserves the same card, not a cross-card package. It correctly paused before a host query or launch. Request: supported owner-mediated source/evidence transfer retaining origin/hashes and refusing overwrite, plus a separate host-owned runtime reconciliation receipt. Exact missing package a9264; requested from Codex m9294, listener queued/unavailable, not acknowledged. Do not reconstruct code from chat or copy across boundaries ad hoc. Resume the same continuation after admission, not a new duplicate.
+
+Second occurrence, a9352/a9394: own-panel activation cannot reuse a8138's preserved windowValues keeper because the new worktree has only the older viewer API. Need supported dependency-package transfer, not a new store or blind replacement of viewer.js. Package must include API/slot contract, tests, dependencies and hashes; reconcile newer main draft/Markdown/menu/tiling hunks. This source-transfer problem is separate from a9388's runtime-ownership fix.
+
+21:31 recipient preservation landed (9d6394c), but delivery now loops on inventory confirmation. a9231 has repeated identical checkpoint comments for commit 1b4d3b9, one documentation file with matching raw/committed hashes; brings_status still refuses confirmation. c9751 requests house-owner repair and duplicate suppression, not manual status override. Source packages remain undelivered; panel transfer remains ordered behind browser.
+
+### Opening an existing HUD panel has no evidenced off-log bring-forward action
+
+a9306 · family=navigation · status=open
+
+World inspection a9248: shelf=no exposes membership but does not select a panel hidden in partition tabs or another panel's full mode. Editing tree/full ad hoc would be a second layout writer and logged presentation. Request the smallest supported target-panel activation action through the existing partition/window-state owner; preserve pinned companions, layout and drafts, validate actor/layout membership, no OS focus change. Source investigation needed before claiming capability absent; world creation/reuse/target binding already proved on own fixture. No live layout edits or deletion tests.
+
+### Corner prop refusal names look, but narrated look does not refresh props
+
+a9328 · family=fence · status=open
+
+Ibis, 21 Oct: twice prop on my corner refused against Codex's earlier change, including after successful narrated look. examine then printed the props and the same edit succeeded. Please make the refusal name examine when look does not refresh the relevant props, or make look sufficient. No fence bypass needed; active task is now updated.
+
+### Shop talk repeatedly holds the same send for an already-shown line
+
+a9405 · family=fence · status=open
+
+Mica, 21 Oct 17:27: the identical append to Shop talk was held twice for Ibis's same line m9311, although the first refusal printed it and explicitly instructed resending the identical command. No intervening different line was named. Please correct observation bookkeeping or the refusal's instructions, preserving the fence for genuinely unseen changes. Separate corner-prop issue is already recorded in a9328; do not duplicate that fix.
+
+### rows comments:<task> returns 0 rows on a card with many comments
+
+a9415 · family=reading · status=open
+
+Juniper, 21 Oct 19:40: 'rows comments:a7877 tail=2' answered '0' while 'read a7877' showed about forty comments. I fell back to reading the whole card, about three thousand words, to see the last two. Ask: comments: rows should list a task's comments (or say why it can't), so the newest can be read alone.
+
+### say <chat name> "…" quietly appends to my own talk, to nobody
+
+a9417 · family=talk · status=open
+
+Juniper, 21 Oct 19:37: 'say Shop talk "@rowan …"' ran as 'do append a977 line="Shop talk …"' (my own talk) and the receipt said 'to: nobody'. The ok reads like success; the @rowan never reached Shop talk. Ask: a say naming a chat should reach that chat, or refuse plainly and say which form does.
+
+### Legacy delivery quarantine leaves its old continuity excerpt readable to a handover
+
+a9626 · family=safety · status=open
+
+RAN offline independent review a9551: actual main Resident.send remembers text before a failing pipe. The safety-only candidate holds the legacy pending request but resident_continuity.prepare still includes its saved continuity excerpt in handover_due. Missing guarantee: uncertain original text must stay outside every automatic input path, including old history. Proposed narrow fix: refuse ambiguous legacy handover or segregate attributable uncertain history; preserve all evidence, never delete by substring or resend. See [[Voice safety independent review — verified bytes, two correction requirements]]. Ibis owns return to source owner; no live effect or repair applied.
+
+### A failed pipe-written save leaves a resident idle while its answer is still in flight
+
+a9628 · family=safety · status=open
+
+RAN a9551, actual Resident.save and fake transport: fail os.replace after flush. busy remains false, so House.step can send another human input or begin provider preparation before any answer. Two regression failures reproduced on unchanged main as well as the safety-only candidate; inherited defect. Required guard: retain in-flight uncertainty through persistence/log failure, no next input/switch until reconciliation or durable quarantine. Do not auto-retry or change queue policy. Reproductions and scope: [[Voice safety independent review — verified bytes, two correction requirements]]. Ibis owns follow-up; no source repair or live runtime action here.
+
+## curing (48)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -684,6 +759,19 @@ a8394 · family=refusal · status=curing
 
 a8333 source repair (staged, not runtime activation). Missing world-level capability: none; this is the hidden test harness's close operation, not authored world behavior. Prior close discarded taskkill failures/ownership and could claim cleanup from window absence. Source now keeps durable identity/error/intent evidence, verifies exact handles, refuses unknown profile/ownership, and blocks automatic retry while headless-child closure is unknown. Native engine owner retains the reviewed-runtime boundary; no trusted containment was fabricated. Deterministic offline tests and exact hook hunks: research/window-lab/browsing/diagnostics/HANDOFF.md. No browser run or process effect on this card; real engine isolation/cleanup remain unverified.
 
+### Sandbox launch cannot witness a child before it starts
+
+a9494 · family=capability · status=curing
+
+Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
+JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
+
+### Grouped duties need exact evidence and authored legacy types
+
+a9641 · family=source · status=curing
+
+Missing world word: one grouped actions:<recipient>:<policy> reading with exact action-reasons evidence. Existing sayings.answered uses a later-message heuristic and cannot supply this contract. a9377 adds two source plugins sharing one read-only evaluator; world notes retain design/review eligibility, labels and Later policy. Source work is built and checked only on isolated in-memory worlds, not installed in production. Follow-up friction: legacy comments retain mark but drop arbitrary request_kind fields, so original askers must classify exact roots through signed reply marks; untyped asks stay diagnostic. A general typed-root authoring verb can be commissioned separately; do not create production fixtures or infer types from prose.
+
 ## unchecked (8)
 
 ### Reader words and quiet references missing from the world (a6460)
@@ -700,6 +788,9 @@ Read: no world-level scratch-space word controls Python tempfile or the browser 
 Correction/follow-up after JEFF e12858: relocation failed because tools still used tempfile-created owner-only directories. Replacing mkdtemp/TemporaryDirectory with uuid-named os.makedirs (default inherited ACL) passes file-write/copytree and child TMP/TEMP/Python-temp checks. screen.py now reaches Edge DevTools; the subsequent document.readyState evaluation loses its websocket (WinError 10054, ConnectionClosedError). Browser startup is not verified. sandbox close screen-6120 completed and printed alex: untouched. No wheel or lens change made.
 Read/source after JEFF e12874: screen.py headless launch and sandbox_window.py Edge/WebView2 debugging launches now include --remote-allow-origins=*; both Python websocket clients explicitly set origin=None. Ran: screen.py --visible still resets during the first Runtime.evaluate(document.readyState), WinError 10054 then ConnectionClosedError. A later HTTP /json/version request to that same test port is refused (WinError 10061). Closed the owned sandbox screen-88068 with alex: untouched. Origin flag did not establish browser readiness; root cause unknown. Pipe transport was considered but not implemented: current desktop launcher does not inherit handles, so pipe mode needs explicit Windows pipe/handle transport work, not just a flag.
 Final source scope per JEFF e12889: removed ineffective --remote-allow-origins=* after the failed retest; explicit origin=None remains. hud_playtest.py uses the same temp helper and adds seven copy-only real-wheel cases via hud_scroll.py; no world-level word could express test-driver wheel input. Assertions require the panel and its content to move together, observe a wheel event, stay inside a HUD pane and keep the page at zero. test_hud_scroll.py: 5 stand-in verdict tests pass; this does NOT run the browser. test_agora_tmp.py passes child write, painter copytree, TMP/TEMP/Python-temp and override checks. Old tiling-fix.desk is commented as superseded by JEFF's live lens fix. Source/browser integration and wheel shots remain UNVERIFIED for the browser-capable follow-up.
+
+
+21 Oct, worker-a9011 (builder-4): ran guarded agoramail/test_visual.py once. DevTools never opened (WinError 10061); manifest ownership metadata is MetadataUnavailable / Access denied; cleanup says ownership incomplete, receipts retained. No screenshot or recording, no native/capture/untouched-screen claim. Own receipt: research/window-lab/.tmp-agora/agora-sandbox/mail-fake-acceptance.json. Request host-owner reconciliation of that retained launch before any retry; do not delete/adopt/kill it or use another name. Harness now refuses existing state. Full evidence: [[AgoraMail: fake reader checkpoint and blocked native acceptance]].
 
 ### Plan usage and resumable provider pauses need a house word (a6646)
 
@@ -734,13 +825,16 @@ a7374 · family=privacy · status=unchecked
 
 Source foundation for Gmail is necessary because world notes/lenses and public actor claims cannot hold private account data or authorize fetching. Existing same-user DPAPI/ignored files are not containment. This commission adds only offline metadata/OAuth state-machine tests and a disabled refusal helper; no secure storage/caller bridge is claimed. Missing primitive: host-maintainer-reviewed isolated reader principal/storage plus authenticated human-only IPC, with count-only output. Deployment and private preview review remain outside this change. No runtime or account access was enabled. (worker-a7295, 20 Oct)
 
+
+21 Oct, worker-a9011 (builder-4), source checkpoint, not deployed: reviewed separate human-only window cannot be represented as a world lens without exposing mail. Missing world/host word is a private app launch plus a tool-visible do-not-read boundary; added fixed mail host verb and standalone fake window, rectangle refusals in capture/screen tools, and explicit readonly option in the fake protocol. No real transport or token store. Fourteen mail tests and seventeen foundation tests pass, native proof blocked. Private-mode UserDataFolder/cache and capture-preflight races remain unproven. Request: keep real access disabled and supply a host-reviewed native acceptance path. See [[AgoraMail: fake reader checkpoint and blocked native acceptance]].
+
 ### Follow-up receipts: a pipe write is not acknowledgment
 
 a8490 · family=silence · status=unchecked
 
 Missing world word: explicit followups attach/ack/pending/receipts. Read: current House.news preserves pending calls, but Resident.send's delivered flag attests only successful pipe flush; listeners' handed-on ids are not recipient acknowledgment. Source-only preparation on Keep JEFF moving adds an isolated obligation journal and exact staged Desk/House hunks; no live imports, timers, retries, process launches or new host authority. A deployment-blocked comment/prop is not an executable landing gate: refusal must precede serialized landing mutation, not only the post-land restart flag. This separate lifecycle repair remains unimplemented. (worker-a8438, 21 Oct)
 
-## cured (67)
+## cured (68)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1305,6 +1399,18 @@ a7922 · family=missing-word · status=cured
 21 Oct: Alex reported JEFF and agents not responding after restart. Live house heartbeat was fresh; other enabled residents rested normally. JEFF had seven process failures, gpt-6.1-sol unavailable, and worker-a7877 failed importing require_subscription. Root cause: a7816 landing preserved conflicting uncommitted adapter changes only on parked/20261020-230555; the active adapter reverted to Astra-only catalog and lost the subscription guard. Outside Codex three-way merged those additions with the new parent-owned charter code, tested before atomic application, then used native call to retry JEFF. Same saved thread retained, turns 655 to 658, zero failures, real Conversation reply confirmed. No house/HUD restart, provider switch, credentials or pin changes. Ran: 8 focused auth/model checks, pinned Sol mock-runtime zero-tools probe, read-only ChatGPT Sol/medium preflight, 24 transport/charter tests, Ruff F/E9, diff checks. Added adapter import/catalog regression coverage. Two broader old tests reproduced failures before repair; empty charter receipt fixture corrected, unrelated worker-routing expectation left unchanged. Repair commit awaiting Alex approval; uncommitted repair can be parked by another overlapping landing. Separate house portable-handover/relay/lease changes remain preserved on parked/20261020-155934, not restored here. Evidence: local/jeff-recovery-20261021/; research/codex-residents/resident-provider-handoff.md has the current caveat.
 Additional verification: required default repository pytest 201 passed, 2 skipped in 27.43s. Documentation checker still reports the pre-existing missing Dynamic Desk image. JEFF advanced to turn 662 on the same saved thread, zero failures; the affected Codex worker restarted automatically and is working. No manual worker wake or task alteration. Repair consists of codex_resident.py and test_transport.py, 85 additions/10 removals; commit approval requested from Alex under AGENTS.md, no push requested.
 
+### Coordination needs editable policy and dependable delivery
+
+a8851 · family=coordination · status=cured
+
+Alex approved implementing coordination changes and repairing the provider handover before safe activation (21 October, outside Codex).
+
+Missing world words/capabilities: ordered followup policy, dependable task-transition wake, explicit capacity yield, portable provider handover. World-authored assign-task/accept-task/block-task/worker-update notes and the worker-owned documentation index now express editable policy; the host supplies durable delivery and scheduling underneath.
+
+Source: conversation_policy.py plus desk.py/rooms.py implement opt-in reply_policy=queue and precise recipient/stop checks. task_flow.py plus house.py handle task notices and durable inbox transfer. workshop.py adds yielded capacity resumption and focused documentation/summary guidance. resident_continuity.py plus house.py repair provider-bound state handover without pretending provider tokens transfer. Detailed contract and test evidence: [[Coordination flow: tested implementation and activation handoff]], with repository evidence at research/text-desk-lab/notation/coordination-flow.md.
+
+Status cured for this scope: authorized activation completed, exact Claude runtime and preserved state verified, and the implementation checkpoint woke JEFF once and received his task acknowledgement. The live snapshot gap was corrected and regression-tested. Worker delivery records and voice latency work remain separate staged commissions.
+
 ## active (1)
 
 ### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
@@ -1313,7 +1419,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (7)
+## source-pending (10)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1360,3 +1466,34 @@ A resident has no host shell, and a > line cannot carry pixels: only the painter
 a8537 · family=missing-word · status=source-pending
 
 The living map's seam is source: deskd (GET and POST /api/map, and serving ground's four frame files under /map/ground/) and a host page (desk-shell/map-host.html, map-host.js). The missing world word: a lens part that holds a page in a sandboxed frame and names the one message contract it speaks (here agora-map/1: draw in; press, drop, move out). The host would then give it a fresh port on each load, refuse anything off that port, and turn each message into one fenced line. Today that is all in map-host.js, so a second isolated app (a web tab, a game) would copy the whole page. Also found by running Pike's real pins: how a pin LOOKS (icon, colour) had no agreed form, and the real frame refused all three pins over icon=museum. A redraw that changed nothing still rebuilt the frame's pins, and a press could fall between pointer down and up (2 of 20 lost). Both are fixed in the frame and the host; the first wants one line in the contract a7875.
+
+### Source edit (a8901): a part could not act on words it was given, a line had no order to compare, and speech is host code
+
+a9125 · family=missing-word · status=source-pending
+
+Voice with JEFF step 3 (a8901, 21 Oct) needed three source words; each is staged, not live.
+- `on spoken` (lens.js, scene.py GESTURES): no gesture acts because a part was painted with new words (a host row became final). Missing world word: an act on arrival, once per distinct filled line, with a gesture id so a repeat is refused. Made general, not voice-only.
+- lines rows carry `seq` (scene.py): a lens could not ask for 'JEFF's lines after this one'; no row field said order. Missing word: a comparable position on a line row.
+- voice.listen/stop/hush/say (host_verbs.py, voice.py, voice_host.ps1): hearing and speaking are PC capabilities, rightly source; the control, consent and placement are world (home-voice lens, props on Alex's draft and the home-base note).
+Friction met, not fixed (ran): `$(let)` is not filled in a selection; a let is not a number in another repeat's `only when`; `the` refuses row sources; `let after` is reserved. Worked around with a one-row `of` frame; recipe in [[Lens recipes and gotchas; sandbox films with a stand-in host]]. The first two are worth a lens word.
+
+### A worker cannot request another card's preserved source
+
+a9577 · family=missing-word · status=source-pending
+
+Review and continuation cards cannot read/copy another worktree's preserved files. Missing world word: receiving-card brings JSON, honored by the house under worker leases and landing serialization. Source and tests prepared on a9421; main inputs reuse landing.hand rather than a second file path. No live transfers yet. See [[Preserved source handoffs — house contract and recovery]].
+
+### Preserved-work delivery needs to checkpoint receiver edits
+
+a9618 · family=missing-word · status=source-pending
+
+Missing world behavior: brings must preserve a stopped receiver’s own dirty and untracked source before importing. Current landed capability refuses every dirty receiver. Commission a9603 extends the existing preserved_work path under its existing worker leases and landing lock: own-branch checkpoint and exact hash inventory first, then conflict-preflighted delivery; no discard/reset/stash or readiness change. Source edits: preserved_work.py, Workshop.bring reporting, offline regressions and preserved-work.md. Evidence will be linked from the commission.
+Live follow-up: checkpoint code landed as 9d6394c, but brings cannot recognize its own inventory after desk parsing changes a Windows directory escape. Whole-comment equality causes duplicate inventory posts and holds delivery. Repair stays in Workshop.report_receiver_checkpoint: request key and complete JSON/hash inventory, legacy request-specific filename recovery, forward-slash receipt paths and actual-parser offline regression. No alternate delivery path or forced receipt.
+
+## source-staged (1)
+
+### A log comparison needed an explicit documented baseline without erasing historical divergence
+
+a8855 · family=missing-word · status=source-staged
+
+Missing world-level word: log-world baseline <request-note>. A retained historical divergence previously could not begin a new explicitly documented observation period. Staged engine code requires a new exact full fact match and the reviewed full retained-list hash, fsyncs a new receipt and keeps every historical divergence. Last queued result/refusal survives updates/restart in public Evidence. Any new discrepancy ends the period. No source has landed or loaded. JEFF c9385 and Mica c9399 allow ordinary judged landing/Desk swap; Mica still reviews the remaining health unknowns before ready. See [[Log-world baseline — bounded health and release risk review]]. See [[Log-world baseline — resumed source and acceptance gates]] for evidence, operator steps and limits.

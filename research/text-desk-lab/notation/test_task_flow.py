@@ -4,14 +4,46 @@
 import unittest
 import uuid
 from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from unittest.mock import patch
 
+import kept
 import rooms
 import roomworld
 import task_flow
 
 
 class TaskFlowTests(unittest.TestCase):
+    def test_archived_native_props_keep_assignment_and_milestone_recipients(self):
+        # Match production's save-time externalization, not an inline undo fixture.
+        reassignment = self.change("juniper", "owner=sable lead=juniper")
+        milestone = self.change(
+            "sable", 'worker_milestone=checkpoint worker_summary="Checked" worker_evidence="note"'
+        )
+        event_start = self.w.events.index(reassignment)
+        with TemporaryDirectory() as directory, patch.object(kept, "SESSIONS", Path(directory)):
+            path = Path(directory) / "task-flow-test.pickle"
+            kept._open(kept.archive_path(path)).close()
+            self.assertGreater(kept.sweep(self.w, path), 0)
+            self.assertNotIn("restore_subject", milestone["undo"])
+            self.assertEqual(milestone["undo"]["kept"], "task-flow-test")
+            # A later handoff must not rewrite either earlier event's recipients.
+            self.change("juniper", "owner=pike lead=pike asked_by=pike")
+            kept.sweep(self.w, path)
+            self.assertEqual(task_flow.notices(self.w, reassignment)[0]["recipient"], "sable")
+            self.assertEqual(task_flow.notices(self.w, milestone)[0]["recipient"], "juniper")
+            self.assertEqual(rooms.reached(self.w, milestone), {"juniper": "call"})
+            import house
+
+            resident = SimpleNamespace(
+                rid=self.r.corner["juniper"], state={"cursor": event_start}, save=lambda: None
+            )
+            self.assertTrue(object.__new__(house.House).news(self.w, resident, "juniper"))
+            self.assertEqual(len(resident.state["inbox"]), 1)
+            self.assertIn("Checked", resident.state["inbox"][0])
+
     def setUp(self):
         self.d, self.r = roomworld.build()
         self.w = self.d.world
