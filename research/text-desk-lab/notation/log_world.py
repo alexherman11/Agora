@@ -19,6 +19,12 @@ import store
 
 STATUS_TITLE = "Log world: is it in step with the live world?"
 REPORT_WORDS = "log-world report"
+BASELINE_MEANING = (
+    "A new starting point, not a claim that history is repaired. "
+    "The set-aside discrepancies and original log stay as they were. "
+    "Any new discrepancy ends this observation period; two observed days "
+    "must begin again from a subsequent matching full-check baseline."
+)
 EXCLUSIONS = (
     "Standing/presence; personal seen marks, folds and views; painter reports; "
     "undo revisions and indexes; joined chat text when derived from its lines; "
@@ -46,7 +52,8 @@ def display_report(report):
 
 def answer_key(report):
     return (report["state"], report["line"],
-            json.dumps(report.get("divergences", [])[:1], sort_keys=True, ensure_ascii=False))
+            json.dumps(report.get("active_divergences", report.get("divergences", []))[:1],
+                       sort_keys=True, ensure_ascii=False))
 
 
 def freeze_world(w):
@@ -120,6 +127,7 @@ class Replay:
         self.seq, self.event, self.records = 0, "e0", 0
         self.first_checked, self.full_event = None, "none"
         self.divergences, self.boxes = [], []
+        self.baselines = []
         self.checked_records = 0
         self.reason = "not checked since this checker started"
 
@@ -175,7 +183,8 @@ class Replay:
             # that expansion once; expanding the resulting scope again would
             # compare unrelated grandchildren only on the replay side.
             logged = {k: v for k, v in logged.items() if k[0] in scope or k[0] == "world" or k[1] == "link"}
-        for tid, aspect, _ in store.diff(logged, live):
+        differences = store.diff(logged, live)
+        for tid, aspect, _ in differences:
             self.add(rec, tid, aspect, live.get((tid, aspect), store.ABSENT),
                      logged.get((tid, aspect), store.ABSENT))
         self.reason = ""
@@ -184,13 +193,24 @@ class Replay:
         if full:
             self.full_event = self.event
         self.checked_records += 1
+        return differences
+
+    def accept_baseline(self, baseline):
+        """Only a durable, fully checked receipt may advance the verdict boundary."""
+        prefix = self.divergences[:baseline["set_aside_count"]]
+        if (len(prefix) != baseline["set_aside_count"] or
+                store.h(prefix) != baseline["divergence_hash"]):
+            raise ValueError("baseline does not identify the retained divergence prefix")
+        self.baselines.append(copy.deepcopy(baseline))
 
     def report(self):
-        state = "unavailable" if self.reason else "diverged" if self.divergences else "in-step"
+        baseline = self.baselines[-1] if self.baselines else None
+        active = self.divergences[baseline["set_aside_count"]:] if baseline else self.divergences
+        state = "unavailable" if self.reason else "diverged" if active else "in-step"
         if state == "unavailable":
             line = "unavailable: " + self.reason
-        elif self.divergences:
-            d = self.divergences[0]
+        elif active:
+            d = active[0]
             title = self.flat.get((d["thing"], "title"))
             if not title:
                 subject = self.flat.get((d["thing"], "subject"))
@@ -198,10 +218,14 @@ class Replay:
             line = (f'diverged at {d["event"]}: {title} {d["aspect"]} is {d["live"]!r} live '
                     f'and {d["log"]!r} from the log; the record was {d["command"]!r} by {d["by"]}')
         else:
-            line = f"in step since {self.first_checked}"
+            line = (f'in step since {baseline["event"]} (documented baseline)' if baseline
+                    else f"in step since {self.first_checked}")
         return {"state": state, "checked_event": self.event if self.first_checked else "none",
                 "line": line, "records": self.records, "checked_records": self.checked_records,
                 "last_full": self.full_event, "divergences": copy.deepcopy(self.divergences),
+                "active_divergences": copy.deepcopy(active),
+                "retained_divergence_hash": store.h(self.divergences),
+                "baselines": copy.deepcopy(self.baselines),
                 "boxes": copy.deepcopy(self.boxes), "exclusions": EXCLUSIONS}
 
 
@@ -233,6 +257,8 @@ class Checker:
         self.needs_full = False
         self.covered_seq = 0
         self.fixture_receipt = None
+        self.baseline_attempt = None
+        self.last_baseline_refusal = None
         self.publish_lock_ms = {"last": 0.0, "max": 0.0}
         self.thread = threading.Thread(target=self._work, name="log-world", daemon=True)
         self.thread.start()
@@ -252,6 +278,24 @@ class Checker:
                     self.covered_seq = rec.get("records", 0)
                 elif rec.get("kind") == "divergence":
                     self.replay.divergences.append(rec["detail"])
+                elif rec.get("kind") == "baseline":
+                    self.replay.accept_baseline(rec["detail"])
+                    self.baseline_attempt = {
+                        "request": rec["detail"]["request"], "event": rec["detail"]["event"],
+                        "reason": rec["detail"]["reason"], "divergence_hash": rec["detail"]["divergence_hash"],
+                        "at": dated(rec["at"]), "result": "accepted after a matching full comparison",
+                        "full": True, "full_differences": 0,
+                    }
+                    # A documented new observation epoch. Old rows remain untouched.
+                    reports = []
+                    self.gaps = []
+                    self.previous_at = rec["at"]
+                    self.covered_seq = rec["detail"]["seq"]
+                elif rec.get("kind") == "baseline-result":
+                    self.baseline_attempt = rec["detail"]
+                elif rec.get("kind") == "baseline-refused":
+                    self.baseline_attempt = rec["detail"]
+                    self.last_baseline_refusal = rec["detail"]
         own = set()
         if reports and reports[-1].get("counting_version") != accounting.VERSION:
             # House-internal metadata reconciliation, off-lock. No raw log output.
@@ -266,7 +310,7 @@ class Checker:
             self.gap_reason = "checker restart; no comparison coverage claimed"
 
     def submit(self, live, end, event, full=False, capture_ms=0, boxes=None, quiet=False, frozen=None,
-               before=None, touched=(), words="", by="house"):
+               before=None, touched=(), words="", by="house", baseline=None):
         if self.stopped:
             return False
         try:
@@ -277,6 +321,7 @@ class Checker:
                                  "full_generation": self.full_generation,
                                  "frozen": frozen,
                                  "before": before, "touched": tuple(touched), "words": words, "by": by,
+                                 "baseline": baseline,
                                  "at": self.clock(), "mono": self.monotonic()})
             return True
         except queue.Full:
@@ -315,7 +360,10 @@ class Checker:
             import witnessed
             report = display_report(self.snapshot())
             # Large evidence lives in its note/receipt, never in the moving row.
-            row = {k: v for k, v in report.items() if k not in ("boxes", "divergences", "exclusions", "paired_fixture")}
+            row = {k: v for k, v in report.items() if k not in (
+                "boxes", "divergences", "active_divergences", "baselines", "exclusions", "paired_fixture",
+                "baseline_attempt", "last_baseline_refusal")}
+            row["baseline_event"] = report["baselines"][-1]["event"] if report.get("baselines") else None
             try:
                 witnessed.write(self.witness_world, "log-world", [row], by="house", changed_only=True)
                 self.witness_error = None
@@ -372,7 +420,7 @@ class Checker:
                     raise ValueError("checkpoint ends inside a missing/torn record")
                 last = last or {"seq": self.replay.seq, "eseq": int(job["event"][1:]), "parts": []}
                 self.replay.event = job["event"]
-                self.replay.compare(last, job["live"], job["full"])
+                differences = self.replay.compare(last, job["live"], job["full"])
                 if job["full"]:
                     self.full_completed = job["full_generation"]
                     if self.full_completed == self.full_generation:
@@ -386,11 +434,59 @@ class Checker:
                         if n["live"] != logged:
                             rows.append(dict(n, thing=nid, log=logged))
                     self.replay.boxes = rows
+                # Persist newly found discrepancies BEFORE considering a baseline.
+                # A torn/failed receipt makes the checker unavailable, never in-step.
+                now = self.clock()
+                for detail in self.replay.divergences[before:]:
+                    self._write({"kind": "divergence", "at": now, "detail": detail})
+                baseline_result = None
+                request = job["baseline"]
+                if request:
+                    already = any(b["request"] == request["request"] for b in self.replay.baselines)
+                    if already:
+                        baseline_result = "already recorded; observation counters unchanged"
+                    elif (not job["full"] or differences or self.needs_full or
+                          any(d["reason"].startswith("broken ") for d in self.replay.divergences) or
+                          request["divergence_hash"] != store.h(self.replay.divergences)):
+                        baseline_result = "refused: full comparison differs, log integrity failed or retained evidence changed"
+                    else:
+                        baseline = dict(request, event=self.replay.event, seq=self.replay.seq, at=dated(now),
+                                        meaning=BASELINE_MEANING,
+                                        log_end=self.offset, state_digest=self.replay.digest,
+                                        full_facts=len(job["live"]), full_differences=0,
+                                        set_aside_count=len(self.replay.divergences),
+                                        set_aside=copy.deepcopy(self.replay.divergences),
+                                        prior_observed_seconds=self.covered_seconds,
+                                        prior_observed_records=self.covered_records)
+                        self._write({"kind": "baseline", "at": now, "detail": baseline})
+                        self.replay.accept_baseline(baseline)
+                        self.covered_seconds, self.covered_records = 0.0, 0
+                        self.covered_seq = self.replay.seq
+                        self.last_observation = None
+                        self.previous_at = now
+                        self.gaps = []
+                        self.gap_start = None
+                        self.accounting_correction = None
+                        baseline_result = "accepted after a matching full comparison"
+                    attempt = {
+                        "request": request["request"], "reason": request["reason"],
+                        "divergence_hash": request["divergence_hash"],
+                        "event": self.replay.event, "at": dated(now), "result": baseline_result,
+                        "full": job["full"], "full_differences": len(differences),
+                    }
+                    refused = baseline_result.startswith("refused:")
+                    self._write({"kind": "baseline-refused" if refused else "baseline-result",
+                                 "at": now, "detail": attempt, "full_differences": len(differences)})
+                    self.baseline_attempt = attempt
+                    if refused:
+                        self.last_baseline_refusal = attempt
                 report = self.replay.report()
+                report["baseline_attempt"] = copy.deepcopy(self.baseline_attempt)
+                report["last_baseline_refusal"] = copy.deepcopy(self.last_baseline_refusal)
+                report["baseline_result"] = (self.baseline_attempt or {}).get("result")
                 if self.needs_full:
                     report.update(state="unavailable",
                                   line="unavailable: observations were dropped; awaiting full recovery")
-                now = self.clock()
                 mono = self.monotonic()
                 if self.gap_start is not None and report["state"] != "unavailable":
                     self.gaps.append({"from": self.gap_start, "to": now, "why": self.gap_reason})
@@ -422,8 +518,6 @@ class Checker:
                               unavailable=self.gaps, capture_ms=job["capture_ms"],
                               max_capture_ms=self.max_capture_ms, at=now,
                               publication_lock_ms=dict(self.publish_lock_ms))
-                for detail in self.replay.divergences[before:]:
-                    self._write({"kind": "divergence", "at": now, "detail": detail})
                 receipt = {k: report[k] for k in ("at", "state", "checked_event", "records", "last_full",
                                                   "observed_seconds", "observed_records", "unavailable",
                                                   "capture_ms", "max_capture_ms")}
@@ -437,17 +531,21 @@ class Checker:
                 new_divergence = len(self.replay.divergences) > before
                 changed_answer = answer_key(self.current) != answer_key(report)
                 with self.report_lock:
-                    if job["full"] or new_divergence:
+                    if job["full"] or new_divergence or request:
                         self.evidence_revision += 1
                         self.evidence = {
                             "checked_event": report["checked_event"], "last_full": report["last_full"],
                             "boxes": report["boxes"], "divergences": report["divergences"],
+                            "active_divergences": report["active_divergences"],
+                            "baselines": report["baselines"],
+                            "baseline_attempt": report["baseline_attempt"],
+                            "last_baseline_refusal": report["last_baseline_refusal"],
                             "exclusions": EXCLUSIONS, "at": now,
                             "accounting_correction": self.accounting_correction,
                         }
                     self.current = report
                 self.witness()
-                if self.publish and (changed_answer or job["full"] or new_divergence):
+                if self.publish and (changed_answer or job["full"] or new_divergence or request):
                     self.publish()
             except Exception as e:
                 self.unavailable(f"{type(e).__name__}: {e}")
@@ -474,7 +572,8 @@ def enabled():
     return os.environ.get("DESK_LOG_WORLD", "").lower() != "off" and os.environ.get("DESK_LOG") != "off"
 
 
-def checkpoint(desk, path, full=False, quiet=False, touched=None, before=None, words="", by="house", before_ms=0):
+def checkpoint(desk, path, full=False, quiet=False, touched=None, before=None, words="", by="house", before_ms=0,
+               baseline=None):
     t0 = time.perf_counter()
     checker = _CHECKERS.get(str(Path(path)))
     if checker is None or checker.stopped or not enabled():
@@ -498,7 +597,7 @@ def checkpoint(desk, path, full=False, quiet=False, touched=None, before=None, w
     checker.event_index = len(desk.world.events)
     event = f"e{getattr(desk.world, '_eseq', 0)}"
     ms = (time.perf_counter() - t0) * 1000 + before_ms
-    checker.submit(live, end, event, full, ms, None, quiet, frozen, before, touched, words, by)
+    return checker.submit(live, end, event, full, ms, None, quiet, frozen, before, touched, words, by, baseline)
 
 
 def status_node(w):
@@ -549,14 +648,15 @@ def project(desk, path, record=True):
                           if n.get("type") == "appearance" and
                           desk.world.subjects.get(n.get("subject"), {}).get("props", {}).get("role")
                           == "log-world-evidence"), None)
-    first = report.get("divergences", [])[:1]
+    first = report.get("active_divergences", report.get("divergences", []))[:1]
     props = {"state": report["state"], "line": report["line"],
              "first_divergence": store.h(first), "evidence": evidence_node or ""}
     text = report["line"] + "\n\n" + EXCLUSIONS
     text += "\n\nLive observation counts and dated gaps: witnessed:log-world. Full-check/divergence detail: Evidence."
     subject = desk.world.subjects[desk.world.nodes[nid]["subject"]]
     old_props = subject.get("props", {})
-    remove = [k for k in ("observed", "unavailable", "at", "capture_ms", "max_capture_ms") if k in old_props]
+    remove = [k for k in ("checked_event", "observed", "unavailable", "at", "capture_ms", "max_capture_ms")
+              if k in old_props]
     status_changed = (subject.get("text") != text or bool(remove) or
                       any(old_props.get(k, "") != v for k, v in props.items()))
     evidence_text = None
@@ -580,10 +680,10 @@ def project(desk, path, record=True):
         if subject.get("text") != text:
             desk.world.apply("edit", subject["id"], None, {"text": text}, "house")
         changes = {k: v for k, v in props.items() if old_props.get(k, "") != v}
-        changes["checked_event"] = report["checked_event"]  # event of this verdict, not a running counter
         if remove:
             changes["remove"] = ",".join(remove)
-        moo.REGISTRY["prop"].run(desk.world, nid, dict(changes, _by="house"))
+        if changes:
+            moo.REGISTRY["prop"].run(desk.world, nid, dict(changes, _by="house"))
     if evidence_text is not None:
         evidence_subject = desk.world.subjects[desk.world.nodes[evidence_node]["subject"]]
         if evidence_subject.get("text") != evidence_text:
@@ -604,8 +704,23 @@ def command(desk, argv):
         return "unavailable: no running log-world checker; only the live writer hosts it"
     if checker.stopped:
         return checker.snapshot()["line"] + "; checker must restart before another check can run"
+    if len(argv) == 2 and argv[0] == "baseline":
+        # A world note is an explicit, reviewable request, not an authorization
+        # to forgive unseen discrepancies. Ordinary writer admission still applies.
+        node = desk.world.nodes.get(argv[1], {})
+        subject = desk.world.subjects.get(node.get("subject"), {})
+        props = subject.get("props", {})
+        reason = subject.get("text", "").strip()
+        if (props.get("role") != "log-world-baseline-request" or not reason or
+                not props.get("divergence_hash")):
+            return "refused: baseline needs a documented request note with role=log-world-baseline-request, text and divergence_hash"
+        request = {"request": argv[1], "reason": reason, "divergence_hash": props["divergence_hash"]}
+        snapshot_path = next(k for k, c in _CHECKERS.items() if c is checker)
+        if not checkpoint(desk, snapshot_path, full=True, baseline=request):
+            return "unavailable: baseline comparison was not queued"
+        return "Baseline full comparison queued; no baseline is accepted until its matching result is durably recorded in Evidence."
     if argv not in ([], ["check"], ["status"]):
-        return "log-world takes check or status; DESK_LOG_WORLD=off is the off switch"
+        return "log-world takes check, status or baseline <request-note>; DESK_LOG_WORLD=off is the off switch"
     if argv == ["check"]:
         snapshot_path = next(k for k, c in _CHECKERS.items() if c is checker)
         checkpoint(desk, snapshot_path, full=True)
@@ -614,7 +729,9 @@ def command(desk, argv):
     return (report["line"] + "\n" + json.dumps(
         {k: report.get(k) for k in ("checked_event", "observed_seconds", "observed_records",
                                    "at", "unavailable", "accounting_correction",
-                                   "accounting_state", "witness_error")}, ensure_ascii=False))
+                                   "accounting_state", "witness_error", "retained_divergence_hash",
+                                   "baseline_result", "baseline_attempt", "last_baseline_refusal",
+                                   "baselines")}, ensure_ascii=False))
 
 
 def committed(ctx, desk, words, by=None):

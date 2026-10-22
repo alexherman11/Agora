@@ -25,7 +25,7 @@ HELP = """commands (one per call):
   pivot id               appearance -> its subject and every place it appears; subject -> appearances
   find words             search titles and text
   history [id]           recent events (with undo ids); history e12 one event, what it caused, its undo
-  log-world [check|status] isolated log replay's answer; check requests a full comparison in the live writer
+  log-world [check|status|baseline <note>] isolated log replay; baseline needs a documented request and matching full check
   do verb id k=v ...     change something. e.g. do move a04 into=f02   do append a03 line="new item"
   undo eN                revert an event
   plan / apply           (apply variant only) paste an edited outline; the desk diffs it into ops
