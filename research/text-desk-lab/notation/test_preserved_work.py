@@ -358,6 +358,104 @@ class Handoffs(unittest.TestCase):
         self.assertEqual(data["receiver_checkpoint"]["after"], after)
         self.assertEqual(len(self.messages), 2)
 
+    def use_real_card_comments(self, ws, subject):
+        """Exercise the actual desk quoting/parser/storage, not an echo mock."""
+        import roomworld
+        desk, _ = roomworld.build(say=False)
+        desk.batch = True  # House.act uses the batched desk transport.
+        world = desk.world
+        world.me = "house"
+        for line in (f"look {world.root} :1",
+                     f'do create {world.root} kind=note title="Receiver fixture"'):
+            result = desk.dispatch("desk", {"line": line, "whole": True})
+            self.assertNotIn("error", result, result)
+        target = world.last_created
+        stored = world.subjects[world.subject_of(target)]
+        subject["comments"] = stored["comments"]
+
+        def act(actor, line):
+            world.me = actor
+            line = line.replace("read a2;", f"read {target};").replace(
+                "do comment a2 ", f"do comment {target} ")
+            result = desk.dispatch("desk", {"line": line, "whole": False})
+            self.assertNotIn("error", result, result)
+            self.assertFalse(result.get("batch_error"), result)
+            return result
+
+        ws.house.act = act
+        ws.say = workshop.Workshop.say.__get__(ws)
+
+    def test_live_card_parser_confirms_new_inventory_and_retry_does_not_repost(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "own.txt", "receiver")
+        ws, subject = self.fake_workshop()
+        self.use_real_card_comments(ws, subject)
+        self.assertTrue(ws.bring("a2", subject))
+        checkpoint = [c for c in subject["comments"]
+                      if c["text"].startswith("Receiver work checkpointed")]
+        self.assertEqual(len(checkpoint), 1)
+        data = pw.read_receipt(Path(subject["props"]["brings_receipt"]))
+        self.assertIn(data["request"], checkpoint[0]["text"])
+        self.assertTrue(data["receiver_checkpoint"]["reported"])
+        after = pw.head(self.dest)
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual(pw.head(self.dest), after)
+        self.assertEqual(len(subject["comments"]), 2)  # inventory + delivery
+        self.assertEqual(subject["props"]["commission"], "paused")
+
+    def test_live_legacy_inventory_with_decoded_windows_path_is_reused(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "own.txt", "receiver")
+        ws, subject = self.fake_workshop()
+        ws.say = lambda *args, **kw: None
+        self.assertFalse(ws.bring("a2", subject))
+        _, key = pw.request(subject["props"]["brings"], "a2")
+        receipt = self.state / "brings" / f"a2-{key}.json"
+        data = pw.read_receipt(receipt)
+        saved = data["receiver_checkpoint"]
+        checkpoint = pw.head(self.dest)
+        self.use_real_card_comments(ws, subject)
+        windows = "C:\\Projects\\Agora4\\research\\text-desk-lab\\notation\\house-state\\frontier\\brings\\"
+        legacy = ("Receiver work checkpointed before handoff: " + json.dumps(saved, sort_keys=True) +
+                  f". Durable inventory: {windows}{receipt.name}. Own worker branch only; not ready or landed.")
+        ws.say("a2", legacy, to="nobody")
+        self.assertNotEqual(subject["comments"][0]["text"], legacy)
+        self.assertIn("\notation", subject["comments"][0]["text"])
+        # Old duplicate entries/other comments and their position are immaterial.
+        ws.say("a2", "Unrelated later context", to="nobody")
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual(sum(c["text"].startswith("Receiver work checkpointed")
+                             for c in subject["comments"]), 1)
+        data = pw.read_receipt(receipt)
+        self.assertEqual(data["receiver_checkpoint"]["after"], checkpoint)
+        self.assertTrue(data["receiver_checkpoint"]["reported"])
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "source")
+        self.assertEqual(subject["props"]["commission"], "paused")
+
+    def test_checkpoint_confirmation_requires_request_author_and_all_hashes(self):
+        ws, subject = self.fake_workshop()
+        receipt = self.state / "a2-current-request.json"
+        saved = {"after": "a" * 40, "before": "b" * 40, "commits": ["a" * 40],
+                 "files": {"own.txt": {"sha256": "c" * 64, "bytes": 5}},
+                 "index_files": {}, "committed_files": {}}
+        prefix = "Receiver work checkpointed before handoff: "
+        good = {"request": "current-request", "checkpoint": saved}
+        wrong_hash = json.loads(json.dumps(good))
+        wrong_hash["checkpoint"]["files"]["own.txt"]["sha256"] = "d" * 64
+        subject["comments"] = [
+            {"by": "house", "text": prefix + "{broken"},
+            {"by": "rowan", "text": prefix + json.dumps(good)},
+            {"by": "house", "text": prefix + json.dumps(dict(good, request="other"))},
+            {"by": "house", "text": prefix + json.dumps(wrong_hash)},
+            {"by": "house", "text": prefix + json.dumps(saved) +
+             ". Durable inventory: C:/brings/a2-other.json. "},
+        ]
+        ws.say = lambda *args, **kw: None
+        with self.assertRaisesRegex(pw.Held, "inventory not confirmed"):
+            ws.report_receiver_checkpoint("a2", receipt, saved)
+        subject["comments"].insert(1, {"by": "house", "text": prefix + json.dumps(good)})
+        ws.report_receiver_checkpoint("a2", receipt, dict(saved, reported=False))
+
     def test_main_input_hold_is_satisfied_only_by_real_import(self):
         self.put(self.live, "research/pkg/new.txt", "main artifact")
         ws, subject = self.fake_workshop(source="main")

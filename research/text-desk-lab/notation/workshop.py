@@ -1105,12 +1105,38 @@ class Workshop:
 
     def report_receiver_checkpoint(self, cid, receipt, saved):
         import preserved_work as pw
-        text = ("Receiver work checkpointed before handoff: " + json.dumps(saved, sort_keys=True) +
-                f". Durable inventory: {receipt}. Own worker branch only; not ready or landed.")
+        prefix = "Receiver work checkpointed before handoff: "
+        request = receipt.stem.removeprefix(cid + "-")
+        inventory = {k: v for k, v in saved.items() if k != "reported"}
+        payload = {"request": request, "checkpoint": inventory}
+        text = (prefix + json.dumps(payload, sort_keys=True) +
+                f". Durable inventory: {receipt.as_posix()}. Own worker branch only; not ready or landed.")
+
+        def matches(comment):
+            if comment.get("by") != "house":
+                return False
+            body = comment.get("text", "")
+            if not body.startswith(prefix):
+                return False
+            try:
+                value, end = json.JSONDecoder().raw_decode(body[len(prefix):])
+            except (ValueError, TypeError):
+                return False
+            if not isinstance(value, dict):
+                return False
+            if "checkpoint" in value:
+                return value.get("request") == request and value["checkpoint"] == inventory
+            # Already-landed inventories carried the request in their receipt
+            # filename. Windows \n in the directory was decoded by the desk;
+            # the filename and JSON hashes survive. Reuse that evidence once.
+            tail = body[len(prefix) + end:]
+            return (value == inventory and tail.startswith(". Durable inventory: ") and
+                    re.search(r"(?<![\w-])" + re.escape(receipt.name) + r"(?=\. |$)", tail)
+                    is not None)
+
         def recorded():
             current = self.commissions(self.house.load()).get(cid)
-            return current and any(c.get("by") == "house" and c.get("text") == text
-                                   for c in current[0].get("comments", []))
+            return current and any(matches(c) for c in current[0].get("comments", []))
         if not recorded():
             self.say(cid, text, to="nobody")
         if not recorded():
