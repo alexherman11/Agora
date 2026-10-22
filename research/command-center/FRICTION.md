@@ -1398,7 +1398,7 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (8)
+## source-pending (9)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1455,6 +1455,12 @@ Voice with JEFF step 3 (a8901, 21 Oct) needed three source words; each is staged
 - lines rows carry `seq` (scene.py): a lens could not ask for 'JEFF's lines after this one'; no row field said order. Missing word: a comparable position on a line row.
 - voice.listen/stop/hush/say (host_verbs.py, voice.py, voice_host.ps1): hearing and speaking are PC capabilities, rightly source; the control, consent and placement are world (home-voice lens, props on Alex's draft and the home-base note).
 Friction met, not fixed (ran): `$(let)` is not filled in a selection; a let is not a number in another repeat's `only when`; `the` refuses row sources; `let after` is reserved. Worked around with a one-row `of` frame; recipe in [[Lens recipes and gotchas; sandbox films with a stand-in host]]. The first two are worth a lens word.
+
+### A worker cannot request another card's preserved source
+
+a9577 · family=missing-word · status=source-pending
+
+Review and continuation cards cannot read/copy another worktree's preserved files. Missing world word: receiving-card brings JSON, honored by the house under worker leases and landing serialization. Source and tests prepared on a9421; main inputs reuse landing.hand rather than a second file path. No live transfers yet. See [[Preserved source handoffs — house contract and recovery]].
 
 ## source-staged (1)
 
