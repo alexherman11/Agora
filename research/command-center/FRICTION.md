@@ -400,7 +400,7 @@ a9417 · family=talk · status=open
 
 Juniper, 21 Oct 19:37: 'say Shop talk "@rowan …"' ran as 'do append a977 line="Shop talk …"' (my own talk) and the receipt said 'to: nobody'. The ok reads like success; the @rowan never reached Shop talk. Ask: a say naming a chat should reach that chat, or refuse plainly and say which form does.
 
-## curing (46)
+## curing (47)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -744,6 +744,12 @@ a7816: the missing engine boundary was under-lock writer admission before detach
 a8394 · family=refusal · status=curing
 
 a8333 source repair (staged, not runtime activation). Missing world-level capability: none; this is the hidden test harness's close operation, not authored world behavior. Prior close discarded taskkill failures/ownership and could claim cleanup from window absence. Source now keeps durable identity/error/intent evidence, verifies exact handles, refuses unknown profile/ownership, and blocks automatic retry while headless-child closure is unknown. Native engine owner retains the reviewed-runtime boundary; no trusted containment was fabricated. Deterministic offline tests and exact hook hunks: research/window-lab/browsing/diagnostics/HANDOFF.md. No browser run or process effect on this card; real engine isolation/cleanup remain unverified.
+
+### Sandbox launch cannot witness a child before it starts
+
+a9494 · family=capability · status=curing
+
+Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
 
 ## unchecked (8)
 
