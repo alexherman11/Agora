@@ -92,6 +92,28 @@ class Routing(unittest.TestCase):
         self.assertEqual(self.w.subjects[self.w.nodes[self.old]["subject"]], self.old_subject)
         self.assertEqual(self.w.events[:len(self.old_events)], self.old_events)
 
+    def test_lead_differs_from_asker_the_asker_gets_the_question(self):
+        # Ibis e23839: the waiting transition goes to the lead; the worker's question itself must reach the asker
+        card = self.make('kind=task title="Fixture led" asked_by=juniper lead=jeff commission=working')
+        self.comment(card, "Which way, A or B?")
+        question = self.last("comment", "worker-fixture")
+        self.wait(card)
+        waiting = self.last("prop", "house")
+        self.assertEqual([n["recipient"] for n in task_flow.notices(self.w, waiting)], ["jeff"])
+        self.assertEqual(rooms.reached(self.w, question).get("juniper"), "call")
+        self.assertEqual(self.recipients(card), [])
+
+    def test_unsupported_asker_is_unresolved(self):
+        # an asker with no resident corner who is not alex: no knock, no task notice, no note. Reported, not routed
+        card = self.card("codex")
+        self.comment(card)
+        question = self.last("comment", "worker-fixture")
+        self.wait(card)
+        waiting = self.last("prop", "house")
+        self.assertNotIn("codex", rooms.reached(self.w, question))
+        self.assertEqual(task_flow.notices(self.w, waiting), [])
+        self.assertEqual(self.recipients(card), [])
+
     def test_a_notice_note_to_a_resident_reaches_no_one(self):
         # why the note is not made for a resident: the house reads a created note with to= as reaching no one, and
         # makes no task notice of it; only Alex's bell (home-notices, to=$me on a person's home base) shows one

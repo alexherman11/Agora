@@ -1,7 +1,7 @@
-# notify-question-owner <card>: the waiting card's question, noticed once, for the one it is for.
-# A native unanswered question to Alex is his. Otherwise the card's asker: a resident (a corner of their own) already
-# hears it through the house (the task notice for commission=waiting, and the knock of the mark=ask comment), so no
-# note is made for them; a person with no corner gets the note their notices bell shows. A card with no asked_by
-# refuses the second line (it cannot be read) and gets a note only for a question to Alex.
+# notify-question-owner <card>: the waiting card's question, noticed once, for Alex when it is his.
+# A note for Alex: an unanswered mark=ask question addressed to him, or a card he asked (asked_by=alex). A resident
+# asker gets no note: the house already reaches them (the worker's mark=ask comment knocks the card's asked_by; the
+# waiting state is a task notice to the card's lead, else its asker). Any other asker (no resident corner, not alex)
+# gets nothing here and is unresolved. A card with no asked_by refuses the second line, by itself.
 do create "Alex's notices" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) > 0
-do create "Alex's notices" kind=note title=asking role=notice to=$1.asked_by topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) = 0 and count(kind:surface,prop:role=resident,prop:actor=$1.asked_by) = 0
+do create "Alex's notices" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) = 0 and $1.asked_by = "alex"

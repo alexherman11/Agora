@@ -1,6 +1,6 @@
-look a9966 :1
-do comment a9966 line="Copy check: which way, A or B?" mark=ask
-look a9968 :1
-do comment a9968 line="Copy check: may I go on?" mark=ask
-look a9970 :1
-do comment a9970 line="Copy check: Alex, may this program be ended?" to=alex mark=ask
+look a10020 :1
+do comment a10020 line="Copy check r3: which way, A or B?" mark=ask
+look a10022 :1
+do comment a10022 line="Copy check r3: may I go on?" mark=ask
+look a10024 :1
+do comment a10024 line="Copy check r3: is this the right file?" mark=ask
