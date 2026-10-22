@@ -97,6 +97,20 @@ def _kept_selections(w, desk):
 
 # (a6010 tried keeping a chat's sayings the same way, ~50 ms of a home-base build, and took it out: who a line calls
 # is the house's rule in code (rooms.calls), which can change with no event, and test_sayings (v) caught it.)
+TIME_KEYS = ("created", "changed")
+
+
+def time_key(k):
+    """a10526: a `by` key that is a time every thing has, not a prop: created, changed, changed.<field>."""
+    return k in TIME_KEYS or k.startswith("changed.")
+
+
+def _when(e):
+    """An event's time as the scene prints it: the desk-clock day (as `today` and `due` are) and the wall clock's time."""
+    wall = (e.get("at") or "")[:16].replace("T", " ")
+    return f"{e['day']} {wall[11:]}".strip() if e.get("day") else wall
+
+
 class Accessor:
     """The seam: six questions, each recorded in R (sable-8 section 1)."""
 
@@ -197,7 +211,7 @@ class Accessor:
         w = self.w
         n = w.nodes.get(r)
         names = {r} | ({n["subject"]} if n and n.get("subject") else set()) | set(w.appearances_of(r) if r in w.subjects else [])
-        hit = None
+        hit, k = None, None
         idx = _touch_index(w)        # a6010: the events on these names only, not every event of the world each time
         for i in sorted({i for nm in names for i in idx.get(nm, ())}, reverse=True):
             e = w.events[i]
@@ -205,17 +219,45 @@ class Accessor:
                 continue
             if aspect and not aspects_meet({aspect}, event_aspects(e)):
                 continue
-            hit = e
+            hit, k = e, i
             break
         self.R.append(("touched", r, aspect, hit["id"] if hit else None))
         if self.rec:
             self._said("touched", (r, aspect), hit["id"] if hit else None)
         if not hit:
             return None
-        wall = (hit.get("at") or "")[:16].replace("T", " ")
-        # Juniper: the date is the event's desk-clock day, as `today` and `due` are; the time is the wall clock's
-        at = (f"{hit['day']} {wall[11:]}".strip() if hit.get("day") else wall)
-        return {"id": hit["id"], "verb": hit.get("via") or hit["verb"], "at": at, "by": hit["by"]}
+        # a10526: n, the event's place in the log, is what `by changed` orders by (the log is in time order)
+        return {"id": hit["id"], "verb": hit.get("via") or hit["verb"], "at": _when(hit), "by": hit["by"], "n": k}
+
+    def made(self, r):
+        """a10526: the event that made thing `r` (the create of its subject, or of a surface or appearance with none);
+        None for a thing made before the log, which no event made: never a guess. -> {id, at, by, n} or None."""
+        w = self.w
+        n = w.nodes.get(r)
+        sid = n.get("subject") if n else (r if r in w.subjects else None)
+        names = {r} | ({sid} | set(w.appearances_of(sid)) if sid else set())
+        hit, k = None, None
+        idx = _touch_index(w)
+        for i in sorted({i for nm in names for i in idx.get(nm, ())}):
+            e = w.events[i]
+            u = e.get("undo") or {}
+            if not e.get("undone") and ((sid and u.get("delete_subject") == sid) or (not sid and u.get("delete") == r)):
+                hit, k = e, i
+                break
+        self.R.append(("made", r, hit["id"] if hit else None))
+        if self.rec:
+            self._said("made", (r,), hit["id"] if hit else None)
+        return {"id": hit["id"], "at": _when(hit), "by": hit["by"], "n": k} if hit else None
+
+    def when_key(self, r, key):
+        """a10526: what `by created`, `by changed` and `by changed.<field>` order a thing by, and the words the scene
+        prints for it. -> (place in the log or None, words)."""
+        if key == "created":
+            m = self.made(r)
+            return (m["n"], m["at"] or m["id"]) if m else (None, "none (made before the log)")
+        t = self.touched(r, (S._aspect_of_field(key[8:]) or key[8:]) if key.startswith("changed.") else None)
+        why = f"no event changed its {key[8:]}" if key.startswith("changed.") else "no event touched it"
+        return (t["n"], t["at"] or t["id"]) if t else (None, f"none ({why})")
 
     def host(self, f):
         v = {"me": self.w.me, "today": getattr(self.desk, "today", None) or getattr(self.w, "today", None),
@@ -607,6 +649,11 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     c = acc.touched(rid, S._aspect_of_field(f) or f)
                     ch[f] = f"{c['id']} {c['verb']} · {c['at']}" if c else None
             frames["changed"] = ch
+        # a10526: $created (when the thing was made; none before the log) and $changed (its latest event), as words
+        if rid and "created" in asked:
+            ctx["created"] = acc.when_key(rid, "created")[1]
+        if rid and "changed" in asked:
+            ctx["changed"] = acc.when_key(rid, "changed")[1]
 
         def frame_reads():
             """This part's reads of frame fields so far, as fence entries: what its lets and bind were built from."""
@@ -987,11 +1034,25 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     # part holding it can be kept: it is used again only while each of them reads the same
                     pr = {}
                     props = lambda i: pr[i] if i in pr else pr.setdefault(i, acc.props(i))      # noqa: E731
+                    # a10526: created / changed / changed.<field> are times every thing has, read from its events
+                    # (acc.made, acc.touched), never a prop; each value is kept to be printed beside the order
+                    tk, when = [k.lstrip("-") for k in (b.get("by") or []) if time_key(k.lstrip("-"))], {}
+
+                    def key_of(i, k):
+                        if time_key(k):
+                            if (i, k) not in when:
+                                when[(i, k)] = acc.when_key(i, k)
+                            return when[(i, k)][0]
+                        return props(i).get(k)
                     if b.get("by"):
                         if named is not None:
-                            named = moo.sort_by(named, b["by"], lambda x, k: props(x[0]).get(k))
+                            named = moo.sort_by(named, b["by"], lambda x, k: key_of(x[0], k))
                         else:
-                            ids = moo.sort_by(list(ids), b["by"], lambda i, k: props(i).get(k))
+                            ids = moo.sort_by(list(ids), b["by"], lambda i, k: key_of(i, k))
+                    if tk:
+                        order_ = [x[0] for x in named] if named is not None else list(ids)
+                        out["sorted"] = [f"{i} " + " ".join(f"{k}={when[(i, k)][1]}" for k in tk if (i, k) in when)
+                                         for i in order_]
                     # a clamped repeat's fence compares the shown prefix, so it says the order it was shown in
                     shown = [["select", sel_text, [list(x) for x in pick(named)] if named is not None else list(pick(list(ids))), keep]
                              + ([list(b["by"])] if b.get("by") else [])] if b["clamp"] else []

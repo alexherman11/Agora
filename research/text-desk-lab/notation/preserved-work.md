@@ -153,14 +153,30 @@ conflicted files. Conflicts remain uncommitted in the worker's files.
 Ordinary later `ready` commits their resolution and judges; prepare does not.
 
 Receipts live under `house-state/<world>/prepares/<card>-<request-event>.json`.
-Completed reporting retries reuse the same result. Interrupted checkpoint
-or merge phases hold for reconciliation, including across new requests;
-the house does not abort/reset/replay an uncertain merge. Clearing a request
+Completed reporting retries reuse the same result. Pre-merge recovery may
+continue an already recorded checkpoint only at its exact saved HEAD with a
+clean receiver; confirmation is retried without another preservation commit.
+Before any checkpoint commit, an unchanged HEAD plus exact raw-file inventory
+and the original index (or exactly the captured files after Git normalization)
+allows the checkpoint to continue. The prior inventory stays in the receipt.
+Changed files/index/HEAD and uncertain commit or merge outcomes remain held,
+including across new requests; the house does not abort/reset/replay an uncertain merge. Clearing a request
 does not undo a checkpoint. Reversal is a reviewed branch change through the
 ordinary house path, never a reset or rewrite of main.
 
 This source path is separately tested by `test_prepare.py` with isolated Git
 repositories. Source tests are not evidence that a live card was prepared.
+
+Landing isolation: branch admission alone is insufficient. The final candidate
+is checked again for forbidden paths (including every changed `sessions/`
+path) before live index inspection, parking or fast-forward. A health run that
+changes the landing room's HEAD aborts judgment and is not cached. Never move
+or remove live world files to make a contaminated candidate merge. Preserve
+its Git identities for diagnosis; regenerate the candidate from the clean
+main through the house's ordinary landing path. `test_landing_state_guard.py`
+exercises a fixture commit on the candidate's first-parent side, unchanged
+live stand-ins, tracked session modifications/deletions and clean-source
+landing, plus health HEAD mutation and normal judgment.
 
 `workshop.py` and the new imported module belong in `HOUSE_FILES`; loading this
 integration needs an ordinary house deployment. Alex explicitly allows that
