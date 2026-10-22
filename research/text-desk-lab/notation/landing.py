@@ -63,7 +63,9 @@ LIVE = live_checkout()
 NOTATION = HERE.relative_to(HERE.parents[2]).as_posix()      # research/text-desk-lab/notation in any checkout
 ROOM = Path(os.environ.get("LANDING_ROOM") or (LIVE / ".worktrees" / "house-landing"))
 STATE = LIVE / NOTATION / "house-state"
-BANNED = (f"{NOTATION}/sessions/",)                           # worlds are never landed; .env never committed
+# worlds are never landed; .env never committed; a10253: a handoff staged beside (.incoming/<request>/) is merged by
+# hand and removed on the worker's branch, never landed
+BANNED = (f"{NOTATION}/sessions/", ".incoming/")
 
 
 def _lock(wait=20 * 60):

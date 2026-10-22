@@ -20,8 +20,10 @@ class Held(RuntimeError):
 def request(raw, recipient):
     try:
         spec = json.loads(raw)
-        if set(spec) - {"source", "paths", "request", "after"}:
+        if set(spec) - {"source", "paths", "request", "after", "conflict"}:
             raise ValueError("unknown fields")
+        if spec.get("conflict", "hold") not in ("hold", "beside"):
+            raise ValueError("conflict must be hold or beside")
         if "after" in spec and (not re.fullmatch(r"a[0-9]+", spec["after"]) or spec["after"] == recipient):
             raise ValueError("after must name another receiving card")
         if spec["source"] != "main" and not re.fullmatch(r"a[0-9]+", spec["source"]):
@@ -293,13 +295,93 @@ def blob_manifest(root, commit, names):
     return result
 
 
+STAGE = ".incoming"
+
+
+def stage_dir(name, key):
+    """`.incoming/<request>/` when the request's own name is a plain word, else the receipt key's prefix."""
+    return f"{STAGE}/{name if name and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', name) else key[:16]}"
+
+
+def blob_of(root, commit, name):
+    """(mode, blob id) of a file in a commit, or None when the commit has no such file."""
+    entry = out(root, "ls-tree", "-z", commit, "--", name).split("\t")[0].split()
+    return (entry[0], entry[2]) if len(entry) == 3 else None
+
+
+def classify(base, incoming, current):
+    """How a selected file stands, by blob id: what the receiving worker has to do with it."""
+    if incoming == current:
+        return "identical"                 # nothing to do
+    if current == base:
+        return "incoming-only"             # the receiver never changed it: take the incoming copy as it is
+    if incoming == base:
+        return "receiver-only"             # the source never changed it: keep the receiver's
+    return "both-changed" if base else "added-both"   # a three-way merge by hand (no base: both made the file)
+
+
+def stage_beside(recipient, source, saved, before, base, manifest, stage, receipt_path, data):
+    """On conflict, a commit on the receiver's HEAD that ADDS `<stage>/incoming/<path>` (the source's committed blob),
+    `<stage>/base/<path>` (the common base's, when it has one) and `<stage>/INVENTORY.json` (each path's base, incoming
+    and current blob and raw SHA-256, and what the worker must do). Nothing at the receiver's own paths changes: the
+    worker merges by hand, keeps or deletes, and removes <stage> before setting ready (landing refuses .incoming/)."""
+    def sha(root, commit, name):
+        return hashlib.sha256(git(root, "show", f"{commit}:{name}").stdout).hexdigest()
+    if git(recipient, "ls-tree", "-r", "--name-only", before, "--", stage + "/").stdout:
+        raise Held(f"{stage} already holds files on the receiver; resolve or remove them first")
+    index = receipt_path.with_suffix(".beside-index")
+    inv_file = receipt_path.with_suffix(".inventory.json")
+    env = {"GIT_INDEX_FILE": str(index)}
+    inventory, staged = {}, []
+    try:
+        git(recipient, "read-tree", before, env=env)
+        for name in manifest:
+            inc = blob_of(source, saved, name)
+            if inc is None or inc[0] not in ("100644", "100755"):
+                raise Held("unsupported source entry: " + name)
+            b, cur = blob_of(recipient, base, name), blob_of(recipient, before, name)
+            item = {"status": classify(b and b[1], inc[1], cur and cur[1]),
+                    "incoming": {"blob": inc[1], "sha256": sha(source, saved, name), "at": f"{stage}/incoming/{name}"},
+                    "base": {"blob": b[1], "sha256": sha(recipient, base, name), "at": f"{stage}/base/{name}"}
+                    if b else None,
+                    "current": {"blob": cur[1], "sha256": sha(recipient, before, name)} if cur else None}
+            git(recipient, "update-index", "--add", "--cacheinfo", inc[0], inc[1], f"{stage}/incoming/{name}", env=env)
+            staged.append(f"{stage}/incoming/{name}")
+            if b:
+                git(recipient, "update-index", "--add", "--cacheinfo", b[0], b[1], f"{stage}/base/{name}", env=env)
+                staged.append(f"{stage}/base/{name}")
+            inventory[name] = item
+        doc = {"request": data["request"], "source": data["source"], "source_commit": saved, "base_commit": base,
+               "receiver_commit": before, "files": inventory,
+               "how": "Merge each both-changed/added-both file by hand: base vs incoming is what the source changed; "
+                      "apply that to the current file, keeping the receiver's own changes. incoming-only files can be "
+                      "copied over; identical and receiver-only need nothing. Remove this folder before ready: "
+                      "landing refuses .incoming/."}
+        inv_file.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        blob = out(recipient, "hash-object", "-w", "--", str(inv_file))
+        git(recipient, "update-index", "--add", "--cacheinfo", "100644", blob, f"{stage}/INVENTORY.json", env=env)
+        staged.append(f"{stage}/INVENTORY.json")
+        tree = out(recipient, "write-tree", env=env)
+        # One parent: the source's changes are NOT recorded as merged, so a later ordinary merge still sees them
+        after = out(recipient, "commit-tree", tree, "-p", before, "-m",
+                    f"house: {data['source']} staged beside for {data['recipient']}; receipt {data['request']}\n\n"
+                    f"conflict with the receiver; nothing at the receiver's own paths changed. Merge by hand from "
+                    f"{stage}/ (INVENTORY.json), then remove it.")
+        return after, inventory, staged
+    finally:
+        index.unlink(missing_ok=True)
+        inv_file.unlink(missing_ok=True)
+
+
 def transfer(landing, source, recipient, source_card, recipient_card, paths, receipt_path, key,
-             report_checkpoint=None):
+             report_checkpoint=None, conflict="hold", stage_name=""):
     """Both process leases and landing lock MUST already be held by the caller.
 
     A source snapshot is committed normally on its own worker branch, only when
     its index is empty. A projection commit includes ONLY selected paths on the
     common base. Merge-tree proves conflict freedom before receiver mutation.
+    conflict="beside" (a10253): a conflict stages the incoming versions beside the receiver's files, under
+    .incoming/<request>/, instead of holding; the receiver's own files never change.
     """
     live = landing.LIVE
     registered(live, recipient, "worker/" + recipient_card)
@@ -311,8 +393,9 @@ def transfer(landing, source, recipient, source_card, recipient_card, paths, rec
             after = old["recipient_after"]
             if git(recipient, "merge-base", "--is-ancestor", after, "HEAD", check=False).returncode == 0:
                 if old["phase"] == "planned":
-                    old["received_files"] = blob_manifest(recipient, after, old["files"])
-                    old["received_worktree_files"] = selected(recipient, list(old["files"]))
+                    received = old.get("staged") or list(old["files"])
+                    old["received_files"] = blob_manifest(recipient, after, received)
+                    old["received_worktree_files"] = selected(recipient, received)
                     old["reconciled_at"] = datetime.now(timezone.utc).isoformat()
                 old["phase"] = "applied"
                 write_receipt(receipt_path, old)
@@ -378,13 +461,21 @@ def transfer(landing, source, recipient, source_card, recipient_card, paths, rec
         # Only selected paths differ from the common base: unrelated source
         # commits (including held deployments) are not imported.
         merged = git(recipient, "merge-tree", "--write-tree", before, projection, check=False)
-        if merged.returncode:
+        received = list(manifest)
+        if merged.returncode and conflict == "beside":
+            stage = stage_dir(stage_name, key)
+            after, inventory, received = stage_beside(recipient, source, saved, before, base, manifest, stage,
+                                                      receipt_path, data)
+            data.update(mode="beside", stage=stage, staged=received, inventory=inventory)
+            receiver_paths(recipient, received)
+        elif merged.returncode:
             data.update(phase="conflict", detail="selected source files conflict with recipient")
             write_receipt(receipt_path, data)
             raise Held(data["detail"])
-        merged_tree = merged.stdout.decode().splitlines()[0]
-        after = out(recipient, "commit-tree", merged_tree, "-p", before, "-p", projection,
-                    "-m", f"house bring {source_card} to {recipient_card}; receipt {key}")
+        else:
+            merged_tree = merged.stdout.decode().splitlines()[0]
+            after = out(recipient, "commit-tree", merged_tree, "-p", before, "-p", projection,
+                        "-m", f"house bring {source_card} to {recipient_card}; receipt {key}")
         if head(recipient) != before or head(source) != (source_before if source_card == "main" else saved):
             raise Held("branch moved during preparation; recipient untouched")
         clean_receiver(recipient)
@@ -393,10 +484,25 @@ def transfer(landing, source, recipient, source_card, recipient_card, paths, rec
         # reconciled by ancestry, never by replaying source preservation.
         data.update(phase="planned", projection=projection, recipient_after=after)
         write_receipt(receipt_path, data)
+        if data.get("mode") == "beside":
+            own = [n for n in manifest if (recipient / n).is_file()]
+            data["receiver_own_files"] = selected(recipient, own) if own else {}
+            write_receipt(receipt_path, data)
         git(recipient, "merge", "--ff-only", "--no-overwrite-ignore", after)
+        if data.get("mode") == "beside":
+            # Rowan c10297: the receiver's own files stay byte-identical; said in the receipt, and refused loudly if not
+            now = selected(recipient, own) if own else {}
+            gone = [n for n in manifest if n not in own and (recipient / n).exists()]
+            data["receiver_own_files_after"] = now
+            if now != data["receiver_own_files"] or gone:
+                data["phase"] = "applied"
+                data["receiver_changed"] = sorted(set(now) ^ set(data["receiver_own_files"]) | set(gone)
+                                                  | {n for n in now if now[n] != data["receiver_own_files"].get(n)})
+                write_receipt(receipt_path, data)
+                raise Held("receiver files changed during beside staging; inspect the receipt")
         data["phase"] = "applied"
-        data["received_files"] = blob_manifest(recipient, after, manifest)
-        data["received_worktree_files"] = selected(recipient, list(manifest))
+        data["received_files"] = blob_manifest(recipient, after, received)
+        data["received_worktree_files"] = selected(recipient, received)
         write_receipt(receipt_path, data)
         return data
     finally:
