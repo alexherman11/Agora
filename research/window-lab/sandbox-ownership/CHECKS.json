@@ -1,0 +1,53 @@
+{
+  "resumed_guarded": {
+    "authority": "JEFF c9582",
+    "attempts": 1,
+    "notification_result": 0,
+    "notification_state": 2,
+    "input_desktop": "Default",
+    "child_started": false,
+    "runtime_closure": "unknown",
+    "result": "refused before desktop/Guard/child creation",
+    "foreground_metadata": {
+      "hwnd": 0,
+      "pid": 0,
+      "exe_basename": "?",
+      "class": "",
+      "bounds": null,
+      "causing_window": "unknown"
+    }
+  },
+  "source_sha256": {
+    "../text-desk-lab/notation/guard_context.py": "83ac66fd3daffab7468bac71023c997bbdc2f8f65f960bae1da91872354af289",
+    "../text-desk-lab/notation/test_guard_context.py": "c892476cf10e18eb6ce4a2d33540a274e6c2b1ebbd925bca43771062a5b2fc97",
+    "../text-desk-lab/notation/house.py": "7f8a5e88579c53f057ce0ca4d67b60cae5c924ca3682a6a1aef8eb78c2542ad1",
+    "../text-desk-lab/notation/workshop.py": "fdeac95545d9b837cf622632f4e913395466321433e3124f81e6f7a3b59ddaa1",
+    "sandbox_birth.py": "6857f08867e5ad36f029a5c97234ee6e806448237d675eb1c91c919aeff57690",
+    "sandbox_owned.py": "0a94ce253cadf78420cdd91728b82e3b026cbcc83af94b40d1d6a85aa3e27182",
+    "sandbox_receipts.py": "3216c1d5e2735bbf151bea47e229aec0fc608fcbf6f1d0878284ff872f3d0e83",
+    "sandbox_window.py": "41d5c016956f3ea22484e5256348ca36157b07e9efe365f7fc9f76e6766122be",
+    "test_sandbox_birth.py": "05fc77ad5ce78bbea6aecabbc2578a2fe8fa1e6438c7157bcd615e954b95ef76",
+    "check_sandbox_birth_guarded.py": "1909989d5314e4fd1e6c18be7ae3c382cdcaf73aa60c9ac76776910a67de8876"
+  },
+  "offline": {
+    "new_tests": 12,
+    "house_context_tests": 10,
+    "receipt_tests": 29,
+    "guard_mock_cases": 10,
+    "startup_fakes": "passed",
+    "diff_check": "passed"
+  },
+  "guarded": {
+    "scope": "one fake direct child",
+    "browser_launched": false,
+    "runtime_closure": "unknown",
+    "child_started": false,
+    "preflight": {
+      "notification_result": 0,
+      "notification_state": 2,
+      "input_desktop": "Default"
+    },
+    "result": "refused: awake/unlocked/no-game preflight uncertain"
+  },
+  "guarded_report": "research\\window-lab\\.tmp-agora\\agora-sandbox\\birth-a9388-bf20e3aa9a-check.json"
+}

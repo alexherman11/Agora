@@ -83,6 +83,7 @@ import plan_usage    # noqa: E402  a6646: provider plan windows and durable paus
 import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 import task_flow
+import guard_context
 
 STATE = HERE / "house-state"
 # a916, use versus mention: words inside backticks or quotes are talked about, never addressed (the rule lives in
@@ -1614,6 +1615,12 @@ class House:
             print(f"house: log-world startup request unavailable: {type(e).__name__}: {e}", flush=True)
         try:
             while True:
+                if self.world == "frontier" and not self.fake:
+                    try:
+                        guard_context.publish()
+                    except Exception as exc:
+                        # Old observations expire; failure never admits a run.
+                        print(f"house: guard context unavailable: {type(exc).__name__}", flush=True)
                 try:
                     self.step()
                 except Exception as e:
