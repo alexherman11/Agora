@@ -1,5 +1,76 @@
 # Suspended direct-child ownership checkpoint
 
+## World-owned non-game policy, JEFF c9725 — staged, not live
+
+The house now passes its current `guard_nongame` setting into each observation.
+There is no executable allowlist in code and no worker-configurable input.
+Exact comma-separated basenames are normalized case-insensitively; malformed
+policy grants no exception. The observation includes that policy snapshot.
+Schema v2 rejects observations from the previous publisher.
+
+State 5 still requires a known executable/foreground, Default desktop and
+explicit clear facts. State 2 (full-screen application) can instead pass
+JEFF's explicit non-game rule when the foreground basename is listed.
+The raw full_screen=true and game=null facts remain unchanged in its receipt;
+admitted=true is a policy conclusion, not a measured absence of games.
+Game state 3, presentation state 7, unknown states, failed image query,
+foreground changes, stale/future/clock-inconsistent observations and locked
+or other desktops still refuse. No auto-retry or polling for admission.
+
+The `pythonw.exe` entry means this HUD only: a hidden, read-only CIM query
+targets just the foreground PID (three-second timeout), binding its creation
+time and image to native identity before/after the query, then reuses the
+existing HUD script/world/door matcher. No process inventory, title/content
+publication, HUD restart or PID-only record trust. Failure refuses the
+exception. Observation age starts before this query; notification state,
+foreground PID/window and input desktop are checked again afterward.
+
+RAN offline: test_guard_context.py, 16 tests in 0.148s, OK, including
+world setting propagation through the real house-loop seam, actual observer
+with fake Win32, policy removal, exact names, HUD scope/birth/denial,
+mid-query game/lock changes and freshness refusals.
+test_sandbox_birth.py: 12 tests in 0.044s, OK.
+Diagnostics recipe: 29 tests in 0.130s OK, startup fakes and 10 Guard cases
+passed; OFFLINE ONLY, no probe invoked.
+Exact source hashes are stored under world_nongame_increment in CHECKS.json.
+
+This stages house.py/guard_context.py, so ordinary landing/house refresh is
+required and authorised. No live attempt has run under this policy. After a
+confirmed landing, JEFF permits ONE bounded fake-only attempt, stopping on
+any refusal. Browser/mail, legacy and delegated-child gates remain unchanged.
+Reversal: remove the relevant world allowlist entries to withdraw full-screen
+exceptions (existing snapshots expire within five seconds), or revert the
+source normally. Preserve every unknown receipt.
+
+## Latest post-diagnostic attempt, 21 October approximately 21:27
+
+READ: house receipt c9712 and local history confirm diagnostic landing
+172e94a; tracked tree was clean. JEFF c9663 authorised one attempt after
+landing. RAN check_sandbox_birth_guarded.py exactly once; it refused before
+Guard, desktop or child creation. No retry or cleanup followed.
+
+The fixed house observation reported issuer_pid=5380,
+observed_at=1792643237.4421554, uptime_ms=274618234,
+notification_result=0, notification_state=2, foreground_known=true,
+foreground_exe="chatgpt.exe", input_desktop="Default", full_screen=true,
+game=null, admitted=false. Reader reason: house observation
+stale/unknown/unsafe. The diagnostic names the foreground executable; it
+does not identify every program contributing to notification state or
+establish game-clear admission. No HUD exception applies.
+
+Receipt: research/window-lab/.tmp-agora/agora-sandbox/
+birth-a9388-5b2240325d-check.json. child_started=false,
+browser_launched=false, runtime_closure=unknown. CHECKS.json retains its
+exact contents. Live returned-handle identity, resume and cleanup remain
+unverified. No browser/mail test is admitted. No suites rerun: this round
+changes evidence only; prior offline results below are historical.
+
+NEXT owner JEFF: resolve the safe-context/admission policy before explicitly
+authorising another attempt. Do not poll until safe or infer that a
+non-game-looking executable clears game=null. Retained-runtime and delegated
+engine ownership gaps are unchanged. The earlier "prepared/not live" text
+below describes historical checkpoints; both source increments have landed.
+
 ## Executable-name increment, JEFF c9663
 
 Prepared provider diagnostic: QueryFullProcessImageNameW on only the foreground

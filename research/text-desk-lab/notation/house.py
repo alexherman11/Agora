@@ -1617,7 +1617,7 @@ class House:
             while True:
                 if self.world == "frontier" and not self.fake:
                     try:
-                        guard_context.publish()
+                        guard_context.publish(self.settings(self.load()).get("guard_nongame", ""))
                     except Exception as exc:
                         # Old observations expire; failure never admits a run.
                         print(f"house: guard context unavailable: {type(exc).__name__}", flush=True)
