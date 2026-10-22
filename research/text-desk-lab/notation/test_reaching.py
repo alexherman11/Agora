@@ -199,14 +199,15 @@ check("7c. a line refused as stale refuses only itself; the line after it runs",
       answer(got, f"do prop {NOTE} reachstale=mine{T}").startswith("ERR") and note_props.get("reachstale") == f"theirs{T}"
       and answer(got, f"do prop {RID} reachstale=after{T}").startswith("ok") and "1 refused" in tail(got), got)
 
-# 7d. a chat line held for new lines by others is held alone; the rest run
+# 7d. a crossing chat line lands and shows the missed words; the rest run
 turn(f"> read {CHAT}")
 H.act("reach-other", f"look {CHAT} :1\ndo append {CHAT} line=\"reach-other: wait, do not merge\"", whole=True)
 got, evs = turn(f"> look {RID} :1\n> do append {CHAT} line=\"merging now\"\n> read {NOTE}")
-check("7d. the held chat line is held alone, and the line after it runs",
-      answer(got, f"do append {CHAT} line=\"merging now\"").startswith("ERR held, not sent")
-      and not chat_lines()[-1].endswith("merging now") and not answer(got, f"read {NOTE}").startswith("ERR")
-      and "refused: do append" in tail(got) and "held, not sent" in tail(got), got)
+check("7d. the crossing chat line lands with the missed words, and the line after it runs",
+      answer(got, f"do append {CHAT} line=\"merging now\"").startswith("ok")
+      and chat_lines()[-1].endswith("merging now") and not answer(got, f"read {NOTE}").startswith("ERR")
+      and "wait, do not merge" in answer(got, f"do append {CHAT} line=\"merging now\"")
+      and "held, not sent" not in tail(got), got)
 
 # 7e. three refusals in a row: each refuses only itself, and the last line still runs
 got, evs = turn(f"> read zz991\n> do prop zz992 x=1\n> read zz993\n> look {RID} :1")

@@ -1,14 +1,13 @@
 # health: room test (health.py runs every test_*.py with this line among its first ten)
-"""test_line_waits (a5068): an agent's chat line or thread reply sent on an old view waits.
+"""test_line_waits (a9369): chat additions land with a receipt of crossing lines.
 
     python test_line_waits.py [world]      on roomworld (built in memory); with a world (frontier-try), its copy,
                                            read into memory and never saved, which also measures its longest chat
 
-Alex, 14 Oct (a4708, e9790): 'when someone sends a message under you, you get that as a response before your tool call
-to send a message goes out. that way you never send and then have to send again.' Agent A reads a chat, agent B adds a
-line, A's append is held with B's line shown whole, and A's same append again goes through; the same for a reply in a
-comment thread; a person (Alex, the Desktop's person=) is never held; a resident is judged on its turn's view (as_of,
-the house's news cursor); a line to a chat nobody else wrote in since goes at once, and what the check costs is printed.
+Alex, 21 Oct: send the line, then show missed lines in its receipt. Agent A reads a chat, agent B adds a
+line, A's append lands with B's line shown; the same for a reply in a chat's comment thread. A resident's
+turn view (as_of, the house's news cursor) still identifies crossings, but a receipt acknowledges them
+immediately within the same turn. Overwriting edits remain fenced.
 Every line is a desk line, as each actor would type it.
 """
 import os
@@ -87,37 +86,38 @@ def lines():
 run(A, f"read {CHAT}")
 run(B, f'do append {CHAT} line="B: the build is red, do not merge"')
 held = run(A, f'do append {CHAT} line="merging now"')
-check("A's line on an old view is held, not appended", held.startswith("ERR held, not sent") and "merging now" not in lines(),
+check("A's line on an old view lands immediately", held.startswith("ok") and lines()[-1].endswith("merging now"),
       held)
-check("the hold prints B's line whole, with who and its ids",
+check("the receipt prints B's short line, with who and its ids",
       "the build is red, do not merge" in held and "Worker-t2" in held.replace("worker-t2", "Worker-t2")
       and "m" in held and "(e" in held, held)
-check("the hold says what to do next: the same line again goes as written; a changed one is judged afresh",
-      "send the same command again" in held and "judged afresh" in held, held)
+check("the receipt confirms sent and marked read, with no retry instruction",
+      "Sent." in held and "marked read" in held and "send the same command again" not in held, held)
 again = run(A, f'do append {CHAT} line="merging now"')
-check("the same line sent again goes through exactly as typed", again.startswith("ok") and lines()[-1].endswith("merging now"),
+check("another send goes through without showing the same crossing again", again.startswith("ok")
+      and "new line" not in again and lines()[-1].endswith("merging now"),
       again)
 
 # 2. a changed line is a new line, judged afresh: after B speaks again it waits; with nothing new it goes
 run(B, f'do append {CHAT} line="B: wait, one more check"')
 h2 = run(A, f'do append {CHAT} line="ok, waiting"')
-check("a later line by B holds A's next line too, showing only what is new", h2.startswith("ERR held") and "one more check" in h2
+check("a later line by B is shown with the next successful send, only what is new", h2.startswith("ok") and "one more check" in h2
       and "do not merge" not in h2, h2)
 c2 = run(A, f'do append {CHAT} line="ok, waiting for your check"')
-check("a changed line after the hold is judged afresh and goes (nothing new since)", c2.startswith("ok"), c2)
+check("a changed line also goes with nothing new since", c2.startswith("ok"), c2)
 
 # 3. a line to a chat nobody else wrote in since goes at once; and what the check costs
 t0 = time.perf_counter()
 for k in range(20):
     o = run(A, f'do append {CHAT} line="note {k}"')
 dt = (time.perf_counter() - t0) / 20
-desk_hold = desk._hold_line
+desk_hold = desk._chat_moved
 t1 = time.perf_counter()
 for k in range(200):
-    desk_hold(CHAT, "append", {"line": "x"})
+    desk_hold(CHAT, {"line": "x"})
 dh = (time.perf_counter() - t1) / 200
 check("lines to a chat nobody else wrote in since go at once", o.startswith("ok") and lines()[-1].endswith("note 19"), o)
-print(f"     cost: one append {dt * 1000:.1f} ms in all; the hold's own check {dh * 1e6:.0f} us of it "
+print(f"     cost: one append {dt * 1000:.1f} ms in all; crossing receipt check {dh * 1e6:.0f} us of it "
       f"({len(w.events)} events, {len(lines())} lines)")
 
 # 4. a person is never held
@@ -146,9 +146,9 @@ run(A, f"read {CHAT}")
 run(B, f"look {CHAT} :1")
 run(B, f'do comment {CHAT} id={cid} line="No: Alex still uses it"')
 th = run(A, f'do comment {CHAT} id={cid} line="archiving it then"')
-check("A's reply on an old view of the thread is held, B's reply shown whole",
-      th.startswith("ERR held") and "Alex still uses it" in th and cid in th
-      and not any(r["text"] == "archiving it then" for c in w.subjects[SID]["comments"] for r in c["replies"]), th)
+check("A's reply on an old chat thread lands with B's reply in its receipt",
+      th.startswith("ok") and "Alex still uses it" in th and cid in th
+      and any(r["text"] == "archiving it then" for c in w.subjects[SID]["comments"] for r in c["replies"]), th)
 th2 = run(A, f'do comment {CHAT} id={cid} line="archiving it then"')
 check("the same reply again goes through", th2.startswith("ok"), th2)
 run(B, f'do comment {CHAT} id={cid} line="B: please do not"')
@@ -164,16 +164,16 @@ run(RES, f"read {CHAT}", as_of=len(w.events))
 turn = len(w.events)                     # the house sends this turn's input now
 run(B, f'do append {CHAT} line="B: said while the resident was thinking"')
 rr = run(RES, f'do append {CHAT} line="my answer"', as_of=turn)
-check("a resident's line is held when someone spoke after its turn began", rr.startswith("ERR held") and "while the resident" in rr, rr)
+check("a resident's line lands and shows what arrived after its turn began", rr.startswith("ok") and "while the resident" in rr, rr)
 rr2 = run(RES, f'do append {CHAT} line="my answer"', as_of=turn)
-check("in the same turn it is still held: what it is shown in this turn counts from its next (a2870, e5141)",
-      rr2.startswith("ERR held"), rr2)
+check("in the same turn a second send lands and does not repeat the crossing",
+      rr2.startswith("ok") and "while the resident" not in rr2, rr2)
 rr3 = run(RES, f'do append {CHAT} line="my answer"', as_of=len(w.events))
 check("its next turn (as_of past the line) sends the same line as written", rr3.startswith("ok"), rr3)
 run(B, f'do append {CHAT} line="B: also, lunch?"')
 rr4 = run(RES, f'do append {CHAT} line="and one more thing"', as_of=len(w.events))
-check("a line before its turn in a chat the house does not tell it of, and it has not read since, holds",
-      rr4.startswith("ERR held") and "lunch" in rr4, rr4)
+check("a line before its turn in a chat the house does not tell it of is shown after sending",
+      rr4.startswith("ok") and "lunch" in rr4, rr4)
 run(A, f"look {CHAT} :1")
 run(A, f"do prop {CHAT} members=all")
 run(B, f'do append {CHAT} line="B: dinner too?"')
@@ -189,7 +189,7 @@ w.me = RES
 desk._as_of = len(w.events)
 t2 = time.perf_counter()
 for k in range(20):
-    desk._hold_line(BIG, "append", {"line": "x"})
+    desk._chat_moved(BIG, {"line": "x"})
 dr = (time.perf_counter() - t2) / 20
 desk._as_of = None
 w.me = A
@@ -197,7 +197,7 @@ desk._as_of = None
 run(A, f"read {BIG} :3")
 t3 = time.perf_counter()
 for k in range(200):
-    desk._hold_line(BIG, "append", {"line": "x"})
+    desk._chat_moved(BIG, {"line": "x"})
 da = (time.perf_counter() - t3) / 200
 print(f"     cost on \"{big['title']}\" ({len(big['lines'])} lines): a resident's check {dr * 1000:.2f} ms, "
       f"another agent's {da * 1e6:.0f} us")
