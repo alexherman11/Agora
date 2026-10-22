@@ -533,11 +533,15 @@ def reached(w, e):
         actor = p.get("actor")
         if n["type"] != "surface" or p.get("role") != "resident" or not actor or same_person(w, by.split("/")[0], actor):
             continue
-        asked = comment and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
-        if by == "house" and not asked:
+        asked = comment and persons.holds(w, task_flow.comment_lead(w, s)
+            or (s.get("props") or {}).get("asked_by") or "", actor)
+        if by == "house" and not (asked or (task_flow.comment_lead(w, s)
+                and any(same_person(w, x, actor) for x in named))):
             continue                                   # the house's own word reaches only who asked (a commission)
         mine = bool(s) and any(a["type"] == "appearance" and a.get("subject") == sid and _within(w, a, fid)
                                for a in w.nodes.values())
+        if comment and task_flow.comment_lead(w, s):
+            mine = False  # implicit card route is its lead, never its containing corner
         called = any(same_person(w, x, actor) for x in named)
         if chat:
             if (calls(w, s, to, actor)

@@ -1,0 +1,44 @@
+{
+  "head": "98627ab4274c3bbd31a5f19af4da51065f266929",
+  "main": "09ef2530ec848cbbcf0afc5d0934737095c3cc69",
+  "patch_sha256": "52c3eca60b213d52789a29196b2ec6e9456fc23cfe935cc417d8491bcc8564db",
+  "files": {
+    "research/text-desk-lab/notation/task_flow.py": {
+      "base_sha256": "ce9c8676c896ddca7eda3aa1a476f94dd73741ba45c788283a858ad1236f944f",
+      "output_sha256": "e398cc6a6d49cd1eeb20165333de74b22f9673cc8743012e774c95e35d655dff",
+      "edit_groups": 6
+    },
+    "research/text-desk-lab/notation/house.py": {
+      "base_sha256": "9ec463f3552eb30dd7b15684823c1dc089d2cae7f189a71bab4119921b61a390",
+      "output_sha256": "93bd5b3300c5ee792176d2c6272b0bcf3c07a1ee4953161ea98e2250120719f8",
+      "edit_groups": 4
+    },
+    "research/text-desk-lab/notation/rooms.py": {
+      "base_sha256": "d5f9bc7a78f795ab3bd97f992b9c7b20835efe362fda3800b836d34ab985d3a0",
+      "output_sha256": "40a3211cae0f76b9cfa642deae61abe32d18062d3929b158f48d9c656a95083b",
+      "edit_groups": 2
+    }
+  },
+  "production_edit_groups": 12,
+  "house_changed_methods": [
+    "House.news"
+  ],
+  "bookkeeping": {
+    ".gitignore": "root pytest-cache-files-* only"
+  },
+  "tests": {
+    "tests": 46,
+    "failures": 0,
+    "errors": 0,
+    "success": true,
+    "captured_records": 718,
+    "before": 13,
+    "after": 9,
+    "modules": {
+      "task_flow": "C:\\Projects\\Agora4\\.worktrees\\a10692\\research\\text-desk-lab\\notation\\task_flow.py",
+      "house": "C:\\Projects\\Agora4\\.worktrees\\a10692\\research\\text-desk-lab\\notation\\house.py",
+      "rooms": "C:\\Projects\\Agora4\\.worktrees\\a10692\\research\\text-desk-lab\\notation\\rooms.py"
+    }
+  },
+  "policy": "no enable act; absence independently read through Desk"
+}
