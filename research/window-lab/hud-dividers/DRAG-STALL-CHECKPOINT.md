@@ -118,3 +118,79 @@ do not assume this batch improves that path.
 
 The card remains incomplete until that comparison and the responsive world
 path are accepted. No host activation is authorized by this checkpoint.
+
+## Prepared branch verification, 22 October (codex-builder-1)
+
+The house completed prepare request e25525 without judging or landing:
+checkpoint `31e3cd89342422abe19794e111b96ce08bc3a3d3`, main
+`1f6cbe52d0434efee01035a749e713f25e53a06c`, clean merge HEAD
+`75d72f65a0ca0eac7d171dac5935e3b0ca8a870c` (card receipt c10731).
+Do not repeat preparation as if it were interrupted. On resumption, tracked
+files were clean; the house-supplied world fixture was left untouched.
+
+Read the actual merge diff against its captured main: lens.js still contains
+only the reviewed 13 additions / 4 removals. Its merged raw SHA256 is
+`8da105b81683eb0a4e319db3d0a7427098e32d29276e1dfaa41c467de8292985`;
+the older whole-file hash is historical, not the merged file identity.
+No whole-file overlay of the historical painter was performed.
+
+RAN on this merged source: repaint race test 18 assertions passed;
+partition DOM gesture test 281 checks passed (stand-in); partition model
+167 checks passed; lens.js syntax and git diff --check exit 0.
+No new browser timing, screenshot, caret or latency acceptance follows.
+
+Before launching, READ the preserved dragtimes consumer and its lifetime:
+
+- `combined-review/journeys.py` calls `hud_playtest.Window(False)`;
+  Window.open calls `sandbox_window.open_edge` without a retained Job scope.
+- `open_edge` calls `start` without `job=`, defaults to two startup tries,
+  and therefore does not use the landed suspended Job enrollment boundary.
+  Cleanup through this consumer cannot certify the descendant family.
+- The existing journey output directory is hardcoded to the main checkout's
+  demos directory, outside this worker's writable root.
+- These three consumer files have no diff between this HEAD and the observed
+  main. The Job primitive being landed does not imply this consumer uses it.
+
+No browser, Job, guard or process was started to discover these source facts.
+No denied lane was retried. The minimal prerequisite is a supported consumer
+integration: retain the existing job_scope through launch and shared cleanup,
+pass that same scope to suspended start, record the empty/unknown cleanup
+receipt, use a single attempt and worktree-local output. Preserve the timing
+journey itself and its before/after comparison. The active reliable paint-lane
+commission a10672 already owns this class of harness work; request its
+supported consumer rather than duplicate lifecycle/cleanup implementation.
+
+This is an integration blocker, not evidence that Edge failed or that the
+13-line repair improves latency. Sable's c10397 performance checkpoint remains
+gated on actual current-world measurements at both requested sizes. Allocation
+predicates remain design-only; no syntax, compact world policy or product
+behavior was added in this round.
+
+## Narrow source landing authorized, 22 October
+
+Sable c11239/e29175 explicitly authorizes ordinary source landing of the
+reviewed race/settle slice while the timing comparison remains owed.
+This supersedes the hold on landing that slice, not the evidence limits above.
+
+Ran again on prepared HEAD 75d72f65a0ca0eac7d171dac5935e3b0ca8a870c:
+- `node research/window-lab/hud-dividers/test_repaint_races.js`: 18 assertions passed.
+- `node research/window-lab/hud-dividers/test_partition_ui.js`: 281 partition DOM gesture checks passed (stand-in; no browser).
+- `node research/window-lab/hud-dividers/test_partition.js`: 167 partition geometry/model checks passed.
+- `node --check research/text-desk-lab/notation/desk-shell/lens.js` and
+  `git diff --check`: exit 0, no output.
+
+Read `git diff main...HEAD`: only lens.js and this report plus the race
+regression are branch changes. The production diff has exactly the two
+reviewed hunks: post-style hold/admission and overflow read/write batching.
+It does not replace main's selection, context-menu or window-values changes.
+The house must merge subsequent main changes under ordinary landing checks.
+
+SHA256 of prepared lens.js:
+8da105b81683eb0a4e319db3d0a7427098e32d29276e1dfaa41c467de8292985.
+SHA256 of race regression:
+6f9f562979875e380b10a61bb7b067b1518f3b32a1bbf1339553216228ce9c8f.
+
+No browser, full health, current-world timing comparison, live apply or
+activation ran in this round. No latency gain is claimed. Before/after at
+both sizes remains owed through the shared guarded paint lane. Rollback of
+the production slice is a revert of its two lens.js hunks.
