@@ -1,5 +1,49 @@
 # Suspended direct-child ownership checkpoint
 
+## Current: landed and one real direct-child run completed, 21 October 21:39
+
+READ house c9796 and local history: policy landed6b9aaea, source checkpoint
+2f9a162. Tracked tree clean before the attempt. JEFF c9804 authorised ONE run.
+RAN check_sandbox_birth_guarded.py exactly once, exit0. No retry.
+
+House schema-v2 preflight and postflight both admitted the world-listed
+chatgpt.exe foreground on Default under the explicit non-game rule.
+Raw notification_state=2/full_screen=true/game=null stayed in the receipt.
+Issuer PID31124; observed_at1792643967.8946886; uptime_ms275348687.
+
+Manifest complete: child PID92092, native creation FILETIME134371175695230930;
+parent PID93600, creation134371175692197682; both images the base Python312
+python.exe. Requested desktop WinSta0\agora-sandbox-birth-a9388-85fb297c11;
+profile the unique birth-a9388-85fb297c11-fake-profile scratch path.
+The owner/launch-intent copies match, method CreateProcessW-suspended-v1,
+resume_result=1. READ persist_then_resume: complete ownership is written
+before ResumeThread; the offline sequencing tests cover that ordering.
+
+Verified direct-child cleanup: status ended, wait0, same PID/creation,
+scope "recorded direct child only". The command succeeded because this
+narrow claim passed. Its close receipt still says ok=false / cleanup
+incomplete, cleanup_complete=false, remaining_pids=null and runtime_closure
+"unknown: no reconciled child ownership boundary". Those are intentional
+whole-runtime limits, not proof of a surviving child or a closed runtime.
+Retained scratch manifest/profile were not deleted or reset.
+
+Guard code0, but the worker could not see Alex's foreground. The report says
+"unknown Alex-screen continuity"; do not call it an untouched-screen proof.
+No browser, page/network, account, input, capture or native mail run.
+This direct-child success does NOT admit native browser/mail or delegated
+engine cleanup. JEFF/host owner still owns that separate boundary and the
+missing retained browser package. Previously read mail owners=[]/denied
+metadata remains unknown. The two known browser package paths were again
+absent in this assigned checkout; no process-absence inference.
+
+Exact original report and manifest copied together into LIVE-20261021.json
+(SHA2566b98f8d2292e9733a9d4e9bc835f19f2cc8dd638b584af9942f74b8ad8fa90a2),
+including original-byte hashes. CHECKS.json links the evidence and preserves
+all earlier failures. No source or test changes in this round; offline
+counts below are from the preceding source round, not freshly rerun.
+Historical "staged/unverified" checkpoints below are superseded only for
+this direct-child proof, not retained/delegated runtime closure.
+
 ## World-owned non-game policy, JEFF c9725 — staged, not live
 
 The house now passes its current `guard_nongame` setting into each observation.
