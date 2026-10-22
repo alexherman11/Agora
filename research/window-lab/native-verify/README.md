@@ -201,8 +201,16 @@ It doesn't stop a run already live: an unwatched half-cleanup would be worse tha
 
 **The first run predates measured provenance.** It explained members by the old `explain(pids)`, which took the
 fixture's own word for its grandchild. Its family verdict (`unknown`: the conhost processes were unexplained) still
-stands. Under the measured rules, whether conhost's recorded parent is the console program hasn't been run. Until a
-run measures it, a consumer must expect conhost members to be `unknown`.
+stands for that run.
+
+Whether Windows records the console program as conhost's parent was then measured read-only on the PC's running
+processes (ran, 21 Oct, counts only, outside any job, nothing about any process kept). There were 47 conhost.exe.
+For 44, Toolhelp's parent pid named a live process created before them, and all 44 parents were console programs:
+node 11, cmd 10, node_repl 9, python 5, powershell 3, codex 2, codex-code-mode-host 2, codex-computer-use-swift 1,
+bash 1. For the other three, one conhost and one parent were unreadable, and one parent had exited. So under the
+measured rules, a conhost started for an explained console program is explained through its parent. One whose
+parent can't be read, or has exited unseen, stays `unknown`. Inside a job this hasn't been run; the consumers'
+first native runs will show it.
 
 **Not yet run:** a real WebView2 engine, an engine report from a live control, the browser's public host, and the
 mail fake. Those are the consumers' native runs, each needing its own admission.
