@@ -109,3 +109,34 @@ Handbook updates: **Commissions, workers and the keeper — Visit-test cleanup**
 **Processes and state — Test-owned door lifetime**. After source landing a
 previously held commission uses ordinary `commission=ready`; do not manually
 delete leftovers or repeat old process kills.
+
+### Bootstrap blocker after judgment retry
+
+House receipt c9857 failed with `RuntimeError: git clean -ffdxq`, before
+candidate judgment. Read: main's `room_at` still calls that bare command;
+`workshop.land` imports main's `landing` and calls `landing.land`, whose room
+preparation precedes merging the candidate. Thus the new exclusion cannot
+protect its own first landing through the unchanged house. Restarting main's
+house alone would still load the old cleaner.
+
+The prepared repair is committed as `391a80e`. A fresh focused run passes
+14 tests in 0.981 s. Its landing.py SHA256 is
+`CB2F44A3469448B02024A1C533975E5CE196A8512F7456FEF2F220C53704B366`;
+fixture_cleanup.py is
+`3D11B9DF0E6DEA8B18C125A8CABABB61EFF080E6219304F9F8BB19BF1E9014C9`.
+These identities do not establish production activation.
+
+JEFF owns bootstrap resolution. The existing read-only investigation a9877
+may establish which process holds the legacy fixture; this worker has not
+identified or stopped it. An alternative requiring explicit review is a
+one-time run of the committed branch's landing CLI, retaining its usual
+landing lock, queue, health judgment and fast-forward gates:
+
+```powershell
+C:/Projects/Agora4/.venv/Scripts/python.exe C:/Projects/Agora4/.worktrees/a9652/research/text-desk-lab/notation/landing.py worker/a9652 --world frontier --as house --why "Reviewed cleanup bootstrap"
+```
+
+That host command has **not** run. It executes candidate orchestration before
+landing and must be explicitly reviewed by JEFF, not silently used as a
+worker workaround. Do not run it concurrently with another landing, delete
+legacy scratch, or repeatedly retry ready while the bootstrap remains blocked.
