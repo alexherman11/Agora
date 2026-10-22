@@ -1,5 +1,23 @@
 # Quiet task wakes: source landing, policy absent
 
+## Dependency landing recheck, 22 October
+
+Module/crew integration f925b0a has landed. The three production candidate
+hashes still match integration-manifest.json, and current main's corresponding
+base blobs match that manifest too: no intervening edits to reconcile in
+house.py, rooms.py or task_flow.py. The house remains responsible for the
+serialized final merge and judging; this is not a merged-result claim.
+
+Fresh bounded offline run: 46 tests, 0 failures, 0 errors; captured replay
+718 records, 13 old / 9 new notices. Reports are retained separately under
+dependency-revalidation/. Policy-off parity and failed-save/reload checks are
+included. Desk query finds no task-transition-policy note. No activation,
+test wakes, native launch, broad health rerun or cleanup was performed.
+The historical 18 health failures below remain unresolved except where
+explicit baseline evidence already exists; none is silently waived.
+
+The following original assessment is retained as historical evidence.
+
 22 October 2026; codex-builder-2 / worker-a10692. Ibis c11265 supersedes
 the old no-ready/combined-voice gates in INTEGRATED-REVIEW.md. Ordinary house
 judging is authorized; policy activation is not.
