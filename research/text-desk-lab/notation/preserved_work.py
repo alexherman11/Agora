@@ -229,6 +229,60 @@ def checkpoint_receiver(tree, card, receipt_path, data, report):
         write_receipt(receipt_path, data)
 
 
+def prepare_main(live, tree, card, receipt_path, request_id, report=None, admit=None):
+    """Checkpoint and merge only the worker branch, under caller's lease/lock.
+
+    An interrupted merge is unknown, never replayed. The receipt survives a
+    house restart; the same request returns its result without another merge.
+    """
+    if receipt_path.exists():
+        data = json.loads(receipt_path.read_text(encoding="utf-8"))
+        if data.get("request") != request_id:
+            raise Held("prepare receipt belongs to another request")
+        if data.get("phase") not in ("prepared", "prepare-conflict"):
+            raise Held("interrupted prepare needs reconciliation; not replaying")
+        if head(tree) != data["after"]:
+            raise Held("prepared branch changed before reporting; reconcile receipt")
+        return data
+    if receipt_path.parent.exists():
+        for previous in receipt_path.parent.glob(card + "-*.json"):
+            prior = json.loads(previous.read_text(encoding="utf-8"))
+            if prior.get("phase") not in ("prepared", "prepare-conflict"):
+                raise Held("earlier prepare needs reconciliation; not starting another")
+    registered(live, tree, f"worker/{card}")
+    main = out(live, "rev-parse", "refs/heads/main")
+    data = dict(request=request_id, phase="prepare-started",
+                before=head(tree), main=main)
+    write_receipt(receipt_path, data)
+    checkpoint_receiver(tree, card, receipt_path, data, report)
+    if admit is not None:
+        admit()
+    data.update(phase="prepare-merging", checkpoint_head=head(tree))
+    write_receipt(receipt_path, data)
+    result = git(tree, "merge", "--no-ff", "-m",
+                 f"Merge main into worker/{card} (house prepare)", main, check=False)
+    conflicts = out(tree, "diff", "--name-only", "--diff-filter=U").splitlines()
+    if result.returncode and not conflicts:
+        # Keep all evidence. Do not abort a possibly interrupted operation.
+        data.update(phase="prepare-unknown", error=(
+            result.stderr or result.stdout).decode("utf-8", "replace")[-1000:])
+        write_receipt(receipt_path, data)
+        raise Held("prepare merge failed; inspect receipt before any retry")
+    binary = [path for path in conflicts if any(
+        b"\0" in git(tree, "show", f":{stage}:{path}", check=False).stdout
+        for stage in (1, 2, 3))]
+    if binary:
+        # Same refusal policy as landing's merge: never stage an implicit
+        # choice of a binary side. The checkpoint remains committed.
+        git(tree, "merge", "--abort")
+    data.update(phase="prepare-conflict" if conflicts else "prepared",
+                after=head(tree), conflicts=conflicts,
+                binary=binary, merge_aborted=bool(binary),
+                changed=out(tree, "diff", "--name-only", data["checkpoint_head"], main).splitlines())
+    write_receipt(receipt_path, data)
+    return data
+
+
 def receiver_paths(tree, names):
     """An ignored file is still someone's work; Git may otherwise overwrite it."""
     for name in names:

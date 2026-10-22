@@ -136,6 +136,32 @@ branch through the house's normal source path. Do not reset either worktree.
 
 ## Deployment / evidence
 
+### Updating a preserved branch before acceptance (a10303)
+
+Set `commission=prepare` and end the worker turn. A running/busy adapter holds
+the request until the house's normal set-down releases its process-held card
+lease. Preparation never stops a live adapter itself. An unleased legacy
+runtime requires a known stopped owner.
+
+The house acquires landing serialization and the card lease, rechecks the
+world request, checkpoints source through `checkpoint_receiver` (including
+partial staging and raw/blob hashes), and merges the captured main commit
+into `worker/<card>`. Main is not changed. No health, judging, landing,
+restart or model turn is invoked by this handler. The card returns to
+`working` with `prepare_status`, `prepare_receipt`, and an inventory of
+conflicted files. Conflicts remain uncommitted in the worker's files.
+Ordinary later `ready` commits their resolution and judges; prepare does not.
+
+Receipts live under `house-state/<world>/prepares/<card>-<request-event>.json`.
+Completed reporting retries reuse the same result. Interrupted checkpoint
+or merge phases hold for reconciliation, including across new requests;
+the house does not abort/reset/replay an uncertain merge. Clearing a request
+does not undo a checkpoint. Reversal is a reviewed branch change through the
+ordinary house path, never a reset or rewrite of main.
+
+This source path is separately tested by `test_prepare.py` with isolated Git
+repositories. Source tests are not evidence that a live card was prepared.
+
 `workshop.py` and the new imported module belong in `HOUSE_FILES`; loading this
 integration needs an ordinary house deployment. Alex explicitly allows that
 for a9421. This does not authorize activation of any transferred candidate.
