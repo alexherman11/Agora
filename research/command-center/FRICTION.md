@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (65)
+## open (64)
 
 ### F2. Scripts cannot say who is running them
 
@@ -342,12 +342,6 @@ a7659 · family=language · status=open
 
 Source checkpoint, not active capability (20 Oct, worker-a7606). Missing world-level words: explicit item carry payload/whole-item appearance; personal stable-reference order projection; all-or-nothing create/restore-plus-placement. Existing CarryTargets freezes receiver actions but cannot compute the pending partition model's result. Ordinary world verb actions are deliberately not transactional: actual in-memory create + refused read leaves creation. New isolated carry-intent.js and personal_order.py have stand-in/pure tests, but no compiler/painter/commit integration. Exact dedup precondition and reversal staged in Needs Me — exact eligibility precondition and reversal. Architecture and next acceptance boundary staged in Item pickup — architecture checkpoint and integration boundary. No hot files or live lenses changed; pending tiling repair retains priority.
 
-### JEFF can't restart the house from the world
-
-a9135 · family=missing-word · status=open
-
-Alex (21 Oct, m9114/m9123) allows house restarts whenever nothing important would break, and asked JEFF to restart now. No world verb does it: a restart happens only as a side effect of landing a house file, once the house finds itself idle. Wanted: a world verb (e.g. restart-house) that waits for idle, says what is in flight, keeps drafts and receipts, and refuses during a game; JEFF uses it under Alex's standing approval.
-
 ### A per-card tool grant doesn't reach a worker session already running
 
 a9172 · family=authority · status=open
@@ -432,7 +426,7 @@ a10043 · family=verbs · status=open
 
 Found 21 Oct by worker-a8911 (a8911), ran on an in-memory roomworld. In a verb line's when, "$1.asked_by" = "alex" is always false on a card asked by alex, and "$1.asked_by" != "" is true even on a card with no asked_by: inside quotes the blank is not filled for the comparison. The skip receipt still shows it filled ('when "juniper" = ""'), which hides the cause. Unquoted, $1.asked_by = "alex" works (and with and). Missing word: either fill blanks inside quoted operands of when, or refuse a quoted blank when the verb is saved, saying to write it unquoted. Also: on a card with no asked_by, any line naming $1.asked_by is refused by itself ('a47 has no asked_by='), so a when cannot test for a prop's absence on $1.
 
-## curing (47)
+## curing (48)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -776,6 +770,12 @@ a7816: the missing engine boundary was under-lock writer admission before detach
 a8394 · family=refusal · status=curing
 
 a8333 source repair (staged, not runtime activation). Missing world-level capability: none; this is the hidden test harness's close operation, not authored world behavior. Prior close discarded taskkill failures/ownership and could claim cleanup from window absence. Source now keeps durable identity/error/intent evidence, verifies exact handles, refuses unknown profile/ownership, and blocks automatic retry while headless-child closure is unknown. Native engine owner retains the reviewed-runtime boundary; no trusted containment was fabricated. Deterministic offline tests and exact hook hunks: research/window-lab/browsing/diagnostics/HANDOFF.md. No browser run or process effect on this card; real engine isolation/cleanup remain unverified.
+
+### JEFF can't restart the house from the world
+
+a9135 · family=missing-word · status=curing
+
+Alex (21 Oct, m9114/m9123) allows house restarts whenever nothing important would break, and asked JEFF to restart now. No world verb does it: a restart happens only as a side effect of landing a house file, once the house finds itself idle. Wanted: a world verb (e.g. restart-house) that waits for idle, says what is in flight, keeps drafts and receipts, and refuses during a game; JEFF uses it under Alex's standing approval.
 
 ### Grouped duties need exact evidence and authored legacy types
 
