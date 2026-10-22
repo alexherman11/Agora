@@ -3,6 +3,7 @@
 the house is a stand-in that runs its desk lines on the world, and the guard is a function the test chooses."""
 import re
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -223,6 +224,71 @@ class RunLoop(Base):
         self.assertEqual(code, 0)                                    # stopped by the test, not restarted
         self.assertEqual(self.props(aid)["state"], "refused")
         self.assertFalse(h.workshop.restart_wanted)
+
+
+class RestartGuard(unittest.TestCase):
+    """Pure metadata fixtures; observe is always mocked, never a native probe."""
+    def data(self, **changes):
+        return dict({"notification_result": 0, "notification_state": 2,
+                     "foreground_known": True, "foreground_exe": "obs64.exe",
+                     "input_desktop": "Default", "game": None,
+                     "full_screen": True, "admitted": False}, **changes)
+
+    def reason(self, data):
+        with patch("guard_context.observe", return_value=data):
+            return HR.game_seen()
+
+    def test_fullscreen_and_unlisted_name_are_not_game_evidence(self):
+        for exe in ("obs64.exe", "SearchHost.exe", "TextInputHost.exe", "unlisted.exe"):
+            for full in (True, False):
+                with self.subTest(exe=exe, full=full):
+                    self.assertEqual(self.reason(self.data(foreground_exe=exe, full_screen=full)), "")
+
+    def test_game_evidence_cannot_be_allowlisted_away(self):
+        for changes in ({"game": True}, {"notification_state": 3, "game": False}):
+            self.assertIn("game", self.reason(self.data(**changes)))
+
+    def test_unknown_or_unsafe_context_stays_refused(self):
+        for changes in ({"notification_result": -1}, {"foreground_known": False},
+                        {"foreground_exe": "unknown"}, {"input_desktop": "Winlogon"},
+                        {"notification_state": 1}, {"notification_state": 4},
+                        {"notification_state": 6}, {"notification_state": 7},
+                        {"notification_state": 5}, {"notification_state": True},
+                        {"notification_result": False}, {"game": "false"}):
+            with self.subTest(changes=changes):
+                self.assertTrue(self.reason(self.data(**changes)))
+        for malformed in ({}, None, []):
+            self.assertTrue(self.reason(malformed))
+        for key in ("notification_result", "notification_state", "foreground_known",
+                    "foreground_exe", "input_desktop", "game"):
+            data = self.data()
+            del data[key]
+            with self.subTest(missing=key):
+                self.assertTrue(self.reason(data))
+        with patch("guard_context.observe", side_effect=OSError):
+            self.assertIn("not restarting blind", HR.game_seen())
+
+    def test_clear_desktop_and_stricter_native_policy_remain_distinct(self):
+        import guard_context
+        clear = self.data(notification_state=5, game=False, full_screen=False)
+        self.assertEqual(self.reason(clear), "")
+        fullscreen = self.data()
+        self.assertEqual(self.reason(fullscreen), "")
+        self.assertFalse(guard_context.policy_clear(fullscreen))
+
+    def test_real_predicate_is_rechecked_at_exit(self):
+        # Exercise real request orchestration with the real new decision,
+        # not a substituted decision that could miss the call sites.
+        fixture = Restart(methodName="test_a_game_at_the_last_moment_refuses_and_stays")
+        fixture.setUp()
+        fixture.restarts.game = None
+        aid = fixture.ask()
+        with patch("guard_context.observe", return_value=self.data()):
+            fixture.restarts.step(fixture.w, CFG, ["busy"])
+        self.assertEqual(fixture.props(aid)["state"], "waiting")
+        with patch("guard_context.observe", return_value=self.data(notification_state=3, game=True)):
+            self.assertFalse(fixture.restarts.leaving(CFG))
+        self.assertEqual(fixture.props(aid)["state"], "refused")
 
 
 def _q(text):
