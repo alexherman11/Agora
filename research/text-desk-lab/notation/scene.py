@@ -2827,6 +2827,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):
                 bits.append("(" + ", ".join(n["states"]) + ")")
+            if n.get("sorted"):                 # a10526: a repeat ordered by a time says each value it ordered by
+                bits.append("· sorted " + "; ".join(n["sorted"]))
         if n.get("test"):
             bits.append(f"· only when {n['test']}")
         for a in n["acts"]:
