@@ -370,6 +370,8 @@ Lived at e21637: the sole browser continuation received a clean worktree without
 
 Second occurrence, a9352/a9394: own-panel activation cannot reuse a8138's preserved windowValues keeper because the new worktree has only the older viewer API. Need supported dependency-package transfer, not a new store or blind replacement of viewer.js. Package must include API/slot contract, tests, dependencies and hashes; reconcile newer main draft/Markdown/menu/tiling hunks. This source-transfer problem is separate from a9388's runtime-ownership fix.
 
+21:31 recipient preservation landed (9d6394c), but delivery now loops on inventory confirmation. a9231 has repeated identical checkpoint comments for commit 1b4d3b9, one documentation file with matching raw/committed hashes; brings_status still refuses confirmation. c9751 requests house-owner repair and duplicate suppression, not manual status override. Source packages remain undelivered; panel transfer remains ordered behind browser.
+
 ### Opening an existing HUD panel has no evidenced off-log bring-forward action
 
 a9306 · family=navigation · status=open
@@ -1486,6 +1488,7 @@ Review and continuation cards cannot read/copy another worktree's preserved file
 a9618 · family=missing-word · status=source-pending
 
 Missing world behavior: brings must preserve a stopped receiver’s own dirty and untracked source before importing. Current landed capability refuses every dirty receiver. Commission a9603 extends the existing preserved_work path under its existing worker leases and landing lock: own-branch checkpoint and exact hash inventory first, then conflict-preflighted delivery; no discard/reset/stash or readiness change. Source edits: preserved_work.py, Workshop.bring reporting, offline regressions and preserved-work.md. Evidence will be linked from the commission.
+Live follow-up: checkpoint code landed as 9d6394c, but brings cannot recognize its own inventory after desk parsing changes a Windows directory escape. Whole-comment equality causes duplicate inventory posts and holds delivery. Repair stays in Workshop.report_receiver_checkpoint: request key and complete JSON/hash inventory, legacy request-specific filename recovery, forward-slash receipt paths and actual-parser offline regression. No alternate delivery path or forced receipt.
 
 ## source-staged (1)
 
