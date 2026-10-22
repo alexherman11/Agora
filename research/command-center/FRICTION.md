@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (62)
+## open (64)
 
 ### F2. Scripts cannot say who is running them
 
@@ -414,7 +414,19 @@ a9628 · family=safety · status=open
 
 RAN a9551, actual Resident.save and fake transport: fail os.replace after flush. busy remains false, so House.step can send another human input or begin provider preparation before any answer. Two regression failures reproduced on unchanged main as well as the safety-only candidate; inherited defect. Required guard: retain in-flight uncertainty through persistence/log failure, no next input/switch until reconciliation or durable quarantine. Do not auto-retry or change queue policy. Reproductions and scope: [[Voice safety independent review — verified bytes, two correction requirements]]. Ibis owns follow-up; no source repair or live runtime action here.
 
-## curing (48)
+### Per-card tool grants work only on Claude workers
+
+a9936 · family=authority · status=open
+
+21 Oct, a9877: extra_tools on a card is refused for Codex runtimes (house c9930), so a read-only host query can't run when the pool is all Codex. Wanted: Codex builders honour the same narrow per-card grant, or the house routes granted cards to a runtime that can, and says so up front instead of after admission.
+
+### Closing a card can miss the promise hook in the quick log
+
+a9948 · family=code · status=open
+
+Read/ran, worker-a7877, 21 October: status=done creates a promise sill question, then after_act directly appends asked-end to the existing promise without declaring it changed. The quick logger and observer both miss that mutation; a later periodic verification detects/reconciles it and retains two observations. Missing underlying capability: every hook side-effect needs a complete event footprint (and ordinary undo/revision handling). Request: narrow promise-hook recording fix with original-command regression and undo/reload checks. Synthetic diagnosis only; no production patch, ready or live repair authorized in this round. Evidence and proposed fix: [[Promise asked-end — one missed footprint, two divergence observations]].
+
+## curing (47)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -759,13 +771,6 @@ a8394 · family=refusal · status=curing
 
 a8333 source repair (staged, not runtime activation). Missing world-level capability: none; this is the hidden test harness's close operation, not authored world behavior. Prior close discarded taskkill failures/ownership and could claim cleanup from window absence. Source now keeps durable identity/error/intent evidence, verifies exact handles, refuses unknown profile/ownership, and blocks automatic retry while headless-child closure is unknown. Native engine owner retains the reviewed-runtime boundary; no trusted containment was fabricated. Deterministic offline tests and exact hook hunks: research/window-lab/browsing/diagnostics/HANDOFF.md. No browser run or process effect on this card; real engine isolation/cleanup remain unverified.
 
-### Sandbox launch cannot witness a child before it starts
-
-a9494 · family=capability · status=curing
-
-Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
-JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
-
 ### Grouped duties need exact evidence and authored legacy types
 
 a9641 · family=source · status=curing
@@ -834,7 +839,7 @@ a8490 · family=silence · status=unchecked
 
 Missing world word: explicit followups attach/ack/pending/receipts. Read: current House.news preserves pending calls, but Resident.send's delivered flag attests only successful pipe flush; listeners' handed-on ids are not recipient acknowledgment. Source-only preparation on Keep JEFF moving adds an isolated obligation journal and exact staged Desk/House hunks; no live imports, timers, retries, process launches or new host authority. A deployment-blocked comment/prop is not an executable landing gate: refusal must precede serialized landing mutation, not only the post-land restart flag. This separate lifecycle repair remains unimplemented. (worker-a8438, 21 Oct)
 
-## cured (68)
+## cured (69)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1410,6 +1415,15 @@ Missing world words/capabilities: ordered followup policy, dependable task-trans
 Source: conversation_policy.py plus desk.py/rooms.py implement opt-in reply_policy=queue and precise recipient/stop checks. task_flow.py plus house.py handle task notices and durable inbox transfer. workshop.py adds yielded capacity resumption and focused documentation/summary guidance. resident_continuity.py plus house.py repair provider-bound state handover without pretending provider tokens transfer. Detailed contract and test evidence: [[Coordination flow: tested implementation and activation handoff]], with repository evidence at research/text-desk-lab/notation/coordination-flow.md.
 
 Status cured for this scope: authorized activation completed, exact Claude runtime and preserved state verified, and the implementation checkpoint woke JEFF once and received his task acknowledgement. The live snapshot gap was corrected and regression-tested. Worker delivery records and voice latency work remain separate staged commissions.
+
+### Sandbox launch cannot witness a child before it starts
+
+a9494 · family=capability · status=cured
+
+Current, landed6b9aaea: direct-child birth checkpoint and verified cleanup proven by the ONE c9804-authorised fake run. Complete manifest, same-birth termination wait=0; whole-runtime closure and Alex-screen continuity remain unknown. Native browser/mail and delegated-child ownership are not admitted. Current receipt and exact hash are in the linked evidence. The direct-child capability gap is cured; legacy/delegated ownership and missing browser receipt remain separate JEFF-owned gates.
+
+Historical gap and staging record (superseded for direct-child proof): Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
+JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
 
 ## active (1)
 
