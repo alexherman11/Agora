@@ -1366,8 +1366,13 @@
     if (resizing) return;   // a divider owns both neighbours until its fenced answer
     const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene by its content (a1505); comparing 700 KB was the fallback
     if (key === last && !force) return;
-    last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null; if (r.scene) held = r;
-    await restyle((def && def.style_name) || "calm", (def && def.style_rev) || "seed");
+    const incomingDef = (r.scene && r.scene.def) || r.def || null;
+    await restyle((incomingDef && incomingDef.style_name) || "calm", (incomingDef && incomingDef.style_rev) || "seed");
+    // A gesture can take the layout while a style request is outstanding.
+    // Do not paint across that hold or acknowledge an answer we did not paint:
+    // the post-gesture refresh must still be able to fetch this generation.
+    if (resizing) return;
+    last = key; sceneAt = r.events_total; def = incomingDef; if (r.scene) held = r;
     // 30 Sep (Alex: the Desktop kept going blank over the node budget): a refused scene keeps the last good paint on
     // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
@@ -1436,12 +1441,16 @@
       }
     }
     for (const el of paint.querySelectorAll('.l-float:not([data-folded="1"])')) placeFloat(el);    // a6265: kept under its line
-    for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
+    // Cut attributes can affect styling. Read all overflow geometry first,
+    // then publish the indicators, instead of invalidating layout per frame.
+    const cuts = [...paint.querySelectorAll("[data-clamped]")].map(el =>
+      [el, el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1]);
     for (const el of paint.querySelectorAll('[data-scroll="none"]')) {
       // a hair is not more. Cut at the head (none end), the overflow is above the box, where scrollHeight does not count it
       const head = el.dataset.atEnd && el.firstElementChild ? el.getBoundingClientRect().top - el.firstElementChild.getBoundingClientRect().top : 0;
-      el.dataset.cut = el.scrollHeight > el.clientHeight + 8 || head > 8 ? "1" : "";
+      cuts.push([el, el.scrollHeight > el.clientHeight + 8 || head > 8]);
     }
+    for (const [el, cut] of cuts) el.dataset.cut = cut ? "1" : "";
   }
 
   // `tip` (a6271; Alex, 17 Oct: icons with 'no text. If I hover them it should say what they are'): a part's name and one
