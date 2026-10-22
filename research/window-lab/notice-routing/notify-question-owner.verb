@@ -1,0 +1,4 @@
+# notify-question-owner <card>: route the existing waiting notice, without changing knocks.
+# A native unanswered question explicitly to Alex takes precedence over asked_by.
+do create "Alex's notices" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) > 0
+do create "Alex's notices" kind=note title=asking role=notice to=$1.asked_by topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) = 0
