@@ -16,8 +16,15 @@ Each of the four checks returns one of:
 `observed` always carries `not_proven`, the list of things snapshots and samples cannot show. There is no `pass`
 (Mica c10185, Rowan c10186, JEFF c10193).
 
-`allow_interaction` is True only when every judged check is `observed`. When it is False, a consumer must stop
-before any input or DevTools use, keep its receipts, and not relaunch.
+`allow_interaction` is True only when every judged check is `observed` and no limit the consumer listed in
+`must_prove` stands. When it is False, a consumer must stop before any input or DevTools use, keep its receipts,
+and not relaunch.
+
+Every `not_proven` item has a stable key, given in `not_proven_keys` (for example `network.udp_remotes` or
+`writes.transient`; `NOT_PROVEN` in the module lists them all). A consumer that needs one of those proven before it
+may interact lists the key in `must_prove`. While any judged check still lists that key, the verdict's
+`blocking_limits` names it and `allow_interaction` is False. A key the verifier doesn't know also blocks, so a typo
+fails closed (c10251).
 
 ## Lifetime
 
@@ -29,7 +36,8 @@ with sandbox_window.Guard(name, name) as guard:          # after fresh guard_con
         v = native_run_verify.Verifier(run, scope, engine_report=read_my_control)
         v.before()                                       # nothing outside already names the profile
         pid = sandbox_window.start(name, argv, job=scope)
-        v.explain(pid)                                   # births and known members
+        for o in sandbox_window.load(name)["owners"]:    # the launcher's measured birth receipts
+            v.add_birth({"pid": o["pid"], "created": o["created"], "exe": o["exe"]})
         v.start_sampling(0.1)                            # the interval is reported
         if not v.gate()["allow_interaction"]:            # family/windows/network so far
             ...stop, keep receipts...
@@ -49,12 +57,30 @@ with sandbox_window.Guard(name, name) as guard:          # after fresh guard_con
 - `exclude`: the harness's own receipts and `__pycache__` under a watched root.
 - `engine_images`: the image names checked outside the job for the profile. The default is
   `msedgewebview2.exe` and `msedge.exe`.
-- `allow_remote`: `[[ip, port|None], ...]`. Empty for the mail fake. For the browser, the one public host's
-  addresses, resolved by the harness before launch.
+- `allow_remote`: a list of `resolve_allowed(host, port)` entries. Each entry keeps the host, the port, the
+  addresses the system resolver gave, when, and how. Empty for the mail fake. For the browser, the one public host,
+  resolved by the harness before launch. A bare `[ip, port]` has no provenance: it is not used, and is reported as
+  unknown. A matched endpoint is evidenced as "an address the harness resolved for host". That is not proof the
+  connection was to that host (`network.hostname`), and it says nothing about URLs, redirects, workers or QUIC
+  (`network.urls`, `network.udp_remotes`) (Rowan c10239).
 - `allow_loopback`: whether loopback sockets (a fake endpoint, DevTools) are allowed.
 - `require_engine_report`: whether the engine report must be given. If it is required and missing, `family` is
   `unknown`.
-- `explained`: pids the harness knows.
+- `births`: the launcher's measured birth receipts, `{"pid", "created", "exe"}`, from `sandbox_window`'s
+  manifest `owners`. `add_birth` takes the same records after launch. A pid alone is refused.
+- `must_prove`: the limit keys this consumer needs proven, as above.
+
+**Provenance is measured, never declared (c10251).** A job member counts as explained in one of two ways:
+
+- It matches a birth receipt: the same pid, creation time and image path as the verifier's own reading.
+- Its parent pid is an explained member created no later than it. The parent pid is the one Toolhelp recorded at
+  the member's creation. A later-created holder of that pid is a reused pid, not the parent.
+
+Each member's role comes from its own command line: Chromium's `--type=`, `console host` for conhost.exe,
+`browser` for an engine image without `--type`, otherwise `process`. Only the role word is kept. A member with no
+such chain is `unknown`, and the reason says which link is missing: no parent read, a parent never seen in the job,
+a reused pid, or an unexplained parent. The engine report never explains a member. It is cross-checked: the
+reported kinds against the measured roles, and the browser process and folder against the job and the profile.
 
 `engine_report()` is the consumer's own reading of its actual WebView2 control:
 `{"browser_pid", "user_data_folder", "processes": [{"pid", "kind"}]}`, from `BrowserProcessId`,
@@ -81,7 +107,7 @@ in the job.
 - *Unknown:*
   - An incomplete job list.
   - An engine-image process that cannot be read (access denied).
-  - Job members nobody explained.
+  - Job members with no measured provenance (no birth receipt match and no measured parent chain).
   - A missing before or after observation.
   - A required engine report that was never given.
 - *Not proven:*
@@ -161,6 +187,22 @@ rows and 522 Default-desktop windows, plus the install record names. Its own loo
   - The install records gained nothing new.
   - The job's I/O was `write_ops=2`, `write_bytes=91`, exactly the two files (4 and 87 bytes).
 - Cleanup: the job was confirmed empty. `allow_interaction` was False, because of family.
+
+**What "Alex untouched" rests on (Mica c10242, Rowan c10239).** Guard polled his foreground window, focus, cursor
+and input desktop every 20 ms for the length of the run. It found no sandbox window becoming his foreground, none
+on his desktop, the input desktop staying Default, and the cursor never moving without real input. That is
+measured continuity of those four things during the run, nothing more. It is not a measurement that no game was
+running.
+
+The house's admission was read fresh before the job was created, and again before the job was used. By the
+postflight read it had lapsed. So whether admission held for the whole run is **unknown**, an explicit gap. Since
+this card, the fake script also re-reads admission once the child is live and records `admission_lapsed_mid_run`.
+It doesn't stop a run already live: an unwatched half-cleanup would be worse than finishing the job's own cleanup.
+
+**The first run predates measured provenance.** It explained members by the old `explain(pids)`, which took the
+fixture's own word for its grandchild. Its family verdict (`unknown`: the conhost processes were unexplained) still
+stands. Under the measured rules, whether conhost's recorded parent is the console program hasn't been run. Until a
+run measures it, a consumer must expect conhost members to be `unknown`.
 
 **Not yet run:** a real WebView2 engine, an engine report from a live control, the browser's public host, and the
 mail fake. Those are the consumers' native runs, each needing its own admission.

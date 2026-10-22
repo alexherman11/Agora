@@ -42,13 +42,13 @@ class FakeNative:
         self.io = {"total": 2, "active": 0, "terminated": 0, "read_ops": 3, "write_ops": 4, "other_ops": 0,
                    "read_bytes": 10, "write_bytes": 20, "other_bytes": 0}
 
-    def add(self, pid, image, cmd="", job=False, created=None):
-        self.procs[pid] = {"image": image, "created": created or pid * 10, "cmd": cmd}
+    def add(self, pid, image, cmd="", job=False, created=None, ppid=1):
+        self.procs[pid] = {"image": image, "created": created or pid * 10, "cmd": cmd, "ppid": ppid}
         if job:
             self.job.add(pid)
 
     def processes(self):
-        return [(pid, 1, p["image"]) for pid, p in self.procs.items()]
+        return [(pid, p["ppid"], p["image"]) for pid, p in self.procs.items()]
 
     def open(self, pid):
         if pid not in self.procs:
@@ -103,10 +103,11 @@ class Case(unittest.TestCase):
         self.n = FakeNative(self.root)
         self.scope = FakeScope(self.n)
         self.ours = PROFILE_ARG.format(root=self.root)
-        # a fake family: host 100 (python), engine 101, renderer 102, all in the job
-        self.n.add(100, "python.exe", "python host.py", job=True)
-        self.n.add(101, "msedgewebview2.exe", "msedgewebview2.exe " + self.ours, job=True)
-        self.n.add(102, "msedgewebview2.exe", "msedgewebview2.exe --type=renderer " + self.ours, job=True)
+        # a fake family: host 100 (python, the launcher's birth), engine 101 its child, renderer 102 the engine's
+        self.n.add(100, "python.exe", "python host.py", job=True, ppid=50)
+        self.n.add(101, "msedgewebview2.exe", "msedgewebview2.exe " + self.ours, job=True, ppid=100)
+        self.n.add(102, "msedgewebview2.exe", "msedgewebview2.exe --type=renderer " + self.ours, job=True, ppid=101)
+        self.birth = {"pid": 100, "created": 1000, "exe": "C:\\x\\python.exe"}
         # Alex's own Edge, outside the job, his own profile
         self.n.add(900, "msedge.exe", "msedge.exe --profile-directory=Default")
         self.n.desktops["agora-sandbox-t"] = [(101, True), (100, False)]
@@ -117,7 +118,7 @@ class Case(unittest.TestCase):
     def verifier(self, **run):
         spec = {"name": "t", "profile_roots": [str(self.root / "profile")],
                 "scratch_roots": [str(self.root / "scratch")], "watched_roots": [str(self.root / "repo")],
-                "explained": [100, 101, 102]}
+                "births": [self.birth]}
         spec.update(run)
         return nv.Verifier(spec, self.scope, native=self.n)
 
@@ -182,18 +183,68 @@ class Case(unittest.TestCase):
         self.assertEqual(r["family"]["status"], "unknown")
         self.assertIn("membership", " ".join(r["family"]["reasons"]))
 
-    def test_unexplained_member_is_unknown(self):
-        self.n.add(105, "cmd.exe", "cmd", job=True)
+    # -- provenance by measurement (c10251)
+    def test_members_are_explained_by_birth_and_measured_parent_chain(self):
+        r = self.whole(self.verifier())
+        prov = {m["pid"]: (m["provenance"], m["role"]) for m in r["family"]["evidence"]["members"]}
+        self.assertTrue(prov[100][0].startswith("birth receipt"))
+        self.assertEqual(prov[101], ("child of 100 (python.exe, process), created after it", "browser"))
+        self.assertEqual(prov[102][1], "renderer")
+        self.assertEqual(r["family"]["status"], "observed", r["family"])
+
+    def test_console_host_is_explained_only_by_its_measured_parent(self):
+        self.n.add(103, "conhost.exe", "\\??\\C:\\WINDOWS\\system32\\conhost.exe 0xffffffff -ForceV1", job=True,
+                   ppid=100)
+        r = self.whole(self.verifier())
+        m = [m for m in r["family"]["evidence"]["members"] if m["pid"] == 103][0]
+        self.assertEqual((m["role"], m["provenance"][:12]), ("console host", "child of 100"))
+        self.assertEqual(r["family"]["status"], "observed")
+
+    def test_member_whose_parent_was_never_a_job_member_is_unknown(self):
+        self.n.add(105, "conhost.exe", "conhost", job=True, ppid=777)       # e.g. made by a broker outside the job
         r = self.whole(self.verifier())
         self.assertEqual(r["family"]["status"], "unknown")
-        self.assertIn("nobody explained", " ".join(r["family"]["reasons"]))
+        self.assertIn("parent 777 was never seen", " ".join(r["family"]["reasons"]))
+
+    def test_reused_parent_pid_does_not_explain(self):
+        self.n.add(106, "cmd.exe", "cmd", job=True, ppid=102, created=500)   # 'parent' 102 was created later (1020)
+        r = self.whole(self.verifier())
+        self.assertEqual(r["family"]["status"], "unknown")
+        self.assertIn("reused pid", " ".join(r["family"]["reasons"]))
+
+    def test_a_birth_receipt_must_match_the_measured_identity(self):
+        v = self.verifier(births=[{"pid": 100, "created": 999, "exe": "C:\\x\\python.exe"}])
+        r = self.whole(v)
+        self.assertEqual(r["family"]["status"], "unknown")
+        self.assertIn("creation time or image differ", " ".join(r["family"]["reasons"]))
+
+    def test_no_birth_means_nothing_is_explained(self):
+        r = self.whole(self.verifier(births=[]))
+        self.assertEqual(r["family"]["status"], "unknown")
+        self.assertEqual(len([x for x in r["family"]["reasons"] if "no measured provenance" in x]), 3)
+
+    def test_a_pid_label_is_not_a_birth(self):
+        v = self.verifier(births=[])
+        with self.assertRaisesRegex(ValueError, "birth"):
+            v.add_birth({"pid": 100})
+        with self.assertRaisesRegex(ValueError, "birth"):
+            v.add_birth(100)
+        self.assertFalse(hasattr(v, "explain"))
 
     def test_engine_report_binds_browser_pid_and_effective_folder(self):
         good = {"browser_pid": 101, "user_data_folder": str(self.root / "profile" / "EBWebView"),
-                "processes": [{"pid": 101, "kind": "browser"}, {"pid": 102, "kind": "renderer"}]}
-        v = self.verifier(explained=[100], require_engine_report=True)
+                "processes": [{"pid": 101, "kind": "Browser"}, {"pid": 102, "kind": "Renderer"}]}
+        v = self.verifier(require_engine_report=True)
         v.engine_report = lambda: good
         self.assertEqual(self.whole(v)["family"]["status"], "observed")
+
+    def test_engine_report_kind_against_measured_role(self):
+        v = self.verifier(require_engine_report=True)
+        v.engine_report = lambda: {"browser_pid": 101, "user_data_folder": str(self.root / "profile"),
+                                   "processes": [{"pid": 102, "kind": "GpuProcess"}]}
+        r = self.whole(v)
+        self.assertEqual(r["family"]["status"], "unknown")
+        self.assertIn("own command line says 'renderer'", " ".join(r["family"]["reasons"]))
 
     def test_engine_report_with_browser_outside_the_job(self):
         self.n.add(800, "msedgewebview2.exe", "msedgewebview2.exe --user-data-dir=c:\\elsewhere")
@@ -266,17 +317,65 @@ class Case(unittest.TestCase):
         r = self.whole(self.verifier())
         self.assertEqual(r["network"]["status"], "violation")
 
+    def allowed(self):
+        return nv.resolve_allowed("example.org", 443, lookup=lambda h, p, proto: [
+            (2, 1, 6, "", ("93.184.215.14", 443)), (23, 1, 6, "", ("2606:2800:21f:cb07::1", 443, 0, 0))],
+            wall=lambda: 12345.0)
+
+    def test_resolved_allowlist_keeps_host_port_and_dns_provenance(self):
+        e = self.allowed()
+        self.assertEqual((e["host"], e["port"], e["ips"], e["resolved_at"]),
+                         ("example.org", 443, ["2606:2800:21f:cb07::1", "93.184.215.14"], 12345.0))
+        self.assertIn("getaddrinfo", e["how"])
+
     def test_browser_allowlist_one_public_host(self):
         self.n.tcp_rows = [(101, 5, "10.0.0.2", 50000, "93.184.215.14", 443),
                            (101, 11, "0.0.0.0", 0, "0.0.0.0", 0)]
-        r = self.whole(self.verifier(allow_remote=[["93.184.215.14", 443]]))
+        r = self.whole(self.verifier(allow_remote=[self.allowed()]))
         self.assertEqual(r["network"]["status"], "observed", r["network"])
-        self.assertIn("hostname", " ".join(r["network"]["not_proven"]))
+        self.assertIn("network.hostname", r["network"]["not_proven_keys"])
+        self.assertEqual(r["network"]["evidence"]["remote_endpoints"], [["93.184.215.14", 443, "example.org"]])
+
+    def test_bare_ip_allowlist_has_no_provenance_and_is_unknown(self):
+        self.n.tcp_rows = [(101, 5, "10.0.0.2", 50000, "93.184.215.14", 443)]
+        r = self.whole(self.verifier(allow_remote=[["93.184.215.14", 443]]))
+        self.assertEqual(r["network"]["status"], "violation")       # not allowed, and the entry itself is unknown
+        self.assertIn("without host/port/DNS provenance", " ".join(r["network"]["reasons"]))
+
+    def test_allowed_ip_on_another_port_is_a_violation(self):
+        self.n.tcp_rows = [(101, 5, "10.0.0.2", 50000, "93.184.215.14", 80)]
+        self.assertEqual(self.whole(self.verifier(allow_remote=[self.allowed()]))["network"]["status"], "violation")
 
     def test_second_host_is_a_violation_even_for_the_browser(self):
         self.n.tcp_rows = [(102, 5, "10.0.0.2", 50001, "203.0.113.9", 443)]
-        r = self.whole(self.verifier(allow_remote=[["93.184.215.14", 443]]))
+        r = self.whole(self.verifier(allow_remote=[self.allowed()]))
         self.assertEqual(r["network"]["status"], "violation")
+
+    # -- limits a consumer needs proven (c10251)
+    def test_must_prove_refuses_interaction_while_the_limit_stands(self):
+        r = self.whole(self.verifier(must_prove=["writes.transient"]))
+        self.assertEqual(r["writes"]["status"], "observed")
+        self.assertFalse(r["allow_interaction"])
+        self.assertEqual(r["blocking_limits"], ["writes.transient"])
+
+    def test_must_prove_unknown_key_fails_closed(self):
+        r = self.whole(self.verifier(must_prove=["writes.transiant"]))
+        self.assertEqual(r["blocking_limits"], ["writes.transiant"])
+        self.assertFalse(r["allow_interaction"])
+
+    def test_gate_judges_must_prove_on_the_checks_it_judges(self):
+        v = self.verifier(must_prove=["writes.transient"])
+        v.before()
+        self.assertTrue(v.gate()["allow_interaction"])           # writes are not judged at the gate
+        v2 = self.verifier(must_prove=["network.udp_remotes"])
+        v2.before()
+        self.assertEqual(v2.gate()["blocking_limits"], ["network.udp_remotes"])
+
+    def test_every_limit_has_a_key(self):
+        r = self.whole(self.verifier())
+        for k in ("family", "windows", "network", "writes"):
+            self.assertEqual(len(r[k]["not_proven"]), len(r[k]["not_proven_keys"]))
+            self.assertTrue(all(x.startswith(k + ".") for x in r[k]["not_proven_keys"]))
 
     def test_listen_beyond_loopback_is_a_violation(self):
         self.n.tcp_rows = [(100, 2, "0.0.0.0", 9222, "0.0.0.0", 0)]

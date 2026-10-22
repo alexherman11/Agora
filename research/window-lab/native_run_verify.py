@@ -6,7 +6,8 @@ observes four things, read-only, and says for each what it observed and what it 
   family    every member of the held job, by identity; no process outside the job names the run's profile (before
             launch: an engine already holding it would be reused; during: an out-of-job or brokered engine; after
             cleanup: a survivor); the consumer's own engine report (WebView2 BrowserProcessId, effective
-            UserDataFolder, process list) bound to job members; job members nobody explained
+            UserDataFolder, process list) cross-checked against job members and their measured roles; job members
+            with no measured provenance (birth receipt, or a measured parent chain) are unknown
   windows   top-level windows on the hidden sandbox desktop owned by job members, and an explicitly scoped
             observation of the Default desktop (owner PIDs only: no titles, no pixels) finding none of ours
   network   TCP endpoints (GetExtendedTcpTable, v4 and v6) and UDP bindings (GetExtendedUdpTable) owned by job
@@ -49,23 +50,64 @@ LISTEN = 2
 TCP_STATES = {1: "closed", 2: "listen", 3: "syn-sent", 4: "syn-received", 5: "established", 6: "fin-wait-1",
               7: "fin-wait-2", 8: "close-wait", 9: "closing", 10: "last-ack", 11: "time-wait", 12: "delete-tcb"}
 
+# What each check cannot prove, by a stable key. A consumer names the keys it needs proven in run["must_prove"]; any of
+# them present in a judged check refuses interaction (c10251), and a key the verifier does not know refuses too.
 NOT_PROVEN = {
-    "family": ["processes started outside this job by a broker, service or WMI that never name the profile on "
-               "their command line", "membership between samples (a member that lived only between two samples)"],
-    "windows": ["windows that existed only between samples", "desktops other than the sandbox and Default "
-                "(other window stations, secure desktop)", "message-only windows (no desktop)"],
-    "network": ["connections opened and closed between samples", "UDP and QUIC remote endpoints (only local "
-                "bindings are visible)", "traffic made for the job by processes outside it (DNS in the Dnscache "
-                "service, BITS, the WebView2 updater)", "that a remote IP is the allowed hostname (IPs only)"],
-    "writes": ["files written then deleted or reverted within the run", "writes outside the scanned roots",
-               "which job process made which write (I/O totals name no path)", "writes by processes outside the "
-                                                                                 "job made on its behalf"],
+    "family": {
+        "family.brokered": "processes started outside this job by a broker, service or WMI that never name the "
+                           "profile on their command line",
+        "family.between_samples": "membership between samples (a member that lived only between two samples)",
+    },
+    "windows": {
+        "windows.between_samples": "windows that existed only between samples",
+        "windows.other_desktops": "desktops other than the sandbox and Default (other window stations, secure "
+                                  "desktop)",
+        "windows.message_only": "message-only windows (no desktop)",
+    },
+    "network": {
+        "network.between_samples": "connections opened and closed between samples",
+        "network.udp_remotes": "UDP and QUIC remote endpoints (only local bindings are visible)",
+        "network.brokered": "traffic made for the job by processes outside it (DNS in the Dnscache service, BITS, "
+                            "the WebView2 updater)",
+        "network.hostname": "that a remote IP is the allowed hostname (an IP matched the harness's own resolution "
+                            "of it, kept with its provenance)",
+        "network.urls": "URLs, redirects, workers and frames (sockets show endpoints, not requests)",
+    },
+    "writes": {
+        "writes.transient": "files written then deleted or reverted within the run",
+        "writes.unscanned": "writes outside the scanned roots",
+        "writes.attribution": "which job process made which write (I/O totals name no path)",
+        "writes.brokered": "writes by processes outside the job made on its behalf",
+    },
 }
+ALL_LIMITS = {k for d in NOT_PROVEN.values() for k in d}
 
 
 def check(status, observed, evidence=None, reasons=None, not_proven=None):
-    return {"status": status, "observed": observed, "not_proven": list(not_proven or []),
-            "reasons": list(reasons or []), "evidence": evidence or {}}
+    limits = dict(not_proven or {})
+    return {"status": status, "observed": observed, "not_proven": list(limits.values()),
+            "not_proven_keys": list(limits), "reasons": list(reasons or []), "evidence": evidence or {}}
+
+
+def role_of(image, command_line):
+    """A member's role, measured from its own image and command line (only this word is kept)."""
+    image = image.lower()
+    if image == "conhost.exe":
+        return "console host"
+    m = re.search(r"--type=([\w-]+)", command_line or "")
+    if m:
+        return m.group(1)
+    return "browser" if image in ENGINE_IMAGES else "process"
+
+
+def resolve_allowed(host, port, *, lookup=socket.getaddrinfo, wall=time.time):
+    """One allowlist entry, resolved by the harness before launch, keeping its provenance: the host, port, the
+    addresses this resolver gave, when, and how. An endpoint matching it is 'an address the harness resolved for host',
+    never proof that the connection was to that host (network.hostname stays not proven)."""
+    infos = lookup(host, port, proto=socket.IPPROTO_TCP)
+    ips = sorted({i[4][0] for i in infos})
+    return {"host": host, "port": port, "ips": ips, "resolved_at": wall(), "how": "socket.getaddrinfo, system "
+            "resolver, before launch"}
 
 
 def worst(statuses):
@@ -417,8 +459,13 @@ class Verifier:
     run: {"name": sandbox name, "profile_roots": [...], "scratch_roots": [...] (both run-owned, hashed),
           "watched_roots": [...] (metadata only, the repo and any user-profile paths the run names),
           "exclude": [...] (the harness's own receipts, under a watched root), "engine_images": [...],
-          "allow_remote": [[ip, port|None], ...], "allow_loopback": bool,
-          "require_engine_report": bool, "explained": [pids the harness started or knows]}
+          "allow_remote": [resolve_allowed(host, port), ...] (host, port, ips and DNS provenance; a bare [ip, port]
+          has no provenance and is unknown), "allow_loopback": bool, "require_engine_report": bool,
+          "births": [{"pid", "created", "exe"}] (the launcher's measured birth receipts, sandbox_window's manifest
+          "owners"), "must_prove": [NOT_PROVEN keys this consumer needs proven; each one present refuses]}
+    A member is explained only by measurement: it matches a birth receipt (pid, creation time, image path), or its
+    recorded parent pid is an explained member created no later than it. Its role is read from its own command line
+    (role_of). Nothing a caller says about a pid explains it.
     engine_report(): {"browser_pid": int, "user_data_folder": str, "processes": [{"pid": int, "kind": str}]} or
           None, read by the consumer from its actual WebView2 control (BrowserProcessId, UserDataFolder,
           GetProcessInfos). The verifier never reaches into the engine itself.
@@ -431,7 +478,8 @@ class Verifier:
         self.run.setdefault("allow_loopback", False)
         self.run.setdefault("watched_roots", [])
         self.run.setdefault("exclude", [])
-        self.run.setdefault("explained", [])
+        self.run.setdefault("must_prove", [])
+        births = self.run.pop("births", []) or []
         self.scope, self.native = scope, native or Native()
         self.engine_report = engine_report
         self.clock, self.wall = clock, wall
@@ -443,11 +491,18 @@ class Verifier:
         self._stop, self._thread, self._lock = threading.Event(), None, threading.Lock()
         self.interval = None
         self.reports = []
+        self.births = []
+        for b in births:
+            self.add_birth(b)
 
-    def explain(self, *pids):
-        """The harness names members it knows (its births, a fixture's own report of its children)."""
+    def add_birth(self, birth):
+        """A launcher's measured birth receipt: {"pid": int, "created": FILETIME int, "exe": absolute path}. It explains
+        a member only if the verifier's own reading of that member has the same creation time and image."""
+        if not (isinstance(birth, dict) and type(birth.get("pid")) is int and type(birth.get("created")) is int
+                and isinstance(birth.get("exe"), str) and ntpath.isabs(birth["exe"])):
+            raise ValueError("a birth is the launcher's receipt: pid, created and an absolute exe")
         with self._lock:
-            self.run["explained"] = list(self.run["explained"]) + [p for p in pids if type(p) is int]
+            self.births.append({"pid": birth["pid"], "created": birth["created"], "exe": path_key(birth["exe"])})
 
     # bookkeeping
     def _bad(self, check_name, what):
@@ -461,11 +516,11 @@ class Verifier:
                 self.unknowns[check_name].append(what)
 
     # outside the job: who names our profile?
-    def outside_with_profile(self, members):
+    def outside_with_profile(self, members, procs=None):
         """-> (pids naming our profile outside the job, unreadable engine-named pids). Nothing is stored but pids."""
         n, images = self.native, {i.lower() for i in self.run["engine_images"]}
         named, unreadable = [], []
-        for pid, _, image in n.processes():
+        for pid, _, image in (n.processes() if procs is None else procs):
             if pid in members or pid in (0, 4) or image.lower() not in images:
                 continue
             try:
@@ -524,6 +579,12 @@ class Verifier:
             self.samples.append(s)
             return s
         members = set(snap["pids"])
+        try:
+            procs = n.processes()
+        except OSError as exc:
+            procs = None
+            self._unknown("family", f"process list failed at a sample: {error(exc)}")
+        parents = {pid: (ppid, image) for pid, ppid, image in procs or []}
         for pid in snap["pids"]:
             try:
                 h = n.open(pid)
@@ -539,9 +600,17 @@ class Verifier:
                     self._unknown("family", f"pid {pid} from the job list is not in the job on its own handle "
                                             f"(reused between list and open)")
                     continue
-                rec = self.members.setdefault(pid, {"created": ident[0], "exe": ntpath.basename(ident[1]),
-                                                    "first": s["t"]})
-                if rec["created"] != ident[0]:
+                rec = self.members.get(pid)
+                if rec is None:
+                    # first sight: parent pid (Toolhelp, as recorded at its creation) and role (its own command line)
+                    try:
+                        role = role_of(ntpath.basename(ident[1]), n.command_line(h))
+                    except OSError:
+                        role = None
+                    rec = self.members[pid] = {"created": ident[0], "exe": ntpath.basename(ident[1]),
+                                               "path": ident[1], "ppid": (parents.get(pid) or (None,))[0],
+                                               "role": role, "first": s["t"]}
+                elif rec["created"] != ident[0]:
                     self._unknown("family", f"pid {pid} changed identity while in the job list")
                 rec["last"] = s["t"]
             except OSError as exc:
@@ -550,7 +619,9 @@ class Verifier:
                 n.close(h)
         # 2. outside the job, naming our profile
         try:
-            named, unreadable = self.outside_with_profile(members)
+            if procs is None:
+                raise OSError("process list unavailable")
+            named, unreadable = self.outside_with_profile(members, procs)
             for p in named:
                 self._bad("family", f"{p['image']} pid {p['pid']} names the run's profile outside the job "
                                     f"(out-of-job or reused engine)")
@@ -596,8 +667,20 @@ class Verifier:
         self.samples.append(s)
         return s
 
+    def _allow(self):
+        """{(ip, port): host} from entries that keep their provenance; an entry without it is unknown, never allowed."""
+        allow = {}
+        for e in self.run["allow_remote"]:
+            if (isinstance(e, dict) and e.get("host") and type(e.get("port")) is int and e.get("ips")
+                    and e.get("resolved_at") and e.get("how")):
+                for ip in e["ips"]:
+                    allow[(ip, e["port"])] = e["host"]
+            else:
+                self._unknown("network", f"allowlist entry without host/port/DNS provenance, not used: {e!r}"[:200])
+        return allow
+
     def _judge_net(self, tcp, udp):
-        allow = {(a, p) for a, p in self.run["allow_remote"]}
+        allow = self._allow()
         loop = self.run["allow_loopback"]
         for pid, st, la, lp, ra, rp in tcp:
             where = f"pid {pid} {TCP_STATES.get(st, st)} {la}:{lp} -> {ra}:{rp}"
@@ -613,7 +696,7 @@ class Verifier:
                 if not loop:
                     self._bad("network", f"loopback connection, not allowed for this run: {where}")
                 continue
-            if (ra, rp) not in allow and (ra, None) not in allow:
+            if (ra, rp) not in allow:
                 self._bad("network", f"remote endpoint not in the allowlist: {where}")
         for pid, la, lp in udp:
             if is_loopback(la):
@@ -633,9 +716,15 @@ class Verifier:
             self._unknown("family", "engine report has no effective user data folder")
         elif not under(folder, self.run.get("profile_roots", [])):
             self._bad("family", "the engine's effective user data folder is not the run's profile")
+        def norm(kind):
+            return re.sub(r"[^a-z]", "", str(kind or "").lower()).replace("process", "")
         for p in rep.get("processes") or []:
             if p.get("pid") not in members:
                 self._bad("family", f"engine process {p.get('pid')} ({p.get('kind')}) is not in the job")
+            elif p.get("pid") in self.members and self.members[p["pid"]]["role"] is not None and \
+                    norm(p.get("kind")) != norm(self.members[p["pid"]]["role"]):
+                self._unknown("family", f"engine process {p['pid']} is reported as {p.get('kind')!r} but its own "
+                                        f"command line says {self.members[p['pid']]['role']!r}")
 
     def start_sampling(self, interval=0.1):
         self.interval = interval
@@ -701,7 +790,13 @@ class Verifier:
         out["writes"] = self._writes() if final else check(UNKNOWN, "not compared yet: writes are compared after "
                                                                     "cleanup", {}, [], NOT_PROVEN["writes"])
         judged = ("family", "windows", "network", "writes") if final else ("family", "windows", "network")
-        out["allow_interaction"] = all(out[k]["status"] == OBSERVED for k in judged)
+        # c10251: a limit this consumer needs proven refuses interaction while any judged check still lists it; a key
+        # the verifier does not know refuses too (fail closed on a typo)
+        need = list(self.run["must_prove"])
+        out["blocking_limits"] = sorted({k for k in need if k not in ALL_LIMITS} |
+                                        {k for c in judged for k in out[c]["not_proven_keys"] if k in need})
+        out["allow_interaction"] = (all(out[k]["status"] == OBSERVED for k in judged)
+                                    and not out["blocking_limits"])
         out["coverage"] = self._coverage()
         return out
 
@@ -727,21 +822,54 @@ class Verifier:
         if self.run.get("require_engine_report") and not self.reports:
             extra.append("the consumer's engine report (BrowserProcessId, UserDataFolder, process list) was "
                          "required and never given")
-        explained = set(self.run["explained"]) | {r["browser_pid"] for r in self.reports
-                                                  if type(r.get("browser_pid")) is int}
-        for r in self.reports:
-            explained |= {p.get("pid") for p in r.get("processes") or []}
-        unexplained = sorted(p for p in self.members if p not in explained)
-        if unexplained:
-            extra.append(f"job members nobody explained (neither the harness's births nor the engine report): "
-                         f"{[(p, self.members[p]['exe']) for p in unexplained]}")
+        how, why = self.provenance()
+        for pid in sorted(why):
+            extra.append(f"job member {pid} ({self.members[pid]['exe']}, {self.members[pid]['role']}) has no measured "
+                         f"provenance: {why[pid]}")
         status, unk = self._status("family", extra)
-        members = [{"pid": p, **{k: v for k, v in m.items() if k in ("created", "exe")}}
-                   for p, m in sorted(self.members.items())]
+        members = [{"pid": p, "created": m["created"], "exe": m["exe"], "role": m["role"], "ppid": m["ppid"],
+                    "provenance": how.get(p)} for p, m in sorted(self.members.items())]
         return check(status, f"{len(members)} distinct job member(s) over {len(good)} sample(s); outside processes "
                              f"named {self.run['engine_images']} checked for the profile before launch, at every "
                              f"sample and after cleanup", {"members": members, "reports": len(self.reports)},
                      self.findings["family"] + unk, NOT_PROVEN["family"])
+
+    def provenance(self):
+        """-> ({pid: how it is explained}, {pid: why it is not}), by measurement only. A birth explains the member whose
+        pid, creation time and image path the verifier itself read; a child is explained when its recorded parent pid
+        is an explained member created no later than it (a later-created holder of that pid is a reuse, not the
+        parent). Parent pids come from Toolhelp; roles from each member's own command line."""
+        how, why = {}, {}
+        for pid, m in self.members.items():
+            for b in self.births:
+                if b["pid"] == pid:
+                    if (b["created"], b["exe"]) == (m["created"], path_key(m["path"])):
+                        how[pid] = "birth receipt (pid, creation time and image match)"
+                    else:
+                        why[pid] = "a birth receipt names this pid but its creation time or image differ"
+        changed = True
+        while changed:
+            changed = False
+            for pid, m in self.members.items():
+                if pid in how or pid in why:
+                    continue
+                parent = self.members.get(m["ppid"])
+                if parent is not None and m["ppid"] in how and parent["created"] <= m["created"]:
+                    how[pid] = f"child of {m['ppid']} ({parent['exe']}, {parent['role']}), created after it"
+                    changed = True
+        for pid, m in self.members.items():
+            if pid in how or pid in why:
+                continue
+            parent = self.members.get(m["ppid"])
+            if m["ppid"] is None:
+                why[pid] = "its parent pid was not read"
+            elif parent is None:
+                why[pid] = f"its recorded parent {m['ppid']} was never seen as a job member"
+            elif parent["created"] > m["created"]:
+                why[pid] = f"pid {m['ppid']} was created after it (a reused pid, not its parent)"
+            else:
+                why[pid] = f"its parent {m['ppid']} is itself unexplained"
+        return how, why
 
     def _windows(self):
         extra = [] if any("windows" in s for s in self.samples) else ["no desktop was enumerated"]
@@ -760,10 +888,17 @@ class Verifier:
         status, unk = self._status("network", extra)
         endpoints = sorted({(r[4], r[5]) for s in self.samples for r in s.get("tcp", [])
                             if r[1] != LISTEN and not is_unspecified(r[4])})
+        allow = {}
+        for e in self.run["allow_remote"]:
+            if isinstance(e, dict) and type(e.get("port")) is int:
+                for ip in e.get("ips") or []:
+                    allow[(ip, e["port"])] = e.get("host")
         cov = self._coverage()
         return check(status, f"TCP endpoints and UDP bindings of job members (and of out-of-job profile holders) at "
                              f"{cov['samples']} sample(s), requested every {self.interval} s, largest gap "
-                             f"{cov['max_gap_s']} s", {"remote_endpoints": [list(e) for e in endpoints],
+                             f"{cov['max_gap_s']} s", {"remote_endpoints": [
+                                 [ip, port, ("loopback" if is_loopback(ip) else allow.get((ip, port)))]
+                                 for ip, port in endpoints],
                                                        "allow_remote": self.run["allow_remote"],
                                                        "allow_loopback": self.run["allow_loopback"]},
                      self.findings["network"] + unk, NOT_PROVEN["network"])
