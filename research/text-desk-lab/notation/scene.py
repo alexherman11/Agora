@@ -325,7 +325,7 @@ SOURCES = {
     "sayings": ("sayings [for:<name>] [in:<id>] (or involving:<name>)",
                 ("item", "what", "saying", "by", "name", "at", "in", "to", "said",
                  "answered", "edited", "before", "state", "eid", "thread",
-                 "source", "line", "reply_to", "mark", "context", "context_summary")),
+                 "source", "line", "reply_to", "mark", "context", "context_summary", "awaiting")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
     "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid", "seq")),   # and each line's own fields
@@ -637,7 +637,7 @@ def saying_rows(desk, terms="", early=None):
                             "line": line["id"] if line else "", "_t": (at or "", _enum(eid)),
                             "source": sid, "thread": "",
                             "reply_to": line.get("reply_to", "") if line else "",
-                            "mark": "", "context": ""}
+                            "mark": "", "context": "", "awaiting": ""}
                 # An authored field may describe a line, never forge its identity,
                 # author, recipients, source or presentation bookkeeping.
                 if line:
@@ -697,7 +697,8 @@ def saying_rows(desk, terms="", early=None):
                         "eid": e["id"] if e else c["id"], "chat": s["title"], "who": by, "open": flip.get(answered, ""),
                         "index": i + 1, "line": "", "_t": (at or "", _enum(e["id"] if e else "")),
                         "source": sid, "thread": c["id"], "reply_to": "",
-                        "mark": "", "context": ""})
+                        "mark": c.get("mark", ""), "context": "",
+                        "awaiting": ("yes" if 0 in rooms.thread_waiting(w, c, me) else "no") if me else ""})
         # Replies are sayings in their own right: a return message to the opening
         # author must reach For you even though their own opening comment does not.
         for c in cs:
@@ -724,7 +725,8 @@ def saying_rows(desk, terms="", early=None):
                             "before": "", "state": "resolved" if c.get("resolved") else "open", "eid": eid,
                             "chat": s["title"], "who": by, "open": flip.get(answered, ""), "index": i, "thread": c["id"],
                             "line": "", "_t": (at or "", _enum(eid)),
-                            "source": sid, "reply_to": "", "mark": "", "context": ""})
+                            "source": sid, "reply_to": "", "mark": reply.get("mark", ""), "context": "",
+                            "awaiting": ("yes" if i in rooms.thread_waiting(w, c, me) else "no") if me else ""})
     out.sort(key=lambda r: r.pop("_t"))
     if involving:
         target = persons.resolve(w, involving)[0] if persons.on(w) else None

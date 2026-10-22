@@ -1,0 +1,4 @@
+look f5189 :1
+do create f5189 kind=task title="Copy check a8911 r3: led by JEFF, asked by Juniper" asked_by=juniper lead=jeff commission=working
+do create f5189 kind=task title="Copy check a8911 r3: led by JEFF, asked by Alex" asked_by=alex lead=jeff commission=working
+do create f5189 kind=task title="Copy check a8911 r3: asked by a non-resident" asked_by=codex commission=working
