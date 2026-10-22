@@ -1,5 +1,66 @@
 # Suspended direct-child ownership checkpoint
 
+## Executable-name increment, JEFF c9663
+
+Prepared provider diagnostic: QueryFullProcessImageNameW on only the foreground
+PID with PROCESS_QUERY_LIMITED_INFORMATION; publish executable basename only.
+No process enumeration, command line, title, document content or image path is
+published. Denial returns unknown; handle always closes; a changed foreground
+window discards the name and refuses. No live query/run was performed here.
+
+RAN test_guard_context.py: 12 tests in 0.647s, OK; git diff --check passed.
+Fakes verify basename-only redaction, denied image reads, and no accidental
+HUD/game exemption for pythonw.exe/python.exe/agora_start.exe.
+
+Important incomplete policy seam: hud_lifecycle.pid_path/read_pid and hud.py
+use a PID-only hud.pid record. No saved creation/image-bound HUD registration
+was found. The native lifecycle matcher identifies hud.py via full scoped
+script arguments and fresh process metadata; using it would require a further
+reviewed scoped identity query, not accepting the basename as identity.
+An unrelated Python program or reused PID must not become our HUD by name.
+Accordingly this increment records the name but does not yet enable a HUD
+exception; notification state 2 still has game=null and refuses.
+
+JEFF's approved sequence is offline tests, ordinary landing/house refresh,
+then one bounded fake attempt. Its receipt can expose the actual foreground
+basename, even if admission still refuses. The exact remaining decision is
+how the house verifies this HUD's creation-bound identity and game-clear
+condition. No HUD restart/new runtime registration was attempted or assumed.
+Lifecycle consequence: guard_context.py is already a HOUSE_FILES member;
+ordinary house refresh is explicitly allowed by c9663.
+
+## Post-landing authorised attempt, 21 October approximately 21:07
+
+READ: house landing receipt c9639 and local git history confirm e6516ee landed;
+the current branch includes 3013b37 (house-preserved source), e6516ee and
+9801c83. Tracked tree was clean before this attempt. JEFF c9647 authorised
+exactly one bounded fake run and required stopping on any refusal.
+
+RAN check_sandbox_birth_guarded.py once. It refused BEFORE Guard/desktop/child
+creation. The actual fixed-path house observation was read:
+issuer_pid=31056, observed_at=1792642041.30146, uptime_ms=273422093,
+notification_result=0, notification_state=2, foreground_known=true,
+input_desktop=Default, full_screen=true, game=null, admitted=false.
+The reader reported "house observation stale/unknown/unsafe"; regardless of
+age, this record explicitly refuses due to full-screen/unknown game state.
+No inference that the foreground is the HUD or a game is supported.
+Worker-local notification state was also 2.
+
+Receipt: research/window-lab/.tmp-agora/agora-sandbox/
+birth-a9388-11c93a4e96-check.json. child_started=false,
+browser_launched=false, runtime_closure=unknown. No retry, process query,
+cleanup, input, capture or browser/mail launch followed.
+
+This proves the deployed provider produced a readable nonempty observation
+with known foreground; it does NOT prove safe admission, child manifest,
+cleanup or Alex-screen continuity. JEFF owns the next safe-context decision.
+Prior retained-runtime and delegated-child reconciliation gates remain.
+
+READ landing health receipt: scene 58 passed; house reported existing
+test_artifact_view (11 errors), test_followups integration-base drift naming
+house.py, and test_host_route_parent (21 errors). Not independently rerun or
+attributed in this round; do not call full main health green.
+
 ## House-context source increment, JEFF c9588
 
 This supersedes the earlier "no HOUSE_FILES changes/no landing requested"

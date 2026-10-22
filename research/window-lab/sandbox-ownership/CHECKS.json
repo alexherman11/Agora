@@ -1,4 +1,36 @@
 {
+  "executable_increment": {
+    "authority": "JEFF c9663",
+    "status": "source prepared; no new live run",
+    "tests": "test_guard_context.py: 12 tests in 0.647s OK",
+    "diff_check": "passed",
+    "guard_context.py": "5081a19d5f5756efb9117cfa4c75fa92edd616a3f5eb1d8aae6fb3a747efe187",
+    "test_guard_context.py": "e8117d792bb9b74a9c3aafcc59e764a6fbcc4d2e4b144d59334b67f3b1d56166",
+    "hud_exception": "not enabled: PID/name alone is not verified HUD identity; game remains unknown at state 2"
+  },
+  "post_landing_attempt": {
+    "landed": "e6516ee",
+    "authority": "JEFF c9647",
+    "attempts": 1,
+    "house_observation": {
+      "schema": "house-guard-context-v1",
+      "issuer": "house",
+      "issuer_pid": 31056,
+      "observed_at": 1792642041.30146,
+      "uptime_ms": 273422093,
+      "notification_result": 0,
+      "notification_state": 2,
+      "foreground_known": true,
+      "input_desktop": "Default",
+      "full_screen": true,
+      "game": null,
+      "admitted": false
+    },
+    "child_started": false,
+    "runtime_closure": "unknown",
+    "result": "refused before desktop/Guard/child creation",
+    "receipt": "research/window-lab/.tmp-agora/agora-sandbox/birth-a9388-11c93a4e96-check.json"
+  },
   "resumed_guarded": {
     "authority": "JEFF c9582",
     "attempts": 1,

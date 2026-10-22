@@ -66,10 +66,15 @@ class ContextTests(unittest.TestCase):
         def state(ptr):
             ptr._obj.value=5
             return 0
+        def image(handle, flags, buf, size):
+            buf.value=r"C:\private\path\pythonw.exe"
+            return True
         user.GetUserObjectInformationW.side_effect=desktop
         user.GetWindowThreadProcessId.side_effect=pid
         shell.SHQueryUserNotificationState.side_effect=state
         kernel.GetTickCount64.return_value=100000
+        kernel.OpenProcess.return_value=1
+        kernel.QueryFullProcessImageNameW.side_effect=image
         dlls={"user32":user,"kernel32":kernel,"shell32":shell}
         with patch.object(ctypes,"WinDLL",side_effect=lambda name,**kw:dlls[name]), \
              patch.object(g.time,"time",return_value=100):
@@ -84,9 +89,31 @@ class ContextTests(unittest.TestCase):
                 shell.SHQueryUserNotificationState.side_effect=blocked
                 observation=g.observe()
                 self.assertFalse(observation["admitted"])
+                self.assertEqual(observation["foreground_exe"],"pythonw.exe")
+                self.assertNotIn("private",json.dumps(observation))
                 if n==3:
                     self.assertTrue(observation["game"])
             self.assertTrue(user.CloseDesktop.called)
+
+    def test_executable_diagnostics_never_grant_hud_or_game_exception(self):
+        for exe in ("pythonw.exe","python.exe","agora_start.exe","game.exe","unknown"):
+            for state in (2,3,7):
+                data={**self.clear(),"foreground_exe":exe,"notification_state":state,
+                      "full_screen":True,"game":None,"admitted":True}
+                self.assertFalse(g.validate(data,101,101000))
+
+    def test_executable_denial_and_zero_pid_are_unknown(self):
+        kernel=Mock()
+        kernel.OpenProcess.return_value=None
+        with patch.object(ctypes,"WinDLL",return_value=kernel):
+            self.assertEqual(g.executable_name(0),"unknown")
+            kernel.OpenProcess.assert_not_called()
+            self.assertEqual(g.executable_name(77),"unknown")
+            kernel.CloseHandle.assert_not_called()
+            kernel.OpenProcess.return_value=123
+            kernel.QueryFullProcessImageNameW.return_value=False
+            self.assertEqual(g.executable_name(77),"unknown")
+            kernel.CloseHandle.assert_called_once_with(123)
 
     def test_fixed_non_worker_location(self):
         self.assertNotIn(".worktrees",str(g.location()))
