@@ -164,7 +164,12 @@ PAINT_WORDS += ("remember",)  # reading scope, viewer hands only; never drafts o
 # pop (a5941): Pop out was pressed on a film or picture a `media` text draws, $value its path as written
 # double (a5994): the part was double-clicked (a panel's title fills the space, and again gives it back)
 # pick (a6431): a part of a `page` was pointed at (a long press, or a tap when `picks`), $value its name, $part its key
-GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop", "double", "capture", "pick")
+GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "link", "pop", "double", "capture", "pick",
+            "spoken")
+# a8901: `on spoken do <command>` / `on spoken host <verb> [words]`: the painter acts when the part is painted with
+# words it has not acted on before (once per distinct filled line, $value the part's words), and only inside the home
+# base, whose voice (research/window-lab/voice.py) made them; a desk command goes with a gesture id made from the
+# filled line, so the door refuses a repeat from another page or a reload ('already done')
 DROP_SIDES = ("left", "right", "top", "bottom")
 # 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
 # too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
@@ -320,10 +325,10 @@ SOURCES = {
     "sayings": ("sayings [for:<name>] [in:<id>] (or involving:<name>)",
                 ("item", "what", "saying", "by", "name", "at", "in", "to", "said",
                  "answered", "edited", "before", "state", "eid", "thread",
-                 "source", "line", "reply_to", "mark", "context", "context_summary")),
+                 "source", "line", "reply_to", "mark", "context", "context_summary", "awaiting")),
     # a1581 (Juniper c1695: lines out of every default find, but reachable when asked): every chat line as a thing,
     # oldest first, in one chat or all; by and at read from the event that made it ('unknown' when none can be found)
-    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid")),   # and each line's own fields
+    "lines": ("lines[:<chat>]", ("item", "chat", "line", "who", "by", "at", "to", "said", "edited", "reply_to", "eid", "seq")),   # and each line's own fields
     "house": ("house[:<corner>]", ("resident", "corner", "doing", "turns", "since", "beat", "fresh", "room", "item")),   # item: the corner, so a gesture on a row acts on it (30 Sep, wake/rest)
     # what each resident wrote, its last turns, oldest first like a chat (Alex, 29 Sep: to see their turns and text;
     # 30 Sep: newest at the bottom on every chat-like list, so a lens shows the newest with `clamp last N, scroll end`)
@@ -632,7 +637,7 @@ def saying_rows(desk, terms="", early=None):
                             "line": line["id"] if line else "", "_t": (at or "", _enum(eid)),
                             "source": sid, "thread": "",
                             "reply_to": line.get("reply_to", "") if line else "",
-                            "mark": "", "context": ""}
+                            "mark": "", "context": "", "awaiting": ""}
                 # An authored field may describe a line, never forge its identity,
                 # author, recipients, source or presentation bookkeeping.
                 if line:
@@ -692,7 +697,8 @@ def saying_rows(desk, terms="", early=None):
                         "eid": e["id"] if e else c["id"], "chat": s["title"], "who": by, "open": flip.get(answered, ""),
                         "index": i + 1, "line": "", "_t": (at or "", _enum(e["id"] if e else "")),
                         "source": sid, "thread": c["id"], "reply_to": "",
-                        "mark": "", "context": ""})
+                        "mark": c.get("mark", ""), "context": "",
+                        "awaiting": ("yes" if 0 in rooms.thread_waiting(w, c, me) else "no") if me else ""})
         # Replies are sayings in their own right: a return message to the opening
         # author must reach For you even though their own opening comment does not.
         for c in cs:
@@ -719,7 +725,8 @@ def saying_rows(desk, terms="", early=None):
                             "before": "", "state": "resolved" if c.get("resolved") else "open", "eid": eid,
                             "chat": s["title"], "who": by, "open": flip.get(answered, ""), "index": i, "thread": c["id"],
                             "line": "", "_t": (at or "", _enum(eid)),
-                            "source": sid, "reply_to": "", "mark": "", "context": ""})
+                            "source": sid, "reply_to": "", "mark": reply.get("mark", ""), "context": "",
+                            "awaiting": ("yes" if i in rooms.thread_waiting(w, c, me) else "no") if me else ""})
     out.sort(key=lambda r: r.pop("_t"))
     if involving:
         target = persons.resolve(w, involving)[0] if persons.on(w) else None
@@ -818,6 +825,7 @@ def _line_rows(desk, chat=None):
                         "at": _clock(e.get("at", "")) if e else "", "to": ", ".join(l["to"]),
                         "said": l["text"][m.end():] if m else l["text"], "edited": "edited" if l.get("edited") else "",
                         "reply_to": l.get("reply_to", ""), "eid": l.get("ev") or l["id"], "_t": (e or {}).get("at", ""),
+                        "seq": _enum(l.get("ev")),      # a8901: its place in the world's order, a number
                         **line_fields(l)})
     out.sort(key=lambda r: r.pop("_t") or "")
     # 14 Oct: a line's own fields (about=, quote=, mark=, or any a writer gave) are row fields; a line without one
@@ -1907,7 +1915,7 @@ ACT_COMMANDS = ("do", "look", "read", "examine", "find", "undo", "run", "scene",
 def _w_on(node, p, val, n, env):
     # Host acts may use the same guard/menu shape as desk acts. They still
     # dispatch only to the host's closed verb table, never through desk verbs.
-    host_act = re.fullmatch(r'(click|pop|menu\s+"[^"]+")(?:\s+when\s+(.+?))?\s+host\s+(.+)', val.strip())
+    host_act = re.fullmatch(r'(click|pop|spoken|menu\s+"[^"]+")(?:\s+when\s+(.+?))?\s+host\s+(.+)', val.strip())
     if host_act:
         action, guard, words = host_act.groups()
         if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", words):
@@ -1924,7 +1932,7 @@ def _w_on(node, p, val, n, env):
     # a5300 (15 Oct): a button asks the program the page is painted in (the home base, research/window-lab/hud.py) to do
     # one of the things it says it can (its rows, witnessed:host). Like `press`, the painter's own act: never a desk line
     # a5941: `on pop host ...` too (Pop out on a `media` film asks for a window)
-    m = re.fullmatch(r"(click|pop) host(?:\s(.*))?", val.strip())
+    m = re.fullmatch(r"(click|pop|spoken) host(?:\s(.*))?", val.strip())
     if m:
         if not re.fullmatch(r"[a-z][a-z0-9_.-]*(\s.*)?", (m.group(2) or "").strip()):
             raise LensRefusal(f"line {n}: `on {m.group(1)} host <verb> [words]`, the verb one of the host's rows (witnessed:host); got {p!r}")

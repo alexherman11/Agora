@@ -63,14 +63,16 @@ def claims(w, but=None):
     return out
 
 
-def check(s, live, w=None):
+def check(s, live, w=None, available=()):
     """One card against the checkout `live` and the world's claims. -> {hold: [path], note: [path], claimed: [...],
     key: what was found as one word (the house writes it on the card, so it is said once), text: what to say, worker:
     what to tell the worker, '' when nothing}."""
     text = f"{s.get('title', '')}\n{s.get('text') or ''}"
     dirty = uncommitted(live)
     named = {p: how for p, how in dirty.items() if mentions(text, p)}
-    hold = sorted(p for p, how in named.items() if how == "new")
+    # A house-preserved handoff can supply files before they land on main.
+    # The caller verifies its receipt/commit; this does not publish those files.
+    hold = sorted(p for p, how in named.items() if how == "new" and p not in available)
     note = sorted(p for p, how in named.items() if how != "new")
     claimed = [(word, aid, title, owner) for word, aid, title, owner in (claims(w, s.get("id")) if w else [])
                if mentions(text, word)]

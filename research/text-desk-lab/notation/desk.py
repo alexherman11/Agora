@@ -25,7 +25,7 @@ HELP = """commands (one per call):
   pivot id               appearance -> its subject and every place it appears; subject -> appearances
   find words             search titles and text
   history [id]           recent events (with undo ids); history e12 one event, what it caused, its undo
-  log-world [check|status] isolated log replay's answer; check requests a full comparison in the live writer
+  log-world [check|status|baseline <note>] isolated log replay; baseline needs a documented request and matching full check
   do verb id k=v ...     change something. e.g. do move a04 into=f02   do append a03 line="new item"
   undo eN                revert an event
   plan / apply           (apply variant only) paste an edited outline; the desk diffs it into ops
@@ -613,7 +613,7 @@ class Desk:
         """Sable a656: a line added to a chat replaces nothing, so it is never refused as stale (in a live room every
         message was refused if someone else spoke first). Rewriting, retitling or removing a chat stays fenced, and the
         adder's receipt does not count as reading the lines it did not see. Appends to notes are unchanged.
-        a5068: not stale, but an agent's line can wait (_hold_line), when someone else spoke there since it last saw."""
+        a9369: crossing lines are shown in the successful send receipt, never held."""
         if verb == "edit":
             if set(kv or {}) != {"append"}:
                 return False
@@ -1282,12 +1282,9 @@ class Desk:
             [f"{part} line{'s' if part > 1 else ''} from others you were shown cut"] if part else [])
         return "; ".join(bits) + f"; read {nid}"
 
-    # ---- a5068: an agent's line waits if the thread moved -------------------------------------------------------
-    # Alex, 14 Oct (a4708, e9790): 'when someone sends a message under you, you get that as a response before your
-    # tool call to send a message goes out. that way you never send and then have to send again.' A chat line or a
-    # reply under a comment carries what its sender had seen there; a line by someone else added since holds it, the
-    # receipt prints those lines whole, and the same line sent again goes as written (they are shown now). A person at
-    # a window is never held (their painter shows lines as they arrive), nor is a rule, nor the house.
+    # ---- a9369: chat additions land, then show what crossed them -----------------------------------------------
+    # Alex, 21 Oct: send first, then show what crossed the line. This supersedes a5068 for chat additions.
+    # Non-chat comment threads retain their old hold. Explicit human stop/correction guards are independent.
     HOLD_SHOWN = 10       # lines a hold prints whole at most; the earlier are counted and named
 
     def _never_held(self):
@@ -1339,20 +1336,33 @@ class Desk:
         self._thread_reads[key] = max(top, self._thread_reads.get(key) or 0)
 
     def _hold_line(self, nid, verb, kv):
-        """a5068: refuse (hold) an agent's chat line or thread reply when someone else has spoken there since what it
-        had seen, printing what they said; marks it shown, so the same line sent again goes through."""
+        """The a5068 hold remains only for replies on non-chat things."""
         if getattr(self, "_in_rules", False):
             return
-        if self._adds_line(nid, verb, kv):
-            said = self._chat_moved(nid, kv)
-        elif verb == "comment" and str((kv or {}).get("id", "")).strip():
+        if self._chat_addition(nid, verb, kv):
+            return                 # successful chat additions report crossings after apply, never before
+        if verb == "comment" and str((kv or {}).get("id", "")).strip():
             said = self._thread_moved(str(kv["id"]).strip())
         else:
             return
         if said:
             raise Refusal(said)
 
+    def _chat_addition(self, nid, verb, kv):
+        n = self.world.nodes.get(nid)
+        s = self.world.subjects.get(n.get("subject") if n else nid)
+        return bool(s and s["kind"] == "chat" and
+                    (self._adds_line(nid, verb, kv) or verb == "comment"))
+
+    def _chat_crossing_receipt(self, nid, verb, kv):
+        crossed = self._chat_moved(nid, kv)
+        if verb == "comment" and str(kv.get("id", "")).strip():
+            thread = self._thread_moved(str(kv["id"]).strip(), sent=True)
+            crossed = "\n".join(x for x in (crossed, thread) if x)
+        return crossed
+
     def _chat_moved(self, nid, kv):
+        """Called only after a successful chat addition. Read receipts are observer state, never world events."""
         import hashlib
         import rooms
         import conversation_policy
@@ -1370,6 +1380,8 @@ class Desk:
         text_lines = s["text"].splitlines()
         rec = self._chat_run(s)
         me = str(w.me).split("/")[0]
+        receipts = getattr(self, "_chat_receipt_through", None) or {}
+        through = receipts.get((self._observer(), s["id"]), 0)
         if at is None and (rec is None or rec[1] >= len(text_lines)):
             # the run reaches the end: nothing new to this reader (the common case, and cheap). With no read at all
             # there is no view to be behind: the line goes, and its receipt says the chat is unread (a834)
@@ -1387,6 +1399,8 @@ class Desk:
             by = str((e or {}).get("by") or "").split("/")[0]
             if not e or not by or by == "house" or rooms.same_person(w, by, me):
                 continue
+            if int(e["id"][1:]) <= through:
+                continue          # a receipt in this very turn already showed it, even with the same as_of
             # Opted-in conversations finish the current answer before ordinary human
             # follow-ups are delivered. Do not mark these lines read: the house's next
             # news pass must still deliver them. Corrections retain the hold.
@@ -1411,18 +1425,36 @@ class Desk:
                 if self._before_turn(e, at) and (ran or member or rooms.calls(w, s, rooms.line_to(e)[0], me)):
                     continue      # a resident was shown it before this turn: read, or told by the house
             new.append((l, e))
-        if not new or self._never_held():     # asked last: it walks the world's surfaces, and most lines need none of it
+        if not new:
             return ""
-        # shown now: the run reaches the end, so the same line sent again is judged on what came after this
+        # Extend only through what was shown. Queued human followups and old cut/unseen holes remain unread.
+        shown_ids = {l["id"] for l, _ in new}
+        lo = rec[0] if rec else len(text_lines)
+        holes, unseen = set(rec[3] if rec else ()), set(rec[4] if rec else ())
+        k = 0
+        for l in s["lines"]:
+            start, k = k, k + len(l["text"].split("\n"))
+            if l["id"] in shown_ids:
+                lo = min(lo, start)
+                holes.difference_update(range(start, k))
+                unseen.difference_update(range(start, k))
+                if len(" ".join(str(l["text"]).split())) > 240:
+                    holes.update(range(start, k))  # snippet acknowledged, but full words still require a read
+            elif start >= (rec[1] if rec else 0):
+                holes.update(range(start, k))
+                unseen.update(range(start, k))
         if getattr(self, "_chat_reads", None) is None:
             self._chat_reads = {}
-        self._chat_reads[(self._observer(), s["id"])] = (rec[0] if rec else 0, len(text_lines),
+        self._chat_reads[(self._observer(), s["id"])] = (lo, len(text_lines),
                                                          hashlib.sha1("\n".join(text_lines).encode()).hexdigest(),
-                                                         tuple(rec[3]) if rec else (), tuple(rec[4]) if rec else ())
-        return self._held_words(nid, f"in chat \"{s['title']}\" ({nid})", [
+                                                         tuple(sorted(holes)), tuple(sorted(unseen)))
+        if getattr(self, "_chat_receipt_through", None) is None:
+            self._chat_receipt_through = {}
+        self._chat_receipt_through[(self._observer(), s["id"])] = max(int(e["id"][1:]) for _, e in new)
+        return self._crossed_words(f"in chat \"{s['title']}\" ({nid})", [
             (l["id"], e, l["text"]) for l, e in new], "line")
 
-    def _thread_moved(self, cid):
+    def _thread_moved(self, cid, sent=False):
         import persons
         import rooms
         w = self.world
@@ -1443,6 +1475,8 @@ class Desk:
             if not by or by == "house" or rooms.same_person(w, by, me):
                 continue
             num = int(e["id"][1:])
+            if sent and num <= base:
+                continue
             if at is None:
                 if num <= base:
                     continue
@@ -1452,13 +1486,24 @@ class Desk:
                 if self._before_turn(e, at) and (num <= base or told):
                     continue
             new.append((f"reply under {cid},", e, r["text"]))
-        if not new or self._never_held():
+        if not new or (not sent and self._never_held()):
             return ""
         if getattr(self, "_thread_reads", None) is None:
             self._thread_reads = {}
         self._thread_reads[(self._observer(), cid)] = max([int(e["id"][1:]) for _, e, _ in new] + [base])
         where = next(iter(w.appearances_of(owner["id"])), owner["id"])
+        if sent:
+            return self._crossed_words(f'in the thread under {cid} on "{owner["title"]}" ({where})', new, "reply")
         return self._held_words(where, f"in the thread under {cid} on \"{owner['title']}\" ({where})", new, "reply")
+
+    def _crossed_words(self, where, new, what):
+        import persons
+        out = [f"Sent. {len(new)} new {what}{'s' if len(new) != 1 else ''} by others {where}; shown here and marked read:"]
+        for ident, e, text in new:
+            short = " ".join(str(text).split())
+            short = short if len(short) <= 240 else short[:239] + "…"
+            out.append(f"  {ident} {persons.by(self.world, e)} ({e['id']}): {short}")
+        return "\n".join(out)
 
     def _held_words(self, nid, where, new, what):
         """The hold's receipt, written for a resident reading it cold: what waits, what was said, what to do next."""
@@ -2022,10 +2067,11 @@ class Desk:
         cur = w.nodes[nid]["rev"] if nid in w.nodes else w.subjects[nid]["rev"]
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         adds = self._adds_line(nid, verb, kv)
-        self._hold_line(nid, verb, kv)    # a5068: a line on an old view of its chat or thread waits
-        if seen is None and not adds:     # a834: an added line overwrites nothing, so looking first protects nothing
+        chat_addition = self._chat_addition(nid, verb, kv)
+        self._hold_line(nid, verb, kv)    # only non-chat thread replies keep the old hold
+        if seen is None and not chat_addition:     # a9369: chat additions overwrite nothing
             raise Refusal(f"you have not looked at {nid} yet; look, read or where it first")
-        behind = (seen != cur and adds) or seen is None     # a chat line lands; what I missed stays unread, and nothing is marked seen
+        behind = (seen != cur and chat_addition) or seen is None     # additions never grant overwrite authority
         if seen != cur and not behind:
             recent = [e for e in w.events if e["target"] == nid or nid in (e.get("changed") or [])]
             why = f"; last change {recent[-1]['id']} {recent[-1]['verb']} by {persons.by(w, recent[-1])}" if recent else ""
@@ -2051,6 +2097,10 @@ class Desk:
             out += f" → created {r['created']}"
         if r.get("note"):
             out += f"\n  {r['note']}"
+        if chat_addition and not getattr(self, "_in_rules", False):
+            crossed = self._chat_crossing_receipt(nid, verb, kv)
+            if crossed:
+                out += "\n  " + crossed
         said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
         if said:
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since

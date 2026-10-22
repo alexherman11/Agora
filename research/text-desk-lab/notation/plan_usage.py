@@ -5,6 +5,7 @@ retain the last observation across house restarts; an expired reading is unknown
 """
 import json
 import math
+import re
 import time
 
 
@@ -189,10 +190,33 @@ class Plans:
                             if text == notice["text"] or text == json.dumps(notice["text"], ensure_ascii=False):
                                 return True
                     return False
-                if not recorded():
-                    self.house.act("house", "notify " + q(notice["text"]))
                 if recorded():
                     notice["sent"] = True
+                    notice["delivery"] = "recorded"
+                    self.save()
+                    continue
+                # Persist before dispatch: an interrupted/unknown acknowledgement
+                # must not become a second append, even across a house restart.
+                if notice.get("attempted"):
+                    continue
+                notice.update(attempted=True, delivery="unknown")
+                self.save()
+                try:
+                    result = self.house.act("house", "notify " + q(notice["text"]))
+                except Exception as exc:
+                    notice["failure"] = type(exc).__name__
+                    self.save()
+                    continue
+                # notify is an ordinary world verb. Its native append receipt is
+                # authoritative; House.load may still hold the pre-append pickle.
+                # Do not accept a generic "ok" or the verb's command echo.
+                receipt = re.search(
+                    r"^ok append 1 thing\(s\) matching prop:role=notifications: "
+                    r"[as]\d+\s+\[(e\d+)\]\s*$", str(result or ""), re.MULTILINE)
+                if receipt or recorded():
+                    notice.update(sent=True, delivery="acknowledged" if receipt else "recorded")
+                    if receipt:
+                        notice["receipt"] = receipt.group(1)
                     self.save()
 
     def publish(self):

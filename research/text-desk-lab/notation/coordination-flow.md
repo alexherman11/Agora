@@ -6,18 +6,22 @@ the current response. This is an implementation record, not a new design mandate
 
 ## State
 
-Source changes are in the canonical main working tree, tested but **not activated**.
-Alex explicitly approved repairing the handover and activating on 21 October.
-A main commit can trigger automatic reload; do not treat it as inert.
-JEFF's live corner requests Claude/Opus while his saved session provider is Codex.
-The running house refuses that mismatch; the prepared source now validates portable
-handover before consuming input, archives old provider state, carries complete
-unresolved text/references, and starts a fresh provider conversation. Same-provider
-resume retains its token. A changed provider waits for the busy turn and prevents
-another old-provider follow-up. Its packet persists until a successful result.
+**Activated**, with Alex's explicit approval, from main commits `a44450e` and
+`952629e`. No push. The desk accepted both versions through its health-checked swap;
+the keeper reloaded the house normally. JEFF completed turns on Claude Opus 5.5,
+with the actual runtime reporting that exact model and zero host tools. His old
+Codex state/token is archived, his new session is distinct, and the handover packet
+cleared after a successful result. All 218 other pre-existing state files retained
+their session tokens; none were missing. Keeper, door, home supervisor and HUD
+process creation identities remained unchanged.
+
+The first reload finished without cutting a turn. The snapshot-routing correction
+needed a second reload, whose 90-second grace limit interrupted Rowan and four
+workers. All five resumed from saved conversations; this is not a claim that their
+tasks finished. Same-provider reload kept JEFF's new Claude conversation.
 
 Already live through native operations: the concise collaboration guide;
-`assign-task`, `accept-task`, `block-task`, and `worker-update` editable verb notes;
+`assign-task`, `accept-task`, `block-task`, `worker-update`, and `yield-work` notes;
 the actionable commission view excludes reported/done/landed/cancelled records.
 Records and evidence remain present. The missed baseline checkpoint was explicitly
 routed to Juniper for review, without resuming that paused commission.
@@ -25,14 +29,18 @@ Juniper subsequently acknowledged both coordination gaps and explicitly resumed
 the worker through ordinary admission, preserving its health/baseline requirements.
 The house recorded its normal resume charter receipt. This confirms lead receipt
 and a chosen next action, not completion of the baseline work.
-Installing verbs alone does not activate automatic transition wakes.
+Automatic transition wakes are active. A real implementation checkpoint produced
+one native wake record and JEFF's acknowledgement on the task (e20373, e20374,
+c8983). No test message was sent to Alex's Conversation. Workers have begun adding
+topic links to the new documentation index (e20397).
 
 ## Contract implemented
 
 - `reply_policy=queue` on a chat opts into ordinary human follow-ups arriving in
   order after the current reply. Unknown/absent policies retain existing behavior.
   Explicit other recipients and worker chatter retain their existing semantics.
-  Enable this on the Conversation during activation, not before claiming it works.
+  Enabled on the Conversation at e20129. Recent actual human message routing was
+  checked against the live policy; ordered mid-turn behavior was tested in fixtures.
 - Leading stop/cancel/correction directives invalidate pending turn commands.
   The parent checks before relay; Desk dispatch rechecks under its native lock.
   This does not cancel an in-flight provider request or undo an effect. Host-route
@@ -49,7 +57,8 @@ Installing verbs alone does not activate automatic transition wakes.
 - `commission=yielded` cooperatively releases capacity and becomes eligible when
   capacity returns, respecting priority, retry, permissions and existing worktree.
   `paused` remains an explicit hold. Blocked/approval-held work does not auto-resume.
-  The `yield-work` seed is tested but deliberately not installed against the old house.
+  `yield-work` is installed. The plan fuel hold is checked before consuming input
+  or resuming; clearing it permits the next eligible turn.
 - Worker prompts start with a concise collaboration guide and a worker-maintained
   documentation index; workers organize focused topic notes and retrieve relevant
   detail on demand. The old catch-all notebook is preserved as historical source,
@@ -65,7 +74,8 @@ Installing verbs alone does not activate automatic transition wakes.
 Ran: 113 affected pytest checks plus 11 subtests passed in 14.51 seconds, including
 real native verb execution in disposable worlds, task routing, interruption gates,
 worker capacity arbitration, crash/pipe-failure recovery and message context.
-No test message entered Alex's Conversation and no live model trial was run.
+No test message entered Alex's Conversation. Live model activity was the approved
+handover/resumption and the real implementation handoff, not a synthetic chat test.
 
 The initial root suite reported 200 passed, 2 skipped, one timing-sensitive failure
 in `test_midturn_delivery_and_explicit_peer_collaboration`; its focused rerun passed.
@@ -79,12 +89,15 @@ delivery with the existing bounded `until` helper, rather than assuming another
 worker's synchronous receipt implies that peer delivery has happened. Runtime code
 is unchanged by this test correction.
 The final root suite passed: 201 passed, 2 skipped in 26.22 seconds.
+Live verification exposed an omitted production storage shape: task event snapshots
+are externalized into the undo archive. `kept.copy_of` now loads them, with an actual
+SQLite archive regression covering assignment, later reassignment, milestone routing
+and House.news. The final combined affected suite passed 126 tests plus 11 subtests
+in 16.17 seconds. The first checkpoint did not wake its lead; a fresh checkpoint
+after the correction did. Historical events were not replayed to manufacture delivery.
 The documentation checker reports the existing missing Dynamic Desk image.
 Changed-file Ruff F/E9 reports four existing desk/workshop diagnostics; new helper
 and test files pass. Diff whitespace checks pass.
 
-Remaining integration: commit the scoped approved repair and coordination changes
-without unrelated edits; enable the Conversation policy; install
-yield-work; verify live task delivery and the next natural Conversation exchange.
 Pike's separate worker delivery-record task and Sable's latency task remain staged
 with overlap notices; this change does not claim their work is integrated.

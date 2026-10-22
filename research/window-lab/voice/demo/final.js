@@ -1,0 +1,1 @@
+fetch("http://127.0.0.1:8955/engine", { method: "POST", body: JSON.stringify({ session: new URLSearchParams(location.search).get("session"), do: "finish", text: "Show me the board and what is waiting on me" }) }).then(r => r.text())
