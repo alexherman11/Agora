@@ -107,20 +107,141 @@ class Handoffs(unittest.TestCase):
         self.assertEqual(pw.out(self.source, "show", "HEAD:research/pkg/existing.txt"), "source")
         self.assertEqual(json.loads(self.receipt.read_text())["phase"], "conflict")
 
-    def test_dirty_receiver_and_staged_source_are_never_changed(self):
+    def test_dirty_receiver_conflict_is_checkpointed_without_losing_either_side(self):
         self.put(self.source, "research/pkg/new.txt", "source")
         self.put(self.dest, "research/pkg/new.txt", "my untracked work")
-        with self.assertRaisesRegex(pw.Held, "uncommitted"):
+        with self.assertRaisesRegex(pw.Held, "conflict"):
             self.run_transfer()
         self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "my untracked work")
+        data = pw.read_receipt(self.receipt)
+        self.assertEqual(data["phase"], "conflict")
+        self.assertEqual(pw.head(self.dest), data["receiver_checkpoint"]["after"])
+        self.assertEqual(pw.out(self.dest, "show", "HEAD:research/pkg/new.txt"), "my untracked work")
+        self.assertEqual(pw.out(self.source, "show", "HEAD:research/pkg/new.txt"), "source")
+        self.assertEqual(pw.git(self.dest, "status", "--porcelain").stdout, b"")
+        again = pw.head(self.dest)
+        with self.assertRaisesRegex(pw.Held, "conflict"):
+            self.run_transfer()
+        self.assertEqual(pw.head(self.dest), again)
+
+    def test_staged_source_is_not_changed_or_receiver_checkpointed(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "own.txt", "receiver work")
         self.assertEqual(pw.head(self.source), self.base)
-        # Separate clean receiver; source's staged state must remain exact.
-        self.dest.joinpath("research/pkg/new.txt").unlink()  # fixture-owned only
         pw.git(self.source, "add", "research/pkg/new.txt")
         staged = pw.git(self.source, "diff", "--cached").stdout
         with self.assertRaisesRegex(pw.Held, "staged"):
             self.run_transfer()
         self.assertEqual(pw.git(self.source, "diff", "--cached").stdout, staged)
+        self.assertEqual(pw.head(self.dest), self.base)
+        self.assertEqual((self.dest / "own.txt").read_text(), "receiver work")
+
+    def test_dirty_receiver_checkpoints_own_edits_then_receives_main(self):
+        self.put(self.live, "research/pkg/browser.md", "main input")
+        self.put(self.dest, "own.txt", b"own raw\r\nbytes")
+        self.put(self.dest, "research/pkg/existing.txt", "receiver edit\n")
+        self.put(self.dest, "research/text-desk-lab/notation/sessions/copy.pickle", "not source")
+        ws, subject = self.fake_workshop(source="main")
+        original_say = ws.say
+        def say(card, text, **kw):
+            if text.startswith("Receiver work checkpointed"):
+                self.assertFalse((self.dest / "research/pkg/browser.md").exists())
+                self.assertEqual(pw.out(self.dest, "show", "HEAD:own.txt"), "own raw\r\nbytes")
+                self.assertIn(hashlib.sha256(b"own raw\r\nbytes").hexdigest(), text)
+            original_say(card, text, **kw)
+        ws.say = say
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual(subject["props"]["commission"], "paused")
+        self.assertEqual((self.dest / "research/pkg/existing.txt").read_text(), "receiver edit\n")
+        self.assertEqual((self.dest / "research/pkg/browser.md").read_text(), "main input")
+        data = pw.read_receipt(Path(subject["props"]["brings_receipt"]))
+        checkpoint = data["receiver_checkpoint"]
+        self.assertEqual(set(checkpoint["files"]), {"own.txt", "research/pkg/existing.txt"})
+        self.assertTrue(checkpoint["reported"])
+        self.assertNotEqual(checkpoint["after"], self.base)
+        self.assertEqual(data["recipient_before"], checkpoint["after"])
+        self.assertEqual(len(self.messages), 2)
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual(len(self.messages), 2)
+        self.assertEqual(pw.head(self.live), self.base)
+        self.assertEqual(ws.workers, {})
+
+    def test_partial_index_and_worktree_versions_both_survive(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "research/pkg/existing.txt", "staged version")
+        pw.git(self.dest, "add", "research/pkg/existing.txt")
+        self.put(self.dest, "research/pkg/existing.txt", "working version")
+        data = self.run_transfer(paths=["research/pkg/new.txt"])
+        checkpoint = data["receiver_checkpoint"]
+        self.assertEqual(len(checkpoint["commits"]), 2)
+        self.assertEqual(pw.out(self.dest, "show", checkpoint["commits"][0] +
+                                ":research/pkg/existing.txt"), "staged version")
+        self.assertEqual(pw.out(self.dest, "show", checkpoint["after"] +
+                                ":research/pkg/existing.txt"), "working version")
+        self.assertEqual(checkpoint["index_files"]["research/pkg/existing.txt"]["sha256"],
+                         hashlib.sha256(b"staged version").hexdigest())
+        self.assertEqual((self.dest / "research/pkg/existing.txt").read_text(), "working version")
+
+    def test_receiver_staged_rename_deletion_and_untracked_bytes_survive(self):
+        self.put(self.dest, "delete.txt", "kept in old history")
+        self.commit(self.dest)
+        pw.git(self.dest, "rm", "delete.txt")  # fixture-owned only
+        pw.git(self.dest, "mv", "research/pkg/existing.txt", "research/pkg/renamed.txt")
+        self.put(self.dest, "new.bin", b"\x00receiver")
+        self.put(self.source, "research/pkg/new.txt", "source")
+        data = self.run_transfer(paths=["research/pkg/new.txt"])
+        checkpoint = data["receiver_checkpoint"]
+        self.assertEqual(checkpoint["files"]["delete.txt"], {"deleted": True})
+        self.assertEqual(checkpoint["index_files"]["delete.txt"], {"deleted": True})
+        self.assertEqual((self.dest / "research/pkg/renamed.txt").read_text(), "base\n")
+        self.assertEqual((self.dest / "new.bin").read_bytes(), b"\x00receiver")
+        self.assertFalse((self.dest / "delete.txt").exists())
+        self.assertEqual(pw.git(self.dest, "status", "--porcelain").stdout, b"")
+
+    def test_interrupted_receiver_checkpoint_never_repeats_commit(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "own.txt", "receiver")
+        write = pw.write_receipt
+        def fail_preserved(path, data):
+            if data.get("phase") == "receiver-preserved":
+                raise OSError("fixture lost checkpoint acknowledgement")
+            write(path, data)
+        with patch.object(pw, "write_receipt", side_effect=fail_preserved):
+            with self.assertRaises(OSError):
+                self.run_transfer()
+        after = pw.head(self.dest)
+        self.assertNotEqual(after, self.base)
+        with self.assertRaisesRegex(pw.Held, "recipient checkpoint was interrupted"):
+            self.run_transfer()
+        self.assertEqual(pw.head(self.dest), after)
+        self.assertEqual(pw.head(self.source), self.base)
+        self.assertEqual((self.dest / "own.txt").read_text(), "receiver")
+
+    def test_checkpoint_reporting_failure_holds_delivery_and_resumes_saved_checkpoint(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "own.txt", "receiver")
+        def fail_report(saved):
+            raise OSError("fixture card report unavailable")
+        args = (landing, self.source, self.dest, "a1", "a2",
+                ["research/pkg/new.txt"], self.receipt, "fixture-key")
+        with self.assertRaises(OSError):
+            pw.transfer(*args, report_checkpoint=fail_report)
+        after = pw.head(self.dest)
+        self.assertEqual(pw.head(self.source), self.base)
+        self.assertFalse((self.dest / "research/pkg/new.txt").exists())
+        reports = []
+        data = pw.transfer(*args, report_checkpoint=reports.append)
+        self.assertEqual(data["receiver_checkpoint"]["after"], after)
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(data["phase"], "applied")
+
+    def test_private_receiver_input_is_held_without_mutation(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "private/fixture.txt", "fixture private path")
+        with self.assertRaisesRegex(pw.Held, "not transferable"):
+            self.run_transfer()
+        self.assertEqual(pw.head(self.dest), self.base)
+        self.assertEqual(pw.head(self.source), self.base)
 
     def test_missing_ignored_private_and_escape_inputs_refuse(self):
         for name in ("../outside", "/absolute", ".git/config", ".env", "a/.env.local",
@@ -194,7 +315,11 @@ class Handoffs(unittest.TestCase):
         ws = workshop.Workshop(house)
         ws.commissions = lambda w: self.subjects
         self.messages = []
-        ws.say = lambda card, text, **kw: self.messages.append((card, text))
+        def say(card, text, **kw):
+            self.messages.append((card, text))
+            self.subjects[card][0].setdefault("comments", []).append(
+                {"by": "house", "text": text})
+        ws.say = say
         def set_state(card, state, **props):
             self.subjects[card][0]["props"].update(commission=state, **props)
         ws.set_state = set_state
@@ -209,6 +334,25 @@ class Handoffs(unittest.TestCase):
         self.assertEqual(subject["props"]["commission"], "paused")
         self.assertEqual(len(self.messages), 1)
         self.assertEqual(ws.workers, {})
+
+    def test_house_requires_card_inventory_receipt_before_delivery(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "own.txt", "receiver")
+        ws, subject = self.fake_workshop()
+        real_say = ws.say
+        ws.say = lambda *args, **kw: None  # world refuses silently, not an exception
+        self.assertFalse(ws.bring("a2", subject))
+        self.assertIn("inventory not confirmed", subject["props"]["brings_status"])
+        after = pw.head(self.dest)
+        self.assertNotEqual(after, self.base)
+        self.assertEqual(pw.head(self.source), self.base)
+        self.assertFalse((self.dest / "research/pkg/new.txt").exists())
+        self.assertEqual(subject["props"]["commission"], "paused")
+        ws.say = real_say
+        self.assertTrue(ws.bring("a2", subject))
+        data = pw.read_receipt(Path(subject["props"]["brings_receipt"]))
+        self.assertEqual(data["receiver_checkpoint"]["after"], after)
+        self.assertEqual(len(self.messages), 2)
 
     def test_main_input_hold_is_satisfied_only_by_real_import(self):
         self.put(self.live, "research/pkg/new.txt", "main artifact")

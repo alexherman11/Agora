@@ -1,8 +1,8 @@
 """House-owned, scoped source handoffs. This never lands or executes transferred code.
 
 Called under Workshop's dispatch lock; also takes landing serialization and both
-process-held worker leases. Receivers must be clean; conflicts are computed in
-Git objects, never left in their files. Main inputs use landing.hand unchanged.
+process-held worker leases. Receivers checkpoint their own edits first; conflicts
+are computed in Git objects, never left in their files. Main inputs use landing.hand unchanged.
 """
 import hashlib
 import json
@@ -89,11 +89,21 @@ def read_receipt(path):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or data.get("phase") not in (
+                "receiver-preserving", "receiver-preserved",
                 "preserving", "preserved", "conflict", "planned", "applied"):
             raise ValueError("unknown receipt shape")
         if data["phase"] in ("planned", "applied"):
             if not re.fullmatch(r"[0-9a-f]{40,64}", data.get("recipient_after", "")):
                 raise ValueError("missing receiver commit")
+        checkpoint = data.get("receiver_checkpoint")
+        if data["phase"].startswith("receiver-") and not isinstance(checkpoint, dict):
+            raise ValueError("missing receiver checkpoint")
+        if checkpoint is not None:
+            if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("files"), dict):
+                raise ValueError("invalid receiver inventory")
+            if data["phase"] != "receiver-preserving" and not re.fullmatch(
+                    r"[0-9a-f]{40,64}", checkpoint.get("after", "")):
+                raise ValueError("missing receiver checkpoint commit")
         return data
     except (ValueError, TypeError):
         raise Held("invalid preserved-work receipt; inspect it before retry") from None
@@ -124,6 +134,97 @@ def clean_receiver(tree):
     if any(x and not x[3:].decode("utf-8", "replace").replace("\\", "/").startswith(
             "research/text-desk-lab/notation/sessions/") for x in changed):
         raise Held("recipient has uncommitted edits; preserve them before bringing work")
+
+
+def receiver_edits(tree):
+    """Inventory both index and worktree, including deletions and rename sides."""
+    def names(*args):
+        return {p.decode("utf-8") for p in git(tree, *args).stdout.split(b"\0") if p}
+    staged = names("diff", "--cached", "--name-only", "--no-renames", "-z", "HEAD")
+    changed = staged | names("diff", "--name-only", "--no-renames", "-z")
+    changed |= names("ls-files", "-z", "--others", "--exclude-standard")
+    sessions = "research/text-desk-lab/notation/sessions/"
+    if any(p.startswith(sessions) for p in staged):
+        raise Held("recipient index contains session state; not checkpointing it")
+    changed = {p for p in changed if not p.startswith(sessions)}
+    if len(changed) > 200:
+        raise Held("recipient checkpoint exceeds 200 files")
+    files, index_files, size = {}, {}, 0
+    for name in sorted(changed):
+        safe_path(name)
+        p = tree / name
+        for part in [p, *p.parents]:
+            if part == tree:
+                break
+            if part.is_symlink() or getattr(part, "is_junction", lambda: False)():
+                raise Held("recipient checkpoint has a linked path: " + name)
+        if p.exists():
+            if not p.is_file() or not p.resolve().is_relative_to(tree.resolve()):
+                raise Held("recipient checkpoint has a non-file: " + name)
+            raw = p.read_bytes()
+            size += len(raw)
+            files[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+        else:
+            files[name] = {"deleted": True}
+        if name in staged:
+            entry = git(tree, "ls-files", "--stage", "-z", "--", name).stdout
+            if entry:
+                if entry.split(b" ", 1)[0] not in (b"100644", b"100755"):
+                    raise Held("recipient checkpoint has an unsupported index entry: " + name)
+                raw = git(tree, "show", ":" + name).stdout
+                size += len(raw)
+                index_files[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+            else:
+                index_files[name] = {"deleted": True}
+        if size > 32 * 1024 * 1024:
+            raise Held("recipient checkpoint exceeds 32 MiB")
+    return files, index_files
+
+
+def checkpoint_receiver(tree, card, receipt_path, data, report):
+    """Caller retains the card lease and landing lock through reporting/delivery."""
+    saved = data.get("receiver_checkpoint")
+    if saved:
+        if git(tree, "merge-base", "--is-ancestor", saved["after"], "HEAD", check=False).returncode:
+            raise Held("recipient checkpoint needs reconciliation; not replaying")
+        clean_receiver(tree)
+    else:
+        files, staged = receiver_edits(tree)
+        if not files:
+            clean_receiver(tree)
+            return
+        saved = {"before": head(tree), "files": files, "index_files": staged}
+        data.update(phase="receiver-preserving", receiver_checkpoint=saved)
+        write_receipt(receipt_path, data)  # unknown commit outcomes never auto-retry
+        # Preserve partial staging too: first commit the existing index, then
+        # commit the remaining worktree. Both versions remain in branch history.
+        commits = []
+        message = f"receiver checkpoint by house for {card}; receipt {data['request']}\n\n"
+        if staged:
+            git(tree, "commit", "-m", message + json.dumps({"index_files": staged}, sort_keys=True))
+            commits.append(head(tree))
+        remaining = receiver_edits(tree)[0]
+        if set(remaining) - set(files):
+            raise Held("recipient changed while checkpointing; inspect receipt")
+        if remaining:
+            git(tree, "add", "-A", "--", *remaining)
+        if git(tree, "diff", "--cached", "--name-only").stdout:
+            git(tree, "commit", "-m", message + json.dumps({"files": files}, sort_keys=True))
+            commits.append(head(tree))
+        clean_receiver(tree)
+        if receiver_edits(tree)[0]:
+            raise Held("recipient changed while checkpointing; inspect receipt")
+        # Record committed blobs separately from raw working bytes.
+        committed = {name: ({"deleted": True} if item.get("deleted") else
+                            blob_manifest(tree, head(tree), [name])[name])
+                     for name, item in files.items()}
+        saved.update(after=head(tree), commits=commits, committed_files=committed)
+        data["phase"] = "receiver-preserved"
+        write_receipt(receipt_path, data)
+    if report is not None and not saved.get("reported"):
+        report(saved)
+        saved["reported"] = True
+        write_receipt(receipt_path, data)
 
 
 def receiver_paths(tree, names):
@@ -192,7 +293,8 @@ def blob_manifest(root, commit, names):
     return result
 
 
-def transfer(landing, source, recipient, source_card, recipient_card, paths, receipt_path, key):
+def transfer(landing, source, recipient, source_card, recipient_card, paths, receipt_path, key,
+             report_checkpoint=None):
     """Both process leases and landing lock MUST already be held by the caller.
 
     A source snapshot is committed normally on its own worker branch, only when
@@ -201,6 +303,8 @@ def transfer(landing, source, recipient, source_card, recipient_card, paths, rec
     """
     live = landing.LIVE
     registered(live, recipient, "worker/" + recipient_card)
+    data = {"request": key, "source": source_card, "recipient": recipient_card,
+            "at": datetime.now(timezone.utc).isoformat()}
     if receipt_path.exists():
         old = read_receipt(receipt_path)
         if old.get("phase") in ("planned", "applied"):
@@ -216,18 +320,21 @@ def transfer(landing, source, recipient, source_card, recipient_card, paths, rec
             raise Held("previous transfer is not reconciled; do not replay it")
         if old.get("phase") == "preserving":
             raise Held("source preservation was interrupted; inspect its receipt before a new request")
-    clean_receiver(recipient)
+        if old.get("phase") == "receiver-preserving":
+            raise Held("recipient checkpoint was interrupted; inspect its receipt before a new request")
+        if old.get("receiver_checkpoint"):
+            data["receiver_checkpoint"] = old["receiver_checkpoint"]
     if source_card != "main":
         registered(live, source, "worker/" + source_card)
         if git(source, "diff", "--cached", "--name-only").stdout:
             raise Held("source has staged edits; not changing its index")
-    source_before, before = head(source), head(recipient)
+    # Validate source selection before changing the receiver's branch.
     manifest = selected(source, paths)
+    checkpoint_receiver(recipient, recipient_card, receipt_path, data, report_checkpoint)
+    source_before, before = head(source), head(recipient)
     receiver_paths(recipient, manifest)
-    data = {"request": key, "source": source_card, "recipient": recipient_card,
-            "at": datetime.now(timezone.utc).isoformat(),
-            "source_before": source_before, "recipient_before": before,
-            "files": manifest, "phase": "preserving"}
+    data.update(source_before=source_before, recipient_before=before,
+                files=manifest, phase="preserving")
     write_receipt(receipt_path, data)
     if source_card == "main":
         try:

@@ -1087,7 +1087,9 @@ class Workshop:
                         git("worktree", "add", str(tree), *([] if exists else ["-b", branch]),
                             *([branch] if exists else ["HEAD"]), cwd=REPO, check=True)
                     result = pw.transfer(landing, REPO if source == "main" else TREES / source,
-                                         tree, source, cid, spec["paths"], receipt, key)
+                                         tree, source, cid, spec["paths"], receipt, key,
+                                         report_checkpoint=lambda saved:
+                                             self.report_receiver_checkpoint(cid, receipt, saved))
             finally:
                 landing._unlock(lock)
             self.brought(cid, subject, key, receipt, result)
@@ -1100,6 +1102,19 @@ class Workshop:
                 self.bring_props(cid, brings_status=status)
                 self.say(cid, "Preserved-work handoff held: " + detail, to="nobody")
             return False
+
+    def report_receiver_checkpoint(self, cid, receipt, saved):
+        import preserved_work as pw
+        text = ("Receiver work checkpointed before handoff: " + json.dumps(saved, sort_keys=True) +
+                f". Durable inventory: {receipt}. Own worker branch only; not ready or landed.")
+        def recorded():
+            current = self.commissions(self.house.load()).get(cid)
+            return current and any(c.get("by") == "house" and c.get("text") == text
+                                   for c in current[0].get("comments", []))
+        if not recorded():
+            self.say(cid, text, to="nobody")
+        if not recorded():
+            raise pw.Held("recipient checkpoint inventory not confirmed on card; delivery held")
 
     def brought(self, cid, subject, key, receipt, result):
         status = f"applied {key}"
