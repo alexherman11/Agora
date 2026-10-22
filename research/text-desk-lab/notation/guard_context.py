@@ -5,6 +5,7 @@ This is NOT authentication against arbitrary same-user host processes. A copied
 file, worker-generated observation or configurable path cannot admit a run.
 """
 import json
+import ntpath
 import os
 from pathlib import Path
 import time
@@ -23,6 +24,34 @@ def main_root():
 
 def location():
     return main_root() / "research/text-desk-lab/notation/house-state/frontier/guard-context.json"
+
+
+def executable_name(pid):
+    """Read only the image name of this foreground PID; no title/argv/content.
+
+    This is diagnostic metadata, never a HUD identity or game-clear grant.
+    """
+    import ctypes as c
+    from ctypes import wintypes as w
+    if not pid:
+        return "unknown"
+    k = c.WinDLL("kernel32", use_last_error=True)
+    k.OpenProcess.argtypes = [w.DWORD, w.BOOL, w.DWORD]
+    k.OpenProcess.restype = w.HANDLE
+    k.QueryFullProcessImageNameW.argtypes = [
+        w.HANDLE, w.DWORD, w.LPWSTR, c.POINTER(w.DWORD)]
+    k.QueryFullProcessImageNameW.restype = w.BOOL
+    k.CloseHandle.argtypes = [w.HANDLE]
+    handle = k.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return "unknown"
+    try:
+        size, image = w.DWORD(32768), c.create_unicode_buffer(32768)
+        if not k.QueryFullProcessImageNameW(handle, 0, image, c.byref(size)):
+            return "unknown"
+        return ntpath.basename(image.value).lower() or "unknown"
+    finally:
+        k.CloseHandle(handle)
 
 
 def observe():
@@ -55,11 +84,18 @@ def observe():
             u.CloseDesktop(desktop)
     clear = result == 0 and state.value == 5 and bool(hwnd) and pid.value > 0
     clear = clear and bool(got) and name.value.lower() == "default"
+    exe = executable_name(pid.value)
+    # An executable basename (even pythonw.exe) cannot distinguish hud.py
+    # from another Python program. Do not manufacture a HUD/game exception.
+    if u.GetForegroundWindow() != hwnd:
+        exe = "unknown"
+        clear = False
     return {
         "schema": SCHEMA, "issuer": "house", "issuer_pid": os.getpid(),
         "observed_at": time.time(), "uptime_ms": int(k.GetTickCount64()),
         "notification_result": int(result), "notification_state": state.value,
         "foreground_known": bool(hwnd) and pid.value > 0,
+        "foreground_exe": exe,
         "input_desktop": name.value if got else "unknown",
         "full_screen": state.value in (2, 3, 7) if result == 0 else None,
         "game": True if result == 0 and state.value == 3 else
