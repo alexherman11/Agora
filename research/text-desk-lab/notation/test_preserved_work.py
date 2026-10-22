@@ -1,0 +1,326 @@
+# health: room test
+"""Real isolated Git repositories; no live worktrees, workers, or host actions."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
+import agora_tmp
+import landing
+import preserved_work as pw
+import workshop
+
+
+class Handoffs(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(agora_tmp.directory("bring-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.live, self.trees = self.tmp / "live", self.tmp / "trees"
+        self.live.mkdir()
+        self.trees.mkdir()
+        self.state = self.tmp / "state"
+        self.state.mkdir()
+        env = dict(GIT_AUTHOR_NAME="fixture", GIT_COMMITTER_NAME="fixture",
+                   GIT_AUTHOR_EMAIL="fixture@example.invalid", GIT_COMMITTER_EMAIL="fixture@example.invalid")
+        self.patches = [patch.dict(os.environ, env), patch.object(landing, "LIVE", self.live),
+                        patch.object(landing, "STATE", self.state), patch.object(workshop, "REPO", self.live),
+                        patch.object(workshop, "TREES", self.trees)]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+        pw.git(self.live, "init", "-b", "main")
+        pw.git(self.live, "config", "core.autocrlf", "false")
+        self.put(self.live, ".gitignore", "research/text-desk-lab/notation/sessions/\nignored/\n")
+        self.put(self.live, "research/pkg/existing.txt", "base\n")
+        self.commit(self.live)
+        self.base = pw.head(self.live)
+        self.source, self.dest = self.trees / "a1", self.trees / "a2"
+        for card, path in [("a1", self.source), ("a2", self.dest)]:
+            pw.git(self.live, "worktree", "add", "-b", f"worker/{card}", str(path), "HEAD")
+        self.receipt = self.state / "receipt.json"
+
+    def put(self, root, name, text):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode() if isinstance(text, str) else text)
+
+    def commit(self, root):
+        pw.git(root, "add", "-A")
+        pw.git(root, "commit", "-m", "fixture")
+
+    def run_transfer(self, source="a1", paths=None):
+        return pw.transfer(landing, self.live if source == "main" else self.source,
+                           self.dest, source, "a2", paths or ["research/pkg/"],
+                           self.receipt, "fixture-key")
+
+    def test_worker_package_hashes_scope_and_retry(self):
+        self.put(self.source, "research/pkg/new.bin", b"\0exact\r\nbytes")
+        self.put(self.source, "unrelated.txt", "held deployment\n")
+        self.commit(self.source)
+        self.put(self.source, "research/pkg/existing.txt", "preserved\n")
+        self.put(self.source, "uncommitted.txt", "also untouched")
+        data = self.run_transfer()
+        self.assertEqual(data["phase"], "applied")
+        self.assertEqual((self.dest / "research/pkg/new.bin").read_bytes(), b"\0exact\r\nbytes")
+        self.assertFalse((self.dest / "unrelated.txt").exists())
+        self.assertFalse((self.dest / "uncommitted.txt").exists())
+        self.assertEqual((self.source / "uncommitted.txt").read_text(), "also untouched")
+        raw = hashlib.sha256(b"\0exact\r\nbytes").hexdigest()
+        self.assertEqual(data["files"]["research/pkg/new.bin"]["sha256"], raw)
+        self.assertEqual(data["committed_files"], data["received_files"])
+        old = pw.head(self.dest)
+        self.assertEqual(self.run_transfer()["recipient_after"], old)
+        self.assertEqual(pw.head(self.live), self.base)
+
+    def test_main_inputs_reuse_hand_without_landing_or_index_changes(self):
+        self.put(self.live, "research/pkg/browser.md", "exact takeover\n")
+        self.put(self.live, "unrelated.txt", "author keeps this")
+        pw.git(self.live, "add", "unrelated.txt")
+        index = pw.git(self.live, "diff", "--cached").stdout
+        with patch.object(landing, "hand", wraps=landing.hand) as hand:
+            data = self.run_transfer("main", ["research/pkg/browser.md"])
+        hand.assert_called_once()
+        self.assertEqual((self.dest / "research/pkg/browser.md").read_text(), "exact takeover\n")
+        self.assertEqual(pw.head(self.live), self.base)
+        self.assertEqual(pw.git(self.live, "diff", "--cached").stdout, index)
+        self.assertTrue((self.live / "research/pkg/browser.md").exists())
+        self.assertTrue(data["source_branch"].startswith("hand/"))
+        self.assertFalse((self.dest / "unrelated.txt").exists())
+
+    def test_conflict_keeps_source_commit_and_receiver_exact(self):
+        self.put(self.source, "research/pkg/existing.txt", "source\n")
+        self.put(self.dest, "research/pkg/existing.txt", "receiver\n")
+        self.commit(self.dest)
+        before = pw.head(self.dest)
+        with self.assertRaisesRegex(pw.Held, "conflict"):
+            self.run_transfer()
+        self.assertEqual(pw.head(self.dest), before)
+        self.assertEqual((self.dest / "research/pkg/existing.txt").read_text(), "receiver\n")
+        self.assertEqual(pw.git(self.dest, "status", "--porcelain").stdout, b"")
+        self.assertEqual(pw.out(self.source, "show", "HEAD:research/pkg/existing.txt"), "source")
+        self.assertEqual(json.loads(self.receipt.read_text())["phase"], "conflict")
+
+    def test_dirty_receiver_and_staged_source_are_never_changed(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "research/pkg/new.txt", "my untracked work")
+        with self.assertRaisesRegex(pw.Held, "uncommitted"):
+            self.run_transfer()
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "my untracked work")
+        self.assertEqual(pw.head(self.source), self.base)
+        # Separate clean receiver; source's staged state must remain exact.
+        self.dest.joinpath("research/pkg/new.txt").unlink()  # fixture-owned only
+        pw.git(self.source, "add", "research/pkg/new.txt")
+        staged = pw.git(self.source, "diff", "--cached").stdout
+        with self.assertRaisesRegex(pw.Held, "staged"):
+            self.run_transfer()
+        self.assertEqual(pw.git(self.source, "diff", "--cached").stdout, staged)
+
+    def test_missing_ignored_private_and_escape_inputs_refuse(self):
+        for name in ("../outside", "/absolute", ".git/config", ".env", "a/.env.local",
+                     "research/text-desk-lab/notation/sessions/frontier.pickle", "a\\b", "a*",
+                     ".git./config", "research/text-desk-lab/notation/sessions./world", "NUL", "a/CON.txt"):
+            with self.subTest(name=name), self.assertRaises(pw.Held):
+                pw.request(json.dumps({"source": "main", "paths": [name]}), "a2")
+        self.put(self.source, "ignored/report.txt", "not public")
+        for name in ("research/pkg/missing", "ignored/report.txt"):
+            with self.subTest(name=name), self.assertRaises(pw.Held):
+                self.run_transfer(paths=[name])
+        self.assertEqual(pw.head(self.dest), self.base)
+
+    def test_ignored_receiver_collision_refuses_without_overwrite(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        self.put(self.dest, "research/pkg/.gitignore", "new.txt\n")
+        self.commit(self.dest)
+        self.put(self.dest, "research/pkg/new.txt", "ignored receiver work")
+        before = pw.head(self.dest)
+        with self.assertRaisesRegex(pw.Held, "ignored"):
+            self.run_transfer(paths=["research/pkg/new.txt"])
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "ignored receiver work")
+        self.assertEqual(pw.head(self.dest), before)
+
+    def test_preserved_selector_is_bounded_to_source_edits_not_worlds(self):
+        self.put(self.source, "research/pkg/new.txt", "new")
+        self.put(self.source, "research/text-desk-lab/notation/sessions/copy.pickle", "fixture only")
+        data = self.run_transfer(paths=["@preserved"])
+        self.assertEqual(list(data["files"]), ["research/pkg/new.txt"])
+        with self.assertRaisesRegex(pw.Held, "main requires explicit"):
+            pw.request(json.dumps({"source": "main", "paths": ["@preserved"]}), "a2")
+
+    def test_wrong_branch_and_in_progress_merge_refuse(self):
+        pw.git(self.dest, "checkout", "-b", "not-the-card")
+        with self.assertRaisesRegex(pw.Held, "different branch"):
+            self.run_transfer()
+        pw.git(self.dest, "checkout", "worker/a2")
+        merge_head = Path(pw.out(self.dest, "rev-parse", "--path-format=absolute", "--git-path", "MERGE_HEAD"))
+        merge_head.write_text(self.base + "\n")
+        with self.assertRaisesRegex(pw.Held, "unfinished merge"):
+            self.run_transfer()
+
+    def test_surviving_planned_receipt_reconciles_without_replay(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        write = pw.write_receipt
+        def fail_applied(path, data):
+            if data.get("phase") == "applied":
+                raise OSError("fixture crash after fast-forward")
+            write(path, data)
+        with patch.object(pw, "write_receipt", side_effect=fail_applied):
+            with self.assertRaises(OSError):
+                self.run_transfer()
+        before_source, before_dest = pw.head(self.source), pw.head(self.dest)
+        recovered = self.run_transfer()
+        self.assertEqual(recovered["phase"], "applied")
+        self.assertEqual(recovered["received_files"], recovered["committed_files"])
+        self.assertIn("received_worktree_files", recovered)
+        self.assertEqual((pw.head(self.source), pw.head(self.dest)), (before_source, before_dest))
+
+    def test_ambiguous_interruption_refuses_instead_of_replaying(self):
+        self.receipt.write_text(json.dumps({"phase": "preserving"}))
+        with self.assertRaisesRegex(pw.Held, "interrupted"):
+            self.run_transfer()
+        self.assertEqual(pw.head(self.dest), self.base)
+
+    def fake_workshop(self, source="a1"):
+        spec = json.dumps({"source": source, "paths": ["research/pkg/"]})
+        self.subjects = {"a1": ({"props": {"commission": "paused"}}, "paused"),
+                         "a2": ({"props": {"commission": "paused", "brings": spec}}, "paused")}
+        house = SimpleNamespace(dir=self.state, load=lambda: None)
+        ws = workshop.Workshop(house)
+        ws.commissions = lambda w: self.subjects
+        self.messages = []
+        ws.say = lambda card, text, **kw: self.messages.append((card, text))
+        def set_state(card, state, **props):
+            self.subjects[card][0]["props"].update(commission=state, **props)
+        ws.set_state = set_state
+        ws.bring_props = lambda card, **props: self.subjects[card][0]["props"].update(**props)
+        return ws, self.subjects["a2"][0]
+
+    def test_house_paused_delivery_does_not_start_models_and_reports_once(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        ws, subject = self.fake_workshop()
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual(subject["props"]["commission"], "paused")
+        self.assertEqual(len(self.messages), 1)
+        self.assertEqual(ws.workers, {})
+
+    def test_main_input_hold_is_satisfied_only_by_real_import(self):
+        self.put(self.live, "research/pkg/new.txt", "main artifact")
+        ws, subject = self.fake_workshop(source="main")
+        subject.update(title="Review", text="Read research/pkg/new.txt")
+        import shared
+        self.assertEqual(shared.check(subject, self.live)["hold"], ["research/pkg/new.txt"])
+        self.assertEqual(ws.brought_paths("a2", subject), set())
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertFalse(ws.uncommitted(None, "a2", subject))
+        self.assertFalse(shared.check(subject, self.live, available=ws.brought_paths("a2", subject))["worker"])
+        # The main files remain uncommitted; no blanket uncommitted=ok is set.
+        self.assertEqual(pw.head(self.live), self.base)
+        self.assertNotIn("uncommitted", subject["props"])
+
+    def test_house_busy_worker_and_real_process_lease_hold(self):
+        ws, subject = self.fake_workshop()
+        ws.workers["a1"] = SimpleNamespace(busy=True, alive=lambda: True)
+        self.assertFalse(ws.bring("a2", subject))
+        self.assertFalse(ws.bring("a2", subject))
+        self.assertEqual(len(self.messages), 1)
+        ws.workers.clear()
+        # A surviving adapter outside Workshop's in-memory registry still owns
+        # its process-held lease. A separate process holds it deterministically.
+        import subprocess
+        code = ("import sys;sys.path.insert(0,sys.argv[1]);"
+                "from worker_lease import worker_leases;"
+                "lease=worker_leases([sys.argv[2]]);lease.__enter__();"
+                "print('held',flush=True);sys.stdin.readline()")
+        child = subprocess.Popen([sys.executable, "-c", code, str(HERE.parents[1] / "codex-residents"),
+                                  str(self.state / "worker-a1/worker.lock")],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(child.stdout.readline().strip(), "held")
+            self.assertFalse(ws.bring("a2", subject))
+            self.assertIn("lease", subject["props"]["brings_status"].lower())
+            self.assertEqual(pw.head(self.dest), self.base)
+        finally:
+            child.communicate("\n", timeout=10)
+
+    def test_unleased_saved_runtime_is_unknown_not_assumed_stopped(self):
+        ws, subject = self.fake_workshop()
+        ws.card_state = lambda card: {"session": "old", "session_provider": "claude"} if card == "a1" else {}
+        self.assertFalse(ws.bring("a2", subject))
+        self.assertIn("unleased", subject["props"]["brings_status"])
+        self.assertEqual(pw.head(self.dest), self.base)
+
+    def test_house_creates_only_absent_recipient_worktree(self):
+        pw.git(self.live, "worktree", "remove", str(self.dest))
+        self.put(self.source, "research/pkg/new.txt", "source")
+        ws, subject = self.fake_workshop()
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "source")
+
+    def test_step_processes_paused_request_before_resume_and_never_starts(self):
+        self.put(self.source, "research/pkg/new.txt", "source")
+        ws, subject = self.fake_workshop()
+        ws.compare_lived = lambda w: None
+        ws.keeper_reverts = lambda w: False
+        ws.limit_handoffs = lambda w, cfg: False
+        ws.ordered = lambda cs, cfg: cs.items()
+        with patch.object(ws, "resume") as resume, patch.object(ws, "begin") as begin:
+            ws.step(None, {})
+        resume.assert_not_called()
+        begin.assert_not_called()
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "source")
+        self.assertEqual(subject["props"]["commission"], "paused")
+
+    def test_changed_request_and_busy_landing_do_not_mutate(self):
+        ws, subject = self.fake_workshop()
+        with patch.object(landing, "_try_lock", return_value=None):
+            self.assertFalse(ws.bring("a2", subject))
+        self.assertEqual(pw.head(self.dest), self.base)
+        initial = self.subjects
+        calls = 0
+        def changed(_):
+            nonlocal calls
+            calls += 1
+            return initial if calls == 1 else {"a2": ({"props": {"brings": "{}"}}, "paused")}
+        ws.commissions = changed
+        self.assertFalse(ws.bring("a2", subject))
+        self.assertIn("changed", subject["props"]["brings_status"])
+        self.assertEqual(pw.head(self.source), self.base)
+        self.assertEqual(pw.head(self.dest), self.base)
+
+    def test_delivery_order_requires_actual_prior_receipt_not_status_prop(self):
+        ws, subject = self.fake_workshop()
+        spec = json.loads(subject["props"]["brings"])
+        spec["after"] = "a1"
+        subject["props"]["brings"] = json.dumps(spec)
+        self.subjects["a1"][0]["props"].update(brings=json.dumps({
+            "source": "main", "paths": ["research/pkg/existing.txt"]}), brings_status="applied forged")
+        self.assertFalse(ws.bring("a2", subject))
+        self.assertIn("receipt", subject["props"]["brings_status"])
+        self.assertEqual(pw.head(self.dest), self.base)
+
+    def test_order_survives_prior_review_worktree_removal(self):
+        ws, subject = self.fake_workshop(source="main")
+        prior_raw = json.dumps({"source": "main", "paths": ["research/pkg/existing.txt"]})
+        self.subjects["a1"][0]["props"]["brings"] = prior_raw
+        _, key = pw.request(prior_raw, "a1")
+        prior_path = self.state / "brings" / f"a1-{key}.json"
+        pw.transfer(landing, self.live, self.source, "main", "a1",
+                    ["research/pkg/existing.txt"], prior_path, key)
+        pw.git(self.live, "worktree", "remove", str(self.source))
+        self.put(self.live, "research/pkg/new.txt", "browser")
+        spec = json.loads(subject["props"]["brings"])
+        spec["after"] = "a1"
+        subject["props"]["brings"] = json.dumps(spec)
+        self.assertTrue(ws.bring("a2", subject))
+        self.assertEqual((self.dest / "research/pkg/new.txt").read_text(), "browser")
+
+
+if __name__ == "__main__":
+    unittest.main()

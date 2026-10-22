@@ -62,7 +62,8 @@ HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "co
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
                "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py",
-               "artifact_view.py", "guarded_artifacts.py", "image_comments.py", "worker_selection.py"}
+               "artifact_view.py", "guarded_artifacts.py", "image_comments.py", "worker_selection.py",
+               "preserved_work.py", "shared.py"}
 WAITING = "ready, and waiting to land"     # how a landing's wait begins on its card, said once per wait (land)
 REVERTS = HERE / "house-state" / "reverts.jsonl"     # a5292: the landings keeper.py reverted, one JSON line each
 
@@ -465,6 +466,8 @@ class Workshop:
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
         for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
+            if (s.get("props") or {}).get("brings") and not self.bring(cid, s):
+                continue  # A dependency never starts a model or overwrites its work.
             if state == "paused":
                 # Finish an already-running turn but never deliver another message or restart.
                 if wk:
@@ -705,7 +708,7 @@ class Workshop:
         if said == "ok":
             return False
         try:
-            c = shared.check(s, REPO, w)
+            c = shared.check(s, REPO, w, available=self.brought_paths(cid, s))
         except Exception:                # git could not be read: the card starts as it did before a5296
             return False
         if c["key"] and c["key"] != said:
@@ -1005,6 +1008,129 @@ class Workshop:
                  or worker_selection.requested(s.get("props") or {}))
         return bool(lane) and not fresh and bool(self.builders(cfg, lane["provider"]))
 
+    def bring(self, cid, subject):
+        """Process even paused recipients, without unpausing or starting them."""
+        import landing
+        import preserved_work as pw
+        raw = (subject.get("props") or {}).get("brings")
+        key = ""
+        try:
+            spec, key = pw.request(raw, cid)
+            receipt = self.house.dir / "brings" / f"{cid}-{key}.json"
+            # Already completed handoffs must not block a running receiver.
+            if receipt.exists():
+                saved = pw.read_receipt(receipt)
+                if saved.get("phase") == "applied":
+                    tree = TREES / cid
+                    pw.registered(REPO, tree, f"worker/{cid}")
+                    if pw.git(tree, "merge-base", "--is-ancestor", saved["recipient_after"],
+                              "HEAD", check=False).returncode == 0:
+                        self.brought(cid, subject, key, receipt, saved)
+                        return True
+                    raise pw.Held("completed bring is no longer in this worktree; reconcile its receipt")
+            source = spec["source"]
+            if prior := spec.get("after"):
+                other = self.commissions(self.house.load()).get(prior)
+                if not other or not (other[0].get("props") or {}).get("brings"):
+                    raise pw.Held(f"waiting for {prior}'s handoff request")
+                _, prior_key = pw.request(other[0]["props"]["brings"], prior)
+                prior_path = self.house.dir / "brings" / f"{prior}-{prior_key}.json"
+                if not prior_path.exists():
+                    raise pw.Held(f"waiting for {prior}'s handoff receipt")
+                prior_result = pw.read_receipt(prior_path)
+                if prior_result.get("phase") != "applied":
+                    raise pw.Held(f"waiting for {prior}'s completed handoff")
+                # A reviewed/reported recipient may already have had its idle
+                # worktree removed. Its kept branch (or landed main) is durable.
+                if not any(pw.git(REPO, "merge-base", "--is-ancestor",
+                                  prior_result["recipient_after"], ref, check=False).returncode == 0
+                           for ref in (f"refs/heads/worker/{prior}", "refs/heads/main")):
+                    raise pw.Held(f"{prior}'s handoff needs reconciliation")
+            if source != "main" and source not in self.commissions(self.house.load()):
+                raise pw.Held("unknown source card")
+            for card in {cid, source} - {"main"}:
+                worker = self.workers.get(card)
+                if worker and (worker.busy or worker.alive()):
+                    raise pw.Held(f"{card} still has a worker process; waiting for it to be set down")
+                if card in self.landing:
+                    raise pw.Held(f"{card} is being judged")
+                saved_worker = self.card_state(card)
+                if saved_worker.get("session") and saved_worker.get("session_provider", "claude") != "codex":
+                    # Legacy Claude starts have no card process lease. An empty
+                    # lease cannot certify a surviving, untracked process gone.
+                    proc = getattr(worker, "proc", None)
+                    if proc is None or proc.poll() is None:
+                        raise pw.Held(f"{card} has an unleased saved runtime; "
+                                      "a known stopped owner is required before importing")
+            # The process-held card leases also cover adapters surviving a house
+            # restart. A transient lease_free() test is insufficient here.
+            runtime = HERE.parents[1] / "codex-residents"
+            if str(runtime) not in sys.path:
+                sys.path.insert(0, str(runtime))
+            from worker_lease import worker_leases
+            lock = landing._try_lock()
+            if not lock:
+                raise pw.Held("landing serialization is busy; handoff queued")
+            try:
+                leases = [self.house.dir / f"worker-{card}" / "worker.lock"
+                          for card in {cid, source} - {"main"}]
+                with worker_leases(leases, timeout=0):
+                    # Do not honor a stale request after waiting on an owner.
+                    fresh = self.commissions(self.house.load()).get(cid)
+                    if not fresh or (fresh[0].get("props") or {}).get("brings") != raw:
+                        raise pw.Held("brings request changed")
+                    tree = TREES / cid
+                    if not tree.exists():
+                        branch = f"worker/{cid}"
+                        exists = git("show-ref", "--verify", "--quiet", f"refs/heads/{branch}",
+                                     cwd=REPO).returncode == 0
+                        git("worktree", "add", str(tree), *([] if exists else ["-b", branch]),
+                            *([branch] if exists else ["HEAD"]), cwd=REPO, check=True)
+                    result = pw.transfer(landing, REPO if source == "main" else TREES / source,
+                                         tree, source, cid, spec["paths"], receipt, key)
+            finally:
+                landing._unlock(lock)
+            self.brought(cid, subject, key, receipt, result)
+            return True
+        except (pw.Held, RuntimeError, OSError, ValueError) as exc:
+            # Same blocked state is said once; a material change has its own receipt.
+            detail = str(exc)[:800]
+            status = f"held {key}: {detail}"
+            if (subject.get("props") or {}).get("brings_status") != status:
+                self.bring_props(cid, brings_status=status)
+                self.say(cid, "Preserved-work handoff held: " + detail, to="nobody")
+            return False
+
+    def brought(self, cid, subject, key, receipt, result):
+        status = f"applied {key}"
+        if (subject.get("props") or {}).get("brings_status") != status:
+            self.bring_props(cid, brings_status=status, brings_receipt=str(receipt))
+            self.say(cid, f"Preserved work brought from {result['source']}: {len(result['files'])} files; "
+                     f"source {result['source_commit']}; receiver {result['recipient_after']}. "
+                     f"Raw-file and committed-blob SHA256 manifest: {receipt}. "
+                     "No main landing, model start or transferred code execution.", to="nobody")
+
+    def bring_props(self, cid, **props):
+        # Bookkeeping never writes commission state from an earlier scene.
+        extra = " ".join(f"{k}={json.dumps(str(v), ensure_ascii=False)}" for k, v in props.items())
+        self.house.act("house", f"look {cid} :1; do prop {cid} {extra}")
+
+    def brought_paths(self, cid, subject):
+        """Only a real imported commit satisfies the new-main-file hold."""
+        import preserved_work as pw
+        try:
+            _, key = pw.request((subject.get("props") or {}).get("brings"), cid)
+            receipt = pw.read_receipt(self.house.dir / "brings" / f"{cid}-{key}.json")
+            tree = TREES / cid
+            pw.registered(REPO, tree, f"worker/{cid}")
+            if receipt.get("phase") == "applied" and pw.git(
+                    tree, "merge-base", "--is-ancestor", receipt["recipient_after"],
+                    "HEAD", check=False).returncode == 0:
+                return set(receipt["files"])
+        except (pw.Held, OSError, ValueError, KeyError):
+            pass
+        return set()
+
     def card_state(self, cid):
         try:
             return json.loads((self.house.dir / f"worker-{cid}" / "state.json").read_text(encoding="utf-8"))
@@ -1229,7 +1355,7 @@ class Workshop:
         first = (f"Your commission ({cid}), asked by {asked_by}:\n\n{s['title']}\n\n{s.get('text') or '(no text)'}\n\n"
                  f"Read the code you need first. Comment on {cid} if anything is unclear.")
         try:                              # a5296: what the house found about the files it names, said to the card at ask
-            found = shared.check(s, REPO, w)["worker"]
+            found = shared.check(s, REPO, w, available=self.brought_paths(cid, s))["worker"]
             first += f"\n\n{found}" if found else ""
         except Exception:
             pass
