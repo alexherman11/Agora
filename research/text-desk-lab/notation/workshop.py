@@ -164,7 +164,14 @@ markers in your files (not committed) and the card lists the files and the block
 hold (plain file edits, no git), re-make any goldens you changed, run health, and set ready again: the house commits
 the merge. A binary conflict is not merged: the card says which files. If you can run git you may still merge first:
   git merge main             (resolve conflicts with Edit, then git add and git commit)
-  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)"""
+  git restore --source=main -- <file>      puts one file back as main has it (a golden you will re-make)
+
+To update a preserved branch BEFORE acceptance, request commission=prepare and end your turn.
+The house waits for the runtime to be set down and its card lease released, checkpoints uncommitted
+source with hashes, and merges current main under landing serialization. It returns working with a
+receipt and conflict inventory; prepare never judges, lands or restarts. Resolve conflicts with plain
+file edits, rerun acceptance and re-read the card/comments before any later ready request.
+Interrupted preparation is held for reconciliation; never blindly repeat it through a new request."""
 
 
 WHO_WORKER = "You are a worker in Agora's house: a disposable builder for one commission, then gone."
@@ -466,6 +473,9 @@ class Workshop:
         # a5378: cards underway first, so a card coming back to its own builder takes it before a new card can
         for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
+            if state == "prepare":
+                self.prepare(cid, s)
+                continue  # preparation never enters worker dispatch or landing
             if (s.get("props") or {}).get("brings") and not self.bring(cid, s):
                 continue  # A dependency never starts a model or overwrites its work.
             if state == "paused":
@@ -1007,6 +1017,93 @@ class Workshop:
         fresh = (str((s.get("props") or {}).get("worker_fresh") or "").strip().lower() in FRESH
                  or worker_selection.requested(s.get("props") or {}))
         return bool(lane) and not fresh and bool(self.builders(cfg, lane["provider"]))
+
+    def prepare(self, cid, subject):
+        """House-only branch preparation; never judge, land or request restart."""
+        import landing
+        import preserved_work as pw
+        try:
+            wk = self.workers.get(cid)
+            if wk and (wk.busy or wk.alive()):
+                raise pw.Held("worker process still owns the card; waiting for it to be set down")
+            if cid in self.landing:
+                raise pw.Held("card is being judged")
+            saved = self.card_state(cid)
+            if saved.get("session") and saved.get("session_provider", "claude") != "codex":
+                proc = getattr(wk, "proc", None)
+                if proc is None or proc.poll() is None:
+                    raise pw.Held("unleased saved runtime needs a known stopped owner")
+            runtime = HERE.parents[1] / "codex-residents"
+            if str(runtime) not in sys.path:
+                sys.path.insert(0, str(runtime))
+            from worker_lease import worker_leases
+            lock = landing._try_lock()
+            if not lock:
+                raise pw.Held("landing serialization is busy; prepare queued")
+            try:
+                with worker_leases([self.house.dir / f"worker-{cid}" / "worker.lock"], timeout=0):
+                    w = self.house.load()
+                    fresh = self.commissions(w).get(cid)
+                    if not fresh or fresh[1] != "prepare":
+                        return
+                    sid = fresh[0]["id"]
+                    requests = [e for e in w.events
+                                if not e.get("undone") and
+                                (e.get("args") or {}).get("commission") == "prepare" and
+                                e.get("target") in (cid, sid)]
+                    if not requests:
+                        raise pw.Held("prepare needs its world request event")
+                    request = str(requests[-1]["id"])
+                    receipt = self.house.dir / "prepares" / f"{cid}-{request}.json"
+                    def admit():
+                        latest = self.house.load()
+                        current = self.commissions(latest).get(cid)
+                        if not current or current[1] != "prepare":
+                            raise pw.Held("prepare withdrawn during checkpoint; branch kept, merge not started")
+                        newer = [e for e in latest.events if not e.get("undone")
+                                 and (e.get("args") or {}).get("commission") == "prepare"
+                                 and e.get("target") in (cid, sid)]
+                        if not newer or str(newer[-1]["id"]) != request:
+                            raise pw.Held("prepare request changed during checkpoint")
+                    result = pw.prepare_main(REPO, TREES / cid, cid, receipt, request,
+                        report=lambda kept: self.report_receiver_checkpoint(cid, receipt, kept),
+                        admit=admit)
+                    admit()  # preserve a changed/withdrawn world request after the Git wait too
+                    if result["conflicts"] and not result.get("merge_aborted"):
+                        # Reuse ready's ordinary marker fence after a prepare
+                        # conflict, including after parent/runtime recovery.
+                        pending = dict(files=result["conflicts"], at=time.time(),
+                                       main=result["main"], prepare_receipt=str(receipt))
+                        if wk:
+                            wk.state["house_merge"] = pending
+                            wk.save()
+                        else:
+                            state = self.card_state(cid)
+                            state["house_merge"] = pending
+                            atomic_state(self.house.dir / f"worker-{cid}" / "state.json", state)
+                    detail = (f"Preparation only: main {result['main']} merged into the preserved branch; "
+                              f"result {result['phase']}, HEAD {result['after']}. "
+                              f"Receipt: {receipt}. No judging, landing or restart. ")
+                    if result.get("merge_aborted"):
+                        detail += ("Binary conflicts: " + ", ".join(result["binary"])
+                                   + ". Merge aborted; checkpoint retained. Ask the lead which version to keep.")
+                    elif result["conflicts"]:
+                        detail += ("Conflicts left for plain file edits: " + ", ".join(result["conflicts"])
+                                   + ".\n" + self._hunks(TREES / cid, result["conflicts"]))
+                    else:
+                        detail += "Clean merge; run acceptance before ready."
+                    # A crash before this state update reuses the durable result.
+                    self.say(cid, detail, to="nobody")
+                    self.set_state(cid, "working", prepare_status=result["phase"],
+                                   prepare_receipt=str(receipt))
+            finally:
+                landing._unlock(lock)
+        except (pw.Held, RuntimeError, OSError, ValueError) as exc:
+            detail = "held: " + str(exc)[:800]
+            fresh = self.commissions(self.house.load()).get(cid)
+            if fresh and fresh[1] == "prepare" and (fresh[0].get("props") or {}).get("prepare_status") != detail:
+                self.bring_props(cid, prepare_status=detail)
+                self.say(cid, "Preparation " + detail, to="nobody")
 
     def bring(self, cid, subject):
         """Process even paused recipients, without unpausing or starting them."""
@@ -1731,7 +1828,7 @@ class Workshop:
         if r.returncode:
             self.returned(cid, s, wk, "working", f"the house could not commit your resolution of the merge: "
                                                  f"{(r.stdout + r.stderr).strip()[-500:]}",
-                          f"~ house: the house could not commit your resolution of the merge; see the card.")
+                          "~ house: the house could not commit your resolution of the merge; see the card.")
             return False
         wk.state.pop("house_merge", None)
         wk.save()
