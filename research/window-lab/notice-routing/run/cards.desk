@@ -1,0 +1,4 @@
+look f5189 :1
+do create f5189 kind=task title="Copy check a8911: JEFF-asked card" asked_by=jeff commission=working
+do create f5189 kind=task title="Copy check a8911: Alex-asked card" asked_by=alex commission=working
+do create f5189 kind=task title="Copy check a8911: permission card" asked_by=jeff commission=working

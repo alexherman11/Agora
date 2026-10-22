@@ -1,0 +1,6 @@
+look a10020 :1
+do prop a10020 commission=waiting
+look a10022 :1
+do prop a10022 commission=waiting
+look a10024 :1
+do prop a10024 commission=waiting
