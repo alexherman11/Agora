@@ -1,0 +1,6 @@
+# restart-house <why>: ask the house to restart itself once, when no turn is under way (a10269; house_restart.py).
+# Makes a note in your corner the house reads: it refuses without a reason, for anyone the house note's restart_by
+# does not name (default jeff,alex), and while the guard sees a game; otherwise no new turn starts, the note says what
+# is still in flight, and when nothing is the house restarts and the note gets its new pid and start time.
+# Cancel while it waits: do prop <the note> state=cancelled.
+do create $me.corner kind=note title="House restart asked" role=house-restart state=asked asked_by=$me why=$*
