@@ -108,21 +108,31 @@ class CleanupTests(unittest.TestCase):
         self.assertTrue(owned.stopping.is_set())
 
     def test_real_pipe_eof_waits_for_owned_child_and_releases_output(self):
-        # Real process/pipe/file lifetime, fake backend: no world, port or model.
+        # Real spawn paths while the lifetime reader is blocked. No world/model.
+        # Inheriting that pipe can stall a Windows child before Python starts.
         program = """
-import pathlib, subprocess, sys, threading
-from types import SimpleNamespace
+import pathlib, subprocess, sys, threading, time
 import door
 root = pathlib.Path(sys.argv[1])
-class Owned:
+reader = threading.Event()
+original_stdin = sys.stdin
+class Input:
+    @property
+    def buffer(self):
+        return self
+    def read(self):
+        reader.set()
+        return original_stdin.buffer.read()
+sys.stdin = Input()
+class Owned(door.Backend):
     def __init__(self):
-        self.out = (root / 'deskd.out').open('w')
-        self.proc = subprocess.Popen([sys.executable, '-c', 'import sys; sys.stdin.buffer.read()'],
-                                     stdin=subprocess.PIPE, stdout=self.out)
+        script = ("import pathlib,time; pathlib.Path('child-ready').touch(); end=time.monotonic()+60"
+                  "\\nwhile not pathlib.Path('child-stop').exists() and time.monotonic()<end: time.sleep(.02)")
+        super().__init__(type('Owner', (), {'state': root, 'static': None})(),
+                         'fixture', argv=['-c', script])
     def stop(self, *args):
-        self.proc.stdin.close()
+        (root / 'child-stop').touch()
         self.proc.wait(timeout=5)
-        self.out.close()
         (root / 'reaped').touch()
 class TestDoor:
     def __init__(self, *args):
@@ -131,6 +141,11 @@ class TestDoor:
         self.visiting = threading.RLock()
         self.current, self.versions = None, {}
     def start_first(self):
+        assert reader.wait(2)
+        # Give the real blocking OS read time to begin, not just set its event.
+        time.sleep(0.05)
+        ok, _ = door.git_in(root, 'init', '-q')
+        assert ok
         self.current = Owned()
     def watch(self):
         self.stopping.wait()
@@ -150,6 +165,8 @@ door.Door, door.ThreadingHTTPServer = TestDoor, Server
 sys.argv = ['door.py', '--no-git', '--lifetime-stdin']
 door.main()
 """
+        # Backend's cwd normally holds deskd.py. This fixture has only a marker.
+        program = program.replace("root = pathlib.Path(sys.argv[1])", "root = pathlib.Path(sys.argv[1]); door.HERE = root")
         proc = subprocess.Popen([sys.executable, "-c", program, str(self.root)], cwd=HERE,
                                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
         try:
@@ -157,12 +174,51 @@ door.main()
             while not (self.root / "ready").exists() and time.monotonic() < until:
                 time.sleep(0.02)
             self.assertTrue((self.root / "ready").exists())
+            while not (self.root / "child-ready").exists() and time.monotonic() < until:
+                time.sleep(0.02)
+            self.assertTrue((self.root / "child-ready").exists(),
+                            "owned child must start before lifetime EOF, not only during cleanup")
         finally:
             proc.stdin.close()
             proc.wait(timeout=10)
         self.assertEqual(proc.returncode, 0)
         self.assertTrue((self.root / "reaped").exists())
         self.assertEqual(cleanup.remove_tree(self.root), [])
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows inherited pipe startup")
+    def test_inherited_lifetime_pipe_reproduces_startup_stall(self):
+        # Control for the real spawn regression above: before the fix a blocked
+        # lifetime read and inherited stdin prevent the child reaching its code.
+        program = """
+import pathlib, subprocess, sys, threading, time
+root = pathlib.Path(sys.argv[1])
+def read():
+    (root / 'reading').touch()
+    sys.stdin.buffer.read()
+threading.Thread(target=read, daemon=True).start()
+while not (root / 'reading').exists(): time.sleep(.01)
+time.sleep(.05)
+(root / 'spawning').touch()
+p = subprocess.Popen([sys.executable, '-c',
+    "import pathlib; pathlib.Path('child-ready').touch()"], cwd=root)
+p.wait(timeout=5)
+"""
+        proc = subprocess.Popen([sys.executable, "-c", program, str(self.root)],
+                                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        try:
+            until = time.monotonic() + 5
+            while not (self.root / "spawning").exists() and time.monotonic() < until:
+                time.sleep(.02)
+            self.assertTrue((self.root / "spawning").exists())
+            time.sleep(.2)
+            self.assertFalse((self.root / "child-ready").exists(),
+                             "control no longer reproduces the inherited-stdin stall")
+        finally:
+            proc.stdin.close()
+            proc.wait(timeout=10)
+        self.assertEqual(proc.returncode, 0)
+        self.assertTrue((self.root / "child-ready").exists(),
+                        "EOF must release the stalled startup in the old path")
 
     def test_retired_visit_cleanup_is_joined_even_after_leaving_version_map(self):
         owner = object.__new__(door.Door)
@@ -225,12 +281,15 @@ door.main()
                 patch.object(landing, "git", return_value=results) as git, \
                 patch.object(landing, "log") as log, \
                 patch("fixture_cleanup.remove_tree", return_value=["state/deskd.out: Invalid argument",
-                      "state/visits: Permission denied"]), \
+                      "state/visits: Permission denied", "bring-fixture/live/.git: Directory not empty",
+                      "lq-fixture/state/landing-queue.lock: No such file or directory"]), \
                 patch("sys.stderr", new_callable=io.StringIO) as err:
             landing.clean_room()
         self.assertIn("could not remove", err.getvalue())
         self.assertIn("deskd.out", err.getvalue())
         self.assertIn("Permission denied", err.getvalue())
+        self.assertIn("bring-fixture/live/.git", err.getvalue())
+        self.assertIn("lq-fixture/state/landing-queue.lock", err.getvalue())
         log.assert_called_once()
         self.assertEqual(git.call_args.args, ("clean", "-ffdxq", "-e", "/research/window-lab/.tmp-agora/"))
 

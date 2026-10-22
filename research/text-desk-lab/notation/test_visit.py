@@ -111,6 +111,7 @@ state, trees = tmp / "state", tmp / "trees"
 port = free_port()
 base = f"http://127.0.0.1:{port}"
 door = None
+owned_doors = []
 
 
 def raw(who, line, session=WORLD, headers=None, whole=True, **more):
@@ -137,9 +138,11 @@ def at_home():
 
 
 def start_door():
-    p = subprocess.Popen([sys.executable, "door.py", str(port), "--no-git", "--world", WORLD, "--state", str(state),
-                          "--trees", str(trees), "--lifetime-stdin"], cwd=HERE, stdin=subprocess.PIPE,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with (tmp / "door.out").open("a", encoding="utf-8") as out:
+        p = subprocess.Popen([sys.executable, "door.py", str(port), "--no-git", "--world", WORLD, "--state", str(state),
+                              "--trees", str(trees), "--lifetime-stdin"], cwd=HERE, stdin=subprocess.PIPE,
+                             stdout=out, stderr=subprocess.STDOUT)
+    owned_doors.append(p)  # Own the start even if readiness or shutdown fails.
     t = time.time() + 60
     while time.time() < t:
         try:
@@ -147,6 +150,11 @@ def start_door():
                 return p
         except OSError:
             time.sleep(0.2)
+        if p.poll() is not None:
+            break
+    for path in (tmp / "door.out", state / "deskd.out"):
+        if path.exists():
+            print(f"test_visit: {path.name}:\n{path.read_text(encoding='utf-8', errors='replace')[-6000:]}", flush=True)
     stop_door(p)
     raise SystemExit("test_visit: the door did not answer within 60 s")
 
@@ -283,7 +291,11 @@ try:
     say("juniper", "visit a9001 with=sable")      # two inside when it dies: each is told, once (Pike e5672)
     vs = get(base + "/door/status")["versions"]
     pid = vs[one]["pid"]
-    subprocess.run(["taskkill", "/F", "/PID", str(pid)] if sys.platform == "win32" else ["kill", "-9", str(pid)], capture_output=True)
+    killed = subprocess.run(["taskkill", "/F", "/PID", str(pid)] if sys.platform == "win32" else ["kill", "-9", str(pid)],
+                            capture_output=True, text=True)
+    if killed.returncode:
+        raise SystemExit("test_visit: could not stop the owned fixture version: " +
+                         (killed.stderr or killed.stdout).strip()[-1200:])
     time.sleep(1)
     before = total()
     t = say("juniper", f'do create {R.SHELF} kind=note title="typed after it died"')
@@ -384,10 +396,15 @@ try:
     check("and the line after is home's", "VERSION" not in t and "[in " not in t and SAYS in t, t)
 finally:
     try:
-        if door is not None:
-            stop_door(door)
+        for p in owned_doors:
+            if p.poll() is None:
+                try:
+                    stop_door(p)
+                except subprocess.TimeoutExpired:
+                    check("owned door stopped within cleanup deadline", False,
+                          f"retained fixture at {tmp}; pid {p.pid} has not exited")
     finally:
-        if door is None or door.poll() is not None:
+        if all(p.poll() is not None for p in owned_doors):
             for p in (saved, saved.with_suffix(".lock")):
                 p.unlink(missing_ok=True)
             remaining = remove_tree(tmp, readonly=True)

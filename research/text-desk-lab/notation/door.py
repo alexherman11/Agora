@@ -59,6 +59,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 NOTATION = HERE.relative_to(REPO).as_posix()      # where the lab is in any checkout: research/text-desk-lab/notation
 PY = sys.executable
+# Services and Git never consume the door's stdin. In particular, inheriting
+# --lifetime-stdin's pipe while its reader blocks can stall Windows child
+# startup until EOF (including the venv Python launcher). Keep it door-only.
 HOP = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-authorization",
        "proxy-authenticate", "host", "content-length", "origin", "sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest"}
 
@@ -73,7 +76,8 @@ def free_port():
 
 def git(*args):
     try:
-        return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, timeout=20).stdout.strip()
+        return subprocess.run(["git", *args], cwd=REPO, stdin=subprocess.DEVNULL,
+                              capture_output=True, text=True, timeout=20).stdout.strip()
     except Exception:
         return ""
 
@@ -101,7 +105,7 @@ class Backend:
         cmd = [PY, *(argv or ["deskd.py"]), str(self.port), *([door.static] if door.static and not argv else [])]
         try:
             self.proc = subprocess.Popen(cmd, cwd=HERE, env={**os.environ, "DESKD_CODE": code, "DESKD_PARENT": str(os.getpid()), **(env or {})},
-                                         stdout=out, stderr=subprocess.STDOUT)
+                                         stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT)
         finally:
             out.close()
         self.painter = None
@@ -141,7 +145,7 @@ class Backend:
 def git_in(tree, *args):
     """git in a commission's worktree. -> (ok, stdout); the door types git so that no resident does."""
     try:
-        r = subprocess.run(["git", *args], cwd=tree, capture_output=True, text=True, timeout=30)
+        r = subprocess.run(["git", *args], cwd=tree, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
         return r.returncode == 0, r.stdout.strip()
     except Exception:
         return False, ""
@@ -211,7 +215,8 @@ class Version:
         import io
         import tarfile
         try:
-            r = subprocess.run(["git", "archive", "--format=tar", self.sha, NOTATION], cwd=self.tree, capture_output=True, timeout=120)
+            r = subprocess.run(["git", "archive", "--format=tar", self.sha, NOTATION], cwd=self.tree,
+                               stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
         except Exception as e:
             return f"could not be read out of git ({type(e).__name__}: {e})"
         if r.returncode:
@@ -239,6 +244,7 @@ class Version:
         out = open(self.out, "a", encoding="utf-8")
         try:
             self.proc = subprocess.Popen([PY, "deskd.py", str(self.port)], cwd=self.dir, stdout=out, stderr=subprocess.STDOUT,
+                                         stdin=subprocess.DEVNULL,
                                          env={**env, "DESKD": "off", "DESKD_CODE": self.label, "DESKD_PARENT": str(os.getpid())})
         finally:
             out.close()
