@@ -123,7 +123,7 @@
   },
   "world_nongame_increment": {
     "authority": "JEFF c9725",
-    "status": "staged; no live run under this policy",
+    "status": "landed6b9aaea; one authorised fake attempt completed",
     "world_setting": "The house guard_nongame; no code allowlist",
     "schema": "house-guard-context-v2",
     "tests": {
@@ -138,5 +138,21 @@
     },
     "live_gate": "confirmed landing/house refresh then ONE authorised fake attempt; stop on refusal",
     "limits": "snapshot policy not measured absence of games; no native browser/mail or delegated child admission"
+  },
+  "successful_direct_child_attempt": {
+    "authority": "JEFF c9804",
+    "landed": "6b9aaea",
+    "attempts": 1,
+    "manifest_complete": true,
+    "pid": 92092,
+    "created": 134371175695230930,
+    "cleanup_status": "ended",
+    "cleanup_wait": 0,
+    "runtime_closure": "unknown: no reconciled child ownership boundary",
+    "cleanup_complete": false,
+    "alex_screen_continuity": "unknown: worker foreground unavailable",
+    "evidence": "research/window-lab/sandbox-ownership/LIVE-20261021.json",
+    "evidence_sha256": "6b98f8d2292e9733a9d4e9bc835f19f2cc8dd638b584af9942f74b8ad8fa90a2",
+    "new_tests": "not rerun: live/evidence-only round"
   }
 }
