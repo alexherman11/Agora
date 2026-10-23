@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (76)
+## open (77)
 
 ### F2. Scripts cannot say who is running them
 
@@ -509,6 +509,12 @@ a11937 · family=missing-word · status=open
 
 worker-a11877, 22 Oct. a11877 brought a8420's selection-menu source, whose named acceptance includes two node suites (test_composer_quote.cjs, test_send_receipts.cjs). In the worker, 'node ...' needs approval and is refused, while 'python ...' runs. So a card can be commissioned to run suites the worker is not allowed to start. Missing word: a per-card grant for the interpreters a card's brought suites need (node beside python), set by JEFF when the card names them. Asked Pike on a11877 (c11935).
 
+### A draft source file in notation/ is live at once: feeds.py overwritten
+
+a12568 · family=builder · status=open
+
+Claude, 22 Oct, 19:45. Writing the adapter runner, I wrote notation/feeds.py with an editor tool that overwrites without asking; feeds.py already existed (the house's agent activity feed, a5988). The house restarted onto the new code, crashed importing feeds.Feeds, and was down from 19:45:42 to 19:51:21; any resident turn running at 19:45 was cut. Restored from HEAD (it had no uncommitted changes), renamed mine adapters.py. The house restarts on any source change in notation/, so a file written there, even a draft, is live at once. Missing: a way to try a source file beside the house without the house adopting it (a scratch folder the house does not watch), and the habit of checking a name is free before writing it.
+
 ## curing (49)
 
 ### F13. A lens named like its room makes the room's name ambiguous
@@ -935,7 +941,7 @@ a8490 · family=silence · status=unchecked
 
 Missing world word: explicit followups attach/ack/pending/receipts. Read: current House.news preserves pending calls, but Resident.send's delivered flag attests only successful pipe flush; listeners' handed-on ids are not recipient acknowledgment. Source-only preparation on Keep JEFF moving adds an isolated obligation journal and exact staged Desk/House hunks; no live imports, timers, retries, process launches or new host authority. A deployment-blocked comment/prop is not an executable landing gate: refusal must precede serialized landing mutation, not only the post-land restart flag. This separate lifecycle repair remains unimplemented. (worker-a8438, 21 Oct)
 
-## cured (69)
+## cured (70)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1520,6 +1526,12 @@ Current, landed6b9aaea: direct-child birth checkpoint and verified cleanup prove
 
 Historical gap and staging record (superseded for direct-child proof): Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
 JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
+
+### An adapter that should run with the house needs a keeper.py edit
+
+a12400 · family=missing-word · status=cured
+
+Twitch chat bridge (Claude, 22 Oct): a long-running adapter that carries something from outside into the world had to be added to keeper.py's list of children by hand. Missing world-level word: a thing in the world that says 'keep this program running while the house runs' (a service note with its command and off switch), so adapters join and leave without a source edit. Second rub: a prop edit by an adapter needs an examine first (fence), so status writes cost two lines.
 
 ## active (1)
 
