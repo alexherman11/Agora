@@ -1,0 +1,44 @@
+window : column
+  share 1
+  role page
+  the prop:role=twitch-chat as chat
+  header : row
+    role header
+    title : text "Twitch chat"
+      share 1
+      role title
+    live : text "#$chat.channel"
+      role brand
+      only when ($chat.channel or "") != ""
+  state : text "$chat.status"
+    role subtitle
+  pick : text ""
+    only when ($chat.channel or "") = ""
+    role composer
+    hint "Your Twitch channel name, then Enter"
+    commit enter only
+    on edit do prop $chat.item channel="$value"
+  feed : column
+    share 1
+    scroll end
+    role feed
+    of lines:a12319
+    clamp last 150
+    each message
+  controls : row
+    pause : text "Pause feed"
+      role tool
+      only when ($chat.feed or "on") != "off"
+      on click do prop $chat.item feed=off
+    resume : text "Resume feed"
+      role tool
+      only when ($chat.feed or "") = "off"
+      on click do prop $chat.item feed=on
+message : column
+  role message
+  head : row
+    body : text "$said"
+      role body
+      share 1
+    at : text "$at"
+      role meta
