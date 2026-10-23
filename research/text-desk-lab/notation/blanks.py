@@ -13,7 +13,10 @@ world verbs, scripts and rules all fill their blanks here, the same way:
     $reach         your last line the desk did not do (refused or missed, within the half hour) and what came back,
                    as words: `[typed: ... | came back: ...]`; nothing when there is none (9 Oct; the wish verb uses it)
     $<handle>      a handle you named (set draft = a98, or create ... as=draft)
-    in a verb:     $1 $2 ... its words, $* the rest of the line exactly as said, $this the thing a verb lives on
+    in a verb:     $1 $2 ... its words, $* the rest of the line exactly as said, $this the thing a verb lives on;
+                   ${3...} its words from the 3rd on, the values $3 $4 ... give (quoted or not, the same words), one
+                   space between: `tell <person> <thing> <why...>` stores why="${3...}" (a894). Braces only: $3* is $3
+                   then *
     in a rule:     $item   the thing it fired on (the target, as in a lens act)
     the current thing's own words (8 Oct, names.py): in a rule, $title $text $kind $due $tags and any prop ($status)
                    are $item's; in a verb that lives on a thing they are $this's
@@ -52,16 +55,26 @@ LIT = ""          # a \$ in the line, kept out of shlex's way until it lands 
 # a3937: a blank is its name and every part after it ($1.before.text), read as one word: a pattern that stopped at the
 # first part filled $1.before and left '.text' behind as plain words, under an ok
 # Braces say where a blank ends, so what follows is words: ${1.title}.md, ${today}th. Groups: name, attr
-BLANK = re.compile(re.escape(LIT) + r"|\$(?P<b>\{)?(?P<name>\*|\d+|[A-Za-z_][A-Za-z0-9_]*)"
+# a894 (a11657): ${N...} is a verb's words from the Nth on; only in braces, so `*waves at $1*` stays Markdown. Its name
+# is "N..." (tail), so every reader of `name` sees it, and isdigit() never mistakes it for $N.
+BLANK = re.compile(re.escape(LIT) + r"|\$(?P<b>\{)?(?P<name>\*|(?(b)\d+\.\.\.|(?!))|\d+|[A-Za-z_][A-Za-z0-9_]*)"
                    r"(?P<attr>(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)(?(b)\})")
-WORD = re.compile(r"^\$(?P<b>\{)?(?P<name>\d+|[A-Za-z_][A-Za-z0-9_]*)(?P<attr>(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)(?(b)\})$")
+
+
+def tail_of(name):
+    """The N of a ${N...} blank's name ('3...'), or None."""
+    n = str(name or "")
+    return int(n[:-3]) if n.endswith("...") and n[:-3].isdigit() else None
+
+
+WORD =re.compile(r"^\$(?P<b>\{)?(?P<name>\d+|[A-Za-z_][A-Za-z0-9_]*)(?P<attr>(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)(?(b)\})$")
 PARTS = re.compile(r"\.[A-Za-z_][A-Za-z0-9_-]*")
 WORDS = {".title": "a title", ".text": "a text", ".maker": "a maker's name"}     # parts that are words, not things
 READS = ("look", "read", "examine", "x", "ex", "find", "table", "why", "compare", "history", "go", "where", "pivot",
          "verbs", "open", "close", "set")       # typed commands whose words name things: filled as values
 
 KNOWN = ("$here $here.<prop> $new $reach $today $now $me $me.corner $me.<prop> $house $house.<prop>, a handle ($name: set, or as= in this "
-         "reply); in a verb $1 $2 $* $this; in a rule $item; the current thing's own words ($title, $status); a thing's parts "
+         "reply); in a verb $1 $2 $* ${2...} $this; in a rule $item; the current thing's own words ($title, $status); a thing's parts "
          ".title .maker .text .in .before .after .<prop>; a value $( <expr> )")
 
 
@@ -335,10 +348,32 @@ def fill(desk, value, text=False, ctx=None, quote=False, soft=False):
         if m.group(0) == LIT:
             return "\\$" if soft else "$"
         name, attr = m.group("name"), m.group("attr") or ""
+        k = tail_of(name)
         if name == "*":
             if ctx.args is None:
                 return m.group(0)               # typed: $* is two characters
             val = literal(ctx.rest)
+        elif k is not None:
+            if ctx.args is None:
+                return m.group(0)               # typed: ${3...} is words, as $5 is
+            if k < 1:
+                if soft:
+                    return m.group(0)
+                raise Refusal(f"${{{name}}}: a verb's words count from 1 (${{1...}} is all of them)")
+            if k > len(ctx.args):
+                if soft:
+                    return m.group(0)
+                raise Refusal(f"{ctx.name or 'this'} needs {k} word(s) after it; got {len(ctx.args)}"
+                              + (f". help {ctx.name}" if ctx.name else ""))
+            words = ctx.args[k - 1:]
+            bad = next((x for x in words if isinstance(x, Refusal)), None)
+            if bad is not None:
+                if soft:
+                    return m.group(0)
+                raise bad
+            # a894: exactly the values $N, $N+1 ... would give (quoted or not, the same words), one space between;
+            # a value, filled once and never read again as desk words (a806)
+            val = " ".join(str(x) for x in words)
         elif name.isdigit() and ctx.args is None:
             return m.group(0)                   # typed: $5 is a price, not a blank
         else:
@@ -400,7 +435,8 @@ def kept(desk, verb, key, value):
     if ctx_of(desk).template or _kind(verb, key) != "prop" or whole_blank(value):
         return []
     return [m.group(0) for m in BLANK.finditer(str(value))
-            if m.group("name") and m.group("name") != "*" and not m.group("name").isdigit()]
+            if m.group("name") and m.group("name") != "*" and not m.group("name").isdigit()
+            and tail_of(m.group("name")) is None]
 
 
 def kept_note(words):

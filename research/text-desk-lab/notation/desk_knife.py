@@ -309,7 +309,7 @@ class DeskKnife(DeskMoo):
             name, attr = m.group("name"), m.group("attr") or ""
             if name == "new":
                 return None, "$new: a rule has no earlier line; it acts on $item, the thing it fired on"
-            if name.isdigit() or name in ("this", "*"):
+            if name.isdigit() or name in ("this", "*") or blanks.tail_of(name) is not None:
                 return None, (f"${name}{attr} is a verb's word; a rule has none. A rule's blanks: $item $item.title $item.<prop> "
                               f"$item.maker, $item's own words bare ($title, $status), $here $here.<prop> $today $now $me $house, or a "
                               f"handle; a literal dollar sign is \\$")
