@@ -1100,13 +1100,18 @@ def _w_grid(node, p, val, n, env):
     """`grid 1 3 3 1`, `grid 1fr fit 2fr`: tracks in fr (a bare number is fr) or fit (as wide as the widest cell).
     a10637 (Alex's Board, Pike m10626): `grid fill <min>` fits as many equal columns as the panel's width allows, each
     at least <min> wide (18ch, 12gap, or pixels: 240 or 240px), its children flowing into rows; the painter counts the
-    columns from the width it has, so a resize writes nothing."""
+    columns from the width it has, so a resize writes nothing.
+    Optional `pack` fits measured items into gaps,
+    retaining their DOM/keyboard order; intrinsic wide items span columns."""
     toks = val.split()
     if toks[:1] == ["fill"]:
-        m = re.fullmatch(r"(\d+(?:\.\d+)?)(ch|gap|px)?", " ".join(toks[1:]))
+        pack = toks[-1:] == ["pack"]
+        minimum = " ".join(toks[1:-1] if pack else toks[1:])
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)(ch|gap|px)?", minimum)
         if not m or float(m[1]) <= 0:
             raise LensRefusal(f"line {n}: `grid fill <min>`: the least width of a column, in ch (18ch), steps of the style's gap (12gap) or pixels (240); got {p!r}")
-        node["layout"], node["tracks"] = "grid", [f"fill {m[1]}{m[2] or 'px'}"]
+        track = f"fill {m[1]}{m[2] or 'px'}" + (" pack" if pack else "")
+        node["layout"], node["tracks"] = "grid", [track]
         return
     tracks = []
     for t in toks:
@@ -1997,7 +2002,7 @@ def _w_on(node, p, val, n, env):
 # word -> (shape as a reader sees it, setter). A layout word is its own name.
 WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
-    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr | fill 18ch>", _w_grid),
+    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr | fill 18ch [pack]>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end|none end", _w_scroll),
     "remember": ('remember "<reading scope>"', _w_remember),

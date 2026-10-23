@@ -564,9 +564,11 @@
     // a10637: `grid fill <min>`: as many equal columns as this part's own width holds, each at least <min> (never wider
     // than the part), children flowing into rows in order; counted by the browser, so a resize writes nothing
     if (/^fill /.test(p.tracks[0])) {
-      const m = p.tracks[0].slice(5), least = /gap$/.test(m) ? `calc(${parseFloat(m)} * var(--t-gap))` : m;
+      const pack = p.tracks[0].endsWith(" pack"), m = p.tracks[0].slice(5).replace(/ pack$/, "");
+      const least = /gap$/.test(m) ? `calc(${parseFloat(m)} * var(--t-gap))` : m;
       el.style.gridTemplateColumns = `repeat(auto-fill, minmax(min(${least}, 100%), 1fr))`;
       el.dataset.fill = "1";
+      if (pack) window.GridPack?.attach(el);
       return;
     }
     el.style.gridTemplateColumns = p.tracks.map((t, i) => kids[i] && kids[i].dataset.folded ? "auto" : t === "fit" ? "max-content" : /gap$/.test(t) ? `calc(${parseFloat(t)} * var(--t-gap))` : `minmax(0, ${t})`).join(" ");
