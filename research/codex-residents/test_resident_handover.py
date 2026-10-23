@@ -488,3 +488,68 @@ def test_unavailable_subscription_start_does_not_escape_house_pass(resident):
     assert r.state["retry_kind"] == "startup"
     assert r.state["provider_error"] == "subscription login unavailable"
     assert h.set_status.call_args.args[-1] == "error"
+
+
+def test_applied_receipt_stages_once_across_restart_without_commands(resident):
+    r, _ = resident
+    r.state["relay_pending"] = {"phase": "applied", "text": "> do append secret",
+                                "receipt": "created exactly one item"}
+    r.state["undelivered"] = "an earlier message"
+    r.state["woke"] = 42
+    before = copy.deepcopy(r.state)
+    assert r.recover_applied_relay()
+    assert "relay_pending" not in r.state and "woke" not in r.state
+    assert r.state["session"] == before["session"] and r.state["inbox"] == before["inbox"]
+    assert r.state["relay_recovered"]["text"] == before["relay_pending"]["text"]
+    assert "do append secret" not in r.state["undelivered"]
+    assert "an earlier message" in r.state["undelivered"]
+    restored = house.Resident(r.house, r.rid)
+    assert not restored.recover_applied_relay()
+    assert restored.state["undelivered"].count("created exactly one item") == 1
+    r.house.act.assert_not_called()
+
+
+@pytest.mark.parametrize("case", ["received", "applying", "no-receipt", "pending", "handoff", "busy", "worker"])
+def test_relay_uncertainty_is_preserved(resident, case):
+    r, _ = resident
+    r.state["relay_pending"] = {"phase": "applied", "receipt": "receipt"}
+    if case in ("received", "applying"):
+        r.state["relay_pending"]["phase"] = case
+    elif case == "no-receipt":
+        del r.state["relay_pending"]["receipt"]
+    elif case in ("pending", "handoff"):
+        r.state[case] = {"carry": "uncertain"}
+    elif case == "busy":
+        r.busy = True
+    else:
+        r.cid = "worker"
+    before = copy.deepcopy(r.state)
+    assert not r.recover_applied_relay()
+    assert r.state == before
+    r.house.act.assert_not_called()
+
+
+def test_receipt_recovery_save_failure_retains_original_journal(resident):
+    r, _ = resident
+    r.state["relay_pending"] = {"phase": "applied", "receipt": "receipt"}
+    before = copy.deepcopy(r.state)
+    with patch.object(r, "save", side_effect=OSError("fixture")), pytest.raises(OSError):
+        r.recover_applied_relay()
+    assert r.state == before
+
+
+def test_scheduler_applied_recovery_respects_asleep_then_provider_gate(resident):
+    r, props = resident
+    r.state["relay_pending"] = {"phase": "applied", "receipt": "receipt"}
+    h = scheduler_for(resident)
+    props["want"] = "asleep"
+    with patch.object(house.feeds, "house_states", return_value={}):
+        h.step()
+    assert "relay_pending" in r.state
+    props.update(want="awake", provider="unsupported")
+    r.start = Mock()
+    with patch.object(house.feeds, "house_states", return_value={}):
+        h.step()
+    assert "relay_pending" not in r.state and "receipt" in r.state["undelivered"]
+    r.start.assert_not_called()
+    assert h.set_status.call_args.args[-1] == "error"

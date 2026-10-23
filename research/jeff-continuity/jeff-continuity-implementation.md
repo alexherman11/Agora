@@ -1,3 +1,10 @@
+> **Live implementation checkpoint, 23 October 2026 (supersedes the pending handoffs below).**
+> This is an implementation/deployment task. Alex explicitly carried that approval forward;
+> the original audit-only scope is superseded. The combined workflow and continuity source
+> landed and activated as `c70ace59866a695f3c0361d0a874dd24dba884b3`. Five world verbs were
+> installed through `/api/deploy`, and Jeff's `next_steps=on` is live. All eight temporary
+> dispatch settings were restored. Historical receipts below remain historical.
+
 # Jeff continuity and task ownership — implementation record
 
 23 October 2026. Authored by architecture-audit from Alex's request and parent delegation.
@@ -258,3 +265,53 @@ worker is not editing landing.py or health.py. Its only post-review edits are th
 two test doubles and its continuity research record. The workflow worker may own
 the landing/health path; the parent coordinates the next combined rejudgment and
 idle activation after that work. The task is not finished or verified live.
+
+
+## Observed live results and bounded recovery follow-up
+
+**Ran:** ordinary serialized landing accepted the combined candidate on current main.
+Frozen baseline took **236.5 s**, candidate **243.1 s**. Both reported the same three
+known failures: artifact-view (11 errors), follow-ups (integration base changed), and
+host-route-parent (21 errors). No new failure was introduced; this was not a clean suite.
+All seven resident session hashes and queued inboxes survived idle activation. Runtime
+source verification preceded world changes; each install receipt has source_verified=true.
+
+**Read:** Jeff's authored comments c12607, c12608 and c12610 confirm the actual normal
+task-linked review wake, inspection of nextsteps rows, and distinct review/verification
+on the completed delivery audit. Jeff did not independently attest the deployment hashes.
+The live projection had 142 inspectable rows; the urgent continuity task was within the
+bounded eight-row packet. A received worker result still does not finish its parent.
+
+**Ran:** the HTTP desk, door, and home-base scene answer. After Alex reported the Windows
+key no longer opening Agora, the exact idle hidden HUD was refreshed through the existing
+identity-checked lifecycle. The replacement is responsive and logged hook installation;
+the draft and all observed backend/House/supervisor identities were preserved. Physical
+keypress success awaits user observation. The old HUD was responsive but held roughly
+11 GB private memory. An exception/block in its toggle path is a hypothesis, not a proven
+cause. No simulated input, screenshot, focus action or OBS operation was performed.
+
+Three small follow-up fixes address observed remaining boundaries:
+
+* An applied relay receipt can be staged atomically into the existing delivery path,
+  preserving its original journal and identity. Received/applying/ambiguous journals
+  remain held. Commands are never replayed. Quota, provider and asleep gates still apply.
+* A legacy worker's host process-lifecycle journal can prove its owner stopped after
+  restart lost the in-memory process object. Every recorded PID must be positively gone;
+  missing/partial evidence, access uncertainty and PID reuse hold. Existing worker leases,
+  request recheck and landing serialization still gate a transfer.
+* The world review/verify verbs now use the projection's same designated reviewer rule:
+  lead, otherwise asker, otherwise owner. A non-lead requester cannot clear a review
+  deadline or overwrite a lead attestation while receiving a misleading success.
+
+**Ran:** private regression fixtures report **74 passed, 7 subtests passed in 2.36s**,
+covering receipt restart/retry without command execution, ambiguous state preservation,
+save failure, asleep/provider gates, stopped/live/unknown legacy ownership, and native
+review attribution. Follow-up source must still land and load before claiming those two
+live holds resolved. Comment's start-time Node grant is already observed: send receipts
+2/2 passed; composer passed six scenarios before reporting two missing fixture inputs.
+
+The module installer's additional read-only gate probe was denied before execution twice.
+The second automatic review rejected its POST /api/deploy boundary despite an offline
+proof that its sole line was `look a11307 :1`. That action was stopped; modules were not
+reinstalled. The core /api/deploy path was independently verified by the actual harness
+installation. Selected installer adoption is not universal enforcement of /api/do.
