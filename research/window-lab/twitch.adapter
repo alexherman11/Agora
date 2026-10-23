@@ -1,0 +1,17 @@
+# Twitch chat, read-only: an anonymous login (justinfan) cannot send. Settings: channel, into (the chat).
+connect wss://irc-ws.chat.twitch.tv:443
+on open
+  send "CAP REQ :twitch.tv/tags twitch.tv/commands"
+  send "PASS SCHMOOPIIE"
+  send "NICK justinfan$random"
+  send "JOIN #$channel"
+answer '^PING :?(?<rest>.*)$' with "PONG :$rest"
+each '^@(?<tags>\S+) :\S+ PRIVMSG #\S+ :(?<words>.*)$'
+  pairs tags ";" "="
+  key "$id"
+  do append $into line="$display-name: $words" words="$words" user="$display-name" color="$color" twitch_id="$id"
+each '^@(?<tags>\S+) :\S+ USERNOTICE #\S+(?: :(?<said>.*))?$'
+  pairs tags ";" "="
+  replace system-msg "\s" " "
+  key "$id"
+  do append $into line="★ $system-msg $said" words="★ $system-msg $said" user="$display-name" kind="notice" twitch_id="$id"

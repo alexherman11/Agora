@@ -1,0 +1,67 @@
+font sans = Segoe UI, system-ui, sans-serif
+font mono = Cascadia Code, ui-monospace, monospace
+token paper = #F7F5FB
+token card = #FFFFFF
+token ink = #1F1A2B
+token accent = #9146FF
+token soft = ink at 55%
+token faint = ink at 10%
+token wash = accent at 8%
+token focus = accent at 30%
+token scrollbar = ink at 18%
+token scrollbar_w = 5
+token gap = 8
+token ramp = 1.14
+token text = sans 14/1.45
+token text.mono = mono 12/1.4
+token n_red = #D91E18
+token n_blue = #2B4BEB
+token n_green = #1E7B1E
+token n_firebrick = #B22222
+token n_coral = #D9603B
+token n_yellowgreen = #5F8A12
+token n_orangered = #E04000
+token n_seagreen = #2E8B57
+token n_goldenrod = #A87A0A
+token n_chocolate = #C05A15
+token n_cadetblue = #3F7F82
+token n_dodgerblue = #1874CD
+token n_hotpink = #E0469A
+token n_blueviolet = #8A2BE2
+token n_springgreen = #129E5E
+role page : on paper, ink, text
+role header : on card, pad gap x1.5, pad left gap x2, pad right gap x2, border bottom faint
+role title : text up 2 strong, ink
+role chip : on wash, accent, text.mono down medium, pad gap /2, pad left gap, pad right gap, corner gap x2
+role subtitle : text down, soft, pad left gap x2, pad right gap x2, pad top gap, pad bottom gap
+role composer : text, ink, on card, pad gap, edge faint, corner gap
+role feed : pad left gap, pad right gap, pad bottom gap
+role msg : pad gap /2, pad left gap, pad right gap, corner gap /2
+role notice : on wash, edge accent, corner gap, pad gap, space above gap /2, space below gap /2
+role sysline : text down slant, soft, pad gap /2, pad left gap, pad right gap
+role name : text strong, accent, pad right gap /2
+role words : text, ink
+role when : text down, soft, shy, pad left gap
+role foot : on card, pad gap, pad left gap x2, pad right gap x2, border top faint
+role hint : text down, soft
+role tool : on wash, accent, text down medium, pad gap /2, pad left gap x1.5, pad right gap x1.5, corner gap x2
+role name.red : text strong, n_red, pad right gap /2
+role name.blue : text strong, n_blue, pad right gap /2
+role name.green : text strong, n_green, pad right gap /2
+role name.firebrick : text strong, n_firebrick, pad right gap /2
+role name.coral : text strong, n_coral, pad right gap /2
+role name.yellowgreen : text strong, n_yellowgreen, pad right gap /2
+role name.orangered : text strong, n_orangered, pad right gap /2
+role name.seagreen : text strong, n_seagreen, pad right gap /2
+role name.goldenrod : text strong, n_goldenrod, pad right gap /2
+role name.chocolate : text strong, n_chocolate, pad right gap /2
+role name.cadetblue : text strong, n_cadetblue, pad right gap /2
+role name.dodgerblue : text strong, n_dodgerblue, pad right gap /2
+role name.hotpink : text strong, n_hotpink, pad right gap /2
+role name.blueviolet : text strong, n_blueviolet, pad right gap /2
+role name.springgreen : text strong, n_springgreen, pad right gap /2
+theme dark of twitch-style
+  token paper = #18161D
+  token card = #211E28
+  token ink = #EFEBF5
+  token accent = #B58CFF

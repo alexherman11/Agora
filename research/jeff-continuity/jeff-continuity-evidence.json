@@ -1,0 +1,82 @@
+{
+  "scope": "Private in-memory worlds, native dispatch, fake transports, real resident JSON save/reload",
+  "runtime_repairs_preserved_after_removing_only_new_hooks": {
+    "house.py": true,
+    "workshop.py": true
+  },
+  "targeted_tests": "136 passed, 29 subtests passed in 5.29s",
+  "review_regressions_before_fix": "2 failed, 12 deselected in 0.85s; both reviewer findings reproduced",
+  "review_fixes": [
+    "Verification token and canonical evidence reference must be bound by the same authorized event",
+    "Safe invalidate-before-reattest permits explicit verification after a reference-only swap",
+    "approval_required True/true/yes matches workshop hold semantics; deadline remains unconsumed"
+  ],
+  "standard_tests": "201 passed, 2 skipped in 32.91s",
+  "dependency_and_source_tests": "70 passed in 3.41s",
+  "lint_new_files": "All checks passed!",
+  "not_claimed": [
+    "Live model behavior",
+    "Live activation",
+    "Landing completed",
+    "Semantic proof of arbitrary acceptance prose"
+  ],
+  "files": {
+    "research/text-desk-lab/notation/task_next_steps.py": "c5cd0309853ecb21180be7df02e041e4db781dc930db17920e77bb965c664467",
+    "research/text-desk-lab/notation/task_next_steps_verbs.py": "2091886edef66d2cfa54c08db8a5dceeccec75618a434b49ca94e4767d3d818f",
+    "research/text-desk-lab/notation/sources/nextsteps.py": "853ef46df396eee7eae407ee5aa17ce820269fb49935f7ef1a4c349c1c1d9a31",
+    "research/text-desk-lab/notation/test_task_next_steps.py": "0be1a05c817013765641db9ef5043f4f5e1317446c1cdfc458412418590ed6dd",
+    "research/text-desk-lab/notation/house.py": "035d2c5b4deef1f0a1d674ffb789f2c498f207359aaa8cc0f54fbbed29803ada",
+    "research/text-desk-lab/notation/workshop.py": "737d166067c84dfc58b55db11f3de2eac1c7c0c29dfdedfafe1ee3e899afb158",
+    "research/text-desk-lab/notation/house_lease.py": "6d0470c7ce1b59d7d50a9acff239ce80971a4f531c341ebb463ca684d70a9f1a",
+    "research/text-desk-lab/notation/quota_policy.py": "91d67df62a805119d5b43597ef9911e7b94b96139b50d7f26a2e32a4ea0c9697",
+    "research/text-desk-lab/notation/plan_usage.py": "6a6fde0778d721da722385b0df1a7002109af76500383f60090eea7fac4ad040",
+    "research/text-desk-lab/notation/explore.py": "623e45fe76238996e8c4fccfc14e1bad14be7417f56a3446e8ee9e9197eb42eb",
+    "research/text-desk-lab/notation/test_house_restart.py": "52d189f0dfee5b6a29bd01f160545fa7c0a5a575a60ac1cdc6ea79c4a0aa2f70",
+    "research/text-desk-lab/notation/test_transfer_lifecycle.py": "4a38b31268c9ad79843508727b840688201c0dbde972e6be4d15df0751dbf63a",
+    "research/codex-residents/codex_worker.py": "121d1dbb69e2462fb0aa8d6c027fedacc0da9dcda4e353ade04cda6bb6740546",
+    "research/codex-residents/test_worker.py": "687e8d7c16126ab56c3ed92e4aff15e5fd05754cf90c58cc4d0bfc8fa8dd0bc9",
+    "research/codex-residents/test_quota_repair.py": "431f573ceafda9c5182cd0d6cae58763ebe39530f975f968cb7384c799166904",
+    "research/codex-residents/test_desk_transport_unknown.py": "9f3726da7779ee7eb3a3a78f9a2f50926dc48efbeec19cc5ed96dbcd8d7f589f",
+    "research/codex-residents/test_resident_handover.py": "9485cceea1211bae43b8a6cafad42969c3582663c1120d1b411a0456d72f6bbf",
+    "research/text-desk-lab/notation/test_builders.py": "295303c05196cbb6dcd5d27ac5343ce84c6357ca4a60c6c03802989c9aa69d4b",
+    "research/text-desk-lab/notation/test_guard_context.py": "de6ed9a05931cc881d7cac9d507bdb413c277bbbfb79172eec6a198b3d346e18"
+  },
+  "board_task": "a11913",
+  "rough_spot": "a11956",
+  "integration_blocker": "Parent reordered work: integration-workflow fixes first. Revised harness candidate preserved; full rejudgment and safe activation remain pending. No quiet settings applied.",
+  "landing_owner_observation": {
+    "observed_at_utc": "2026-10-23T00:45:50Z",
+    "landing_lock_pid": 85976,
+    "owner_alive": true,
+    "owner_is_frontier_house": true,
+    "index_lock_writer": "Historical creating writer unattributed; no current writer or resource user at recovery.",
+    "correction": "landing.lock is per-batch, not the lifetime House lease; house-owner.lock is lifetime. Original observation retained as historical only."
+  },
+  "lock_recovery": {
+    "at_utc": "2026-10-23T01:00:23.914306Z",
+    "action": "Unchanged orphan transient index lock reversibly renamed under normal landing mutex",
+    "preconditions": "Empty queue, observed Git child exited, no Git processes, Windows Restart Manager zero resource users",
+    "lifetime_house_lease_changed": false,
+    "owner_acknowledged": "Jeff c12047"
+  },
+  "first_full_landing": {
+    "candidate": "77221a1366d35274344b4748fc7c2a87df1c3092",
+    "outcome": "refused, not promoted",
+    "baseline_seconds": 266.8,
+    "candidate_seconds": 286.4,
+    "baseline_failures": [
+      "test_artifact_view errors=11",
+      "test_followups integration base changed",
+      "test_host_route_parent errors=21"
+    ],
+    "additional_candidate_failures": [
+      "test_builders fake auth subprocess lacked communicate/exit response",
+      "test_guard_context stub lacked private lease directory and owned-loop method"
+    ],
+    "runtime_changed_to_fix": false
+  },
+  "fixture_checks": {
+    "test_guard_context": "Ran 20 tests in 1.330s; OK",
+    "test_builders": "all passed (full offline builder script, including both quota-fallback directions and paused-card hold)"
+  }
+}

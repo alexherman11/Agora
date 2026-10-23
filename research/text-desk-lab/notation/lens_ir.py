@@ -559,6 +559,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         continue
                     g["cb"] = list(cb) + g["cb"][old["cb0"]:]
                     n["reads"] = _fence_reads(w, g["fields0"], g["ids0"], g["cb"])
+                    if n.get("source"):
+                        n["source"] = {**n["source"], "rev": S._rev_of(w, n["source"]["item"])}
                     _bind(w, n)
                 old["cb0"] = len(cb)
                 for k2, e2 in old["inner"]:
@@ -824,6 +826,14 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     out["computed"] = computed
             else:
                 out["text"] = S._fill(em["text"], fill_ctx, track)
+            # Exact provenance only for direct fields, never a substring guess.
+            direct = re.fullmatch(r"\$(?:(\w+)\.)?(text|title)", em["text"])
+            if direct:
+                frame, field = direct.groups()
+                origin = frames.get(frame, {}) if frame else ctx
+                sid = origin.get("id") or origin.get("item")
+                if sid and out["text"] == acc.thing(sid).get(field):
+                    out["source"] = {"item": sid, "rev": S._rev_of(w, sid), "field": field}
             if em.get("light"):              # 13 Oct: the passages to light, filled as the words are
                 lt = em["light"]
                 out["light"] = (S._fill_text(lt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in lt
@@ -904,6 +914,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
             {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "side", "label") if a.get(k)}}
             for a in node["acts"] if offered(a)]
+        if (ctx.get("_state") not in ("gone", "unplaced")
+                and any(a["on"] == "edit-quoted" for a in node["acts"])):
+            # Guards choose the world-authored route first. The composer then
+            # chooses plain/quoted locally, retaining that route's entire batch.
+            if (sum(a["on"] == "edit" for a in acts) != 1
+                    or sum(a["on"] == "edit-quoted" for a in acts) > 1):
+                raise S.LensRefusal(f"line {node['line']}: paired composer needs exactly one offered plain action and at most one offered quoted action after guards")
         if node["carry"]:
             if not ctx.get("item"):
                 raise S.LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")

@@ -121,7 +121,8 @@
   async function sendNow(n, line, draft, more, attachment, token) {
     const observed = { ...(n.fence || {}), at: sceneAt, def, ...more }, gesture = attachment?.gesture || V.gesture(n.key, draft !== undefined);
     let r;
-    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture, image_context: attachment?.image }) })).json(); }
+    try { r = await (await fetch("/api/do", { method: "POST", body: JSON.stringify({ session, as: who, line, observed, gesture, image_context: attachment?.image,
+      source_quote: attachment?.quote }) })).json(); }
     catch (e) {      // a1008: the next scene is painted even if it is unchanged, so the kept draft can be sent again (same id)
       last = ""; V.answered(n.key, `the answer was lost (${e.message}); whether it was done is unknown until the view repaints`, draft, token); return refresh(true);
     }
@@ -461,7 +462,7 @@
       d.box.style.top = (r.top + d.dy) + "px";
     }
   }
-  function menuComposer(box, el, action, picked, x, y) {
+  function menuComposer(box, el, action, fill, x, y) {
     const key = el._n.key + "/composer/" + action.label;
     closeMenu();
     if (menuDrafts.has(key)) { menuDrafts.get(key).input.focus(); return; }
@@ -491,7 +492,9 @@
       if (!input.value.trim() || post.disabled) return;
       const raw = input.value; post.disabled = discard.disabled = true; state.textContent = "Sending…";
       // The command and quotation belong to the place where composition began, never the latest selection.
-      await send(n, action.line.replace("$selected", () => picked).replace("$value", () => TEXT.esc(raw)), raw);
+      const line = fill(action.line, TEXT.esc(raw));
+      if (line == null) { post.disabled = discard.disabled = false; state.textContent = "Not sent — the words you selected changed; select them again"; return; }
+      await send(n, line, raw);
       if (!V.drafts.has(key)) drop();
       else { post.disabled = !input.value.trim(); discard.disabled = false; state.textContent = "Not sent — retry or discard"; }
     };
@@ -502,35 +505,217 @@
     });
     input.focus();
   }
-  function closeMenu(refocus) { if (!pop) return; const back = pop._from; pop.remove(); pop = null; if (refocus && back && back.focus) back.focus(); }
+  // a7625: a menu that closes without an action puts back the words that were selected when it opened
+  function closeMenu(refocus) {
+    if (!pop) return; const back = pop._from, snap = pop._snap; pop.remove(); pop = null;
+    if (refocus && back && back.focus) back.focus();
+    if (snap && !snap.spent) SEL.restore(snap);
+  }
+  // a7625 (Alex, 20 Oct: 'I should be able to highlight and then right click to get options ... comment on it, copy,
+  // cut, etc. Short list of relevant verbs'). Words deliberately selected in the painted page get a short menu of their
+    // own: explicit world-authored prepare entries (never `on select`),
+  // the part's own `on menu` entries, Copy, and Cut only in words being written. A right-click inside the selection never
+  // replaces it (it is kept from the press, before the browser moves it); outside it, the menu is the part's as before.
+  // `$quoted` and `$quoted_in` (reserved since 13 Oct) are the selected words exactly as the source has them, and the
+  // thing they are in: a Markdown text gives its source's own slice (TextEdit's anchor), any other text its drawn words
+  // only when the source holds them as they are. An entry naming them is refused when the thing changed since the words
+  // were selected (its fence: the same item at the same revision), never by what is merely still on the screen.
+  // Text inside something that carries has no press-selection of its own (the carry owns the press): its menu offers
+  // "Select text". Shift+right-click, and words in an input or a textarea, keep the browser's menu.
+  const SEL = {
+    press: null,
+    part(node) {
+      let k = node && (node.nodeType === 1 ? node : node.parentElement);
+      k = k && k.closest ? k.closest("[data-key]") : null;
+      while (k && !(k._n && (k._n.paint.source || (k._n.fence || {}).item))) k = k.parentElement && k.parentElement.closest("[data-key]");
+      return k && paint.contains(k) ? k : null;
+    },
+    inside(range, x, y) {
+      for (const r of range.getClientRects()) if (x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2) return true;
+      return false;
+    },
+    norm: s => String(s).replace(/\s+/g, " ").trim(),
+    snapshot(range) {
+      const words = String(range), k = SEL.part(range.commonAncestorContainer);
+      const binding = k && k._n.paint.source;
+      const snap = { range: range.cloneRange(), words, key: k && k.dataset.key, item: binding?.item, rev: binding?.rev,
+        field: binding?.field, start: null, end: null,
+        quoted: null, why: "", editable: false, md: null };
+      if (!k) { snap.why = "these words are not one thing's"; return snap; }
+      const at = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+      const md = at && at.closest(".md-part");
+      if (md && md._md && md.contains(range.endContainer)) {
+        snap.md = md; snap.localSource = md._md.src();
+        const ed = at.closest('[contenteditable="true"]');
+        snap.editable = !!ed && ed.contains(range.endContainer);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(range);       // the module reads the live selection
+        const an = md._md.anchor && md._md.anchor();
+        if (binding && an && an.quote && !an.unsent) {
+          snap.quoted = an.quote; snap.start = an.start; snap.end = an.end;
+        }
+        else snap.why = "these words could not be found in the document's source";
+      } else {
+        const source = (k._n.paint && k._n.paint.text) || "";
+        // DOM offsets distinguish repeated words; transformed labels fail closed.
+        const prefix = document.createRange(); prefix.selectNodeContents(k); prefix.setEnd(range.startContainer, range.startOffset);
+        const start = String(prefix).length, end = start + words.length;
+        if (binding && k.textContent === source && source.slice(start, end) === words) {
+          snap.quoted = words; snap.start = start; snap.end = end;
+        }
+        else snap.why = "these words are drawn differently from their source; select them in its source (Ctrl+E) to quote them";
+      }
+      return snap;
+    },
+    fresh(snap) {
+      const now = snap.key && paint.querySelector(`[data-key="${CSS.escape(snap.key)}"]`), f = now && now._n && now._n.paint.source;
+      return !!f && f.item === snap.item && f.rev === snap.rev;
+    },
+    restore(snap) {
+      if (!snap.range.startContainer.isConnected || !snap.range.endContainer.isConnected) return false;
+      const s = getSelection(); s.removeAllRanges(); s.addRange(snap.range); return true;
+    },
+    async copy(snap) {
+      let ok = SEL.restore(snap) && String(getSelection()) === snap.words && document.execCommand("copy");
+      if (!ok && navigator.clipboard) ok = await navigator.clipboard.writeText(snap.words).then(() => true, () => false);   // write only, never a read
+      V.notify(ok ? "copied" : "Copy did not happen: the browser refused it (Shift+right-click gives its own menu)");
+    },
+    cut(snap) {
+      snap.spent = true;
+      const why = !SEL.fresh(snap) ? "the text changed since you selected it"
+        : snap.md?._md.src() !== snap.localSource ? "the unsaved text changed since you selected it"
+        : !SEL.restore(snap) ? "the words were drawn again" : String(getSelection()) !== snap.words ? "the selection moved" : "";
+      if (why) { snap.spent = false; return V.notify(`Cut did not happen: ${why}; the words are still there — select them again`); }
+      const sc = snap.range.startContainer, ed = (sc.nodeType === 1 ? sc : sc.parentElement).closest('[contenteditable="true"]');
+      if (ed) ed.focus({ preventScroll: true });
+      SEL.restore(snap);
+      const before = snap.md._md.src(), ok = document.execCommand("cut"), after = snap.md._md.src();
+      if (!ok || after === before) { snap.spent = false; V.notify("Cut did not happen: the browser refused it; the words are still there"); }
+    },
+  };
+  // Private to this page, never URLs/reports/writer props. A destination must be
+  // an existing explicit composer, named exactly by the authored menu.
+  const quoteDrafts = new Map();
+  async function checkQuote(selection) {
+    const r = await (await fetch("/api/selection", { method: "POST",
+      body: JSON.stringify({ session, as: who, selection }) })).json();
+    if (r.error || !r.selection) throw new Error(r.error || "The source could not be checked");
+    return r.selection;
+  }
+  async function prepareQuote(words, snap, origin) {
+    const [target, ...args] = words.split(/\s+/), context = {};
+    for (const arg of args) {
+      const [name, item] = arg.split("=");
+      const binding = (origin.fence?.reads || []).find(r => r[0] === item);
+      const rev = binding ? binding[1] : origin.fence?.item === item ? origin.fence.rev : null;
+      if (!["context", "destination"].includes(name) || !Number.isInteger(rev))
+        return V.notify("Comment: the authored context has no revision; nothing changed");
+      context[name === "context" ? "item" : name] = { item, rev };
+    }
+    const el = paint.querySelector(`[data-key="${CSS.escape(target)}"]`);
+    if (!el?._composer) return V.notify("Comment: the destination composer is not open");
+    if (!/\$quote_text\b/.test(el._composer.quotedLine || el._composer.line))
+      return V.notify("Comment: this composer has no authored quote consumer");
+    for (const line of [el._composer.line, el._composer.quotedLine || ""]) {
+      const about = line.match(/(?:^|\s)about=(?:"([^"]*)"|(\S+))/);
+      const existing = about && (about[1] ?? about[2]);
+      if (existing && !existing.startsWith("$quote_") && context.item && existing !== context.item.item)
+        return V.notify("Comment: the draft already has another topic; keep it or clear that topic first");
+    }
+    if (!snap?.quoted || !SEL.fresh(snap)) return V.notify("Comment: select the current source words again");
+    const previous = quoteDrafts.get(target);
+    try {
+      const selection = await checkQuote({ item: snap.item, rev: snap.rev, field: snap.field,
+        start: snap.start, end: snap.end, quote: snap.quoted, context });
+      // Recheck after the asynchronous read: never replace another preparation.
+      if (quoteDrafts.get(target) !== previous || (previous && JSON.stringify(previous) !== JSON.stringify(selection)))
+        return V.notify("Comment: a quote is already attached; remove it before choosing another");
+      if (!el.isConnected || el._composer.busy()) return V.notify("Comment: the composer changed or is sending; try again");
+      quoteDrafts.set(target, selection); el._composer.sync();
+      V.notify("Quote prepared; your words are kept");
+    } catch (e) { V.notify(`Comment: ${e.message}; your draft is kept`); }
+  }
+  // the selection as it was at the right button's press, before the browser can move it
+  document.addEventListener("pointerdown", e => {
+    if (e.button !== 2) return;
+    const s = getSelection();
+    SEL.pressAt = performance.now();
+    SEL.press = s.rangeCount && !s.isCollapsed ? { range: s.getRangeAt(0).cloneRange(), at: SEL.pressAt } : null;
+  }, true);
+  function menuButton(label, run, why) {
+    const b = document.createElement("button"); Object.assign(b, { type: "button", textContent: label });
+    b.className = Style.roleClass("tool") + " " + Style.roleClass("menu.item"); b.setAttribute("role", "menuitem");
+    // an entry that cannot run now stays in the list (the keys reach it) and says why when pressed
+    if (why) { b.title = why; b.setAttribute("aria-disabled", "true"); b.addEventListener("click", () => { closeMenu(true); V.notify(`${label}: ${why}`); }); }
+    else b.addEventListener("click", run);
+    b.addEventListener("pointerdown", ev => ev.preventDefault());       // pressing an entry does not take the words' selection away
+    return b;
+  }
   document.addEventListener("contextmenu", e => {
     const t = e.target instanceof Element ? e.target : null;
     if (e.shiftKey || !t || t.closest("input, textarea")) return;
-    const el = t.closest("[data-menu]");
+    // the words: those kept at the press, if this right-click is inside them; for the menu key, what is selected now
+    // no right press just before: the menu key or Shift+F10 opened it
+    const keyed = !(SEL.pressAt && performance.now() - SEL.pressAt < 1500), s = getSelection();
+    SEL.pressAt = 0;
+    let range = null;
+    if (!keyed && SEL.press && performance.now() - SEL.press.at < 1500 && SEL.inside(SEL.press.range, e.clientX, e.clientY)) range = SEL.press.range;
+    else if (keyed && s.rangeCount && !s.isCollapsed) range = s.getRangeAt(0);
+    SEL.press = null;
+    // words of no one thing (a tile, a label) still get Copy; only the entries that quote them need a thing
+    const snap = range && paint.contains(range.commonAncestorContainer) ? SEL.snapshot(range) : null;
+    const host0 = snap && snap.key ? paint.querySelector(`[data-key="${CSS.escape(snap.key)}"]`) : t;
+    const el = host0 && host0.closest("[data-menu]");
     const entries = el && paint.contains(el) && el._n ? el._n.acts.filter(a => a.on === "menu") : [];
-    if (!entries.length) return;
+    // text in something that carries, with nothing selected: a way to select it
+    const leaf = t.closest("[data-key]");
+    const carried = !snap && leaf && paint.contains(leaf) && leaf.closest("[data-carry]") && (leaf.textContent || "").trim() ? leaf : null;
+    if (!snap && !entries.length && !carried) return;
     e.preventDefault(); closeMenu();
+    if (snap) SEL.restore(snap);
     const box = document.createElement("div"); box.id = "menu-pop"; box.setAttribute("role", "menu");
     box.className = Style.roleClass("sheet") + " " + Style.roleClass("popup");
+    // 13 Oct: an entry's line may name $selected (the words highlighted in this part's thing, in quotation marks) and
+    // $value (words the entry asks for: pressed, it becomes a box to type in); a7625: $quoted, $quoted_in. One pass, so
+    // words filled in are never read again as names
+    const picked = el ? TEXT.selected(el._n) : "";
+    const fill = (l, value) => {
+      if (/\$quoted/.test(l) && (!snap || !snap.quoted || !SEL.fresh(snap))) return null;
+      return l.replace(/\$(value|selected|quoted_in|quoted)\b/g, (m, k) => k === "value" ? (value ?? m) : k === "selected" ? picked
+        : k === "quoted" ? TEXT.esc(snap.quoted) : snap.item);
+    };
     for (const a of entries) {
-      const b = document.createElement("button"); Object.assign(b, { type: "button", textContent: a.label });
-      b.className = Style.roleClass("tool") + " " + Style.roleClass("menu.item"); b.setAttribute("role", "menuitem");
-      // 13 Oct (Alex: right-click a text and comment on it): an entry's line may name $selected, the words highlighted
-      // in this part's thing when the menu opened, and $value, words the entry asks for: pressed, it becomes a box
-      // to type in (Enter sends, Shift+Enter is a new line, Escape leaves), since a line with $value is not yet whole
-      const picked = TEXT.selected(el._n), fill = l => l.replace("$selected", () => picked);
-      b.addEventListener("click", () => {
-        if (!a.line.includes("$value")) { closeMenu(); const line = fill(a.line); return line.startsWith("host ") ? host(line.slice(5)) : send(el._n, line); }
-        menuComposer(box, el, a, picked, e.clientX, e.clientY);
-      });
-      box.append(b);
+      if (a.line.startsWith("prepare ")) {
+        box.append(menuButton(a.label, () => { closeMenu(); prepareQuote(a.line.slice(8), snap, el._n); },
+          snap?.quoted ? "" : snap?.why || "select the source words first"));
+        continue;
+      }
+      const stale = /\$quoted/.test(a.line) && (!snap || !snap.quoted) ? (snap ? snap.why : "select the words first") : "";
+      box.append(menuButton(a.label, () => {
+        if (!a.line.includes("$value")) {
+          closeMenu(); const line = fill(a.line);
+          if (line == null) return V.notify(`${a.label}: the words changed since you selected them; select them again`);
+          return line.startsWith("host ") ? host(line.slice(5)) : send(el._n, line);
+        }
+        menuComposer(box, el, a, fill, e.clientX, e.clientY);
+      }, stale));
     }
+    if (snap) {
+      box.append(menuButton("Copy", () => { snap.spent = true; closeMenu(); SEL.copy(snap); }));
+      if (snap.editable) box.append(menuButton("Cut", () => { snap.spent = true; closeMenu(); SEL.cut(snap); }));
+    }
+    if (carried) box.append(menuButton("Select text", () => {
+      closeMenu(); const r = document.createRange(); r.selectNodeContents(carried);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    }));
     document.body.append(box);
     let x = e.clientX, y = e.clientY;
-    if (!x && !y) { const r = el.getBoundingClientRect(); x = r.left + 8; y = r.top + 8; }        // the menu key: at the part
+    if (keyed) {                                                                    // the menu key: at the words, or at the part
+      const r = (snap ? snap.range : (el || t)).getBoundingClientRect(); x = r.left + 8; y = (snap ? r.bottom : r.top + 8);
+    }
     box.style.left = Math.max(0, Math.min(x, innerWidth - box.offsetWidth - 4)) + "px";
     box.style.top = Math.max(0, Math.min(y, innerHeight - box.offsetHeight - 4)) + "px";
-    box._from = document.activeElement; pop = box; box.querySelector("button").focus();
+    box._from = document.activeElement; box._snap = snap; pop = box;
+    const first = box.querySelector('button:not([aria-disabled="true"])') || box.querySelector("button"); if (first) first.focus({ preventScroll: true });
   });
   document.addEventListener("pointerdown", e => { if (pop && !pop.contains(e.target)) closeMenu(); }, true);
   // a scroll of the page closes the menu; a scroll inside it does not (Alex, 13 Oct: a comment longer than the box
@@ -564,9 +749,11 @@
     // a10637: `grid fill <min>`: as many equal columns as this part's own width holds, each at least <min> (never wider
     // than the part), children flowing into rows in order; counted by the browser, so a resize writes nothing
     if (/^fill /.test(p.tracks[0])) {
-      const m = p.tracks[0].slice(5), least = /gap$/.test(m) ? `calc(${parseFloat(m)} * var(--t-gap))` : m;
+      const pack = p.tracks[0].endsWith(" pack"), m = p.tracks[0].slice(5).replace(/ pack$/, "");
+      const least = /gap$/.test(m) ? `calc(${parseFloat(m)} * var(--t-gap))` : m;
       el.style.gridTemplateColumns = `repeat(auto-fill, minmax(min(${least}, 100%), 1fr))`;
       el.dataset.fill = "1";
+      if (pack) window.GridPack?.attach(el);
       return;
     }
     el.style.gridTemplateColumns = p.tracks.map((t, i) => kids[i] && kids[i].dataset.folded ? "auto" : t === "fit" ? "max-content" : /gap$/.test(t) ? `calc(${parseFloat(t)} * var(--t-gap))` : `minmax(0, ${t})`).join(" ");
@@ -583,13 +770,24 @@
     post.type = discard.type = "button"; post.textContent = "Send"; discard.textContent = "Discard";
     recover.type = "button"; recover.textContent = "Use current version"; recover.className = Style.roleClass("button");
     post.className = Style.roleClass("button"); discard.className = Style.roleClass("tool"); status.className = Style.roleClass("meta");
-    actions.append(post, discard, recover, status); el.append(input, actions);
+    const quotation = document.createElement("div"), source = document.createElement("a"), removeQuote = document.createElement("button");
+    quotation.hidden = true; removeQuote.type = "button"; removeQuote.textContent = "Remove quote";
+    quotation.append(source, removeQuote);
+    removeQuote.onclick = () => { if (!busy) { quoteDrafts.delete(n.key); sync(); } };
+    actions.append(post, discard, recover, status); el.append(quotation, input, actions);
     let busy = false, picked = TEXT.selected(n), why = "";
     const sync = () => {
       // Reused elements must observe the refreshed value too. Otherwise a refused draft
       // never gets `shown`, and the next keystroke loses its origin while keeping its text.
       const words = V.words(n.key, el._n.paint.text || "", el._n.fence);
       const d = V.drafts.get(n.key);
+      const quote = quoteDrafts.get(n.key);
+      quotation.hidden = !quote;
+      if (quote) {
+        source.textContent = `${quote.label}: “${quote.quote.slice(0, 240)}${quote.quote.length > 240 ? "…" : ""}”`;
+        source.href = "lens.html?" + new URLSearchParams({ session, as: who, lens, on: quote.item, inspect: "0" });
+      }
+      removeQuote.disabled = busy;
       if (document.activeElement !== input && input.value !== words) { input.value = words; if (te) te.reset(words); }
       const open = openComposers.has(n.key) || !!d;
       el.dataset.composing = String(open);
@@ -612,7 +810,8 @@
       if (!el.dataset.now) delete el.dataset.now;
       settle();
     };
-    el._composer = { config: JSON.stringify([n.paint, n.acts]), sync };
+    const quotedLine = n.acts.find(x => x.on === "edit-quoted")?.line;
+    el._composer = { config: JSON.stringify([n.paint, n.acts]), sync, busy: () => busy, line: a.line, quotedLine };
     input.value = V.words(n.key, n.paint.text || "", n.fence);
     // a6067: the box's keys, undo and composition are the continuous-text module's (textedit.js), as a document's are;
     // the draft rules here stay this composer's (Codex): what is unsent, its origin, Send, Discard, Use current version
@@ -641,10 +840,26 @@
       if (busy || !input.value.trim()) return;
       if (te && te.composing()) { why = "Not sent — the input method is still writing; finish it first"; return sync(); }   // Codex, a6067 c6120
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
-      const raw = input.value; busy = true; why = ""; sync();
-      await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
-      busy = false;
-      if (!V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
+      const quote = quoteDrafts.get(n.key);
+      // Select ONE authored action before substitution. Removal restores plain Send.
+      const action = quote ? quotedLine || a.line : a.line;
+      if (quote && !/\$quote_text\b/.test(action)) { why = "This composer has no authored quote consumer"; return sync(); }
+      if (/\$quote_\w+\b/.test(action) && !quote) { why = "Prepare a source quote first"; return sync(); }
+      const raw = input.value; let delivered = false; busy = true; why = ""; sync();
+      try {
+        if (quote) await checkQuote(quote);
+        const values = quote ? { item: quote.item, rev: quote.rev, field: quote.field, start: quote.start, end: quote.end,
+          text: quote.quote, before: quote.before, after: quote.after, context: quote.context.item?.item || "",
+          destination: quote.context.destination?.item || "" } : {};
+        // One substitution pass: selected/typed words never become command tokens.
+        const line = action.replace(/\$(value|selected|quote_(?:item|rev|field|start|end|text|before|after|context|destination))\b/g,
+          (m, key) => key === "value" ? TEXT.esc(raw) : key === "selected" ? picked : TEXT.esc(String(values[key.slice(6)] ?? "")));
+        const answer = await send(seen, line, raw, undefined, quote ? { quote } : undefined);
+        delivered = !!answer && !answer.error && !/^(ERR|!!)/.test(answer.text || "");
+        if (delivered && !V.drafts.has(n.key)) quoteDrafts.delete(n.key);
+      } catch (e) { why = `${e.message}; your draft and quote are kept`; }
+      finally { busy = false; }
+      if (delivered && !V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
       sync();
     };
     discard.onclick = () => { if (V.drop(n.key)) { input.value = n.paint.text || ""; if (te) te.reset(input.value); openComposers.delete(n.key); sync(); } };
@@ -1015,25 +1230,8 @@
     if (!t || !t._n || !t._n.paint.marks) return;                // only a text that carries marks is a document's words
     TEXT.sel = sel.isCollapsed ? null : { item: (t._n.fence || {}).item, text: String(sel) };
   });
-  // `on select` (14 Oct; Alex: what he highlighted should stay lit while he writes about it, and agents should be able
-  // to highlight too): words let go of in a part's text send the nearest `on select` line with $value the words; a
-  // click there that highlights nothing sends it once with $value empty. Where it is kept is the lens's word, so a
-  // highlight is world data: it survives a repaint, and anyone (an agent too) can read or write it.
-  let selSent = "";
-  function selectGesture() {
-    const sel = getSelection(), at = sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
-    let k = at && at.closest && paint.contains(at) ? at.closest("[data-key]") : null;
-    while (k && !(k._n && k._n.acts.some(a => a.on === "select"))) k = k.parentElement && k.parentElement.closest("[data-key]");
-    if (!k) return;
-    // a5949: in a document (markdown) the words are its source's own, marks and all, so the desk finds them again
-    const md = at.closest(".md-part"), own = md && md._md && md._md.picked && md._md.picked();
-    const words = sel.isCollapsed ? "" : (own || String(sel)).replace(/\s+/g, " ").trim(), sig = words && k._n.key + " " + words;
-    if (sig === selSent) return;
-    selSent = sig;
-    send(k._n, k._n.acts.find(a => a.on === "select").line.replace(/\$value\b/g, () => TEXT.esc(words)));
-  }
-  document.addEventListener("pointerup", () => setTimeout(selectGesture, 0));
-  document.addEventListener("keyup", e => { if (e.shiftKey || e.key === "Shift") selectGesture(); });
+  // Highlighting is local selection only. Legacy on-select acts remain readable
+  // while world owners remove them; no pointer/key path executes them.
   // a6109 (Alex: 'names of things ... should ALL be clickable'): a name drawn for an id opens what it names, by the
   // nearest `on link` above it (the home base's root says where: its viewer), $value the id. With none above, the press
   // is the part's own, as a press on its words always was. Caught before the parts' own clicks, so a name on a card
@@ -1396,8 +1594,13 @@
     if (resizing) return;   // a divider owns both neighbours until its fenced answer
     const key = r.gen || JSON.stringify(r.scene || r.refused);      // deskd names each scene by its content (a1505); comparing 700 KB was the fallback
     if (key === last && !force) return;
-    last = key; sceneAt = r.events_total; def = (r.scene && r.scene.def) || r.def || null; if (r.scene) held = r;
-    await restyle((def && def.style_name) || "calm", (def && def.style_rev) || "seed");
+    const incomingDef = (r.scene && r.scene.def) || r.def || null;
+    await restyle((incomingDef && incomingDef.style_name) || "calm", (incomingDef && incomingDef.style_rev) || "seed");
+    // A gesture can take the layout while a style request is outstanding.
+    // Do not paint across that hold or acknowledge an answer we did not paint:
+    // the post-gesture refresh must still be able to fetch this generation.
+    if (resizing) return;
+    last = key; sceneAt = r.events_total; def = incomingDef; if (r.scene) held = r;
     // 30 Sep (Alex: the Desktop kept going blank over the node budget): a refused scene keeps the last good paint on
     // screen and says why, as a refused style keeps the last good look; a page with nothing painted yet shows the reason
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
@@ -1466,12 +1669,16 @@
       }
     }
     for (const el of paint.querySelectorAll('.l-float:not([data-folded="1"])')) placeFloat(el);    // a6265: kept under its line
-    for (const el of paint.querySelectorAll("[data-clamped]")) el.dataset.cut = el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1 ? "1" : "";
+    // Cut attributes can affect styling. Read all overflow geometry first,
+    // then publish the indicators, instead of invalidating layout per frame.
+    const cuts = [...paint.querySelectorAll("[data-clamped]")].map(el =>
+      [el, el.classList.contains("clamp") && el.scrollHeight > el.clientHeight + 1]);
     for (const el of paint.querySelectorAll('[data-scroll="none"]')) {
       // a hair is not more. Cut at the head (none end), the overflow is above the box, where scrollHeight does not count it
       const head = el.dataset.atEnd && el.firstElementChild ? el.getBoundingClientRect().top - el.firstElementChild.getBoundingClientRect().top : 0;
-      el.dataset.cut = el.scrollHeight > el.clientHeight + 8 || head > 8 ? "1" : "";
+      cuts.push([el, el.scrollHeight > el.clientHeight + 8 || head > 8]);
     }
+    for (const [el, cut] of cuts) el.dataset.cut = cut ? "1" : "";
   }
 
   // `tip` (a6271; Alex, 17 Oct: icons with 'no text. If I hover them it should say what they are'): a part's name and one

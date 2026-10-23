@@ -37,6 +37,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import deployment_preflight
+# Capture before loading selectors/desk modules. Only the explicit installer
+# route uses this receipt; ordinary world gestures keep their existing fences.
+_SOURCE_ROOT = Path(__file__).resolve().parents[3]
+_STARTUP_SOURCES = deployment_preflight.runtime_sources(_SOURCE_ROOT)
+
 import reports
 import scene
 from desk import aspects_of, aspects_meet, event_aspects
@@ -853,6 +859,13 @@ class Handler(SimpleHTTPRequestHandler):
                                                                    if isinstance(body, dict) and body.get("line") else "")
         if not isinstance(body, dict):
             raise BadRequest("the body must be a JSON object")
+        if urlparse(self.path).path == "/api/selection":
+            import selection_snapshot
+            with Session(body.get("session", "desktop"), body.get("as"), read=True) as desk:
+                try:
+                    return self._json({"selection": selection_snapshot.capture(desk, body.get("selection"))})
+                except scene.Refusal as e:
+                    return self._json({"error": str(e)})
         if urlparse(self.path).path == "/api/observe":
             # a painter reports what happened on its screen. Not an event, not undoable, not the world: a viewer's observation.
             # a4869: so it is kept beside the world by the house (reports.py), and the world file is neither loaded nor written
@@ -899,8 +912,15 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json(map_seam.check(desk.world, body.get("message"), scope))
                 except map_seam.Refused as e:
                     return self._json({"refused": str(e)})
-        if urlparse(self.path).path != "/api/do":
+        deployment = urlparse(self.path).path == "/api/deploy"
+        if urlparse(self.path).path not in ("/api/do", "/api/deploy"):
             return self._json({"error": "POST /api/do, /api/map, /api/observe or /api/style"}, 404)
+        if deployment:
+            try:
+                deployment_preflight.require_activation(_SOURCE_ROOT, body.get("source_dependencies"),
+                                                        CODE_VERSION, _STARTUP_SOURCES)
+            except (deployment_preflight.SourceNotIntegrated, OSError) as exc:
+                return self._json({"error": str(exc), "source_verified": False}, 409)
         line = str(body.get("line", "")).strip()
         if not line:
             return self._json({"error": "line is required: every gesture is a command"}, 400)
@@ -920,6 +940,12 @@ class Handler(SimpleHTTPRequestHandler):
                                    "nothing new was done", "error": None, "events_total": n0, "line": line,
                                    "as": (body.get("as") or "alex"), "created": [], "events": [], "already": [e["id"] for e in done],
                                    "code": CODE_VERSION})
+            if body.get("source_quote") is not None:
+                import selection_snapshot
+                try:
+                    selection_snapshot.capture(desk, body["source_quote"])
+                except scene.Refusal as e:
+                    return self._json({"error": str(e), "events_total": n0})
             ob = body.get("observed") or {}
             d = ob.get("def") or {}
             lens_id = d.get("id")                   # a990: the lens a gesture was painted by (d may be reassigned below)
@@ -1091,7 +1117,7 @@ class Handler(SimpleHTTPRequestHandler):
         refused = r.get("error") or (bad[0] if bad else None)
         self._json({"text": r.get("text"), "error": refused, "events_total": total, "line": line,
                     "as": (body.get("as") or "alex"), "created": created, "events": events,
-                    "code": CODE_VERSION})       # a1505 (vii, Sable a1201): which code answered, told apart across a swap
+                    "code": CODE_VERSION, **({"source_verified": True} if deployment else {})})
 
 
 if __name__ == "__main__":

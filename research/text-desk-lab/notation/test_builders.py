@@ -117,6 +117,17 @@ procs = []
 
 def new_proc(*a, **k):
     p = mock.MagicMock()
+    if a[0] == ["claude.exe", "auth", "status"]:
+        # Exercise the real subscription gate with an offline CLI response.
+        # This probe is not a model process or a builder dispatch.
+        p.__enter__.return_value = p
+        p.communicate.return_value = (json.dumps({
+            "loggedIn": True, "authMethod": "claude.ai",
+            "apiProvider": "firstParty", "subscriptionType": "max",
+        }), "")
+        p.returncode = 0
+        p.poll.return_value = 0
+        return p
     p.poll.return_value = None          # alive until stopped
     p.pid = 4000 + len(procs)
     procs.append((a[0], p))

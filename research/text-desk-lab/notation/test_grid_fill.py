@@ -30,6 +30,26 @@ class GridFill(unittest.TestCase):
         _, parts = scene.parse("ws : grid 1 3fr fit 12gap\n")
         self.assertEqual(parts["ws"]["tracks"], ["1fr", "3fr", "fit", "12gap"])
 
+    def test_pack_forms_and_refusals(self):
+        for unit in ("18ch", "12gap", "240px", "240", "17.5ch"):
+            _, p = scene.parse(TILES.format(m=unit + " pack"))
+            minimum = unit + "px" if unit == "240" else unit
+            self.assertEqual(p["tiles"]["tracks"], ["fill " + minimum + " pack"])
+        invalid = ("pack", "0 pack", "18em pack", "18ch pack pack",
+                   "18ch dense", "18ch pack extra")
+        for bad in invalid:
+            with self.assertRaises(scene.LensRefusal, msg=bad):
+                scene.parse(TILES.format(m=bad))
+
+    def test_pack_roundtrip_is_read_only(self):
+        d, _ = roomworld.build(say=False)
+        before = list(d.events)
+        sc = lens_ir.evaluate(d, TILES.format(m="18ch pack"))
+        self.assertEqual(sc["tracks"], ["fill 18ch pack"])
+        self.assertIn("grid fill 18ch pack", scene.to_text(sc, "t", "jeff", 0))
+        self.assertIn("grid fill 18ch pack", scene.to_lines(TILES.format(m="18ch pack")))
+        self.assertEqual(d.events, before)
+
     def test_scene_prints_and_sends_it(self):
         d, r = roomworld.build(say=False)
         sc = lens_ir.evaluate(d, TILES.format(m="18ch"))
