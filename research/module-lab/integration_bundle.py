@@ -1,8 +1,8 @@
 """Prepare new world objects for reviewed live integration; never load/save a session.
 
-This module has no HTTP client, service control or automatic live installation.
-Its manifest is replayed only through an admitted normal desk-command transport.
-Fixture installation below is deliberately restricted to a new in-memory desk.
+Prepared live commands use the mandatory source/runtime deployment gate below.
+There is no automatic installation or service control. Fixture installation
+remains deliberately restricted to a new in-memory desk.
 """
 
 import json
@@ -128,6 +128,20 @@ entry : column, role card
             dict(title="Modules", glyph="◇", window="composition-workshop"),
         ],
     )
+
+
+
+def deploy_command(files, line, *, url, world, actor):
+    """Replay one reviewed module/dashboard install command, without retries.
+
+    The integration owner supplies the complete reviewed dependency closure.
+    Both the client and answering backend require exact committed source; the
+    backend additionally checks its loaded revision and startup byte inventory.
+    Ordinary preview telemetry reads do not use this mutation boundary.
+    """
+    from deployment_preflight import deploy_line
+
+    return deploy_line(ROOT, files, line, url=url, world=world, actor=actor)
 
 
 def install_memory(desk, bundle=None):

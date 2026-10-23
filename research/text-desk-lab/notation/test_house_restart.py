@@ -195,7 +195,8 @@ class RunLoop(Base):
         import house as H
         with patch.dict(os.environ, {"HOUSE_KEEPER": "1"}), patch.object(H.time, "sleep", lambda s: None), \
                 patch.object(H.house_restart, "game_seen", lambda nongame="": self.game):
-            return h.run()
+            # OS ownership is covered separately; this fixture exercises drain/restart ordering.
+            return h._run_owned()
 
     def test_run_waits_for_the_busy_resident_then_exits_75_once(self):
         aid = self.ask()

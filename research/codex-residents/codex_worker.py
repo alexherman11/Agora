@@ -119,7 +119,7 @@ def build_config(directory, binary, profile, catalog):
     for key in list(os.environ):
         if key.startswith("CODEX_"):
             os.environ.pop(key)
-    env = {"CODEX_HOME": str(profile)}
+    env = {"CODEX_HOME": str(profile), "OPENAI_API_KEY": "", "CODEX_API_KEY": ""}
     return CodexConfig(
         codex_bin=binary,
         cwd=str(directory),
@@ -219,6 +219,7 @@ def serve(args):
                 if isinstance(content, str)
                 else "\n".join(c["text"] for c in content if c.get("type") == "text")
             )
+            require_subscription(client)
             turn_id = client.turn_start(started.thread.id, text, {"effort": args.reasoning}).turn.id
             finished = threading.Event()
 

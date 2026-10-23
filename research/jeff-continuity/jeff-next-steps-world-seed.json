@@ -1,0 +1,19 @@
+{
+  "status": "prepared, not executed",
+  "preconditions": [
+    "Source landed and loaded through owner-coordinated idle activation",
+    "Check for existing matching verb names; preserve world customizations"
+  ],
+  "actor": "architecture-audit",
+  "session": "frontier",
+  "commands": [
+    "look f193 :1",
+    "do create f193 kind=note title=task-next tags=verb on=house text=\"# task-next <task> \\\"<next action>\\\" \\\"<acceptance>\\\"\\nread \\$1\\ndo prop \\$1 next_action=\\\"\\$2\\\" acceptance=\\\"\\$3\\\" when (\\$1.owner = \\$me or \\$1.lead = \\$me or \\$1.asked_by = \\$me) and \\$2 != \\\"\\\" and \\$3 != \\\"\\\"\"",
+    "do create f193 kind=note title=task-revise tags=verb on=house text=\"# task-revise <task> \\\"<goal>\\\" \\\"<acceptance>\\\" <request-ref> \\\"<next action>\\\"\\nread \\$1\\ndo prop \\$1 goal=\\\"\\$2\\\" acceptance=\\\"\\$3\\\" request_ref=\\\"\\$4\\\" next_action=\\\"\\$5\\\" when (\\$1.owner = \\$me or \\$1.lead = \\$me or \\$1.asked_by = \\$me) and \\$2 != \\\"\\\" and \\$3 != \\\"\\\" and \\$4 != \\\"\\\" and \\$5 != \\\"\\\"\"",
+    "do create f193 kind=note title=task-review tags=verb on=house text=\"# task-review <task> <current-basis> \\\"<next action>\\\"\\n# Read the result first. Review does not verify acceptance or finish a parent.\\nread \\$1\\ndo prop \\$1 reviewed_basis=\\$2 next_action=\\\"\\$3\\\" remove=review_at when (\\$1.owner = \\$me or \\$1.lead = \\$me or \\$1.asked_by = \\$me) and \\$2 != \\\"\\\" and \\$3 != \\\"\\\"\"",
+    "do create f193 kind=note title=task-verify tags=verb on=house text=\"# task-verify <task> <current-basis> <evidence-note>\\n# Inspect evidence against acceptance first. This is attributed owner verification, not host proof.\\n# Invalidate first so re-attesting a swapped pointer cannot be a native no-op.\\n# An interruption between the two writes leaves the task unverified.\\nread \\$1\\nread \\$3\\ndo prop \\$1 remove=verified_basis when (\\$1.owner = \\$me or \\$1.lead = \\$me or \\$1.asked_by = \\$me) and \\$1.verified_basis != \\\"\\\" and \\$2 != \\\"\\\" and \\$3 != \\\"\\\"\\ndo prop \\$1 verified_basis=\\$2 verified_evidence=\\$3 when (\\$1.owner = \\$me or \\$1.lead = \\$me or \\$1.asked_by = \\$me) and \\$2 != \\\"\\\" and \\$3 != \\\"\\\"\"",
+    "do create f193 kind=note title=task-followup tags=verb on=house text=\"# task-followup <task> <ISO-datetime-with-timezone>\\n# One-shot owner review, never permission, automatic resume or an external action.\\nread \\$1\\ndo prop \\$1 review_at=\\\"\\$2\\\" when (\\$1.owner = \\$me or \\$1.lead = \\$me or \\$1.asked_by = \\$me) and \\$2 != \\\"\\\"\""
+  ],
+  "separate_enable_after_runtime_verification": "look f5189 :1; do prop f5189 next_steps=on",
+  "off_switch": "look f5189 :1; do prop f5189 next_steps=off"
+}

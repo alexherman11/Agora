@@ -46,6 +46,7 @@ import time
 from pathlib import Path
 import charter
 import claude_worker_runtime
+import quota_policy  # noqa: E402
 import worker_selection
 
 HERE = Path(__file__).resolve().parent
@@ -58,7 +59,8 @@ PY = Path(sys.executable)
 # call) and deskd restarts on every commit. These files run inside the house or its persistent child transports;
 # changing a worker adapter must also replace already-running children so its runtime configuration takes effect.
 HOUSE_FILES = {"house.py", "workshop.py", "charter.py", "codex_resident.py", "codex_worker.py", "guard_context.py",
-               "resident_continuity.py", "conversation_policy.py", "task_flow.py",
+               "resident_continuity.py", "quota_policy.py", "house_lease.py",
+               "conversation_policy.py", "task_flow.py", "task_next_steps.py",
                "explore.py", "export_docs.py", "desk_mcp.py", "landing.py", "feeds.py",
                "scripts_mirror.py", "plan_usage.py", "worker_lease.py", "worker_job.py",
                "host_route_parent.py", "host_route_draft.py", "claude_worker_runtime.py",
@@ -474,6 +476,9 @@ class Workshop:
         for cid, (s, state) in self.ordered(cs, cfg):
             wk = self.workers.get(cid)
             if state == "prepare":
+                # Drain completion before judging ownership. Previously this branch
+                # skipped turns_ended forever, stranding an already finished turn.
+                self.prepare_idle(cid, wk)
                 self.prepare(cid, s)
                 continue  # preparation never enters worker dispatch or landing
             if (s.get("props") or {}).get("brings") and not self.bring(cid, s):
@@ -1018,6 +1023,24 @@ class Workshop:
                  or worker_selection.requested(s.get("props") or {}))
         return bool(lane) and not fresh and bool(self.builders(cfg, lane["provider"]))
 
+    def prepare_idle(self, cid, wk):
+        if not wk:
+            return
+        for result in wk.turns_ended():
+            if isinstance(result, dict):
+                wk.state["last_error"] = result.get("detail", "worker turn failed")
+                wk.save()
+            wk.log("prepare_drain", {"completed": isinstance(result, str)})
+        if wk.busy:
+            return
+        # No new model turn; retain its session, pending input and worktree.
+        if wk.alive():
+            wk.stop()
+            wk._prepare_stopped_owner = True
+            wk.events = queue.Queue()
+        if plans := getattr(self.house, "plans", None):
+            plans.target(cid, "Preparing preserved work; no model turn is running.")
+
     def prepare(self, cid, subject):
         """House-only branch preparation; never judge, land or request restart."""
         import landing
@@ -1031,7 +1054,8 @@ class Workshop:
             saved = self.card_state(cid)
             if saved.get("session") and saved.get("session_provider", "claude") != "codex":
                 proc = getattr(wk, "proc", None)
-                if proc is None or proc.poll() is None:
+                if (not getattr(wk, "_prepare_stopped_owner", False)
+                        and (proc is None or proc.poll() is None)):
                     raise pw.Held("unleased saved runtime needs a known stopped owner")
             runtime = HERE.parents[1] / "codex-residents"
             if str(runtime) not in sys.path:
@@ -1105,6 +1129,24 @@ class Workshop:
                 self.bring_props(cid, prepare_status=detail)
                 self.say(cid, "Preparation " + detail, to="nobody")
 
+    def drain_bring(self, cid, raw, wk):
+        """Drain receiver completion; process/lease release remains a separate boundary."""
+        if not wk:
+            return
+        import preserved_work as pw
+        for result in wk.turns_ended():
+            if isinstance(result, dict):
+                wk.state["last_error"] = result.get("detail", "worker turn failed")
+                wk.save()
+            wk.log("bring_drain", {"completed": isinstance(result, str)})
+        if wk.busy:
+            return  # admission below still holds a genuinely active turn
+        if any(wk.state.get(k) for k in ("pending", "handoff", "relay_pending")):
+            raise pw.Held("receiver has unresolved turn/delivery state; reconcile before handoff")
+        fresh = self.commissions(self.house.load()).get(cid)
+        if not fresh or (fresh[0].get("props") or {}).get("brings") != raw:
+            raise pw.Held("brings request changed while draining receiver")
+
     def bring(self, cid, subject):
         """Process even paused recipients, without unpausing or starting them."""
         import landing
@@ -1145,6 +1187,7 @@ class Workshop:
                     raise pw.Held(f"{prior}'s handoff needs reconciliation")
             if source != "main" and source not in self.commissions(self.house.load()):
                 raise pw.Held("unknown source card")
+            self.drain_bring(cid, raw, self.workers.get(cid))
             for card in {cid, source} - {"main"}:
                 worker = self.workers.get(card)
                 if worker and (worker.busy or worker.alive()):
@@ -1152,6 +1195,9 @@ class Workshop:
                 if card in self.landing:
                     raise pw.Held(f"{card} is being judged")
                 saved_worker = self.card_state(card)
+                if any(saved_worker.get(k) for k in ("pending", "handoff", "relay_pending")):
+                    raise pw.Held(f"{card} has unresolved turn/delivery state; "
+                                  "reconcile before handoff")
                 if saved_worker.get("session") and saved_worker.get("session_provider", "claude") != "codex":
                     # Legacy Claude starts have no card process lease. An empty
                     # lease cannot certify a surviving, untracked process gone.
@@ -1625,7 +1671,7 @@ class Workshop:
     def failed(self, cid, wk, why):
         detail = (why or {}).get("detail", "the process ended") if isinstance(why, dict) else "the process ended"
         reset = limit_reset(detail)
-        if reset or usage_limited(detail):
+        if quota_policy.quota_error(detail):
             # 1 Oct (Sable e4431, a1566 c1903): at 09:22 the usage limit failed every worker twice in a row; each was
             # marked failed and its worktree removed with its uncommitted edits, and the re-asked worker resumed a
             # conversation that remembered them. A limit is not the worker failing: stop it, keep its worktree and its
@@ -2221,6 +2267,9 @@ class Worker:
                 if self.state.get("session"):
                     cmd += ["--resume", self.state["session"]]
                 env = H.clean_env(self.house.fake)
+                if (provider == "claude" and not self.house.fake
+                        and (self.state.get("last_handoff") or {}).get("to") == "claude"):
+                    env = quota_policy.claude_environment(self.house.claude, env)
                 env["PATH"] = str(PY.parent) + os.pathsep + env.get("PATH", "")     # `python` is the pinned interpreter
                 env["DESKD"] = "off"
                 self.proc = subprocess.Popen(cmd, cwd=self.tree, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,

@@ -6,7 +6,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from prepare_worker import TARGET
@@ -47,7 +47,11 @@ def test_provider_selection_and_resume_guard(tmp_path):
     module.__file__ = str(TARGET)
     source = TARGET.read_text(encoding="utf-8")
     exec(compile(source, str(TARGET), "exec"), module.__dict__)
-    host = SimpleNamespace(dir=tmp_path, fake=None, claude="claude.exe", load=lambda: None)
+    world = SimpleNamespace(nodes={}, subjects={}, events=[])
+    host = SimpleNamespace(
+        dir=tmp_path, fake=None, claude="claude.exe", load=lambda: world,
+        act=Mock(return_value="fixture charter receipt"),
+    )
     with (
         patch.object(module.subprocess, "Popen") as popen,
         patch.object(module.threading, "Thread"),
@@ -58,8 +62,12 @@ def test_provider_selection_and_resume_guard(tmp_path):
         assert popen.call_args.args[0][0] == "claude.exe"
         worker.state["session"] = "claude-session"
         props = {"worker_provider": "codex", "worker_model": "gpt-6.1-sol"}
-        with pytest.raises(ValueError, match="belongs to claude"):
-            worker.start("claude-opus-5-5", "frontier", {"props": props})
+        # Legacy provider props cannot rebind an existing conversation. Explicit
+        # requested_* selections are refused separately by worker_selection.
+        worker.start("claude-opus-5-5", "frontier", {"props": props})
+        assert popen.call_args.args[0][0] == "claude.exe"
+        assert worker.state["session"] == "claude-session"
+        assert worker.state["session_provider"] == "claude"
         fresh = module.Worker(host, "new", tmp_path, "worker/new", "mica")
         fresh.start("claude-opus-5-5", "frontier", {"props": props})
         command = popen.call_args.args[0]
