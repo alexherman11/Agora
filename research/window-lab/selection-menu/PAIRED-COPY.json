@@ -1,6 +1,6 @@
 {
-  "world_event": "e18947",
-  "events_before": 18949,
+  "world_event": "e31331",
+  "events_before": 31339,
   "cases": [
     {
       "name": "ordinary",
@@ -15,7 +15,7 @@
           "line": "do append a5080 line=\"$value\" default_to=\"jeff\" captures=\"\" context_from=\"a5082\" reply_to=\"\" about=\"\""
         }
       ],
-      "nodes": 2610
+      "nodes": 3422
     },
     {
       "name": "topic",
@@ -26,7 +26,7 @@
           "line": "do append a5080 line=\"$value\" default_to=\"jeff\" captures=\"\" context_from=\"a5082\" reply_to=\"\" about=\"a6079\"; read a5082; do prop a5082 topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\""
         }
       ],
-      "nodes": 2611
+      "nodes": 3423
     },
     {
       "name": "reply elsewhere",
@@ -37,7 +37,7 @@
           "line": "do append a6079 line=\"$value\" reply_to=\"m1\"; read a5082; do prop a5082 topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\""
         }
       ],
-      "nodes": 2602
+      "nodes": 3414
     },
     {
       "name": "thread",
@@ -48,12 +48,12 @@
           "line": "do comment a6079 id=c1 line=\"$value\"; read a5082; do prop a5082 topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\""
         }
       ],
-      "nodes": 2602
+      "nodes": 3414
     },
     {
       "name": "ambiguous reply and thread",
       "refusal": "paired composer guard ambiguity; nested lens withheld"
     }
   ],
-  "events_after": 18949
+  "events_after": 31339
 }

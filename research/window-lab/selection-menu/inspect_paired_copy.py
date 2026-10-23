@@ -97,18 +97,20 @@ print(f"5 copied mounted guard cases passed; {report['world_event']}; events {be
 # consumer above. Keep all edits in the same deep copy, never save it.
 doc = w.subjects[w.nodes["a6079"]["subject"]]
 doc_original = doc["text"]
-old = '              on select do read $w; do prop $w quoting=$d.item quote_in=$d.item quote="$value"'
+# a11877, 22 Oct: the world is selection-only now. Pike's e24847-e24851 removed
+# doc-page's body and paragraph on-select lines (the 21 Oct fixture replaced
+# them), so the menu is staged beside the body's own edit line instead, and
+# no on-select may remain anywhere in the lens.
+assert not [x for x in doc_original.splitlines() if re.match(r"\s*on select\b", x)]
+anchor = '              on edit do read $d.item; do rewrite $d.item text="$value"'
 target_key = report["cases"][0]["key"]
 menu_hunk = ('              let destination_title = join($title of $d.talk) when talk != ""\n'
              '              let destination_title = "" otherwise\n'
              '              let destination_id = join($id of $d.talk) when talk != ""\n'
              '              let destination_id = "" otherwise\n'
              f'              on menu "Comment" prepare {target_key} context=$d.id destination=$(destination_id)')
-assert doc_original.count(old) == 1
-doc["text"] = doc_original.replace(old, menu_hunk)
-paragraph_old = '  on select do read $w; do prop $w quoting=$item quote_in=$d.item quote="$value"'
-assert doc["text"].count(paragraph_old) == 1
-doc["text"] = doc["text"].replace(paragraph_old + "\n", "")
+assert doc_original.count(anchor + "\n") == 1
+doc["text"] = doc_original.replace(anchor + "\n", anchor + "\n" + menu_hunk + "\n")
 assert [x for x in doc_original.splitlines() if "on edit" in x] == [
     x for x in doc["text"].splitlines() if "on edit" in x]
 
