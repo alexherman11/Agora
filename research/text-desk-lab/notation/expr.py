@@ -397,7 +397,23 @@ def _f_tree_activate(args):
         return none(str(e))
 
 
-FUNCS = {"tree-activate": (("tree", "panel"), _f_tree_activate),
+def _reference_list(action):
+    def apply(args):
+        import reference_lists
+        if any(a.kind != "text" for a in args):
+            return none("reference-list arguments must be text")
+        try:
+            return Value("text", reference_lists.edit(
+                args[0].v, args[1].v, action, args[2].v if len(args) == 3 else ""))
+        except ValueError as e:
+            return none(str(e))
+    return apply
+
+
+FUNCS = {"refs-add": (("list", "item"), _reference_list("add")),
+         "refs-remove": (("list", "item"), _reference_list("remove")),
+         "refs-before": (("list", "item", "before"), _reference_list("before")),
+         "tree-activate": (("tree", "panel"), _f_tree_activate),
          "weekday": (("date",), _f_weekday), "week-of": (("date",), _f_week_of), "day-n": (("date", "n"), _f_day_n),
          "days-from": (("start", "end"), _f_days_from), "day-or-time": (("when", "today"), _f_day_or_time),
          "time": (("when",), _f_time), "date": (("when",), _f_date), "words-of": (("text",), _f_words_of),
