@@ -194,3 +194,29 @@ No browser, full health, current-world timing comparison, live apply or
 activation ran in this round. No latency gain is claimed. Before/after at
 both sizes remains owed through the shared guarded paint lane. Rollback of
 the production slice is a revert of its two lens.js hunks.
+
+## Dependency landing and second preparation, 22 October
+
+The earlier judging refusal was the missing committed `modules:`/`crew:`
+dependency, not a failed race assertion. That dependency landed via a11327.
+The house then completed request e30410 (receipt c11763), merging captured main
+`8949819e813fb38a9b472b34cb04b33415809427` cleanly into this branch at
+`9e03c83e2875b399b2df1ec521bf9504869232f8`.
+
+RAN on that prepared checkout: race 18 assertions, DOM 281 stand-in checks,
+geometry/model 167 checks, all passed. Node syntax and `git diff --check`
+exit 0. READ `git diff main`: exactly the same two production hunks
+(13 additions, 4 removals), plus this report and the regression. Main's other
+painter changes remain intact; no historical whole-file overlay was used.
+
+Current lens.js SHA256:
+`9bda5201534a071b3ed200332ae665ce729fb689108bb4f430e674218719f87a`.
+Regression SHA256 remains:
+`6f9f562979875e380b10a61bb7b067b1518f3b32a1bbf1339553216228ce9c8f`.
+
+Coordination reply m11789 identifies no overlap between these hunks and
+a11702's proposed tracks/grid-parser packing scope. This is a source boundary
+comparison, not acceptance of that other candidate.
+No browser, full health, latency measurement or live activation ran here.
+Ordinary house judging is requested under Sable c11600. Timing and painted
+continuity remain owed through the shared paint lane; no latency gain claimed.
