@@ -258,16 +258,21 @@ def test_original_painted_send_survives_attachment_completion(case, monkeypatch,
     assert props(case)["capture_generation"] == "1"
 
 
-def test_original_audience_action_is_not_replaced(case, monkeypatch, tmp_path):
+def test_changed_audience_refuses_original_action_without_substitution(case, monkeypatch, tmp_path):
     case.w.subjects[case.sid]["props"].update(pending="wait-1-1", to="pike")
     node = painter_send(case)
     case.desk.dispatch("desk", {"line": f"examine {case.draft}"})
     changed = case.desk.dispatch("desk", {"line": f'do prop {case.draft} to=juniper pending=""'})
     assert not changed.get("error"), changed
     assert node["fence"].get("reads"), node
+    before = copy.deepcopy(store.flatten(case.w))
+    events = copy.deepcopy(case.w.events)
     result = fixture_handler(case, monkeypatch, tmp_path)(node)
-    assert not result.get("error"), result
-    assert case.w.subjects[case.chat]["lines"][-1]["to"] == ["pike"]
+    assert "changed since this was painted" in result.get("error", ""), result
+    assert store.flatten(case.w) == before
+    assert case.w.events == events
+    assert not case.w.subjects[case.chat].get("lines")
+    case.service.sent_copy.assert_not_called()
 
 
 def native_producer(case):

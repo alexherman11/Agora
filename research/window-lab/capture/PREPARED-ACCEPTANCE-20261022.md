@@ -101,3 +101,46 @@ the previous prepared main was 09ef253, before the module dependency landed.
 These numbers belong to b58cc7e plus the named test, not a future merged tree.
 Full-scene system-temp failure above remains a failure, not waived as a pass.
 No new full-scene run, browser, world patch application or host action this round.
+
+## Current-main source submission, codex-builder-1, 22 October
+
+READ actual prepare c11788: main
+8949819e813fb38a9b472b34cb04b33415809427 merged cleanly into HEAD
+79b32eb8deae0edadd9638bdf1d7008a3b05c943. Original capture production hunks
+remain intact. Main's lexical row-field fix in scene/lens_ir is retained.
+It correctly fences the original `$draft.to` read as a property.
+
+First integration run: **1 failed, 57 passed in 2.30s**. The old regression
+expected an original Send to succeed after the draft recipient changed.
+Main now correctly refuses that stale gesture. Corrected only the test
+expectation: `test_changed_audience_refuses_original_action_without_substitution`
+asserts refusal, no world/event change, no message and no capture-service call.
+No permission/fence weakening. Attachment completion alone still allows the
+original gesture; changing audience does not. Also corrected the waits source
+comment to say original action/fence, matching the implementation.
+
+RAN on this prepared tree:
+- Native admission/context/lifecycle: **58 passed in 2.20s**. Includes the named
+  `test_plain_send_no_capture_matches_ordinary_append_receipt_and_immediate_path`;
+  unchanged ordinary receipt/synchronous path, not a timing benchmark.
+- Offline reservations: **11 tests OK**.
+- Actual painter wait function, fake clock: **5 cases passed**; no browser.
+- Wait compiler/IR: **1 passed, 58 deselected in 0.45s**.
+- Grid-fill **4 tests OK**, event-time **7 tests OK**.
+- Both staged lens fixtures: two native Send opt-ins each and exact inverses pass.
+- `git diff --check`: passed.
+- Full scene: **2 failed, 57 passed in 1.37s**. Both are explicit failures:
+  `test_rooms_go_look_and_replay` cannot write system-temp
+  `tmpn7kowuk0/base@walk.pickle`;
+  `test_scene_prints_painted_boxes_and_their_age` cannot create
+  `reports-6_5d8wbp/_test_boxes` under system temp (WinError 5).
+  No full-health pass or independent clean-main comparison claimed.
+
+The source/evidence inventory and exact byte hashes are recorded separately in
+LANDING-HASHES-20261022.json; historical manifests remain unchanged. Session
+copies are excluded and untouched. Sable c11451 authorizes source-only judging;
+all four world hunks remain unapplied until guarded painted acceptance.
+No current browser/Guard/host attempt, Conversation sends or restart was made.
+Physical release-to-reservation ordering and visible words/caret/chips at
+1280/2560 remain owed on the shared guarded lane. Rollback: revert this increment;
+JEFF has no world inverse to run unless those hunks are later applied.

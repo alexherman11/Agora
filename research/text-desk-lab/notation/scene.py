@@ -1211,7 +1211,7 @@ def _w_light(node, p, val, n, env):
 def _w_waits(node, p, val, n, env):
     # a10486 (Alex's capture rode on his next message): `waits "<words>"` on a text sent by a gesture: while the words,
     # filled as the text is (waits "$draft.pending"), are not empty, Send waits for them to empty, a few seconds at most,
-    # then sends with the scene as it then stands; if they never empty it sends nothing and says so; the words stay
+    # then submits the original action and fence; if they never empty it sends nothing and says so; the words stay
     # the second words name what is awaited, as Send says it ("Waiting for the capture…"); an attachment if unsaid
     m = re.fullmatch(r'"([^"]*)"(?:\s+"([^"$]*)")?', val.strip())
     if not m or not m.group(1).strip():
