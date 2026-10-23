@@ -113,10 +113,9 @@ def main():
     # handbook_docs.py writes to frontier, so only frontier's keeper runs the watch
     docs_args = ["docs_sync.py", "--watch", "--with", str(os.getpid())] if world == "frontier" else None
     docs, docs_at = (start(docs_args, env, name="docs_sync"), time.time()) if docs_args else (None, 0.0)
-    # Twitch chat into frontier's chat role=twitch-chat (read-only; feed=off there is its off switch)
-    tw_args = ([str(HERE.parent.parent / "window-lab" / "twitch_chat.py"), "--with", str(os.getpid())]
-               if world == "frontier" else None)
-    tw, tw_at = (start(tw_args, env, name="twitch_chat"), time.time()) if tw_args else (None, 0.0)
+    # every adapter in the world (notes role=adapter: Twitch chat, mail, ...) runs here; each has its own off switch
+    ad_args = ["adapters.py", "--with", str(os.getpid())] if world == "frontier" else None
+    ad, ad_at = (start(ad_args, env, name="adapters"), time.time()) if ad_args else (None, 0.0)
     log(f"keeper: world {world}, the door on {port} (deskd behind it), HEAD {head[:7]}")
     deaths, backoff_until, deskd_at, deskd_wait = [], 0.0, time.time(), 0.0
     try:
@@ -132,10 +131,10 @@ def main():
                 log("another docs_sync watch holds the lock; trying again" if docs.returncode == 76
                     else f"docs_sync exited ({docs.returncode}); starting it again")
                 docs, docs_at = start(docs_args, env, name="docs_sync"), time.time()
-            if tw and tw.poll() is not None and time.time() - tw_at >= 60:
-                if tw.returncode != 76:            # 76: another bridge holds the lock
-                    log(f"twitch_chat exited ({tw.returncode}); starting it again")
-                tw, tw_at = start(tw_args, env, name="twitch_chat"), time.time()
+            if ad and ad.poll() is not None and time.time() - ad_at >= 60:
+                if ad.returncode != 76:            # 76: another runner holds the lock
+                    log(f"adapters exited ({ad.returncode}); starting it again")
+                ad, ad_at = start(ad_args, env, name="adapters"), time.time()
             if house is None:                          # waiting out a pause after a crash
                 if time.time() >= backoff_until:
                     house = start(["house.py", world], env, name="house")
@@ -168,7 +167,7 @@ def main():
     finally:
         stop(house)
         stop(docs)
-        stop(tw)
+        stop(ad)
         stop(deskd)
 
 

@@ -1031,3 +1031,24 @@ of one attachment while retaining the others were checked in the live browser.
 - [[Previous Work]]: earlier architectures and what they taught.
 
 <!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e7556. Edit it there; a direct edit here makes the next export stop and warn. sha1:4fed8a826b95 -->
+
+## Adapters: outside sources as world notes (22 October 2026)
+
+*Claude, from Alex's ask that Twitch chat need no Python file of its own and that the same word serve mail, texts, notifications and tasks (card a12473). Not called feed: `feeds.py` is the house's agent activity feed.*
+
+An **adapter** is a note with `role=adapter`. Its text says where to connect and what each arrival becomes, in world lines; its props hold its settings (`name`, who it signs as; `on=yes|no`; anything its text reads as `$prop`). One runner, `notation/adapters.py`, runs every adapter; the keeper starts it for frontier beside the house and docs_sync (`keeper.py`, `--with <keeper pid>`, a second runner exits 76 on `house-state/adapters.lock`). Seen keys are kept in `house-state/adapters/<id>.json`.
+
+| Statement | Meaning |
+|---|---|
+| `connect wss://…` | a websocket; each message split into lines |
+| `poll https://… every N` | fetch every N s (at least 30); JSON gives records (`items <dotted path>` finds the list, nested keys flattened `a.b`), anything else lines; `header Name "value"`, where `env:NAME` is a secret |
+| `imap <host> every N` | mail, read-only: the folder opened read-only, headers fetched with BODY.PEEK (nothing marked read); mail arriving after start becomes records `from from_name from_address subject date id uid folder`; `login "env:A" "env:B"` (a login written in the text is refused); `folder X` |
+| `on open` / `send "…"` | lines sent when a socket opens; only props and `$random` fill them |
+| `answer 'regex' with "…"` | a reply on the socket to a matching line (keep-alives) |
+| `each 'regex'` | for an arriving line (named groups `(?<name>…)` become fields), or a record (matched against its `match` field or its JSON); under it `pairs f ";" "="`, `replace f "a" "b"`, `key "$id"` (posted once ever), then any world lines: `do append $into line="…"`, `notify "…"`, `do create $tasks kind=task title="…"` |
+
+The rules `adapters.py` enforces: an adapter runs only while `on=yes` and the last change to it by anyone but itself was Alex's (read from `history <id>`), so anyone may stop one and any other hand stops it until Alex's Turn on; an arriving value only ever fills a quoted value, escaped (`\` `"` `$`, one line); a `$` outside quotes may name only the adapter's own prop and only an id or a selection; a line that would open with `@` is not run; secrets come only from the environment or the repository's `.env` and go only to a poll header or an imap login; at most 40 arrivals a second are written per adapter, the rest counted and dropped. Lines are posted through `/api/do` as the adapter's name, a batch at a time, with a gesture id made from the batch's keys. The runner writes `status=` and `status_at=` (examine first, for the fence).
+
+Live (22 Oct): `Twitch chat adapter` a12557 (anonymous read-only Twitch IRC over websocket, into the chat a12319, lens `twitch-chat` a12379 with style `twitch-style` a12456, dock pin a12384) and `Gmail adapter` a12561 (into the chat `Mail` a12559; off, waiting on `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD` in `.env`). Repository copies: `research/window-lab/twitch.adapter`, `gmail.adapter`, `twitch-chat.lens`, `twitch-style.style`.
+
+Ran: `test_adapters.py`, 14 tests (Twitch messages and notices, PING, a hostile chat line that tries to close the quote and run a second command, targets, `@`, approval, imap login refusal, poll floor). Ran live: a scratch adapter carried a public channel's chat through the door; a hostile line landed as its words. Not run: the imap transport against a real mailbox (no credential), `poll` against a real API, and the approval stopping on another actor's live edit (unit-tested only). Twitch documents only token logins for chat; anonymous reading is what overlays use and may stop working. Texts (Google Messages) have no supported API (a7295), so an adapter for them needs a bridge first.

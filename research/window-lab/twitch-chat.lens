@@ -1,7 +1,7 @@
 window : column
   share 1
   role page
-  the prop:role=twitch-chat as chat
+  the prop:role=adapter,prop:name=twitch as chat
   header : row
     role header
     title : text "Twitch chat"
@@ -27,17 +27,17 @@ window : column
     each message
   foot : row
     role foot
-    note : text "Read-only · kept in the world as Twitch chat"
+    note : text "Read-only · the Twitch adapter writes it into the world"
       role hint
       share 1
     pause : text "Pause"
       role tool
-      only when ($chat.feed or "on") != "off"
-      on click do prop $chat.item feed=off
-    resume : text "Resume"
+      only when ($chat.on or "") = "yes"
+      on click do prop $chat.item on=no
+    resume : text "Turn on"
       role tool
-      only when ($chat.feed or "") = "off"
-      on click do prop $chat.item feed=on
+      only when ($chat.on or "") != "yes" or ($chat.status or "") = "waiting for Alex to turn it on"
+      on click do prop $chat.item on=yes
 message : row
   role msg
   role notice when ($kind or "") = "notice"
