@@ -69,6 +69,12 @@ with sandbox_window.Guard(name, name) as guard:          # after fresh guard_con
 - `births`: the launcher's measured birth receipts, `{"pid", "created", "exe"}`, from `sandbox_window`'s
   manifest `owners`. `add_birth` takes the same records after launch. A pid alone is refused.
 - `must_prove`: the limit keys this consumer needs proven, as above.
+- `network_mode`: absent by default. `"local-page"` is the one mode (a13146, JEFF's ruling in Shop talk m13143,
+  after Alex: "network is fine if it's reasonable"). A run asks for it explicitly, and only when it opens our own
+  local pages. It needs `pages`.
+- `pages`: in local-page mode, every address the run opens. Each one must be `http` or `https` on a loopback host
+  (`127.0.0.1`, `::1`, `localhost`), with no user or password in it. Anything else refuses the network check before
+  any input: a public page, another machine, `file:`, `about:`, or an account.
 
 **Provenance is measured, never declared (c10251).** A job member counts as explained in one of two ways:
 
@@ -133,6 +139,22 @@ in the job.
   - Listening beyond loopback.
   - Loopback use when the run doesn't allow it.
 - *Unknown:* a UDP binding beyond loopback (its remotes are invisible), or a table that could not be read.
+- *Local-page mode (a13146):* remote TCP connections and UDP bindings beyond loopback by **the job's own browser
+  tree** are recorded, not refused. The tree is the members explained by measurement whose own image is an engine
+  image. Each recorded item is listed in `evidence.connections` with its pid, process image, role, protocol,
+  address, port, state and `browser_tree`. The label is `network: observed, not contained`. Still refused in this
+  mode:
+  - the same traffic from any process outside that tree: the launcher, a console host, an unexplained member, or an
+    out-of-job profile holder;
+  - a page that isn't ours (above);
+  - a non-empty `allow_remote`;
+  - listening beyond loopback;
+  - loopback use without `allow_loopback`.
+
+  An unreadable table is still `unknown`. Family, windows and writes are unchanged.
+- *Label:* every verdict has `network_label` (also `network.label`): `network: <status>`, or in local-page mode
+  `network: <status>, not contained`. No label claims containment. Local-page mode watches the browser's traffic;
+  it doesn't stop it.
 - *Not proven:*
   - Transient connections between samples.
   - UDP and QUIC remotes.
