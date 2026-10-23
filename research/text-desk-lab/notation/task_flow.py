@@ -71,6 +71,50 @@ def _residents(w, value):
             yield str(actor).lower()
 
 
+
+def policy(w):
+    """Opt in through one world-authored policy note; absent/ambiguous = legacy."""
+    notes = [s for s in w.subjects.values()
+             if (s.get("props") or {}).get("role") == "task-transition-policy"]
+    if len(notes) != 1:
+        return None
+    p = notes[0].get("props") or {}
+    if p.get("version") != "1" or p.get("enabled") != "on":
+        return None
+    return p
+
+
+def comment_lead(w, s):
+    """Only the task's implicit destination changes; explicit addresses still win."""
+    p = (s or {}).get("props") or {}
+    if policy(w) and (s or {}).get("kind") in {"task", "story", "epic"}:
+        return p.get("lead") or p.get("asked_by") or ""
+    return ""
+
+
+def accept_notice(state, notice):
+    """Queue-receipt index, saved WITH inbox/cursor by news(), not model delivery.
+
+    Per task/reason/recipient high water marks prevent duplicate event passes,
+    including an older event replayed after a later one. This function never sends,
+    retries or reads a provider's pending/unknown delivery state.
+    """
+    if not notice.get("action_keys"):
+        return notice
+    seen = state.setdefault("task_notice_receipts", {})
+    fresh = []
+    for kind, key in zip(notice["kinds"], notice["action_keys"]):
+        if int(notice["event"][1:]) > int(seen.get(key, "e0")[1:]):
+            fresh.append(kind)
+    if not fresh:
+        return None
+    for key in notice["action_keys"]:
+        previous = seen.get(key, "e0")
+        if int(notice["event"][1:]) > int(previous[1:]):
+            seen[key] = notice["event"]
+    return dict(notice, kinds=fresh)
+
+
 def notices(w, event):
     """Return bounded, structured notices for one durable native mutation.
 
@@ -85,6 +129,7 @@ def notices(w, event):
     by = str(event.get("by") or "").split("/")[0]
     changed = {k for k in set(old) | set(props) if old.get(k) != props.get(k)}
     recipients = {}
+    eligibility = policy(w)
     lead = props.get("lead") or props.get("asked_by") or _creator(w, event, card)
 
     def add(value, kind):
@@ -107,16 +152,23 @@ def notices(w, event):
         if "status" in changed
         else None
     )
-    if state in STATES:
+    states = set(eligibility.get("states", "").split(",")) if eligibility else STATES
+    if state in states:
         add(lead, "state: " + state)
-    if changed.intersection(BLOCK_FIELDS):
+    block_change = bool(changed.intersection(BLOCK_FIELDS))
+    if eligibility:
+        block_change = bool(props.get("blocked_on") and props.get("blocker_owner")
+                            and (block_change or "lead" in changed or "asked_by" in changed))
+    if block_change:
         add(lead, "blocker changed")
         if props.get("blocked_on"):
             add(props.get("blocker_owner", ""), "blocker needs resolution")
     if (
         "worker_milestone" in (event.get("args") or {})
         and changed.intersection({"worker_summary", "worker_milestone", "worker_evidence"})
-        and props.get("worker_milestone") in MILESTONES
+        and props.get("worker_milestone") in (
+            set(eligibility.get("milestones", "").split(",")) if eligibility else MILESTONES)
+        and (not eligibility or "worker_milestone" in changed)
     ):
         add(lead, "worker " + props["worker_milestone"])
     missing = [k for k in BLOCK_FIELDS if not props.get(k)] if state == "blocked" else []
@@ -128,6 +180,10 @@ def notices(w, event):
             "target": (event.get("undo") or {}).get("delete", event["target"]),
             "title": str(card.get("title") or "Task")[:160],
             "kinds": kinds,
+            # Native event identity is the action epoch, not summary prose.
+            # Kind and recipient are independent: a new resolver is never deduped away.
+            "action_keys": [f"{card.get('id') or event['target']}:{actor}:{kind}"
+                            for kind in kinds] if eligibility else [],
             "summary": _bounded(props.get("worker_summary"), 600),
             "evidence": str(props.get("worker_evidence") or "")[:200],
             "blocker": str(props.get("blocked_on") or "")[:200],
