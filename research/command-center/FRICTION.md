@@ -1560,7 +1560,7 @@ RERAN offline:20 guard-context tests OK1.136s;13 house-restart tests OK0.584s. P
 Raw20 rows retained in own worktree research/window-lab/sandbox-ownership/freshness-live-20261022.json (PowerShell UTF-16 redirection), SHA256 b0181122449bba4efa82896b86cb4e80c9f2b9bfd3a69c9145f97cc1dcd92618. Source recipe and old baseline remain preserved. This finite result meets this card's freshness acceptance only; future slow OS/native probes still refuse when stale. No restart performed here, no policy/settings/account/input change. Do not call live freshness complete from offline tests.
 Health finished at copied event e26902: 303.7s, exit1. Python/scripts, guard context and restart checks passed; 95 help notes correct; 103 lenses compile, 0 unexpected refusals. Failures include temp PermissionError across scene and multiple suites; artifact_view errors28; host_route_parent errors21; task_flow errors1; worker_yield errors18; reach four assertions; textedit lock timeout; door timeout; owned fixture teardown Access denied; painter checks failed. Other failures have not been independently reproduced on main. Followups frozen staging is demonstrably already incompatible with unchanged HEAD: expected house hash40b9a403 versus HEAD LF535e71a3 / CRLF4bd83434; its cfg anchor occurs twice on HEAD. Its manifest remains unchanged; no staged integration approval inferred. Final git diff --check passed. Read FRESHNESS.md for reproduction. Required post-landing live20 is now complete as recorded above; broad-health failures remain unresolved and unchanged.
 
-## source-pending (15)
+## source-pending (16)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1660,6 +1660,12 @@ Missing host distinction, not a new lens word: restart admission reused the nati
 a11836 · family=missing-word · status=source-pending
 
 Read: grid fill emits ordinary auto-fill rows; variable-height list items leave holes. No existing measured packing word was found. Requested source capability: opt-in grid fill <min> pack, generic to repeats, using measured heights and minimum-content spans without changing partition navigation, DOM order or world facts. Source candidate and staged help/undo: research/text-desk-lab/notation/grid-pack.md. Synthetic geometry and compiler checks passed; guarded painted acceptance remains owed. The existing commission supplies the requested fix; no live lens/style was changed.
+
+### Automatic Comment lacked target identity and an explicit semantic consumer
+
+a12874 · family=lens · status=source-pending
+
+a12734: actionless bound parts lost their item before painting, sayings lacked exact passage provenance, and prepare targeted a literal mounted composer path. Shared staged source adds readable target metadata, saying/object snapshots, comments off and comments accept plus role-bound visible consumer lookup. No per-view Comment declarations for sources, no new executor or logged draft. Native editable right-click remains native; keyboard/selection control shares actions. [[Comment anywhere — shared build checkpoint and exact test boundaries]] records ten Python tests and ten existing composer mocks passing; new combined harness and wider suite blocked by exact sandbox EPERM/temp write refusals. Painted check and world pairing remain owed. Not ready/live; no workaround or native retry.
 
 ## source-staged (1)
 
