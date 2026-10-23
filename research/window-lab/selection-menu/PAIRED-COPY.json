@@ -1,0 +1,59 @@
+{
+  "world_event": "e18947",
+  "events_before": 18949,
+  "cases": [
+    {
+      "name": "ordinary",
+      "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+      "actions": [
+        {
+          "on": "edit-quoted",
+          "line": "do append $quote_destination line=\"$value\" about=\"$quote_item\" quote=\"$quote_text\" words_before=\"$quote_before\" words_after=\"$quote_after\" captures=\"\" context_from=\"a5082\""
+        },
+        {
+          "on": "edit",
+          "line": "do append a5080 line=\"$value\" default_to=\"jeff\" captures=\"\" context_from=\"a5082\" reply_to=\"\" about=\"\""
+        }
+      ],
+      "nodes": 2610
+    },
+    {
+      "name": "topic",
+      "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+      "actions": [
+        {
+          "on": "edit",
+          "line": "do append a5080 line=\"$value\" default_to=\"jeff\" captures=\"\" context_from=\"a5082\" reply_to=\"\" about=\"a6079\"; read a5082; do prop a5082 topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\""
+        }
+      ],
+      "nodes": 2611
+    },
+    {
+      "name": "reply elsewhere",
+      "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+      "actions": [
+        {
+          "on": "edit",
+          "line": "do append a6079 line=\"$value\" reply_to=\"m1\"; read a5082; do prop a5082 topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\""
+        }
+      ],
+      "nodes": 2602
+    },
+    {
+      "name": "thread",
+      "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+      "actions": [
+        {
+          "on": "edit",
+          "line": "do comment a6079 id=c1 line=\"$value\"; read a5082; do prop a5082 topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\""
+        }
+      ],
+      "nodes": 2602
+    },
+    {
+      "name": "ambiguous reply and thread",
+      "refusal": "paired composer guard ambiguity; nested lens withheld"
+    }
+  ],
+  "events_after": 18949
+}

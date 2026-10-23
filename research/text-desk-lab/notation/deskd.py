@@ -822,6 +822,13 @@ class Handler(SimpleHTTPRequestHandler):
                                                                    if isinstance(body, dict) and body.get("line") else "")
         if not isinstance(body, dict):
             raise BadRequest("the body must be a JSON object")
+        if urlparse(self.path).path == "/api/selection":
+            import selection_snapshot
+            with Session(body.get("session", "desktop"), body.get("as"), read=True) as desk:
+                try:
+                    return self._json({"selection": selection_snapshot.capture(desk, body.get("selection"))})
+                except scene.Refusal as e:
+                    return self._json({"error": str(e)})
         if urlparse(self.path).path == "/api/observe":
             # a painter reports what happened on its screen. Not an event, not undoable, not the world: a viewer's observation.
             # a4869: so it is kept beside the world by the house (reports.py), and the world file is neither loaded nor written
@@ -878,6 +885,12 @@ class Handler(SimpleHTTPRequestHandler):
                                    "nothing new was done", "error": None, "events_total": n0, "line": line,
                                    "as": (body.get("as") or "alex"), "created": [], "events": [], "already": [e["id"] for e in done],
                                    "code": CODE_VERSION})
+            if body.get("source_quote") is not None:
+                import selection_snapshot
+                try:
+                    selection_snapshot.capture(desk, body["source_quote"])
+                except scene.Refusal as e:
+                    return self._json({"error": str(e), "events_total": n0})
             ob = body.get("observed") or {}
             d = ob.get("def") or {}
             lens_id = d.get("id")                   # a990: the lens a gesture was painted by (d may be reassigned below)

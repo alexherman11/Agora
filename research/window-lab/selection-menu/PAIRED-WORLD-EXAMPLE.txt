@@ -1,0 +1,11 @@
+    say : text ""
+      role input
+      only when held = ""
+      hint "Write to JEFF, or anyone above…"
+      lines 1..12
+      commit explicit
+      on edit quoted when ($draft.topic or "") = "" and ($draft.reply_to or "") = "" and ($draft.reply_thread or "") = "" do append $quote_destination line="$value" about="$quote_item" quote="$quote_text" words_before="$quote_before" words_after="$quote_after" captures="$draft.context" context_from="$draft"
+      on edit when elsewhere = "no" and ($draft.reply_thread or "") = "" and (($draft.topic or "") != "" or ($draft.reply_to or "") != "" or ($draft.reply_thread or "") != "") do append a5080 line="$value" default_to="$draft.to" captures="$draft.context" context_from="$draft" reply_to="$draft.reply_to" about="$(about)"; read $draft; do prop $draft topic="" reply_to="" quote="" reply_in="" reply_thread="" reply_kind=""
+      on edit when elsewhere = "no" and ($draft.reply_thread or "") = "" and not (($draft.topic or "") != "" or ($draft.reply_to or "") != "" or ($draft.reply_thread or "") != "") do append a5080 line="$value" default_to="$draft.to" captures="$draft.context" context_from="$draft" reply_to="$draft.reply_to" about="$(about)"
+      on edit when elsewhere = "yes" do append $draft.reply_in line="$value" reply_to="$draft.reply_to"; read $draft; do prop $draft topic="" reply_to="" quote="" reply_in="" reply_thread="" reply_kind=""
+      on edit when ($draft.reply_thread or "") != "" do comment $draft.reply_in id=$draft.reply_thread line="$value"; read $draft; do prop $draft topic="" reply_to="" quote="" reply_in="" reply_thread="" reply_kind=""
