@@ -28,7 +28,7 @@ _PLACEHOLDER = {"str": "prose", "text": "prose", "id": "thing", "surface": "thin
                 "weight": "number", "YYYY-MM-DD": "date", "date": "date", "name": "name", "frame": "name", "role": "name", "handle": "name",
                 "part": "name", "kind": "name", "actor": "person", "event": "thing", "verb": "name", "value": "text", "k": "name", "v": "text",
                 "cNN": "thing", "lNN": "thing", "m id": "thing", "handle label": "prose", "label": "prose", "command": "prose", "desk command": "prose",
-                "tracks: 1 3 3 1 | 1fr fit 2fr": "word", "min": "number", "max": "number", "start": "number", "gesture": "choice",
+                "tracks: 1 3 3 1 | 1fr fit 2fr": "word", "tracks: 1 3 3 1 | 1fr fit 2fr | fill 18ch": "word","min": "number", "max": "number", "start": "number", "gesture": "choice",
                 "interpretation": "name", "inputs": "text", "a kind made here": "name"}
 NEEDED = re.compile(r"^\[.*\]$")
 

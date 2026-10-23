@@ -103,9 +103,9 @@ check("the Lounge narrated from Home does not offer a $here verb", "(say <words>
 reply(ME, f"go {HOME} :1", f"go {LOUNGE}")
 reply(OTHER, "say a line after pike looked")
 got = reply(ME, "say second")
-# a5068: an agent's line on an old view waits, shown what was said; the same line again goes as written
-check("someone speaks after the look: the line waits, and the receipt prints theirs",
-      "held, not sent" in (got[-1][1] + got[-1][2]) and "a line after pike looked" in (got[-1][1] + got[-1][2]), got)
+# a9369: say lands on the same append path and reports what crossed it.
+check("someone speaks after the look: the line lands, and the receipt prints theirs",
+      not got[-1][2] and "Sent." in got[-1][1] and "a line after pike looked" in got[-1][1], got)
 got = reply(ME, "say second")
 check("and the same line again goes, with nothing from others unseen", not got[-1][2] and not behind(got[-1][1]), got)
 

@@ -1,0 +1,7 @@
+# notify-question-owner <card>: the waiting card's question, noticed once, for Alex when it is his.
+# A note for Alex: an unanswered mark=ask question addressed to him, or a card he asked (asked_by=alex). A resident
+# asker gets no note: the house already reaches them (the worker's mark=ask comment knocks the card's asked_by; the
+# waiting state is a task notice to the card's lead, else its asker). Any other asker (no resident corner, not alex)
+# gets nothing here and is unresolved. A card with no asked_by refuses the second line, by itself.
+do create "Alex's notices" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) > 0
+do create "Alex's notices" kind=note title=asking role=notice to=alex topic=asking about=$1 came=$now when count(sayings for:alex in:$1 mark=ask awaiting=yes) = 0 and $1.asked_by = "alex"

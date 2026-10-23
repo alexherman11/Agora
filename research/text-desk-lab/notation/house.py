@@ -43,9 +43,10 @@ house-state/<world>/house.json (with liveness, turns and the time of the last tu
 Transcripts (every stream event, and every message the house sent) are house-state/<world>/<corner>/transcript.jsonl.
 Everything is kept per world: two worlds can hold the same corner ids (a copy of a world does), and a resident must
 never resume another world's conversation.
-Settings are props on the Desktop's note "The house": model, breather, wake_every, timers (off: only a call wakes a
-resident, never an open objective, wake_every or the end of a timed rest; 13 Oct), and for workers: workers (how many at
-once, default 1), worker_model (default: model) and worker_pool (a5284: each provider's share of them, e.g.
+Settings are props on the Desktop's note "The house": model, breather, wake_every, timers (off, the default since
+a8980: no open objective or wake_every wakes a resident; 13 Oct), rest_wakes (on, the default: a resident's own timed
+rest ends at its deadline, on the first house pass at or after it, so after the computer resumes if it slept then;
+never an OS wake timer; Alex 21 Oct, a8980), and for workers: workers (how many at once, default 1), worker_model (default: model) and worker_pool (a5284: each provider's share of them, e.g.
 "2 claude, 2 codex gpt-6-astra"; a card's own worker_provider and worker_model win). Replay never wakes anyone.
 
 Workers (workshop.py): a task with prop commission=asked is taken up by a disposable worker with real tools in its own
@@ -83,6 +84,8 @@ import plan_usage    # noqa: E402  a6646: provider plan windows and durable paus
 import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 import task_flow
+import guard_context
+import house_restart  # noqa: E402  a10269: a restart asked for from the world
 
 STATE = HERE / "house-state"
 # a916, use versus mention: words inside backticks or quotes are talked about, never addressed (the rule lives in
@@ -101,7 +104,7 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "on", "claude_start_threshold": "off"}
+            "timers": "off", "rest_wakes": "on", "claude_start_threshold": "off"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -1263,7 +1266,7 @@ class House:
                 # one for a whole turn with no caller, at every landing of a house file, through any rest. A resident
                 # resting when the house stopped, whose conversation resumes with nothing unanswered, keeps resting:
                 # its rest ends as it would have (a call, its time, the house's own wake), on the resumed conversation
-                resting = r.state.get("at_rest") or r.state.get("rest_until", 0) > now()     # (a rest from older code)
+                resting = bool(r.state.get("at_rest") or r.state.get("rest_until"))     # (a rest from older code)
                 keep = first and resting and r.state.get("session") and \
                     not any(r.state.get(k) for k in ("unanswered", "undelivered", "lost", "door", "welcome_due"))
                 if keep:
@@ -1290,28 +1293,29 @@ class House:
             # before the next, up to wake_every; a turn that changes the world, or a call, makes it short again. A
             # resident at work on the objective is still asked every `breather`; one who looked and rested is let be
             breather = min(float(cfg["breather"]) * 2 ** min(int(r.state.get("idle_wakes", 0)), 12), float(cfg["wake_every"]))
-            r.wakes_at = until or (last + breather if objective else last + float(cfg["wake_every"]))
-            # 13 Oct (Alex: 'none of this wake on timers stuff, its wasting my usage limit. They should get woken by
-            # comments, worker reports etc, but not on timers'): timers=off on the house note, and only a call wakes a
-            # resident: not an open objective, not wake_every, not the end of a rest it timed itself
-            timers = str(cfg.get("timers", "on")).strip().lower() != "off"
-            if not timers:
-                r.wakes_at = None
+            # a8980: chosen rest deadlines are promises, separate from periodic wakes.
+            # No OS timer: if the machine sleeps, the next ordinary pass handles overdue rests.
+            timers = str(cfg.get("timers", "off")).strip().lower() == "on"
+            rest_wakes = str(cfg.get("rest_wakes", "on")).strip().lower() == "on"
+            r.wakes_at = ((until if rest_wakes else None) if until else
+                          (last + breather if objective else last + float(cfg["wake_every"])) if timers else None)
             if called:                                     # a call ends any rest
                 r.state["idle_wakes"] = 0
                 r.state.pop("rest_until", None)
                 r.state.pop("rest_for", None)
+                r.wakes_at = None
                 head = self.woken_by(r)                    # a3150: its first line names the line, a4473: and the time
                 r.send("\n".join(head + self.take(r, "" if head else it_is())))
                 if props.get("call"):                      # delivered: clear it, so the next press is a change again
                     self.act("house", f"look {rid} :1; do prop {rid} remove=call")
-            elif not timers or (until and now() < until):  # resting for a while, or no timers: only a call reaches it
-                self.set_status(r, corner, "awake")
-                continue
-            elif until:
+            elif until and rest_wakes and now() >= until:
                 slept = r.state.pop("rest_for", None) or 0
                 r.state.pop("rest_until", None)
+                r.wakes_at = None
                 self.wake(r, corner, actor, f"(you rested {human(slept)})\n")
+            elif until or not timers:  # pending/disabled chosen rest, or no periodic wakes
+                self.set_status(r, corner, "awake")
+                continue
             elif objective and idle >= breather:
                 r.state["idle_wakes"] = int(r.state.get("idle_wakes", 0)) + 1
                 self.wake(r, corner, actor, f"(time passes; an objective is open: {self.objectives}. If nothing in it is "
@@ -1607,13 +1611,30 @@ class House:
             return r.stdout.strip() if r.returncode == 0 else ""
         started_on, passes = head(), 0
         checked_on = started_on       # the HEAD-watch's baseline; started_on stays what this process imported
+        # a10269: a restart asked for from the world; the one that brought this house up says so on its note
+        self.restarts = house_restart.Restarts(self)
+        try:
+            self.restarts.started_up(self.load())
+        except Exception as e:
+            print(f"house: restart notes unreadable at start: {type(e).__name__}: {e}", flush=True)
         # No timer: startup requests one full comparison from the live writer.
         try:
             self.act("house", "log-world check", whole=True)
         except Exception as e:
             print(f"house: log-world startup request unavailable: {type(e).__name__}: {e}", flush=True)
+        guard_publisher = None
+        if self.world == "frontier" and not self.fake:
+            guard_publisher = guard_context.Publisher()
         try:
+            if guard_publisher:
+                guard_publisher.start()
             while True:
+                if guard_publisher:
+                    try:
+                        guard_publisher.update(self.settings(self.load()).get("guard_nongame", ""))
+                    except Exception as exc:
+                        guard_publisher.update("")
+                        print(f"house: guard policy unavailable: {type(exc).__name__}", flush=True)
                 try:
                     self.step()
                 except Exception as e:
@@ -1634,20 +1655,39 @@ class House:
                             self.workshop.restart_wanted = True
                         else:
                             checked_on = now_on       # nothing the house runs changed: deskd and the next command have it
+                busy = ([r.rid for r in self.residents.values() if r.busy]
+                        + [c for c, x in self.workshop.workers.items() if x.busy]
+                        + [f"landing {c}" for c in self.workshop.landing])      # a landing being judged is never cut
+                try:
+                    w = self.load()
+                    cfg = self.settings(w)
+                    self.restarts.step(w, cfg, busy, keeper=bool(os.environ.get("HOUSE_KEEPER")))
+                except Exception as e:
+                    cfg = {}
+                    print(f"house: restart notes: {type(e).__name__}: {e}", flush=True)
                 if self.workshop.restart_wanted and os.environ.get("HOUSE_KEEPER"):
                     self.restart_since = getattr(self, "restart_since", None) or now()
-                    busy = ([r.rid for r in self.residents.values() if r.busy]
-                            + [c for c, x in self.workshop.workers.items() if x.busy]
-                            + [f"landing {c}" for c in self.workshop.landing])      # a landing being judged is never cut
-                    if not busy or now() - self.restart_since >= RESTART_GRACE:
-                        print("house: the code changed; restarting on it"
+                    # a10269: a restart the world asked for waits for idle and cuts nothing; a landing's still cuts
+                    # after RESTART_GRACE, as before
+                    if house_restart.should_exit(self.restarts.owns, busy, now() - self.restart_since, RESTART_GRACE):
+                        if not self.restarts.leaving(cfg):
+                            print("house: a requested restart was refused at the last moment (the guard)", flush=True)
+                            self.restart_since = None
+                            time.sleep(2)
+                            continue
+                        print("house: " + ("restarting as asked in the world" if self.restarts.owns
+                                           else "the code changed; restarting on it")
                               + (f" (cutting {', '.join(busy)}: each resumes, and is told)" if busy else ""), flush=True)
                         self.exit_code = RESTART
                         break
+                else:
+                    self.restart_since = None
                 time.sleep(2)
         except KeyboardInterrupt:
             pass
         finally:
+            if guard_publisher and guard_publisher.thread.ident is not None:
+                guard_publisher.close()
             everyone = list(self.residents.values()) + list(self.workshop.workers.values())
             for x in everyone:          # every pipe closed first, so the waits in stop() overlap (not 20 s each)
                 try:

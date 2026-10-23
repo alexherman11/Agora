@@ -69,22 +69,25 @@ def test_interrupts_hold_reply_and_produce_stable_batch_guard_records(chat, word
 
 
 @pytest.mark.parametrize("value", ["hold", "future-policy"])
-def test_other_and_unknown_policies_keep_old_guard(chat, value):
+def test_other_and_unknown_policies_still_send_and_show_crossings(chat, value):
     desk, _, nid, run = chat
     run("alex", f"look {nid} :1")
     run("alex", f"do prop {nid} reply_policy={value}")
     cursor = len(desk.world.events)
     run("alex", f'do append {nid} line="One more request"')
     result = run("pike", f'do append {nid} line="Old answer"', cursor)
-    assert "held, not sent" in str(result.get("error")), result
+    assert not result.get("error"), result
+    assert "One more request" in result["text"]
+    assert "marked read" in result["text"]
 
 
-def test_worker_and_comment_updates_still_hold(chat):
+def test_worker_and_chat_thread_updates_send_with_crossing_receipts(chat):
     desk, subject, nid, run = chat
     cursor = len(desk.world.events)
     run("worker-test", f'do append {nid} line="The build failed"')
     result = run("pike", f'do append {nid} line="Done"', cursor)
-    assert "held, not sent" in str(result.get("error")), result
+    assert not result.get("error"), result
+    assert "The build failed" in result["text"]
     run("pike", f"look {nid} :1")
     run("pike", f'do comment {nid} line="Ship?"')
     cid = subject["comments"][-1]["id"]
@@ -92,7 +95,8 @@ def test_worker_and_comment_updates_still_hold(chat):
     run("alex", f"look {nid} :1")
     run("alex", f'do comment {nid} id={cid} line="No, do not ship"')
     result = run("pike", f'do comment {nid} id={cid} line="Shipping"', cursor)
-    assert "held, not sent" in str(result.get("error")), result
+    assert not result.get("error"), result
+    assert "No, do not ship" in result["text"]
 
 
 def test_unrelated_conversation_does_not_interrupt_resident(chat):
@@ -114,14 +118,15 @@ def test_reply_target_cannot_bypass_an_unseen_interruption(chat):
     assert "held, not sent" in str(result.get("error")), result
 
 
-def test_message_to_another_resident_keeps_normal_guard(chat):
+def test_message_to_another_resident_is_shown_after_send(chat):
     desk, _, nid, run = chat
     run("alex", f"look {nid} :1")
     run("alex", f"do prop {nid} members=all")
     cursor = len(desk.world.events)
     run("alex", f'do append {nid} line="@sable: add another feature"')
     result = run("pike", f'do append {nid} line="Old answer"', cursor)
-    assert "held, not sent" in str(result.get("error")), result
+    assert not result.get("error"), result
+    assert "add another feature" in result["text"]
 
 
 def test_typed_human_signature_does_not_impersonate_human(chat):
@@ -129,7 +134,8 @@ def test_typed_human_signature_does_not_impersonate_human(chat):
     cursor = len(desk.world.events)
     run("worker-test", f'do append {nid} line="Alex: ordinary request"')
     result = run("pike", f'do append {nid} line="Old answer"', cursor)
-    assert "held, not sent" in str(result.get("error")), result
+    assert not result.get("error"), result
+    assert "ordinary request" in result["text"]
     run("worker-test", f'do append {nid} line="Alex: /stop"')
     assert policy.queued_interrupts(desk.world, "pike", cursor) == []
 

@@ -201,8 +201,9 @@ class DeskMoo(Desk):
         cur = w.nodes[nid]["rev"]
         seen = cur if getattr(self, "_in_rules", False) else self.seen.get(nid)   # a rule is the desk's own hands: no fence
         adds = self._adds_line(nid, name, kv)
-        self._hold_line(nid, name, kv)    # a5068: a line on an old view of its chat or thread waits
-        unread = seen is None and adds      # a834: an added line overwrites nothing, so looking first protects nothing
+        chat_addition = self._chat_addition(nid, name, kv)
+        self._hold_line(nid, name, kv)    # only non-chat thread replies keep the old hold
+        unread = seen is None and chat_addition      # chat additions overwrite nothing
         if seen is None and not unread:
             raise Refusal(f"you have not looked at {nid} yet; look, examine or read it first"
                           + (" (on a fresh desk, start with look)" if not self.seen else ""))
@@ -213,7 +214,7 @@ class DeskMoo(Desk):
         if blind:
             raise Refusal(f"you have not seen {nid}'s {blind}; {self._read_hint(nid, blind)} before you replace it")
         hit = name not in ("create", "comment") and self._touched_by_others(nid, mine, others_only=not getattr(self, "_window", ""))
-        behind = (bool(hit) and adds) or unread     # a chat line lands; what I missed stays unread (a656), and it marks nothing seen
+        behind = (bool(hit) and chat_addition) or unread     # additions never grant overwrite authority
         joined = ""
         if hit and not behind and mine == {"text"}:
             # 7 Oct: two people in one text. When the log knows what I read and their change is on other lines, mine
@@ -273,6 +274,10 @@ class DeskMoo(Desk):
             out += f"\n  {r['note']}"
         if joined:
             out += f"\n  {joined}"
+        if chat_addition and not getattr(self, "_in_rules", False):
+            crossed = self._chat_crossing_receipt(nid, name, kv)
+            if crossed:
+                out += "\n  " + crossed
         said = self._chat_behind(nid) if adds and not getattr(self, "_in_rules", False) else ""
         if said:
             out += f"\n  {said}"     # a834: counted from what this reader was shown, not from who touched it since

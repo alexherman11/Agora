@@ -193,7 +193,7 @@ class CleanupTests(unittest.TestCase):
         path = scratch / "fake.json"
         launches = []
         namespace = {"state_file": lambda _: path, "os": os,
-                     "_start_locked": lambda *args: launches.append(args) or 10}
+                     "_start_locked": lambda *args, **kwargs: launches.append((args, kwargs)) or 10}
         exec(compile(ast.Module(body=[node], type_ignores=[]), str(HERE / "sandbox_window.py"), "exec"), namespace)
         try:
             path.with_suffix(".cleanup-lock").write_text("")
@@ -202,6 +202,7 @@ class CleanupTests(unittest.TestCase):
             self.assertEqual(launches, [])
             path.with_suffix(".cleanup-lock").unlink()
             self.assertEqual(namespace["start"]("fixture", ["fake"]), 10)
+            self.assertEqual(launches[-1][1], {"job": None})
             self.assertFalse(path.with_suffix(".cleanup-lock").exists())
         finally:
             shutil.rmtree(scratch)

@@ -63,7 +63,9 @@ LIVE = live_checkout()
 NOTATION = HERE.relative_to(HERE.parents[2]).as_posix()      # research/text-desk-lab/notation in any checkout
 ROOM = Path(os.environ.get("LANDING_ROOM") or (LIVE / ".worktrees" / "house-landing"))
 STATE = LIVE / NOTATION / "house-state"
-BANNED = (f"{NOTATION}/sessions/",)                           # worlds are never landed; .env never committed
+# worlds are never landed; .env never committed; a10253: a handoff staged beside (.incoming/<request>/) is merged by
+# hand and removed on the worker's branch, never landed
+BANNED = (f"{NOTATION}/sessions/", ".incoming/")
 
 
 def _lock(wait=20 * 60):
@@ -140,8 +142,29 @@ def room_at(base):
     git("merge", "--abort", cwd=ROOM)
     git("checkout", "--detach", "--force", base, cwd=ROOM, check=True)
     git("reset", "--hard", base, cwd=ROOM, check=True)
-    git("clean", "-ffdxq", cwd=ROOM, check=True)
+    clean_room()
     return ROOM / NOTATION
+
+
+def clean_room():
+    """Ignore only isolated tool scratch, not untracked source contamination."""
+    from fixture_cleanup import remove_tree
+    scratch = ROOM / "research/window-lab/.tmp-agora"
+    errors = remove_tree(scratch)
+    if errors:
+        log("cleanup-warning", path=str(scratch), errors=errors)
+        print("landing: retained tool scratch; could not remove:\n" + "\n".join(errors), file=sys.stderr)
+    # Old tests can still be letting go of scratch. Git must not race their
+    # recursive deletion. The exclusion is rooted, not a repository-wide glob.
+    args = ("clean", "-ffdxq", "-e", "/research/window-lab/.tmp-agora/")
+    result = git(*args, cwd=ROOM)
+    if result.returncode:
+        # A concurrent remover may have finished between Git's scan and unlink.
+        # Retry once; any persistent failure outside scratch still refuses.
+        result = git(*args, cwd=ROOM)
+        if result.returncode:
+            raise RuntimeError(f"landing clean could not remove non-scratch files: "
+                               f"{(result.stderr or result.stdout).strip()[-1600:]}")
 
 
 def merge_in(branches, why, heads=None):
@@ -196,6 +219,11 @@ def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
     scratch = Path(cwd).resolve().parents[2] / "research/window-lab/.tmp-agora"
     os.makedirs(scratch, exist_ok=True)
     env = {**os.environ, "DESKD": "off", **{key: str(scratch) for key in ("AGORA_TMP", "TMP", "TEMP", "TMPDIR")}}
+    # Visits make nested Git repositories and run child servers. Their private
+    # lifetime must not overlap a subsequent room reset/clean after a restart.
+    visits = STATE / "test-visits"
+    visits.mkdir(parents=True, exist_ok=True)
+    env["AGORA_VISIT_TMP"] = str(visits.resolve())
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=1200, env=env)
     lines = (r.stdout or "").strip().splitlines()
@@ -234,6 +262,10 @@ def judged(world, sha, kept, **how):
     copy_world(world, ROOM / NOTATION)
     t0 = time.time()
     h = health(world, ROOM / NOTATION, **how)
+    current = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
+    if current != sha:
+        raise RuntimeError(f"health changed landing-room HEAD from {sha} to {current}; "
+                           "judgment discarded; live checkout unchanged")
     log("health", sha=sha[:7], how={k: v for k, v in how.items() if k != "changed"}, seconds=round(time.time() - t0, 1),
         ok=h.get("ok"), stopped=h.get("stopped"), failed=(h.get("failed") or [])[:4])
     h["partial"] = bool(how.get("only")) or bool(h.get("partial")) or bool(h.get("stopped"))
@@ -376,6 +408,12 @@ def advance(sha, base, why):
     if head != base:
         return False, None, "main moved while this was judged"
     changed = set(git("diff", "--name-only", base, sha, cwd=LIVE, check=True).stdout.split("\n")) - {""}
+    # Recheck the actual candidate, not just each requested branch. A health
+    # fixture must never smuggle copied world state into the room's ancestry.
+    # Do this before staging/parking anything in the live checkout.
+    banned = sorted(p for p in changed if p.startswith(BANNED) or p.endswith(".env"))
+    if banned:
+        return False, None, "candidate contains paths that may not land: " + ", ".join(banned)
     # a file that already holds what lands (a hand landing's own files) is not in the way: nothing to park
     dirty = [p for p in dirty_in_live() if p in changed]
     overlap = sorted(p for p in dirty if not _holds(p, sha))
