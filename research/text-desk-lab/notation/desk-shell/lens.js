@@ -875,8 +875,13 @@
       if (busy || waiting.has(n.key) || !input.value.trim()) return;
       if (te && te.composing()) { why = "Not sent — the input method is still writing; finish it first"; return sync(); }   // Codex, a6067 c6120
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
-<<<<<<< HEAD
-      const raw = input.value; let submitted = false; busy = true; why = ""; sync();
+      const quote = quoteDrafts.get(n.key);
+      // Freeze the chosen authored branch at the press, with the original
+      // audience/topic/generation/fence. Only pending status may refresh.
+      const action = quote ? quotedLine || a.line : a.line;
+      if (quote && !/\$quote_text\b/.test(action)) { why = "This composer has no authored quote consumer"; return sync(); }
+      if (/\$quote_\w+\b/.test(action) && !quote) { why = "Prepare a source quote first"; return sync(); }
+      const raw = input.value; let submitted = false, delivered = false; busy = true; why = ""; sync();
       const shown = () => { const k = kept.get(n.key); if (k && k.el._composer && k.el !== el) k.el._composer.sync(); sync(); };
       try {
         const cur = latest(n.key, el);
@@ -890,42 +895,28 @@
             return;
           }
         }
-        if (input.value !== raw) { why = "Not sent — your words changed while waiting; review and send again"; return; }
-        // Native context_from admission owns current attachment selection. Keep
-        // the original audience, reply, topic, generation and edit fence.
-        submitted = true;
-        await send(seen, a.line.replace("$value", () => TEXT.esc(raw)).replace("$selected", () => picked), raw);
-        if (!V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
-      } catch (e) {
-        why = submitted ? "Send outcome unknown — check the feed before sending again"
-          : "Not sent — the attachment check failed; your words are kept";
-        V.notify(why);
-      } finally {
-        waiting.delete(n.key); busy = false; shown();
-      }
-=======
-      const quote = quoteDrafts.get(n.key);
-      // Select ONE authored action before substitution. Removal restores plain Send.
-      const action = quote ? quotedLine || a.line : a.line;
-      if (quote && !/\$quote_text\b/.test(action)) { why = "This composer has no authored quote consumer"; return sync(); }
-      if (/\$quote_\w+\b/.test(action) && !quote) { why = "Prepare a source quote first"; return sync(); }
-      const raw = input.value; let delivered = false; busy = true; why = ""; sync();
-      try {
         if (quote) await checkQuote(quote);
+        if (input.value !== raw) { why = "Not sent — your words changed while waiting; review and send again"; return; }
         const values = quote ? { item: quote.item, rev: quote.rev, field: quote.field, start: quote.start, end: quote.end,
           text: quote.quote, before: quote.before, after: quote.after, context: quote.context.item?.item || "",
           destination: quote.context.destination?.item || "" } : {};
         // One substitution pass: selected/typed words never become command tokens.
         const line = action.replace(/\$(value|selected|quote_(?:item|rev|field|start|end|text|before|after|context|destination))\b/g,
           (m, key) => key === "value" ? TEXT.esc(raw) : key === "selected" ? picked : TEXT.esc(String(values[key.slice(6)] ?? "")));
+        // Native context_from admission selects current captures atomically.
+        // Comment's source_quote travels through that same fenced dispatch.
+        submitted = true;
         const answer = await send(seen, line, raw, undefined, quote ? { quote } : undefined);
         delivered = !!answer && !answer.error && !/^(ERR|!!)/.test(answer.text || "");
         if (delivered && !V.drafts.has(n.key)) quoteDrafts.delete(n.key);
-      } catch (e) { why = `${e.message}; your draft and quote are kept`; }
-      finally { busy = false; }
-      if (delivered && !V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
-      sync();
->>>>>>> main
+        if (delivered && !V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
+      } catch (e) {
+        why = submitted ? "Send outcome unknown — check the feed before sending again"
+          : `${e.message}; your draft and quote are kept`;
+        V.notify(why);
+      } finally {
+        waiting.delete(n.key); busy = false; shown();
+      }
     };
     discard.onclick = () => { if (V.drop(n.key)) { input.value = n.paint.text || ""; if (te) te.reset(input.value); openComposers.delete(n.key); sync(); } };
     recover.onclick = () => {
