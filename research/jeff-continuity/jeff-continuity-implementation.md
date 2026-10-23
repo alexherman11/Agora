@@ -315,3 +315,84 @@ The second automatic review rejected its POST /api/deploy boundary despite an of
 proof that its sole line was `look a11307 :1`. That action was stopped; modules were not
 reinstalled. The core /api/deploy path was independently verified by the actual harness
 installation. Selected installer adoption is not universal enforcement of /api/do.
+
+
+## Recovery activation and overnight continuation - 23 October
+
+This supersedes the pending follow-up language above; historical evidence is retained.
+
+**Ran:** recovery candidate `66a4bc5` landed and activated as `08df1c3`. Comparative
+health retained the same three failures, with no new ones; refreshed baseline world
+checks took 18.9 seconds and candidate health 234.0 seconds. Source and running-byte
+verification passed before updating only the existing task-review/task-verify bodies
+(events e34444/e34445). All eight temporary settings were restored; seven resident
+identities/inboxes survived. Focused groups printed 74 passed/7 subtests and a separate
+74 passed/26 subtests; the 43 passed/10 subtests exit-tail follow-up overlaps earlier
+coverage and is not an additional unique-test total.
+
+**Ran/read:** Ibis's retained applied receipt (39,315 characters) and original command
+hash matched, its session was preserved, recovery-needed cleared, and subsequent turns
+completed. Ibis c12642 acknowledged receipt continuation without saved-command replay.
+The supplemental Comment transfer applied its two exact fixture hashes; its original
+18-file import was not repeated. Comment source landed as 47d53c8, and Sable applied
+paired world hunks. Actual clicking/quoted sending remained unverified at this checkpoint.
+Jeff c12655 accepted the scoped continuity evidence in world note a12649, explicitly
+excluding universal exactly-once, painted, physical-key and sibling-feature guarantees.
+
+**Ran/read:** the six browser/tiling siblings are now owned together by overnight task
+`a12732`, with existing feature owners retained. Drag-stall source landed as 3319834;
+packed-grid source landed as bab33e8; backend subsequently reported c60a142. Those are
+source/runtime milestones, not painted timing or Board-world activation evidence.
+Magnetic reflow was restored through the ordinary asked-state path and prepared as
+77d41f4, still default off. Item carry has resumed real implementation; it is unfinished.
+
+Browser's original verifier import was proven applied and ancestral; only the stale
+completed request was retired. Its two conflict repairs were reviewed by Rowan, then
+committed under the normal worker lease as d7cb13d, preserving parents 3ac1a72 and
+09ef253 plus all prior staged work. No native browser execution or ready claim follows.
+The exact receipt was supplied to Rowan; native interpreter inventory remains unapproved.
+
+**Ran:** panel activation's old startup diagnostic could not attribute the cause because
+it discarded child output. Its worker's exact retained-directory listing was denied
+(OS error 5) and was not retried. A fresh, separately owned paired diagnostic used exact
+parent6f6cc7 and candidatea73b1a3 source, synthetic worlds/free loopback ports, existing
+child lifetime pipes and retained output. All nine acceptance ASTs and instrumentation
+hashes matched. Parent: 143 gestures, one missing, no duplicates/errors, 8/9 checks pass,
+26.487 seconds. Candidate: 144 gestures, all nine pass,26.016 seconds. Both completed;
+all fourteen recorded listeners closed and four recorded door launcher PIDs were absent.
+This is bounded cleanup evidence, not continuous descendant containment certification.
+The candidate tree equals worker/a9352. Fresh evidence is world note a12796; it supports
+ordinary source review while keeping the intermittent baseline defect visible. It does
+not explain the old timeout or prove the defect eliminated.
+
+No production diagnostic patch, live test message, screenshot, simulated input, focus
+change, OBS action, forced lease or new credential was used. Physical Windows-key
+confirmation remains pending with Alex. The module-wrapper gate-only probe remains
+stopped after the recorded denial; no new attempt or module reinstall occurred.
+
+Exact private receipts are under Documents/Codex/2026-10-22/task-3/continuity;
+readable world notes a12649/a12796 and the overnight task contain the user-facing facts.
+This continuation is unfinished until the existing feature owners supply actual remaining
+native/painted/world-activation evidence or a precise unresolved authorization decision.
+
+
+### Paint handoff natural-exit correction
+
+**Read:** the existing Claude paint acceptance worker a11403 has a delivered pending
+message whose matching-session successful terminal result was recorded after last_sent,
+followed by host-recorded exit code0. Its completion was not drained into state. This is
+distinct from the prior Ibis relay receipt and Comment transfer; those are already resolved.
+
+The existing ownership check recognized explicit stop but not this natural exit. The
+narrow source correction recognizes an integer-code exit of the latest recorded start
+PID, still requiring every recorded PID positively absent. A stale/wrong PID, missing
+exit code, later start, live PID or uncertain absence stays held. This does not consume
+pending delivery, review a result, waive a worker lease or bypass landing serialization.
+Existing interrupted-delivery recovery will preserve the already-delivered input for
+same-session continuation without replay before the original transfer is retried.
+
+**Ran:** affected lifecycle/preserved-transfer tests:57 passed,30 subtests passed in
+129.26s. Whitespace clean. Exact main/current lint comparison:551 existing workshop
+diagnostics on each side, zero added; transfer test file has no lint diagnostics.
+At this source checkpoint, correction is tested but not yet landed/loaded. Native paint
+and its empty remote allowlist remain unchanged; no attempt was repeated.
