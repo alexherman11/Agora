@@ -7,8 +7,9 @@ corner, and the house:
 
   - takes it only from those the house note's restart_by= names (default jeff,alex), and only with a reason;
     otherwise state=refused, saying why;
-  - refuses while the guard sees a game, or a full-screen program it has not been told is no game (guard_context;
-    the house's own reading, never a caller's), at the request and again at the moment of restarting;
+  - refuses game evidence or unknown/unsafe screen state (the house's own observation, never a caller's),
+    at the request and again at the moment of restarting; fullscreen geometry or an unlisted app alone
+    is not evidence of a game. Native/browser admission retains its separate, stricter policy;
   - drains: no new turn starts (the same drain a landing's restart uses), and the note says what is still in flight
     (in_flight=), until nothing is: a turn is never cut for a requested restart (a landing's restart still cuts
     after RESTART_GRACE, as before);
@@ -51,16 +52,33 @@ def maker(w, sid):
 
 def game_seen(nongame=""):
     """The house's own guard reading: a reason the restart must not happen now, or "" when none.
-    A game, or a full-screen program not named as no game, refuses; an unreadable guard does not invent a game."""
+    Restart-only policy: geometry/app naming does not establish a game.
+    Retain Windows' game indication and unknown/unsafe observation refusal.
+    This does not change guard_context.policy_clear or native-run admission."""
     import guard_context
     try:
         data = guard_context.observe(nongame)
     except Exception as exc:
         return f"the guard could not be read ({type(exc).__name__}); not restarting blind"
-    if data.get("game") is True:
+    if not isinstance(data, dict):
+        return "the guard observation is malformed; not restarting blind"
+    if data.get("game") is True or data.get("notification_state") == 3:
         return "the guard sees a game (full-screen Direct3D)"
-    if data.get("full_screen") is True and not data.get("admitted"):
-        return f"the guard sees a full-screen program ({data.get('foreground_exe', 'unknown')}) not named as no game"
+    if (type(data.get("notification_result")) is not int or data["notification_result"] != 0
+            or data.get("foreground_known") is not True
+            or data.get("input_desktop") != "Default"):
+        return "the guard cannot establish a stable foreground on the unlocked desktop; not restarting blind"
+    exe = data.get("foreground_exe")
+    if (not isinstance(exe, str) or not exe or exe.lower() == "unknown"
+            or "/" in exe or "\\" in exe):
+        # observe marks transitions during its probes unknown, too.
+        return "the guard foreground identity is unknown or changed; not restarting blind"
+    state = data.get("notification_state")
+    if type(state) is not int or state not in (2, 5):
+        return "the guard reports an unavailable, busy or presentation state; not restarting now"
+    if ("game" not in data or
+            (data["game"] is not False and not (state == 2 and data["game"] is None))):
+        return "the guard game reading is unknown or inconsistent; not restarting blind"
     return ""
 
 
