@@ -1,0 +1,453 @@
+{
+  "world_event": "e18947",
+  "baseline_events": 18949,
+  "fixture_events": 18953,
+  "events_after_assertions": 18953,
+  "exact_menu_hunk": "              let destination_title = join($title of $d.talk) when talk != \"\"\n              let destination_title = \"\" otherwise\n              let destination_id = join($id of $d.talk) when talk != \"\"\n              let destination_id = \"\" otherwise\n              on menu \"Comment\" prepare home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say context=$d.id destination=$(destination_id)",
+  "origin": {
+    "key": "page/stood/one/a8536/a5914/work/paper/pages/written/words/body",
+    "paint": {
+      "kind": "text",
+      "text": "same same **bold** end",
+      "wrap": "prose",
+      "role": "body",
+      "hint": "Start writing\u2026 select any words to comment on them",
+      "light": [
+        "none"
+      ],
+      "markdown": true,
+      "titles": [
+        {
+          "id": "f3407",
+          "title": "The log, in our words",
+          "kind": "surface"
+        },
+        {
+          "id": "f3546",
+          "title": "Pike's scratch document",
+          "kind": "surface"
+        },
+        {
+          "id": "f4040",
+          "title": "The Workbench, first whole",
+          "kind": "surface"
+        },
+        {
+          "id": "f4277",
+          "title": "Where visitors stand: one choice",
+          "kind": "surface"
+        },
+        {
+          "id": "f4358",
+          "title": "A window's own values",
+          "kind": "surface"
+        },
+        {
+          "id": "f4494",
+          "title": "Writing: one home for documents, designs, and personal work",
+          "kind": "surface"
+        },
+        {
+          "id": "a4865",
+          "title": "Continuous documents",
+          "kind": "note"
+        },
+        {
+          "id": "a4934",
+          "title": "The Workbench",
+          "kind": "note"
+        },
+        {
+          "id": "a5916",
+          "title": "Writing in Agora",
+          "kind": "note"
+        },
+        {
+          "id": "a7383",
+          "title": "Claude runway: keep the useful work, cut repeated context",
+          "kind": "note"
+        },
+        {
+          "id": "a8536",
+          "title": "Copy source",
+          "kind": "note"
+        },
+        {
+          "id": "a8538",
+          "title": "Copy navigation",
+          "kind": "note"
+        }
+      ],
+      "commit": "enter",
+      "source": {
+        "item": "s8535",
+        "rev": 1,
+        "field": "text"
+      }
+    },
+    "acts": [
+      {
+        "on": "menu",
+        "line": "prepare home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say context=s8535 destination=s8531",
+        "label": "Comment"
+      },
+      {
+        "on": "edit",
+        "line": "read a8536; do rewrite a8536 text=\"$value\""
+      }
+    ],
+    "kids": [],
+    "fence": {
+      "item": "a5914",
+      "rev": 48,
+      "reads": [
+        [
+          "a5914",
+          48,
+          [
+            "place"
+          ]
+        ],
+        [
+          "a8532",
+          1,
+          [
+            "place"
+          ]
+        ],
+        [
+          "s5913",
+          48,
+          [
+            "prop:actor",
+            "prop:role"
+          ]
+        ],
+        [
+          "s8531",
+          1,
+          [
+            "title"
+          ]
+        ],
+        [
+          "s8535",
+          1,
+          [
+            "prop:talk",
+            "text"
+          ]
+        ],
+        [
+          "select",
+          "a8536",
+          [
+            [
+              "a8536",
+              "live"
+            ]
+          ]
+        ],
+        [
+          "select",
+          "a8532",
+          [
+            [
+              "a8532",
+              "live"
+            ]
+          ]
+        ]
+      ],
+      "defpart": {
+        "path": "page/stood/one/mine/sheet/work/paper/pages/written/words/body",
+        "hash": "f9fd6033f80e",
+        "lens": "doc-page",
+        "id": "s6078"
+      },
+      "bind": {
+        "subject": "s5913",
+        "subject_rev": 48,
+        "parent": "f3402",
+        "parent_rev": 71,
+        "units": "px in parent"
+      }
+    },
+    "part": "body"
+  },
+  "consumer": {
+    "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+    "paint": {
+      "kind": "text",
+      "text": "",
+      "wrap": "prose",
+      "role": "input",
+      "lines": [
+        1,
+        12
+      ],
+      "hint": "Write to JEFF, or anyone above\u2026",
+      "commit": "explicit"
+    },
+    "acts": [
+      {
+        "on": "edit-quoted",
+        "line": "do append $quote_destination line=\"$value\" about=\"$quote_item\" quote=\"$quote_text\" words_before=\"$quote_before\" words_after=\"$quote_after\" captures=\"cap-999998 cap-999999\" context_from=\"a5082\""
+      },
+      {
+        "on": "edit",
+        "line": "do append a5080 line=\"$value\" default_to=\"rowan\" captures=\"cap-999998 cap-999999\" context_from=\"a5082\" reply_to=\"\" about=\"\""
+      }
+    ],
+    "kids": [],
+    "fence": {
+      "item": "a5082",
+      "rev": 24,
+      "reads": [
+        [
+          "a5082",
+          24,
+          [
+            "place"
+          ]
+        ],
+        [
+          "a5482",
+          101,
+          [
+            "place"
+          ]
+        ],
+        [
+          "a6802",
+          1,
+          [
+            "place"
+          ]
+        ],
+        [
+          "f5664",
+          115,
+          [
+            "place",
+            "prop:actor",
+            "prop:role"
+          ]
+        ],
+        [
+          "s5081",
+          24,
+          [
+            "prop:actor",
+            "prop:reply_thread",
+            "prop:role",
+            "prop:topic"
+          ]
+        ],
+        [
+          "s5481",
+          101,
+          [
+            "prop:viewing"
+          ]
+        ],
+        [
+          "s6801",
+          1,
+          [
+            "prop:role"
+          ]
+        ],
+        [
+          "select",
+          "prop:role=home-view,prop:actor=alex,prop:viewing,-prop:viewing=a5080",
+          [
+            "a5482"
+          ]
+        ],
+        [
+          "select",
+          "prop:role=home-view,prop:actor=alex",
+          [
+            "a5482"
+          ]
+        ]
+      ],
+      "defpart": {
+        "path": "chat/room/dock/say",
+        "hash": "d21347a79049",
+        "lens": "jeff-chat",
+        "id": "s5209"
+      },
+      "bind": {
+        "subject": "s5081",
+        "subject_rev": 24,
+        "parent": "f5078",
+        "parent_rev": 7,
+        "units": "px in parent"
+      }
+    },
+    "part": "say"
+  },
+  "navigated_consumer": {
+    "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+    "paint": {
+      "kind": "text",
+      "text": "",
+      "wrap": "prose",
+      "role": "input",
+      "lines": [
+        1,
+        12
+      ],
+      "hint": "Write to JEFF, or anyone above\u2026",
+      "commit": "explicit"
+    },
+    "acts": [
+      {
+        "on": "edit-quoted",
+        "line": "do append $quote_destination line=\"$value\" about=\"$quote_item\" quote=\"$quote_text\" words_before=\"$quote_before\" words_after=\"$quote_after\" captures=\"cap-999998 cap-999999\" context_from=\"a5082\""
+      },
+      {
+        "on": "edit",
+        "line": "do append a5080 line=\"$value\" default_to=\"pike\" captures=\"cap-999998 cap-999999\" context_from=\"a5082\" reply_to=\"\" about=\"\""
+      }
+    ],
+    "kids": [],
+    "fence": {
+      "item": "a5082",
+      "rev": 24,
+      "reads": [
+        [
+          "a5082",
+          24,
+          [
+            "place"
+          ]
+        ],
+        [
+          "a5482",
+          101,
+          [
+            "place"
+          ]
+        ],
+        [
+          "a6802",
+          1,
+          [
+            "place"
+          ]
+        ],
+        [
+          "f5664",
+          115,
+          [
+            "place",
+            "prop:actor",
+            "prop:role"
+          ]
+        ],
+        [
+          "s5081",
+          24,
+          [
+            "prop:actor",
+            "prop:reply_thread",
+            "prop:role",
+            "prop:topic"
+          ]
+        ],
+        [
+          "s5481",
+          101,
+          [
+            "prop:viewing"
+          ]
+        ],
+        [
+          "s6801",
+          1,
+          [
+            "prop:role"
+          ]
+        ],
+        [
+          "select",
+          "prop:role=home-view,prop:actor=alex,prop:viewing,-prop:viewing=a5080",
+          [
+            "a5482"
+          ]
+        ],
+        [
+          "select",
+          "prop:role=home-view,prop:actor=alex",
+          [
+            "a5482"
+          ]
+        ]
+      ],
+      "defpart": {
+        "path": "chat/room/dock/say",
+        "hash": "d21347a79049",
+        "lens": "jeff-chat",
+        "id": "s5209"
+      },
+      "bind": {
+        "subject": "s5081",
+        "subject_rev": 24,
+        "parent": "f5078",
+        "parent_rev": 7,
+        "units": "px in parent"
+      }
+    },
+    "part": "say"
+  },
+  "snapshot_for_isolated_consumer_test": {
+    "item": "s8535",
+    "rev": 1,
+    "field": "text",
+    "start": 5,
+    "end": 9,
+    "quote": "same",
+    "before": "same",
+    "after": "**bold** end",
+    "context": {
+      "item": {
+        "item": "s8535",
+        "rev": 1
+      },
+      "destination": {
+        "item": "s8531",
+        "rev": 1
+      }
+    },
+    "label": "Copy source"
+  },
+  "fixture": {
+    "source": "a8536",
+    "source_subject": "s8535",
+    "talk": "a8532",
+    "talk_subject": "s8531",
+    "other_source": "a8538",
+    "other_talk": "a8534",
+    "capture_ids": "cap-999998 cap-999999"
+  },
+  "acceptance": "PASS canonical source/Talk menu fence, native disposable Talk route, compiled consumer/navigation",
+  "unreadable_talk_refusal": "The quote context is unavailable",
+  "stale_talk_refusal": "The quote context changed; prepare the quote again",
+  "stale_source_refusal": "The source changed; select the words again",
+  "native_canonical_append": {
+    "destination": "s8531",
+    "receipt": {
+      "text": "ok e18952: append s8531 line='Copy canonical route'\n  line m8539 \u00b7 to: jeff (with= of this chat: jeff)\n  Jeff: not woken, the house is not running (no heartbeat); your line waits for them until it runs"
+    },
+    "events_before": 18953,
+    "events_after": 18954
+  },
+  "limits": [
+    "Consumer DOM/transport integration is tested separately using this exact artifact",
+    "Capture rows are mocks; private capture delivery/detach unproven",
+    "Native append only to disposable fixture Talk; no live sends or browser"
+  ]
+}
