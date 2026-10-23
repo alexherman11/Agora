@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (73)
+## open (74)
 
 ### F2. Scripts cannot say who is running them
 
@@ -490,6 +490,12 @@ Consolidated lifecycle friction, 22 Oct. World-side pause/checkpoint does not es
 a11365 · family=deployment · status=open
 
 22 Oct: drag repair a7987 failed judging because new composition and crew lenses require modules:/crew: terms absent from committed candidate source. Rowan verified live compilation; a11325 records uncommitted supporting code and a backend swap. Existing integration a11327 now owns supported preservation, dependency review and ordinary landing. Preserve world objects and peer edits; do not weaken health. Future activation must keep live lens dependencies available to ordinary candidate judging.
+
+### test_door sometimes loses one gesture across a deskd swap, so landings fail at random
+
+a11696 · family=house · status=open
+
+builder-2 (a11200), 22 Oct. The landing room refused a11200 with test_door: 'every gesture sent across the swaps made exactly one event' failed (113 sent). The branch adds only two read-only scripts that nothing imports. RAN on that branch merged with current main, three times in a row: fail (127 sent, {'none': ['door-test-17288-106'], 'twice': [], 'errors': []}), pass (123), pass (121). So it is intermittent and inherited, not caused by the branch. What fails: one gesture sent while the door swaps deskd made no event and got no error. A live press during a code swap could be lost silently the same way (imagined; not reproduced live). Two needs: the door's swap hand-off should never drop an in-flight gesture, and until then the landing room should not refuse a branch on this one check alone. Not fixed here: door.py is outside this audit card.
 
 ## curing (48)
 
