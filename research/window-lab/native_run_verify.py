@@ -46,6 +46,24 @@ ENGINE_IMAGES = ("msedgewebview2.exe", "msedge.exe")
 VIOLATION, UNKNOWN, OBSERVED = "violation", "unknown", "observed"
 MAX_FILES = 20000                 # per root; more is unknown, never a partial clean
 MAX_HASH_BYTES = 1 << 30          # per run-owned root
+
+
+class EnumerationIncomplete(OSError):
+    """Bounded API metadata, with no window names or process content."""
+    def __init__(self, api, code, visited, callback_failed=False):
+        super().__init__(code, "Native enumeration incomplete")
+        self.winerror = code
+        self.enumeration = {"api": api, "complete": False, "error": code,
+                            "visited": visited, "callback_failed": callback_failed}
+
+
+def enumeration_error(exc):
+    result = error(exc)
+    if isinstance(exc, EnumerationIncomplete):
+        result["enumeration"] = dict(exc.enumeration)
+    return result
+
+
 LISTEN = 2
 TCP_STATES = {1: "closed", 2: "listen", 3: "syn-sent", 4: "syn-received", 5: "established", 6: "fin-wait-1",
               7: "fin-wait-2", 8: "close-wait", 9: "closing", 10: "last-ack", 11: "time-wait", 12: "delete-tcb"}
@@ -206,10 +224,15 @@ class Native:
             raise c.WinError(c.get_last_error())
         try:
             entry, out = PROCESSENTRY32W(dwSize=c.sizeof(PROCESSENTRY32W)), []
+            c.set_last_error(0)
             ok = self.k.Process32FirstW(snap, c.byref(entry))
             while ok:
                 out.append((int(entry.th32ProcessID), int(entry.th32ParentProcessID), entry.szExeFile))
+                c.set_last_error(0)
                 ok = self.k.Process32NextW(snap, c.byref(entry))
+            err = c.get_last_error()
+            if err != 18:  # ERROR_NO_MORE_FILES is Toolhelp completion, not desktop completion.
+                raise EnumerationIncomplete("Toolhelp", err, len(out))
             return out
         finally:
             self.k.CloseHandle(snap)
@@ -268,19 +291,26 @@ class Native:
         h = self.u.OpenDesktopW(desktop, 0, False, 0x0001 | 0x0040)       # DESKTOP_READOBJECTS | DESKTOP_ENUMERATE
         if not h:
             raise c.WinError(c.get_last_error())
-        out = []
+        out, failures = [], []
 
         @self.enum_type
         def each(hwnd, _):
-            pid = w.DWORD()
-            self.u.GetWindowThreadProcessId(hwnd, c.byref(pid))
-            out.append((int(pid.value), bool(self.u.IsWindowVisible(hwnd))))
-            return True
+            try:
+                pid = w.DWORD()
+                if not self.u.GetWindowThreadProcessId(hwnd, c.byref(pid)) or not pid.value:
+                    failures.append("owner unavailable")
+                    return False
+                out.append((int(pid.value), bool(self.u.IsWindowVisible(hwnd))))
+                return True
+            except Exception:
+                failures.append("callback failed")
+                return False
         try:
-            if not self.u.EnumDesktopWindows(h, each, 0) and not out:
-                err = c.get_last_error()
-                if err:
-                    raise c.WinError(err)
+            c.set_last_error(0)
+            ok = self.u.EnumDesktopWindows(h, each, 0)
+            err = c.get_last_error()  # before CloseDesktop or any other API
+            if not ok or failures:
+                raise EnumerationIncomplete("EnumDesktopWindows", err, len(out), bool(failures))
             return out
         finally:
             self.u.CloseDesktop(h)
@@ -555,7 +585,8 @@ class Verifier:
                 self._unknown("family", f"before launch, {len(unreadable)} engine-named process(es) could not be "
                                         f"read to rule out our profile ({unreadable})")
         except OSError as exc:
-            self._unknown("family", f"before launch, the process list failed: {error(exc)}")
+            self._unknown("family", "before launch, the process list failed: "
+                          f"{enumeration_error(exc)}")
         pre["owned"] = {r: snapshot_root(r, hash_files=True) for r in self.owned}
         pre["watched"] = {r: snapshot_root(r, hash_files=False, exclude=self.owned + self.run["exclude"])
                           for r in self.run["watched_roots"]}
@@ -583,7 +614,7 @@ class Verifier:
             procs = n.processes()
         except OSError as exc:
             procs = None
-            self._unknown("family", f"process list failed at a sample: {error(exc)}")
+            self._unknown("family", f"process list failed at a sample: {enumeration_error(exc)}")
         parents = {pid: (ppid, image) for pid, ppid, image in procs or []}
         for pid in snap["pids"]:
             try:
@@ -630,7 +661,7 @@ class Verifier:
                                         f"our profile")
             s["outside_named"] = [p["pid"] for p in named]
         except OSError as exc:
-            self._unknown("family", f"process list failed at a sample: {error(exc)}")
+            self._unknown("family", f"process list failed at a sample: {enumeration_error(exc)}")
             named = []
         ours = members | {p["pid"] for p in named}
         # 3. windows: the sandbox desktop (expected), Default (must hold none of ours)
@@ -645,7 +676,8 @@ class Verifier:
                     self._bad("windows", f"{len(mine)} window(s) of job/profile processes on the Default desktop "
                                          f"(pids {sorted({p for p, _ in mine})})")
             except OSError as exc:
-                self._unknown("windows", f"desktop {desk} could not be enumerated: {error(exc)}")
+                self._unknown("windows", f"desktop {desk} could not be enumerated: "
+                              f"{enumeration_error(exc)}")
         # 4. sockets
         try:
             tcp = [r for r in n.tcp() if r[0] in ours]
@@ -765,7 +797,8 @@ class Verifier:
                 self._unknown("family", f"after cleanup, {len(unreadable)} engine-named process(es) could not be "
                                         f"read: {unreadable}")
         except OSError as exc:
-            self._unknown("family", f"after cleanup, the process list failed: {error(exc)}")
+            self._unknown("family", "after cleanup, the process list failed: "
+                          f"{enumeration_error(exc)}")
         try:
             post["job"] = self.scope.snapshot()
             post["io"] = self.native.job_io(self.scope.handle)
