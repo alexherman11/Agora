@@ -217,12 +217,46 @@
     const projected = geometry(next.root, bounds, options);
     return { tree: next, box: projected.boxes[dragged], target };
   }
+  function magneticHit(bounds, boxes, point, dragged, previous, margin = 12) {
+    // Always use pickup geometry, never boxes moved by our own preview.
+    const target = hit(bounds, boxes, point, dragged);
+    if (!target) return null;
+    const same = (a, b) => a && b && a.global === b.global && a.target === b.target && a.side === b.side;
+    if (previous && !same(target, previous.target)) {
+      const dx = previous.point.x - point.x, dy = previous.point.y - point.y, distance = Math.hypot(dx, dy);
+      const scale = distance ? Math.min(1, Math.max(0, margin) / distance) : 0;
+      const inward = hit(bounds, boxes, { x: point.x + dx * scale, y: point.y + dy * scale }, dragged);
+      if (same(inward, previous.target)) return previous;
+    }
+    return { target, point: { ...point } };
+  }
+  function previewPlan(tree, dragged, target, bounds, options = {}) {
+    // Ordinary model/resize behavior is unchanged. A carry must not introduce
+    // a preview that only fits by scaling below the declared physical minima.
+    const opt = { minimum: [240, 140], gap: 16, tab: 28, ...options };
+    function feasible(t) {
+      if (!t) return false;
+      const root = opt.visible ? project(t.root, opt.visible) : t.root;
+      if (!root) return false;
+      const min = minimum(root, opt);
+      return min[0] <= bounds.w && min[1] <= bounds.h;
+    }
+    let proposed = plan(tree, dragged, target, bounds, options);
+    if (proposed && feasible(proposed.tree)) return proposed;
+    // Reuse the existing tab operation; preserve the rest of the slicing tree.
+    // If that tree also cannot fit, refuse rather than flatten/reset it.
+    if (target && target.side !== "centre") {
+      proposed = plan(tree, dragged, { ...target, side: "centre" }, bounds, options);
+      if (proposed && feasible(proposed.tree)) return { ...proposed, fallback: "tabs" };
+    }
+    return null;
+  }
   function escape(value) { return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/\n/g, "\\n"); }
   function command(n, tree, focus) {
     return n.acts.find(a => a.on === "arrange").line.replace(/\$(value|partition_focus)\b/g,
       (_, key) => escape(key === "value" ? JSON.stringify(encoded(tree)) : focus || ""));
   }
-  const exports = { ids, model, encoded, prune, project, replace, activate, minimum, fit, geometry, drop, resize, hit, plan, nodeAt, command };
+  const exports = { ids, model, encoded, prune, project, replace, activate, minimum, fit, geometry, drop, resize, hit, plan, magneticHit, previewPlan, nodeAt, command };
   if (typeof module !== "undefined") module.exports = exports;
   else host.Partition = exports;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -208,11 +208,50 @@
       const a = g.el._n.acts.find(a => a.on === "partition-focus");
       if (a) await api.send(g.el._n, a.line.replace(/\$value\b/g, () => id));
     }
-    async function commit(g, tree, focus) {
+    async function commit(g, tree, focus, restore) {
       if (active || armed || pending || api.busy()) return;
       pending = true; api.hold(true);
       try { await api.send(g.el._n, P.command(g.el._n, tree, focus)); }
-      finally { pending = false; api.hold(false); api.refresh(); }
+      finally {
+        pending = false; api.hold(false);
+        if (restore) { try { await api.refresh(); } finally { restore(); } }
+        else api.refresh();
+      }
+    }
+    function continuity(g) {
+      // Scroll offsets do not require intrinsic measurements. Keep the actual
+      // editors, never a cloned/replaced app, and restore after authoritative
+      // refresh as well as cancellation. Viewer owns continuity across repaints.
+      const elements = [...g.members.values()].flatMap(el => [el, ...el.querySelectorAll("*")]);
+      const scroll = elements.map(el => [el, el.scrollLeft, el.scrollTop]);
+      const focused = document.activeElement;
+      return () => {
+        // Reflow may hide the focused tab and send focus to body. Recover that
+        // loss, but never override an intentional move to another editor.
+        // Retained editors own their current caret, including typing during a
+        // delayed send; replaying a pickup-time range would lose that progress.
+        if (focused?.isConnected && focused.getClientRects().length && elements.includes(focused) &&
+            (!document.activeElement || document.activeElement === document.body || document.activeElement === focused)) {
+          if (document.activeElement !== focused) focused.focus?.({ preventScroll: true });
+        }
+        for (const [el, x, y] of scroll) if (el.isConnected) {
+          if (x !== undefined) el.scrollLeft = x;
+          if (y !== undefined) el.scrollTop = y;
+        }
+      };
+    }
+    function showCandidate(a, plan) {
+      const next = plan?.tree || null;
+      a.preview.hidden = !plan;
+      a.preview.title = plan?.fallback === "tabs" ? "Not enough room for a split; previewing tabs" : "";
+      if (plan?.box) place(a.preview, plan.box);
+      // No work for a stationary snapped target: geometry changes only when
+      // the candidate changes, not for every ghost position.
+      const key = next ? JSON.stringify(next) : "";
+      if (key === a.previewKey) return;
+      a.previewKey = key; a.next = next;
+      a.g.chrome.forEach(e => e.remove()); a.g.chrome = [];
+      render(a.g, next || a.g.tree, next ? "" : a.g.focus, false);
     }
     function listen(pid, moving, done) {
       const move = e => { if (e.pointerId === pid) moving(e); };
@@ -245,7 +284,7 @@
       if (!cancel && a.external?.target) {
         pending = true;
         a.external.release().finally(() => { pending = false; api.refresh(); });
-        render(a.g);
+        render(a.g); a.restore?.();
       } else if (!cancel && a.next) {
         a.external?.cancel();
         const focus = a.kind === "carry" ? "" : a.g.focus;
@@ -255,8 +294,8 @@
         // otherwise an invisible old divider can intercept the next title press.
         a.g.chrome.forEach(e => e.remove()); a.g.chrome = [];
         render(a.g, a.next, focus, false);
-        commit(a.g, a.next, focus);
-      } else { a.external?.cancel(); render(a.g); api.refresh(); }
+        commit(a.g, a.next, focus, a.restore);
+      } else { a.external?.cancel(); render(a.g); a.restore?.(); api.refresh(); }
     }
     function carry(grip, e) {
       const g = groups.find(g => g.el.contains(grip));
@@ -299,7 +338,8 @@
             pointerEvents: "none", zIndex: "40", opacity: ".85", animation: "none", transition: "none" });
           document.body.appendChild(ghost); whole.style.opacity = ".35";
           const preview = document.createElement("div"); preview.className = "landing-box"; g.el.appendChild(preview);
-          active = { kind: "carry", g, ghost, preview, whole, next: null,
+          active = { kind: "carry", g, ghost, preview, whole, next: null, previewKey: "",
+            bounds: rect(g.el), boxes: g.geometry.boxes, restore: g.magnetic ? continuity(g) : null, snap: null,
             external: host.CarryTargets?.session(paint, { el: grip, n: grip._n }, api.send, g.el) };
           // Only a threshold drag changes selection policy; clicks and app
           // controls retain their normal focus/caret behavior.
@@ -312,12 +352,23 @@
         m.preventDefault();
         active.ghost.style.transform = `translate(${m.clientX - start.x}px,${m.clientY - start.y}px)`;
         if (active.external?.move(m)) {
-          active.next = null; active.preview.hidden = true; return;
+          if (g.magnetic) { active.snap = null; showCandidate(active, null); }
+          else { active.next = null; active.preview.hidden = true; }
+          return;
         }
-        const target = P.hit(rect(g.el), g.geometry.boxes, pagePoint(g, m), id);
-        const p = P.plan(g.tree, id, target, rect(g.el), g.options);
-        active.next = p?.tree; active.preview.hidden = !p;
-        if (p?.box) place(active.preview, p.box);
+        if (!g.magnetic) {
+          const target = P.hit(rect(g.el), g.geometry.boxes, pagePoint(g, m), id);
+          const p = P.plan(g.tree, id, target, rect(g.el), g.options);
+          active.next = p?.tree; active.preview.hidden = !p;
+          if (p?.box) place(active.preview, p.box);
+          return;
+        }
+        const prior = active.snap;
+        const snap = P.magneticHit(active.bounds, active.boxes, pagePoint(g, m), id, prior);
+        if (snap === active.snap) return;
+        active.snap = snap;
+        if (prior && snap && JSON.stringify(prior.target) === JSON.stringify(snap.target)) return;
+        showCandidate(active, P.previewPlan(g.tree, id, snap?.target, active.bounds, g.options));
       }, cancel => { armed = false; if (taken) finish(cancel); });
       return true;
     }
@@ -330,13 +381,15 @@
       if (e.key === " " && !active && !armed && !pending && !api.busy()) {
         e.preventDefault(); api.hold(true);
         const preview = document.createElement("div"); preview.className = "landing-box"; g.el.appendChild(preview);
-        active = { g, kind: "carry", whole, id: whole._n.paint.partition_item, preview, next: null };
+        active = { g, kind: "carry", whole, id: whole._n.paint.partition_item, preview, next: null,
+          previewKey: "", restore: g.magnetic ? continuity(g) : null };
       } else if (active?.g === g && active.kind === "carry") {
         const side = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "top", ArrowDown: "bottom" }[e.key];
         if (side) {
           e.preventDefault();
-          const plan = P.plan(g.tree, active.id, { global: true, side }, rect(g.el), g.options);
-          active.next = plan?.tree; if (plan?.box) place(active.preview, plan.box);
+          const plan = (g.magnetic ? P.previewPlan : P.plan)(g.tree, active.id, { global: true, side }, rect(g.el), g.options);
+          if (g.magnetic) showCandidate(active, plan);
+          else { active.next = plan?.tree; if (plan?.box) place(active.preview, plan.box); }
         } else if (e.key === "Enter") { e.preventDefault(); finish(false); }
       }
       return true;
@@ -358,7 +411,7 @@
           else n.kids.forEach(visit); })(tree.root);
         const intrinsic = Object.fromEntries([...members].filter(([id]) => content.has(id)).map(([id, e]) =>
           [id, measure(e, el.clientWidth, spec.minimum)]));
-        const g = { el, members, visible, tree, focus: spec.focus || "", chrome: [],
+        const g = { el, members, visible, tree, focus: spec.focus || "", magnetic: spec.magnetic === true, chrome: [],
           options: { minimum: spec.minimum, gap: spec.gap, intrinsic } };
         g.options.visible = visible;
         el.dataset.partition = "1"; el.style.position = "relative"; el.style.display = "block"; el.style.padding = "0"; el.style.gap = "0";
