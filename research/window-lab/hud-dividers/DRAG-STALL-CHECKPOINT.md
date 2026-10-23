@@ -220,3 +220,30 @@ comparison, not acceptance of that other candidate.
 No browser, full health, latency measurement or live activation ran here.
 Ordinary house judging is requested under Sable c11600. Timing and painted
 continuity remain owed through the shared paint lane; no latency gain claimed.
+
+## Version-aware judging resumption, 22 October
+
+Sable c12656/e34546 reports version-aware judging loaded and authorizes one
+ordinary serialized submission, behind right-click Comment. This supersedes
+the stale Twitch-inventory hold; it does not excuse an actual test failure.
+
+RAN read-only Git verification: preserved HEAD
+`940fbf4f13477808234608c5def20e55100956a3`, observed main
+`08df1c3688ad82b540d9a8e9d3cc7f120e649a63`. The endpoint lens.js diff contains
+exactly the two reviewed hunks, still 13 additions / 4 removals. No newer main
+painter hunk is absent from this file. The branch-only inventory remains
+lens.js, this report and test_repaint_races.js; subsequent main additions
+belong to ordinary house integration, not deletion.
+
+Fresh RAN on the preserved source: race 18 assertions passed; partition DOM
+281 checks passed (stand-in, no browser); geometry/model 167 checks passed.
+Node syntax and scoped production/regression diff whitespace checks exit 0.
+No product source was changed during this resumption.
+
+READ current Comment card: already commission=landing. Submit behind it through
+ordinary serialized judging. If refused, retain the exact exception and judged
+commit rather than retry unchanged or attribute another test's failure away.
+
+Not run: browser, full health, before/after timing, live apply or restart.
+Timing and painted continuity remain owed through the shared lane. No latency
+gain is claimed. Rollback remains reverting the two production hunks.
