@@ -103,7 +103,8 @@ def append(cid, msgs):
     lines = []
     for m in msgs:
         extra = " kind=notice" if m.get("notice") else ""
-        lines.append(f"do append {cid} line={quote(m['line'])} user={quote(m['user'])} "
+        lines.append(f"do append {cid} line={quote(m['line'])} words={quote(m['words'])} "
+                     f"user={quote(m['user'])} "
                      f"color={quote(m['color'])} twitch_id={quote(m['id'])}{extra}")
     gesture = "tw-" + hashlib.sha1("|".join(m["id"] for m in msgs).encode()).hexdigest()[:24]
     body = json.dumps({"session": WORLD, "as": ACTOR, "line": "\n".join(lines),
@@ -157,11 +158,12 @@ def message(cmd, tags, prefix, trailing):
         words = trailing
         if words.startswith("\x01ACTION ") and words.endswith("\x01"):   # /me
             words = "* " + words[8:-1]
-        return {"line": f"{who}: {words}", "user": who, "color": color, "id": mid}
+        return {"line": f"{who}: {words}", "user": who, "color": color, "id": mid, "words": words}
     if cmd == "USERNOTICE":        # subs, gifts, raids, announcements: Twitch's own words for it
         system = tags.get("system-msg") or tags.get("msg-id") or "notice"
         said = f"{system} {trailing}".strip() if trailing else system
-        return {"line": f"★ {said}", "user": who, "color": color, "id": mid, "notice": True}
+        return {"line": f"★ {said}", "user": who, "color": color, "id": mid, "notice": True,
+                "words": f"★ {said}"}
     return None
 
 

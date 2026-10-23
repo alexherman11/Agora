@@ -8,7 +8,7 @@ window : column
       share 1
       role title
     live : text "#$chat.channel"
-      role brand
+      role chip
       only when ($chat.channel or "") != ""
   state : text "$chat.status"
     role subtitle
@@ -25,20 +25,45 @@ window : column
     of lines:a12319
     clamp last 150
     each message
-  controls : row
-    pause : text "Pause feed"
+  foot : row
+    role foot
+    note : text "Read-only · kept in the world as Twitch chat"
+      role hint
+      share 1
+    pause : text "Pause"
       role tool
       only when ($chat.feed or "on") != "off"
       on click do prop $chat.item feed=off
-    resume : text "Resume feed"
+    resume : text "Resume"
       role tool
       only when ($chat.feed or "") = "off"
       on click do prop $chat.item feed=on
-message : column
-  role message
-  head : row
-    body : text "$said"
-      role body
-      share 1
-    at : text "$at"
-      role meta
+message : row
+  role msg
+  role notice when ($kind or "") = "notice"
+  role sysline when ($user or "") = "bridge"
+  let msg = $words when ($words or "") != ""
+  let msg = $said otherwise
+  who : text "$user"
+    only when ($words or "") != "" and ($kind or "") != "notice"
+    role name
+    role name.red when $color = "#FF0000"
+    role name.blue when $color = "#0000FF"
+    role name.green when $color = "#008000"
+    role name.firebrick when $color = "#B22222"
+    role name.coral when $color = "#FF7F50"
+    role name.yellowgreen when $color = "#9ACD32"
+    role name.orangered when $color = "#FF4500"
+    role name.seagreen when $color = "#2E8B57"
+    role name.goldenrod when $color = "#DAA520"
+    role name.chocolate when $color = "#D2691E"
+    role name.cadetblue when $color = "#5F9EA0"
+    role name.dodgerblue when $color = "#1E90FF"
+    role name.hotpink when $color = "#FF69B4"
+    role name.blueviolet when $color = "#8A2BE2"
+    role name.springgreen when $color = "#00FF7F"
+  body : text "$(msg)"
+    role words
+    share 1
+  at : text "$at"
+    role when
