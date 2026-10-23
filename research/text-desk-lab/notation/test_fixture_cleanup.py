@@ -277,7 +277,7 @@ p.wait(timeout=5)
 
     def test_held_legacy_scratch_warns_and_does_not_fail_landing(self):
         results = subprocess.CompletedProcess([], 0, "", "")
-        with patch.object(landing, "ROOM", self.root), \
+        with patch.object(landing, "ROOM", self.root), patch.object(landing, "STATE", self.root / "house-state"), \
                 patch.object(landing, "git", return_value=results) as git, \
                 patch.object(landing, "log") as log, \
                 patch("fixture_cleanup.remove_tree", return_value=["state/deskd.out: Invalid argument",
@@ -296,7 +296,7 @@ p.wait(timeout=5)
     def test_vanished_git_clean_path_retried(self):
         results = [subprocess.CompletedProcess([], 1, "", "No such file or directory"),
                    subprocess.CompletedProcess([], 0, "", "")]
-        with patch.object(landing, "ROOM", self.root), patch.object(landing, "git", side_effect=results) as git:
+        with patch.object(landing, "ROOM", self.root), patch.object(landing, "STATE", self.root / "house-state"), patch.object(landing, "git", side_effect=results) as git:
             landing.clean_room()
         self.assertEqual(git.call_count, 2)
 
@@ -307,7 +307,7 @@ p.wait(timeout=5)
         (scratch / "held.out").touch()
         source = self.root / "untracked-source.py"
         source.touch()
-        with patch.object(landing, "ROOM", self.root), patch.object(landing, "log"), \
+        with patch.object(landing, "ROOM", self.root), patch.object(landing, "STATE", self.root / "house-state"), patch.object(landing, "log"), \
                 patch("fixture_cleanup.remove_tree", return_value=["held fixture"]), \
                 patch("sys.stderr", new_callable=io.StringIO):
             landing.clean_room()
@@ -316,7 +316,7 @@ p.wait(timeout=5)
 
     def test_non_scratch_failure_still_refuses(self):
         result = subprocess.CompletedProcess([], 1, "", "untracked-source.py: Permission denied")
-        with patch.object(landing, "ROOM", self.root), patch.object(landing, "git", return_value=result):
+        with patch.object(landing, "ROOM", self.root), patch.object(landing, "STATE", self.root / "house-state"), patch.object(landing, "git", return_value=result):
             with self.assertRaisesRegex(RuntimeError, "untracked-source.py: Permission denied"):
                 landing.clean_room()
 

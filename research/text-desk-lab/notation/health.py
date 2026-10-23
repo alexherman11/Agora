@@ -488,7 +488,8 @@ def main():
           + ("; STOPPED at the first failure" if stopped else "") + ")")
     if "--json" in sys.argv:
         print(json.dumps({"ok": not failed, "world_at": at, "lenses_ok": lenses_ok, "lenses_bad": bad, "failed": [f for _, f in failed],
-                          "failed_checks": sorted({k for k, _ in failed}), "ran": sorted(ran | {"python", "scripts"}),
+                          "failed_checks": sorted({k for k, _ in failed}), "failure_details": failed,
+                          "ran": sorted(ran | {"python", "scripts"}),
                           "first": sorted(k for k, d in first.items() if d <= 1), "stopped": stopped, "partial": bool(only) or stopped,
                           "seconds": {**seconds, "total": total}}))
     sys.exit(1 if failed else 0)

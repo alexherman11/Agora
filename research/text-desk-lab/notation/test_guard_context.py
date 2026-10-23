@@ -156,6 +156,10 @@ class ContextTests(unittest.TestCase):
         # models, live world or native probe.
         import house
         class Stub:
+            # The real public entry now acquires its lifetime lease first.
+            # Keep that behavior in this test, using only a private fixture.
+            dir=Path(agora_tmp.directory("guard-house-loop-"))
+            _run_owned=house.House._run_owned
             world="frontier"
             fake=False
             claude_version="stub"

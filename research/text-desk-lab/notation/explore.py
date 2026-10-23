@@ -164,8 +164,9 @@ REPLY = __import__("uuid").uuid4().hex   # a806: the lines of one call are one r
 def via_deskd(name, me, lines, whole=False, stored="", as_of=None):
     """When deskd is up it is the one owner of every world: send each line as one turn and hold nothing between
     turns. A refused line refuses only itself (a6437, carry_on): the lines after it run, as they do without deskd, and
-    the receipt ends saying what ran, was refused or was skipped. Returns False when no server answers, and the caller
-    falls back to the file lock."""
+    the receipt ends saying what ran, was refused or was skipped. Only explicit DESKD=off selects
+    the local file-lock path. Once HTTP was attempted, an unacknowledged result is unknown and must
+    not be replayed locally."""
     import os, urllib.request, urllib.error
     import carry_on
     if os.environ.get("DESKD", "") == "off":
@@ -173,18 +174,18 @@ def via_deskd(name, me, lines, whole=False, stored="", as_of=None):
     url = os.environ.get("DESKD", "http://127.0.0.1:8780") + "/api/do"
     reply = REPLY
     tally = carry_on.Tally()
-    for k, line in enumerate(lines):
+    for line in lines:
         body = json.dumps({"session": name, "as": me, "line": line, "cli": True, "whole": whole,
                            "reply": reply, **({"stored": stored} if stored else {}),
                            **({"as_of": as_of} if as_of is not None else {})}).encode("utf-8")
         try:
             with urllib.request.urlopen(urllib.request.Request(url, body, {"Content-Type": "application/json"}), timeout=60) as f:
                 r = json.loads(f.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError):
-            if k == 0:
-                return False
-            print("ERR deskd stopped answering; the lines above were applied, this one and the rest were not")
-            return True
+        except (urllib.error.URLError, OSError, ValueError):
+            print("ERR deskd acknowledgement unavailable: this command's outcome is uncertain. "
+                  "No local fallback or retry was attempted; later lines were not sent. "
+                  "Inspect the world's receipts before deciding whether to retry.")
+            raise SystemExit(2) from None
         print(f"> {line}")
         said = r.get("text") or ("ERR " + str(r.get("error")))
         print(said)
