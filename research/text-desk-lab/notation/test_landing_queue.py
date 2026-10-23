@@ -376,6 +376,7 @@ with patch.object(landing.subprocess, "run", return_value=SimpleNamespace(
 check("19. nonzero health exit cannot be overridden by an ok JSON receipt",
       not h["ok"] and any("exited 1" in x for x in h["failed"]), h)
 
+landing.room_at(was)  # judged requires the room to hold the named commit.
 kept, worlds = {}, []
 def fake_health(world, cwd, **how):
     worlds.append(world)

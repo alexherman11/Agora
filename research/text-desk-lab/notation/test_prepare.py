@@ -194,6 +194,69 @@ class Prepare(unittest.TestCase):
             pw.prepare_main(self.live, self.tree, "a123", receipt, "e2")
         self.assertFalse(receipt.exists())
 
+    def interrupted_checkpoint(self):
+        (self.tree / "draft.txt").write_text("captured draft\n")
+        files, staged = pw.receiver_edits(self.tree)
+        saved = dict(before=pw.head(self.tree), files=files, index_files=staged)
+        data = dict(request="e1", phase="receiver-preserving",
+                    before=pw.head(self.tree), main=pw.head(self.live),
+                    receiver_checkpoint=saved)
+        pw.write_receipt(self.receipt, data)
+        return data
+
+    def test_interrupted_checkpoint_before_commit_can_resume(self):
+        data = self.interrupted_checkpoint()
+        result = self.run_prepare()
+        self.assertEqual(result["phase"], "prepared")
+        self.assertEqual(result["reconciliations"][0]["checkpoint"], data["receiver_checkpoint"])
+        self.assertEqual((self.tree / "draft.txt").read_text(), "captured draft\n")
+        self.assertFalse(pw.git(self.tree, "status", "--porcelain").stdout)
+
+    def test_interrupted_git_add_can_resume_without_reset(self):
+        self.interrupted_checkpoint()
+        pw.git(self.tree, "add", "draft.txt")
+        result = self.run_prepare()
+        self.assertEqual(result["phase"], "prepared")
+        self.assertEqual(len(result["receiver_checkpoint"]["commits"]), 1)
+
+    def test_changed_files_hold_without_rewriting_receipt(self):
+        self.interrupted_checkpoint()
+        before = self.receipt.read_bytes()
+        (self.tree / "draft.txt").write_text("newer draft\n")
+        with self.assertRaisesRegex(pw.Held, "files changed"):
+            self.run_prepare()
+        self.assertEqual(self.receipt.read_bytes(), before)
+        self.assertEqual((self.tree / "draft.txt").read_text(), "newer draft\n")
+
+    def test_unknown_commit_is_not_reissued(self):
+        self.interrupted_checkpoint()
+        self.commit(self.tree, "unconfirmed commit")
+        before = self.receipt.read_bytes()
+        with self.assertRaisesRegex(pw.Held, "not replaying"):
+            self.run_prepare()
+        self.assertEqual(self.receipt.read_bytes(), before)
+
+    def test_confirmation_failure_resumes_saved_checkpoint_once(self):
+        (self.tree / "draft.txt").write_text("preserve once")
+        with self.assertRaisesRegex(pw.Held, "not confirmed"):
+            pw.prepare_main(self.live, self.tree, "a123", self.receipt, "e1",
+                            report=lambda saved: (_ for _ in ()).throw(pw.Held("not confirmed")))
+        kept = pw.head(self.tree)
+        reports = []
+        result = pw.prepare_main(self.live, self.tree, "a123", self.receipt, "e1",
+                                 report=lambda saved: reports.append(saved["after"]))
+        self.assertEqual(reports, [kept])
+        self.assertEqual(result["receiver_checkpoint"]["commits"], [kept])
+        self.assertEqual(result["phase"], "prepared")
+
+    def test_changed_index_holds(self):
+        self.interrupted_checkpoint()
+        (self.tree / "base.txt").write_text("other staged change\n")
+        pw.git(self.tree, "add", "base.txt")
+        (self.tree / "base.txt").write_text("original\n")
+        with self.assertRaisesRegex(pw.Held, "files changed|index changed"):
+            self.run_prepare()
+
 
 class Dispatch(unittest.TestCase):
     def test_prepare_has_its_own_dispatch_branch(self):

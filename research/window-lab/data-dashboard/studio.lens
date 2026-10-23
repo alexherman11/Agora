@@ -1,0 +1,65 @@
+root : column
+  role dashboard
+  kicker : text "AGORA / STUDIO"
+    role kicker
+  nav : text "Open live Observatory →"
+    on click host window observatory
+    role tool
+  heading : text "A tiny exhibition, taking shape."
+    role hero
+  intro : text "Illustrative planning data · the same charts, roles, folds and layouts · no provider telemetry"
+    role subtitle
+  stats : grid fill 16ch
+    role ribbon
+    pieces : column
+      value : text "12 / 18"
+        role metric
+      label : text "PIECES READY"
+        role label
+    guests : column
+      value : text "84"
+        role metric
+      label : text "GUESTS CONFIRMED"
+        role label
+    activity : column
+      value : text "● Printing"
+        role active
+      label : text "SAMPLE ACTIVITY"
+        role label
+  panels : grid fill 65ch
+    gap 15
+    parts : column
+      role card
+      chart : column
+        of charts:@MATERIALS@ as g
+        each graphic
+      note : text "The remaining area is unassigned, not assumed available. Unknown values stay visibly unknown."
+        role meta
+    progress : column
+      role card
+      chart : column
+        of charts:@HISTORY@ as g
+        each graphic
+      note : text "Uneven dates use actual numeric x spacing. The missing observation breaks the line; no interpolation is presented as evidence."
+        role meta
+    rooms : column
+      role card
+      chart : column
+        of charts:@ROOMS@ as g
+        each graphic
+    empty : column
+      role card
+      chart : column
+        of charts:@EMPTY@ as g
+        each graphic
+      note : text "A reusable empty state is part of the vocabulary too."
+        role meta
+graphic : column
+  picture : text "$g.picture"
+    picture
+  state : text "$g.summary"
+    role meta
+  evidence : column
+    fold "Data & scale"
+    body : text "$g.detail"
+      role meta

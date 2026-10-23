@@ -916,7 +916,8 @@ class House:
         def asked(s):
             # a1590: asked_by= holds the person once a world has persons (p2919), a name before: by person when it
             # can, by name when it can't (Claude c2998 (1))
-            return bool(s) and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
+            return bool(s) and persons.holds(w, task_flow.comment_lead(w, s)
+                or (s.get("props") or {}).get("asked_by") or "", actor)
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
         for e in w.events[start:]:
             if rooms.same_person(w, str(e.get("by") or "").split("/")[0], actor) or e.get("undone"):
@@ -932,6 +933,9 @@ class House:
             if notices:
                 for notice in notices:
                     if rooms.same_person(w, notice["recipient"], actor):
+                        notice = task_flow.accept_notice(r.state, notice)
+                        if notice is None:
+                            continue
                         inbox.append(task_flow.delivery_text(notice))
                         urgent = True
                         self._knocked(r, e, s, resting)
@@ -941,7 +945,9 @@ class House:
                 # your commission (landed, landed then reverted, the worker stopped, failed) reaches you as the worker's
                 # does; everything else the house writes is its bookkeeping. Sable's a1062 and a1101 failed this
                 # morning, and the only sign was their absence from a view that hides failures.
-                if not (e["verb"] == "comment" and asked(s)):
+                if not (e["verb"] == "comment" and (asked(s) or (
+                    task_flow.comment_lead(w, s) and any(
+                        rooms.same_person(w, x, actor) for x in rooms.comment_to(e))))):
                     continue
             said = " ".join(str(v) for k, v in args.items() if isinstance(v, str) and k != "mark")   # a5007: a mark is said in words
             waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # kept, first and marked for it
@@ -1014,7 +1020,7 @@ class House:
                 self._knocked(r, e, s, resting)
             elif quiet:
                 continue
-            elif rooms.comment_falls_back(e) and sid in mine:
+            elif rooms.comment_falls_back(e) and sid in mine and not task_flow.comment_lead(w, s):
                 inbox.append(f"~ {e['by']} {'asks a question' if asks else 'commented'} on \"{s['title']}\" ({e['id']}): {said[:300]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
@@ -1622,14 +1628,19 @@ class House:
             self.act("house", "log-world check", whole=True)
         except Exception as e:
             print(f"house: log-world startup request unavailable: {type(e).__name__}: {e}", flush=True)
+        guard_publisher = None
+        if self.world == "frontier" and not self.fake:
+            guard_publisher = guard_context.Publisher()
         try:
+            if guard_publisher:
+                guard_publisher.start()
             while True:
-                if self.world == "frontier" and not self.fake:
+                if guard_publisher:
                     try:
-                        guard_context.publish(self.settings(self.load()).get("guard_nongame", ""))
+                        guard_publisher.update(self.settings(self.load()).get("guard_nongame", ""))
                     except Exception as exc:
-                        # Old observations expire; failure never admits a run.
-                        print(f"house: guard context unavailable: {type(exc).__name__}", flush=True)
+                        guard_publisher.update("")
+                        print(f"house: guard policy unavailable: {type(exc).__name__}", flush=True)
                 try:
                     self.step()
                 except Exception as e:
@@ -1681,6 +1692,8 @@ class House:
         except KeyboardInterrupt:
             pass
         finally:
+            if guard_publisher and guard_publisher.thread.ident is not None:
+                guard_publisher.close()
             everyone = list(self.residents.values()) + list(self.workshop.workers.values())
             for x in everyone:          # every pipe closed first, so the waits in stop() overlap (not 20 s each)
                 try:

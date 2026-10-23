@@ -1097,8 +1097,17 @@ def _w_layout(node, p, val, n, env):
 
 
 def _w_grid(node, p, val, n, env):
-    """`grid 1 3 3 1`, `grid 1fr fit 2fr`: tracks in fr (a bare number is fr) or fit (as wide as the widest cell)."""
+    """`grid 1 3 3 1`, `grid 1fr fit 2fr`: tracks in fr (a bare number is fr) or fit (as wide as the widest cell).
+    a10637 (Alex's Board, Pike m10626): `grid fill <min>` fits as many equal columns as the panel's width allows, each
+    at least <min> wide (18ch, 12gap, or pixels: 240 or 240px), its children flowing into rows; the painter counts the
+    columns from the width it has, so a resize writes nothing."""
     toks = val.split()
+    if toks[:1] == ["fill"]:
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)(ch|gap|px)?", " ".join(toks[1:]))
+        if not m or float(m[1]) <= 0:
+            raise LensRefusal(f"line {n}: `grid fill <min>`: the least width of a column, in ch (18ch), steps of the style's gap (12gap) or pixels (240); got {p!r}")
+        node["layout"], node["tracks"] = "grid", [f"fill {m[1]}{m[2] or 'px'}"]
+        return
     tracks = []
     for t in toks:
         if t == "fit" or re.fullmatch(r"\d+gap", t):
@@ -1988,7 +1997,7 @@ def _w_on(node, p, val, n, env):
 # word -> (shape as a reader sees it, setter). A layout word is its own name.
 WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
-    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr>", _w_grid),
+    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr | fill 18ch>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end|none end", _w_scroll),
     "remember": ('remember "<reading scope>"', _w_remember),
@@ -2476,12 +2485,14 @@ def _defpart_hash(src, path, roles, style):
 _ASPECT_NAMES = ("title", "text", "due", "tags")
 
 
-def _aspect_of_field(f):
+def _aspect_of_field(f, row_fields=()):
+    # Row vocabulary is lexical. Registering an unrelated source must not hide a
+    # world's prop (including its freshness, aggregate reads or gesture fence).
     if f in _ASPECT_NAMES:
         return f
     if f in ("in", "before", "after"):
         return "place"          # 8 Oct: where a thing is, read as a field, is a read of its place
-    if f in NAMES or f in SOURCE_FIELDS or f in ("value", "x", "y", "n", "count"):
+    if f in NAMES or f in row_fields or f in ("value", "x", "y", "n", "count"):
         return None
     return f"prop:{f}"
 
@@ -2827,6 +2838,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
                 bits.append("(empty)")         # Pike: every miss printed like an honest empty; now an empty says so
             if n.get("states"):
                 bits.append("(" + ", ".join(n["states"]) + ")")
+            if n.get("sorted"):                 # a10526: a repeat ordered by a time says each value it ordered by
+                bits.append("· sorted " + "; ".join(n["sorted"]))
         if n.get("test"):
             bits.append(f"· only when {n['test']}")
         for a in n["acts"]:

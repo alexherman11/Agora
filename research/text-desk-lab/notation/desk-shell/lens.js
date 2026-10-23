@@ -253,7 +253,7 @@
     if (p.share != null) { el.style.flex = `${p.share} 1 0`; el.style.minWidth = el.style.minHeight = "0"; el.dataset.share = "1"; }
     // a grid given a share is bounded, so it divides its height among its rows and its cells fill them; a cell with
     // `scroll` then scrolls inside the window instead of the page growing (Alex, 29 Sep: the window is bounded)
-    if (p.share != null && p.tracks) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
+    if (p.share != null && p.tracks && !/^fill /.test(p.tracks[0])) { el.dataset.bounded = "1"; el.style.gridAutoRows = "minmax(0, 1fr)"; el.style.alignItems = "stretch"; }
     if (p.lines && p.commit !== "explicit") { el.style.minHeight = p.lines[0] + "lh"; if (p.lines[1]) el.style.maxHeight = p.lines[1] + "lh"; el.style.overflowY = "auto"; }
     if (p.hint) el.dataset.hint = p.hint;       // Juniper: what an empty input is for; paint only, never content
     if (p.caret) el.dataset.caret = p.caret.join(" ");    // a6642: what brings the caret here from anywhere (caretKeys)
@@ -561,6 +561,14 @@
   function tracks(el) {
     const p = el._n && el._n.paint; if (!p || !p.tracks) return;
     const kids = [...el.children].filter(c => c.dataset.key);
+    // a10637: `grid fill <min>`: as many equal columns as this part's own width holds, each at least <min> (never wider
+    // than the part), children flowing into rows in order; counted by the browser, so a resize writes nothing
+    if (/^fill /.test(p.tracks[0])) {
+      const m = p.tracks[0].slice(5), least = /gap$/.test(m) ? `calc(${parseFloat(m)} * var(--t-gap))` : m;
+      el.style.gridTemplateColumns = `repeat(auto-fill, minmax(min(${least}, 100%), 1fr))`;
+      el.dataset.fill = "1";
+      return;
+    }
     el.style.gridTemplateColumns = p.tracks.map((t, i) => kids[i] && kids[i].dataset.folded ? "auto" : t === "fit" ? "max-content" : /gap$/.test(t) ? `calc(${parseFloat(t)} * var(--t-gap))` : `minmax(0, ${t})`).join(" ");
     kids.forEach((c, i) => { if (i < p.tracks.length) c.style.gridColumn = String(i + 1); });
   }

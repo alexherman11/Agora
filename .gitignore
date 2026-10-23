@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+/pytest-cache-files-*/
 .ruff_cache/
 *.egg-info/
 build/
@@ -55,3 +56,6 @@ research/window-lab/.tmp-*/
 
 # House-owned paired proof data and synthetic log-world fixtures are never source.
 /.agora-tmp/
+
+# a11327: exact pytest cache scratch retained after denied cache creation; no deletion.
+/pytest-cache-files-pgxvchi0/
