@@ -210,6 +210,45 @@ class TransferLifecycle(unittest.TestCase):
             self.assertTrue(self.pool.legacy_owner_stopped("card"))
         gone.assert_called_once_with(123)
 
+    def test_natural_exit_is_owner_closure_not_turn_completion(self):
+        self.lifecycle([{"kind": "start", "data": {"pid": 123}},
+                        {"kind": "exit", "data": {"pid": 123, "code": 0}}])
+        self.pool.workers.clear()
+        with patch.object(workshop, "process_gone", return_value=True) as gone:
+            self.assertTrue(self.pool.legacy_owner_stopped("card"))
+        gone.assert_called_once_with(123)
+        # Exit alone never consumes the saved delivery or marks a result reviewed.
+        self.assertTrue(self.worker.state["pending"]["delivered"])
+
+    def test_natural_exit_requires_latest_identity_and_positive_absence(self):
+        for suffix, gone in [
+            ([{"kind": "exit", "data": {"pid": 124, "code": 0}}], True),
+            ([{"kind": "exit", "data": {"pid": 123}}], True),
+            ([{"kind": "exit", "data": {"pid": 123, "code": "0"}}], True),
+            ([{"kind": "exit", "data": {"pid": 123, "code": 0}}], False),
+            ([{"kind": "exit", "data": {"pid": 123, "code": 0}},
+              {"kind": "start", "data": {"pid": 124}}], True),
+            ([{"kind": "start", "data": {"pid": 124}},
+              {"kind": "exit", "data": {"pid": 123, "code": 0}}], True),
+        ]:
+            with self.subTest(suffix=suffix, gone=gone):
+                self.lifecycle([{"kind": "start", "data": {"pid": 123}}, *suffix])
+                with patch.object(workshop, "process_gone", return_value=gone):
+                    self.assertFalse(self.pool.legacy_owner_stopped("card"))
+
+    def test_natural_exit_still_reaches_ordinary_landing_mutex(self):
+        self.complete()
+        self.worker.proc.code = 0
+        self.worker.state["session_provider"] = "claude"
+        self.pool.drain_bring("card", self.raw, self.worker)
+        self.worker.proc = None
+        self.lifecycle([{"kind": "start", "data": {"pid": 123}},
+                        {"kind": "exit", "data": {"pid": 123, "code": 0}}])
+        with patch.object(workshop, "process_gone", return_value=True):
+            self.assertFalse(self.pool.bring("card", self.subject))
+        self.lock.assert_called_once()
+        self.assertIn("serialization is busy", self.subject["props"]["brings_status"])
+
     def test_missing_ambiguous_or_live_owner_stays_held(self):
         self.assertFalse(self.pool.legacy_owner_stopped("card"))
         for events, gone in [

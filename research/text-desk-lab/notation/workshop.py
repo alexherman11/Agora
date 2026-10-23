@@ -1160,12 +1160,13 @@ class Workshop:
         """Recover existing stop evidence after House replaced its process objects.
 
         Read only lifecycle metadata from the host journal, never model text.
-        Require a recorded stop after the last start AND every recorded PID gone.
-        Missing/truncated evidence and PID reuse hold. The ordinary worker leases,
+        Require a recorded stop or matching exit after the last start AND every
+        recorded PID gone. Missing/truncated evidence and PID reuse hold. The ordinary
+        worker leases,
         request recheck and landing mutex remain required by bring().
         """
         path = self.house.dir / f"worker-{cid}" / "transcript.jsonl"
-        pids, stopped = set(), False
+        pids, stopped, latest_pid = set(), False, None
         try:
             # A bounded legacy recovery; large/uncertain journals need inspection.
             if path.stat().st_size > 8 * 1024 * 1024:
@@ -1187,9 +1188,15 @@ class Workshop:
                         if not isinstance(pid, int) or pid <= 0:
                             return False
                         pids.add(pid)
-                        stopped = False
+                        latest_pid, stopped = pid, False
                     elif event.get("kind") == "stop" and pids:
                         stopped = True
+                    elif event.get("kind") == "exit":
+                        data = event.get("data") or {}
+                        if data.get("pid") == latest_pid and type(data.get("code")) is int:
+                            # A naturally exited owner needs no synthetic stop record.
+                            # Completion/delivery and positive absence remain separate gates.
+                            stopped = True
             return bool(pids and stopped and all(process_gone(pid) for pid in pids))
         except (OSError, ValueError, TypeError, AttributeError):
             return False
