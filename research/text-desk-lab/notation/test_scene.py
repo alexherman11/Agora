@@ -444,6 +444,31 @@ def test_paint_words_print_and_emit():
         tmp.unlink(missing_ok=True)
 
 
+def test_waits_is_filled_and_emitted_on_a_sent_text():
+    """a10486 (Alex's capture rode on his next message): `waits "<words>" ["<what>"]` names what a Send waits for,
+    filled as the words are; "" is nothing to wait for, and the painter sends at once."""
+    refused('x : text "a", waits ""', "waits")
+    refused('x : column, waits "$me"', "text word")
+    src = chr(10).join(["ws : column", '  let gone = ""', '  let here = "cap-9"',
+                        '  idle : text "", commit explicit, waits "$(gone)" "capture", on edit do note line="$value"',
+                        '  busy : text "", commit explicit, waits "$(here)" "capture", on edit do note line="$value"',
+                        '  plain : text "", commit explicit, waits "$(here)", on edit do note line="$value"'])
+    import deskd, lens_ir
+    tmp = _scratch("_test_waits")
+    try:
+        with deskd.Session("_test_waits", "jeff") as desk:
+            sc = lens_ir.evaluate(desk, src)
+            scene.emit(sc)
+            idle, busy, plain = scene.painter_view(sc)["kids"]
+            assert idle["paint"]["waits"] == "" and idle["paint"]["waits_for"] == "capture", idle["paint"]
+            assert busy["paint"]["waits"] == "cap-9" and busy["paint"]["commit"] == "explicit", busy["paint"]
+            assert plain["paint"]["waits"] == "cap-9" and "waits_for" not in plain["paint"], plain["paint"]
+            text = scene.to_text(sc, "ws", "jeff", 0)
+            assert 'waits "cap-9" for the capture' in text and 'waits ""' in text, text
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def test_fold_open_and_float():
     """Alex, 29 Sep: `fold ... open` starts unfolded, `fold ... float` is a menu drawn over the page; both print and emit."""
     src = chr(10).join(["ws : column", '  talk : column, fold "LOUNGE" open, share 2', '    t : text "a"',

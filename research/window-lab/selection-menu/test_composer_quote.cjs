@@ -23,9 +23,13 @@ class Element {
 }
 function fixture({plainAbout = "", quotedAbout = "", plainLine, quotedLine, filtered = false, compiledNode, snapshot} = {}) {
   const sent = [], notices = [], drafts = new Map(), elements = new Map();
+  const timers = new Map(); let timerId = 0, now = 0, refresh = async () => {};
   let stale = false, captures = 0, transportError = false;
   const context = {
     console, URLSearchParams, Map, Set, JSON, CSS: {escape: x => x},
+    kept: new Map(), refresh: () => refresh(),
+    setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, {fn, at: now + ms}); return id; },
+    clearTimeout: id => timers.delete(id),
     innerHeight: 900, getComputedStyle: () => ({lineHeight: "20px", fontSize: "14px"}),
     session: "mock-copy", who: "fixture", lens: "fixture",
     document: {activeElement: null, createElement: tag => new Element(tag)},
@@ -52,7 +56,7 @@ function fixture({plainAbout = "", quotedAbout = "", plainLine, quotedLine, filt
       }};
     },
     send: async (node, line, raw, unused, attachment) => {
-      sent.push({line, raw, attachment});
+      sent.push({node, line, raw, attachment});
       if (transportError) return {error: "append succeeded; cleanup refused"};
       drafts.delete(node.key); return {text: "ok"};
     },
@@ -80,6 +84,14 @@ function fixture({plainAbout = "", quotedAbout = "", plainLine, quotedLine, filt
   }
   return {sent, notices, drafts, n, el, input, post, remove, status,
     type, quote, api: context.api, context,
+    onRefresh: fn => { refresh = fn; },
+    tick: async ms => {
+      now += ms;
+      for (const [id, timer] of [...timers]) if (timer.at <= now) {
+        timers.delete(id); timer.fn();
+      }
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+    },
     stale: () => {stale = true;}, transportError: () => {transportError = true;},
     captures: () => captures};
 }
@@ -197,4 +209,52 @@ function fixture({plainAbout = "", quotedAbout = "", plainLine, quotedLine, filt
   assert.equal(f.api.quoteDrafts.size, 1);
   console.log("PASS exact paired consumer Remove quote restores native plain action; stale refusal retains words/quote");
   console.log("2 exact compiled paired-menu scenarios passed (source mocks only)");
+
+  f = fixture(); f.type("with late capture"); await f.quote();
+  f.n.paint.waits = true; f.n.paint.waits_for = "capture";
+  const original = f.n;
+  f.onRefresh(async () => {
+    // New paint may change the action, but cannot change this Send's origin.
+    f.context.V.hold = f.n.key;
+    f.el._next = {...f.n, paint: {...f.n.paint, waits: false},
+      acts: [{on: "edit", line: 'do append other line="$value"'}]};
+  });
+  let sending = f.post.onclick();
+  await f.post.onclick();
+  assert.equal(f.sent.length, 0);
+  assert.match(f.status.textContent, /capture/);
+  await f.tick(250); await sending;
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.sent[0].node, original);
+  assert.match(f.sent[0].line, /append quoted/);
+  assert.equal(f.sent[0].attachment.quote.rev, 5);
+  assert.equal(f.api.quoteDrafts.size, 0);
+  console.log("PASS pending quoted Send waits, ignores duplicate press and preserves original action/fence");
+
+  f = fixture(); f.type("keep stale while waiting"); await f.quote();
+  f.n.paint.waits = true;
+  f.onRefresh(async () => { f.n.paint.waits = false; f.stale(); });
+  sending = f.post.onclick(); await f.tick(250); await sending;
+  assert.equal(f.sent.length, 0); assert.equal(f.api.quoteDrafts.size, 1);
+  assert.equal(f.input.value, "keep stale while waiting");
+  assert.match(f.status.textContent, /stale source/);
+  console.log("PASS source becoming stale during capture wait refuses Send and retains quote/words");
+
+  f = fixture(); f.type("keep missing capture"); await f.quote();
+  f.n.paint.waits = true; f.n.paint.waits_for = "capture";
+  sending = f.post.onclick(); await f.tick(6000); await sending;
+  assert.equal(f.sent.length, 0); assert.equal(f.api.quoteDrafts.size, 1);
+  assert.equal(f.input.value, "keep missing capture");
+  assert.match(f.status.textContent, /did not arrive/);
+  console.log("PASS capture deadline refuses quoted Send without losing quote/words");
+
+  f = fixture(); f.type("original words"); await f.quote();
+  f.n.paint.waits = true;
+  f.onRefresh(async () => { f.n.paint.waits = false; f.type("new words"); });
+  sending = f.post.onclick(); await f.tick(250); await sending;
+  assert.equal(f.sent.length, 0); assert.equal(f.api.quoteDrafts.size, 1);
+  assert.equal(f.input.value, "new words");
+  assert.match(f.status.textContent, /words changed/);
+  console.log("PASS words edited during capture wait refuse Send without replacing the newer draft");
+  console.log("4 combined capture/quote scenarios passed (actual composer, fake clock/transport)");
 })().catch(e => { console.error(e); process.exitCode = 1; });

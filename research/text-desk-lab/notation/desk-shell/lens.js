@@ -181,7 +181,9 @@
       try { textFresh(old.el, n, p); old.sig = null; next.set(n.key, old); return old.el; }
       catch (e) { console.warn("a document could not take the desk's new words; it is drawn again", e); }   // a6452
     }
-    if (old && V.hold === n.key) { next.set(n.key, old); return old.el; }   // the part in a person's hands is not repainted under them
+    // Keep the person's DOM and original gesture provenance. A newer scene can
+    // update read-only wait status, never substitute another action or fence.
+    if (old && V.hold === n.key) { old.el._next = n; next.set(n.key, old); return old.el; }
     const sig = JSON.stringify([p, n.acts.map(a => [a.on, a.line, a.part, a.label]), n.kids.map(k => k.key), V.drafts.get(n.key)]);
     // a6431: a page in a frame is one element for as long as it shows the same page: a new size, turn or toggle changes
     // the frame where it stands (a new element would load the page again)
@@ -761,6 +763,36 @@
   }
 
   const openComposers = new Set();
+  // a10486: the part as the latest scene has it. A held part keeps its element and the newer scene beside it (make); a
+  // part let go is the kept element's own. Only the wait status is read here;
+  // the original action and fence remain the user's Send provenance.
+  function latest(key, el) {
+    const k = kept.get(key), e = k ? k.el : el;
+    return (V.hold === key && e._next) || e._n;
+  }
+  // a10486: `waits "<words>" ["<what>"]`: Send waits while the words are not empty (what is still arriving), a few
+  // seconds at most, then tries the original action; native admission selects
+  // current attachments. Past the deadline it sends nothing and the words stay.
+  const waiting = new Map(), WAIT_MS = 6000;
+  async function waitUntilClear(read, update, ms = WAIT_MS) {
+    let stopped = false, deadline, pause;
+    try {
+      return await Promise.race([
+        (async () => {
+          while (read()) {
+            await new Promise(resolve => { pause = setTimeout(resolve, 250); });
+            if (stopped) return false;
+            await update();           // shared refresh can stall; deadline still settles the wait
+            if (stopped) return false;
+          }
+          return true;
+        })(),
+        new Promise(resolve => { deadline = setTimeout(() => resolve(false), ms); })
+      ]);
+    } finally {
+      stopped = true; clearTimeout(deadline); clearTimeout(pause);
+    }
+  }
   function composer(el, n, a) {
     el.replaceChildren(); el.classList.add("explicit-composer");
     const input = document.createElement("textarea"), actions = document.createElement("div");
@@ -801,9 +833,10 @@
         input.style.overflowY = "auto";
       }
       const unknown = !!d && !d.seen && !d.shown;
-      post.disabled = busy || !input.value.trim() || unknown; discard.disabled = busy;
-      recover.hidden = !unknown; recover.disabled = busy;
-      status.textContent = busy ? "Sending…" : why || (unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "");
+      const awaits = waiting.get(n.key);
+      post.disabled = busy || !!awaits || !input.value.trim() || unknown; discard.disabled = busy || !!awaits;
+      recover.hidden = !unknown; recover.disabled = busy || !!awaits;
+      status.textContent = awaits ? `Waiting for the ${awaits}…` : busy ? "Sending…" : why || (unknown ? "Draft kept — review this version" : d && d.refused ? "Not sent — " + (d.why || "review and send again") : d ? "Unsent" : "");
       status.setAttribute("aria-live", "polite");
       V.mark(el, n.key);
       // An empty composer has no saved current text to compare with a refused draft.
@@ -818,7 +851,9 @@
     let te = null;
     input.addEventListener("focus", () => { if (!openComposers.has(n.key) && !V.drafts.has(n.key)) picked = TEXT.selected(el._n); openComposers.add(n.key); V.hold = n.key; sync(); });
     input.addEventListener("blur", () => { if (!V.repainting) { V.hold = null; sync(); } });
-    input.addEventListener("input", () => { why = ""; V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
+    // a10486: a send lets go of the box (V.hold), yet its caret stays; words typed after it hold it again, or the next
+    // scene (a capture landing on the draft) made the composer again and the caret fell to the page mid-word
+    input.addEventListener("input", () => { if (document.activeElement === input && V.hold !== n.key) { el._next = null; V.hold = n.key; } why = ""; V.typed(n.key, input.value, { key: n.key, fence: el._n.fence }); sync(); });
     // a5588 (a5581: a click in the box's middle missed its one-row textarea, and the keys went nowhere): the whole
     // composer is its hit area, so a press on its padding, the actions row or the status gives the words the caret
     el.addEventListener("mousedown", e => {
@@ -827,7 +862,7 @@
     });
     // Enter that cannot send says why on the page, instead of pressing a disabled Send
     const trySend = () => {
-      if (busy) return;
+      if (busy || waiting.has(n.key)) return;
       const d = V.drafts.get(n.key);
       why = te && te.composing() ? "Not sent — the input method is still writing; finish it first"
         : !input.value.trim() ? "Nothing to send — write something first"
@@ -837,30 +872,51 @@
       post.click();
     };
     post.onclick = async () => {
-      if (busy || !input.value.trim()) return;
+      if (busy || waiting.has(n.key) || !input.value.trim()) return;
       if (te && te.composing()) { why = "Not sent — the input method is still writing; finish it first"; return sync(); }   // Codex, a6067 c6120
       const seen = V.editOrigin(n.key, el._n); if (!seen) return;
       const quote = quoteDrafts.get(n.key);
-      // Select ONE authored action before substitution. Removal restores plain Send.
+      // Freeze the chosen authored branch at the press, with the original
+      // audience/topic/generation/fence. Only pending status may refresh.
       const action = quote ? quotedLine || a.line : a.line;
       if (quote && !/\$quote_text\b/.test(action)) { why = "This composer has no authored quote consumer"; return sync(); }
       if (/\$quote_\w+\b/.test(action) && !quote) { why = "Prepare a source quote first"; return sync(); }
-      const raw = input.value; let delivered = false; busy = true; why = ""; sync();
+      const raw = input.value; let submitted = false, delivered = false; busy = true; why = ""; sync();
+      const shown = () => { const k = kept.get(n.key); if (k && k.el._composer && k.el !== el) k.el._composer.sync(); sync(); };
       try {
+        const cur = latest(n.key, el);
+        if (cur.paint.waits) {
+          const what = cur.paint.waits_for || "attachment";
+          waiting.set(n.key, what); shown();
+          const arrived = await waitUntilClear(() => !!latest(n.key, el).paint.waits, () => refresh());
+          if (!arrived) {
+            why = `Not sent — the ${what} did not arrive; your words are kept`;
+            V.notify(why);
+            return;
+          }
+        }
         if (quote) await checkQuote(quote);
+        if (input.value !== raw) { why = "Not sent — your words changed while waiting; review and send again"; return; }
         const values = quote ? { item: quote.item, rev: quote.rev, field: quote.field, start: quote.start, end: quote.end,
           text: quote.quote, before: quote.before, after: quote.after, context: quote.context.item?.item || "",
           destination: quote.context.destination?.item || "" } : {};
         // One substitution pass: selected/typed words never become command tokens.
         const line = action.replace(/\$(value|selected|quote_(?:item|rev|field|start|end|text|before|after|context|destination))\b/g,
           (m, key) => key === "value" ? TEXT.esc(raw) : key === "selected" ? picked : TEXT.esc(String(values[key.slice(6)] ?? "")));
+        // Native context_from admission selects current captures atomically.
+        // Comment's source_quote travels through that same fenced dispatch.
+        submitted = true;
         const answer = await send(seen, line, raw, undefined, quote ? { quote } : undefined);
         delivered = !!answer && !answer.error && !/^(ERR|!!)/.test(answer.text || "");
         if (delivered && !V.drafts.has(n.key)) quoteDrafts.delete(n.key);
-      } catch (e) { why = `${e.message}; your draft and quote are kept`; }
-      finally { busy = false; }
-      if (delivered && !V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
-      sync();
+        if (delivered && !V.drafts.has(n.key)) { input.value = ""; if (te) te.reset(""); openComposers.delete(n.key); }
+      } catch (e) {
+        why = submitted ? "Send outcome unknown — check the feed before sending again"
+          : `${e.message}; your draft and quote are kept`;
+        V.notify(why);
+      } finally {
+        waiting.delete(n.key); busy = false; shown();
+      }
     };
     discard.onclick = () => { if (V.drop(n.key)) { input.value = n.paint.text || ""; if (te) te.reset(input.value); openComposers.delete(n.key); sync(); } };
     recover.onclick = () => {

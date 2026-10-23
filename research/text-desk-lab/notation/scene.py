@@ -172,7 +172,7 @@ import style as style_mod
 import tree
 
 LAYOUTS = ("column", "row", "free", "grid", "cells")      # pike-7 section 9: grid with tracks; cells is a grid row drawn as display: contents
-PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "resize", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
+PAINT_WORDS = ("tracks", "gap", "scroll", "fold", "fold_open", "fold_float", "fold_inline", "fold_handle", "fold_group", "measure", "wrap", "lines", "share", "resize", "hint", "tip", "plain", "peek", "marks", "picture", "commit", "commit_only", "light", "waits", "waits_for", "live", "markdown", "media", "ids", "arrows", "caret", "page")   # fold_open and fold_float are fold's modifiers; commit_only is commit's
 PAINT_WORDS += ("partition", "companion", "sizing", "chrome")
 PAINT_WORDS += ("remember",)  # reading scope, viewer hands only; never drafts or permissions
 # end (a5530): a `live until` count reached zero; link (a5820): a wikilink in a `markdown` text was followed, $value its id
@@ -1227,6 +1227,19 @@ def _w_light(node, p, val, n, env):
     node["light"] = chr(10).join(x for x in parts if x)
 
 
+def _w_waits(node, p, val, n, env):
+    # a10486 (Alex's capture rode on his next message): `waits "<words>"` on a text sent by a gesture: while the words,
+    # filled as the text is (waits "$draft.pending"), are not empty, Send waits for them to empty, a few seconds at most,
+    # then submits the original action and fence; if they never empty it sends nothing and says so; the words stay
+    # the second words name what is awaited, as Send says it ("Waiting for the capture…"); an attachment if unsaid
+    m = re.fullmatch(r'"([^"]*)"(?:\s+"([^"$]*)")?', val.strip())
+    if not m or not m.group(1).strip():
+        raise LensRefusal(f'line {n}: `waits "<words>" ["<what>"]` (Send waits while the words are not empty: waits "$draft.pending" "capture"); got {p!r}')
+    node["waits"] = m.group(1)
+    if m.group(2) and m.group(2).strip():
+        node["waits_for"] = m.group(2).strip()
+
+
 def _w_commit(node, p, val, n, env):
     # 14 Oct: `commit enter only` (or ctrl-enter only): the key sends and nothing else does; leaving the text keeps the
     # draft. For a message, which is an act toward someone; an edit of words already there is saved on leaving too
@@ -2052,6 +2065,7 @@ WORDS = {
     "page": (PAGE_WORDS, _w_page),
     "live": ("live clock|date|until [ring]", _w_live),
     "light": ('light "<passages>"', _w_light),
+    "waits": ('waits "<words>"', _w_waits),
     "peek": ("peek [lines]", _w_peek),
     "carry": ("carry", _w_carry),
     "partition": ("partition <prop> min <width> <height> gap <pixels> [focus <prop>]", _w_partition),
@@ -2157,7 +2171,7 @@ def parse(src, roles=None, style=None):
         node = {"name": name, "kids": [], "line": n, "layout": None, "role": None, "role_when": [], "text": None, "clamp": None,
                 "of": None, "over": None, "each": None, "at": None, "on": [], "lens": None, "only": None, "props": [],
                 "the": None, "as": None, "let": [], "capture": {}, "src": "", "words": [], "carry": False, "by": None, "run": None,
-                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "tip": None, "plain": False, "peek": False, "marks": False, "ids": False, "arrows": False, "caret": None, "picture": False, "markdown": False, "media": False, "page": None, "light": None, "live": None, "count": None}
+                "tracks": None, "gap": None, "scroll": None, "fold": False, "measure": None, "wrap": None, "lines": None, "share": None, "hint": None, "tip": None, "plain": False, "peek": False, "marks": False, "ids": False, "arrows": False, "caret": None, "picture": False, "markdown": False, "media": False, "page": None, "light": None, "waits": None, "live": None, "count": None}
         last = None
         for p in [p.strip() for p in _outside_quotes(rest, ", ") if p.strip()]:
             word, _, val = p.partition(" ")
@@ -2200,7 +2214,7 @@ def parse(src, roles=None, style=None):
         for wd in ("gap", "scroll", "fold", "measure", "arrows", "remember"):
             if k.get(wd) not in (None, False) and not k["layout"]:
                 raise LensRefusal(f"line {k['line']}: `{wd}` is a frame word; this part has no layout (column, row, free, grid)")
-        for wd in ("wrap", "lines", "hint", "commit", "light", "live"):
+        for wd in ("wrap", "lines", "hint", "commit", "light", "live", "waits"):
             if k.get(wd) is not None and k["text"] is None:
                 raise LensRefusal(f"line {k['line']}: `{'verbatim' if wd == 'wrap' else wd}` is a text word; this part prints no text")
         if k["picture"] and (k["text"] is None or any(a["on"] == "edit" for a in k["on"])):
@@ -2814,6 +2828,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
             bits.append("live " + n["live"])
         if n.get("light"):
             bits.append("light " + str(len([x for x in str(n["light"]).split(chr(10)) if x.strip()])))
+        if n.get("waits") is not None and n.get("text") is not None:     # a10486: what Send would wait on now
+            bits.append(f'waits "{str(n["waits"]).strip()}"' + (f' for the {n["waits_for"]}' if n.get("waits_for") else ""))
         if n.get("markdown"):
             wl = n.get("wikilinks") or {}
             bits.append("markdown" + (f" · links {sum(1 for v in wl.values() if v.get('id'))} of {len(wl)}" if wl else ""))
@@ -3078,6 +3094,10 @@ def emit(node):
             paint["commit"] = node.get("commit") or ("enter" if (not node.get("lines") or mx == 1) else "ctrl-enter")
             if node.get("commit_only"):
                 paint["commit_only"] = True
+            if node.get("waits") is not None:     # a10486: filled; "" is nothing to wait for
+                paint["waits"] = str(node["waits"]).strip()
+                if node.get("waits_for"):
+                    paint["waits_for"] = node["waits_for"]
             if node.get("caret"):
                 paint["caret"] = list(node["caret"])
         if "click" in ons:

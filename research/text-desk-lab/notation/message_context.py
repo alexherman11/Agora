@@ -319,9 +319,10 @@ def _durable_append(line, world, new_events):
         return line
     words, pairs = parsed
     captures = dict(pairs)["captures"]
+    current = captures == "current"
     _need(
         re.fullmatch(r"[as]\d+", words[2])
-        and all(CAP_ID.fullmatch(cid) for cid in captures.split()),
+        and (current or all(CAP_ID.fullmatch(cid) for cid in captures.split())),
         "cannot record capture append without one literal native chat and capture ids",
     )
     target = world.subject_of(words[2])
@@ -334,10 +335,13 @@ def _durable_append(line, world, new_events):
         subject, created = world.find_line(mid)
         if subject and subject["id"] == target and created.get("ev") == event.get("id"):
             stored = (created.get("fields") or {}).get("context", "")
+            if current and not stored:
+                matches.append("")
+                continue
             if not isinstance(stored, str) or not stored.lstrip().startswith("{"):
                 continue
             stored = _stored(stored)
-            if {capture["id"] for capture in json.loads(stored)["captures"]} == expected:
+            if current or {capture["id"] for capture in json.loads(stored)["captures"]} == expected:
                 matches.append(stored)
     _need(len(matches) == 1, "cannot record capture append without one durable created context")
 
@@ -349,7 +353,7 @@ def _durable_append(line, world, new_events):
     return " ".join(
         words[:3]
         + [
-            ("context" if key == "captures" else key)
+            ("context" if key == "captures" and matches[0] else key)
             + "="
             + quote(matches[0] if key == "captures" else value)
             for key, value in pairs

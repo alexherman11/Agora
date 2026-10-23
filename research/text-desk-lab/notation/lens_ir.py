@@ -345,7 +345,7 @@ def _static(node, irs, memo):
     if got is not None:
         return got
     em, b = node["emit"], node["bind"]
-    words = [em.get("text"), em.get("light"), em.get("remember"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
+    words = [em.get("text"), em.get("light"), em.get("waits"), em.get("remember"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
              *(em.get("tip") or ()), em.get("share"),
              "$" + em["resize"][0] if em.get("resize") else None]
     if em.get("partition"):
@@ -838,6 +838,22 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 lt = em["light"]
                 out["light"] = (S._fill_text(lt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in lt
                                 else S._fill(lt, fill_ctx, track))
+            if em.get("waits"):              # a10486: what Send waits on, filled as the words are
+                # Wait status is presentation, never permission or an action
+                # value. Keep its cache dependency (_static), but not a gesture
+                # fence that would stale merely because the wait completed.
+                from copy import deepcopy
+                saved_track, saved_cb = deepcopy(track), list(cb)
+                wt = em["waits"]
+                try:
+                    out["waits"] = (S._fill_text(wt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in wt
+                                    else S._fill(wt, fill_ctx, track))
+                finally:
+                    wait_bad = set(track["bad"]) - set(saved_track["bad"])
+                    track.clear()
+                    track.update(saved_track)
+                    track["bad"].update(wait_bad)
+                    cb[:] = saved_cb
             if em.get("markdown") and "[[" in (out["text"] or ""):     # a5820: what each [[wikilink]] names, read now
                 out["wikilinks"] = S.wikilinks_of(w, out["text"], acc.thing)
             # a6109: an id in words that are only read is drawn as the name of what it names. Not recorded as a read:
